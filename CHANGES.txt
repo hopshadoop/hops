@@ -20,6 +20,9 @@ Trunk (unreleased changes)
     MAPREDUCE-817. Add a cache for retired jobs with minimal job info and 
     provide a way to access history file url. (sharad)
 
+    MAPREDUCE-711. Moved Distributed Cache from Common to Map/Reduce
+    project. (Vinod Kumar Vavilapalli via yhemanth)
+
   NEW FEATURES
 
     MAPREDUCE-706. Support for FIFO pools in the fair scheduler.
