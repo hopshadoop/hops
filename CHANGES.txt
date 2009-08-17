@@ -403,3 +403,5 @@ Trunk (unreleased changes)
     MAPREDUCE-877. Added avro as a dependency to contrib ivy settings.
     (Tsz Wo (Nicholas) Sze via yhemanth)
 
+    MAPREDUCE-852. In build.xml, remove the Main-Class, which is incorrectly
+    set in tools, and rename the target "tools-jar" to "tools".  (szetszwo)
