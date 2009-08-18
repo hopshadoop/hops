@@ -405,3 +405,7 @@ Trunk (unreleased changes)
 
     MAPREDUCE-852. In build.xml, remove the Main-Class, which is incorrectly
     set in tools, and rename the target "tools-jar" to "tools".  (szetszwo)
+
+    MAPREDUCE-773. Sends progress reports for compressed gzip inputs in maps.
+    Fixes a native direct buffer leak in LineRecordReader classes.
+    (Hong Tang and ddas)
