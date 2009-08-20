@@ -150,7 +150,9 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   final static FsPermission SYSTEM_FILE_PERMISSION =
     FsPermission.createImmutable((short) 0700); // rwx------
   
-  private static Clock clock;
+  private static Clock clock = null;
+  
+  static final Clock DEFAULT_CLOCK = new Clock();
 
   /**
    * A client tried to submit a job before the Job Tracker was ready.
@@ -181,8 +183,13 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
 
   public static final Log LOG = LogFactory.getLog(JobTracker.class);
     
+  /**
+   * Returns JobTracker's clock. Note that the correct clock implementation will
+   * be obtained only when the JobTracker is initialized. If the JobTracker is
+   * not initialized then the default clock i.e {@link Clock} is returned. 
+   */
   static Clock getClock() {
-    return clock;
+    return clock == null ? DEFAULT_CLOCK : clock;
   }
   
   /**
@@ -198,15 +205,20 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   public static JobTracker startTracker(JobConf conf
                                         ) throws IOException,
                                                  InterruptedException {
-    return startTracker(conf, new Clock());
+    return startTracker(conf, DEFAULT_CLOCK);
   }
 
   static JobTracker startTracker(JobConf conf, Clock clock) 
   throws IOException, InterruptedException {
+    return startTracker(conf, clock, generateNewIdentifier());
+  }
+
+  static JobTracker startTracker(JobConf conf, Clock clock, String identifier) 
+  throws IOException, InterruptedException {
     JobTracker result = null;
     while (true) {
       try {
-        result = new JobTracker(conf, clock);
+        result = new JobTracker(conf, clock, identifier);
         result.taskScheduler.setTaskTrackerManager(result);
         break;
       } catch (VersionMismatch e) {
@@ -1104,6 +1116,9 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
           hasUpdates = true;
           LOG.info("Calling init from RM for job " + jip.getJobID().toString());
           initJob(jip);
+          if (!jip.inited()) {
+            throw new IOException("Failed to initialize job " + jip.getJobID());
+          }
         }
       }
       
@@ -1832,8 +1847,13 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    * Start the JobTracker process, listen on the indicated port
    */
   JobTracker(JobConf conf, Clock clock) throws IOException, InterruptedException {
+    this(conf, clock, generateNewIdentifier());
+  }
+
+  JobTracker(JobConf conf, Clock newClock, String jobtrackerIndentifier) 
+  throws IOException, InterruptedException {
     // find the owner of the process
-    this.clock = clock;
+    clock = newClock;
     try {
       mrOwner = UnixUserGroupInformation.login(conf);
     } catch (LoginException e) {
@@ -1928,7 +1948,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     infoServer.addServlet("reducegraph", "/taskgraph", TaskGraphServlet.class);
     infoServer.start();
     
-    trackerIdentifier = getDateFormat().format(new Date());
+    this.trackerIdentifier = jobtrackerIndentifier;
 
     // Initialize instrumentation
     JobTrackerInstrumentation tmp;
@@ -2037,6 +2057,10 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     return new SimpleDateFormat("yyyyMMddHHmm");
   }
 
+  private static String generateNewIdentifier() {
+    return getDateFormat().format(new Date());
+  }
+  
   static boolean validateIdentifier(String id) {
     try {
       // the jobtracker id should be 'date' parseable
