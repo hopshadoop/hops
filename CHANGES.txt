@@ -213,7 +213,7 @@ Trunk (unreleased changes)
       deprecated mapred.child.ulimit
     (acmurthy)
 
-    MAPREDUCE-157. Remove the dependence on the CLI 2.0 snapshot.
+    MAPREDUCE-767. Remove the dependence on the CLI 2.0 snapshot.
     (Amar Kamat via omalley)
 
   BUG FIXES
