@@ -409,3 +409,7 @@ Trunk (unreleased changes)
     MAPREDUCE-773. Sends progress reports for compressed gzip inputs in maps.
     Fixes a native direct buffer leak in LineRecordReader classes.
     (Hong Tang and ddas)
+
+    MAPREDUCE-832. Reduce number of warning messages printed when
+    deprecated memory variables are used. (Rahul Kumar Singh via yhemanth)
+
