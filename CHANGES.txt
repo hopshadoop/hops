@@ -221,6 +221,9 @@ Trunk (unreleased changes)
     MAPREDUCE-870. Remove the job retire thread and the associated 
     config parameters. (sharad)
 
+    MAPREDUCE-749. Make Sqoop unit tests more Hudson-friendly.
+    (Aaron Kimball via tomwhite)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 
