@@ -949,9 +949,16 @@ public class JobClient extends Configured implements MRConstants, Tool  {
    */
   public static boolean isJobDirValid(Path jobDirPath, FileSystem fs) 
   throws IOException {
-    FileStatus[] contents = fs.listStatus(jobDirPath);
+    FileStatus[] contents = null;
+    
+    try {
+      contents = fs.listStatus(jobDirPath);
+    } catch(FileNotFoundException fnfe) {
+      return false;
+    }
+    
     int matchCount = 0;
-    if (contents != null && contents.length >=2) {
+    if (contents.length >=2) {
       for (FileStatus status : contents) {
         if ("job.xml".equals(status.getPath().getName())) {
           ++matchCount;
