@@ -218,6 +218,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-712. Minor efficiency tweaks to RandomTextWriter. (cdouglas)
 
+    MAPREDUCE-870. Remove the job retire thread and the associated 
+    config parameters. (sharad)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 

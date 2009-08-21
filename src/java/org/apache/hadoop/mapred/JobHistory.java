@@ -188,6 +188,9 @@ public class JobHistory {
     }
 
     void moveToDone(final JobID id) {
+      if (disableHistory) {
+        return;
+      }
       final List<Path> paths = new ArrayList<Path>();
       final Path historyFile = fileManager.getHistoryFile(id);
       if (historyFile == null) {
@@ -218,19 +221,18 @@ public class JobHistory {
                     new FsPermission(HISTORY_FILE_PERMISSION));
               }
             }
-
-            String historyFileDonePath = null;
-            if (historyFile != null) {
-              historyFileDonePath = new Path(DONE, 
-                  historyFile.getName()).toString();
-            }
-            jobTracker.historyFileCopied(id, historyFileDonePath);
-            
-            //purge the job from the cache
-            fileManager.purgeJob(id);
           } catch (Throwable e) {
             LOG.error("Unable to move history file to DONE folder.", e);
           }
+          String historyFileDonePath = null;
+          if (historyFile != null) {
+            historyFileDonePath = new Path(DONE, 
+                historyFile.getName()).toString();
+          }
+          jobTracker.retireJob(id, historyFileDonePath);
+          
+          //purge the job from the cache
+          fileManager.purgeJob(id);
         }
 
       });
