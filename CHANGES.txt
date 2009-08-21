@@ -216,6 +216,8 @@ Trunk (unreleased changes)
     MAPREDUCE-767. Remove the dependence on the CLI 2.0 snapshot.
     (Amar Kamat via omalley)
 
+    MAPREDUCE-712. Minor efficiency tweaks to RandomTextWriter. (cdouglas)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 
