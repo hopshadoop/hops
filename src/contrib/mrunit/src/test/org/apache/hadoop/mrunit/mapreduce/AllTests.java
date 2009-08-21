@@ -15,35 +15,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.mrunit;
 
-import org.apache.hadoop.mrunit.mock.TestMockReporter;
-import org.apache.hadoop.mrunit.mock.TestMockOutputCollector;
+package org.apache.hadoop.mrunit.mapreduce;
 
 import junit.framework.Test;
 import junit.framework.TestSuite;
 
 /**
- * All tests for MRUnit testing device (org.apache.hadoop.mrunit)
- *
+ * All tests for the new 0.20+ mapreduce API versions of the test harness.
  */
 public final class AllTests  {
 
   private AllTests() { }
 
   public static Test suite() {
-    TestSuite suite = new TestSuite("Test for org.apache.hadoop.mrunit");
+    TestSuite suite = new TestSuite("Test for org.apache.hadoop.mrunit.mapreduce");
 
     suite.addTestSuite(TestMapDriver.class);
-    suite.addTestSuite(TestMapReduceDriver.class);
-    suite.addTestSuite(TestMockReporter.class);
-    suite.addTestSuite(TestMockOutputCollector.class);
     suite.addTestSuite(TestReduceDriver.class);
-    suite.addTestSuite(TestTestDriver.class);
-    suite.addTestSuite(TestExample.class);
+    suite.addTestSuite(TestMapReduceDriver.class);
 
-    suite.addTest(org.apache.hadoop.mrunit.types.AllTests.suite());
-    suite.addTest(org.apache.hadoop.mrunit.mapreduce.AllTests.suite());
     return suite;
   }
 

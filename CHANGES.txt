@@ -62,6 +62,9 @@ Trunk (unreleased changes)
     MAPREDUCE-814. Provide a way to configure completed job history files 
     to be on HDFS. (sharad)
 
+    MAPREDUCE-800. MRUnit should support the new API. (Aaron Kimball via
+    tomwhite)
+
   IMPROVEMENTS
 
     MAPREDUCE-816. Rename "local" mysql import to "direct" in Sqoop.

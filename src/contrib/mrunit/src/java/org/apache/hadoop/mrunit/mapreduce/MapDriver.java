@@ -15,18 +15,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.mrunit;
+
+package org.apache.hadoop.mrunit.mapreduce;
 
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.mapred.Mapper;
-import org.apache.hadoop.mrunit.mock.MockOutputCollector;
-import org.apache.hadoop.mrunit.mock.MockReporter;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mrunit.MapDriverBase;
+import org.apache.hadoop.mrunit.mapreduce.mock.MockMapContextWrapper;
 import org.apache.hadoop.mrunit.types.Pair;
 
 /**
@@ -50,6 +52,7 @@ public class MapDriver<K1, V1, K2, V2> extends MapDriverBase<K1, V1, K2, V2> {
 
   public MapDriver() {
   }
+
 
   /**
    * Set the Mapper instance to use with this test driver
@@ -163,18 +166,24 @@ public class MapDriver<K1, V1, K2, V2> extends MapDriverBase<K1, V1, K2, V2> {
 
   @Override
   public List<Pair<K2, V2>> run() throws IOException {
-    MockOutputCollector<K2, V2> outputCollector =
-      new MockOutputCollector<K2, V2>();
-    MockReporter reporter = new MockReporter(MockReporter.ReporterType.Mapper);
+    List<Pair<K1, V1>> inputs = new ArrayList<Pair<K1, V1>>();
+    inputs.add(new Pair<K1, V1>(inputKey, inputVal));
 
-    myMapper.map(inputKey, inputVal, outputCollector, reporter);
+    try {
+      MockMapContextWrapper<K1, V1, K2, V2> wrapper = new MockMapContextWrapper();
+      MockMapContextWrapper<K1, V1, K2, V2>.MockMapContext context =
+          wrapper.getMockContext(inputs);
 
-    return outputCollector.getOutputs();
+      myMapper.run(context);
+      return context.getOutputs();
+    } catch (InterruptedException ie) {
+      throw new IOException(ie);
+    }
   }
 
   @Override
   public String toString() {
-    return "MapDriver (" + myMapper + ")";
+    return "MapDriver (0.20+) (" + myMapper + ")";
   }
 }
 

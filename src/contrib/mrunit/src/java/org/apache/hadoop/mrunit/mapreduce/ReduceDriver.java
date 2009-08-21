@@ -15,7 +15,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.mrunit;
+
+package org.apache.hadoop.mrunit.mapreduce;
 
 
 import java.io.IOException;
@@ -25,9 +26,9 @@ import java.util.List;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.mapred.Reducer;
-import org.apache.hadoop.mrunit.mock.MockOutputCollector;
-import org.apache.hadoop.mrunit.mock.MockReporter;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mrunit.ReduceDriverBase;
+import org.apache.hadoop.mrunit.mapreduce.mock.MockReduceContextWrapper;
 import org.apache.hadoop.mrunit.types.Pair;
 
 /**
@@ -170,20 +171,24 @@ public class ReduceDriver<K1, V1, K2, V2> extends ReduceDriverBase<K1, V1, K2, V
 
   @Override
   public List<Pair<K2, V2>> run() throws IOException {
-    MockOutputCollector<K2, V2> outputCollector =
-      new MockOutputCollector<K2, V2>();
-    MockReporter reporter = new MockReporter(MockReporter.ReporterType.Reducer);
+    List<Pair<K1, List<V1>>> inputs = new ArrayList<Pair<K1, List<V1>>>();
+    inputs.add(new Pair<K1, List<V1>>(inputKey, inputValues));
 
-    myReducer.reduce(inputKey, inputValues.iterator(), outputCollector,
-            reporter);
+    try {
+      MockReduceContextWrapper<K1, V1, K2, V2> wrapper = new MockReduceContextWrapper();
+      MockReduceContextWrapper<K1, V1, K2, V2>.MockReduceContext context =
+          wrapper.getMockContext(inputs);
 
-    List<Pair<K2, V2>> outputs = outputCollector.getOutputs();
-    return outputs;
+      myReducer.run(context);
+      return context.getOutputs();
+    } catch (InterruptedException ie) {
+      throw new IOException(ie);
+    }
   }
 
   @Override
   public String toString() {
-    return "ReduceDriver (" + myReducer + ")";
+    return "ReduceDriver (0.20+) (" + myReducer + ")";
   }
 }
 
