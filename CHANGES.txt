@@ -425,3 +425,6 @@ Trunk (unreleased changes)
     memory management parameters are used in configuration.
     (Sreekanth Ramakrishnan via yhemanth)
 
+    MAPREDUCE-818. Fixes Counters#getGroup API. (Amareshwari Sriramadasu 
+    via sharad)
+
