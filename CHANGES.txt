@@ -227,6 +227,9 @@ Trunk (unreleased changes)
     MAPREDUCE-749. Make Sqoop unit tests more Hudson-friendly.
     (Aaron Kimball via tomwhite)
 
+    MAPREDUCE-874. Rename the PiEstimator example to QuasiMonteCarlo.
+    (szetszwo)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 
