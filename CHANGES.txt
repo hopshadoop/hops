@@ -421,3 +421,7 @@ Trunk (unreleased changes)
     MAPREDUCE-745. Fixes a testcase problem to do with generation of JobTracker
     IDs. (Amar Kamat via ddas)
 
+    MAPREDUCE-834. Enables memory management on tasktrackers when old
+    memory management parameters are used in configuration.
+    (Sreekanth Ramakrishnan via yhemanth)
+
