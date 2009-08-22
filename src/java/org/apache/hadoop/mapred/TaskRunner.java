@@ -42,6 +42,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.TaskTracker.PermissionsHandler;
 import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.log4j.Level;
 
 /** Base class that runs a task in a separate process.  Tasks are run in a
  * separate process in order to isolate the map/reduce system code from bugs in
@@ -154,6 +155,13 @@ abstract class TaskRunner extends Thread {
     return jobConf.get(JobConf.MAPRED_TASK_ENV);
   }
 
+  /**
+   * Get the log {@link Level} for the child map/reduce tasks.
+   * @param jobConf
+   * @return the log-level for the child map/reduce tasks
+   */
+  public abstract Level getLogLevel(JobConf jobConf);
+  
   @Override
   public final void run() {
     String errorInfo = "Child Error";
@@ -411,7 +419,7 @@ abstract class TaskRunner extends Thread {
     vargs.add("-Dhadoop.log.dir=" + 
         new File(System.getProperty("hadoop.log.dir")
         ).getAbsolutePath());
-    vargs.add("-Dhadoop.root.logger=INFO,TLA");
+    vargs.add("-Dhadoop.root.logger=" + getLogLevel(conf).toString() + ",TLA");
     vargs.add("-Dhadoop.tasklog.taskid=" + taskid);
     vargs.add("-Dhadoop.tasklog.totalLogFileSize=" + logSize);
 

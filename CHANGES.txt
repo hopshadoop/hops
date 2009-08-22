@@ -234,6 +234,12 @@ Trunk (unreleased changes)
     MAPREDUCE-874. Rename the PiEstimator example to QuasiMonteCarlo.
     (szetszwo)
 
+    MAPREDUCE-336. Allow logging level of map/reduce tasks to be configurable. 
+    Configuration changes:
+      add mapred.map.child.log.level 
+      add mapred.reduce.child.log.level 
+    (acmurthy)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 

@@ -43,6 +43,7 @@ import org.apache.hadoop.mapred.lib.KeyFieldBasedComparator;
 import org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Tool;
+import org.apache.log4j.Level;
 
 /** 
  * A map/reduce job configuration.
@@ -304,6 +305,29 @@ public class JobConf extends Configuration {
   public static final String MAPRED_REDUCE_TASK_ENV =
     "mapred.reduce.child.env";
 
+  /**
+   * Configuration key to set the logging {@link Level} for the map task.
+   *
+   * The allowed logging levels are:
+   * OFF, FATAL, ERROR, WARN, INFO, DEBUG, TRACE and ALL.
+   */
+  public static final String MAPRED_MAP_TASK_LOG_LEVEL = 
+    "mapred.map.child.log.level";
+  
+  /**
+   * Configuration key to set the logging {@link Level} for the reduce task.
+   *
+   * The allowed logging levels are:
+   * OFF, FATAL, ERROR, WARN, INFO, DEBUG, TRACE and ALL.
+   */
+  public static final String MAPRED_REDUCE_TASK_LOG_LEVEL = 
+    "mapred.reduce.child.log.level";
+  
+  /**
+   * Default logging level for map/reduce tasks.
+   */
+  public static final Level DEFAULT_LOG_LEVEL = Level.INFO;
+  
   /**
    * Construct a map/reduce job configuration.
    */
