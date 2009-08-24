@@ -249,7 +249,7 @@ public class StreamJob implements Tool {
     if (cmdLine != null){
       verbose_ =  cmdLine.hasOption("verbose");
       detailedUsage_ = cmdLine.hasOption("info");
-      debug_ = cmdLine.hasOption("-debug")? debug_ + 1 : debug_;
+      debug_ = cmdLine.hasOption("debug")? debug_ + 1 : debug_;
       
       String[] values = cmdLine.getOptionValues("input");
       if (values != null && values.length > 0) {
@@ -309,7 +309,7 @@ public class StreamJob implements Tool {
       if (null != jobconf && jobconf.length > 0){
         LOG.warn("-jobconf option is deprecated, please use -D instead.");
         for(String s : jobconf){
-          String[] parts = s.split("=",2);
+          String[] parts = s.split("=", 2);
           config_.set(parts[0], parts[1]);
         }
       }
