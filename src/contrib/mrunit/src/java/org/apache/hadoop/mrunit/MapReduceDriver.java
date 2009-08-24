@@ -41,7 +41,7 @@ import org.apache.hadoop.mrunit.types.Pair;
  * inputs. By calling runTest(), the harness will deliver the input to the
  * Mapper, feed the intermediate results to the Reducer (without checking
  * them), and will check the Reducer's outputs against the expected results.
- * This is designed to handle a single (k, v)* -> (k, v)* case from the
+ * This is designed to handle the (k, v)* -> (k, v)* case from the
  * Mapper/Reducer pair, representing a single unit test.
  *
  * If a combiner is specified, then it will be run exactly once after

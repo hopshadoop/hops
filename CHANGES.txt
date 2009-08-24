@@ -72,6 +72,9 @@ Trunk (unreleased changes)
     MAPREDUCE-800. MRUnit should support the new API. (Aaron Kimball via
     tomwhite)
 
+    MAPREDUCE-798. MRUnit should be able to test a succession of MapReduce
+    passes. (Aaron Kimball via tomwhite)
+
   IMPROVEMENTS
 
     MAPREDUCE-816. Rename "local" mysql import to "direct" in Sqoop.

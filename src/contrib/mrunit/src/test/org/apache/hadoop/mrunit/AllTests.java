@@ -36,6 +36,7 @@ public final class AllTests  {
 
     suite.addTestSuite(TestMapDriver.class);
     suite.addTestSuite(TestMapReduceDriver.class);
+    suite.addTestSuite(TestPipelineMapReduceDriver.class);
     suite.addTestSuite(TestMockReporter.class);
     suite.addTestSuite(TestMockOutputCollector.class);
     suite.addTestSuite(TestReduceDriver.class);
