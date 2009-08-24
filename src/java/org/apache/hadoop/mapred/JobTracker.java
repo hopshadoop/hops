@@ -188,19 +188,18 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    * @param conf configuration for the JobTracker.
    * @throws IOException
    */
-  public static JobTracker startTracker(JobConf conf
-                                        ) throws IOException,
-                                                 InterruptedException {
+  public static JobTracker startTracker(JobConf conf) 
+  throws IOException, InterruptedException, LoginException {
     return startTracker(conf, DEFAULT_CLOCK);
   }
 
   static JobTracker startTracker(JobConf conf, Clock clock) 
-  throws IOException, InterruptedException {
+  throws IOException, InterruptedException, LoginException {
     return startTracker(conf, clock, generateNewIdentifier());
   }
 
   static JobTracker startTracker(JobConf conf, Clock clock, String identifier) 
-  throws IOException, InterruptedException {
+  throws IOException, InterruptedException, LoginException {
     JobTracker result = null;
     while (true) {
       try {
@@ -213,6 +212,10 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
         throw e;
       } catch (UnknownHostException e) {
         throw e;
+      } catch (AccessControlException ace) {
+        // in case of jobtracker not having right access
+        // bail out
+        throw ace;
       } catch (IOException e) {
         LOG.warn("Error starting tracker: " + 
                  StringUtils.stringifyException(e));
@@ -1784,25 +1787,23 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
 
   private QueueManager queueManager;
 
-  JobTracker(JobConf conf) throws IOException,InterruptedException{
+  JobTracker(JobConf conf) 
+  throws IOException,InterruptedException, LoginException {
     this(conf, new Clock());
   }
   /**
    * Start the JobTracker process, listen on the indicated port
    */
-  JobTracker(JobConf conf, Clock clock) throws IOException, InterruptedException {
+  JobTracker(JobConf conf, Clock clock) 
+  throws IOException, InterruptedException, LoginException {
     this(conf, clock, generateNewIdentifier());
   }
 
   JobTracker(JobConf conf, Clock newClock, String jobtrackerIndentifier) 
-  throws IOException, InterruptedException {
+  throws IOException, InterruptedException, LoginException {
     // find the owner of the process
     clock = newClock;
-    try {
-      mrOwner = UnixUserGroupInformation.login(conf);
-    } catch (LoginException e) {
-      throw new IOException(StringUtils.stringifyException(e));
-    }
+    mrOwner = UnixUserGroupInformation.login(conf);
     supergroup = conf.get("mapred.permissions.supergroup", "supergroup");
     LOG.info("Starting jobtracker with owner as " + mrOwner.getUserName() 
              + " and supergroup as " + supergroup);
@@ -1918,7 +1919,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     // start the recovery manager
     recoveryManager = new RecoveryManager();
     
-    while (true) {
+    while (!Thread.currentThread().isInterrupted()) {
       try {
         // if we haven't contacted the namenode go ahead and do it
         if (fs == null) {
@@ -1964,15 +1965,21 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
           break;
         }
         LOG.error("Mkdirs failed to create " + systemDir);
+      } catch (AccessControlException ace) {
+        LOG.warn("Failed to operate on mapred.system.dir (" + systemDir 
+                 + ") because of permissions.");
+        LOG.warn("Manually delete the mapred.system.dir (" + systemDir 
+                 + ") and then start the JobTracker.");
+        LOG.warn("Bailing out ... ");
+        throw ace;
       } catch (IOException ie) {
-        if (ie instanceof RemoteException && 
-            AccessControlException.class.getName().equals(
-                ((RemoteException)ie).getClassName())) {
-          throw ie;
-        }
         LOG.info("problem cleaning system directory: " + systemDir, ie);
       }
       Thread.sleep(FS_ACCESS_RETRY_PERIOD);
+    }
+    
+    if (Thread.currentThread().isInterrupted()) {
+      throw new InterruptedException();
     }
     
     // Same with 'localDir' except it's always on the local disk.

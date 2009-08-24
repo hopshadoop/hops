@@ -580,11 +580,20 @@ public class MiniMRCluster {
    * Start the jobtracker.
    */
   public void startJobTracker() {
+    startJobTracker(true);
+  }
+
+  public void startJobTracker(boolean wait) {
     //  Create the JobTracker
     jobTracker = new JobTrackerRunner(conf, clock);
     jobTrackerThread = new Thread(jobTracker);
         
     jobTrackerThread.start();
+
+    if (!wait) {
+      return;
+    }
+
     while (jobTracker.isActive() && !jobTracker.isUp()) {
       try {                                     // let daemons get started
         Thread.sleep(1000);
