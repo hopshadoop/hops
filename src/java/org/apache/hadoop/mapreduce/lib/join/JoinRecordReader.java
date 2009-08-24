@@ -16,28 +16,24 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.mapred.join;
+package org.apache.hadoop.mapreduce.lib.join;
 
 import java.io.IOException;
 import java.util.PriorityQueue;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.io.WritableComparator;
-import org.apache.hadoop.io.WritableUtils;
-import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.util.ReflectionUtils;
 
 /**
  * Base class for Composite joins returning Tuples of arbitrary Writables.
- * @deprecated Use 
- * {@link org.apache.hadoop.mapreduce.lib.join.JoinRecordReader} instead
  */
-@Deprecated
-public abstract class JoinRecordReader<K extends WritableComparable>
-    extends CompositeRecordReader<K,Writable,TupleWritable>
-    implements ComposableRecordReader<K,TupleWritable> {
+public abstract class JoinRecordReader<K extends WritableComparable<?>>
+    extends CompositeRecordReader<K,Writable,TupleWritable> {
 
-  public JoinRecordReader(int id, JobConf conf, int capacity,
+  public JoinRecordReader(int id, Configuration conf, int capacity,
       Class<? extends WritableComparator> cmpcl) throws IOException {
     super(id, capacity, cmpcl);
     setConf(conf);
@@ -47,19 +43,27 @@ public abstract class JoinRecordReader<K extends WritableComparable>
    * Emit the next set of key, value pairs as defined by the child
    * RecordReaders and operation associated with this composite RR.
    */
-  public boolean next(K key, TupleWritable value) throws IOException {
+  public boolean nextKeyValue() 
+      throws IOException, InterruptedException {
+    if (key == null) {
+      key = createKey();
+    }
     if (jc.flush(value)) {
-      WritableUtils.cloneInto(key, jc.key());
+      ReflectionUtils.copy(conf, jc.key(), key);
       return true;
     }
     jc.clear();
+    if (value == null) {
+      value = createValue();
+    }
+    final PriorityQueue<ComposableRecordReader<K,?>> q = 
+            getRecordReaderQueue();
     K iterkey = createKey();
-    final PriorityQueue<ComposableRecordReader<K,?>> q = getRecordReaderQueue();
-    while (!q.isEmpty()) {
+    while (q != null && !q.isEmpty()) {
       fillJoinCollector(iterkey);
       jc.reset(iterkey);
       if (jc.flush(value)) {
-        WritableUtils.cloneInto(key, jc.key());
+        ReflectionUtils.copy(conf, jc.key(), key);
         return true;
       }
       jc.clear();
@@ -67,9 +71,8 @@ public abstract class JoinRecordReader<K extends WritableComparable>
     return false;
   }
 
-  /** {@inheritDoc} */
   public TupleWritable createValue() {
-    return createInternalValue();
+    return createTupleWritable();
   }
 
   /**

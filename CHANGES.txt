@@ -243,6 +243,9 @@ Trunk (unreleased changes)
       add mapred.reduce.child.log.level 
     (acmurthy)
 
+    MAPREDUCE-355. Update mapred.join package to use the new API. (Amareshwari
+    Sriramadasu via cdouglas)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 

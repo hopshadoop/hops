@@ -16,39 +16,30 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.mapred.join;
+package org.apache.hadoop.mapreduce.lib.join;
 
 import java.io.IOException;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.io.WritableComparator;
-import org.apache.hadoop.mapred.JobConf;
 
 /**
- * Full inner join.
- * 
- * @deprecated Use 
- * {@link org.apache.hadoop.mapreduce.lib.join.InnerJoinRecordReader} instead.
+ * Full outer join.
  */
-@Deprecated
-public class InnerJoinRecordReader<K extends WritableComparable>
+public class OuterJoinRecordReader<K extends WritableComparable<?>>
     extends JoinRecordReader<K> {
 
-  InnerJoinRecordReader(int id, JobConf conf, int capacity,
+  OuterJoinRecordReader(int id, Configuration conf, int capacity,
       Class<? extends WritableComparator> cmpcl) throws IOException {
     super(id, conf, capacity, cmpcl);
   }
 
   /**
-   * Return true iff the tuple is full (all data sources contain this key).
+   * Emit everything from the collector.
    */
   protected boolean combine(Object[] srcs, TupleWritable dst) {
     assert srcs.length == dst.size();
-    for (int i = 0; i < srcs.length; ++i) {
-      if (!dst.has(i)) {
-        return false;
-      }
-    }
     return true;
   }
 }

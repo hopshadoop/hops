@@ -16,35 +16,30 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.mapred.join;
+package org.apache.hadoop.mapreduce.lib.join;
 
 import java.io.IOException;
 import java.util.PriorityQueue;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.io.WritableComparator;
-import org.apache.hadoop.io.WritableUtils;
+import org.apache.hadoop.mapreduce.InputSplit;
+import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.util.ReflectionUtils;
-import org.apache.hadoop.mapred.JobConf;
-import org.apache.hadoop.mapred.RecordReader;
 
 /**
  * Base class for Composite join returning values derived from multiple
  * sources, but generally not tuples.
- * @deprecated Use 
- * {@link org.apache.hadoop.mapreduce.lib.join.MultiFilterRecordReader} instead
  */
-@Deprecated
-public abstract class MultiFilterRecordReader<K extends WritableComparable,
+public abstract class MultiFilterRecordReader<K extends WritableComparable<?>,
                                               V extends Writable>
-    extends CompositeRecordReader<K,V,V>
-    implements ComposableRecordReader<K,V> {
+    extends CompositeRecordReader<K,V,V> {
 
-  private Class<? extends Writable> valueclass;
-  private TupleWritable ivalue;
+  private TupleWritable ivalue = null;
 
-  public MultiFilterRecordReader(int id, JobConf conf, int capacity,
+  public MultiFilterRecordReader(int id, Configuration conf, int capacity,
       Class<? extends WritableComparator> cmpcl) throws IOException {
     super(id, capacity, cmpcl);
     setConf(conf);
@@ -68,21 +63,31 @@ public abstract class MultiFilterRecordReader<K extends WritableComparable,
   }
 
   /** {@inheritDoc} */
-  public boolean next(K key, V value) throws IOException {
+  public boolean nextKeyValue() throws IOException, InterruptedException {
+    if (key == null) {
+      key = createKey();
+    }
+    if (value == null) {
+      value = createValue();
+    }
     if (jc.flush(ivalue)) {
-      WritableUtils.cloneInto(key, jc.key());
-      WritableUtils.cloneInto(value, emit(ivalue));
+      ReflectionUtils.copy(conf, jc.key(), key);
+      ReflectionUtils.copy(conf, emit(ivalue), value);
       return true;
     }
+    if (ivalue == null) {
+      ivalue = createTupleWritable();
+    }
     jc.clear();
+    final PriorityQueue<ComposableRecordReader<K,?>> q = 
+            getRecordReaderQueue();
     K iterkey = createKey();
-    final PriorityQueue<ComposableRecordReader<K,?>> q = getRecordReaderQueue();
-    while (!q.isEmpty()) {
+    while (q != null && !q.isEmpty()) {
       fillJoinCollector(iterkey);
       jc.reset(iterkey);
       if (jc.flush(ivalue)) {
-        WritableUtils.cloneInto(key, jc.key());
-        WritableUtils.cloneInto(value, emit(ivalue));
+        ReflectionUtils.copy(conf, jc.key(), key);
+        ReflectionUtils.copy(conf, emit(ivalue), value);
         return true;
       }
       jc.clear();
@@ -90,20 +95,10 @@ public abstract class MultiFilterRecordReader<K extends WritableComparable,
     return false;
   }
 
-  /** {@inheritDoc} */
-  @SuppressWarnings("unchecked") // Explicit check for value class agreement
-  public V createValue() {
-    if (null == valueclass) {
-      final Class<?> cls = kids[0].createValue().getClass();
-      for (RecordReader<K,? extends V> rr : kids) {
-        if (!cls.equals(rr.createValue().getClass())) {
-          throw new ClassCastException("Child value classes fail to agree");
-        }
-      }
-      valueclass = cls.asSubclass(Writable.class);
-      ivalue = createInternalValue();
-    }
-    return (V) ReflectionUtils.newInstance(valueclass, null);
+  @SuppressWarnings("unchecked")
+  public void initialize(InputSplit split, TaskAttemptContext context) 
+      throws IOException, InterruptedException {
+    super.initialize(split, context);
   }
 
   /**
@@ -127,13 +122,13 @@ public abstract class MultiFilterRecordReader<K extends WritableComparable,
     public boolean next(V val) throws IOException {
       boolean ret;
       if (ret = jc.flush(ivalue)) {
-        WritableUtils.cloneInto(val, emit(ivalue));
+        ReflectionUtils.copy(getConf(), emit(ivalue), val);
       }
       return ret;
     }
 
     public boolean replay(V val) throws IOException {
-      WritableUtils.cloneInto(val, emit(ivalue));
+      ReflectionUtils.copy(getConf(), emit(ivalue), val);
       return true;
     }
 

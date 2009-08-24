@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.mapred.join;
+package org.apache.hadoop.mapreduce.lib.join;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -24,40 +24,42 @@ import java.util.PriorityQueue;
 
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.io.WritableComparator;
-import org.apache.hadoop.io.WritableUtils;
-import org.apache.hadoop.mapred.RecordReader;
+import org.apache.hadoop.mapreduce.InputSplit;
+import org.apache.hadoop.mapreduce.RecordReader;
+import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.util.ReflectionUtils;
 
 /**
  * A RecordReader that can effect joins of RecordReaders sharing a common key
  * type and partitioning.
- * 
- * @deprecated Use 
- * {@link org.apache.hadoop.mapreduce.lib.join.CompositeRecordReader} instead
  */
-@Deprecated
 public abstract class CompositeRecordReader<
-    K extends WritableComparable, // key type
-    V extends Writable,           // accepts RecordReader<K,V> as children
-    X extends Writable>           // emits Writables of this type
+    K extends WritableComparable<?>, // key type
+    V extends Writable,  // accepts RecordReader<K,V> as children
+    X extends Writable>  // emits Writables of this type
+    extends ComposableRecordReader<K, X>
     implements Configurable {
 
-
   private int id;
-  private Configuration conf;
+  protected Configuration conf;
   private final ResetableIterator<X> EMPTY = new ResetableIterator.EMPTY<X>();
 
   private WritableComparator cmp;
-  private Class<? extends WritableComparable> keyclass;
+  @SuppressWarnings("unchecked")
+  protected Class<? extends WritableComparable> keyclass = null;
   private PriorityQueue<ComposableRecordReader<K,?>> q;
 
   protected final JoinCollector jc;
   protected final ComposableRecordReader<K,? extends V>[] kids;
 
   protected abstract boolean combine(Object[] srcs, TupleWritable value);
+  
+  protected K key;
+  protected X value;
 
   /**
    * Create a RecordReader with <tt>capacity</tt> children to position
@@ -74,15 +76,54 @@ public abstract class CompositeRecordReader<
     if (null != cmpcl) {
       cmp = ReflectionUtils.newInstance(cmpcl, null);
       q = new PriorityQueue<ComposableRecordReader<K,?>>(3,
-          new Comparator<ComposableRecordReader<K,?>>() {
-            public int compare(ComposableRecordReader<K,?> o1,
-                               ComposableRecordReader<K,?> o2) {
-              return cmp.compare(o1.key(), o2.key());
-            }
-          });
+            new Comparator<ComposableRecordReader<K,?>>() {
+              public int compare(ComposableRecordReader<K,?> o1,
+                                 ComposableRecordReader<K,?> o2) {
+                return cmp.compare(o1.key(), o2.key());
+              }
+            });
     }
     jc = new JoinCollector(capacity);
     kids = new ComposableRecordReader[capacity];
+  }
+
+  @SuppressWarnings("unchecked")
+  public void initialize(InputSplit split, TaskAttemptContext context) 
+      throws IOException, InterruptedException {
+    if (kids != null) {
+      for (int i = 0; i < kids.length; ++i) {
+        kids[i].initialize(((CompositeInputSplit)split).get(i), context);
+        if (kids[i].key() == null) {
+          continue;
+        }
+        
+        // get keyclass
+        if (keyclass == null) {
+          keyclass = kids[i].createKey().getClass().
+            asSubclass(WritableComparable.class);
+        }
+        // create priority queue
+        if (null == q) {
+          cmp = WritableComparator.get(keyclass);
+          q = new PriorityQueue<ComposableRecordReader<K,?>>(3,
+                new Comparator<ComposableRecordReader<K,?>>() {
+                  public int compare(ComposableRecordReader<K,?> o1,
+                                     ComposableRecordReader<K,?> o2) {
+                    return cmp.compare(o1.key(), o2.key());
+                  }
+                });
+        }
+        // Explicit check for key class agreement
+        if (!keyclass.equals(kids[i].key().getClass())) {
+          throw new ClassCastException("Child key classes fail to agree");
+        }
+        
+        // add the kid to priority queue if it has any elements
+        if (kids[i].hasNext()) {
+          q.add(kids[i]);
+        }
+      }
+    }
   }
 
   /**
@@ -127,21 +168,9 @@ public abstract class CompositeRecordReader<
    * entry will appear. Adding RecordReaders with the same id has
    * undefined behavior.
    */
-  public void add(ComposableRecordReader<K,? extends V> rr) throws IOException {
+  public void add(ComposableRecordReader<K,? extends V> rr) 
+      throws IOException, InterruptedException {
     kids[rr.id()] = rr;
-    if (null == q) {
-      cmp = WritableComparator.get(rr.createKey().getClass());
-      q = new PriorityQueue<ComposableRecordReader<K,?>>(3,
-          new Comparator<ComposableRecordReader<K,?>>() {
-            public int compare(ComposableRecordReader<K,?> o1,
-                               ComposableRecordReader<K,?> o2) {
-              return cmp.compare(o1.key(), o2.key());
-            }
-          });
-    }
-    if (rr.hasNext()) {
-      q.add(rr);
-    }
   }
 
   /**
@@ -150,7 +179,7 @@ public abstract class CompositeRecordReader<
    * one or more child RR contain duplicate keys, this will emit the cross
    * product of the associated values until exhausted.
    */
-  class JoinCollector {
+  public class JoinCollector {
     private K key;
     private ResetableIterator<X>[] iters;
     private int pos = -1;
@@ -212,7 +241,7 @@ public abstract class CompositeRecordReader<
     /**
      * Returns false if exhausted or if reset(K) has not been called.
      */
-    protected boolean hasNext() {
+    public boolean hasNext() {
       return !(pos < 0);
     }
 
@@ -222,7 +251,7 @@ public abstract class CompositeRecordReader<
      * sources s_1...s_n sharing key k, repeated calls to next should yield
      * I x I.
      */
-    @SuppressWarnings("unchecked") // No static typeinfo on Tuples
+    @SuppressWarnings("unchecked") // No static type info on Tuples
     protected boolean next(TupleWritable val) throws IOException {
       if (first) {
         int i = -1;
@@ -325,9 +354,13 @@ public abstract class CompositeRecordReader<
    * Clone the key at the top of this RR into the given object.
    */
   public void key(K key) throws IOException {
-    WritableUtils.cloneInto(key, key());
+    ReflectionUtils.copy(conf, key(), key);
   }
 
+  public K getCurrentKey() {
+    return key;
+  }
+  
   /**
    * Return true if it is possible that this could emit more values.
    */
@@ -338,7 +371,7 @@ public abstract class CompositeRecordReader<
   /**
    * Pass skip key to child RRs.
    */
-  public void skip(K key) throws IOException {
+  public void skip(K key) throws IOException, InterruptedException {
     ArrayList<ComposableRecordReader<K,?>> tmp =
       new ArrayList<ComposableRecordReader<K,?>>();
     while (!q.isEmpty() && cmp.compare(q.peek().key(), key) <= 0) {
@@ -363,8 +396,9 @@ public abstract class CompositeRecordReader<
    * iterator over values it may emit.
    */
   @SuppressWarnings("unchecked") // No values from static EMPTY class
+  @Override
   public void accept(CompositeRecordReader.JoinCollector jc, K key)
-      throws IOException {
+      throws IOException, InterruptedException {
     if (hasNext() && 0 == cmp.compare(key, key())) {
       fillJoinCollector(createKey());
       jc.add(id, getDelegate());
@@ -377,7 +411,8 @@ public abstract class CompositeRecordReader<
    * For all child RRs offering the key provided, obtain an iterator
    * at that position in the JoinCollector.
    */
-  protected void fillJoinCollector(K iterkey) throws IOException {
+  protected void fillJoinCollector(K iterkey) 
+      throws IOException, InterruptedException {
     if (!q.isEmpty()) {
       q.peek().key(iterkey);
       while (0 == cmp.compare(q.peek().key(), iterkey)) {
@@ -401,19 +436,13 @@ public abstract class CompositeRecordReader<
   }
 
   /**
-   * Create a new key value common to all child RRs.
+   * Create a new key common to all child RRs.
    * @throws ClassCastException if key classes differ.
    */
-  @SuppressWarnings("unchecked") // Explicit check for key class agreement
-  public K createKey() {
-    if (null == keyclass) {
-      final Class<?> cls = kids[0].createKey().getClass();
-      for (RecordReader<K,? extends Writable> rr : kids) {
-        if (!cls.equals(rr.createKey().getClass())) {
-          throw new ClassCastException("Child key classes fail to agree");
-        }
-      }
-      keyclass = cls.asSubclass(WritableComparable.class);
+  @SuppressWarnings("unchecked")
+  protected K createKey() {
+    if (keyclass == null || keyclass.equals(NullWritable.class)) {
+      return (K) NullWritable.get();
     }
     return (K) ReflectionUtils.newInstance(keyclass, getConf());
   }
@@ -421,7 +450,7 @@ public abstract class CompositeRecordReader<
   /**
    * Create a value to be used internally for joins.
    */
-  protected TupleWritable createInternalValue() {
+  protected TupleWritable createTupleWritable() {
     Writable[] vals = new Writable[kids.length];
     for (int i = 0; i < vals.length; ++i) {
       vals[i] = kids[i].createValue();
@@ -429,11 +458,10 @@ public abstract class CompositeRecordReader<
     return new TupleWritable(vals);
   }
 
-  /**
-   * Unsupported (returns zero in all cases).
-   */
-  public long getPos() throws IOException {
-    return 0;
+  /** {@inheritDoc} */
+  public X getCurrentValue() 
+      throws IOException, InterruptedException {
+    return value;
   }
 
   /**
@@ -453,11 +481,12 @@ public abstract class CompositeRecordReader<
   /**
    * Report progress as the minimum of all child RR progress.
    */
-  public float getProgress() throws IOException {
+  public float getProgress() throws IOException, InterruptedException {
     float ret = 1.0f;
     for (RecordReader<K,? extends Writable> rr : kids) {
       ret = Math.min(ret, rr.getProgress());
     }
     return ret;
   }
+  
 }

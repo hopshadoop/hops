@@ -16,34 +16,34 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.mapred.join;
+package org.apache.hadoop.mapreduce.lib.join;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.PriorityQueue;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.io.WritableComparator;
-import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.util.ReflectionUtils;
 
 /**
  * Prefer the &quot;rightmost&quot; data source for this key.
  * For example, <tt>override(S1,S2,S3)</tt> will prefer values
  * from S3 over S2, and values from S2 over S1 for all keys
  * emitted from all sources.
- * @deprecated Use 
- * {@link org.apache.hadoop.mapreduce.lib.join.OverrideRecordReader} instead
  */
-@Deprecated
-public class OverrideRecordReader<K extends WritableComparable,
+public class OverrideRecordReader<K extends WritableComparable<?>,
                                   V extends Writable>
     extends MultiFilterRecordReader<K,V> {
 
-  OverrideRecordReader(int id, JobConf conf, int capacity,
+  OverrideRecordReader(int id, Configuration conf, int capacity,
       Class<? extends WritableComparator> cmpcl) throws IOException {
     super(id, conf, capacity, cmpcl);
   }
+  private Class<? extends Writable> valueclass = null;
 
   /**
    * Emit the value with the highest position in the tuple.
@@ -51,6 +51,21 @@ public class OverrideRecordReader<K extends WritableComparable,
   @SuppressWarnings("unchecked") // No static typeinfo on Tuples
   protected V emit(TupleWritable dst) {
     return (V) dst.iterator().next();
+  }
+
+  @SuppressWarnings("unchecked") // Explicit check for value class agreement
+  public V createValue() {
+    if (null == valueclass) {
+      Class<?> cls = kids[kids.length -1].createValue().getClass();
+      for (int i = kids.length -1; cls.equals(NullWritable.class); i--) {
+        cls = kids[i].createValue().getClass();
+      }
+      valueclass = cls.asSubclass(Writable.class);
+    }
+    if (valueclass.equals(NullWritable.class)) {
+      return (V) NullWritable.get();
+    }
+    return (V) ReflectionUtils.newInstance(valueclass, null);
   }
 
   /**
@@ -62,9 +77,11 @@ public class OverrideRecordReader<K extends WritableComparable,
    * n is the cardinality of the cross product of the discarded
    * streams for the given key.
    */
-  protected void fillJoinCollector(K iterkey) throws IOException {
-    final PriorityQueue<ComposableRecordReader<K,?>> q = getRecordReaderQueue();
-    if (!q.isEmpty()) {
+  protected void fillJoinCollector(K iterkey) 
+      throws IOException, InterruptedException {
+    final PriorityQueue<ComposableRecordReader<K,?>> q = 
+      getRecordReaderQueue();
+    if (q != null && !q.isEmpty()) {
       int highpos = -1;
       ArrayList<ComposableRecordReader<K,?>> list =
         new ArrayList<ComposableRecordReader<K,?>>(kids.length);

@@ -16,53 +16,63 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.mapred.join;
+package org.apache.hadoop.mapreduce.lib.join;
 
 import java.io.IOException;
 
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableComparable;
-import org.apache.hadoop.mapred.RecordReader;
+import org.apache.hadoop.mapreduce.RecordReader;
 
 /**
  * Additional operations required of a RecordReader to participate in a join.
- * @deprecated Use 
- * {@link org.apache.hadoop.mapreduce.lib.join.ComposableRecordReader} instead
  */
-@Deprecated
-public interface ComposableRecordReader<K extends WritableComparable,
-                                 V extends Writable>
-    extends RecordReader<K,V>, Comparable<ComposableRecordReader<K,?>> {
+public abstract class ComposableRecordReader<K extends WritableComparable<?>,
+                                             V extends Writable>
+    extends RecordReader<K,V>
+    implements Comparable<ComposableRecordReader<K,?>> {
 
   /**
    * Return the position in the collector this class occupies.
    */
-  int id();
+  abstract int id();
 
   /**
    * Return the key this RecordReader would supply on a call to next(K,V)
    */
-  K key();
+  abstract K key();
 
   /**
    * Clone the key at the head of this RecordReader into the object provided.
    */
-  void key(K key) throws IOException;
+  abstract void key(K key) throws IOException;
 
+  /**
+   * Create instance of key.
+   */
+  abstract K createKey();
+  
+  /**
+   * Create instance of value.
+   */
+  abstract V createValue();
+  
   /**
    * Returns true if the stream is not empty, but provides no guarantee that
    * a call to next(K,V) will succeed.
    */
-  boolean hasNext();
+  abstract boolean hasNext();
 
   /**
    * Skip key-value pairs with keys less than or equal to the key provided.
    */
-  void skip(K key) throws IOException;
+  abstract void skip(K key) throws IOException, InterruptedException;
 
   /**
    * While key-value pairs from this RecordReader match the given key, register
    * them with the JoinCollector provided.
    */
-  void accept(CompositeRecordReader.JoinCollector jc, K key) throws IOException;
+  @SuppressWarnings("unchecked")
+  abstract void accept(CompositeRecordReader.JoinCollector jc, K key) 
+      throws IOException, InterruptedException;
 }

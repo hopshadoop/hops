@@ -16,20 +16,23 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.mapred.join;
+package org.apache.hadoop.mapreduce.lib.join;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.WritableComparable;
-import org.apache.hadoop.mapred.InputFormat;
-import org.apache.hadoop.mapred.InputSplit;
-import org.apache.hadoop.mapred.JobConf;
-import org.apache.hadoop.mapred.Reporter;
+import org.apache.hadoop.mapreduce.InputFormat;
+import org.apache.hadoop.mapreduce.InputSplit;
+import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.RecordReader;
+import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
 /**
  * An InputFormat capable of performing joins over a set of data sources sorted
@@ -37,20 +40,21 @@ import org.apache.hadoop.mapred.Reporter;
  * @see #setFormat
  *
  * A user may define new join types by setting the property
- * <tt>mapred.join.define.&lt;ident&gt;</tt> to a classname. In the expression
- * <tt>mapred.join.expr</tt>, the identifier will be assumed to be a
- * ComposableRecordReader.
- * <tt>mapred.join.keycomparator</tt> can be a classname used to compare keys
- * in the join.
+ * <tt>mapreduce.join.define.&lt;ident&gt;</tt> to a classname. 
+ * In the expression <tt>mapreduce.join.expr</tt>, the identifier will be
+ * assumed to be a ComposableRecordReader.
+ * <tt>mapreduce.join.keycomparator</tt> can be a classname used to compare 
+ * keys in the join.
  * @see JoinRecordReader
  * @see MultiFilterRecordReader
- * @deprecated Use 
- * {@link org.apache.hadoop.mapreduce.lib.join.CompositeInputFormat} instead
  */
-@Deprecated
+@SuppressWarnings("unchecked")
 public class CompositeInputFormat<K extends WritableComparable>
-      implements ComposableInputFormat<K,TupleWritable> {
+    extends InputFormat<K, TupleWritable> {
 
+  public static final String JOIN_EXPR = "mapreduce.join.expr";
+  public static final String JOIN_COMPARATOR = "mapreduce.join.keycomparator";
+  
   // expression parse tree to which IF requests are proxied
   private Parser.Node root;
 
@@ -65,16 +69,16 @@ public class CompositeInputFormat<K extends WritableComparable>
    *   class ::= @see java.lang.Class#forName(java.lang.String)
    *   path  ::= @see org.apache.hadoop.fs.Path#Path(java.lang.String)
    * }
-   * Reads expression from the <tt>mapred.join.expr</tt> property and
-   * user-supplied join types from <tt>mapred.join.define.&lt;ident&gt;</tt>
+   * Reads expression from the <tt>mapreduce.join.expr</tt> property and
+   * user-supplied join types from <tt>mapreduce.join.define.&lt;ident&gt;</tt>
    *  types. Paths supplied to <tt>tbl</tt> are given as input paths to the
    * InputFormat class listed.
    * @see #compose(java.lang.String, java.lang.Class, java.lang.String...)
    */
-  public void setFormat(JobConf job) throws IOException {
+  public void setFormat(Configuration conf) throws IOException {
     addDefaults();
-    addUserIdentifiers(job);
-    root = Parser.parse(job.get("mapred.join.expr", null), job);
+    addUserIdentifiers(conf);
+    root = Parser.parse(conf.get(JOIN_EXPR, null), conf);
   }
 
   /**
@@ -94,17 +98,16 @@ public class CompositeInputFormat<K extends WritableComparable>
   /**
    * Inform the parser of user-defined types.
    */
-  private void addUserIdentifiers(JobConf job) throws IOException {
-    Pattern x = Pattern.compile("^mapred\\.join\\.define\\.(\\w+)$");
-    for (Map.Entry<String,String> kv : job) {
+  private void addUserIdentifiers(Configuration conf) throws IOException {
+    Pattern x = Pattern.compile("^mapreduce\\.join\\.define\\.(\\w+)$");
+    for (Map.Entry<String,String> kv : conf) {
       Matcher m = x.matcher(kv.getKey());
       if (m.matches()) {
         try {
           Parser.CNode.addIdentifier(m.group(1),
-              job.getClass(m.group(0), null, ComposableRecordReader.class));
+              conf.getClass(m.group(0), null, ComposableRecordReader.class));
         } catch (NoSuchMethodException e) {
-          throw (IOException)new IOException(
-              "Invalid define for " + m.group(1)).initCause(e);
+          throw new IOException("Invalid define for " + m.group(1), e);
         }
       }
     }
@@ -114,10 +117,12 @@ public class CompositeInputFormat<K extends WritableComparable>
    * Build a CompositeInputSplit from the child InputFormats by assigning the
    * ith split from each child to the ith composite split.
    */
-  public InputSplit[] getSplits(JobConf job, int numSplits) throws IOException {
-    setFormat(job);
-    job.setLong("mapred.min.split.size", Long.MAX_VALUE);
-    return root.getSplits(job, numSplits);
+  @SuppressWarnings("unchecked")
+  public List<InputSplit> getSplits(JobContext job) 
+      throws IOException, InterruptedException {
+    setFormat(job.getConfiguration());
+    job.getConfiguration().setLong("mapred.min.split.size", Long.MAX_VALUE);
+    return root.getSplits(job);
   }
 
   /**
@@ -127,10 +132,11 @@ public class CompositeInputFormat<K extends WritableComparable>
    * Mandating TupleWritable isn't strictly correct.
    */
   @SuppressWarnings("unchecked") // child types unknown
-  public ComposableRecordReader<K,TupleWritable> getRecordReader(
-      InputSplit split, JobConf job, Reporter reporter) throws IOException {
-    setFormat(job);
-    return root.getRecordReader(split, job, reporter);
+  public RecordReader<K,TupleWritable> createRecordReader(InputSplit split, 
+      TaskAttemptContext taskContext) 
+      throws IOException, InterruptedException {
+    setFormat(taskContext.getConfiguration());
+    return root.createRecordReader(split, taskContext);
   }
 
   /**
@@ -138,8 +144,10 @@ public class CompositeInputFormat<K extends WritableComparable>
    * Given InputFormat class (inf), path (p) return:
    * {@code tbl(<inf>, <p>) }
    */
-  public static String compose(Class<? extends InputFormat> inf, String path) {
-    return compose(inf.getName().intern(), path, new StringBuffer()).toString();
+  public static String compose(Class<? extends InputFormat> inf, 
+      String path) {
+    return compose(inf.getName().intern(), path, 
+             new StringBuffer()).toString();
   }
 
   /**
@@ -147,8 +155,8 @@ public class CompositeInputFormat<K extends WritableComparable>
    * Given operation (op), Object class (inf), set of paths (p) return:
    * {@code <op>(tbl(<inf>,<p1>),tbl(<inf>,<p2>),...,tbl(<inf>,<pn>)) }
    */
-  public static String compose(String op, Class<? extends InputFormat> inf,
-      String... path) {
+  public static String compose(String op, 
+      Class<? extends InputFormat> inf, String... path) {
     final String infname = inf.getName();
     StringBuffer ret = new StringBuffer(op + '(');
     for (String p : path) {
@@ -164,8 +172,8 @@ public class CompositeInputFormat<K extends WritableComparable>
    * Given operation (op), Object class (inf), set of paths (p) return:
    * {@code <op>(tbl(<inf>,<p1>),tbl(<inf>,<p2>),...,tbl(<inf>,<pn>)) }
    */
-  public static String compose(String op, Class<? extends InputFormat> inf,
-      Path... path) {
+  public static String compose(String op, 
+      Class<? extends InputFormat> inf, Path... path) {
     ArrayList<String> tmp = new ArrayList<String>(path.length);
     for (Path p : path) {
       tmp.add(p.toString());
@@ -180,5 +188,4 @@ public class CompositeInputFormat<K extends WritableComparable>
     sb.append("\")");
     return sb;
   }
-
 }

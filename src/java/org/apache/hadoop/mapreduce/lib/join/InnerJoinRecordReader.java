@@ -16,25 +16,21 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.mapred.join;
+package org.apache.hadoop.mapreduce.lib.join;
 
 import java.io.IOException;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.io.WritableComparator;
-import org.apache.hadoop.mapred.JobConf;
 
 /**
  * Full inner join.
- * 
- * @deprecated Use 
- * {@link org.apache.hadoop.mapreduce.lib.join.InnerJoinRecordReader} instead.
  */
-@Deprecated
-public class InnerJoinRecordReader<K extends WritableComparable>
+public class InnerJoinRecordReader<K extends WritableComparable<?>>
     extends JoinRecordReader<K> {
 
-  InnerJoinRecordReader(int id, JobConf conf, int capacity,
+  InnerJoinRecordReader(int id, Configuration conf, int capacity,
       Class<? extends WritableComparator> cmpcl) throws IOException {
     super(id, conf, capacity, cmpcl);
   }

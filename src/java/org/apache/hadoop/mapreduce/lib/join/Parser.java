@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.mapred.join;
+package org.apache.hadoop.mapreduce.lib.join;
 
 import java.io.CharArrayReader;
 import java.io.IOException;
@@ -32,13 +32,16 @@ import java.util.ListIterator;
 import java.util.Map;
 import java.util.Stack;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.WritableComparator;
-import org.apache.hadoop.mapred.FileInputFormat;
-import org.apache.hadoop.mapred.InputFormat;
-import org.apache.hadoop.mapred.InputSplit;
-import org.apache.hadoop.mapred.JobConf;
-import org.apache.hadoop.mapred.RecordReader;
-import org.apache.hadoop.mapred.Reporter;
+import org.apache.hadoop.mapreduce.InputFormat;
+import org.apache.hadoop.mapreduce.InputSplit;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.RecordReader;
+import org.apache.hadoop.mapreduce.TaskAttemptContext;
+import org.apache.hadoop.mapreduce.TaskAttemptID;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.util.ReflectionUtils;
 
 /**
@@ -59,9 +62,7 @@ import org.apache.hadoop.util.ReflectionUtils;
  * straightforward. One need only override the relevant method(s) (usually only
  * {@link CompositeRecordReader#combine}) and include a property to map its
  * value to an identifier in the parser.
- * @deprecated Use {@link org.apache.hadoop.mapreduce.lib.join.Parser} instead
  */
-@Deprecated
 public class Parser {
   public enum TType { CIF, IDENT, COMMA, LPAREN, RPAREN, QUOT, NUM, }
 
@@ -78,12 +79,15 @@ public class Parser {
     }
 
     public TType getType() { return type; }
+    
     public Node getNode() throws IOException {
       throw new IOException("Expected nodetype");
     }
+    
     public double getNum() throws IOException {
       throw new IOException("Expected numtype");
     }
+    
     public String getStr() throws IOException {
       throw new IOException("Expected strtype");
     }
@@ -167,7 +171,8 @@ public class Parser {
     }
   }
 
-  public abstract static class Node implements ComposableInputFormat {
+@SuppressWarnings("unchecked")
+public abstract static class Node extends ComposableInputFormat {
     /**
      * Return the node type registered for the particular identifier.
      * By default, this is a CNode for any composite node and a WNode
@@ -183,11 +188,11 @@ public class Parser {
         }
         return nodeCstrMap.get(ident).newInstance(ident);
       } catch (IllegalAccessException e) {
-        throw (IOException)new IOException().initCause(e);
+        throw new IOException(e);
       } catch (InstantiationException e) {
-        throw (IOException)new IOException().initCause(e);
+        throw new IOException(e);
       } catch (InvocationTargetException e) {
-        throw (IOException)new IOException().initCause(e);
+        throw new IOException(e);
       }
     }
 
@@ -195,8 +200,8 @@ public class Parser {
     private static final
         Map<String,Constructor<? extends Node>> nodeCstrMap =
         new HashMap<String,Constructor<? extends Node>>();
-    protected static final
-        Map<String,Constructor<? extends ComposableRecordReader>> rrCstrMap =
+    protected static final Map<String,Constructor<? extends 
+        ComposableRecordReader>> rrCstrMap =
         new HashMap<String,Constructor<? extends ComposableRecordReader>>();
 
     /**
@@ -233,10 +238,12 @@ public class Parser {
       this.id = id;
     }
 
-    protected void setKeyComparator(Class<? extends WritableComparator> cmpcl) {
+    protected void setKeyComparator(
+        Class<? extends WritableComparator> cmpcl) {
       this.cmpcl = cmpcl;
     }
-    abstract void parse(List<Token> args, JobConf job) throws IOException;
+    abstract void parse(List<Token> args, Configuration conf) 
+        throws IOException;
   }
 
   /**
@@ -246,14 +253,15 @@ public class Parser {
     private static final Class<?>[] cstrSig =
       { Integer.TYPE, RecordReader.class, Class.class };
 
-    static void addIdentifier(String ident,
+    @SuppressWarnings("unchecked")
+	static void addIdentifier(String ident,
                               Class<? extends ComposableRecordReader> cl)
         throws NoSuchMethodException {
       Node.addIdentifier(ident, cstrSig, WNode.class, cl);
     }
 
     private String indir;
-    private InputFormat inf;
+    private InputFormat<?, ?> inf;
 
     public WNode(String ident) {
       super(ident);
@@ -263,20 +271,20 @@ public class Parser {
      * Let the first actual define the InputFormat and the second define
      * the <tt>mapred.input.dir</tt> property.
      */
-    public void parse(List<Token> ll, JobConf job) throws IOException {
+    @Override
+    public void parse(List<Token> ll, Configuration conf) throws IOException {
       StringBuilder sb = new StringBuilder();
       Iterator<Token> i = ll.iterator();
       while (i.hasNext()) {
         Token t = i.next();
         if (TType.COMMA.equals(t.getType())) {
           try {
-          	inf = (InputFormat)ReflectionUtils.newInstance(
-          			job.getClassByName(sb.toString()),
-                job);
+          	inf = (InputFormat<?, ?>)ReflectionUtils.newInstance(
+          			conf.getClassByName(sb.toString()), conf);
           } catch (ClassNotFoundException e) {
-            throw (IOException)new IOException().initCause(e);
+            throw new IOException(e);
           } catch (IllegalArgumentException e) {
-            throw (IOException)new IOException().initCause(e);
+            throw new IOException(e);
           }
           break;
         }
@@ -293,32 +301,36 @@ public class Parser {
       // no check for ll.isEmpty() to permit extension
     }
 
-    private JobConf getConf(JobConf job) {
-      JobConf conf = new JobConf(job);
-      FileInputFormat.setInputPaths(conf, indir);
-      conf.setClassLoader(job.getClassLoader());
-      return conf;
+    private Configuration getConf(Configuration jconf) throws IOException {
+      Job job = new Job(jconf);
+      FileInputFormat.setInputPaths(job, indir);
+      return job.getConfiguration();
+    }
+    
+    public List<InputSplit> getSplits(JobContext context)
+        throws IOException, InterruptedException {
+      return inf.getSplits(new JobContext(
+        getConf(context.getConfiguration()), context.getJobID()));
     }
 
-    public InputSplit[] getSplits(JobConf job, int numSplits)
-        throws IOException {
-      return inf.getSplits(getConf(job), numSplits);
-    }
-
-    public ComposableRecordReader getRecordReader(
-        InputSplit split, JobConf job, Reporter reporter) throws IOException {
+    public ComposableRecordReader<?, ?> createRecordReader(InputSplit split, 
+        TaskAttemptContext taskContext) 
+        throws IOException, InterruptedException {
       try {
         if (!rrCstrMap.containsKey(ident)) {
           throw new IOException("No RecordReader for " + ident);
         }
+        Configuration conf = getConf(taskContext.getConfiguration());
+        TaskAttemptContext context = new TaskAttemptContext(conf, 
+          TaskAttemptID.forName(conf.get("mapred.task.id")));
         return rrCstrMap.get(ident).newInstance(id,
-            inf.getRecordReader(split, getConf(job), reporter), cmpcl);
+            inf.createRecordReader(split, context), cmpcl);
       } catch (IllegalAccessException e) {
-        throw (IOException)new IOException().initCause(e);
+        throw new IOException(e);
       } catch (InstantiationException e) {
-        throw (IOException)new IOException().initCause(e);
+        throw new IOException(e);
       } catch (InvocationTargetException e) {
-        throw (IOException)new IOException().initCause(e);
+        throw new IOException(e);
       }
     }
 
@@ -333,9 +345,10 @@ public class Parser {
   static class CNode extends Node {
 
     private static final Class<?>[] cstrSig =
-      { Integer.TYPE, JobConf.class, Integer.TYPE, Class.class };
+      { Integer.TYPE, Configuration.class, Integer.TYPE, Class.class };
 
-    static void addIdentifier(String ident,
+    @SuppressWarnings("unchecked")
+	static void addIdentifier(String ident,
                               Class<? extends ComposableRecordReader> cl)
         throws NoSuchMethodException {
       Node.addIdentifier(ident, cstrSig, CNode.class, cl);
@@ -348,6 +361,7 @@ public class Parser {
       super(ident);
     }
 
+    @Override
     public void setKeyComparator(Class<? extends WritableComparator> cmpcl) {
       super.setKeyComparator(cmpcl);
       for (Node n : kids) {
@@ -359,34 +373,38 @@ public class Parser {
      * Combine InputSplits from child InputFormats into a
      * {@link CompositeInputSplit}.
      */
-    public InputSplit[] getSplits(JobConf job, int numSplits)
-        throws IOException {
-      InputSplit[][] splits = new InputSplit[kids.size()][];
+    @SuppressWarnings("unchecked")
+	public List<InputSplit> getSplits(JobContext job)
+        throws IOException, InterruptedException {
+      List<List<InputSplit>> splits = 
+        new ArrayList<List<InputSplit>>(kids.size());
       for (int i = 0; i < kids.size(); ++i) {
-        final InputSplit[] tmp = kids.get(i).getSplits(job, numSplits);
+        List<InputSplit> tmp = kids.get(i).getSplits(job);
         if (null == tmp) {
           throw new IOException("Error gathering splits from child RReader");
         }
-        if (i > 0 && splits[i-1].length != tmp.length) {
+        if (i > 0 && splits.get(i-1).size() != tmp.size()) {
           throw new IOException("Inconsistent split cardinality from child " +
-              i + " (" + splits[i-1].length + "/" + tmp.length + ")");
+              i + " (" + splits.get(i-1).size() + "/" + tmp.size() + ")");
         }
-        splits[i] = tmp;
+        splits.add(i, tmp);
       }
-      final int size = splits[0].length;
-      CompositeInputSplit[] ret = new CompositeInputSplit[size];
+      final int size = splits.get(0).size();
+      List<InputSplit> ret = new ArrayList<InputSplit>();
       for (int i = 0; i < size; ++i) {
-        ret[i] = new CompositeInputSplit(splits.length);
-        for (int j = 0; j < splits.length; ++j) {
-          ret[i].add(splits[j][i]);
+        CompositeInputSplit split = new CompositeInputSplit(splits.size());
+        for (int j = 0; j < splits.size(); ++j) {
+          split.add(splits.get(j).get(i));
         }
+        ret.add(split);
       }
       return ret;
     }
 
     @SuppressWarnings("unchecked") // child types unknowable
-    public ComposableRecordReader getRecordReader(
-        InputSplit split, JobConf job, Reporter reporter) throws IOException {
+    public ComposableRecordReader 
+        createRecordReader(InputSplit split, TaskAttemptContext taskContext) 
+        throws IOException, InterruptedException {
       if (!(split instanceof CompositeInputSplit)) {
         throw new IOException("Invalid split type:" +
                               split.getClass().getName());
@@ -398,17 +416,17 @@ public class Parser {
         if (!rrCstrMap.containsKey(ident)) {
           throw new IOException("No RecordReader for " + ident);
         }
-        ret = (CompositeRecordReader)
-          rrCstrMap.get(ident).newInstance(id, job, capacity, cmpcl);
+        ret = (CompositeRecordReader)rrCstrMap.get(ident).
+          newInstance(id, taskContext.getConfiguration(), capacity, cmpcl);
       } catch (IllegalAccessException e) {
-        throw (IOException)new IOException().initCause(e);
+        throw new IOException(e);
       } catch (InstantiationException e) {
-        throw (IOException)new IOException().initCause(e);
+        throw new IOException(e);
       } catch (InvocationTargetException e) {
-        throw (IOException)new IOException().initCause(e);
+        throw new IOException(e);
       }
       for (int i = 0; i < capacity; ++i) {
-        ret.add(kids.get(i).getRecordReader(spl.get(i), job, reporter));
+        ret.add(kids.get(i).createRecordReader(spl.get(i), taskContext));
       }
       return (ComposableRecordReader)ret;
     }
@@ -416,7 +434,8 @@ public class Parser {
     /**
      * Parse a list of comma-separated nodes.
      */
-    public void parse(List<Token> args, JobConf job) throws IOException {
+    public void parse(List<Token> args, Configuration conf) 
+        throws IOException {
       ListIterator<Token> i = args.listIterator();
       while (i.hasNext()) {
         Token t = i.next();
@@ -439,7 +458,8 @@ public class Parser {
     }
   }
 
-  private static Token reduce(Stack<Token> st, JobConf job) throws IOException {
+  private static Token reduce(Stack<Token> st, Configuration conf) 
+      throws IOException {
     LinkedList<Token> args = new LinkedList<Token>();
     while (!st.isEmpty() && !TType.LPAREN.equals(st.peek().getType())) {
       args.addFirst(st.pop());
@@ -452,7 +472,7 @@ public class Parser {
       throw new IOException("Identifier expected");
     }
     Node n = Node.forIdent(st.pop().getStr());
-    n.parse(args, job);
+    n.parse(args, conf);
     return new NodeToken(n);
   }
 
@@ -460,18 +480,18 @@ public class Parser {
    * Given an expression and an optional comparator, build a tree of
    * InputFormats using the comparator to sort keys.
    */
-  static Node parse(String expr, JobConf job) throws IOException {
+  static Node parse(String expr, Configuration conf) throws IOException {
     if (null == expr) {
       throw new IOException("Expression is null");
     }
-    Class<? extends WritableComparator> cmpcl =
-      job.getClass("mapred.join.keycomparator", null, WritableComparator.class);
+    Class<? extends WritableComparator> cmpcl = conf.getClass(
+      CompositeInputFormat.JOIN_COMPARATOR, null, WritableComparator.class);
     Lexer lex = new Lexer(expr);
     Stack<Token> st = new Stack<Token>();
     Token tok;
     while ((tok = lex.next()) != null) {
       if (TType.RPAREN.equals(tok.getType())) {
-        st.push(reduce(st, job));
+        st.push(reduce(st, conf));
       } else {
         st.push(tok);
       }

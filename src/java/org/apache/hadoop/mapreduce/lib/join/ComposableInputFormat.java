@@ -16,39 +16,26 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.mapred.join;
+package org.apache.hadoop.mapreduce.lib.join;
 
 import java.io.IOException;
 
+import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableComparable;
-import org.apache.hadoop.io.WritableComparator;
-import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapreduce.InputFormat;
+import org.apache.hadoop.mapreduce.InputSplit;
+import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
 /**
- * Full inner join.
- * 
- * @deprecated Use 
- * {@link org.apache.hadoop.mapreduce.lib.join.InnerJoinRecordReader} instead.
+ * Refinement of InputFormat requiring implementors to provide
+ * ComposableRecordReader instead of RecordReader.
  */
-@Deprecated
-public class InnerJoinRecordReader<K extends WritableComparable>
-    extends JoinRecordReader<K> {
+public abstract class ComposableInputFormat<K extends WritableComparable<?>,
+                                            V extends Writable>
+    extends InputFormat<K,V> {
 
-  InnerJoinRecordReader(int id, JobConf conf, int capacity,
-      Class<? extends WritableComparator> cmpcl) throws IOException {
-    super(id, conf, capacity, cmpcl);
-  }
+  public abstract ComposableRecordReader<K,V> createRecordReader(
+    InputSplit split, TaskAttemptContext context) 
+    throws IOException, InterruptedException;
 
-  /**
-   * Return true iff the tuple is full (all data sources contain this key).
-   */
-  protected boolean combine(Object[] srcs, TupleWritable dst) {
-    assert srcs.length == dst.size();
-    for (int i = 0; i < srcs.length; ++i) {
-      if (!dst.has(i)) {
-        return false;
-      }
-    }
-    return true;
-  }
 }
