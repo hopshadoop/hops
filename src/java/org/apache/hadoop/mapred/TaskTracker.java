@@ -131,6 +131,7 @@ public class TaskTracker
         ", bytes: %s" + // byte count
         ", op: %s" +    // operation
         ", cliID: %s" + // task id
+        ", reduceID: %s" + // reduce id
         ", duration: %s"; // duration
   public static final Log ClientTraceLog =
     LogFactory.getLog(TaskTracker.class.getName() + ".clienttrace");
@@ -3160,6 +3161,7 @@ public class TaskTracker
     public void doGet(HttpServletRequest request, 
                       HttpServletResponse response
                       ) throws ServletException, IOException {
+      TaskAttemptID reduceAttId = null;
       String mapId = request.getParameter("map");
       String reduceId = request.getParameter("reduce");
       String jobId = request.getParameter("job");
@@ -3171,8 +3173,13 @@ public class TaskTracker
       if (mapId == null || reduceId == null) {
         throw new IOException("map and reduce parameters are required");
       }
+      try {
+        reduceAttId = TaskAttemptID.forName(reduceId);
+      } catch (IllegalArgumentException e) {
+        throw new IOException("reduce attempt ID is malformed");
+      }
       ServletContext context = getServletContext();
-      int reduce = Integer.parseInt(reduceId);
+      int reduce = reduceAttId.getTaskID().getId();
       byte[] buffer = new byte[MAX_BYTES_TO_READ];
       // true iff IOException was caused by attempt to access input
       boolean isInputException = true;
@@ -3287,7 +3294,8 @@ public class TaskTracker
           ClientTraceLog.info(String.format(MR_CLIENTTRACE_FORMAT,
                 request.getLocalAddr() + ":" + request.getLocalPort(),
                 request.getRemoteAddr() + ":" + request.getRemotePort(),
-                totalRead, "MAPRED_SHUFFLE", mapId, endTime-startTime));
+                totalRead, "MAPRED_SHUFFLE", mapId, reduceId,
+                endTime-startTime));
         }
       }
       outStream.close();
