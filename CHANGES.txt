@@ -249,6 +249,10 @@ Trunk (unreleased changes)
     MAPREDUCE-355. Update mapred.join package to use the new API. (Amareshwari
     Sriramadasu via cdouglas)
 
+    HADOOP-6184. Updated hadoop common and test jars to get the new API
+    in Configuration for dumping in JSON format from Hudson trunk build #68.
+    (yhemanth)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 
