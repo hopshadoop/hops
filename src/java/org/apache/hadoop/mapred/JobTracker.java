@@ -20,7 +20,9 @@ package org.apache.hadoop.mapred;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
+import java.io.Writer;
 import java.net.BindException;
 import java.net.InetSocketAddress;
 import java.net.URLEncoder;
@@ -4128,18 +4130,38 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   public static void main(String argv[]
                           ) throws IOException, InterruptedException {
     StringUtils.startupShutdownMessage(JobTracker.class, argv, LOG);
-    if (argv.length != 0) {
-      System.out.println("usage: JobTracker");
-      System.exit(-1);
-    }
-      
+    
     try {
-      JobTracker tracker = startTracker(new JobConf());
-      tracker.offerService();
+      if(argv.length == 0) {
+        JobTracker tracker = startTracker(new JobConf());
+        tracker.offerService();
+      }
+      else {
+        if ("-dumpConfiguration".equals(argv[0]) && argv.length == 1) {
+          dumpConfiguration(new PrintWriter(System.out));
+        }
+        else {
+          System.out.println("usage: JobTracker [-dumpConfiguration]");
+          System.exit(-1);
+        }
+      }
     } catch (Throwable e) {
       LOG.fatal(StringUtils.stringifyException(e));
       System.exit(-1);
     }
+  }
+
+  /**
+   * Dumps the configuration properties in Json format
+   * @param writer {@link}Writer object to which the output is written
+   * @throws IOException
+   */
+  private static void dumpConfiguration(Writer writer) throws IOException {
+    Configuration.dumpConfiguration(new JobConf(), writer);
+    writer.write("\n");
+    // get the QueueManager configuration properties
+    QueueManager.dumpConfiguration(writer);
+    writer.write("\n");
   }
 
   @Override

@@ -75,6 +75,9 @@ Trunk (unreleased changes)
     MAPREDUCE-798. MRUnit should be able to test a succession of MapReduce
     passes. (Aaron Kimball via tomwhite)
 
+    MAPREDUCE-768. Provide an option to dump jobtracker configuration in JSON
+    format to standard output. (V.V.Chaitanya Krishna via yhemanth)
+
   IMPROVEMENTS
 
     MAPREDUCE-816. Rename "local" mysql import to "direct" in Sqoop.
