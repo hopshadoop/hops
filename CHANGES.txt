@@ -253,6 +253,9 @@ Trunk (unreleased changes)
     in Configuration for dumping in JSON format from Hudson trunk build #68.
     (yhemanth)
 
+    MAPREDUCE-476. Extend DistributedCache to work locally (LocalJobRunner).
+    (Philip Zeyliger via tomwhite)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 
