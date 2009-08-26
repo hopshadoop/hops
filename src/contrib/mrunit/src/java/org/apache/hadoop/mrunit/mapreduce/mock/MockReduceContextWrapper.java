@@ -22,7 +22,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.mapreduce.Counter;
+import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.ReduceContext;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
@@ -63,13 +63,13 @@ public class MockReduceContextWrapper<KEYIN, VALUEIN, KEYOUT, VALUEOUT>
 
     private MockOutputCollector<KEYOUT, VALUEOUT> output;
 
-    public MockReduceContext(final List<Pair<KEYIN, List<VALUEIN>>> in)
+    public MockReduceContext(final List<Pair<KEYIN, List<VALUEIN>>> in, final Counters counters)
         throws IOException, InterruptedException {
 
       super(new Configuration(),
             new TaskAttemptID("mrunit-jt", 0, TaskType.REDUCE, 0, 0),
             new MockRawKeyValueIterator(), null, null,
-            new MockOutputCommitter(), null, null,
+            new MockOutputCommitter(), new MockReporter(counters), null,
             (Class) Text.class, (Class) Text.class);
       this.inputIter = in.iterator();
       this.output = new MockOutputCollector<KEYOUT, VALUEOUT>();
@@ -159,17 +159,6 @@ public class MockReduceContextWrapper<KEYIN, VALUEIN, KEYOUT, VALUEOUT>
       output.collect(key, value);
     }
 
-    /** This method does nothing in the mock version. */
-    public Counter getCounter(Enum<?> counterName) {
-      return null;
-    }
-
-    @Override
-    /** This method does nothing in the mock version. */
-    public Counter getCounter(String groupName, String counterName) {
-      return null;
-    }
-
     @Override
     /** This method does nothing in the mock version. */
     public void progress() {
@@ -189,9 +178,10 @@ public class MockReduceContextWrapper<KEYIN, VALUEIN, KEYOUT, VALUEOUT>
     }
   }
 
-  public MockReduceContext getMockContext(List<Pair<KEYIN, List<VALUEIN>>> inputs)
+  public MockReduceContext getMockContext(List<Pair<KEYIN, List<VALUEIN>>> inputs,
+      Counters counters)
       throws IOException, InterruptedException {
-    return new MockReduceContext(inputs);
+    return new MockReduceContext(inputs, counters);
   }
 }
 

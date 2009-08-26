@@ -21,7 +21,7 @@ package org.apache.hadoop.mrunit.mapreduce.mock;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.mapreduce.Counter;
+import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
@@ -57,12 +57,12 @@ public class MockMapContextWrapper<KEYIN, VALUEIN, KEYOUT, VALUEOUT>
     private Pair<KEYIN, VALUEIN> curInput;
     private MockOutputCollector<KEYOUT, VALUEOUT> output;
 
-    public MockMapContext(final List<Pair<KEYIN, VALUEIN>> in)
+    public MockMapContext(final List<Pair<KEYIN, VALUEIN>> in, final Counters counters)
         throws IOException, InterruptedException {
 
       super(new Configuration(),
             new TaskAttemptID("mrunit-jt", 0, TaskType.MAP, 0, 0),
-            null, null, new MockOutputCommitter(), null, null);
+            null, null, new MockOutputCommitter(), new MockReporter(counters), null);
       this.inputIter = in.iterator();
       this.output = new MockOutputCollector<KEYOUT, VALUEOUT>();
     }
@@ -96,17 +96,6 @@ public class MockMapContextWrapper<KEYIN, VALUEIN, KEYOUT, VALUEOUT>
       output.collect(key, value);
     }
 
-    /** This method does nothing in the mock version. */
-    public Counter getCounter(Enum<?> counterName) {
-      return null;
-    }
-
-    @Override
-    /** This method does nothing in the mock version. */
-    public Counter getCounter(String groupName, String counterName) {
-      return null;
-    }
-
     @Override
     /** This method does nothing in the mock version. */
     public void progress() {
@@ -126,9 +115,9 @@ public class MockMapContextWrapper<KEYIN, VALUEIN, KEYOUT, VALUEOUT>
     }
   }
 
-  public MockMapContext getMockContext(List<Pair<KEYIN, VALUEIN>> inputs)
+  public MockMapContext getMockContext(List<Pair<KEYIN, VALUEIN>> inputs, Counters counters)
       throws IOException, InterruptedException {
-    return new MockMapContext(inputs);
+    return new MockMapContext(inputs, counters);
   }
 }
 

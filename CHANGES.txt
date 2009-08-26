@@ -269,6 +269,8 @@ Trunk (unreleased changes)
     MAPREDUCE-825. JobClient completion poll interval of 5s causes slow tests
     in local mode. (Aaron Kimball via tomwhite)
 
+    MAPREDUCE-910. Support counters in MRUnit. (Aaron Kimball via cdouglas)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 

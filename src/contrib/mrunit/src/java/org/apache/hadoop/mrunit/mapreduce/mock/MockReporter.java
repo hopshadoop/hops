@@ -15,52 +15,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.mrunit.mock;
+package org.apache.hadoop.mrunit.mapreduce.mock;
 
-import org.apache.hadoop.mapred.Counters;
-import org.apache.hadoop.mapred.InputSplit;
-import org.apache.hadoop.mapred.Reporter;
-import org.apache.hadoop.mapred.Counters.Counter;
+import org.apache.hadoop.mapreduce.Counter;
+import org.apache.hadoop.mapreduce.Counters;
+import org.apache.hadoop.mapreduce.StatusReporter;
 
-public class MockReporter implements Reporter {
+public class MockReporter extends StatusReporter {
 
-  private MockInputSplit inputSplit = new MockInputSplit();
   private Counters counters;
 
-  public enum ReporterType {
-    Mapper,
-    Reducer
-  }
-
-  private ReporterType typ;
-
-  public MockReporter(final ReporterType kind, final Counters ctrs) {
-    this.typ = kind;
+  public MockReporter(final Counters ctrs) {
     this.counters = ctrs;
-  }
-
-  @Override
-  public InputSplit getInputSplit() {
-    if (typ == ReporterType.Reducer) {
-      throw new UnsupportedOperationException(
-              "Reducer cannot call getInputSplit()");
-    } else {
-      return inputSplit;
-    }
-  }
-
-  @Override
-  public void incrCounter(Enum key, long amount) {
-    if (null != counters) {
-      counters.incrCounter(key, amount);
-    }
-  }
-
-  @Override
-  public void incrCounter(String group, String counter, long amount) {
-    if (null != counters) {
-      counters.incrCounter(group, counter, amount);
-    }
   }
 
   @Override
@@ -75,7 +41,7 @@ public class MockReporter implements Reporter {
 
   @Override
   public Counter getCounter(String group, String name) {
-    Counters.Counter counter = null;
+    Counter counter = null;
     if (counters != null) {
       counter = counters.findCounter(group, name);
     }
@@ -85,7 +51,7 @@ public class MockReporter implements Reporter {
 
   @Override
   public Counter getCounter(Enum key) {
-    Counters.Counter counter = null;
+    Counter counter = null;
     if (counters != null) {
       counter = counters.findCounter(key);
     }
