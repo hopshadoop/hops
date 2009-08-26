@@ -16,15 +16,15 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.mapred;
+package org.apache.hadoop.mapreduce;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.EnumSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map.Entry;
 import java.util.TreeMap;
 
@@ -32,11 +32,15 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.examples.Sort;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.mapred.Counters.Group;
-import org.apache.hadoop.mapred.RunningJob;
-import org.apache.hadoop.mapred.jobcontrol.*;
-import org.apache.hadoop.mapred.lib.IdentityMapper;
-import org.apache.hadoop.mapred.lib.IdentityReducer;
+import org.apache.hadoop.mapred.JobClient;
+import org.apache.hadoop.mapred.TaskReport;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.jobcontrol.ControlledJob;
+import org.apache.hadoop.mapreduce.lib.jobcontrol.JobControl;
+import org.apache.hadoop.mapreduce.lib.input.KeyValueTextInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
+
 import org.apache.hadoop.streaming.StreamJob;
 
 public class GridMixRunner {
@@ -66,17 +70,17 @@ public class GridMixRunner {
 
   private enum Size {
     SMALL("small",                               // name
-          "/{part-00000,part-00001,part-00002}", // default input subset
-          NUM_OF_SMALL_JOBS_PER_CLASS,           // defuault num jobs
-          NUM_OF_REDUCERS_FOR_SMALL_JOB),        // default num reducers
+      "/{part-*-00000,part-*-00001,part-*-00002}", // default input subset
+      NUM_OF_SMALL_JOBS_PER_CLASS,           // defuault num jobs
+      NUM_OF_REDUCERS_FOR_SMALL_JOB),        // default num reducers
     MEDIUM("medium",                             // name
-          "/{part-000*0,part-000*1,part-000*2}", // default input subset
-          NUM_OF_MEDIUM_JOBS_PER_CLASS,          // defuault num jobs
-          NUM_OF_REDUCERS_FOR_MEDIUM_JOB),       // default num reducers
+      "/{part-*-000*0, part-*-000*1, part-*-000*2}", // default input subset
+      NUM_OF_MEDIUM_JOBS_PER_CLASS,          // defuault num jobs
+      NUM_OF_REDUCERS_FOR_MEDIUM_JOB),       // default num reducers
     LARGE("large",                               // name
-          "",                                    // default input subset
-          NUM_OF_LARGE_JOBS_PER_CLASS,           // defuault num jobs
-          NUM_OF_REDUCERS_FOR_LARGE_JOB);        // default num reducers
+      "",                                    // default input subset
+      NUM_OF_LARGE_JOBS_PER_CLASS,           // defuault num jobs
+      NUM_OF_REDUCERS_FOR_LARGE_JOB);        // default num reducers
 
     private final String str;
     private final String path;
@@ -107,7 +111,8 @@ public class GridMixRunner {
     public void addJob(int numReducers, boolean mapoutputCompressed,
         boolean outputCompressed, Size size, JobControl gridmix) {
       final String prop = String.format("streamSort.%sJobs.inputFiles", size);
-      final String indir = getInputDirsFor(prop, size.defaultPath(VARINFLTEXT));
+      final String indir = 
+        getInputDirsFor(prop, size.defaultPath(VARINFLTEXT));
       final String outdir = addTSSuffix("perf-out/stream-out-dir-" + size);
 
       StringBuffer sb = new StringBuffer();
@@ -120,12 +125,12 @@ public class GridMixRunner {
 
       clearDir(outdir);
       try {
-        JobConf jobconf = StreamJob.createJob(args);
-        jobconf.setJobName("GridmixStreamingSorter." + size);
-        jobconf.setCompressMapOutput(mapoutputCompressed);
-        jobconf.setBoolean("mapred.output.compress", outputCompressed);
-        Job job = new Job(jobconf);
-        gridmix.addJob(job);
+        Configuration conf = StreamJob.createJob(args);
+        conf.setBoolean("mapred.output.compress", outputCompressed);
+        conf.setBoolean("mapred.compress.map.output", mapoutputCompressed);
+        Job job = new Job(conf, "GridmixStreamingSorter." + size);
+        ControlledJob cjob = new ControlledJob(job, null);
+        gridmix.addJob(cjob);
       } catch (Exception ex) {
         ex.printStackTrace();
       }
@@ -136,33 +141,34 @@ public class GridMixRunner {
     public void addJob(int numReducers, boolean mapoutputCompressed,
         boolean outputCompressed, Size size, JobControl gridmix) {
       final String prop = String.format("javaSort.%sJobs.inputFiles", size);
-      final String indir = getInputDirsFor(prop, size.defaultPath(VARINFLTEXT));
+      final String indir = getInputDirsFor(prop,
+                             size.defaultPath(VARINFLTEXT));
       final String outdir = addTSSuffix("perf-out/sort-out-dir-" + size);
 
       clearDir(outdir);
 
       try {
-        JobConf jobConf = new JobConf();
-        jobConf.setJarByClass(Sort.class);
-        jobConf.setJobName("GridmixJavaSorter." + size);
-        jobConf.setMapperClass(IdentityMapper.class);
-        jobConf.setReducerClass(IdentityReducer.class);
+        Configuration conf = new Configuration();
+        conf.setBoolean("mapred.output.compress", outputCompressed);
+        conf.setBoolean("mapred.compress.map.output", mapoutputCompressed);
+        Job job = new Job(conf);
+        job.setJarByClass(Sort.class);
+        job.setJobName("GridmixJavaSorter." + size);
+        job.setMapperClass(Mapper.class);
+        job.setReducerClass(Reducer.class);
 
-        jobConf.setNumReduceTasks(numReducers);
-        jobConf.setInputFormat(org.apache.hadoop.mapred.KeyValueTextInputFormat.class);
-        jobConf.setOutputFormat(org.apache.hadoop.mapred.TextOutputFormat.class);
+        job.setNumReduceTasks(numReducers);
+        job.setInputFormatClass(KeyValueTextInputFormat.class);
+        job.setOutputFormatClass(TextOutputFormat.class);
 
-        jobConf.setOutputKeyClass(org.apache.hadoop.io.Text.class);
-        jobConf.setOutputValueClass(org.apache.hadoop.io.Text.class);
-        jobConf.setCompressMapOutput(mapoutputCompressed);
-        jobConf.setBoolean("mapred.output.compress", outputCompressed);
+        job.setOutputKeyClass(org.apache.hadoop.io.Text.class);
+        job.setOutputValueClass(org.apache.hadoop.io.Text.class);
 
-        FileInputFormat.addInputPaths(jobConf, indir);
-        FileOutputFormat.setOutputPath(jobConf, new Path(outdir));
+        FileInputFormat.addInputPaths(job, indir);
+        FileOutputFormat.setOutputPath(job, new Path(outdir));
 
-        Job job = new Job(jobConf);
-        gridmix.addJob(job);
-
+        ControlledJob cjob = new ControlledJob(job, null);
+        gridmix.addJob(cjob);
       } catch (Exception ex) {
         ex.printStackTrace();
       }
@@ -174,12 +180,17 @@ public class GridMixRunner {
         boolean outputCompressed, Size size, JobControl gridmix) {
       final String prop = String.format("webdataScan.%sJobs.inputFiles", size);
       final String indir = getInputDirsFor(prop, size.defaultPath(VARCOMPSEQ));
-      final String outdir = addTSSuffix("perf-out/webdata-scan-out-dir-" + size);
+      final String outdir = addTSSuffix("perf-out/webdata-scan-out-dir-"
+                              + size);
       StringBuffer sb = new StringBuffer();
       sb.append("-keepmap 0.2 ");
       sb.append("-keepred 5 ");
-      sb.append("-inFormat org.apache.hadoop.mapred.SequenceFileInputFormat ");
-      sb.append("-outFormat org.apache.hadoop.mapred.SequenceFileOutputFormat ");
+      sb.append("-inFormat");
+      sb.append(" org.apache.hadoop.mapreduce." +
+        "lib.input.SequenceFileInputFormat ");
+      sb.append("-outFormat");
+      sb.append(" org.apache.hadoop.mapreduce." +
+        "lib.output.SequenceFileOutputFormat ");
       sb.append("-outKey org.apache.hadoop.io.Text ");
       sb.append("-outValue org.apache.hadoop.io.Text ");
       sb.append("-indir ").append(indir).append(" ");
@@ -189,11 +200,11 @@ public class GridMixRunner {
       String[] args = sb.toString().split(" ");
       clearDir(outdir);
       try {
-        JobConf jobconf = GenericMRLoadJobCreator.createJob(
+        Job job = GenericMRLoadJobCreator.createJob(
             args, mapoutputCompressed, outputCompressed);
-        jobconf.setJobName("GridmixWebdatascan." + size);
-        Job job = new Job(jobconf);
-        gridmix.addJob(job);
+        job.setJobName("GridmixWebdatascan." + size);
+        ControlledJob cjob = new ControlledJob(job, null);
+        gridmix.addJob(cjob);
       } catch (Exception ex) {
         System.out.println(ex.getStackTrace());
       }
@@ -211,16 +222,17 @@ public class GridMixRunner {
       sb.append("-r ").append(numReducers).append(" ");
       sb.append("-indir ").append(indir).append(" ");
       sb.append("-outdir ").append(outdir);
-      sb.append("-mapoutputCompressed ").append(mapoutputCompressed).append(" ");
+      sb.append("-mapoutputCompressed ");
+      sb.append(mapoutputCompressed).append(" ");
       sb.append("-outputCompressed ").append(outputCompressed);
 
       String[] args = sb.toString().split(" ");
       clearDir(outdir);
       try {
-        JobConf jobconf = CombinerJobCreator.createJob(args);
-        jobconf.setJobName("GridmixCombinerJob." + size);
-        Job job = new Job(jobconf);
-        gridmix.addJob(job);
+        Job job = CombinerJobCreator.createJob(args);
+        job.setJobName("GridmixCombinerJob." + size);
+        ControlledJob cjob = new ControlledJob(job, null);
+        gridmix.addJob(cjob);
       } catch (Exception ex) {
         ex.printStackTrace();
       }
@@ -230,13 +242,14 @@ public class GridMixRunner {
     MONSTERQUERY("monsterQuery") {
     public void addJob(int numReducers, boolean mapoutputCompressed,
         boolean outputCompressed, Size size, JobControl gridmix) {
-      final String prop = String.format("monsterQuery.%sJobs.inputFiles", size);
+      final String prop = 
+        String.format("monsterQuery.%sJobs.inputFiles", size);
       final String indir = getInputDirsFor(prop, size.defaultPath(FIXCOMPSEQ));
       final String outdir = addTSSuffix("perf-out/mq-out-dir-" + size);
       int iter = 3;
       try {
-        Job pjob = null;
-        Job job = null;
+        ControlledJob pjob = null;
+        ControlledJob cjob = null;
         for (int i = 0; i < iter; i++) {
           String outdirfull = outdir + "." + i;
           String indirfull = (0 == i) ? indir : outdir + "." + (i - 1);
@@ -245,8 +258,12 @@ public class GridMixRunner {
           StringBuffer sb = new StringBuffer();
           sb.append("-keepmap 10 ");
           sb.append("-keepred 40 ");
-          sb.append("-inFormat org.apache.hadoop.mapred.SequenceFileInputFormat ");
-          sb.append("-outFormat org.apache.hadoop.mapred.SequenceFileOutputFormat ");
+          sb.append("-inFormat");
+          sb.append(" org.apache.hadoop.mapreduce." +
+            "lib.input.SequenceFileInputFormat ");
+          sb.append("-outFormat");
+          sb.append(" org.apache.hadoop.mapreduce." +
+            "lib.output.SequenceFileOutputFormat ");
           sb.append("-outKey org.apache.hadoop.io.Text ");
           sb.append("-outValue org.apache.hadoop.io.Text ");
           sb.append("-indir ").append(indirfull).append(" ");
@@ -260,15 +277,15 @@ public class GridMixRunner {
             System.out.println(ex.toString());
           }
 
-          JobConf jobconf = GenericMRLoadJobCreator.createJob(
+          Job job = GenericMRLoadJobCreator.createJob(
               args, mapoutputCompressed, outputCompressed);
-          jobconf.setJobName("GridmixMonsterQuery." + size);
-          job = new Job(jobconf);
+          job.setJobName("GridmixMonsterQuery." + size);
+          cjob = new ControlledJob(job, null);
           if (pjob != null) {
-            job.addDependingJob(pjob);
+            cjob.addDependingJob(pjob);
           }
-          gridmix.addJob(job);
-          pjob = job;
+          gridmix.addJob(cjob);
+          pjob = cjob;
         }
       } catch (Exception e) {
         System.out.println(e.getStackTrace());
@@ -281,13 +298,16 @@ public class GridMixRunner {
         boolean outputCompressed, Size size, JobControl gridmix) {
       final String prop = String.format("webdataSort.%sJobs.inputFiles", size);
       final String indir = getInputDirsFor(prop, size.defaultPath(VARCOMPSEQ));
-      final String outdir = addTSSuffix("perf-out/webdata-sort-out-dir-" + size);
+      final String outdir = 
+        addTSSuffix("perf-out/webdata-sort-out-dir-" + size);
 
       StringBuffer sb = new StringBuffer();
       sb.append("-keepmap 100 ");
       sb.append("-keepred 100 ");
-      sb.append("-inFormat org.apache.hadoop.mapred.SequenceFileInputFormat ");
-      sb.append("-outFormat org.apache.hadoop.mapred.SequenceFileOutputFormat ");
+      sb.append("-inFormat org.apache.hadoop.mapreduce." +
+        "lib.input.SequenceFileInputFormat ");
+      sb.append("-outFormat org.apache.hadoop.mapreduce." +
+        "lib.output.SequenceFileOutputFormat ");
       sb.append("-outKey org.apache.hadoop.io.Text ");
       sb.append("-outValue org.apache.hadoop.io.Text ");
       sb.append("-indir ").append(indir).append(" ");
@@ -297,11 +317,11 @@ public class GridMixRunner {
       String[] args = sb.toString().split(" ");
       clearDir(outdir);
       try {
-        JobConf jobconf = GenericMRLoadJobCreator.createJob(
+        Job job = GenericMRLoadJobCreator.createJob(
             args, mapoutputCompressed, outputCompressed);
-        jobconf.setJobName("GridmixWebdataSort." + size);
-        Job job = new Job(jobconf);
-        gridmix.addJob(job);
+        job.setJobName("GridmixWebdataSort." + size);
+        ControlledJob cjob = new ControlledJob(job, null);
+        gridmix.addJob(cjob);
       } catch (Exception ex) {
         System.out.println(ex.getStackTrace());
       }
@@ -443,7 +463,8 @@ public class GridMixRunner {
     for (GridMixJob jobtype : EnumSet.allOf(GridMixJob.class)) {
       addAllJobs(jobtype);
     }
-    System.out.println("total " + gridmix.getWaitingJobs().size() + " jobs");
+    System.out.println("total " + 
+      gridmix.getWaitingJobList().size() + " jobs");
   }
 
   class SimpleStats {
@@ -480,35 +501,35 @@ public class GridMixRunner {
     }
   }
 
-  private TreeMap<String, String> getStatForJob(Job job) {
+  private TreeMap<String, String> getStatForJob(ControlledJob cjob) {
     TreeMap<String, String> retv = new TreeMap<String, String>();
-    String mapreduceID = job.getAssignedJobID().toString();
-    JobClient jc = job.getJobClient();
-    JobConf jobconf = job.getJobConf();
-    String jobName = jobconf.getJobName();
-    retv.put("JobId", mapreduceID);
+    JobID mapreduceID = cjob.getMapredJobID();
+    Job job = cjob.getJob();
+    String jobName = job.getJobName();
+    retv.put("JobId", mapreduceID.toString());
     retv.put("JobName", jobName);
 
     TaskExecutionStats theTaskExecutionStats = new TaskExecutionStats();
 
     try {
-      RunningJob running = jc.getJob(JobID.forName(mapreduceID));
-      Counters jobCounters = running.getCounters();
-      Iterator<Group> groups = jobCounters.iterator();
+      Counters jobCounters = job.getCounters();
+      Iterator<CounterGroup> groups = jobCounters.iterator();
       while (groups.hasNext()) {
-        Group g = groups.next();
+        CounterGroup g = groups.next();
         String gn = g.getName();
-        Iterator<Counters.Counter> cs = g.iterator();
+        Iterator<Counter> cs = g.iterator();
         while (cs.hasNext()) {
-          Counters.Counter c = cs.next();
+          Counter c = cs.next();
           String n = c.getName();
-          long v = c.getCounter();
+          long v = c.getValue();
           retv.put(mapreduceID + "." + jobName + "." + gn + "." + n, "" + v);
         }
       }
-      TaskReport[] maps = jc.getMapTaskReports(JobID.forName(mapreduceID));
+      JobClient jc = new JobClient(job.getConfiguration());
+      TaskReport[] maps = jc
+          .getMapTaskReports((org.apache.hadoop.mapred.JobID)mapreduceID);
       TaskReport[] reduces = jc
-          .getReduceTaskReports(JobID.forName(mapreduceID));
+          .getReduceTaskReports((org.apache.hadoop.mapred.JobID)mapreduceID);
       retv.put(mapreduceID + "." + jobName + "." + "numOfMapTasks", ""
           + maps.length);
       retv.put(mapreduceID + "." + jobName + "." + "numOfReduceTasks", ""
@@ -562,15 +583,15 @@ public class GridMixRunner {
           + startTime);
       retv.put(mapreduceID + "." + jobName + "." + "reduceEndTime", ""
           + finishTime);
-      if (job.getState() == Job.SUCCESS) {
+      if (cjob.getJobState() == ControlledJob.State.SUCCESS) {
         retv.put(mapreduceID + "." + "jobStatus", "successful");
-      } else if (job.getState() == Job.FAILED) {
+      } else if (cjob.getJobState() == ControlledJob.State.FAILED) {
         retv.put(mapreduceID + "." + jobName + "." + "jobStatus", "failed");
       } else {
         retv.put(mapreduceID + "." + jobName + "." + "jobStatus", "unknown");
       }
-      Iterator<Entry<String, SimpleStats>> entries = theTaskExecutionStats.theStats
-          .entrySet().iterator();
+      Iterator<Entry<String, SimpleStats>> entries = 
+        theTaskExecutionStats.theStats.entrySet().iterator();
       while (entries.hasNext()) {
         Entry<String, SimpleStats> e = entries.next();
         SimpleStats v = e.getValue();
@@ -599,7 +620,7 @@ public class GridMixRunner {
     }
   }
 
-  private void printStatsForJobs(ArrayList<Job> jobs) {
+  private void printStatsForJobs(List<ControlledJob> jobs) {
     for (int i = 0; i < jobs.size(); i++) {
       printJobStat(getStatForJob(jobs.get(i)));
     }
@@ -612,15 +633,15 @@ public class GridMixRunner {
     long startTime = System.currentTimeMillis();
     while (!gridmix.allFinished()) {
       System.out.println("Jobs in waiting state: "
-          + gridmix.getWaitingJobs().size());
+          + gridmix.getWaitingJobList().size());
       System.out.println("Jobs in ready state: "
-          + gridmix.getReadyJobs().size());
+          + gridmix.getReadyJobsList().size());
       System.out.println("Jobs in running state: "
-          + gridmix.getRunningJobs().size());
+          + gridmix.getRunningJobList().size());
       System.out.println("Jobs in success state: "
-          + gridmix.getSuccessfulJobs().size());
+          + gridmix.getSuccessfulJobList().size());
       System.out.println("Jobs in failed state: "
-          + gridmix.getFailedJobs().size());
+          + gridmix.getFailedJobList().size());
       System.out.println("\n");
 
       try {
@@ -630,8 +651,8 @@ public class GridMixRunner {
       }
     }
     long endTime = System.currentTimeMillis();
-    ArrayList<Job> fail = gridmix.getFailedJobs();
-    ArrayList<Job> succeed = gridmix.getSuccessfulJobs();
+    List<ControlledJob> fail = gridmix.getFailedJobList();
+    List<ControlledJob> succeed = gridmix.getSuccessfulJobList();
     int numOfSuccessfulJob = succeed.size();
     if (numOfSuccessfulJob > 0) {
       System.out.println(numOfSuccessfulJob + " jobs succeeded");
@@ -646,7 +667,7 @@ public class GridMixRunner {
     }
     System.out.println("GridMix results:");
     System.out.println("Total num of Jobs: " + numOfJobs);
-    System.out.println("ExecutionTime: " + ((endTime-startTime)/1000));
+    System.out.println("ExecutionTime: " + ((endTime-startTime) / 1000));
     gridmix.stop();
   }
 

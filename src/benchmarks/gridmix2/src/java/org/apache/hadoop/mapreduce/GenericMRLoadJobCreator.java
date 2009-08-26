@@ -16,27 +16,29 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.mapred;
+package org.apache.hadoop.mapreduce;
 
 import java.util.Random;
 import java.util.Stack;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.mapred.GenericMRLoadGenerator;
-import org.apache.hadoop.mapred.lib.NullOutputFormat;
-import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
+import org.apache.hadoop.mapred.JobClient;
 
 public class GenericMRLoadJobCreator extends GenericMRLoadGenerator {
 
-  public static JobConf createJob(String[] argv, boolean mapoutputCompressed,
+  public static Job createJob(String[] argv, boolean mapoutputCompressed,
       boolean outputCompressed) throws Exception {
 
-    JobConf job = new JobConf();
+    Job job = new Job();
     job.setJarByClass(GenericMRLoadGenerator.class);
     job.setMapperClass(SampleMapper.class);
     job.setReducerClass(SampleReducer.class);
@@ -46,28 +48,29 @@ public class GenericMRLoadJobCreator extends GenericMRLoadGenerator {
 
     if (null == FileOutputFormat.getOutputPath(job)) {
       // No output dir? No writes
-      job.setOutputFormat(NullOutputFormat.class);
+      job.setOutputFormatClass(NullOutputFormat.class);
     }
 
+    Configuration conf = job.getConfiguration();
     if (0 == FileInputFormat.getInputPaths(job).length) {
       // No input dir? Generate random data
       System.err.println("No input path; ignoring InputFormat");
       confRandom(job);
-    } else if (null != job.getClass("mapred.indirect.input.format", null)) {
+    } else if (null != conf.getClass("mapred.indirect.input.format", null)) {
       // specified IndirectInputFormat? Build src list
-      JobClient jClient = new JobClient(job);
+      JobClient jClient = new JobClient(conf);
       Path sysdir = jClient.getSystemDir();
       Random r = new Random();
       Path indirInputFile = new Path(sysdir, Integer.toString(r
           .nextInt(Integer.MAX_VALUE), 36)
           + "_files");
-      job.set("mapred.indirect.input.file", indirInputFile.toString());
+      conf.set("mapred.indirect.input.file", indirInputFile.toString());
       SequenceFile.Writer writer = SequenceFile.createWriter(sysdir
-          .getFileSystem(job), job, indirInputFile, LongWritable.class,
+          .getFileSystem(conf), conf, indirInputFile, LongWritable.class,
           Text.class, SequenceFile.CompressionType.NONE);
       try {
         for (Path p : FileInputFormat.getInputPaths(job)) {
-          FileSystem fs = p.getFileSystem(job);
+          FileSystem fs = p.getFileSystem(conf);
           Stack<Path> pathstack = new Stack<Path>();
           pathstack.push(p);
           while (!pathstack.empty()) {
@@ -89,10 +92,9 @@ public class GenericMRLoadJobCreator extends GenericMRLoadGenerator {
       }
     }
 
-    job.setCompressMapOutput(mapoutputCompressed);
-    job.setBoolean("mapred.output.compress", outputCompressed);
+    conf.setBoolean("mapred.compress.map.output", mapoutputCompressed);
+    conf.setBoolean("mapred.output.compress", outputCompressed);
     return job;
-
   }
 
 }
