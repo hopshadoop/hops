@@ -165,6 +165,9 @@ public class TestTaskFail extends TestCase {
       String input = "The quick brown fox\nhas many silly\nred fox sox\n";
       // launch job with fail tasks
       JobConf jobConf = mr.createJobConf();
+      // turn down the completion poll interval from the 5 second default
+      // for better test performance.
+      jobConf.set(JobClient.NetworkedJob.COMPLETION_POLL_INTERVAL_KEY, "50");
       jobConf.setOutputCommitter(CommitterWithLogs.class);
       RunningJob rJob = launchJob(jobConf, inDir, outDir, input);
       rJob.waitForCompletion();

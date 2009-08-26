@@ -715,6 +715,26 @@
 </property>
 
   <property>
+    <name>jobclient.completion.poll.interval</name>
+    <value>5000</value>
+    <description>The interval (in milliseconds) between which the JobClient
+    polls the JobTracker for updates about job status. You may want to set this
+    to a lower value to make tests run faster on a single node system. Adjusting
+    this value in production may lead to unwanted client-server traffic.
+    </description>
+  </property>
+
+  <property>
+    <name>jobclient.progress.monitor.poll.interval</name>
+    <value>1000</value>
+    <description>The interval (in milliseconds) between which the JobClient
+    reports status to the console and checks for job completion. You may want to set this
+    to a lower value to make tests run faster on a single node system. Adjusting
+    this value in production may lead to unwanted client-server traffic.
+    </description>
+  </property>
+
+  <property>
     <name>mapred.job.tracker.persist.jobstatus.active</name>
     <value>false</value>
     <description>Indicates if persistency of job status information is

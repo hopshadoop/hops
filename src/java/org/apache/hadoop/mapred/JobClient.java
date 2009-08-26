@@ -168,6 +168,17 @@ public class JobClient extends Configured implements MRConstants, Tool  {
     Configuration.addDefaultResource("mapred-site.xml");
   }
 
+  /** The interval at which monitorAndPrintJob() prints status */
+  private int progMonitorPollIntervalMillis;
+
+  /** Default progMonitorPollIntervalMillis is 1000 ms. */
+  private static final int DEFAULT_MONITOR_POLL_INTERVAL = 1000;
+
+  /** Key in mapred-*.xml that sets progMonitorPollIntervalMillis */
+  static final String PROGRESS_MONITOR_POLL_INTERVAL_KEY =
+      "jobclient.progress.monitor.poll.interval";
+
+
   /**
    * A NetworkedJob is an implementation of RunningJob.  It holds
    * a JobProfile object to provide some info, and interacts with the
@@ -176,6 +187,15 @@ public class JobClient extends Configured implements MRConstants, Tool  {
   class NetworkedJob implements RunningJob {
     JobStatus status;
     long statustime;
+
+    /** The interval at which NetworkedJob.waitForCompletion() should check. */
+    private int completionPollIntervalMillis;
+
+    /** Default completionPollIntervalMillis is 5000 ms. */
+    private static final int DEFAULT_COMPLETION_POLL_INTERVAL = 5000;
+
+    /** Key in mapred-*.xml that sets completionPollInvervalMillis */
+    static final String COMPLETION_POLL_INTERVAL_KEY = "jobclient.completion.poll.interval";
 
     /**
      * We store a JobProfile and a timestamp for when we last
@@ -187,6 +207,17 @@ public class JobClient extends Configured implements MRConstants, Tool  {
     public NetworkedJob(JobStatus job) throws IOException {
       this.status = job;
       this.statustime = System.currentTimeMillis();
+
+      // Set the completion poll interval from the configuration.
+      // Default is 5 seconds.
+      Configuration conf = JobClient.this.getConf();
+      this.completionPollIntervalMillis = conf.getInt(COMPLETION_POLL_INTERVAL_KEY,
+          DEFAULT_COMPLETION_POLL_INTERVAL);
+      if (this.completionPollIntervalMillis < 1) {
+        LOG.warn(COMPLETION_POLL_INTERVAL_KEY + " has been set to an invalid value; "
+            + "replacing with " + DEFAULT_COMPLETION_POLL_INTERVAL);
+        this.completionPollIntervalMillis = DEFAULT_COMPLETION_POLL_INTERVAL;
+      }
     }
 
     /**
@@ -306,7 +337,7 @@ public class JobClient extends Configured implements MRConstants, Tool  {
     public void waitForCompletion() throws IOException {
       while (!isComplete()) {
         try {
-          Thread.sleep(5000);
+          Thread.sleep(this.completionPollIntervalMillis);
         } catch (InterruptedException ie) {
         }
       }
@@ -412,6 +443,7 @@ public class JobClient extends Configured implements MRConstants, Tool  {
    * Create a job client.
    */
   public JobClient() {
+    this.progMonitorPollIntervalMillis = DEFAULT_MONITOR_POLL_INTERVAL;
   }
     
   /**
@@ -450,6 +482,15 @@ public class JobClient extends Configured implements MRConstants, Tool  {
     } else {
       this.jobSubmitClient = createRPCProxy(JobTracker.getAddress(conf), conf);
     }        
+
+    // Read progress monitor poll interval from config. Default is 1 second.
+    this.progMonitorPollIntervalMillis = conf.getInt(PROGRESS_MONITOR_POLL_INTERVAL_KEY,
+        DEFAULT_MONITOR_POLL_INTERVAL);
+    if (this.progMonitorPollIntervalMillis < 1) {
+      LOG.warn(PROGRESS_MONITOR_POLL_INTERVAL_KEY + " has been set to an invalid value; "
+          + " replacing with " + DEFAULT_MONITOR_POLL_INTERVAL);
+      this.progMonitorPollIntervalMillis = DEFAULT_MONITOR_POLL_INTERVAL;
+    }
   }
 
   private JobSubmissionProtocol createRPCProxy(InetSocketAddress addr,
@@ -1292,7 +1333,7 @@ public class JobClient extends Configured implements MRConstants, Tool  {
     Configuration.IntegerRanges reduceRanges = conf.getProfileTaskRange(false);
 
     while (!job.isComplete()) {
-      Thread.sleep(1000);
+      Thread.sleep(this.progMonitorPollIntervalMillis);
       String report = 
         (" map " + StringUtils.formatPercent(job.mapProgress(), 0)+
             " reduce " + 
