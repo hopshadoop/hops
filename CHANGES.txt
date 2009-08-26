@@ -263,6 +263,9 @@ Trunk (unreleased changes)
     and org.apache.hadoop.mapred.lib.MultipleOutputFormat to use new api.
     (Amareshwari Sriramadasu via sharad)
 
+    MAPREDUCE-750. Extensible ConnManager factory API. (Aaron Kimball via
+    tomwhite)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 
