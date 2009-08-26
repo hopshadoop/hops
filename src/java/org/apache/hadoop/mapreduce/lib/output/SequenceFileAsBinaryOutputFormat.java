@@ -127,10 +127,10 @@ public class SequenceFileAsBinaryOutputFormat
   
   @Override 
   public RecordWriter<BytesWritable, BytesWritable> getRecordWriter(
-      TaskAttemptContext context) throws IOException {
+      TaskAttemptContext context, String name) throws IOException {
     final SequenceFile.Writer out = getSequenceWriter(context,
       getSequenceFileOutputKeyClass(context),
-      getSequenceFileOutputValueClass(context)); 
+      getSequenceFileOutputValueClass(context), name); 
 
     return new RecordWriter<BytesWritable, BytesWritable>() {
       private WritableValueBytes wvaluebytes = new WritableValueBytes();

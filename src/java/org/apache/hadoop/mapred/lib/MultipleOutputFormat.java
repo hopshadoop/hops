@@ -47,7 +47,10 @@ import org.apache.hadoop.util.Progressable;
  * Case three: This class is used for a map only job. The job wants to use an
  * output file name that depends on both the keys and the input file name,
  * 
+ * @deprecated Use 
+ * {@link org.apache.hadoop.mapreduce.lib.output.MultipleOutputs} instead
  */
+@Deprecated
 public abstract class MultipleOutputFormat<K, V>
 extends FileOutputFormat<K, V> {
 

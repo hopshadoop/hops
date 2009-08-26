@@ -108,7 +108,7 @@ public class TextOutputFormat<K, V> extends FileOutputFormat<K, V> {
   }
 
   public RecordWriter<K, V> 
-         getRecordWriter(TaskAttemptContext job
+         getRecordWriter(TaskAttemptContext job, String name
                          ) throws IOException, InterruptedException {
     Configuration conf = job.getConfiguration();
     boolean isCompressed = getCompressOutput(job);
@@ -122,7 +122,7 @@ public class TextOutputFormat<K, V> extends FileOutputFormat<K, V> {
       codec = (CompressionCodec) ReflectionUtils.newInstance(codecClass, conf);
       extension = codec.getDefaultExtension();
     }
-    Path file = getDefaultWorkFile(job, extension);
+    Path file = getDefaultWorkFile(job, name, extension);
     FileSystem fs = file.getFileSystem(conf);
     if (!isCompressed) {
       FSDataOutputStream fileOut = fs.create(file, false);

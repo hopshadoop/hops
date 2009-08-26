@@ -39,7 +39,7 @@ import org.apache.hadoop.conf.Configuration;
 public class SequenceFileOutputFormat <K,V> extends FileOutputFormat<K, V> {
 
   protected SequenceFile.Writer getSequenceWriter(TaskAttemptContext context,
-      Class<?> keyClass, Class<?> valueClass) 
+      Class<?> keyClass, Class<?> valueClass, String name) 
       throws IOException {
     Configuration conf = context.getConfiguration();
 	    
@@ -55,7 +55,7 @@ public class SequenceFileOutputFormat <K,V> extends FileOutputFormat<K, V> {
         ReflectionUtils.newInstance(codecClass, conf);
     }
     // get the path of the temporary output file 
-    Path file = getDefaultWorkFile(context, "");
+    Path file = getDefaultWorkFile(context, name, "");
     FileSystem fs = file.getFileSystem(conf);
     return SequenceFile.createWriter(fs, conf, file,
              keyClass,
@@ -66,10 +66,10 @@ public class SequenceFileOutputFormat <K,V> extends FileOutputFormat<K, V> {
   }
   
   public RecordWriter<K, V> 
-         getRecordWriter(TaskAttemptContext context
+         getRecordWriter(TaskAttemptContext context, String name
                          ) throws IOException, InterruptedException {
     final SequenceFile.Writer out = getSequenceWriter(context,
-      context.getOutputKeyClass(), context.getOutputValueClass());
+      context.getOutputKeyClass(), context.getOutputValueClass(), name);
 
     return new RecordWriter<K, V>() {
 
