@@ -154,6 +154,11 @@
        <Bug pattern="IS2_INCONSISTENT_SYNC" />
      </Match>
 
+     <Match>
+       <Class name="org.apache.hadoop.mapred.Task" />
+       <Method name="reportFatalError" />
+       <Bug pattern="DM_EXIT" />
+     </Match>
      <!-- 
         core changes 
      -->

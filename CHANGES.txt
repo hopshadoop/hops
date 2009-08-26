@@ -488,3 +488,6 @@ Trunk (unreleased changes)
     mapred.system.dir in the JobTracker. The JobTracker will bail out if it
     encounters such an exception. (Amar Kamat via ddas)
 
+    MAPREDUCE-430. Fix a bug related to task getting stuck in case of 
+    OOM error. (Amar Kamat via ddas)
+

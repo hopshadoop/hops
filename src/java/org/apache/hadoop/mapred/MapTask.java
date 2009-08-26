@@ -60,6 +60,7 @@ import org.apache.hadoop.util.IndexedSorter;
 import org.apache.hadoop.util.Progress;
 import org.apache.hadoop.util.QuickSort;
 import org.apache.hadoop.util.ReflectionUtils;
+import org.apache.hadoop.util.StringUtils;
 
 /** A Map task. */
 class MapTask extends Task {
@@ -290,6 +291,7 @@ class MapTask extends Task {
   @Override
   public void run(final JobConf job, final TaskUmbilicalProtocol umbilical)
     throws IOException, ClassNotFoundException, InterruptedException {
+    this.umbilical = umbilical;
 
     if (isMapTask()) {
       mapPhase = getProgress().addPhase("map", 0.667f);
@@ -1188,8 +1190,13 @@ class MapTask extends Task {
             try {
               spillLock.unlock();
               sortAndSpill();
-            } catch (Throwable e) {
+            } catch (Exception e) {
               sortSpillException = e;
+            } catch (Throwable t) {
+              sortSpillException = t;
+              String logMsg = "Task " + getTaskID() + " failed : " 
+                              + StringUtils.stringifyException(t);
+              reportFatalError(getTaskID(), t, logMsg);
             } finally {
               spillLock.lock();
               if (bufend < bufindex && bufindex < bufstart) {
