@@ -497,3 +497,6 @@ Trunk (unreleased changes)
     MAPREDUCE-430. Fix a bug related to task getting stuck in case of 
     OOM error. (Amar Kamat via ddas)
 
+    MAPREDUCE-871. Fix ownership of Job/Task local files to have correct 
+    group ownership according to the egid of the tasktracker.
+    (Vinod Kumar Vavilapalli via yhemanth) 
