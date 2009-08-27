@@ -24,6 +24,8 @@ import java.io.FileWriter;
 import java.io.PrintWriter;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
 
 import junit.framework.TestCase;
 
@@ -276,6 +278,56 @@ public class TestCapacitySchedulerConf extends TestCase {
     }catch(IllegalArgumentException e) {
       assertTrue(true);
     }
+  }
+
+  /**
+   * Create a hiearchy in the conf .and check if AbstractQueue hierarchy is
+   * created properly.
+   * 
+   * @throws Exception
+   */
+  public void testHierarchyQueueCreation() throws Exception {
+    testConf = new CapacitySchedulerConf();
+    openFile();
+    startConfig();
+    writeProperty("mapred.capacity-scheduler.queue.defaultt.subQueues","q1,q2");
+    writeProperty("mapred.capacity-scheduler.queue.defaultt.capacity","100");
+    writeProperty("mapred.capacity-scheduler.queue.defaultt.q1.capacity","50");
+    writeProperty("mapred.capacity-scheduler.queue.defaultt.q2.capacity","50");
+    writeProperty("mapred.capacity-scheduler.queue.defaultt.q2.maximum-capacity","80");
+    writeProperty("mapred.capacity-scheduler.queue.defaultt.q1.supports-priority","true");
+    endConfig();
+    testConf = new CapacitySchedulerConf(new Path(testConfFile));
+    CapacityTaskScheduler scheduler = new CapacityTaskScheduler();
+    scheduler.schedConf = testConf;
+    Set<String> qs = new HashSet<String>();
+    qs.add("defaultt");
+
+    QueueHierarchyBuilder builder 
+        = new QueueHierarchyBuilder(scheduler.schedConf);
+    builder.createHierarchy(scheduler.getRoot(),qs);
+    
+    AbstractQueue rt = scheduler.getRoot();
+
+    //check for 1st level children
+    assertEquals(rt.getChildren().size(),1);
+
+    //get the first level queue.
+    AbstractQueue q = rt.getChildren().get(0);
+    assertEquals(q.getName(),"defaultt");
+    assertEquals(q instanceof ContainerQueue,true);
+    assertTrue(q.getQueueSchedulingContext().getCapacityPercent() == 100.0f);
+    assertEquals(q.getQueueSchedulingContext().supportsPriorities(),false);
+    assertTrue(q.getQueueSchedulingContext().getUlMin() == 100);
+
+    //check for grandchildren
+    AbstractQueue q1 = q.getChildren().get(0);
+    assertEquals(q.getChildren().size(),2);
+    assertTrue(q1 instanceof JobQueue);
+    assertTrue(q1.getQueueSchedulingContext().getCapacityPercent() == 50);
+    assertTrue(q1.getQueueSchedulingContext().getMaxCapacityPercent() == 80);
+
+    
   }
   
   public void testInitializationPollerProperties() 

@@ -134,7 +134,7 @@ public class JobInitializationPoller extends Thread {
           if (job == null) {
             continue;
           }
-          LOG.info("Initializing job : " + job.getJobID() + " in Queue "
+          LOG.info("Initializing job : " + job.getJobID() + " in AbstractQueue "
               + job.getProfile().getQueueName() + " For user : "
               + job.getProfile().getUser());
           if (startIniting) {
@@ -246,9 +246,9 @@ public class JobInitializationPoller extends Thread {
    */
   private HashMap<String, JobInitializationThread> threadsToQueueMap;
 
-  public JobInitializationPoller(JobQueuesManager mgr,
-      CapacitySchedulerConf rmConf, Set<String> queue, 
-      TaskTrackerManager ttm) {
+  public JobInitializationPoller(
+    JobQueuesManager mgr,
+    TaskTrackerManager ttm) {
     initializedJobs = new HashMap<JobID,JobInProgress>();
     jobQueues = new HashMap<String, QueueInfo>();
     this.jobQueueManager = mgr;
@@ -343,7 +343,7 @@ public class JobInitializationPoller extends Thread {
   private void printJobs(ArrayList<JobInProgress> jobsToInitialize) {
     for (JobInProgress job : jobsToInitialize) {
       LOG.info("Passing to Initializer Job Id :" + job.getJobID()
-          + " User: " + job.getProfile().getUser() + " Queue : "
+          + " User: " + job.getProfile().getUser() + " AbstractQueue : "
           + job.getProfile().getQueueName());
     }
   }
@@ -440,7 +440,7 @@ public class JobInitializationPoller extends Thread {
         * maxJobsPerUserAllowedToInitialize;
     int countOfJobsInitialized = 0;
     HashMap<String, Integer> userJobsInitialized = new HashMap<String, Integer>();
-    Collection<JobInProgress> jobs = jobQueueManager.getWaitingJobs(queue);
+    Collection<JobInProgress> jobs = jobQueueManager.getJobQueue(queue).getWaitingJobs();
     /*
      * Walk through the collection of waiting jobs.
      *  We maintain a map of jobs that have already been initialized. If a 
@@ -536,7 +536,7 @@ public class JobInitializationPoller extends Thread {
           LOG.info("Removing scheduled jobs from waiting queue"
               + job.getJobID());
           jobsIterator.remove();
-          jobQueueManager.removeJobFromWaitingQueue(job);
+          jobQueueManager.getJobQueue(job).removeWaitingJob(new JobSchedulingInfo(job));
           continue;
         }
       }

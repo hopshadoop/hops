@@ -14,6 +14,29 @@
       to be available for jobs in this queue.
     </description>    
   </property>
+
+  <property>
+    <name>mapred.capacity-scheduler.queue.default.subQueues</name>
+    <value></value>
+    <description>Sub-queues are queues configured within queues. 
+       They provide a mechanism for administrators to link logically related queues
+       Sub-queues can be nested. So there can be queues within a sub-queue.
+    </description>    
+  </property>
+
+  <property>
+    <name>mapred.capacity-scheduler.queue.default.maximum-capacity</name>
+    <value>-1</value>
+    <description>
+	maximum-capacity-stretch defines a limit beyond which a sub-queue cannot use the capacity of its parent queue.
+	This provides a means to limit how much excess capacity a sub-queue can use. By default, there is no limit.
+	The maximum-capacity-stretch of a queue can only be greater than or equal to its minimum capacity.
+        Default value of 100 implies , sub-queue can use complete capacity of its parent.
+        This property could be to curtail certain jobs which are long running in nature from occupying more than a 
+        certain percentage of the cluster, which in the absence of pre-emption, could lead to capacity guarantees of 
+        other queues being affected.
+    </description>    
+  </property>
   
   <property>
     <name>mapred.capacity-scheduler.queue.default.supports-priority</name>
