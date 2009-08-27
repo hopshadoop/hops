@@ -49,7 +49,7 @@ import org.apache.hadoop.conf.Configuration;
  */
 public class DBRecordReader<T extends DBWritable> extends
     RecordReader<LongWritable, T> {
-  private ResultSet results;
+  private ResultSet results = null;
 
   private Class<T> inputClass;
 
@@ -91,8 +91,6 @@ public class DBRecordReader<T extends DBWritable> extends
     this.conditions = cond;
     this.fieldNames = fields;
     this.tableName = table;
-    
-    this.results = executeQuery(getSelectQuery());
   }
 
   protected ResultSet executeQuery(String query) throws SQLException {
@@ -213,6 +211,10 @@ public class DBRecordReader<T extends DBWritable> extends
       }
       if (value == null) {
         value = createValue();
+      }
+      if (null == this.results) {
+        // First time into this method, run the query.
+        this.results = executeQuery(getSelectQuery());
       }
       if (!results.next())
         return false;

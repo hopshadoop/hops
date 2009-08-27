@@ -277,6 +277,9 @@ Trunk (unreleased changes)
     MAPREDUCE-788. Update gridmix2 to use the new API (Amareshwari Sriramadasu
     via cdouglas)
 
+    MAPREDUCE-875. Make DBRecordReader execute queries lazily. (Aaron Kimball 
+    via enis)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 
