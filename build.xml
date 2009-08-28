@@ -112,6 +112,8 @@
   <property name="test.junit.haltonfailure" value="no" />
   <property name="test.junit.maxmemory" value="512m" />
 
+  <property name="test.tools.input.dir" value="${basedir}/src/test/tools/data" />
+
   <property name="test.mapred.build.classes" value="${test.build.dir}/mapred/classes"/>
   <property name="test.mapred.commit.tests.file" value="${test.src.dir}/commit-tests" />
   <property name="test.mapred.all.tests.file" value="${test.src.dir}/all-tests" />
@@ -372,7 +374,7 @@
 
   <target name="compile-core" depends="clover, compile-mapred-classes, compile-c++" description="Compile core only"/> 
 
-  <target name="compile-contrib" depends="compile-core,compile-c++-libhdfs">
+  <target name="compile-contrib" depends="compile-core,tools,compile-c++-libhdfs">
      <subant target="compile">
         <property name="version" value="${version}"/>
         <property name="hadoop-core.version" value="${hadoop-core.version}"/>
@@ -564,6 +566,7 @@
         dir="${basedir}" timeout="${test.timeout}"
         errorProperty="tests.failed" failureProperty="tests.failed">
         <sysproperty key="test.build.data" value="${test.build.data}"/>
+        <sysproperty key="test.tools.input.dir" value = "${test.tools.input.dir}"/>
         <sysproperty key="test.cache.data" value="${test.cache.data}"/>     
         <sysproperty key="test.debug.data" value="${test.debug.data}"/>
         <sysproperty key="hadoop.log.dir" value="${test.log.dir}"/>

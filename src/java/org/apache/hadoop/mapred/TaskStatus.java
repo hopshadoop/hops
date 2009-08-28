@@ -32,7 +32,7 @@ import org.apache.hadoop.io.WritableUtils;
  * not intended to be a comprehensive piece of data.
  *
  **************************************************/
-abstract class TaskStatus implements Writable, Cloneable {
+public abstract class TaskStatus implements Writable, Cloneable {
   static final Log LOG =
     LogFactory.getLog(TaskStatus.class.getName());
   

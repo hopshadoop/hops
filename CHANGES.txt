@@ -81,6 +81,10 @@ Trunk (unreleased changes)
     MAPREDUCE-824. Add support for a hierarchy of queues in the capacity 
     scheduler. (Rahul Kumar Singh via yhemanth)
 
+    MAPREDUCE-751. Add Rumen, a tool for extracting statistics from job tracker
+    logs and generating job traces for simulation and analysis. (Dick King via
+    cdouglas)
+
   IMPROVEMENTS
 
     MAPREDUCE-816. Rename "local" mysql import to "direct" in Sqoop.

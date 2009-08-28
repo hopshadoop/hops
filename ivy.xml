@@ -275,7 +275,11 @@
       conf="common->default"/>
     <dependency org="org.codehaus.jackson"
       name="jackson-mapper-asl"
-      rev="1.0.1"
+      rev="${jackson.version}"
+      conf="common->default"/>
+    <dependency org="org.codehaus.jackson"
+      name="jackson-core-asl"
+      rev="${jackson.version}"
       conf="common->default"/>
     <dependency org="com.thoughtworks.paranamer"
       name="paranamer"
