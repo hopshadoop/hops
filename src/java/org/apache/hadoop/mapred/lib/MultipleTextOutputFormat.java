@@ -29,10 +29,7 @@ import org.apache.hadoop.util.Progressable;
 /**
  * This class extends the MultipleOutputFormat, allowing to write the output
  * data to different output files in Text output format.
- * @deprecated Use 
- * {@link org.apache.hadoop.mapreduce.lib.output.MultipleOutputs} instead
  */
-@Deprecated
 public class MultipleTextOutputFormat<K, V>
     extends MultipleOutputFormat<K, V> {
 

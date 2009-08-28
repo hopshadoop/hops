@@ -42,7 +42,6 @@ public abstract class FileOutputFormat<K, V> extends OutputFormat<K, V> {
   /** Construct output file names so that, when an output directory listing is
    * sorted lexicographically, positions correspond to output partitions.*/
   private static final NumberFormat NUMBER_FORMAT = NumberFormat.getInstance();
-  protected static final String PART = "part";
   static {
     NUMBER_FORMAT.setMinimumIntegerDigits(5);
     NUMBER_FORMAT.setGroupingUsed(false);
@@ -109,14 +108,10 @@ public abstract class FileOutputFormat<K, V> extends OutputFormat<K, V> {
     return codecClass;
   }
   
-  public RecordWriter<K, V> getRecordWriter(TaskAttemptContext job
-                     ) throws IOException, InterruptedException {
-    return getRecordWriter(job, PART);
-  }
+  public abstract RecordWriter<K, V> 
+     getRecordWriter(TaskAttemptContext job
+                     ) throws IOException, InterruptedException;
 
-  public abstract RecordWriter<K, V> getRecordWriter(TaskAttemptContext job,
-      String name) throws IOException, InterruptedException;
- 
   public void checkOutputSpecs(JobContext job
                                ) throws FileAlreadyExistsException, IOException{
     // Ensure that the output directory is set and not already there
@@ -255,11 +250,10 @@ public abstract class FileOutputFormat<K, V> extends OutputFormat<K, V> {
    * @throws IOException
    */
   public Path getDefaultWorkFile(TaskAttemptContext context,
-                                 String name,
                                  String extension) throws IOException{
     FileOutputCommitter committer = 
       (FileOutputCommitter) getOutputCommitter(context);
-    return new Path(committer.getWorkPath(), getUniqueFile(context, name, 
+    return new Path(committer.getWorkPath(), getUniqueFile(context, "part", 
                                                            extension));
   }
 

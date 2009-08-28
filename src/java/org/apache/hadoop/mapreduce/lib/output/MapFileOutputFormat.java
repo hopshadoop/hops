@@ -45,7 +45,7 @@ public class MapFileOutputFormat
     extends FileOutputFormat<WritableComparable<?>, Writable> {
 
   public RecordWriter<WritableComparable<?>, Writable> getRecordWriter(
-      TaskAttemptContext context, String name) throws IOException {
+      TaskAttemptContext context) throws IOException {
     Configuration conf = context.getConfiguration();
     CompressionCodec codec = null;
     CompressionType compressionType = CompressionType.NONE;
@@ -59,7 +59,7 @@ public class MapFileOutputFormat
       codec = (CompressionCodec) ReflectionUtils.newInstance(codecClass, conf);
     }
 
-    Path file = getDefaultWorkFile(context, name, "");
+    Path file = getDefaultWorkFile(context, "");
     FileSystem fs = file.getFileSystem(conf);
     // ignore the progress parameter, since MapFile is local
     final MapFile.Writer out =

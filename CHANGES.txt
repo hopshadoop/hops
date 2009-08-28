@@ -266,10 +266,6 @@ Trunk (unreleased changes)
     MAPREDUCE-476. Extend DistributedCache to work locally (LocalJobRunner).
     (Philip Zeyliger via tomwhite)
 
-    MAPREDUCE-370. Change org.apache.hadoop.mapred.lib.MultipleOutputs
-    and org.apache.hadoop.mapred.lib.MultipleOutputFormat to use new api.
-    (Amareshwari Sriramadasu via sharad)
-
     MAPREDUCE-750. Extensible ConnManager factory API. (Aaron Kimball via
     tomwhite)
 
