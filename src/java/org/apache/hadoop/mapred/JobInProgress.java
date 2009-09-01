@@ -321,11 +321,6 @@ public class JobInProgress {
    * to the tracker.
    */
   public JobInProgress(JobID jobid, JobTracker jobtracker, 
-                       JobConf default_conf) throws IOException {
-    this(jobid, jobtracker, default_conf, 0);
-  }
-  
-  public JobInProgress(JobID jobid, JobTracker jobtracker, 
                        JobConf default_conf, int rCount) throws IOException {
     this.restartCount = rCount;
     this.jobId = jobid;
@@ -379,10 +374,8 @@ public class JobInProgress {
     this.jobMetrics.setTag("sessionId", conf.getSessionId());
     this.jobMetrics.setTag("jobName", conf.getJobName());
     this.jobMetrics.setTag("jobId", jobid.toString());
-    if (!hasRestarted()) { //This is temporary until we fix the restart model
-      hasSpeculativeMaps = conf.getMapSpeculativeExecution();
-      hasSpeculativeReduces = conf.getReduceSpeculativeExecution();
-    }
+    hasSpeculativeMaps = conf.getMapSpeculativeExecution();
+    hasSpeculativeReduces = conf.getReduceSpeculativeExecution();
     this.maxLevel = jobtracker.getNumTaskCacheLevels();
     this.anyCacheLevel = this.maxLevel+1;
     this.nonLocalMaps = new LinkedList<TaskInProgress>();
@@ -490,10 +483,6 @@ public class JobInProgress {
    */
   public boolean inited() {
     return tasksInited.get();
-  }
-  
-  boolean hasRestarted() {
-    return restartCount > 0;
   }
 
   /**
@@ -626,7 +615,7 @@ public class JobInProgress {
   void logToJobHistory() throws IOException {
     // log job info
     JobHistory.JobInfo.logSubmitted(getJobID(), conf, jobFile.toString(), 
-        this.startTime, hasRestarted());
+        this.startTime);
   }
 
   JobClient.RawSplit[] createSplits() throws IOException {

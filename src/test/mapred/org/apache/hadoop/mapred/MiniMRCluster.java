@@ -564,13 +564,7 @@ public class MiniMRCluster {
   public JobConf getJobTrackerConf() {
     return this.conf;
   }
-  
-  /**
-   * Get num events recovered
-   */
-  public int getNumEventsRecovered() {
-    return jobTracker.getJobTracker().recoveryManager.totalEventsRecovered();
-  }
+
 
   public int getFaultCount(String hostName) {
     return jobTracker.getJobTracker().getFaultCount(hostName);

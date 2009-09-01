@@ -811,10 +811,36 @@ public class TestJobHistory extends TestCase {
       //set the done folder location
       String doneFolder = "history_done";
       conf.set("mapred.job.tracker.history.completed.location", doneFolder);
+      
+      String logDir = 
+        "file:///" + new File(System.getProperty("hadoop.log.dir")).
+        getAbsolutePath() + File.separator + "history";
+
+      Path logDirPath = new Path(logDir);
+      FileSystem logDirFs = logDirPath.getFileSystem(conf);
+      //there may be some stale files, clean them
+      if (logDirFs.exists(logDirPath)) {
+        boolean deleted = logDirFs.delete(logDirPath, true);
+        LOG.info(logDirPath + " deleted " + deleted); 
+      }
+      
+      logDirFs.mkdirs(logDirPath);
+      assertEquals("No of file in logDir not correct", 0, 
+          logDirFs.listStatus(logDirPath).length); 
+      logDirFs.create(new Path(logDirPath, "f1"));
+      logDirFs.create(new Path(logDirPath, "f2"));
+      assertEquals("No of file in logDir not correct", 2, 
+          logDirFs.listStatus(logDirPath).length);
 
       MiniDFSCluster dfsCluster = new MiniDFSCluster(conf, 2, true, null);
       mr = new MiniMRCluster(2, dfsCluster.getFileSystem().getUri().toString(),
           3, null, null, conf);
+
+      assertEquals("Files in logDir did not move to DONE folder",
+          0, logDirFs.listStatus(logDirPath).length);
+      Path doneDir = JobHistory.getCompletedJobHistoryLocation();
+      assertEquals("Files in DONE dir not correct",
+          2, doneDir.getFileSystem(conf).listStatus(doneDir).length);
 
       // run the TCs
       conf = mr.createJobConf();
@@ -836,7 +862,6 @@ public class TestJobHistory extends TestCase {
       // Run a job that will be succeeded and validate its history file
       RunningJob job = UtilsForTests.runJobSucceed(conf, inDir, outDir);
       
-      Path doneDir = JobHistory.getCompletedJobHistoryLocation();
       assertEquals("History DONE folder not correct", 
           doneFolder, doneDir.getName());
       JobID id = job.getID();

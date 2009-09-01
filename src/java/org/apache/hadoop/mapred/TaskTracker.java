@@ -1366,39 +1366,6 @@ public class TaskTracker
         // next heartbeat   
         lastHeartbeat = System.currentTimeMillis();
         
-        
-        // Check if the map-event list needs purging
-        Set<JobID> jobs = heartbeatResponse.getRecoveredJobs();
-        if (jobs.size() > 0) {
-          synchronized (this) {
-            // purge the local map events list
-            for (JobID job : jobs) {
-              RunningJob rjob;
-              synchronized (runningJobs) {
-                rjob = runningJobs.get(job);          
-                if (rjob != null) {
-                  synchronized (rjob) {
-                    FetchStatus f = rjob.getFetchStatus();
-                    if (f != null) {
-                      f.reset();
-                    }
-                  }
-                }
-              }
-            }
-
-            // Mark the reducers in shuffle for rollback
-            synchronized (shouldReset) {
-              for (Map.Entry<TaskAttemptID, TaskInProgress> entry 
-                   : runningTasks.entrySet()) {
-                if (entry.getValue().getStatus().getPhase() == Phase.SHUFFLE) {
-                  this.shouldReset.add(entry.getKey());
-                }
-              }
-            }
-          }
-        }
-        
         TaskTrackerAction[] actions = heartbeatResponse.getActions();
         if(LOG.isDebugEnabled()) {
           LOG.debug("Got heartbeatResponse from JobTracker with responseId: " + 

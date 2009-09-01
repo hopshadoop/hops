@@ -95,11 +95,11 @@ public class JobHistory {
   
   static final Pattern pattern = Pattern.compile(KEY + "=" + "\"" + VALUE + "\"");
   
+  static final String OLD_SUFFIX = ".old";
   public static final int JOB_NAME_TRIM_LENGTH = 50;
   private static String JOBTRACKER_UNIQUE_STRING = null;
   private static String LOG_DIR = null;
   private static boolean disableHistory = true; 
-  private static final String SECONDARY_FILE_SUFFIX = ".recover";
   private static long jobHistoryBlockSize = 0;
   private static String jobtrackerHostname;
   private static JobHistoryFilesManager fileManager = null;
@@ -187,6 +187,20 @@ public class JobHistory {
       fileCache.remove(id);
     }
 
+    void moveToDoneNow(Path fromPath, Path toPath) throws IOException {
+      if (disableHistory) {
+        return;
+      }
+      //check if path exists, in case of retries it may not exist
+      if (LOGDIR_FS.exists(fromPath)) {
+        LOG.info("Moving " + fromPath.toString() + " to " + 
+            toPath.toString()); 
+        DONEDIR_FS.moveFromLocalFile(fromPath, toPath);
+        DONEDIR_FS.setPermission(toPath, 
+            new FsPermission(HISTORY_FILE_PERMISSION));
+      }
+    }
+
     void moveToDone(final JobID id) {
       if (disableHistory) {
         return;
@@ -212,14 +226,7 @@ public class JobHistory {
           //move the files to DONE folder
           try {
             for (Path path : paths) {
-              //check if path exists, in case of retries it may not exist
-              if (LOGDIR_FS.exists(path)) {
-                LOG.info("Moving " + path.toString() + " to " + 
-                    DONE.toString()); 
-                DONEDIR_FS.moveFromLocalFile(path, DONE);
-                DONEDIR_FS.setPermission(new Path(DONE, path.getName()), 
-                    new FsPermission(HISTORY_FILE_PERMISSION));
-              }
+              moveToDoneNow(path, new Path(DONE, path.getName()));
             }
           } catch (Throwable e) {
             LOG.error("Unable to move history file to DONE folder.", e);
@@ -356,6 +363,21 @@ public class JobHistory {
       }
 
       fileManager.start();
+      //move the log files remaining from last run to the DONE folder
+      //suffix the file name based on Jobtracker identifier so that history
+      //files with same job id don't get over written in case of recovery.
+      FileStatus[] files = LOGDIR_FS.listStatus(new Path(LOG_DIR));
+      String jtIdentifier = fileManager.jobTracker.getTrackerIdentifier();
+      String fileSuffix = "." + jtIdentifier + OLD_SUFFIX;
+      for (FileStatus fileStatus : files) {
+        Path fromPath = fileStatus.getPath();
+        if (fromPath.equals(DONE)) { //DONE can be a subfolder of log dir
+          continue;
+        }
+        LOG.info("Moving log file from last run: " + fromPath);
+        Path toPath = new Path(DONE, fromPath.getName() + fileSuffix);
+        fileManager.moveToDoneNow(fromPath, toPath);
+      }
     } catch(IOException e) {
         LOG.error("Failed to initialize JobHistory log file", e); 
         disableHistory = true;
@@ -826,22 +848,6 @@ public class JobHistory {
       return "\\Q"+string.replaceAll("\\\\E", "\\\\E\\\\\\\\E\\\\Q")+"\\E";
     }
 
-    /**
-     * Recover the job history filename from the history folder. 
-     * Uses the following pattern
-     *    $jt-hostname_[0-9]*_$job-id_$user-$job-name*
-     * @param jobConf the job conf
-     * @param id job id
-     */
-    public static synchronized String getJobHistoryFileName(JobConf jobConf, 
-                                                            JobID id) 
-    throws IOException {
-      if (LOG_DIR == null) {
-        return null;
-      }
-      return getJobHistoryFileName(jobConf, id, new Path(LOG_DIR), LOGDIR_FS);
-    }
-
     static synchronized String getDoneJobHistoryFileName(JobConf jobConf, 
         JobID id) throws IOException {
       if (DONE == null) {
@@ -888,8 +894,7 @@ public class JobHistory {
       if (statuses.length == 0) {
         LOG.info("Nothing to recover for job " + id);
       } else {
-        // return filename considering that fact the name can be a 
-        // secondary filename like filename.recover
+        // return filename
         filename = getPrimaryFilename(statuses[0].getPath().getName(), jobName);
         LOG.info("Recovered job history filename for job " + id + " is " 
                  + filename);
@@ -902,149 +907,7 @@ public class JobHistory {
     private static String getPrimaryFilename(String filename, String jobName) 
     throws IOException{
       filename = decodeJobHistoryFileName(filename);
-      // Remove the '.recover' suffix if it exists
-      if (filename.endsWith(jobName + SECONDARY_FILE_SUFFIX)) {
-        int newLength = filename.length() - SECONDARY_FILE_SUFFIX.length();
-        filename = filename.substring(0, newLength);
-      }
       return encodeJobHistoryFileName(filename);
-    }
-    
-    /** Since there was a restart, there should be a master file and 
-     * a recovery file. Once the recovery is complete, the master should be 
-     * deleted as an indication that the recovery file should be treated as the 
-     * master upon completion or next restart.
-     * @param fileName the history filename that needs checkpointing
-     * @param conf Job conf
-     * @throws IOException
-     */
-    static synchronized void checkpointRecovery(String fileName, JobConf conf) 
-    throws IOException {
-      Path logPath = JobHistory.JobInfo.getJobHistoryLogLocation(fileName);
-      if (logPath != null) {
-        LOG.info("Deleting job history file " + logPath.getName());
-        LOGDIR_FS.delete(logPath, false);
-      }
-      // do the same for the user file too
-      logPath = JobHistory.JobInfo.getJobHistoryLogLocationForUser(fileName, 
-                                                                   conf);
-      if (logPath != null) {
-        FileSystem fs = logPath.getFileSystem(conf);
-        fs.delete(logPath, false);
-      }
-    }
-    
-    static String getSecondaryJobHistoryFile(String filename) 
-    throws IOException {
-      return encodeJobHistoryFileName(
-          decodeJobHistoryFileName(filename) + SECONDARY_FILE_SUFFIX);
-    }
-    
-    /** Selects one of the two files generated as a part of recovery. 
-     * The thumb rule is that always select the oldest file. 
-     * This call makes sure that only one file is left in the end. 
-     * @param conf job conf
-     * @param logFilePath Path of the log file
-     * @throws IOException 
-     */
-    public synchronized static Path recoverJobHistoryFile(JobConf conf, 
-                                                          Path logFilePath) 
-    throws IOException {
-      Path ret;
-      String logFileName = logFilePath.getName();
-      String tmpFilename = getSecondaryJobHistoryFile(logFileName);
-      Path logDir = logFilePath.getParent();
-      Path tmpFilePath = new Path(logDir, tmpFilename);
-      if (LOGDIR_FS.exists(logFilePath)) {
-        LOG.info(logFileName + " exists!");
-        if (LOGDIR_FS.exists(tmpFilePath)) {
-          LOG.info("Deleting " + tmpFilename 
-                   + "  and using " + logFileName + " for recovery.");
-          LOGDIR_FS.delete(tmpFilePath, false);
-        }
-        ret = tmpFilePath;
-      } else {
-        LOG.info(logFileName + " doesnt exist! Using " 
-                 + tmpFilename + " for recovery.");
-        if (LOGDIR_FS.exists(tmpFilePath)) {
-          LOG.info("Renaming " + tmpFilename + " to " + logFileName);
-          LOGDIR_FS.rename(tmpFilePath, logFilePath);
-          ret = tmpFilePath;
-        } else {
-          ret = logFilePath;
-        }
-      }
-
-      // do the same for the user files too
-      logFilePath = getJobHistoryLogLocationForUser(logFileName, conf);
-      if (logFilePath != null) {
-        FileSystem fs = logFilePath.getFileSystem(conf);
-        logDir = logFilePath.getParent();
-        tmpFilePath = new Path(logDir, tmpFilename);
-        if (fs.exists(logFilePath)) {
-          LOG.info(logFileName + " exists!");
-          if (fs.exists(tmpFilePath)) {
-            LOG.info("Deleting " + tmpFilename + "  and making " + logFileName 
-                     + " as the master history file for user.");
-            fs.delete(tmpFilePath, false);
-          }
-        } else {
-          LOG.info(logFileName + " doesnt exist! Using " 
-                   + tmpFilename + " as the master history file for user.");
-          if (fs.exists(tmpFilePath)) {
-            LOG.info("Renaming " + tmpFilename + " to " + logFileName 
-                     + " in user directory");
-            fs.rename(tmpFilePath, logFilePath);
-          }
-        }
-      }
-      
-      return ret;
-    }
-
-    /** Finalize the recovery and make one file in the end. 
-     * This invloves renaming the recover file to the master file.
-     * Note that this api should be invoked only if recovery is involved.
-     * @param id Job id  
-     * @param conf the job conf
-     * @throws IOException
-     */
-    static synchronized void finalizeRecovery(JobID id, JobConf conf) 
-    throws IOException {
-      Path tmpLogPath = fileManager.getHistoryFile(id);
-      if (tmpLogPath == null) {
-        LOG.debug("No file for job with " + id + " found in cache!");
-        return;
-      }
-      String tmpLogFileName = tmpLogPath.getName();
-      
-      // get the primary filename from the cached filename
-      String masterLogFileName = 
-        getPrimaryFilename(tmpLogFileName, getJobName(conf));
-      Path masterLogPath = new Path(tmpLogPath.getParent(), masterLogFileName);
-      
-      // rename the tmp file to the master file. Note that this should be 
-      // done only when the file is closed and handles are released.
-      LOG.info("Renaming " + tmpLogFileName + " to " + masterLogFileName);
-      LOGDIR_FS.rename(tmpLogPath, masterLogPath);
-      // update the cache
-      fileManager.setHistoryFile(id, masterLogPath);
-      
-      // do the same for the user file too
-      masterLogPath = 
-        JobHistory.JobInfo.getJobHistoryLogLocationForUser(masterLogFileName,
-                                                           conf);
-      tmpLogPath = 
-        JobHistory.JobInfo.getJobHistoryLogLocationForUser(tmpLogFileName, 
-                                                           conf);
-      if (masterLogPath != null) {
-        FileSystem fs = masterLogPath.getFileSystem(conf);
-        if (fs.exists(tmpLogPath)) {
-          LOG.info("Renaming " + tmpLogFileName + " to " + masterLogFileName
-                   + " in user directory");
-          fs.rename(tmpLogPath, masterLogPath);
-        }
-      }
     }
 
     /**
@@ -1079,19 +942,9 @@ public class JobHistory {
      * @param jobConfPath path to job conf xml file in HDFS.
      * @param submitTime time when job tracker received the job
      * @throws IOException
-     * @deprecated Use 
-     *     {@link #logSubmitted(JobID, JobConf, String, long, boolean)} instead.
      */
-     @Deprecated
      public static void logSubmitted(JobID jobId, JobConf jobConf, 
                                     String jobConfPath, long submitTime) 
-    throws IOException {
-      logSubmitted(jobId, jobConf, jobConfPath, submitTime, true);
-    }
-    
-    public static void logSubmitted(JobID jobId, JobConf jobConf, 
-                                    String jobConfPath, long submitTime, 
-                                    boolean restarted) 
     throws IOException {
       FileSystem fs = null;
       String userLogDir = null;
@@ -1106,23 +959,9 @@ public class JobHistory {
         
         // get the history filename
         String logFileName = null;
-        if (restarted) {
-          logFileName = getJobHistoryFileName(jobConf, jobId);
-          if (logFileName == null) {
-            logFileName =
-              encodeJobHistoryFileName(getNewJobHistoryFileName(jobConf, jobId));
-          } else {
-            String parts[] = logFileName.split("_");
-            //TODO this is a hack :(
-            // jobtracker-hostname_jobtracker-identifier_
-            String jtUniqueString = parts[0] + "_" + parts[1] + "_";
-            jobUniqueString = jtUniqueString + jobId.toString();
-          }
-        } else {
-          logFileName = 
-            encodeJobHistoryFileName(getNewJobHistoryFileName(jobConf, jobId));
-        }
-
+        logFileName = 
+          encodeJobHistoryFileName(getNewJobHistoryFileName(jobConf, jobId));
+        
         // setup the history log file for this job
         Path logFile = getJobHistoryLogLocation(logFileName);
         
@@ -1135,11 +974,6 @@ public class JobHistory {
           PrintWriter writer = null;
 
           if (LOG_DIR != null) {           
-          // create output stream for logging in hadoop.job.history.location 
-            if (restarted) {
-              logFile = recoverJobHistoryFile(jobConf, logFile);
-              logFileName = logFile.getName();
-            }
             
             int defaultBufferSize = 
               LOGDIR_FS.getConf().getInt("io.file.buffer.size", 4096);
@@ -1156,8 +990,6 @@ public class JobHistory {
             fileManager.setHistoryFile(jobId, logFile);
           }
           if (userLogFile != null) {
-            // Get the actual filename as recoverJobHistoryFile() might return
-            // a different filename
             userLogDir = userLogFile.getParent().toString();
             userLogFile = new Path(userLogDir, logFileName);
             
@@ -1429,15 +1261,7 @@ public class JobHistory {
      * @param jobid job id
      * @param submitTime job's submit time
      * @param launchTime job's launch time
-     * @param restartCount number of times the job got restarted
-     * @deprecated Use {@link #logJobInfo(JobID, long, long)} instead.
      */
-    @Deprecated
-    public static void logJobInfo(JobID jobid, long submitTime, long launchTime,
-                                  int restartCount){
-      logJobInfo(jobid, submitTime, launchTime);
-    }
-
     public static void logJobInfo(JobID jobid, long submitTime, long launchTime)
     {
       if (!disableHistory){

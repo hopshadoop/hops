@@ -70,7 +70,7 @@
               "</td></tr></table>\n");
 
     out.print("<br>");
-    if (tracker.hasRestarted()) {
+    if (tracker.recoveryManager.shouldRecover()) {
       out.print("<span class=\"small\"><i>");
       if (tracker.hasRecovered()) {
         out.print("The JobTracker got restarted and recovered back in " );

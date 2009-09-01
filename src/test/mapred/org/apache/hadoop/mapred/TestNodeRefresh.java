@@ -435,8 +435,8 @@ public class TestNodeRefresh extends TestCase {
     UtilsForTests.signalTasks(dfs, dfs.getFileSystem(), 
         signalFilename.toString(), signalFilename.toString(), 1);
 
-    assertTrue("Decommissioning of tracker has no effect restarted job", 
-        jt.getJob(job.getID()).failedMapTasks > 0);
+    assertTrue("Decommissioning of tracker has effect on restarted job", 
+        jt.getJob(job.getID()).failedMapTasks == 0);
     
     // check the cluster status and tracker size
     assertEquals("Tracker is not lost upon host decommissioning", 

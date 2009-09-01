@@ -95,7 +95,9 @@ window.location.href = url;
       }
 
       public boolean accept(Path path) {
-        return !(path.getName().endsWith(".xml")) && matchUser(path.getName()) && matchJobName(path.getName());
+        return !((path.getName().endsWith(".xml") || 
+          path.getName().endsWith(JobHistory.OLD_SUFFIX)) && 
+          matchUser(path.getName()) && matchJobName(path.getName()));
       }
     };
     
