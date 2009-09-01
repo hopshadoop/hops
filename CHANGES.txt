@@ -30,6 +30,9 @@ Trunk (unreleased changes)
     MAPREDUCE-479. Provide full task id to map output servlet rather than the
     reduce id, only. (Jiaqi Tan via cdouglas)
 
+    MAPREDUCE-873. Simplify job recovery. Incomplete jobs are resubmitted on 
+    jobtracker restart. Removes a public constructor in JobInProgress. (sharad)
+
   NEW FEATURES
 
     MAPREDUCE-706. Support for FIFO pools in the fair scheduler.
@@ -279,9 +282,6 @@ Trunk (unreleased changes)
 
     MAPREDUCE-875. Make DBRecordReader execute queries lazily. (Aaron Kimball 
     via enis)
-
-    MAPREDUCE-873. Simplify job recovery. InComplete jobs are resubmitted on 
-    jobtracker restart. (sharad)
 
   BUG FIXES
 
