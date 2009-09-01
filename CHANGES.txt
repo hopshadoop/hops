@@ -510,3 +510,6 @@ Trunk (unreleased changes)
     MAPREDUCE-687. Fix an assertion in TestMiniMRMapRedDebugScript.
     (Amareshwari Sriramadasu via sharad)
 
+    MAPREDUCE-924. Fixes the TestPipes testcase to use Tool.
+    (Amareshwari Sriramadasu via sharad)
+

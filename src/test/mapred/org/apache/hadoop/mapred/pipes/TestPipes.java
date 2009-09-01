@@ -42,6 +42,7 @@ import org.apache.hadoop.mapred.RunningJob;
 import org.apache.hadoop.mapred.TestMiniMRWithDFS;
 import org.apache.hadoop.mapred.Counters.Counter;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.util.ToolRunner;
 
 import junit.framework.TestCase;
 
@@ -262,12 +263,14 @@ public class TestPipes extends TestCase {
                        " -program " + 
                        dfs.getFileSystem().makeQualified(wordExec));
     try {
-      Submitter.main(new String[]{"-conf", jobXml.toString(),
+      int ret = ToolRunner.run(new Submitter(),
+                               new String[]{"-conf", jobXml.toString(),
                                   "-input", inDir.toString(),
                                   "-output", nonPipedOutDir.toString(),
                                   "-program", 
                         dfs.getFileSystem().makeQualified(wordExec).toString(),
                                   "-reduces", "2"});
+      assertEquals(0, ret);
     } catch (Exception e) {
       assertTrue("got exception: " + StringUtils.stringifyException(e), false);
     }
