@@ -503,3 +503,7 @@ Trunk (unreleased changes)
 
     MAPREDUCE-911. Fix a bug in TestTaskFail related to speculative 
     execution. (Amareshwari Sriramadasu via sharad)
+
+    MAPREDUCE-687. Fix an assertion in TestMiniMRMapRedDebugScript.
+    (Amareshwari Sriramadasu via sharad)
+
