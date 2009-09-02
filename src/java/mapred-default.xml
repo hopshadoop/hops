@@ -78,14 +78,6 @@
 </property>
 
 <property>
-  <name>io.map.index.skip</name>
-  <value>0</value>
-  <description>Number of index entries to skip between each entry.
-  Zero by default. Setting this to values larger than zero can
-  facilitate opening large map files using less memory.</description>
-</property>
-
-<property>
   <name>mapred.job.tracker</name>
   <value>local</value>
   <description>The host and port that the MapReduce job tracker runs
