@@ -77,7 +77,7 @@ public class TestReduceFetchFromPartialMem extends TestCase {
 
   /** Verify that at least one segment does not hit disk */
   public void testReduceFromPartialMem() throws Exception {
-    final int MAP_TASKS = 5;
+    final int MAP_TASKS = 7;
     JobConf job = mrCluster.createJobConf();
     job.setNumMapTasks(MAP_TASKS);
     job.setInt("mapred.inmem.merge.threshold", 0);

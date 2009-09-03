@@ -35,7 +35,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.WritableUtils;
-import org.apache.hadoop.mapred.IFile.InMemoryReader;
 import org.apache.hadoop.mapred.IFile.Reader;
 import org.apache.hadoop.mapred.IFile.Writer;
 import org.apache.hadoop.mapred.Merger.Segment;
@@ -355,7 +354,11 @@ public class BackupStore<K,V> {
   
   private void clearSegmentList() throws IOException {
     for (Segment<K,V> segment: segmentList) {
+      long len = segment.getLength();
       segment.close();
+      if (segment.inMemory()) {
+       memCache.unreserve(len);
+      }
     }
     segmentList.clear();
   }
@@ -374,6 +377,10 @@ public class BackupStore<K,V> {
       if (maxSize < defaultBlockSize) {
         defaultBlockSize = maxSize;
       }
+    }
+
+    public void unreserve(long len) {
+      ramManager.unreserve((int)len);
     }
 
     /**
@@ -485,7 +492,7 @@ public class BackupStore<K,V> {
       ramManager.unreserve(blockSize - usedSize);
 
       Reader<K, V> reader = 
-        new InMemoryReader<K, V>(ramManager, 
+        new org.apache.hadoop.mapreduce.task.reduce.InMemoryReader<K, V>(null, 
             (org.apache.hadoop.mapred.TaskAttemptID) tid, 
             dataOut.getData(), 0, usedSize);
       Segment<K, V> segment = new Segment<K, V>(reader, false);
@@ -568,7 +575,6 @@ public class BackupStore<K,V> {
       availableSize = maxSize = size;
     }
 
-    @Override
     public boolean reserve(int requestedSize, InputStream in) {
       // Not used
       LOG.warn("Reserve(int, InputStream) not supported by BackupRamManager");
@@ -595,7 +601,6 @@ public class BackupStore<K,V> {
       }
     }
 
-    @Override
     public void unreserve(int requestedSize) {
       availableSize += requestedSize;
       LOG.debug("Unreserving: " + requestedSize +

@@ -654,6 +654,11 @@ public class CapacityTestUtils {
         public int getNumSlots() {
           return t.getNumSlotsRequired();
         }
+
+        @Override
+        public void addFetchFailedMap(TaskAttemptID mapTaskId) {
+          
+        }
       };
       taskStatuses.put(t.getTaskID().toString(), status);
       status.setRunState(TaskStatus.State.RUNNING);

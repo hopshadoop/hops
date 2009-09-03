@@ -40,7 +40,11 @@ import org.apache.hadoop.util.PriorityQueue;
 import org.apache.hadoop.util.Progress;
 import org.apache.hadoop.util.Progressable;
 
-class Merger {  
+/**
+ * Merger is an utility class used by the Map and Reduce tasks for merging
+ * both their memory and disk segments
+ */
+public class Merger {  
   private static final Log LOG = LogFactory.getLog(Merger.class);
 
   // Local directories
@@ -60,9 +64,32 @@ class Merger {
   throws IOException {
     return 
       new MergeQueue<K, V>(conf, fs, inputs, deleteInputs, codec, comparator, 
-                           reporter).merge(keyClass, valueClass,
+                           reporter, null).merge(keyClass, valueClass,
                                            mergeFactor, tmpDir,
-                                           readsCounter, writesCounter, mergePhase);
+                                           readsCounter, writesCounter, 
+                                           mergePhase);
+  }
+
+  public static <K extends Object, V extends Object>
+  RawKeyValueIterator merge(Configuration conf, FileSystem fs,
+                            Class<K> keyClass, Class<V> valueClass, 
+                            CompressionCodec codec,
+                            Path[] inputs, boolean deleteInputs, 
+                            int mergeFactor, Path tmpDir,
+                            RawComparator<K> comparator,
+                            Progressable reporter,
+                            Counters.Counter readsCounter,
+                            Counters.Counter writesCounter,
+                            Counters.Counter mergedMapOutputsCounter,
+                            Progress mergePhase)
+  throws IOException {
+    return 
+      new MergeQueue<K, V>(conf, fs, inputs, deleteInputs, codec, comparator, 
+                           reporter, mergedMapOutputsCounter).merge(
+                                           keyClass, valueClass,
+                                           mergeFactor, tmpDir,
+                                           readsCounter, writesCounter,
+                                           mergePhase);
   }
   
   public static <K extends Object, V extends Object>
@@ -76,7 +103,8 @@ class Merger {
                             Progress mergePhase)
       throws IOException {
     return merge(conf, fs, keyClass, valueClass, segments, mergeFactor, tmpDir,
-                 comparator, reporter, false, readsCounter, writesCounter, mergePhase);
+                 comparator, reporter, false, readsCounter, writesCounter,
+                 mergePhase);
   }
 
   public static <K extends Object, V extends Object>
@@ -116,7 +144,7 @@ class Merger {
                                                mergePhase);
   }
 
-  static <K extends Object, V extends Object>
+  public static <K extends Object, V extends Object>
     RawKeyValueIterator merge(Configuration conf, FileSystem fs,
                             Class<K> keyClass, Class<V> valueClass,
                             List<Segment<K, V>> segments,
@@ -184,14 +212,33 @@ class Merger {
     long segmentOffset = 0;
     long segmentLength = -1;
     
+    Counters.Counter mapOutputsCounter = null;
+
     public Segment(Configuration conf, FileSystem fs, Path file,
-                   CompressionCodec codec, boolean preserve) throws IOException {
-      this(conf, fs, file, 0, fs.getFileStatus(file).getLen(), codec, preserve);
+                   CompressionCodec codec, boolean preserve)
+    throws IOException {
+      this(conf, fs, file, codec, preserve, null);
+    }
+
+    public Segment(Configuration conf, FileSystem fs, Path file,
+                   CompressionCodec codec, boolean preserve,
+                   Counters.Counter mergedMapOutputsCounter)
+  throws IOException {
+      this(conf, fs, file, 0, fs.getFileStatus(file).getLen(), codec, preserve, 
+           mergedMapOutputsCounter);
+    }
+
+    public Segment(Configuration conf, FileSystem fs, Path file,
+                   long segmentOffset, long segmentLength,
+                   CompressionCodec codec,
+                   boolean preserve) throws IOException {
+      this(conf, fs, file, segmentOffset, segmentLength, codec, preserve, null);
     }
 
     public Segment(Configuration conf, FileSystem fs, Path file,
         long segmentOffset, long segmentLength, CompressionCodec codec,
-        boolean preserve) throws IOException {
+        boolean preserve, Counters.Counter mergedMapOutputsCounter)
+    throws IOException {
       this.conf = conf;
       this.fs = fs;
       this.file = file;
@@ -200,13 +247,22 @@ class Merger {
 
       this.segmentOffset = segmentOffset;
       this.segmentLength = segmentLength;
+      
+      this.mapOutputsCounter = mergedMapOutputsCounter;
     }
     
     public Segment(Reader<K, V> reader, boolean preserve) {
+      this(reader, preserve, null);
+    }
+    
+    public Segment(Reader<K, V> reader, boolean preserve, 
+                   Counters.Counter mapOutputsCounter) {
       this.reader = reader;
       this.preserve = preserve;
       
       this.segmentLength = reader.getLength();
+      
+      this.mapOutputsCounter = mapOutputsCounter;
     }
 
     void init(Counters.Counter readsCounter) throws IOException {
@@ -214,6 +270,10 @@ class Merger {
         FSDataInputStream in = fs.open(file);
         in.seek(segmentOffset);
         reader = new Reader<K, V>(conf, in, segmentLength, codec, readsCounter);
+      }
+      
+      if (mapOutputsCounter != null) {
+        mapOutputsCounter.increment(1);
       }
     }
     
@@ -228,7 +288,7 @@ class Merger {
       return value;
     }
 
-    long getLength() { 
+    public long getLength() { 
       return (reader == null) ?
         segmentLength : reader.getLength();
     }
@@ -333,6 +393,15 @@ class Merger {
                       CompressionCodec codec, RawComparator<K> comparator,
                       Progressable reporter) 
     throws IOException {
+      this(conf, fs, inputs, deleteInputs, codec, comparator, reporter, null);
+    }
+    
+    public MergeQueue(Configuration conf, FileSystem fs, 
+                      Path[] inputs, boolean deleteInputs, 
+                      CompressionCodec codec, RawComparator<K> comparator,
+                      Progressable reporter, 
+                      Counters.Counter mergedMapOutputsCounter) 
+    throws IOException {
       this.conf = conf;
       this.fs = fs;
       this.codec = codec;
@@ -340,7 +409,11 @@ class Merger {
       this.reporter = reporter;
       
       for (Path file : inputs) {
-        segments.add(new Segment<K, V>(conf, fs, file, codec, !deleteInputs));
+        LOG.debug("MergeQ: adding: " + file);
+        segments.add(new Segment<K, V>(conf, fs, file, codec, !deleteInputs, 
+                                       (file.toString().endsWith(
+                                           Task.MERGED_OUTPUT_PREFIX) ? 
+                                        null : mergedMapOutputsCounter)));
       }
       
       // Sort segments on file-lengths

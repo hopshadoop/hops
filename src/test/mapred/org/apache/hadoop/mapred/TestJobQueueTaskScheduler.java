@@ -237,6 +237,11 @@ public class TestJobQueueTaskScheduler extends TestCase {
         public boolean getIsMap() {
           return t.isMapTask();
         }
+
+        @Override
+        public void addFetchFailedMap(TaskAttemptID mapTaskId) {
+          
+        }
       };
       status.setRunState(TaskStatus.State.RUNNING);
       trackers.get(taskTrackerName).getStatus().getTaskReports().add(status);

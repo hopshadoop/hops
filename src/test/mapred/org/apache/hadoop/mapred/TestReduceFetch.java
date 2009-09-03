@@ -37,7 +37,7 @@ public class TestReduceFetch extends TestReduceFetchFromPartialMem {
     job.setNumMapTasks(MAP_TASKS);
     job.set(JobConf.MAPRED_REDUCE_TASK_JAVA_OPTS, "-Xmx128m");
     job.setInt("mapred.job.reduce.total.mem.bytes", 128 << 20);
-    job.set("mapred.job.shuffle.input.buffer.percent", "0.14");
+    job.set("mapred.job.shuffle.input.buffer.percent", "0.05");
     job.setInt("io.sort.factor", 2);
     job.setInt("mapred.inmem.merge.threshold", 4);
     Counters c = runJob(job);

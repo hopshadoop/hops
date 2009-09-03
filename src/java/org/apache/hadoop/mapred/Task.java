@@ -61,6 +61,30 @@ abstract public class Task implements Writable, Configurable {
   private static final Log LOG =
     LogFactory.getLog(Task.class);
 
+  // Counters used by Task subclasses
+  protected static enum Counter { 
+    MAP_INPUT_RECORDS, 
+    MAP_OUTPUT_RECORDS,
+    MAP_SKIPPED_RECORDS,
+    MAP_INPUT_BYTES, 
+    MAP_OUTPUT_BYTES,
+    COMBINE_INPUT_RECORDS,
+    COMBINE_OUTPUT_RECORDS,
+    REDUCE_INPUT_GROUPS,
+    REDUCE_SHUFFLE_BYTES,
+    REDUCE_INPUT_RECORDS,
+    REDUCE_OUTPUT_RECORDS,
+    REDUCE_SKIPPED_GROUPS,
+    REDUCE_SKIPPED_RECORDS,
+    SPILLED_RECORDS,
+    FAILED_SHUFFLE,
+    SHUFFLED_MAPS,
+    MERGED_MAP_OUTPUTS,
+  }
+  
+  public static String MERGED_OUTPUT_PREFIX = ".merged";
+  
+
   /**
    * Counters to measure the usage of the different file systems.
    * Always return the String array with two elements. First one is the name of  
@@ -123,6 +147,8 @@ abstract public class Task implements Writable, Configurable {
   protected org.apache.hadoop.mapreduce.OutputFormat<?,?> outputFormat;
   protected org.apache.hadoop.mapreduce.OutputCommitter committer;
   protected final Counters.Counter spilledRecordsCounter;
+  protected final Counters.Counter failedShuffleCounter;
+  protected final Counters.Counter mergedMapOutputsCounter;
   private int numSlotsRequired;
   protected TaskUmbilicalProtocol umbilical;
 
@@ -134,6 +160,8 @@ abstract public class Task implements Writable, Configurable {
     taskStatus = TaskStatus.createTaskStatus(isMapTask());
     taskId = new TaskAttemptID();
     spilledRecordsCounter = counters.findCounter(TaskCounter.SPILLED_RECORDS);
+    failedShuffleCounter = counters.findCounter(Counter.FAILED_SHUFFLE);
+    mergedMapOutputsCounter = counters.findCounter(Counter.MERGED_MAP_OUTPUTS);
   }
 
   public Task(String jobFile, TaskAttemptID taskId, int partition, 
@@ -152,6 +180,8 @@ abstract public class Task implements Writable, Configurable {
                                                     TaskStatus.Phase.SHUFFLE, 
                                                   counters);
     spilledRecordsCounter = counters.findCounter(TaskCounter.SPILLED_RECORDS);
+    failedShuffleCounter = counters.findCounter(Counter.FAILED_SHUFFLE);
+    mergedMapOutputsCounter = counters.findCounter(Counter.MERGED_MAP_OUTPUTS);
   }
 
   ////////////////////////////////////////////
@@ -693,7 +723,12 @@ abstract public class Task implements Writable, Configurable {
     sendDone(umbilical);
   }
 
-  protected void statusUpdate(TaskUmbilicalProtocol umbilical) 
+  /**
+   * Send a status update to the task tracker
+   * @param umbilical
+   * @throws IOException
+   */
+  public void statusUpdate(TaskUmbilicalProtocol umbilical) 
   throws IOException {
     int retries = MAX_RETRIES;
     while (true) {
@@ -860,7 +895,7 @@ abstract public class Task implements Writable, Configurable {
   /**
    * OutputCollector for the combiner.
    */
-  protected static class CombineOutputCollector<K extends Object, V extends Object> 
+  public static class CombineOutputCollector<K extends Object, V extends Object> 
   implements OutputCollector<K, V> {
     private Writer<K, V> writer;
     private Counters.Counter outCounter;
@@ -938,7 +973,7 @@ abstract public class Task implements Writable, Configurable {
     /// Auxiliary methods
 
     /** Start processing next unique key. */
-    void nextKey() throws IOException {
+    public void nextKey() throws IOException {
       // read until we find a new key
       while (hasNext) { 
         readNextKey();
@@ -953,12 +988,12 @@ abstract public class Task implements Writable, Configurable {
     }
 
     /** True iff more keys remain. */
-    boolean more() { 
+    public boolean more() { 
       return more; 
     }
 
     /** The current key. */
-    KEY getKey() { 
+    public KEY getKey() { 
       return key; 
     }
 
@@ -988,7 +1023,8 @@ abstract public class Task implements Writable, Configurable {
     }
   }
 
-  protected static class CombineValuesIterator<KEY,VALUE>
+    /** Iterator to return Combined values */
+  public static class CombineValuesIterator<KEY,VALUE>
       extends ValuesIterator<KEY,VALUE> {
 
     private final Counters.Counter combineInputCounter;

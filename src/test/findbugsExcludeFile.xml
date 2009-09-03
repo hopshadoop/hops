@@ -155,10 +155,33 @@
      </Match>
 
      <Match>
+       <Class name="org.apache.hadoop.mapreduce.task.reduce.MergeThread" />
+       <Field name="inputs" />
+       <Bug pattern="IS2_INCONSISTENT_SYNC" />
+     </Match>
+
+    <!--
+     This class is unlikely to get subclassed, so ignore
+    -->
+     <Match>
+       <Class name="org.apache.hadoop.mapreduce.task.reduce.MergeManager" />
+       <Bug pattern="SC_START_IN_CTOR" />
+     </Match>
+
+    <!--
+      Do not bother if equals is not implemented. We will not need it here
+    -->
+     <Match>
+      <Class name="org.apache.hadoop.mapreduce.task.reduce.ShuffleScheduler$Penalty" />
+      <Bug pattern="EQ_COMPARETO_USE_OBJECT_EQUALS" />
+     </Match>
+
+     <Match>
        <Class name="org.apache.hadoop.mapred.Task" />
        <Method name="reportFatalError" />
        <Bug pattern="DM_EXIT" />
      </Match>
+
      <!-- 
         core changes 
      -->

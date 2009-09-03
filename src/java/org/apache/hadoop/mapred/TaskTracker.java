@@ -17,10 +17,10 @@
  */
  package org.apache.hadoop.mapred;
 
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.StringTokenizer;
 import java.util.TreeMap;
 import java.util.Vector;
 import java.util.concurrent.BlockingQueue;
@@ -70,6 +71,7 @@ import org.apache.hadoop.mapred.TaskTrackerStatus.TaskTrackerHealthStatus;
 import org.apache.hadoop.mapred.pipes.Submitter;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.filecache.TrackerDistributedCacheManager;
+import org.apache.hadoop.mapreduce.task.reduce.ShuffleHeader;
 import org.apache.hadoop.metrics.MetricsContext;
 import org.apache.hadoop.metrics.MetricsException;
 import org.apache.hadoop.metrics.MetricsRecord;
@@ -126,13 +128,13 @@ public class TaskTracker
     LogFactory.getLog(TaskTracker.class);
 
   public static final String MR_CLIENTTRACE_FORMAT =
-        "src: %s" +     // src IP
-        ", dest: %s" +  // dst IP
-        ", bytes: %s" + // byte count
-        ", op: %s" +    // operation
-        ", cliID: %s" + // task id
-        ", reduceID: %s" + // reduce id
-        ", duration: %s"; // duration
+    "src: %s" +     // src IP
+    ", dest: %s" +  // dst IP
+    ", maps: %s" + // number of maps
+    ", op: %s" +    // operation
+    ", reduceID: %s" + // reduce id
+    ", duration: %s"; // duration
+
   public static final Log ClientTraceLog =
     LogFactory.getLog(TaskTracker.class.getName() + ".clienttrace");
 
@@ -147,7 +149,7 @@ public class TaskTracker
 
   Server taskReportServer = null;
   InterTrackerProtocol jobClient;
-  
+
   private TrackerDistributedCacheManager distributedCacheManager;
     
   // last heartbeat response recieved
@@ -402,7 +404,7 @@ public class TaskTracker
     return TaskTracker.SUBDIR + Path.SEPARATOR + TaskTracker.DISTCACHEDIR;
   }
 
-  static String getJobCacheSubdir() {
+  public static String getJobCacheSubdir() {
     return TaskTracker.SUBDIR + Path.SEPARATOR + TaskTracker.JOBCACHE;
   }
 
@@ -3144,145 +3146,183 @@ public class TaskTracker
     public void doGet(HttpServletRequest request, 
                       HttpServletResponse response
                       ) throws ServletException, IOException {
-      TaskAttemptID reduceAttId = null;
-      String mapId = request.getParameter("map");
+      long start = System.currentTimeMillis();
+      String mapIds = request.getParameter("map");
       String reduceId = request.getParameter("reduce");
       String jobId = request.getParameter("job");
+
+      LOG.debug("Shuffle started for maps (mapIds=" + mapIds + ") to reduce " + 
+               reduceId);
 
       if (jobId == null) {
         throw new IOException("job parameter is required");
       }
 
-      if (mapId == null || reduceId == null) {
+      if (mapIds == null || reduceId == null) {
         throw new IOException("map and reduce parameters are required");
       }
-      try {
-        reduceAttId = TaskAttemptID.forName(reduceId);
-      } catch (IllegalArgumentException e) {
-        throw new IOException("reduce attempt ID is malformed");
-      }
+      
       ServletContext context = getServletContext();
-      int reduce = reduceAttId.getTaskID().getId();
-      byte[] buffer = new byte[MAX_BYTES_TO_READ];
-      // true iff IOException was caused by attempt to access input
-      boolean isInputException = true;
-      OutputStream outStream = null;
-      FSDataInputStream mapOutputIn = null;
+      int reduce = Integer.parseInt(reduceId);
+      DataOutputStream outStream = null;
  
-      long totalRead = 0;
       ShuffleServerMetrics shuffleMetrics =
         (ShuffleServerMetrics) context.getAttribute("shuffleServerMetrics");
       TaskTracker tracker = 
         (TaskTracker) context.getAttribute("task.tracker");
 
-      long startTime = 0;
+      int numMaps = 0;
       try {
         shuffleMetrics.serverHandlerBusy();
-        if(ClientTraceLog.isInfoEnabled())
-          startTime = System.nanoTime();
-        outStream = response.getOutputStream();
+        outStream = new DataOutputStream(response.getOutputStream());
+        //use the same buffersize as used for reading the data from disk
+        response.setBufferSize(MAX_BYTES_TO_READ);
         JobConf conf = (JobConf) context.getAttribute("conf");
         LocalDirAllocator lDirAlloc = 
           (LocalDirAllocator)context.getAttribute("localDirAllocator");
         FileSystem rfs = ((LocalFileSystem)
             context.getAttribute("local.file.system")).getRaw();
 
-        // Index file
-        Path indexFileName = lDirAlloc.getLocalPathToRead(
-            TaskTracker.getIntermediateOutputDir(jobId, mapId)
-            + "/file.out.index", conf);
-        
-        // Map-output file
-        Path mapOutputFileName = lDirAlloc.getLocalPathToRead(
-            TaskTracker.getIntermediateOutputDir(jobId, mapId)
-            + "/file.out", conf);
+        // Split the map ids, send output for one map at a time
+        StringTokenizer itr = new StringTokenizer(mapIds, ",");
+        while(itr.hasMoreTokens()) {
+          String mapId = itr.nextToken();
+          ++numMaps;
+          sendMapFile(jobId, mapId, reduce, conf, outStream,
+                      tracker, lDirAlloc, shuffleMetrics, rfs);
+        }
+      } catch (IOException ie) {
+        Log log = (Log) context.getAttribute("log");
+        String errorMsg = ("getMapOutputs(" + mapIds + "," + reduceId + 
+                           ") failed");
+        log.warn(errorMsg, ie);
+        response.sendError(HttpServletResponse.SC_GONE, errorMsg);
+        shuffleMetrics.failedOutput();
+        throw ie;
+      } finally {
+        shuffleMetrics.serverHandlerFree();
+      }
+      outStream.close();
+      shuffleMetrics.successOutput();
+      long timeElapsed = (System.currentTimeMillis()-start);
+      LOG.info("Shuffled " + numMaps
+          + "maps (mapIds=" + mapIds + ") to reduce "
+          + reduceId + " in " + timeElapsed + "s");
 
+      if (ClientTraceLog.isInfoEnabled()) {
+        ClientTraceLog.info(String.format(MR_CLIENTTRACE_FORMAT,
+            request.getLocalAddr() + ":" + request.getLocalPort(),
+            request.getRemoteAddr() + ":" + request.getRemotePort(),
+            numMaps, "MAPRED_SHUFFLE", reduceId,
+            timeElapsed));
+      }
+    }
+
+    private void sendMapFile(String jobId, String mapId,
+                             int reduce,
+                             Configuration conf,
+                             DataOutputStream outStream,
+                             TaskTracker tracker,
+                             LocalDirAllocator lDirAlloc,
+                             ShuffleServerMetrics shuffleMetrics,
+                             FileSystem localfs
+                             ) throws IOException {
+      
+      LOG.debug("sendMapFile called for " + mapId + " to reduce " + reduce);
+      
+      // true iff IOException was caused by attempt to access input
+      boolean isInputException = false;
+      FSDataInputStream mapOutputIn = null;
+      byte[] buffer = new byte[MAX_BYTES_TO_READ];
+      long totalRead = 0;
+
+      // Index file
+      Path indexFileName = lDirAlloc.getLocalPathToRead(
+          TaskTracker.getIntermediateOutputDir(jobId, mapId)
+          + "/file.out.index", conf);
+      
+      // Map-output file
+      Path mapOutputFileName = lDirAlloc.getLocalPathToRead(
+          TaskTracker.getIntermediateOutputDir(jobId, mapId)
+          + "/file.out", conf);
+
+      /**
+       * Read the index file to get the information about where
+       * the map-output for the given reducer is available. 
+       */
+      IndexRecord info = 
+        tracker.indexCache.getIndexInformation(mapId, reduce, indexFileName);
+      
+      try {
         /**
-         * Read the index file to get the information about where
-         * the map-output for the given reducer is available. 
-         */
-        IndexRecord info = 
-          tracker.indexCache.getIndexInformation(mapId, reduce,indexFileName);
-          
-        //set the custom "from-map-task" http header to the map task from which
-        //the map output data is being transferred
-        response.setHeader(FROM_MAP_TASK, mapId);
-        
-        //set the custom "Raw-Map-Output-Length" http header to 
-        //the raw (decompressed) length
-        response.setHeader(RAW_MAP_OUTPUT_LENGTH,
-            Long.toString(info.rawLength));
-
-        //set the custom "Map-Output-Length" http header to 
-        //the actual number of bytes being transferred
-        response.setHeader(MAP_OUTPUT_LENGTH,
-            Long.toString(info.partLength));
-
-        //set the custom "for-reduce-task" http header to the reduce task number
-        //for which this map output is being transferred
-        response.setHeader(FOR_REDUCE_TASK, Integer.toString(reduce));
-        
-        //use the same buffersize as used for reading the data from disk
-        response.setBufferSize(MAX_BYTES_TO_READ);
-        
-        /**
-         * Read the data from the sigle map-output file and
+         * Read the data from the single map-output file and
          * send it to the reducer.
          */
         //open the map-output file
-        mapOutputIn = rfs.open(mapOutputFileName);
-
+        mapOutputIn = localfs.open(mapOutputFileName);
         //seek to the correct offset for the reduce
         mapOutputIn.seek(info.startOffset);
+        
+        // write header for each map output
+        ShuffleHeader header = new ShuffleHeader(mapId, info.partLength,
+            info.rawLength, reduce);
+        header.write(outStream);
+
+        // read the map-output and stream it out
+        isInputException = true;
         long rem = info.partLength;
+        if (rem == 0) {
+          throw new IOException("Illegal partLength of 0 for mapId " + mapId + 
+                                " to reduce " + reduce);
+        }
         int len =
           mapOutputIn.read(buffer, 0, (int)Math.min(rem, MAX_BYTES_TO_READ));
-        while (rem > 0 && len >= 0) {
+        long now = 0;
+        while (len >= 0) {
           rem -= len;
           try {
             shuffleMetrics.outputBytes(len);
-            outStream.write(buffer, 0, len);
-            outStream.flush();
+            
+            if (len > 0) {
+              outStream.write(buffer, 0, len);
+            } else {
+              LOG.info("Skipped zero-length read of map " + mapId + 
+                       " to reduce " + reduce);
+            }
+            
           } catch (IOException ie) {
             isInputException = false;
             throw ie;
           }
           totalRead += len;
+          if (rem == 0) {
+            break;
+          }
           len =
             mapOutputIn.read(buffer, 0, (int)Math.min(rem, MAX_BYTES_TO_READ));
         }
-
-        LOG.info("Sent out " + totalRead + " bytes for reduce: " + reduce + 
-                 " from map: " + mapId + " given " + info.partLength + "/" + 
-                 info.rawLength);
+        
+        mapOutputIn.close();
       } catch (IOException ie) {
-        Log log = (Log) context.getAttribute("log");
-        String errorMsg = ("getMapOutput(" + mapId + "," + reduceId + 
-                           ") failed :\n"+
-                           StringUtils.stringifyException(ie));
-        log.warn(errorMsg);
+        String errorMsg = "error on sending map " + mapId + " to reduce " + 
+                          reduce;
         if (isInputException) {
-          tracker.mapOutputLost(TaskAttemptID.forName(mapId), errorMsg);
+          tracker.mapOutputLost(TaskAttemptID.forName(mapId), errorMsg + 
+                                StringUtils.stringifyException(ie));
         }
-        response.sendError(HttpServletResponse.SC_GONE, errorMsg);
-        shuffleMetrics.failedOutput();
-        throw ie;
-      } finally {
-        if (null != mapOutputIn) {
-          mapOutputIn.close();
+        if (mapOutputIn != null) {
+          try {
+            mapOutputIn.close();
+          } catch (IOException ioe) {
+            LOG.info("problem closing map output file", ioe);
+          }
         }
-        final long endTime = ClientTraceLog.isInfoEnabled() ? System.nanoTime() : 0;
-        shuffleMetrics.serverHandlerFree();
-        if (ClientTraceLog.isInfoEnabled()) {
-          ClientTraceLog.info(String.format(MR_CLIENTTRACE_FORMAT,
-                request.getLocalAddr() + ":" + request.getLocalPort(),
-                request.getRemoteAddr() + ":" + request.getRemotePort(),
-                totalRead, "MAPRED_SHUFFLE", mapId, reduceId,
-                endTime-startTime));
-        }
+        throw new IOException(errorMsg, ie);
       }
-      outStream.close();
-      shuffleMetrics.successOutput();
+      
+      LOG.info("Sent out " + totalRead + " bytes to reduce " + reduce + 
+          " from map: " + mapId + " given " + info.partLength + "/" + 
+          info.rawLength);
     }
   }
 

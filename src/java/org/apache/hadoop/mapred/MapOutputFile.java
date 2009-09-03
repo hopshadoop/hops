@@ -26,14 +26,22 @@ import org.apache.hadoop.fs.Path;
 
 /**
  * Manipulate the working area for the transient store for maps and reduces.
+ * This class is used by map and reduce tasks to identify the directories that
+ * they need to write to/read from for intermediate files. The callers of 
+ * these methods are from child space and see mapred.local.dir as 
+ * taskTracker/jobCache/jobId/attemptId
+ * 
+ * <FRAMEWORK-USE-ONLY>
+ * This method is intended only for use by the Map/Reduce framework and not
+ * for external users
  */ 
-class MapOutputFile {
+public class MapOutputFile {
 
   private JobConf conf;
 
   static final String REDUCE_INPUT_FILE_FORMAT_STRING = "%s/map_%d.out";
 
-  MapOutputFile() {
+  public MapOutputFile() {
   }
 
   private LocalDirAllocator lDirAlloc = 
@@ -165,7 +173,8 @@ class MapOutputFile {
    * @return path
    * @throws IOException
    */
-  public Path getInputFileForWrite(TaskID mapId, long size)
+  public Path getInputFileForWrite(org.apache.hadoop.mapreduce.TaskID mapId, 
+                                   long size)
       throws IOException {
     return lDirAlloc.getLocalPathForWrite(String.format(
         REDUCE_INPUT_FILE_FORMAT_STRING, TaskTracker.OUTPUT, mapId.getId()),
@@ -185,4 +194,5 @@ class MapOutputFile {
       this.conf = new JobConf(conf);
     }
   }
+  
 }

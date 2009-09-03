@@ -27,7 +27,7 @@ import org.apache.hadoop.mapred.JvmTask;
  * parent is a daemon which which polls the central master for a new map or
  * reduce task and runs it as a child process.  All communication between child
  * and parent is via this protocol. */ 
-interface TaskUmbilicalProtocol extends VersionedProtocol {
+public interface TaskUmbilicalProtocol extends VersionedProtocol {
 
   /** 
    * Changed the version to 2, since we have a new method getMapOutputs 
@@ -142,7 +142,6 @@ interface TaskUmbilicalProtocol extends VersionedProtocol {
    * task-tracker has changed or not. This will trigger some action at the 
    * child-process.
    *
-   * @param taskId the reduce task id
    * @param fromIndex the index starting from which the locations should be 
    * fetched
    * @param maxLocs the max number of locations to fetch
