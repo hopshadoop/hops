@@ -216,9 +216,6 @@ Trunk (unreleased changes)
     MAPREDUCE-779. Added node health failure counts into 
     JobTrackerStatistics. (Sreekanth Ramakrishnan via yhemanth)
 
-    MAPREDUCE-372. Moves ChainMapper/Reducer to the new API.
-    (Amareshwari Sriramadasu via ddas)
-
     MAPREDUCE-789. Oracle support for Sqoop. (Aaron Kimball via tomwhite)
 
     MAPREDUCE-842. Setup secure permissions for localized job files,
