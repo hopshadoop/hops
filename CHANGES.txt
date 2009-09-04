@@ -283,6 +283,9 @@ Trunk (unreleased changes)
     MAPREDUCE-318. Modularizes the shuffle code. (Jothi Padmanabhan and 
     Arun Murthy via ddas)
 
+    MAPREDUCE-936. Allow a load difference for fairshare scheduler.
+    (Zheng Shao via dhruba)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 
