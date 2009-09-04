@@ -513,3 +513,5 @@ Trunk (unreleased changes)
     MAPREDUCE-924. Fixes the TestPipes testcase to use Tool.
     (Amareshwari Sriramadasu via sharad)
 
+    MAPREDUCE-903. Add Avro jar to eclipse classpath.
+    (Philip Zeyliger via tomwhite)
