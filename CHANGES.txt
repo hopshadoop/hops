@@ -286,6 +286,9 @@ Trunk (unreleased changes)
     MAPREDUCE-936. Allow a load difference for fairshare scheduler.
     (Zheng Shao via dhruba)
 
+    MAPREDUCE-370. Update MultipleOutputs to use the API, merge funcitonality
+    of MultipleOutputFormat. (Amareshwari Sriramadasu via cdouglas)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 
