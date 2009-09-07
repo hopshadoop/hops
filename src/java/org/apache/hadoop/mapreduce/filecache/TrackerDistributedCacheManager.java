@@ -27,13 +27,11 @@ import java.util.TreeMap;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.mapreduce.filecache.DistributedCache;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.util.RunJar;
 
 /**
@@ -208,6 +206,22 @@ public class TrackerDistributedCacheManager {
     return path;
   }
 
+  /**
+   * Returns mtime of a given cache file on hdfs.
+   * 
+   * @param conf configuration
+   * @param cache cache file 
+   * @return mtime of a given cache file on hdfs
+   * @throws IOException
+   */
+  static long getTimestamp(Configuration conf, URI cache)
+    throws IOException {
+    FileSystem fileSystem = FileSystem.get(cache, conf);
+    Path filePath = new Path(cache.getPath());
+
+    return fileSystem.getFileStatus(filePath).getModificationTime();
+  }
+
   private Path cacheFilePath(Path p) {
     return new Path(p, p.getName());
   }
@@ -324,7 +338,7 @@ public class TrackerDistributedCacheManager {
 
       // update cacheStatus to reflect the newly cached file
       cacheStatus.currentStatus = true;
-      cacheStatus.mtime = DistributedCache.getTimestamp(conf, cache);
+      cacheStatus.mtime = getTimestamp(conf, cache);
 
       LOG.info(String.format("Cached %s as %s",
           cache.toString(), cacheStatus.localLoadPath));
@@ -367,7 +381,7 @@ public class TrackerDistributedCacheManager {
       if (fileStatus != null) {
         dfsFileStamp = fileStatus.getModificationTime();
       } else {
-        dfsFileStamp = DistributedCache.getTimestamp(conf, cache);
+        dfsFileStamp = getTimestamp(conf, cache);
       }
 
       // ensure that the file on hdfs hasn't been modified since the job started
@@ -488,25 +502,113 @@ public class TrackerDistributedCacheManager {
     if (tarchives != null) {
       StringBuffer archiveTimestamps = 
         new StringBuffer(String.valueOf(
-            DistributedCache.getTimestamp(job, tarchives[0])));
+            getTimestamp(job, tarchives[0])));
       for (int i = 1; i < tarchives.length; i++) {
         archiveTimestamps.append(",");
         archiveTimestamps.append(String.valueOf(
-            DistributedCache.getTimestamp(job, tarchives[i])));
+            getTimestamp(job, tarchives[i])));
       }
-      DistributedCache.setArchiveTimestamps(job, archiveTimestamps.toString());
+      setArchiveTimestamps(job, archiveTimestamps.toString());
     }
   
     URI[] tfiles = DistributedCache.getCacheFiles(job);
     if (tfiles != null) {
       StringBuffer fileTimestamps = new StringBuffer(String.valueOf(
-          DistributedCache.getTimestamp(job, tfiles[0])));
+          getTimestamp(job, tfiles[0])));
       for (int i = 1; i < tfiles.length; i++) {
         fileTimestamps.append(",");
         fileTimestamps.append(String.valueOf(
-            DistributedCache.getTimestamp(job, tfiles[i])));
+            getTimestamp(job, tfiles[i])));
       }
-      DistributedCache.setFileTimestamps(job, fileTimestamps.toString());
+      setFileTimestamps(job, fileTimestamps.toString());
     }
+  }
+  
+  /**
+   * This method checks if there is a conflict in the fragment names 
+   * of the uris. Also makes sure that each uri has a fragment. It 
+   * is only to be called if you want to create symlinks for 
+   * the various archives and files.  May be used by user code.
+   * @param uriFiles The uri array of urifiles
+   * @param uriArchives the uri array of uri archives
+   */
+  public static boolean checkURIs(URI[]  uriFiles, URI[] uriArchives){
+    if ((uriFiles == null) && (uriArchives == null)){
+      return true;
+    }
+    if (uriFiles != null){
+      for (int i = 0; i < uriFiles.length; i++){
+        String frag1 = uriFiles[i].getFragment();
+        if (frag1 == null)
+          return false;
+        for (int j=i+1; j < uriFiles.length; j++){
+          String frag2 = uriFiles[j].getFragment();
+          if (frag2 == null)
+            return false;
+          if (frag1.equalsIgnoreCase(frag2))
+            return false;
+        }
+        if (uriArchives != null){
+          for (int j = 0; j < uriArchives.length; j++){
+            String frag2 = uriArchives[j].getFragment();
+            if (frag2 == null){
+              return false;
+            }
+            if (frag1.equalsIgnoreCase(frag2))
+              return false;
+            for (int k=j+1; k < uriArchives.length; k++){
+              String frag3 = uriArchives[k].getFragment();
+              if (frag3 == null)
+                return false;
+              if (frag2.equalsIgnoreCase(frag3))
+                return false;
+            }
+          }
+        }
+      }
+    }
+    return true;
+  }
+
+  /**
+   * This is to check the timestamp of the archives to be localized.
+   * 
+   * @param conf Configuration which stores the timestamp's
+   * @param timestamps comma separated list of timestamps of archives.
+   * The order should be the same as the order in which the archives are added.
+   */
+  static void setArchiveTimestamps(Configuration conf, String timestamps) {
+    conf.set("mapred.cache.archives.timestamps", timestamps);
+  }
+
+  /**
+   * This is to check the timestamp of the files to be localized.
+   * 
+   * @param conf Configuration which stores the timestamp's
+   * @param timestamps comma separated list of timestamps of files.
+   * The order should be the same as the order in which the files are added.
+   */
+  static void setFileTimestamps(Configuration conf, String timestamps) {
+    conf.set("mapred.cache.files.timestamps", timestamps);
+  }
+  
+  /**
+   * Set the conf to contain the location for localized archives.
+   * 
+   * @param conf The conf to modify to contain the localized caches
+   * @param str a comma separated list of local archives
+   */
+  static void setLocalArchives(Configuration conf, String str) {
+    conf.set("mapred.cache.localArchives", str);
+  }
+
+  /**
+   * Set the conf to contain the location for localized files.
+   * 
+   * @param conf The conf to modify to contain the localized caches
+   * @param str a comma separated list of local files
+   */
+  static void setLocalFiles(Configuration conf, String str) {
+    conf.set("mapred.cache.localFiles", str);
   }
 }

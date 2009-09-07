@@ -19,11 +19,13 @@
 package org.apache.hadoop.mapreduce;
 
 import java.io.IOException;
+import java.net.URI;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.RawComparator;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
+import org.apache.hadoop.mapreduce.filecache.DistributedCache;
 import org.apache.hadoop.mapred.JobClient;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.RunningJob;
@@ -299,6 +301,97 @@ public class Job extends JobContext {
   public void setJobSetupCleanupNeeded(boolean needed) {
     ensureState(JobState.DEFINE);
     conf.setBoolean("mapred.committer.job.setup.cleanup.needed", needed);
+  }
+
+  /**
+   * Set the given set of archives
+   * @param archives The list of archives that need to be localized
+   */
+  public void setCacheArchives(URI[] archives) {
+    ensureState(JobState.DEFINE);
+    DistributedCache.setCacheArchives(archives, conf);
+  }
+
+  /**
+   * Set the given set of files
+   * @param files The list of files that need to be localized
+   */
+  public void setCacheFiles(URI[] files) {
+    ensureState(JobState.DEFINE);
+    DistributedCache.setCacheFiles(files, conf);
+  }
+
+  /**
+   * Add a archives to be localized
+   * @param uri The uri of the cache to be localized
+   */
+  public void addCacheArchive(URI uri) {
+    ensureState(JobState.DEFINE);
+    DistributedCache.addCacheArchive(uri, conf);
+  }
+  
+  /**
+   * Add a file to be localized
+   * @param uri The uri of the cache to be localized
+   */
+  public void addCacheFile(URI uri) {
+    ensureState(JobState.DEFINE);
+    DistributedCache.addCacheFile(uri, conf);
+  }
+
+  /**
+   * Add an file path to the current set of classpath entries It adds the file
+   * to cache as well.
+   * 
+   * @param file Path of the file to be added
+   */
+  public void addFileToClassPath(Path file)
+    throws IOException {
+    ensureState(JobState.DEFINE);
+    DistributedCache.addFileToClassPath(file, conf);
+  }
+
+  /**
+   * Add an archive path to the current set of classpath entries. It adds the
+   * archive to cache as well.
+   * 
+   * @param archive Path of the archive to be added
+   */
+  public void addArchiveToClassPath(Path archive)
+    throws IOException {
+    ensureState(JobState.DEFINE);
+    DistributedCache.addArchiveToClassPath(archive, conf);
+  }
+
+  /**
+   * This method allows you to create symlinks in the current working directory
+   * of the task to all the cache files/archives
+   */
+  public void createSymlink() {
+    ensureState(JobState.DEFINE);
+    DistributedCache.createSymlink(conf);
+  }
+  
+  /** 
+   * Expert: Set the number of maximum attempts that will be made to run a
+   * map task.
+   * 
+   * @param n the number of attempts per map task.
+   */
+  public void setMaxMapAttempts(int n) {
+    ensureState(JobState.DEFINE);
+    conf.setMaxMapAttempts(n);
+  }
+
+  /** 
+   * Expert: Set the number of maximum attempts that will be made to run a
+   * reduce task.
+   * 
+   * @param n the number of attempts per reduce task.
+   */
+  public void setMaxReduceAttempts(int n) {
+    ensureState(JobState.DEFINE);
+    conf.setMaxReduceAttempts(n);
   }
 
   /**

@@ -1881,6 +1881,52 @@
           cached files that are symlinked into the working directory of the
           task can be used to distribute native libraries and load them.</p>
           
+          <p>The <code>DistributedCache</code> tracks modification timestamps 
+          of the cache files/archives. Clearly the cache files/archives should
+          not be modified by the application or externally 
+          while the job is executing.</p>
+          
+          <p>Here is an illustrative example on how to use the 
+          <code>DistributedCache</code>:<br/>
+           // Setting up the cache for the application
+           1. Copy the requisite files to the <code>FileSystem</code>:<br/>
+            <code>$ bin/hadoop fs -copyFromLocal lookup.dat /myapp/lookup.dat</code><br/>  
+            <code>$ bin/hadoop fs -copyFromLocal map.zip /myapp/map.zip </code><br/> 
+            <code>$ bin/hadoop fs -copyFromLocal mylib.jar /myapp/mylib.jar</code><br/>
+            <code>$ bin/hadoop fs -copyFromLocal mytar.tar /myapp/mytar.tar</code><br/>
+            <code>$ bin/hadoop fs -copyFromLocal mytgz.tgz /myapp/mytgz.tgz</code><br/>
+            <code>$ bin/hadoop fs -copyFromLocal mytargz.tar.gz /myapp/mytargz.tar.gz</code><br/>
+           2. Setup the job<br/>
+            <code>Job job = new Job(conf);</code><br/>
+            <code>job.addCacheFile(new URI("/myapp/lookup.dat#lookup.dat"));</code><br/>
+            <code>job.addCacheArchive(new URI("/myapp/map.zip"));</code><br/>
+            <code>job.addFileToClassPath(new Path("/myapp/mylib.jar"));</code><br/>
+            <code>job.addCacheArchive(new URI("/myapp/mytar.tar"));</code><br/>
+            <code>job.addCacheArchive(new URI("/myapp/mytgz.tgz"));</code><br/>
+            <code>job.addCacheArchive(new URI("/myapp/mytargz.tar.gz"));</code><br/>
+      
+           3. Use the cached files in the 
+              <code>{@link org.apache.hadoop.mapreduce.Mapper}
+              or {@link org.apache.hadoop.mapreduce.Reducer}:</code><br/>
+      
+              <code>public static class MapClass extends Mapper&lt;K, V, K, V&gt; {</code><br/>
+                <code>private Path[] localArchives;</code><br/>
+                <code>private Path[] localFiles;</code><br/>
+                <code>public void setup(Context context) {</code><br/>
+                 <code>// Get the cached archives/files</code><br/>
+                 <code>localArchives = context.getLocalCacheArchives();</code><br/>
+                 <code>localFiles = context.getLocalCacheFiles();</code><br/>
+              <code>}</code><br/>
+        
+              <code>public void map(K key, V value, 
+                  Context context) throws IOException {</code><br/>
+                <code>// Use data from the cached archives/files here</code><br/>
+                <code>// ...</code><br/>
+                <code>// ...</code><br/>
+                <code>context.write(k, v);</code><br/>
+              <code>}</code><br/>
+            <code>}</code></p>
+          
         </section>
         
         <section>

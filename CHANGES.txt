@@ -289,6 +289,9 @@ Trunk (unreleased changes)
     MAPREDUCE-370. Update MultipleOutputs to use the API, merge funcitonality
     of MultipleOutputFormat. (Amareshwari Sriramadasu via cdouglas)
 
+    MAPREDUCE-898. Changes DistributedCache to use the new API.
+    (Amareshwari Sriramadasu via ddas)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 

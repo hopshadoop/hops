@@ -174,11 +174,12 @@ public class TaskDistributedCacheManager {
 
     // Update the configuration object with localized data.
     if (!localArchives.isEmpty()) {
-      DistributedCache.setLocalArchives(taskConf, 
+      TrackerDistributedCacheManager.setLocalArchives(taskConf, 
         stringifyPathList(localArchives));
     }
     if (!localFiles.isEmpty()) {
-      DistributedCache.setLocalFiles(taskConf, stringifyPathList(localFiles));
+      TrackerDistributedCacheManager.setLocalFiles(taskConf,
+        stringifyPathList(localFiles));
     }
 
   }

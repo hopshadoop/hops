@@ -24,6 +24,8 @@ import org.apache.hadoop.conf.*;
 import org.apache.hadoop.util.*;
 import org.apache.hadoop.fs.*;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.JobContext;
 
 import java.net.URI;
 
@@ -125,6 +127,7 @@ import java.net.URI;
  * @see org.apache.hadoop.mapred.JobConf
  * @see org.apache.hadoop.mapred.JobClient
  */
+@Deprecated
 public class DistributedCache {
   /**
    * Get the locally cached file or archive; it could either be 
@@ -148,9 +151,10 @@ public class DistributedCache {
    * @return the path to directory where the archives are unjarred in case of archives,
    * the path to the file where the file is copied locally 
    * @throws IOException
-   * @deprecated Internal to MapReduce framework.  Use DistributedCacheManager
-   * instead.
+   * @deprecated Internal to MapReduce framework. 
+   * Use TrackerDistributedCacheManager instead.
    */
+  @Deprecated
   public static Path getLocalCache(URI cache, Configuration conf, 
                                    Path baseDir, FileStatus fileStatus,
                                    boolean isArchive, long confFileStamp,
@@ -185,9 +189,10 @@ public class DistributedCache {
    * @return the path to directory where the archives are unjarred in case of archives,
    * the path to the file where the file is copied locally 
    * @throws IOException
-   * @deprecated Internal to MapReduce framework.  Use DistributedCacheManager
-   * instead.
+   * @deprecated Internal to MapReduce framework. 
+   * Use TrackerDistributedCacheManager instead.
    */
+  @Deprecated
   public static Path getLocalCache(URI cache, Configuration conf, 
       Path baseDir, FileStatus fileStatus,
       boolean isArchive, long confFileStamp,
@@ -219,9 +224,10 @@ public class DistributedCache {
    * @return the path to directory where the archives are unjarred in case of archives,
    * the path to the file where the file is copied locally 
    * @throws IOException
-   * @deprecated Internal to MapReduce framework.  Use DistributedCacheManager
-   * instead.
+   * @deprecated Internal to MapReduce framework.  
+   * Use TrackerDistributedCacheManager instead.
    */
+  @Deprecated
   public static Path getLocalCache(URI cache, Configuration conf, 
                                    Path baseDir, boolean isArchive,
                                    long confFileStamp, Path currentWorkDir) 
@@ -238,15 +244,16 @@ public class DistributedCache {
    * @param conf configuration which contains the filesystem the cache 
    * is contained in.
    * @throws IOException
-   * @deprecated Internal to MapReduce framework.  Use DistributedCacheManager
-   * instead.
+   * @deprecated Internal to MapReduce framework. 
+   * Use TrackerDistributedCacheManager instead.
    */
+  @Deprecated
   public static void releaseCache(URI cache, Configuration conf)
       throws IOException {
     new TrackerDistributedCacheManager(conf).releaseCache(cache, conf);
   }
   
-  /*
+  /**
    * Returns the relative path of the dir this cache will be localized in
    * relative path that this cache will be localized in. For
    * hdfs://hostname:port/absolute_path -- the relative path is
@@ -256,6 +263,7 @@ public class DistributedCache {
    * @deprecated Internal to MapReduce framework.  Use DistributedCacheManager
    * instead.
    */
+  @Deprecated
   public static String makeRelative(URI cache, Configuration conf)
       throws IOException {
     return new TrackerDistributedCacheManager(conf).makeRelative(cache, conf);
@@ -268,13 +276,13 @@ public class DistributedCache {
    * @param cache cache file 
    * @return mtime of a given cache file on hdfs
    * @throws IOException
+   * @deprecated Internal to MapReduce framework.  
+   * Use {@link TrackerDistributedCacheManager} instead.
    */
+  @Deprecated
   public static long getTimestamp(Configuration conf, URI cache)
     throws IOException {
-    FileSystem fileSystem = FileSystem.get(cache, conf);
-    Path filePath = new Path(cache.getPath());
-
-    return fileSystem.getFileStatus(filePath).getModificationTime();
+    return TrackerDistributedCacheManager.getTimestamp(conf, cache);
   }
 
   /**
@@ -286,6 +294,7 @@ public class DistributedCache {
    * @deprecated Internal to MapReduce framework.  Use DistributedCacheManager
    * instead.
    */
+  @Deprecated
   public static void createAllSymlink(Configuration conf, File jobCacheDir, File workDir)
       throws IOException{
     TrackerDistributedCacheManager.createAllSymlink(conf, jobCacheDir, workDir);
@@ -296,7 +305,9 @@ public class DistributedCache {
    * to be used by user code.
    * @param archives The list of archives that need to be localized
    * @param conf Configuration which will be changed
+   * @deprecated Use {@link Job#setCacheArchives(URI[])} instead
    */
+  @Deprecated
   public static void setCacheArchives(URI[] archives, Configuration conf) {
     String sarchives = StringUtils.uriToString(archives);
     conf.set("mapred.cache.archives", sarchives);
@@ -307,7 +318,9 @@ public class DistributedCache {
    * used by user code.
    * @param files The list of files that need to be localized
    * @param conf Configuration which will be changed
+   * @deprecated Use {@link Job#setCacheFiles(URI[])} instead
    */
+  @Deprecated
   public static void setCacheFiles(URI[] files, Configuration conf) {
     String sfiles = StringUtils.uriToString(files);
     conf.set("mapred.cache.files", sfiles);
@@ -319,7 +332,9 @@ public class DistributedCache {
    * @param conf The configuration which contains the archives
    * @return A URI array of the caches set in the Configuration
    * @throws IOException
+   * @deprecated Use {@link JobContext#getCacheArchives()} instead
    */
+  @Deprecated
   public static URI[] getCacheArchives(Configuration conf) throws IOException {
     return StringUtils.stringToURI(conf.getStrings("mapred.cache.archives"));
   }
@@ -330,7 +345,9 @@ public class DistributedCache {
    * @param conf The configuration which contains the files
    * @return A URI array of the files set in the Configuration
    * @throws IOException
+   * @deprecated Use {@link JobContext#getCacheFiles()} instead
    */
+  @Deprecated
   public static URI[] getCacheFiles(Configuration conf) throws IOException {
     return StringUtils.stringToURI(conf.getStrings("mapred.cache.files"));
   }
@@ -341,7 +358,9 @@ public class DistributedCache {
    * @param conf Configuration that contains the localized archives
    * @return A path array of localized caches
    * @throws IOException
+   * @deprecated Use {@link JobContext#getLocalCacheArchives()} instead
    */
+  @Deprecated
   public static Path[] getLocalCacheArchives(Configuration conf)
     throws IOException {
     return StringUtils.stringToPath(conf
@@ -354,7 +373,9 @@ public class DistributedCache {
    * @param conf Configuration that contains the localized files
    * @return A path array of localized files
    * @throws IOException
+   * @deprecated Use {@link JobContext#getLocalCacheFiles()} instead
    */
+  @Deprecated
   public static Path[] getLocalCacheFiles(Configuration conf)
     throws IOException {
     return StringUtils.stringToPath(conf.getStrings("mapred.cache.localFiles"));
@@ -366,7 +387,9 @@ public class DistributedCache {
    * @param conf The configuration which stored the timestamps
    * @return a string array of timestamps 
    * @throws IOException
+   * @deprecated Use {@link JobContext#getArchiveTimestamps()} instead
    */
+  @Deprecated
   public static String[] getArchiveTimestamps(Configuration conf) {
     return conf.getStrings("mapred.cache.archives.timestamps");
   }
@@ -378,7 +401,9 @@ public class DistributedCache {
    * @param conf The configuration which stored the timestamps
    * @return a string array of timestamps 
    * @throws IOException
+   * @deprecated Use {@link JobContext#getFileTimestamps()} instead
    */
+  @Deprecated
   public static String[] getFileTimestamps(Configuration conf) {
     return conf.getStrings("mapred.cache.files.timestamps");
   }
@@ -389,9 +414,13 @@ public class DistributedCache {
    * @param conf Configuration which stores the timestamp's
    * @param timestamps comma separated list of timestamps of archives.
    * The order should be the same as the order in which the archives are added.
+   * @deprecated Use 
+   * {@link TrackerDistributedCacheManager#setArchiveTimestamps(Configuration, String)}
+   * instead
    */
+  @Deprecated
   public static void setArchiveTimestamps(Configuration conf, String timestamps) {
-    conf.set("mapred.cache.archives.timestamps", timestamps);
+    TrackerDistributedCacheManager.setArchiveTimestamps(conf, timestamps);
   }
 
   /**
@@ -400,9 +429,13 @@ public class DistributedCache {
    * @param conf Configuration which stores the timestamp's
    * @param timestamps comma separated list of timestamps of files.
    * The order should be the same as the order in which the files are added.
+   * @deprecated Use 
+   * {@link TrackerDistributedCacheManager#setFileTimestamps(Configuration, String)}
+   * instead
    */
+  @Deprecated
   public static void setFileTimestamps(Configuration conf, String timestamps) {
-    conf.set("mapred.cache.files.timestamps", timestamps);
+    TrackerDistributedCacheManager.setFileTimestamps(conf, timestamps);
   }
   
   /**
@@ -410,9 +443,13 @@ public class DistributedCache {
    * by internal DistributedCache code.
    * @param conf The conf to modify to contain the localized caches
    * @param str a comma separated list of local archives
+   * @deprecated Use 
+   * {@link TrackerDistributedCacheManager#setLocalArchives(Configuration, String)}
+   * instead
    */
+  @Deprecated
   public static void setLocalArchives(Configuration conf, String str) {
-    conf.set("mapred.cache.localArchives", str);
+    TrackerDistributedCacheManager.setLocalArchives(conf, str);
   }
 
   /**
@@ -420,9 +457,13 @@ public class DistributedCache {
    * by internal DistributedCache code.
    * @param conf The conf to modify to contain the localized caches
    * @param str a comma separated list of local files
+   * @deprecated Use 
+   * {@link TrackerDistributedCacheManager#setLocalFiles(Configuration, String)}
+   * instead
    */
+  @Deprecated
   public static void setLocalFiles(Configuration conf, String str) {
-    conf.set("mapred.cache.localFiles", str);
+    TrackerDistributedCacheManager.setLocalFiles(conf, str);
   }
 
   /**
@@ -430,7 +471,9 @@ public class DistributedCache {
    * be used by user code.
    * @param uri The uri of the cache to be localized
    * @param conf Configuration to add the cache to
+   * @deprecated Use {@link Job#addCacheArchive(URI)} instead
    */
+  @Deprecated
   public static void addCacheArchive(URI uri, Configuration conf) {
     String archives = conf.get("mapred.cache.archives");
     conf.set("mapred.cache.archives", archives == null ? uri.toString()
@@ -442,7 +485,9 @@ public class DistributedCache {
    * to be used by user code.
    * @param uri The uri of the cache to be localized
    * @param conf Configuration to add the cache to
+   * @deprecated Use {@link Job#addCacheFile(URI)} instead
    */
+  @Deprecated
   public static void addCacheFile(URI uri, Configuration conf) {
     String files = conf.get("mapred.cache.files");
     conf.set("mapred.cache.files", files == null ? uri.toString() : files + ","
@@ -455,7 +500,9 @@ public class DistributedCache {
    * 
    * @param file Path of the file to be added
    * @param conf Configuration that contains the classpath setting
+   * @deprecated Use {@link Job#addFileToClassPath(Path)} instead
    */
+  @Deprecated
   public static void addFileToClassPath(Path file, Configuration conf)
     throws IOException {
     String classpath = conf.get("mapred.job.classpath.files");
@@ -472,7 +519,9 @@ public class DistributedCache {
    * Used by internal DistributedCache code.
    * 
    * @param conf Configuration that contains the classpath setting
+   * @deprecated Use {@link JobContext#getFileClassPaths()} instead 
    */
+  @Deprecated
   public static Path[] getFileClassPaths(Configuration conf) {
     ArrayList<String> list = (ArrayList<String>)conf.getStringCollection(
                                 "mapred.job.classpath.files");
@@ -492,7 +541,9 @@ public class DistributedCache {
    * 
    * @param archive Path of the archive to be added
    * @param conf Configuration that contains the classpath setting
+   * @deprecated Use {@link Job#addArchiveToClassPath(Path)} instead
    */
+  @Deprecated
   public static void addArchiveToClassPath(Path archive, Configuration conf)
     throws IOException {
     String classpath = conf.get("mapred.job.classpath.archives");
@@ -509,7 +560,9 @@ public class DistributedCache {
    * Used by internal DistributedCache code.
    * 
    * @param conf Configuration that contains the classpath setting
+   * @deprecated Use {@link JobContext#getArchiveClassPaths()} instead 
    */
+  @Deprecated
   public static Path[] getArchiveClassPaths(Configuration conf) {
     ArrayList<String> list = (ArrayList<String>)conf.getStringCollection(
                                 "mapred.job.classpath.archives");
@@ -527,8 +580,10 @@ public class DistributedCache {
    * This method allows you to create symlinks in the current working directory
    * of the task to all the cache files/archives.
    * Intended to be used by user code.
-   * @param conf the jobconf 
+   * @param conf the jobconf
+   * @deprecated Use {@link Job#createSymlink()} instead  
    */
+  @Deprecated
   public static void createSymlink(Configuration conf){
     conf.set("mapred.create.symlink", "yes");
   }
@@ -539,7 +594,9 @@ public class DistributedCache {
    * Used by internal DistributedCache code.
    * @param conf the jobconf
    * @return true if symlinks are to be created- else return false
+   * @deprecated Use {@link JobContext#getSymlink()} instead
    */
+  @Deprecated
   public static boolean getSymlink(Configuration conf){
     String result = conf.get("mapred.create.symlink");
     if ("yes".equals(result)){
@@ -555,52 +612,22 @@ public class DistributedCache {
    * the various archives and files.  May be used by user code.
    * @param uriFiles The uri array of urifiles
    * @param uriArchives the uri array of uri archives
+   * @deprecated Use 
+   * {@link TrackerDistributedCacheManager#checkURIs(URI[], URI[])} instead
    */
+  @Deprecated
   public static boolean checkURIs(URI[]  uriFiles, URI[] uriArchives){
-    if ((uriFiles == null) && (uriArchives == null)){
-      return true;
-    }
-    if (uriFiles != null){
-      for (int i = 0; i < uriFiles.length; i++){
-        String frag1 = uriFiles[i].getFragment();
-        if (frag1 == null)
-          return false;
-        for (int j=i+1; j < uriFiles.length; j++){
-          String frag2 = uriFiles[j].getFragment();
-          if (frag2 == null)
-            return false;
-          if (frag1.equalsIgnoreCase(frag2))
-            return false;
-        }
-        if (uriArchives != null){
-          for (int j = 0; j < uriArchives.length; j++){
-            String frag2 = uriArchives[j].getFragment();
-            if (frag2 == null){
-              return false;
-            }
-            if (frag1.equalsIgnoreCase(frag2))
-              return false;
-            for (int k=j+1; k < uriArchives.length; k++){
-              String frag3 = uriArchives[k].getFragment();
-              if (frag3 == null)
-                return false;
-              if (frag2.equalsIgnoreCase(frag3))
-                return false;
-            }
-          }
-        }
-      }
-    }
-    return true;
+    return TrackerDistributedCacheManager.checkURIs(uriFiles, uriArchives);
   }
 
   /**
    * Clear the entire contents of the cache and delete the backing files. This
    * should only be used when the server is reinitializing, because the users
    * are going to lose their files.
-   * @deprecated Internal to MapReduce framework.  Use DistributedCacheManager
-   * instead.
+   * @deprecated Internal to MapReduce framework. 
+   * Use TrackerDistributedCacheManager instead.
    */
+  @Deprecated
   public static void purgeCache(Configuration conf) throws IOException {
     new TrackerDistributedCacheManager(conf).purgeCache();
   }
