@@ -292,6 +292,9 @@ Trunk (unreleased changes)
     MAPREDUCE-898. Changes DistributedCache to use the new API.
     (Amareshwari Sriramadasu via ddas)
 
+    MAPREDUCE-876. Sqoop import of large tables can time out.
+    (Aaron Kimball via tomwhite)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 
