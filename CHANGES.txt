@@ -521,3 +521,6 @@ Trunk (unreleased changes)
 
     MAPREDUCE-903. Add Avro jar to eclipse classpath.
     (Philip Zeyliger via tomwhite)
+
+    MAPREDUCE-943. Removes a testcase in TestNodeRefresh that doesn't make 
+    sense in the new Job recovery model. (Amar Kamat via ddas)
