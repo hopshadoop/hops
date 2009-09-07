@@ -295,6 +295,9 @@ Trunk (unreleased changes)
     MAPREDUCE-876. Sqoop import of large tables can time out.
     (Aaron Kimball via tomwhite)
 
+    MAPREDUCE-918. Test hsqldb server should be memory-only.
+    (Aaron Kimball via tomwhite)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 
