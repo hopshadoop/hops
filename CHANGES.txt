@@ -33,6 +33,9 @@ Trunk (unreleased changes)
     MAPREDUCE-873. Simplify job recovery. Incomplete jobs are resubmitted on 
     jobtracker restart. Removes a public constructor in JobInProgress. (sharad)
 
+    HADOOP-6230. Moved process tree and memory calculator related classes from
+    Common to Map/Reduce. (Vinod Kumar Vavilapalli via yhemanth)
+
   NEW FEATURES
 
     MAPREDUCE-706. Support for FIFO pools in the fair scheduler.

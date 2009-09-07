@@ -34,8 +34,7 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.mapred.TaskController.TaskControllerContext;
 import org.apache.hadoop.mapred.TaskTracker.TaskInProgress;
 import org.apache.hadoop.util.Shell.ShellCommandExecutor;
-import org.apache.hadoop.util.ProcessTree;
-import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.mapreduce.util.ProcessTree;
 
 class JvmManager {
 

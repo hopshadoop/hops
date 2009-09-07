@@ -32,9 +32,9 @@ import org.apache.hadoop.examples.SleepJob;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.util.TestProcfsBasedProcessTree;
 import org.apache.hadoop.util.ProcfsBasedProcessTree;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.util.TestProcfsBasedProcessTree;
 import org.apache.hadoop.util.ToolRunner;
 
 import junit.framework.TestCase;
