@@ -91,6 +91,8 @@ Trunk (unreleased changes)
     logs and generating job traces for simulation and analysis. (Dick King via
     cdouglas)
 
+    MAPREDUCE-938. Postgresql support for Sqoop. (Aaron Kimball via tomwhite)	
+
   IMPROVEMENTS
 
     MAPREDUCE-816. Rename "local" mysql import to "direct" in Sqoop.
