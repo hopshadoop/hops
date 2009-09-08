@@ -539,3 +539,7 @@ Trunk (unreleased changes)
 
     MAPREDUCE-764. TypedBytesInput's readRaw() does not preserve custom type
     codes. (Klaas Bosteels via tomwhite)
+
+    HADOOP-6243. Fixes a NullPointerException in handling deprecated keys.
+    (Sreekanth Ramakrishnan via yhemanth)
+
