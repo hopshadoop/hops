@@ -307,6 +307,10 @@ Trunk (unreleased changes)
     a task is killed due to exceeding memory limits.
     (Vinod Kumar Vavilapalli via yhemanth)
 
+    MAPREDUCE-945. Modifies MRBench and TestMapRed to use ToolRunner so that
+    options such as queue name can be passed via command line.
+    (Sreekanth Ramakrishnan via yhemanth)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 
