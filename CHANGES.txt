@@ -311,6 +311,10 @@ Trunk (unreleased changes)
     options such as queue name can be passed via command line.
     (Sreekanth Ramakrishnan via yhemanth)
 
+    MAPREDUCE-963. Deprecate o.a.h.mapred.FileAlreadyExistsException and
+    replace it with o.a.h.fs.FileAlreadyExistsException.  (Boris Shkolnik
+    via szetszwo)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 
