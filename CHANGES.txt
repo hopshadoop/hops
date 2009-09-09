@@ -318,6 +318,9 @@ Trunk (unreleased changes)
     MAPREDUCE-960. Remove an unnecessary intermediate copy and obsolete API
     from KeyValueLineRecordReader. (cdouglas)
 
+    MAPREDUCE-930. Modify Rumen to resolve paths in the canonical way, rather
+    than defaulting to the local filesystem. (cdouglas)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 

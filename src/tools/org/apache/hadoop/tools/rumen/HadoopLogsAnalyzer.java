@@ -125,8 +125,6 @@ public class HadoopLogsAnalyzer extends Configured implements Tool {
    */
   private boolean omitTaskDetails = false;
 
-  private String jobTraceFilename = null;
-
   private JsonGenerator jobTraceGen = null;
 
   private boolean prettyprintTrace = true;
@@ -148,8 +146,6 @@ public class HadoopLogsAnalyzer extends Configured implements Tool {
   static final private Log LOG = LogFactory.getLog(HadoopLogsAnalyzer.class);
 
   private int[] attemptTimesPercentiles;
-
-  private String topologyFilename = null;
 
   private JsonGenerator topologyGen = null;
 
@@ -305,17 +301,6 @@ public class HadoopLogsAnalyzer extends Configured implements Tool {
     super();
   }
 
-  private Path parsePathString(String pathname) {
-    Path wd = null;
-    try {
-      wd = FileSystem.getLocal(getConf()).getWorkingDirectory();
-    } catch (IOException e) {
-      return new Path(pathname);
-    }
-
-    return new Path(wd, pathname);
-  }
-
   private boolean pathIsDirectory(Path p) throws IOException {
     FileSystem fs = p.getFileSystem(getConf());
     return fs.getFileStatus(p).isDir();
@@ -329,6 +314,8 @@ public class HadoopLogsAnalyzer extends Configured implements Tool {
    */
   private int initializeHadoopLogsAnalyzer(String[] args)
       throws FileNotFoundException, IOException {
+    Path jobTraceFilename = null;
+    Path topologyFilename = null;
     if (args.length == 0 || args[args.length - 1].charAt(0) == '-') {
       inputFilename = null;
     } else {
@@ -351,7 +338,7 @@ public class HadoopLogsAnalyzer extends Configured implements Tool {
       // these control the job digest
       if ("-write-job-trace".equals(args[i].toLowerCase())) {
         ++i;
-        jobTraceFilename = args[i];
+        jobTraceFilename = new Path(args[i]);
         continue;
       }
 
@@ -367,7 +354,7 @@ public class HadoopLogsAnalyzer extends Configured implements Tool {
 
       if ("-write-topology".equals(args[i].toLowerCase())) {
         ++i;
-        topologyFilename = args[i];
+        topologyFilename = new Path(args[i]);
         continue;
       }
 
@@ -462,7 +449,7 @@ public class HadoopLogsAnalyzer extends Configured implements Tool {
     taskMapAttemptFinishTimes = new HashMap<String, Long>();
     taskReduceAttemptFinishTimes = new HashMap<String, Long>();
 
-    Path inputPath = parsePathString(inputFilename);
+    final Path inputPath = new Path(inputFilename);
 
     inputIsDirectory = pathIsDirectory(inputPath);
 
@@ -518,10 +505,9 @@ public class HadoopLogsAnalyzer extends Configured implements Tool {
       jmapper.configure(
           SerializationConfig.Feature.CAN_OVERRIDE_ACCESS_MODIFIERS, true);
       JsonFactory jfactory = jmapper.getJsonFactory();
-      FileSystem jobFS = parsePathString(jobTraceFilename).getFileSystem(
-          getConf());
-      jobTraceGen = jfactory.createJsonGenerator(jobFS
-          .create(parsePathString(jobTraceFilename)), JsonEncoding.UTF8);
+      FileSystem jobFS = jobTraceFilename.getFileSystem(getConf());
+      jobTraceGen = jfactory.createJsonGenerator(
+          jobFS.create(jobTraceFilename), JsonEncoding.UTF8);
       if (prettyprintTrace) {
         jobTraceGen.useDefaultPrettyPrinter();
       }
@@ -531,10 +517,9 @@ public class HadoopLogsAnalyzer extends Configured implements Tool {
         tmapper.configure(
             SerializationConfig.Feature.CAN_OVERRIDE_ACCESS_MODIFIERS, true);
         JsonFactory tfactory = tmapper.getJsonFactory();
-        FileSystem topoFS = parsePathString(topologyFilename).getFileSystem(
-            getConf());
-        topologyGen = tfactory.createJsonGenerator(topoFS
-            .create(parsePathString(topologyFilename)), JsonEncoding.UTF8);
+        FileSystem topoFS = topologyFilename.getFileSystem(getConf());
+        topologyGen = tfactory.createJsonGenerator(
+            topoFS.create(topologyFilename), JsonEncoding.UTF8);
         topologyGen.useDefaultPrettyPrinter();
       }
     }

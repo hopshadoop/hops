@@ -25,8 +25,14 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.util.ToolRunner;
 
 import org.codehaus.jackson.JsonParseException;
 import org.codehaus.jackson.JsonParser;
@@ -38,94 +44,80 @@ import org.codehaus.jackson.map.DeserializationConfig;
 import junit.framework.TestCase;
 
 public class TestRumenJobTraces extends TestCase {
-  public void testSmallTrace() throws IOException {
-    File tempDirectory = new File(System.getProperty("test.build.data", "/tmp"));
 
-    String rootInputDir = System.getProperty("test.tools.input.dir", "");
-    String rootTempDir = System.getProperty("test.build.data", "");
+  public void testSmallTrace() throws Exception {
+    final Configuration conf = new Configuration();
+    final FileSystem lfs = FileSystem.getLocal(conf);
 
-    File rootInputFile = new File(new File(rootInputDir),
-        "rumen/small-trace-test");
-    File tempDirFile = new File(rootTempDir);
+    final Path rootInputDir = new Path(
+        System.getProperty("test.tools.input.dir", "")).makeQualified(lfs);
+    final Path rootTempDir = new Path(
+        System.getProperty("test.build.data", "/tmp")).makeQualified(lfs);
 
-    assertFalse("property test.build.data is not defined", ""
-        .equals(rootTempDir));
-    assertFalse("property test.tools.input.dir is not defined", ""
-        .equals(rootInputDir));
 
-    if (rootInputDir.charAt(rootInputDir.length() - 1) == '/') {
-      rootInputDir = rootInputDir.substring(0, rootInputDir.length() - 1);
-    }
+    final Path rootInputFile = new Path(rootInputDir, "rumen/small-trace-test");
+    final Path tempDir = new Path(rootTempDir, "TestRumenJobTraces");
+    lfs.delete(tempDir, true);
 
-    if (rootTempDir.charAt(rootTempDir.length() - 1) == '/') {
-      rootTempDir = rootTempDir.substring(0, rootTempDir.length() - 1);
-    }
+    assertFalse("property test.build.data is not defined",
+        "".equals(rootTempDir));
+    assertFalse("property test.tools.input.dir is not defined",
+        "".equals(rootInputDir));
 
-    File topologyFile = File.createTempFile("topology", ".json", tempDirFile);
-    File traceFile = File.createTempFile("trace", ".json", tempDirFile);
+    final Path topologyFile = new Path(tempDir, "topology.json");
+    final Path traceFile = new Path(tempDir, "trace.json");
 
-    File inputFile = new File(rootInputFile, "sample-job-tracker-logs");
+    final Path inputFile = new Path(rootInputFile, "sample-job-tracker-logs");
 
-    // topologyFile.deleteOnExit();
-    // traceFile.deleteOnExit();
-    System.out.println("topology result file = "
-        + topologyFile.getCanonicalPath());
-    System.out.println("trace result file = " + traceFile.getCanonicalPath());
+    System.out.println("topology result file = " + topologyFile);
+    System.out.println("trace result file = " + traceFile);
 
     String[] args = new String[6];
 
     args[0] = "-v1";
 
     args[1] = "-write-topology";
-    args[2] = topologyFile.getPath();
+    args[2] = topologyFile.toString();
 
     args[3] = "-write-job-trace";
-    args[4] = traceFile.getPath();
+    args[4] = traceFile.toString();
 
-    args[5] = inputFile.getPath();
-
-    assertTrue("The input file " + inputFile.getPath() + " does not exist.",
-        inputFile.canRead());
-    assertTrue("The output topology file " + topologyFile.getPath()
-        + " cannot be written.", topologyFile.canWrite());
-    assertTrue("The output trace file " + traceFile.getPath()
-        + " cannot be written.", traceFile.canWrite());
+    args[5] = inputFile.toString();
 
     PrintStream old_stdout = System.out;
 
-    File stdoutFile = File.createTempFile("stdout", ".text", tempDirFile);
+    final Path stdoutFile = new Path(tempDir, "stdout.text");
 
-    // stdoutFile.deleteOnExit();
-    System.out.println("stdout file = " + stdoutFile.getCanonicalPath());
+    System.out.println("stdout file = " + stdoutFile);
 
     PrintStream enveloped_stdout = new PrintStream(new BufferedOutputStream(
-        new FileOutputStream(stdoutFile)));
+          lfs.create(stdoutFile, true)));
 
-    File topologyGoldFile = new File(rootInputFile,
+    final Path topologyGoldFile = new Path(rootInputFile, 
         "job-tracker-logs-topology-output");
-    File traceGoldFile = new File(rootInputFile,
+    final Path traceGoldFile = new Path(rootInputFile,
         "job-tracker-logs-trace-output");
 
     try {
       System.setOut(enveloped_stdout);
 
-      HadoopLogsAnalyzer.main(args);
+      HadoopLogsAnalyzer analyzer = new HadoopLogsAnalyzer();
+
+      int result = ToolRunner.run(analyzer, args);
 
       enveloped_stdout.close();
+
+      assertEquals("Non-zero exit", 0, result);
+
     } finally {
       System.setOut(old_stdout);
     }
 
-    jsonFileMatchesGold(topologyFile, topologyGoldFile,
+    jsonFileMatchesGold(lfs, topologyFile, topologyGoldFile,
         new LoggedNetworkTopology(), "topology");
-    jsonFileMatchesGold(traceFile, traceGoldFile, new LoggedJob(), "trace");
+    jsonFileMatchesGold(lfs, traceFile, traceGoldFile, new LoggedJob(),
+        "trace");
 
-    System.out
-        .println("These files have been erased because the tests have succeeded.");
-
-    topologyFile.deleteOnExit();
-    traceFile.deleteOnExit();
-    stdoutFile.deleteOnExit();
   }
 
   /*
@@ -182,7 +174,7 @@ public class TestRumenJobTraces extends TestCase {
    * @throws IOException
    */
   private void statisticalTest(String args[], String inputFname,
-      String goldFilename, boolean inputIsDirectory) throws IOException {
+      String goldFilename, boolean inputIsDirectory) throws Exception {
     File tempDirectory = new File(System.getProperty("test.build.data", "/tmp"));
 
     String rootInputDir = System.getProperty("test.tools.input.dir", "");
@@ -232,13 +224,16 @@ public class TestRumenJobTraces extends TestCase {
     try {
       System.setOut(enveloped_stdout);
 
-      HadoopLogsAnalyzer.main(newArgs);
+      HadoopLogsAnalyzer analyzer = new HadoopLogsAnalyzer();
+
+      int result = ToolRunner.run(analyzer, args);
 
       enveloped_stdout.close();
 
       System.setOut(old_stdout);
 
       assertFilesMatch(stdoutFile, jobDistroGold);
+      assertEquals("Non-zero exit", 0, result);
     } finally {
       System.setOut(old_stdout);
     }
@@ -284,13 +279,13 @@ public class TestRumenJobTraces extends TestCase {
     assertFalse("Line number " + currentLineNumber + " disagrees", true);
   }
 
-  static private void jsonFileMatchesGold(File result, File gold, Object obj,
-      String fileDescription) throws IOException {
-    FileInputStream goldStream = new FileInputStream(gold);
+  static private void jsonFileMatchesGold(FileSystem lfs, Path result,
+        Path gold, Object obj, String fileDescription) throws IOException {
+    InputStream goldStream = lfs.open(gold);
     BufferedReader goldReader = new BufferedReader(new InputStreamReader(
         goldStream));
 
-    FileInputStream resultStream = new FileInputStream(result);
+    InputStream resultStream = lfs.open(result);
     BufferedReader resultReader = new BufferedReader(new InputStreamReader(
         resultStream));
 
