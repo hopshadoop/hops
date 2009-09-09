@@ -44,8 +44,6 @@ public class KeyValueLineRecordReader extends RecordReader<Text, Text> {
   
   private Text value;
   
-  public Class<?> getKeyClass() { return Text.class; }
-  
   public KeyValueLineRecordReader(Configuration conf)
     throws IOException {
     
@@ -75,14 +73,8 @@ public class KeyValueLineRecordReader extends RecordReader<Text, Text> {
       key.set(line, 0, lineLen);
       value.set("");
     } else {
-      int keyLen = pos;
-      byte[] keyBytes = new byte[keyLen];
-      System.arraycopy(line, 0, keyBytes, 0, keyLen);
-      int valLen = lineLen - keyLen - 1;
-      byte[] valBytes = new byte[valLen];
-      System.arraycopy(line, pos + 1, valBytes, 0, valLen);
-      key.set(keyBytes);
-      value.set(valBytes);
+      key.set(line, 0, pos);
+      value.set(line, pos + 1, lineLen - pos - 1);
     }
   }
   /** Read key/value pair in a line. */

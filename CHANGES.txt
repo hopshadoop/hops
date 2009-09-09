@@ -315,6 +315,9 @@ Trunk (unreleased changes)
     replace it with o.a.h.fs.FileAlreadyExistsException.  (Boris Shkolnik
     via szetszwo)
 
+    MAPREDUCE-960. Remove an unnecessary intermediate copy and obsolete API
+    from KeyValueLineRecordReader. (cdouglas)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 
