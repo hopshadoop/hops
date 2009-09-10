@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.mapred;
 
+import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.conf.Configuration;
 
 /**
@@ -58,5 +59,11 @@ public class CapBasedLoadManager extends LoadManager {
       int totalRunnableReduces, int totalReduceSlots) {
     return tracker.countReduceTasks() < getCap(totalRunnableReduces,
         tracker.getMaxReduceSlots(), totalReduceSlots);
+  }
+
+  @Override
+  public boolean canLaunchTask(TaskTrackerStatus tracker,
+      JobInProgress job,  TaskType type) {
+    return true;
   }
 }

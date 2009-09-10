@@ -321,6 +321,10 @@ Trunk (unreleased changes)
     MAPREDUCE-930. Modify Rumen to resolve paths in the canonical way, rather
     than defaulting to the local filesystem. (cdouglas)
 
+    MAPREDUCE-944. Extend the LoadManager API of the fair-share scheduler
+    to support regulating tasks for a job based on resources currently in use
+    by that job. (dhruba)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 

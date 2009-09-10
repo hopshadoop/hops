@@ -212,6 +212,13 @@ public class FairScheduler extends TaskScheduler {
     LOG.info("Successfully configured FairScheduler");
   }
 
+  /**
+   * Returns the LoadManager object used by the Fair Share scheduler
+   */
+  LoadManager getLoadManager() {
+    return loadMgr;
+  }
+
   @Override
   public void terminate() throws IOException {
     if (eventLog != null)
