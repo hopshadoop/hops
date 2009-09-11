@@ -19,8 +19,8 @@ package org.apache.hadoop.mapred;
 
 import java.io.IOException;
 
-import org.apache.hadoop.examples.SleepJob;
 import org.apache.hadoop.ipc.RemoteException;
+import org.apache.hadoop.mapreduce.SleepJob;
 import org.apache.hadoop.util.ToolRunner;
 
 import junit.framework.TestCase;

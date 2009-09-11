@@ -28,6 +28,8 @@ import org.apache.hadoop.mapred.TestMapRed;
 import org.apache.hadoop.mapred.TestSequenceFileInputFormat;
 import org.apache.hadoop.mapred.TestTextInputFormat;
 import org.apache.hadoop.mapred.ThreadedMapBenchmark;
+import org.apache.hadoop.mapreduce.FailJob;
+import org.apache.hadoop.mapreduce.SleepJob;
 import org.apache.hadoop.util.ProgramDriver;
 
 /**
@@ -69,6 +71,8 @@ public class MapredTestDriver {
       pgd.addClass("MRReliabilityTest", ReliabilityTest.class,
           "A program that tests the reliability of the MR framework by " +
           "injecting faults/failures");
+      pgd.addClass("fail", FailJob.class, "a job that always fails");
+      pgd.addClass("sleep", SleepJob.class, "A job that sleeps at each map and reduce task.");
     } catch(Throwable e) {
       e.printStackTrace();
     }

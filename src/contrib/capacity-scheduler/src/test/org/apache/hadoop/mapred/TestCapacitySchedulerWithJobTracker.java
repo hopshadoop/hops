@@ -20,8 +20,8 @@ package org.apache.hadoop.mapred;
 
 import java.util.Properties;
 
-import org.apache.hadoop.examples.SleepJob;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.SleepJob;
 
 public class TestCapacitySchedulerWithJobTracker extends
     ClusterWithCapacityScheduler {

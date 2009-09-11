@@ -328,6 +328,9 @@ Trunk (unreleased changes)
     to support regulating tasks for a job based on resources currently in use
     by that job. (dhruba)
 
+    MAPREDUCE-973. Move FailJob and SleepJob from examples to test. (cdouglas 
+    via omalley)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 

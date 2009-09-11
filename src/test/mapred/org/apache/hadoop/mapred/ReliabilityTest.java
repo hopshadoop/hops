@@ -122,7 +122,7 @@ public class ReliabilityTest extends Configured implements Tool {
         "-r", Integer.toString(maxReduces),
         "-mt", Integer.toString(mapSleepTime),
         "-rt", Integer.toString(reduceSleepTime)};
-    runTest(jc, conf, "org.apache.hadoop.examples.SleepJob", sleepJobArgs, 
+    runTest(jc, conf, "org.apache.hadoop.mapreduce.SleepJob", sleepJobArgs, 
         new KillTaskThread(jc, 2, 0.2f, false, 2),
         new KillTrackerThread(jc, 2, 0.4f, false, 1));
     LOG.info("SleepJob done");
