@@ -24,10 +24,13 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.compress.CodecPool;
 import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.hadoop.io.compress.SplitCompressionInputStream;
+import org.apache.hadoop.io.compress.SplittableCompressionCodec;
 import org.apache.hadoop.io.compress.CompressionCodecFactory;
 import org.apache.hadoop.io.compress.Decompressor;
 import org.apache.hadoop.mapreduce.Counter;
@@ -38,6 +41,7 @@ import org.apache.hadoop.mapreduce.MapContext;
 import org.apache.hadoop.util.LineReader;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.Log;
+import org.apache.hadoop.fs.Seekable;
 
 /**
  * Treats keys as offset in file and value as line. 
@@ -51,6 +55,7 @@ public class LineRecordReader extends RecordReader<LongWritable, Text> {
   private long end;
   private LineReader in;
   private FSDataInputStream fileIn;
+  private Seekable filePosition;
   private int maxLineLength;
   private LongWritable key = null;
   private Text value = null;
@@ -73,14 +78,27 @@ public class LineRecordReader extends RecordReader<LongWritable, Text> {
     codec = compressionCodecs.getCodec(file);
 
     // open the file and seek to the start of the split
-    FileSystem fs = file.getFileSystem(job);
-    fileIn = fs.open(split.getPath());
+    final FileSystem fs = file.getFileSystem(job);
+    fileIn = fs.open(file);
     if (isCompressedInput()) {
       decompressor = CodecPool.getDecompressor(codec);
-      in = new LineReader(codec.createInputStream(fileIn, decompressor), job);
+      if (codec instanceof SplittableCompressionCodec) {
+        final SplitCompressionInputStream cIn =
+          ((SplittableCompressionCodec)codec).createInputStream(
+            fileIn, decompressor, start, end,
+            SplittableCompressionCodec.READ_MODE.BYBLOCK);
+        in = new LineReader(cIn, job);
+        start = cIn.getAdjustedStart();
+        end = cIn.getAdjustedEnd();
+        filePosition = cIn;
+      } else {
+        in = new LineReader(codec.createInputStream(fileIn, decompressor), job);
+        filePosition = fileIn;
+      }
     } else {
       fileIn.seek(start);
       in = new LineReader(fileIn, job);
+      filePosition = fileIn;
     }
     // If this is not the first split, we always throw away first record
     // because we always (except the last split) read one extra line in
@@ -91,22 +109,26 @@ public class LineRecordReader extends RecordReader<LongWritable, Text> {
     this.pos = start;
   }
   
-  private boolean isCompressedInput() { return (codec != null); }
-  
+  private boolean isCompressedInput() {
+    return (codec != null);
+  }
+
   private int maxBytesToConsume() {
-    return (isCompressedInput()) ? Integer.MAX_VALUE
-                           : (int) Math.min(Integer.MAX_VALUE, (end - start));
+    return isCompressedInput()
+      ? Integer.MAX_VALUE
+      : (int) Math.min(Integer.MAX_VALUE, (end - start));
   }
   
   private long getFilePosition() throws IOException {
     long retVal;
-    if (isCompressedInput()) {
-      retVal = fileIn.getPos();
+    if (isCompressedInput() && null != filePosition) {
+      retVal = filePosition.getPos();
     } else {
       retVal = pos;
     }
     return retVal;
   }
+
   public boolean nextKeyValue() throws IOException {
     if (key == null) {
       key = new LongWritable();

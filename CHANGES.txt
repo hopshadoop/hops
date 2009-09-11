@@ -93,6 +93,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-938. Postgresql support for Sqoop. (Aaron Kimball via tomwhite)	
 
+    MAPREDUCE-830. Add support for splittable compression to TextInputFormats.
+    (Abdul Qadeer via cdouglas)
+
   IMPROVEMENTS
 
     MAPREDUCE-816. Rename "local" mysql import to "direct" in Sqoop.
