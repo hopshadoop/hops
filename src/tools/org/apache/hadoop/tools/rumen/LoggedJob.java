@@ -102,7 +102,7 @@ public class LoggedJob implements DeepCompare {
     setJobID(jobID);
   }
 
-  // TODO consider having default readers on the other objects
+  @SuppressWarnings("unused") // for input parameter ignored.
   @JsonAnySetter
   public void setUnknownAttribute(String attributeName, Object ignored) {
     if (!alreadySeenAnySetterAttributes.contains(attributeName)) {

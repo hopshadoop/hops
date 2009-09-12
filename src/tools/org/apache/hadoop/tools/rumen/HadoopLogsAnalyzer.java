@@ -66,7 +66,7 @@ import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.map.SerializationConfig;
 
 /**
- * This is the mainclass for rumen log mining functionality.
+ * This is the main class for rumen log mining functionality.
  * 
  * It reads a directory of job tracker logs, and computes various information
  * about it. See {@code usage()}, below.
@@ -85,11 +85,12 @@ public class HadoopLogsAnalyzer extends Configured implements Tool {
    */
   private final static int MAXIMUM_PREFERRED_LOCATIONS = 25;
 
-  // This element is to compensate for the fact that our percentiles
-  // engine rounds up for the expected sample count, so if the total
-  // number of readings is small enough we need to compensate slightly
-  // when aggregating the spread data from jobs with few reducers together
-  // with jobs with many reducers.
+  /**
+   * This element is to compensate for the fact that our percentiles engine
+   * rounds up for the expected sample count, so if the total number of readings
+   * is small enough we need to compensate slightly when aggregating the spread
+   * data from jobs with few reducers together with jobs with many reducers.
+   */
   private static final long SMALL_SPREAD_COMPENSATION_THRESHOLD = 5L;
 
   /**
@@ -317,7 +318,7 @@ public class HadoopLogsAnalyzer extends Configured implements Tool {
     Path jobTraceFilename = null;
     Path topologyFilename = null;
     if (args.length == 0 || args[args.length - 1].charAt(0) == '-') {
-      inputFilename = null;
+      throw new IllegalArgumentException("No input specified.");
     } else {
       inputFilename = args[args.length - 1];
     }
@@ -547,6 +548,7 @@ public class HadoopLogsAnalyzer extends Configured implements Tool {
       IOException {
     if (input != null) {
       input.close();
+      LOG.info("File closed: "+currentFileName);
       input = null;
     }
 
@@ -580,6 +582,9 @@ public class HadoopLogsAnalyzer extends Configured implements Tool {
 
   private String readInputLine() throws IOException {
     try {
+      if (input == null) {
+        return null;
+      }
       inputLineText.clear();
       if (input.readLine(inputLineText) == 0) {
         return null;
@@ -1002,7 +1007,7 @@ public class HadoopLogsAnalyzer extends Configured implements Tool {
 
           ParsedHost node = getAndRecordParsedHost(nextSplit);
 
-          if (locations != null) {
+          if (locations != null && node != null) {
             locations.add(node.makeLoggedLocation());
           }
         }
@@ -1104,82 +1109,95 @@ public class HadoopLogsAnalyzer extends Configured implements Tool {
   private void incorporateCounters(LoggedTaskAttempt attempt2,
       String counterString) {
     incorporateCounter(new SetField(attempt2) {
+      @Override
       void set(long val) {
         attempt.hdfsBytesRead = val;
       }
     }, counterString, "HDFS_BYTES_READ");
     incorporateCounter(new SetField(attempt2) {
+      @Override
       void set(long val) {
         attempt.hdfsBytesWritten = val;
       }
     }, counterString, "HDFS_BYTES_WRITTEN");
     incorporateCounter(new SetField(attempt2) {
+      @Override
       void set(long val) {
         attempt.fileBytesRead = val;
       }
     }, counterString, "FILE_BYTES_READ");
     incorporateCounter(new SetField(attempt2) {
+      @Override
       void set(long val) {
         attempt.fileBytesWritten = val;
       }
     }, counterString, "FILE_BYTES_WRITTEN");
     incorporateCounter(new SetField(attempt2) {
+      @Override
       void set(long val) {
         attempt.mapInputBytes = val;
       }
     }, counterString, "MAP_INPUT_BYTES");
     incorporateCounter(new SetField(attempt2) {
+      @Override
       void set(long val) {
         attempt.mapInputRecords = val;
       }
     }, counterString, "MAP_INPUT_RECORDS");
     incorporateCounter(new SetField(attempt2) {
+      @Override
       void set(long val) {
         attempt.mapOutputBytes = val;
       }
     }, counterString, "MAP_OUTPUT_BYTES");
     incorporateCounter(new SetField(attempt2) {
+      @Override
       void set(long val) {
         attempt.mapOutputRecords = val;
       }
     }, counterString, "MAP_OUTPUT_RECORDS");
     incorporateCounter(new SetField(attempt2) {
+      @Override
       void set(long val) {
         attempt.combineInputRecords = val;
       }
     }, counterString, "COMBINE_INPUT_RECORDS");
     incorporateCounter(new SetField(attempt2) {
+      @Override
       void set(long val) {
         attempt.reduceInputGroups = val;
       }
     }, counterString, "REDUCE_INPUT_GROUPS");
     incorporateCounter(new SetField(attempt2) {
+      @Override
       void set(long val) {
         attempt.reduceInputRecords = val;
       }
     }, counterString, "REDUCE_INPUT_RECORDS");
     incorporateCounter(new SetField(attempt2) {
+      @Override
       void set(long val) {
         attempt.reduceShuffleBytes = val;
       }
     }, counterString, "REDUCE_SHUFFLE_BYTES");
     incorporateCounter(new SetField(attempt2) {
+      @Override
       void set(long val) {
         attempt.reduceOutputRecords = val;
       }
     }, counterString, "REDUCE_OUTPUT_RECORDS");
     incorporateCounter(new SetField(attempt2) {
+      @Override
       void set(long val) {
         attempt.spilledRecords = val;
       }
     }, counterString, "SPILLED_RECORDS");
   }
 
-  private ParsedHost getAndRecordParsedHost(String hostName)
-      throws IllegalArgumentException {
-    ParsedHost result = new ParsedHost(hostName);
+  private ParsedHost getAndRecordParsedHost(String hostName) {
+    ParsedHost result = ParsedHost.parse(hostName);
 
-    if (!allHosts.contains(result)) {
+    if (result != null && !allHosts.contains(result)) {
       allHosts.add(result);
     }
 
@@ -1259,28 +1277,23 @@ public class HadoopLogsAnalyzer extends Configured implements Tool {
 
         ParsedHost host = null;
 
-        try {
-          host = getAndRecordParsedHost(hostName);
-        } catch (IllegalArgumentException e) {
-        }
+        host = getAndRecordParsedHost(hostName);
 
         if (host != null) {
           attempt.setLocation(host.makeLoggedLocation());
         }
 
-        if (task != null) {
-          ArrayList<LoggedLocation> locs = task.getPreferredLocations();
+        ArrayList<LoggedLocation> locs = task.getPreferredLocations();
 
-          if (host != null && locs != null) {
-            for (LoggedLocation loc : locs) {
-              ParsedHost preferedLoc = new ParsedHost(loc);
+        if (host != null && locs != null) {
+          for (LoggedLocation loc : locs) {
+            ParsedHost preferedLoc = new ParsedHost(loc);
 
-              distance = Math.min(distance, preferedLoc.distance(host));
-            }
+            distance = Math.min(distance, preferedLoc.distance(host));
           }
-
-          mapperLocality.enter(distance);
         }
+
+        mapperLocality.enter(distance);
       }
 
       distance = Math.min(distance, successfulMapAttemptTimes.length - 1);

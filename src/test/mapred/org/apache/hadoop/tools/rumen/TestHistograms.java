@@ -17,32 +17,25 @@
  */
 
 package org.apache.hadoop.tools.rumen;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.InputStreamReader;
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.PrintStream;
-
-import junit.framework.TestCase;
 
 import java.util.List;
 
-import org.codehaus.jackson.JsonParseException;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.codehaus.jackson.JsonEncoding;
 import org.codehaus.jackson.JsonGenerator;
 import org.codehaus.jackson.JsonFactory;
-import org.codehaus.jackson.JsonParser;
-import org.codehaus.jackson.map.DeserializationConfig;
-import org.codehaus.jackson.JsonProcessingException;
-import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
 
-/**
- *
- */
-public class TestHistograms extends TestCase {
+import org.junit.Test;
+import static org.junit.Assert.*;
+
+public class TestHistograms {
 
   /**
    * @throws IOException
@@ -58,107 +51,56 @@ public class TestHistograms extends TestCase {
    *           we read the corresponding goldXxx.json as a LoggedDiscreteCDF and
    *           deepCompare them.
    */
+  @Test
   public void testHistograms() throws IOException {
-    String rootInputDir = System.getProperty("test.tools.input.dir", "");
+    final Configuration conf = new Configuration();
+    final FileSystem lfs = FileSystem.getLocal(conf);
+    final Path rootInputDir = new Path(
+        System.getProperty("test.tools.input.dir", "")).makeQualified(lfs);
+    final Path rootInputFile = new Path(rootInputDir, "rumen/histogram-tests");
 
-    File rootInputDirFile = new File(rootInputDir);
 
-    File rootInputFile = new File(rootInputDirFile, "rumen/histogram-tests");
-
-    if (rootInputDir.charAt(rootInputDir.length() - 1) == '/') {
-      rootInputDir = rootInputDir.substring(0, rootInputDir.length() - 1);
-    }
-
-    String[] tests = rootInputFile.list();
+    FileStatus[] tests = lfs.listStatus(rootInputFile);
 
     for (int i = 0; i < tests.length; ++i) {
-      if (tests[i].length() > 5 && "input".equals(tests[i].substring(0, 5))) {
-        File inputData = new File(rootInputFile, tests[i]);
-
-        if (!(new File(rootInputFile, "build" + tests[i].substring(5)))
-            .exists()
-            && !(new File(rootInputFile, "gold" + tests[i].substring(5))
-                .exists())
-            && !(new File(rootInputFile, "silver" + tests[i].substring(5))
-                .exists())) {
-          System.out
-              .println("Neither a build nor a gold file exists for the file, "
-                  + inputData.getCanonicalPath());
-
-          continue;
+      Path filePath = tests[i].getPath();
+      String fileName = filePath.getName();
+      if (fileName.startsWith("input")) {
+        String testName = fileName.substring("input".length());
+        Path goldFilePath = new Path(rootInputFile, "gold"+testName);
+        assertTrue("Gold file dies not exist", lfs.exists(goldFilePath));
+        LoggedDiscreteCDF newResult = histogramFileToCDF(filePath, lfs);
+        System.out.println("Testing a Histogram for " + fileName);
+        FSDataInputStream goldStream = lfs.open(goldFilePath);
+        JsonObjectMapperParser<LoggedDiscreteCDF> parser = new JsonObjectMapperParser<LoggedDiscreteCDF>(
+            goldStream, LoggedDiscreteCDF.class); 
+        try {
+          LoggedDiscreteCDF dcdf = parser.getNext();
+          dcdf.deepCompare(newResult, new TreePath(null, "<root>"));
+        } catch (DeepInequalityException e) {
+          fail(e.path.toString());
         }
-
-        LoggedDiscreteCDF newResult = histogramFileToCDF(inputData.getPath());
-
-        if ((new File(rootInputFile, "build" + tests[i].substring(5))).exists()
-            && !(new File(rootInputFile, "gold" + tests[i].substring(5)))
-                .exists()
-            && !(new File(rootInputFile, "silver" + tests[i].substring(5)))
-                .exists()) {
-          try {
-            System.out.println("Building a new gold file for the file, "
-                + inputData.getCanonicalPath());
-            System.out.println("Please inspect it thoroughly and rename it.");
-
-            ObjectMapper mapper = new ObjectMapper();
-            JsonFactory factory = mapper.getJsonFactory();
-            PrintStream ostream = new PrintStream(new File(rootInputFile,
-                "silver" + tests[i].substring(5)));
-            JsonGenerator gen = factory.createJsonGenerator(ostream,
-                JsonEncoding.UTF8);
-            gen.useDefaultPrettyPrinter();
-
-            gen.writeObject(newResult);
-
-            gen.close();
-          } catch (IOException e) {
-            e.printStackTrace();
-          }
-        } else {
-          System.out.println("Testing a Histogram built from the file, "
-              + inputData.getCanonicalPath());
-          File goldCDF = new File(rootInputFile, "gold" + tests[i].substring(5));
-          FileInputStream goldStream = new FileInputStream(goldCDF);
-          BufferedReader goldReader = new BufferedReader(new InputStreamReader(
-              goldStream));
-          ObjectMapper goldMapper = new ObjectMapper();
-          JsonParser goldParser = goldMapper.getJsonFactory().createJsonParser(
-              goldReader);
-          LoggedDiscreteCDF DCDF = goldMapper.readValue(goldParser,
-              LoggedDiscreteCDF.class);
-
-          try {
-            DCDF.deepCompare(newResult, new TreePath(null, "<root>"));
-          } catch (DeepInequalityException e) {
-            String error = e.path.toString();
-
-            assertFalse(error, true);
-          }
+        finally {
+            parser.close();
         }
       }
     }
   }
 
-  private static LoggedDiscreteCDF histogramFileToCDF(String filename)
+  private static LoggedDiscreteCDF histogramFileToCDF(Path path, FileSystem fs)
       throws IOException {
-
-    File inputData = new File(filename);
-
-    FileInputStream dataStream = new FileInputStream(inputData);
-    BufferedReader dataReader = new BufferedReader(new InputStreamReader(
-        dataStream));
-    ObjectMapper dataMapper = new ObjectMapper();
-    dataMapper.configure(
-        DeserializationConfig.Feature.CAN_OVERRIDE_ACCESS_MODIFIERS, true);
-    JsonParser dataParser = dataMapper.getJsonFactory().createJsonParser(
-        dataReader);
-    HistogramRawTestData data = dataMapper.readValue(dataParser,
-        HistogramRawTestData.class);
-
+    FSDataInputStream dataStream = fs.open(path);
+    JsonObjectMapperParser<HistogramRawTestData> parser = new JsonObjectMapperParser<HistogramRawTestData>(
+        dataStream, HistogramRawTestData.class);
+    HistogramRawTestData data;
+    try {
+      data = parser.getNext();
+    } finally {
+      parser.close();
+    }
+    
     Histogram hist = new Histogram();
-
     List<Long> measurements = data.getData();
-
     List<Long> typeProbeData = new HistogramRawTestData().getData();
 
     assertTrue(
@@ -180,7 +122,34 @@ public class TestHistograms extends TestCase {
     }
 
     result.setCDF(hist, percentiles, data.getScale());
-
     return result;
+  }
+  
+  public static void main(String[] args) throws IOException {
+    final Configuration conf = new Configuration();
+    final FileSystem lfs = FileSystem.getLocal(conf);
+
+    for (String arg : args) {
+      Path filePath = new Path(arg).makeQualified(lfs);
+      String fileName = filePath.getName();
+      if (fileName.startsWith("input")) {
+        LoggedDiscreteCDF newResult = histogramFileToCDF(filePath, lfs);
+        String testName = fileName.substring("input".length());
+        Path goldFilePath = new Path(filePath.getParent(), "gold"+testName);
+
+        ObjectMapper mapper = new ObjectMapper();
+        JsonFactory factory = mapper.getJsonFactory();
+        FSDataOutputStream ostream = lfs.create(goldFilePath, true);
+        JsonGenerator gen = factory.createJsonGenerator(ostream,
+            JsonEncoding.UTF8);
+        gen.useDefaultPrettyPrinter();
+        
+        gen.writeObject(newResult);
+        
+        gen.close();
+      } else {
+        System.err.println("Input file not started with \"input\". File "+fileName+" skipped.");
+      }
+    }
   }
 }

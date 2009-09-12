@@ -50,7 +50,7 @@ public class LoggedNetworkTopology implements DeepCompare {
    * order.
    * 
    */
-  static private class TopoSort implements Comparator<LoggedNetworkTopology> {
+  static class TopoSort implements Comparator<LoggedNetworkTopology> {
     public int compare(LoggedNetworkTopology t1, LoggedNetworkTopology t2) {
       return t1.name.compareTo(t2.name);
     }

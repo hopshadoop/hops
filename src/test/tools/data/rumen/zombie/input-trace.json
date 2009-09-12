@@ -10951,7 +10951,7 @@
   "computonsPerReduceOutputByte" : -1,
   "submitTime" : 1240336853354,
   "launchTime" : 1240336854289,
-  "heapMegabytes" : -1,
+  "heapMegabytes" : 1234,
   "totalMaps" : 131,
   "totalReduces" : 47,
   "outcome" : "SUCCESS",

@@ -245,11 +245,4 @@ public class LoggedTask implements DeepCompare {
     compareLoggedLocations(preferredLocations, other.preferredLocations, loc,
         "preferredLocations");
   }
-  /*
-   * ArrayList<LoggedTaskAttempt> attempts = new ArrayList<LoggedTaskAttempt>();
-   * 
-   * ArrayList<LoggedLocation> preferredLocations;
-   * 
-   * int numberMaps = -1; int numberReduces = -1;
-   */
 }

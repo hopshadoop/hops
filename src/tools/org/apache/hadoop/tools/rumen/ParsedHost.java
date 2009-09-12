@@ -23,27 +23,21 @@ import java.util.regex.Pattern;
 import java.util.regex.Matcher;
 
 class ParsedHost {
-  String rackName;
-  String nodeName;
-
-  private static Pattern splitPattern = Pattern
-      .compile("/([0-9\\\\\\.]+)/(.+)");
-
-  static int numberOfDistances() {
-    return 3;
-  }
+  private final String rackName;
+  private final String nodeName;
 
   /**
-   * @return the components, broadest first [ie., the last element is always the
-   *         individual node name]
+   * TODO the following only works for /rack/host format. Change to support
+   * arbitrary level of network names.
    */
-  String[] nameComponents() {
-    String[] result = new String[2];
+  private static final Pattern splitPattern = Pattern
+      .compile("/([^/]+)/([^/]+)");
 
-    result[0] = rackName;
-    result[1] = nodeName;
-
-    return result;
+  /**
+   * TODO handle arbitrary level of network names.
+   */
+  static int numberOfDistances() {
+    return 3;
   }
 
   String nameComponent(int i) throws IllegalArgumentException {
@@ -65,17 +59,14 @@ class ParsedHost {
     return rackName.hashCode() * 17 + nodeName.hashCode();
   }
 
-  ParsedHost(String name) throws IllegalArgumentException {
+  public static ParsedHost parse(String name) {
     // separate out the node name
     Matcher matcher = splitPattern.matcher(name);
 
-    if (!matcher.matches()) {
-      throw new IllegalArgumentException("Illegal node designator: \"" + name
-          + "\"");
-    }
+    if (!matcher.matches())
+      return null;
 
-    rackName = matcher.group(1);
-    nodeName = matcher.group(2);
+    return new ParsedHost(matcher.group(1), matcher.group(2));
   }
 
   public ParsedHost(LoggedLocation loc) {
@@ -97,29 +88,28 @@ class ParsedHost {
 
     return result;
   }
+  
+  String getNodeName() {
+    return nodeName;
+  }
+  
+  String getRackName() {
+    return rackName;
+  }
 
   // expects the broadest name first
-  ParsedHost(String[] names) {
-    rackName = names[0];
-    nodeName = names[1];
+  ParsedHost(String rackName, String nodeName) {
+    this.rackName = rackName;
+    this.nodeName = nodeName;
   }
 
-  // returns the broadest name first
-  String[] nameList() {
-    String[] result = new String[2];
-
-    result[0] = rackName;
-    result[1] = nodeName;
-
-    return result;
-  }
-
+  @Override
   public boolean equals(Object other) {
-    if (other instanceof ParsedHost) {
-      return distance((ParsedHost) other) == 0;
+    if (!(other instanceof ParsedHost)) {
+      return false;
     }
-
-    return false;
+    ParsedHost host = (ParsedHost) other;
+    return (nodeName.equals(host.nodeName) && rackName.equals(host.rackName));
   }
 
   int distance(ParsedHost other) {

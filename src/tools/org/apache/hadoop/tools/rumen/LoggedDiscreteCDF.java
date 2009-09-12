@@ -50,19 +50,7 @@ public class LoggedDiscreteCDF implements DeepCompare {
   void setCDF(Histogram data, int[] steps, int modulus) {
 
     numberValues = data.getTotalCount();
-
-    // HadoopLogsAnalyzer.printStackTrace();
-    // data.dump(System.out);
-
     long[] CDF = data.getCDF(modulus, steps);
-
-    /*
-     * if (CDF == null) { System.out.print("(null result)\n"); } else { for
-     * (long step : CDF) { System.out.print("One result row: " + step + "\n"); }
-     * }
-     * 
-     * System.out.print("\n");
-     */
 
     if (CDF != null) {
       minimum = CDF[0];

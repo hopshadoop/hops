@@ -18,22 +18,20 @@
 
 package org.apache.hadoop.tools.rumen;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.io.IOException;
-import java.util.Vector;
 import java.util.List;
 import java.util.ArrayList;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.TaskStatus.State;
-import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.TaskType;
 
-import junit.framework.TestCase;
+import org.junit.Before;
+import org.junit.Test;
+import static org.junit.Assert.*;
 
-public class TestZombieJob extends TestCase {
-
+public class TestZombieJob {
   final double epsilon = 0.01;
   private final int[] attemptTimesPercentiles = new int[] { 10, 50, 90 };
   private long[] succeededCDF = new long[] { 5268, 5268, 5268, 5268, 5268 };
@@ -41,26 +39,26 @@ public class TestZombieJob extends TestCase {
   private double[] expectedPs = new double[] { 0.000001, 0.18707660239708182,
       0.0013027618551328818, 2.605523710265763E-4 };
 
+  private final long[] mapTaskCounts = new long[] { 7838525L, 342277L, 100228L,
+      1564L, 1234L };
+  private final long[] reduceTaskCounts = new long[] { 4405338L, 139391L,
+      1514383L, 139391, 1234L };
+
   List<LoggedJob> loggedJobs = new ArrayList<LoggedJob>();
   List<JobStory> jobStories = new ArrayList<JobStory>();
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see junit.framework.TestCase#setUp()
-   */
-  protected void setUp() throws Exception {
-    String rootTempDir = System.getProperty("test.build.data", "/tmp");
+  @Before
+  public void setUp() throws Exception {
+    final Configuration conf = new Configuration();
+    final FileSystem lfs = FileSystem.getLocal(conf);
 
-    String rootInputDir = System.getProperty("test.tools.input.dir", "");
+    final Path rootInputDir = new Path(
+        System.getProperty("test.tools.input.dir", "")).makeQualified(lfs);
+    final Path rootInputFile = new Path(rootInputDir, "rumen/zombie");
 
-    File rootInputFile = new File(new File(rootInputDir), "rumen/zombie");
-    File tempDirFile = new File(rootTempDir);
-
-    Parser parser = new Parser(new FileReader(new File(rootInputFile,
-        "input-trace.json")));
-
-    parser.readTopology(new File(rootInputFile, "input-topology.json"));
+    ZombieJobProducer parser = new ZombieJobProducer(new Path(rootInputFile,
+        "input-trace.json"), new ZombieCluster(new Path(rootInputFile,
+        "input-topology.json"), null, conf), conf);
 
     JobStory job = null;
     for (int i = 0; i < 4; i++) {
@@ -74,12 +72,6 @@ public class TestZombieJob extends TestCase {
 
       System.out.println("Input Splits -- " + job.getInputSplits().length
           + ", " + job.getNumberMaps());
-      /*
-       * for (InputSplit split: job.getInputSplits()) {
-       * System.out.print(split.getLength() + ": "); for (String location:
-       * split.getLocations()) { System.out.print(location + ","); }
-       * System.out.println(); }
-       */
 
       System.out.println("Successful Map CDF -------");
       for (LoggedDiscreteCDF cdf : loggedJob.getSuccessfulMapAttemptCDFs()) {
@@ -125,21 +117,10 @@ public class TestZombieJob extends TestCase {
       loggedJobs.add(loggedJob);
       jobStories.add(job);
     }
-
-    super.setUp();
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see junit.framework.TestCase#tearDown()
-   */
-  protected void tearDown() throws Exception {
-    super.tearDown();
-  }
-
-  public void testFirstJob() throws FileNotFoundException, IOException,
-      InterruptedException {
+  @Test
+  public void testFirstJob() {
     // 20th job seems reasonable: "totalMaps":329,"totalReduces":101
     // successful map: 80 node-local, 196 rack-local, 53 rack-remote, 2 unknown
     // failed map: 0-0-0-1
@@ -177,8 +158,8 @@ public class TestZombieJob extends TestCase {
     // TODO fill in test case
   }
 
-  public void testSecondJob() throws FileNotFoundException, IOException,
-      InterruptedException {
+  @Test
+  public void testSecondJob() {
     // 7th job has many failed tasks.
     // 3204 m, 0 r
     // successful maps 497-586-23-1, failed maps 0-0-0-2714
@@ -209,8 +190,8 @@ public class TestZombieJob extends TestCase {
     // available data set.
   }
 
-  public void testFourthJob() throws FileNotFoundException, IOException,
-      InterruptedException {
+  @Test
+  public void testFourthJob() {
     // 7th job has many failed tasks.
     // 3204 m, 0 r
     // successful maps 497-586-23-1, failed maps 0-0-0-2714
@@ -241,8 +222,29 @@ public class TestZombieJob extends TestCase {
     assertEquals(State.FAILED, taInfo.getRunState());
   }
 
-  public void testMakeUpInfo() throws FileNotFoundException, IOException,
-      InterruptedException {
+  @Test
+  public void testRecordIOInfo() {
+    JobStory job = jobStories.get(3);
+
+    TaskInfo mapTask = job.getTaskInfo(TaskType.MAP, 113);
+
+    TaskInfo reduceTask = job.getTaskInfo(TaskType.REDUCE, 0);
+
+    assertEquals(mapTaskCounts[0], mapTask.getInputBytes());
+    assertEquals(mapTaskCounts[1], mapTask.getInputRecords());
+    assertEquals(mapTaskCounts[2], mapTask.getOutputBytes());
+    assertEquals(mapTaskCounts[3], mapTask.getOutputRecords());
+    assertEquals(mapTaskCounts[4], mapTask.getTaskMemory());
+
+    assertEquals(reduceTaskCounts[0], reduceTask.getInputBytes());
+    assertEquals(reduceTaskCounts[1], reduceTask.getInputRecords());
+    assertEquals(reduceTaskCounts[2], reduceTask.getOutputBytes());
+    assertEquals(reduceTaskCounts[3], reduceTask.getOutputRecords());
+    assertEquals(reduceTaskCounts[4], reduceTask.getTaskMemory());
+  }
+
+  @Test
+  public void testMakeUpInfo() {
     // get many non-exist tasks
     // total 3204 map tasks, 3300 is a non-exist task.
     checkMakeUpTask(jobStories.get(3), 113, 1);
@@ -253,7 +255,7 @@ public class TestZombieJob extends TestCase {
 
     Histogram sampleSucceeded = new Histogram();
     Histogram sampleFailed = new Histogram();
-    Vector<Integer> sampleAttempts = new Vector<Integer>();
+    List<Integer> sampleAttempts = new ArrayList<Integer>();
     for (int i = 0; i < 100000; i++) {
       int attemptId = 0;
       while (true) {

@@ -17,10 +17,6 @@
  */
 package org.apache.hadoop.tools.rumen;
 
-/**
- * 
- *
- */
 public class CDFPiecewiseLinearRandomGenerator extends CDFRandomGenerator {
 
   /**
@@ -43,7 +39,7 @@ public class CDFPiecewiseLinearRandomGenerator extends CDFRandomGenerator {
     super(cdf, seed);
   }
 
-  /*
+  /**
    * TODO This code assumes that the empirical minimum resp. maximum is the
    * epistomological minimum resp. maximum. This is probably okay for the
    * minimum, because that likely represents a task where everything went well,

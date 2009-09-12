@@ -331,6 +331,9 @@ Trunk (unreleased changes)
     MAPREDUCE-973. Move FailJob and SleepJob from examples to test. (cdouglas 
     via omalley)
 
+    MAPREDUCE-966. Modify Rumen to clean up interfaces and simplify integration
+    with other tools. (Hong Tang via cdouglas)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 

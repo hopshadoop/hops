@@ -19,8 +19,11 @@ package org.apache.hadoop.tools.rumen;
 
 import org.apache.hadoop.mapred.TaskStatus.State;
 
+/**
+ * {@link ReduceTaskAttemptInfo} represents the information with regard to a
+ * reduce task attempt.
+ */
 public class ReduceTaskAttemptInfo extends TaskAttemptInfo {
-
   private long shuffleTime;
   private long mergeTime;
   private long reduceTime;
@@ -62,8 +65,6 @@ public class ReduceTaskAttemptInfo extends TaskAttemptInfo {
 
   @Override
   public long getRuntime() {
-    // XXX Does this make sense? Should TaskAttemptInfo.getRuntime() return
-    // total reduce runtime, rather than reduce phase time?
     return (getShuffleRuntime() + getMergeRuntime() + getReduceRuntime());
   }
 

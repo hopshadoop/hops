@@ -20,7 +20,6 @@ package org.apache.hadoop.tools.rumen;
 import java.util.regex.Pattern;
 import java.util.regex.Matcher;
 
-import java.io.StringReader;
 import java.io.InputStream;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -38,9 +37,8 @@ import org.w3c.dom.Text;
 import org.xml.sax.SAXException;
 
 class ParsedConfigFile {
-  static Pattern jobIDPattern = Pattern.compile("_(job_[0-9]+_[0-9]+)_");
-
-  static Pattern heapPattern = Pattern.compile("-Xmx([0-9]+)([mMgG])");
+  private static final Pattern jobIDPattern = Pattern.compile("_(job_[0-9]+_[0-9]+)_");
+  private static final Pattern heapPattern = Pattern.compile("-Xmx([0-9]+)([mMgG])");
 
   final int heapMegabytes;
 
@@ -69,6 +67,7 @@ class ParsedConfigFile {
     return oldValue;
   }
 
+  @SuppressWarnings("hiding")
   ParsedConfigFile(String filenameLine, String xmlString) {
     super();
 
@@ -121,6 +120,7 @@ class ParsedConfigFile {
         NodeList fields = prop.getChildNodes();
         String attr = null;
         String value = null;
+        @SuppressWarnings("unused")
         boolean finalParameter = false;
         for (int j = 0; j < fields.getLength(); j++) {
           Node fieldNode = fields.item(j);

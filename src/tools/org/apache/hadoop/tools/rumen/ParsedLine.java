@@ -20,24 +20,14 @@ package org.apache.hadoop.tools.rumen;
 import java.util.Properties;
 import java.util.regex.Pattern;
 
-/**
- * 
- */
 class ParsedLine {
-
   Properties content;
-
   LogRecordType type;
 
-  static Pattern keyValPair = Pattern
+  static final Pattern keyValPair = Pattern
       .compile(" *([a-zA-Z0-9_]+)=\"((?:[^\"\\\\]|\\\\[ .\"\\\\])*)\"");
 
-  /**
-	 * 
-	 */
-  ParsedLine() {
-  }
-
+  @SuppressWarnings("unused") 
   ParsedLine(String fullLine, int version) {
     super();
 

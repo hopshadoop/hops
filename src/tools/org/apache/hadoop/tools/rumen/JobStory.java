@@ -18,6 +18,7 @@
 package org.apache.hadoop.tools.rumen;
 
 import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapred.JobHistory;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.TaskType;
@@ -99,7 +100,6 @@ public interface JobStory {
   /**
    * Get {@link TaskAttemptInfo} for a given task-attempt, considering impact
    * of locality.
-   * @param taskType {@link TaskType} of the task-attempt
    * @param taskNumber Partition number of the task-attempt
    * @param taskAttemptNumber Attempt number of the task
    * @param locality Data locality of the task as scheduled in simulation
@@ -109,4 +109,10 @@ public interface JobStory {
     getMapTaskAttemptInfoAdjusted(int taskNumber,
                                   int taskAttemptNumber,
                                   int locality);
+  
+  /**
+   * Get the outcome of the job execution.
+   * @return The outcome of the job execution.
+   */
+  public JobHistory.Values getOutcome();
 }

@@ -37,9 +37,11 @@ import java.util.List;
  * 
  */
 public class LoggedLocation implements DeepCompare {
-  // The full path from the root of the network to the host.
-  //
-  // NOTE that this assumes that the network topology is a tree.
+  /**
+   * The full path from the root of the network to the host.
+   * 
+   * NOTE that this assumes that the network topology is a tree.
+   */ 
   List<String> layers = new ArrayList<String>();
 
   public List<String> getLayers() {

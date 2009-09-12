@@ -15,43 +15,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.apache.hadoop.tools.rumen;
 
+import java.util.Set;
+
 /**
- * This describes a path from a node to the root. We use it when we compare two
- * trees during rumen unit tests. If the trees are not identical, this chain
- * will be converted to a string which describes the path from the root to the
- * fields that did not compare.
- * 
+ * {@link RackNode} represents a rack node in the cluster topology.
  */
-public class TreePath {
-  final TreePath parent;
-
-  final String fieldName;
-
-  final int index;
-
-  public TreePath(TreePath parent, String fieldName) {
-    super();
-
-    this.parent = parent;
-    this.fieldName = fieldName;
-    this.index = -1;
+public final class RackNode extends Node {
+  public RackNode(String name, int level) {
+    // Hack: ensuring rack name starts with "/".
+    super(name.startsWith("/") ? name : "/" + name, level);
   }
-
-  public TreePath(TreePath parent, String fieldName, int index) {
-    super();
-
-    this.parent = parent;
-    this.fieldName = fieldName;
-    this.index = index;
-  }
-
+  
   @Override
-  public String toString() {
-    String mySegment = fieldName + (index == -1 ? "" : ("[" + index + "]"));
-
-    return ((parent == null) ? "" : parent.toString() + "-->") + mySegment;
+  public synchronized boolean addChild(Node child) {
+    if (!(child instanceof MachineNode)) {
+      throw new IllegalArgumentException(
+          "Only MachineNode can be added to RackNode");
+    }
+    return super.addChild(child);
+  }
+  
+  /**
+   * Get the machine nodes that belong to the rack.
+   * @return The machine nodes that belong to the rack.
+   */
+  @SuppressWarnings({ "cast", "unchecked" })
+  public Set<MachineNode> getMachinesInRack() {
+    return (Set<MachineNode>)(Set)getChildren();
   }
 }

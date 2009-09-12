@@ -18,7 +18,6 @@
 package org.apache.hadoop.tools.rumen;
 
 public class TaskInfo {
-
   private final long bytesIn;
   private final int recsIn;
   private final long bytesOut;

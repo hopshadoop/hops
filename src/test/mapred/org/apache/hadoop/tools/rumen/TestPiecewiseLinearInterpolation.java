@@ -20,9 +20,10 @@ package org.apache.hadoop.tools.rumen;
 
 import java.util.ArrayList;
 
-import junit.framework.TestCase;
+import org.junit.Test;
+import static org.junit.Assert.*;
 
-public class TestPiecewiseLinearInterpolation extends TestCase {
+public class TestPiecewiseLinearInterpolation {
 
   static private double maximumRelativeError = 0.002D;
 
@@ -35,6 +36,7 @@ public class TestPiecewiseLinearInterpolation extends TestCase {
     return result;
   }
 
+  @Test
   public void testOneRun() {
     LoggedDiscreteCDF input = new LoggedDiscreteCDF();
 

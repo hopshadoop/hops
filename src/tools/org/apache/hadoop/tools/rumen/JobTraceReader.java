@@ -17,32 +17,35 @@
  */
 package org.apache.hadoop.tools.rumen;
 
-import org.apache.hadoop.mapred.TaskStatus.State;
+import java.io.IOException;
+import java.io.InputStream;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 
 /**
- * {@link MapTaskAttemptInfo} represents the information with regard to a
- * map task attempt.
+ * Reading JSON-encoded job traces and produce {@link LoggedJob} instances.
  */
-public class MapTaskAttemptInfo extends TaskAttemptInfo {
-  private long runtime;
-
-  public MapTaskAttemptInfo(State state, TaskInfo taskInfo, long runtime) {
-    super(state, taskInfo);
-    this.runtime = runtime;
-  }
-
-  @Override
-  public long getRuntime() {
-    return getMapRuntime();
+public class JobTraceReader extends JsonObjectMapperParser<LoggedJob> {
+  /**
+   * Constructor.
+   * 
+   * @param path
+   *          Path to the JSON trace file, possibly compressed.
+   * @param conf
+   * @throws IOException
+   */
+  public JobTraceReader(Path path, Configuration conf) throws IOException {
+    super(path, LoggedJob.class, conf);
   }
 
   /**
-   * Get the runtime for the <b>map</b> phase of the map-task attempt.
+   * Constructor.
    * 
-   * @return the runtime for the <b>map</b> phase of the map-task attempt
+   * @param input
+   *          The input stream for the JSON trace.
    */
-  public long getMapRuntime() {
-    return runtime;
+  public JobTraceReader(InputStream input) throws IOException {
+    super(input, LoggedJob.class);
   }
-
 }

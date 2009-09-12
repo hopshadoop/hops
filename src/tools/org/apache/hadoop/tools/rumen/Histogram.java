@@ -127,12 +127,14 @@ class Histogram implements Iterable<Map.Entry<Long, Long>> {
     long cumulativeCount = 0;
     int bucketCursor = 0;
 
+    
     // Loop invariant: the item at buckets[bucketCursor] can still be reached
-    // from iter, and the number of logged elements no longer
-    // available from iter is cumulativeCount .
-    //
+    // from iter, and the number of logged elements no longer available from
+    // iter is cumulativeCount.
+    // 
     // cumulativeCount/totalCount is therefore strictly less than
     // buckets[bucketCursor]/scale .
+     
     while (iter.hasNext()) {
       long targetCumulativeCount = buckets[bucketCursor] * totalCount / scale;
 

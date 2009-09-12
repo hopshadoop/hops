@@ -17,32 +17,17 @@
  */
 package org.apache.hadoop.tools.rumen;
 
-import org.apache.hadoop.mapred.TaskStatus.State;
+import java.io.Closeable;
+import java.io.IOException;
 
 /**
- * {@link MapTaskAttemptInfo} represents the information with regard to a
- * map task attempt.
+ * {@link JobStoryProducer} produces the sequence of {@link JobStory}'s.
  */
-public class MapTaskAttemptInfo extends TaskAttemptInfo {
-  private long runtime;
-
-  public MapTaskAttemptInfo(State state, TaskInfo taskInfo, long runtime) {
-    super(state, taskInfo);
-    this.runtime = runtime;
-  }
-
-  @Override
-  public long getRuntime() {
-    return getMapRuntime();
-  }
-
+public interface JobStoryProducer extends Closeable {
   /**
-   * Get the runtime for the <b>map</b> phase of the map-task attempt.
-   * 
-   * @return the runtime for the <b>map</b> phase of the map-task attempt
+   * Get the next job.
+   * @return The next job. Or null if no more job is available.
+   * @throws IOException 
    */
-  public long getMapRuntime() {
-    return runtime;
-  }
-
+  JobStory getNextJob() throws IOException;
 }
