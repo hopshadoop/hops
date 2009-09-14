@@ -172,7 +172,15 @@ public class DBInputFormat<T extends DBWritable>
   public DBConfiguration getDBConf() {
     return dbConf;
   }
-  
+
+  public Connection getConnection() {
+    return connection;
+  }
+
+  public String getDBProductName() {
+    return dbProductName;
+  }
+
   protected RecordReader<LongWritable, T> createDBRecordReader(DBInputSplit split,
       Configuration conf) throws IOException {
 

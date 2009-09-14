@@ -18,30 +18,26 @@
 
 package org.apache.hadoop.mapreduce.lib.db;
 
-import java.sql.Connection;
 import java.sql.ResultSet;
-import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.mapreduce.InputSplit;
 
 /**
- * A RecordReader that reads records from a MySQL table.
+ * DBSplitter will generate DBInputSplits to use with DataDrivenDBInputFormat.
+ * DataDrivenDBInputFormat needs to interpolate between two values that
+ * represent the lowest and highest valued records to import. Depending
+ * on the data-type of the column, this requires different behavior.
+ * DBSplitter implementations should perform this for a data type or family
+ * of data types.
  */
-public class MySQLDBRecordReader<T extends DBWritable> extends DBRecordReader<T> {
-
-  public MySQLDBRecordReader(DBInputFormat.DBInputSplit split, 
-      Class<T> inputClass, Configuration conf, Connection conn, DBConfiguration dbConfig,
-      String cond, String [] fields, String table) throws SQLException {
-    super(split, inputClass, conf, conn, dbConfig, cond, fields, table);
-  }
-
-  // Execute statements for mysql in unbuffered mode.
-  protected ResultSet executeQuery(String query) throws SQLException {
-    PreparedStatement statement = getConnection().prepareStatement(query,
-      ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
-    statement.setFetchSize(Integer.MIN_VALUE); // MySQL: read row-at-a-time.
-    setStatement(statement); // save a ref for cleanup in close()
-    return statement.executeQuery();
-  }
+public interface DBSplitter {
+  /**
+   * Given a ResultSet containing one record (and already advanced to that record)
+   * with two columns (a low value, and a high value, both of the same type), determine
+   * a set of splits that span the given values.
+   */
+  List<InputSplit> split(Configuration conf, ResultSet results, String colName) throws SQLException;
 }

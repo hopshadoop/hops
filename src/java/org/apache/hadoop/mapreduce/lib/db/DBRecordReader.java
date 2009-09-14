@@ -30,6 +30,8 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapreduce.InputFormat;
@@ -49,6 +51,9 @@ import org.apache.hadoop.conf.Configuration;
  */
 public class DBRecordReader<T extends DBWritable> extends
     RecordReader<LongWritable, T> {
+
+  private static final Log LOG = LogFactory.getLog(DBRecordReader.class);
+
   private ResultSet results = null;
 
   private Class<T> inputClass;
@@ -102,7 +107,7 @@ public class DBRecordReader<T extends DBWritable> extends
   /** Returns the query for selecting the records, 
    * subclasses can override this for custom behaviour.*/
   protected String getSelectQuery() {
-      StringBuilder query = new StringBuilder();
+    StringBuilder query = new StringBuilder();
 
     // Default codepath for MySQL, HSQLDB, etc. Relies on LIMIT/OFFSET for splits.
     if(dbConf.getInputQuery() == null) {
@@ -253,5 +258,13 @@ public class DBRecordReader<T extends DBWritable> extends
 
   protected Connection getConnection() {
     return connection;
+  }
+
+  protected PreparedStatement getStatement() {
+    return statement;
+  }
+
+  protected void setStatement(PreparedStatement stmt) {
+    this.statement = stmt;
   }
 }

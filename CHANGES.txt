@@ -337,6 +337,9 @@ Trunk (unreleased changes)
     MAPREDUCE-856. Setup secure permissions for distributed cache files.
     (Vinod Kumar Vavilapalli via yhemanth)
 
+    MAPREDUCE-885. More efficient SQL queries for DBInputFormat. (Aaron Kimball 
+    via enis)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 

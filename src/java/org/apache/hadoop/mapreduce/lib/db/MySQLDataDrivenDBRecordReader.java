@@ -26,11 +26,12 @@ import java.sql.SQLException;
 import org.apache.hadoop.conf.Configuration;
 
 /**
- * A RecordReader that reads records from a MySQL table.
+ * A RecordReader that reads records from a MySQL table via DataDrivenDBRecordReader
  */
-public class MySQLDBRecordReader<T extends DBWritable> extends DBRecordReader<T> {
+public class MySQLDataDrivenDBRecordReader<T extends DBWritable>
+    extends DataDrivenDBRecordReader<T> {
 
-  public MySQLDBRecordReader(DBInputFormat.DBInputSplit split, 
+  public MySQLDataDrivenDBRecordReader(DBInputFormat.DBInputSplit split,
       Class<T> inputClass, Configuration conf, Connection conn, DBConfiguration dbConfig,
       String cond, String [] fields, String table) throws SQLException {
     super(split, inputClass, conf, conn, dbConfig, cond, fields, table);
@@ -41,7 +42,7 @@ public class MySQLDBRecordReader<T extends DBWritable> extends DBRecordReader<T>
     PreparedStatement statement = getConnection().prepareStatement(query,
       ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
     statement.setFetchSize(Integer.MIN_VALUE); // MySQL: read row-at-a-time.
-    setStatement(statement); // save a ref for cleanup in close()
+    setStatement(statement); // save a ref so the close() method cleans this up.
     return statement.executeQuery();
   }
 }

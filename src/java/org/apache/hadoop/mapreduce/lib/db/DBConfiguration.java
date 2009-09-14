@@ -77,6 +77,10 @@ public class DBConfiguration {
   public static final String INPUT_COUNT_QUERY = 
       "mapred.jdbc.input.count.query";
   
+  /** Input query to get the max and min values of the jdbc.input.query */
+  public static final String INPUT_BOUNDING_QUERY =
+      "mapred.jdbc.input.bounding.query";
+  
   /** Class name implementing DBWritable which will hold input tuples */
   public static final String INPUT_CLASS_PROPERTY = "mapred.jdbc.input.class";
 
@@ -207,7 +211,17 @@ public class DBConfiguration {
       conf.set(DBConfiguration.INPUT_COUNT_QUERY, query);
     }
   }
-  
+
+  public void setInputBoundingQuery(String query) {
+    if (query != null && query.length() > 0) {
+      conf.set(DBConfiguration.INPUT_BOUNDING_QUERY, query);
+    }
+  }
+
+  public String getInputBoundingQuery() {
+    return conf.get(DBConfiguration.INPUT_BOUNDING_QUERY);
+  }
+
   public Class<?> getInputClass() {
     return conf.getClass(DBConfiguration.INPUT_CLASS_PROPERTY,
                          NullDBWritable.class);
