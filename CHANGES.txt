@@ -584,3 +584,7 @@ Trunk (unreleased changes)
 
     MAPREDUCE-968. NPE in distcp encountered when placing _logs directory on
     S3FileSystem. (Aaron Kimball via tomwhite)
+ 
+    MAPREDUCE-826. harchive doesn't use ToolRunner / harchive returns 0 even
+    if the job fails with exception (koji Noguchi via mahadev)
+
