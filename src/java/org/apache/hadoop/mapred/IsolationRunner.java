@@ -184,8 +184,8 @@ public class IsolationRunner {
     // where it is.
     Path localSplit =
         new LocalDirAllocator("mapred.local.dir").getLocalPathToRead(
-            TaskTracker.getLocalSplitFile(taskId.getJobID().toString(), taskId
-                .toString()), conf);
+            TaskTracker.getLocalSplitFile(conf.getUser(), taskId.getJobID()
+                .toString(), taskId.toString()), conf);
     DataInputStream splitFile = FileSystem.getLocal(conf).open(localSplit);
     String splitClass = Text.readString(splitFile);
     BytesWritable split = new BytesWritable();

@@ -115,8 +115,8 @@ class MapTask extends Task {
             .getKeepFailedTaskFiles())) {
       Path localSplit =
           new LocalDirAllocator("mapred.local.dir").getLocalPathForWrite(
-              TaskTracker.getLocalSplitFile(getJobID().toString(), getTaskID()
-                  .toString()), conf);
+              TaskTracker.getLocalSplitFile(conf.getUser(), getJobID()
+                  .toString(), getTaskID().toString()), conf);
       LOG.debug("Writing local split to " + localSplit);
       DataOutputStream out = FileSystem.getLocal(conf).create(localSplit);
       Text.writeString(out, splitClass);

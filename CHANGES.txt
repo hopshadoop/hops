@@ -334,6 +334,9 @@ Trunk (unreleased changes)
     MAPREDUCE-966. Modify Rumen to clean up interfaces and simplify integration
     with other tools. (Hong Tang via cdouglas)
 
+    MAPREDUCE-856. Setup secure permissions for distributed cache files.
+    (Vinod Kumar Vavilapalli via yhemanth)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 

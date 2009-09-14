@@ -29,6 +29,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.BoundedByteArrayOutputStream;
+import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.TaskTracker;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 
@@ -62,7 +63,7 @@ class MapOutput<K,V> {
   private final boolean primaryMapOutput;
   
   MapOutput(TaskAttemptID mapId, MergeManager<K,V> merger, long size, 
-            Configuration conf, LocalDirAllocator localDirAllocator,
+            JobConf conf, LocalDirAllocator localDirAllocator,
             int fetcher, boolean primaryMapOutput)  throws IOException {
     this.id = ID.incrementAndGet();
     this.mapId = mapId;
@@ -77,7 +78,8 @@ class MapOutput<K,V> {
     
     this.localFS = FileSystem.getLocal(conf);
     String filename = "map_" + mapId.getTaskID().getId() + ".out";
-    String tmpOutput = Path.SEPARATOR + TaskTracker.getJobCacheSubdir() +
+    String tmpOutput = Path.SEPARATOR +
+                            TaskTracker.getJobCacheSubdir(conf.getUser()) +
                        Path.SEPARATOR + mapId.getJobID() +
                        Path.SEPARATOR + merger.getReduceId() +
                        Path.SEPARATOR + "output" + 

@@ -257,9 +257,8 @@ public class TestSeveral extends TestCase {
     // Check Task directories
     TaskAttemptID taskid = new TaskAttemptID(
         new TaskID(jobId, TaskType.MAP, 1),0);
-    TestMiniMRWithDFS.checkTaskDirectories(
-        mrCluster, new String[]{jobId.toString()}, 
-        new String[]{taskid.toString()});
+    TestMiniMRWithDFS.checkTaskDirectories(mrCluster, TEST1_UGI.getUserName(),
+        new String[] { jobId.toString() }, new String[] { taskid.toString() });
 
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     int exitCode = TestJobClient.runTool(conf, new JobClient(),
@@ -286,9 +285,10 @@ public class TestSeveral extends TestCase {
     // Since we keep setKeepTaskFilesPattern, these files should still be
     // present and will not be cleaned up.
     for(int i=0; i < numTT; ++i) {
-      String jobDirStr = mrCluster.getTaskTrackerLocalDir(i)+
-      "/taskTracker/jobcache";
-      boolean b = FileSystem.getLocal(conf).delete(new Path(jobDirStr), true);
+      Path jobDirPath =
+          new Path(mrCluster.getTaskTrackerLocalDir(i), TaskTracker
+              .getJobCacheSubdir(TEST1_UGI.getUserName()));
+      boolean b = FileSystem.getLocal(conf).delete(jobDirPath, true);
       assertTrue(b);
     }
   }

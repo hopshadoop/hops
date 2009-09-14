@@ -121,6 +121,7 @@ abstract public class Task implements Writable, Configurable {
   ////////////////////////////////////////////
 
   private String jobFile;                         // job configuration file
+  private String user;                            // user running the job
   private TaskAttemptID taskId;                   // unique, includes job id
   private int partition;                          // id within job
   TaskStatus taskStatus;                          // current status of the task
@@ -332,7 +333,18 @@ abstract public class Task implements Writable, Configurable {
   boolean isMapOrReduce() {
     return !jobSetup && !jobCleanup && !taskCleanup;
   }
-  
+
+  /**
+   * Get the name of the user running the job/task. TaskTracker needs task's
+   * user name even before it's JobConf is localized. So we explicitly serialize
+   * the user name.
+   * 
+   * @return user
+   */
+  String getUser() {
+    return user;
+  }
+
   ////////////////////////////////////////////
   // Writable methods
   ////////////////////////////////////////////
@@ -348,7 +360,8 @@ abstract public class Task implements Writable, Configurable {
     out.writeBoolean(jobCleanup);
     out.writeBoolean(jobSetup);
     out.writeBoolean(writeSkipRecs);
-    out.writeBoolean(taskCleanup);  
+    out.writeBoolean(taskCleanup);
+    Text.writeString(out, user);
   }
   
   public void readFields(DataInput in) throws IOException {
@@ -368,6 +381,7 @@ abstract public class Task implements Writable, Configurable {
     if (taskCleanup) {
       setPhase(TaskStatus.Phase.CLEANUP);
     }
+    user = Text.readString(in);
   }
 
   @Override
@@ -886,6 +900,7 @@ abstract public class Task implements Writable, Configurable {
         NetUtils.addStaticResolution(name, resolvedName);
       }
     }
+    this.user = this.conf.getUser();
   }
 
   public Configuration getConf() {

@@ -80,7 +80,9 @@ class LinuxTaskController extends TaskController {
    * List of commands that the setuid script will execute.
    */
   enum TaskCommands {
+    INITIALIZE_USER,
     INITIALIZE_JOB,
+    INITIALIZE_DISTRIBUTEDCACHE,
     LAUNCH_TASK_JVM,
     INITIALIZE_TASK,
     TERMINATE_TASK_JVM,
@@ -258,8 +260,10 @@ class LinuxTaskController extends TaskController {
     String taskId = context.task.getTaskID().toString();
     for (String dir : mapredLocalDirs) {
       File mapredDir = new File(dir);
-      File taskDir = new File(mapredDir, TaskTracker.getTaskWorkDir(
-          jobId, taskId, context.task.isTaskCleanupTask())).getParentFile();
+      File taskDir =
+          new File(mapredDir, TaskTracker.getTaskWorkDir(context.task
+              .getUser(), jobId, taskId, context.task.isTaskCleanupTask()))
+              .getParentFile();
       if (directory.equals(taskDir)) {
         return dir;
       }
@@ -376,6 +380,24 @@ class LinuxTaskController extends TaskController {
         + " on the TT");
     runCommand(TaskCommands.INITIALIZE_JOB, context.user,
         buildInitializeJobCommandArgs(context), context.workDir, null);
+  }
+
+  @Override
+  public void initializeDistributedCache(InitializationContext context)
+      throws IOException {
+    LOG.debug("Going to initialize distributed cache for " + context.user
+        + " on the TT");
+    runCommand(TaskCommands.INITIALIZE_DISTRIBUTEDCACHE, context.user,
+        new ArrayList<String>(), context.workDir, null);
+  }
+
+  @Override
+  public void initializeUser(InitializationContext context)
+      throws IOException {
+    LOG.debug("Going to initialize user directories for " + context.user
+        + " on the TT");
+    runCommand(TaskCommands.INITIALIZE_USER, context.user,
+        new ArrayList<String>(), context.workDir, null);
   }
 
   /**
