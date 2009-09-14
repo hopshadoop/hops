@@ -88,6 +88,7 @@
   <property name="install.c++.examples" 
             value="${build.dir}/c++-examples/${build.platform}"/>
 
+  <property environment="env"/>
   <property name="test.src.dir" value="${basedir}/src/test"/>
   <property name="test.lib.dir" value="${basedir}/src/test/lib"/>
   <property name="test.build.dir" value="${build.dir}/test"/>
@@ -111,6 +112,8 @@
   <property name="test.junit.printsummary" value="yes" />
   <property name="test.junit.haltonfailure" value="no" />
   <property name="test.junit.maxmemory" value="512m" />
+  <property name="test.tmp.dir" value="${env.TMP}" />
+  <property name="test.temp.dir" value="${env.TEMP}" />
 
   <property name="test.tools.input.dir" value="${basedir}/src/test/tools/data" />
 
@@ -578,6 +581,9 @@
         <sysproperty key="java.library.path"
           value="${build.native}/lib:${lib.dir}/native/${build.platform}"/>
         <sysproperty key="install.c++.examples" value="${install.c++.examples}"/>
+        <syspropertyset dynamic="no">
+          <propertyref name="hadoop.tmp.dir"/>
+        </syspropertyset>
         <!-- set compile.c++ in the child jvm only if it is set -->
         <syspropertyset dynamic="no">
           <propertyref name="compile.c++"/>

@@ -588,3 +588,5 @@ Trunk (unreleased changes)
     MAPREDUCE-826. harchive doesn't use ToolRunner / harchive returns 0 even
     if the job fails with exception (koji Noguchi via mahadev)
 
+    MAPREDUCE-839. unit test TestMiniMRChildTask fails on mac os-x (hong tang
+    via mahadev)

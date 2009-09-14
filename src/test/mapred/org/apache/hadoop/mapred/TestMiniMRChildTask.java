@@ -145,13 +145,44 @@ public class TestMiniMRChildTask extends TestCase {
     JobClient.runJob(conf);
     outFs.delete(outDir, true);
 
+    final String DEFAULT_ABS_TMP_PATH = "/tmp";
+    final String DEFAULT_REL_TMP_PATH = "../temp";
+
+    String absoluteTempPath = null;
+    String relativeTempPath = null;
+
+    for (String key : new String[] { "test.temp.dir", "test.tmp.dir" }) {
+      String p = conf.get(key);
+      if (p == null || p.isEmpty()) {
+        continue;
+      }
+      if (new Path(p).isAbsolute()) {
+        if (absoluteTempPath == null) {
+          absoluteTempPath = p;
+        }
+      } else {
+        if (relativeTempPath == null) {
+          relativeTempPath = p;
+        }
+      }
+    }
+
+    if (absoluteTempPath == null) {
+      absoluteTempPath = DEFAULT_ABS_TMP_PATH;
+    }
+    if (relativeTempPath == null) {
+      relativeTempPath = DEFAULT_REL_TMP_PATH;
+    }
+
     // Launch job by giving relative path to temp dir.
-    conf.set("mapred.child.tmp", "../temp");
+    LOG.info("Testing with relative temp dir = "+relativeTempPath);
+    conf.set("mapred.child.tmp", relativeTempPath);
     JobClient.runJob(conf);
     outFs.delete(outDir, true);
 
     // Launch job by giving absolute path to temp dir
-    conf.set("mapred.child.tmp", "/tmp");
+    LOG.info("Testing with absolute temp dir = "+absoluteTempPath);
+    conf.set("mapred.child.tmp", absoluteTempPath);
     JobClient.runJob(conf);
     outFs.delete(outDir, true);
   }
