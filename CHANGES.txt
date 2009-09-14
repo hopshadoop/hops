@@ -582,3 +582,5 @@ Trunk (unreleased changes)
     HADOOP-6243. Fixes a NullPointerException in handling deprecated keys.
     (Sreekanth Ramakrishnan via yhemanth)
 
+    MAPREDUCE-968. NPE in distcp encountered when placing _logs directory on
+    S3FileSystem. (Aaron Kimball via tomwhite)

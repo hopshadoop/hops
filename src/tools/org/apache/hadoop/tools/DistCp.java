@@ -1062,6 +1062,12 @@ public class DistCp implements Tool {
       String filename = "_distcp_logs_" + randomId;
       if (!dstExists || !dstIsDir) {
         Path parent = args.dst.getParent();
+        if (null == parent) {
+          // If dst is '/' on S3, it might not exist yet, but dst.getParent()
+          // will return null. In this case, use '/' as its own parent to prevent
+          // NPE errors below.
+          parent = args.dst;
+        }
         if (!dstfs.exists(parent)) {
           dstfs.mkdirs(parent);
         }
