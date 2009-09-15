@@ -340,6 +340,9 @@ Trunk (unreleased changes)
     MAPREDUCE-885. More efficient SQL queries for DBInputFormat. (Aaron Kimball 
     via enis)
 
+    MAPREDUCE-284. Enables ipc.client.tcpnodelay in Tasktracker's Child.
+    (Ravi Gummadi via sharad)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 

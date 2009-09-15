@@ -54,6 +54,9 @@ class Child {
     LOG.debug("Child starting");
 
     JobConf defaultConf = new JobConf();
+    // set tcp nodelay
+    defaultConf.setBoolean("ipc.client.tcpnodelay", true);
+    
     String host = args[0];
     int port = Integer.parseInt(args[1]);
     InetSocketAddress address = new InetSocketAddress(host, port);
