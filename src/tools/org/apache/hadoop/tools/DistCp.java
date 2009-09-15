@@ -40,6 +40,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -380,6 +381,16 @@ public class DistCp implements Tool {
       int totfiles = job.getInt(SRC_COUNT_LABEL, -1);
       assert totfiles >= 0 : "Invalid file count " + totfiles;
 
+      if (totfiles == 1) {
+        // Copying a single file; use dst path provided by user as
+        // destination file rather than destination directory
+        Path dstparent = absdst.getParent();
+        if (!(destFileSys.exists(dstparent) &&
+              destFileSys.getFileStatus(dstparent).isDir())) {
+          absdst = dstparent;
+        }
+      }
+      
       // if a directory, ensure created even if empty
       if (srcstat.isDir()) {
         if (destFileSys.exists(absdst)) {
@@ -438,15 +449,6 @@ public class DistCp implements Tool {
             + " from " + srcstat.getPath());        
       }
       else {
-        if (totfiles == 1) {
-          // Copying a single file; use dst path provided by user as destination
-          // rather than destination directory, if a file
-          Path dstparent = absdst.getParent();
-          if (!(destFileSys.exists(dstparent) &&
-                destFileSys.getFileStatus(dstparent).isDir())) {
-            absdst = dstparent;
-          }
-        }
         if (destFileSys.exists(absdst) &&
             destFileSys.getFileStatus(absdst).isDir()) {
           throw new IOException(absdst + " is a directory");
@@ -736,7 +738,7 @@ public class DistCp implements Tool {
     }
   }
 
-  static private class Arguments {
+  static class Arguments {
     final List<Path> srcs;
     final Path basedir;
     final Path dst;
@@ -1023,13 +1025,32 @@ public class DistCp implements Tool {
   }
   
   /**
+   * Does the dir already exist at destination ?
+   * @return true   if the dir already exists at destination
+   */
+  private static boolean dirExists(Configuration conf, Path dst)
+                 throws IOException {
+    FileSystem destFileSys = dst.getFileSystem(conf);
+    FileStatus status = null;
+    try {
+      status = destFileSys.getFileStatus(dst);
+    }catch (FileNotFoundException e) {
+      return false;
+    }
+    if (!status.isDir()) {
+      throw new FileAlreadyExistsException("Not a dir: " + dst+" is a file.");
+    }
+    return true;
+  }
+  
+  /**
    * Initialize DFSCopyFileMapper specific job-configuration.
    * @param conf : The dfs/mapred configuration.
    * @param jobConf : The handle to the jobConf object to be initialized.
    * @param args Arguments
    * @return true if it is necessary to launch a job.
    */
-  private static boolean setup(Configuration conf, JobConf jobConf,
+  static boolean setup(Configuration conf, JobConf jobConf,
                             final Arguments args)
       throws IOException {
     jobConf.set(DST_DIR_LABEL, args.dst.toUri().toString());
@@ -1150,9 +1171,12 @@ public class DistCp implements Tool {
         
         if (srcfilestat.isDir()) {
           ++srcCount;
-          ++dirCount;
           final String dst = makeRelative(root,src);
-          src_writer.append(new LongWritable(0), new FilePair(srcfilestat, dst));
+          if (!update || !dirExists(conf, new Path(args.dst, dst))) {
+            ++dirCount;
+            src_writer.append(new LongWritable(0),
+                              new FilePair(srcfilestat, dst));
+          }
           dst_writer.append(new Text(dst), new Text(src.toString()));
         }
 
@@ -1161,23 +1185,39 @@ public class DistCp implements Tool {
           FileStatus cur = pathstack.pop();
           FileStatus[] children = srcfs.listStatus(cur.getPath());
           for(int i = 0; i < children.length; i++) {
-            boolean skipfile = false;
+            boolean skipPath = false;
             final FileStatus child = children[i]; 
             final String dst = makeRelative(root, child.getPath());
             ++srcCount;
 
             if (child.isDir()) {
               pathstack.push(child);
-              ++dirCount;
+              if (!update || !dirExists(conf, new Path(args.dst, dst))) {
+                ++dirCount;
+              }
+              else {
+                skipPath = true; // skip creating dir at destination
+              }
             }
             else {
-              //skip file if the src and the dst files are the same.
-              skipfile = update && sameFile(srcfs, child, dstfs, new Path(args.dst, dst));
-              //skip file if it exceed file limit or size limit
-              skipfile |= fileCount == args.filelimit
+              Path destPath = new Path(args.dst, dst);
+              if (!cur.isDir() && (args.srcs.size() == 1)) {
+                // Copying a single file; use dst path provided by user as
+                // destination file rather than destination directory
+                Path dstparent = destPath.getParent();
+                FileSystem destFileSys = destPath.getFileSystem(jobConf);
+                if (!(destFileSys.exists(dstparent) &&
+                    destFileSys.getFileStatus(dstparent).isDir())) {
+                  destPath = dstparent;
+                }
+              }
+              //skip path if the src and the dst files are the same.
+              skipPath = update && sameFile(srcfs, child, dstfs, destPath);
+              //skip path if it exceed file limit or size limit
+              skipPath |= fileCount == args.filelimit
                           || byteCount + child.getLen() > args.sizelimit; 
 
-              if (!skipfile) {
+              if (!skipPath) {
                 ++fileCount;
                 byteCount += child.getLen();
 
@@ -1196,7 +1236,7 @@ public class DistCp implements Tool {
               }
             }
 
-            if (!skipfile) {
+            if (!skipPath) {
               src_writer.append(new LongWritable(child.isDir()? 0: child.getLen()),
                   new FilePair(child, dst));
             }

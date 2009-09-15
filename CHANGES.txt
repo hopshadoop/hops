@@ -596,3 +596,7 @@ Trunk (unreleased changes)
 
     MAPREDUCE-112. Add counters for reduce input, output records to the new API.
     (Jothi Padmanabhan via cdouglas)
+
+    MAPREDUCE-648. Fix two distcp bugs: (1) it should not launch a job if all
+    src paths are directories, and (2) it does not skip copying when updating
+    a single file.  (Ravi Gummadi via szetszwo)
