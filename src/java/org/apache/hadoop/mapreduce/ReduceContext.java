@@ -45,7 +45,8 @@ import org.apache.hadoop.util.Progressable;
 public class ReduceContext<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
     extends TaskInputOutputContext<KEYIN,VALUEIN,KEYOUT,VALUEOUT> {
   private RawKeyValueIterator input;
-  private Counter inputCounter;
+  private Counter inputValueCounter;
+  private Counter inputKeyCounter;
   private RawComparator<KEYIN> comparator;
   private KEYIN key;                                  // current key
   private VALUEIN value;                              // current value
@@ -70,7 +71,8 @@ public class ReduceContext<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
   
   public ReduceContext(Configuration conf, TaskAttemptID taskid,
                        RawKeyValueIterator input, 
-                       Counter inputCounter,
+                       Counter inputKeyCounter,
+                       Counter inputValueCounter,
                        RecordWriter<KEYOUT,VALUEOUT> output,
                        OutputCommitter committer,
                        StatusReporter reporter,
@@ -80,7 +82,8 @@ public class ReduceContext<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
                        ) throws InterruptedException, IOException{
     super(conf, taskid, output, committer, reporter);
     this.input = input;
-    this.inputCounter = inputCounter;
+    this.inputKeyCounter = inputKeyCounter;
+    this.inputValueCounter = inputValueCounter;
     this.comparator = comparator;
     this.serializationFactory = new SerializationFactory(conf);
     this.keyDeserializer = serializationFactory.getDeserializer(keyClass);
@@ -100,6 +103,9 @@ public class ReduceContext<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
       nextKeyValue();
     }
     if (hasMore) {
+      if (inputKeyCounter != null) {
+        inputKeyCounter.increment(1);
+      }
       return nextKeyValue();
     } else {
       return false;
@@ -134,7 +140,6 @@ public class ReduceContext<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
     }
 
     hasMore = input.next();
-    inputCounter.increment(1);
     if (hasMore) {
       nextKey = input.getKey();
       nextKeyIsSame = comparator.compare(currentRawKey.getBytes(), 0, 
@@ -146,6 +151,7 @@ public class ReduceContext<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
     } else {
       nextKeyIsSame = false;
     }
+    inputValueCounter.increment(1);
     return true;
   }
 

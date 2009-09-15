@@ -68,7 +68,7 @@ public class MockReduceContextWrapper<KEYIN, VALUEIN, KEYOUT, VALUEOUT>
 
       super(new Configuration(),
             new TaskAttemptID("mrunit-jt", 0, TaskType.REDUCE, 0, 0),
-            new MockRawKeyValueIterator(), null, null,
+            new MockRawKeyValueIterator(), null, null, null,
             new MockOutputCommitter(), new MockReporter(counters), null,
             (Class) Text.class, (Class) Text.class);
       this.inputIter = in.iterator();

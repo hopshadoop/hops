@@ -590,3 +590,6 @@ Trunk (unreleased changes)
 
     MAPREDUCE-839. unit test TestMiniMRChildTask fails on mac os-x (hong tang
     via mahadev)
+
+    MAPREDUCE-112. Add counters for reduce input, output records to the new API.
+    (Jothi Padmanabhan via cdouglas)
