@@ -17,13 +17,14 @@
 
 package org.apache.hadoop.mapred;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.Path;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 
-import java.util.HashSet;
-import java.util.Set;
+import java.util.Properties;
+import java.util.Map;
+import java.util.HashMap;
 
 /**
  * Class providing access to Capacity scheduler configuration.
@@ -50,6 +51,9 @@ class CapacitySchedulerConf {
     "mapred.capacity-scheduler.queue.";
   
   private static final String SUBQUEUE_SUFFIX="subQueues";
+
+  private Map<String, Properties> queueProperties
+    = new HashMap<String,Properties>();
 
   /**
    * If {@link JobConf#MAPRED_TASK_MAXPMEM_PROPERTY} is set to
@@ -156,6 +160,10 @@ class CapacitySchedulerConf {
         "mapred.capacity-scheduler.default-maximum-initialized-jobs-per-user",
         2);
   }
+
+  void setProperties(String queueName , Properties properties) {
+    this.queueProperties.put(queueName,properties);
+  }
   
   /**
    * Get the percentage of the cluster for the specified queue.
@@ -178,19 +186,29 @@ class CapacitySchedulerConf {
     //In case of both capacity and default capacity not configured.
     //Last check is if the configuration is specified and is marked as
     //negative we throw exception
-    String raw = getCSConf().getRaw(toFullPropertyName(queue,
-        "capacity"));
-    if(raw == null) {
-      return -1;
-    }
-    float result = getCSConf().getFloat(toFullPropertyName(queue,
-                                   "capacity"), 
-                                   -1);
-    if (result < 0.0 || result > 100.0) {
+    String raw = getProperty(queue,"capacity");
+
+
+    float result = this.getFloat(raw,-1);
+    
+    if (result > 100.0) {
       throw new IllegalArgumentException("Illegal capacity for queue " + queue +
                                          " of " + result);
     }
     return result;
+  }
+
+  String getProperty(String queue,String property) {
+    if(!queueProperties.containsKey(queue))
+     throw new IllegalArgumentException("Invalid queuename " + queue);
+
+    //This check is still required as sometimes we create queue with null
+    //This is typically happens in case of test.
+    if(queueProperties.get(queue) != null) {
+      return queueProperties.get(queue).getProperty(property);
+    }
+
+    return null;
   }
 
   /**
@@ -207,13 +225,8 @@ class CapacitySchedulerConf {
    * @return
    */
   public float getMaxCapacity(String queue) {
-    String raw = getCSConf().getRaw(toFullPropertyName(queue, MAX_CAPACITY));
-    if(raw == null) {
-      return -1;
-    }
-    float result = getCSConf().getFloat(toFullPropertyName(queue,
-                                                           MAX_CAPACITY),
-                                   -1);
+    String raw = getProperty(queue,MAX_CAPACITY);
+    float result = getFloat(raw,-1);
     result = (result <= 0) ? -1 : result; 
     if (result > 100.0) {
       throw new IllegalArgumentException("Illegal maximum-capacity-stretch " +
@@ -228,48 +241,6 @@ class CapacitySchedulerConf {
   }
 
   /**
-   *
-   * @param queue . Complete qualified name of the queue
-   * All the subQueues at same level should have unique names.
-   * 
-   * @return list of subQueues at a level.
-   * @return null if no subQueues specified.
-   */
-  public Set<String> getSubQueues(String queue){
-    String[] result = getCSConf().getStrings(
-      toFullPropertyName(
-        queue,SUBQUEUE_SUFFIX));
-    if(result != null && result.length  > 0){
-      HashSet<String> qs = new HashSet<String>(result.length);
-      for (String q: result){
-        qs.add(q);
-      }
-      return qs;
-    }
-    return null;
-  }
-  
-  /**
-   * Sets the capacity of the given queue.
-   * 
-   * @param queue name of the queue
-   * @param capacity percent of the cluster for the queue.
-   */
-  public void setMaxCapacity(String queue,float capacity) {
-    getCSConf().setFloat(toFullPropertyName(queue, MAX_CAPACITY),capacity);
-  }
-
-  /**
-   * Sets the capacity of the given queue.
-   *
-   * @param queue name of the queue
-   * @param capacity percent of the cluster for the queue.
-   */
-  public void setCapacity(String queue,float capacity) {
-    getCSConf().setFloat(toFullPropertyName(queue, "capacity"),capacity);
-  }
-  
-  /**
    * Get whether priority is supported for this queue.
    * 
    * If this value is false, then job priorities will be ignored in 
@@ -279,23 +250,10 @@ class CapacitySchedulerConf {
    * @return Whether this queue supports priority or not.
    */
   public boolean isPrioritySupported(String queue) {
-    checkIfJobQueue(queue);
-    return getCSConf().getBoolean(toFullPropertyName(queue, "supports-priority"),
-        defaultSupportPriority);  
+    String raw = getProperty(queue,"supports-priority");
+    return Boolean.parseBoolean(raw);
   }
-  
-  /**
-   * Set whether priority is supported for this queue.
-   * 
-   * 
-   * @param queue name of the queue
-   * @param value true, if the queue must support priorities, false otherwise.
-   */
-  public void setPrioritySupported(String queue, boolean value) {
-    checkIfJobQueue(queue);
-    getCSConf().setBoolean(toFullPropertyName(queue, "supports-priority"), value);
-  }
-  
+
   /**
    * Get the minimum limit of resources for any user submitting jobs in 
    * this queue, in percentage.
@@ -312,37 +270,14 @@ class CapacitySchedulerConf {
    * 
    */
   public int getMinimumUserLimitPercent(String queue) {
-    checkIfJobQueue(queue);
-    int userLimit = getCSConf().getInt(toFullPropertyName(queue,
-        "minimum-user-limit-percent"), defaultUlimitMinimum);
+    String raw = getProperty(queue,
+        "minimum-user-limit-percent");
+    int userLimit = getInt(raw,defaultUlimitMinimum);
     if(userLimit <= 0 || userLimit > 100) {
       throw new IllegalArgumentException("Invalid user limit : "
           + userLimit + " for queue : " + queue);
     }
     return userLimit;
-  }
-
-  private void checkIfJobQueue(String queue) {
-    Set<String> queues = getSubQueues(queue);
-    if(queues == null || queues.isEmpty()) {
-      return;
-    } else {
-      LOG.warn("This property is " +
-        "only allowed for child queue not for container Queue " + queue);
-    }
-  }
-
-  /**
-   * Set the minimum limit of resources for any user submitting jobs in
-   * this queue, in percentage.
-   * 
-   * @param queue name of the queue
-   * @param value minimum limit of resources for any user submitting jobs
-   * in this queue
-   */
-  public void setMinimumUserLimitPercent(String queue, int value) {
-    getCSConf().setInt(toFullPropertyName(queue, "minimum-user-limit-percent"),
-                    value);
   }
   
   /**
@@ -369,28 +304,15 @@ class CapacitySchedulerConf {
    * or zero.
    */
   public int getMaxJobsPerUserToInitialize(String queue) {
-    checkIfJobQueue(queue);
-    int maxJobsPerUser = getCSConf().getInt(toFullPropertyName(queue,
-        "maximum-initialized-jobs-per-user"), 
-        defaultMaxJobsPerUsersToInitialize);
+    String raw = getProperty(queue,"maximum-initialized-jobs-per-user");
+    int maxJobsPerUser = getInt(raw,defaultMaxJobsPerUsersToInitialize);
     if(maxJobsPerUser <= 0) {
       throw new IllegalArgumentException(
           "Invalid maximum jobs per user configuration " + maxJobsPerUser);
     }
     return maxJobsPerUser;
   }
-  
-  /**
-   * Sets the maximum number of jobs which are allowed to be initialized 
-   * for a user in the queue.
-   * 
-   * @param queue queue name.
-   * @param value maximum number of jobs allowed to be initialized per user.
-   */
-  public void setMaxJobsPerUserToInitialize(String queue, int value) {
-    getCSConf().setInt(toFullPropertyName(queue,
-        "maximum-initialized-jobs-per-user"), value);
-  }
+
 
   /**
    * Amount of time in milliseconds which poller thread and initialization
@@ -442,28 +364,6 @@ class CapacitySchedulerConf {
     }
     return maxWorkerThreads;
   }
-  /**
-   * Set the sleep interval which initialization poller would sleep before 
-   * it looks at the jobs in the job queue.
-   * 
-   * @param interval sleep interval
-   */
-  public void setSleepInterval(long interval) {
-    getCSConf().setLong(
-        "mapred.capacity-scheduler.init-poll-interval", interval);
-  }
-  
-  /**
-   * Sets number of threads which can be spawned to initialize jobs in
-   * parallel.
-   * 
-   * @param poolSize number of threads to be spawned to initialize jobs
-   * in parallel.
-   */
-  public void setMaxWorkerThreads(int poolSize) {
-    getCSConf().setInt(
-        "mapred.capacity-scheduler.init-worker-threads", poolSize);
-  }
 
   /**
    * get the max map slots cap
@@ -471,19 +371,10 @@ class CapacitySchedulerConf {
    * @return
    */
   public int getMaxMapCap(String queue) {
-    checkIfJobQueue(queue);
-    return getCSConf().getInt(toFullPropertyName(queue,MAX_MAP_CAP_PROPERTY),-1);
+    String raw = getProperty(queue,MAX_MAP_CAP_PROPERTY);
+    return getInt(raw,-1);
   }
 
-  /**
-   * Used for testing
-   * @param queue
-   * @param val
-   */
-  public void setMaxMapCap(String queue,int val) {
-    checkIfJobQueue(queue);
-    getCSConf().setInt(toFullPropertyName(queue,MAX_MAP_CAP_PROPERTY),val);
-  }
 
   /**
    * get the max reduce slots cap
@@ -491,21 +382,32 @@ class CapacitySchedulerConf {
    * @return
    */
   public int getMaxReduceCap(String queue) {
-    checkIfJobQueue(queue);
-    return getCSConf().getInt(toFullPropertyName(queue,MAX_REDUCE_CAP_PROPERTY),-1);
+    String raw = getProperty(queue,MAX_REDUCE_CAP_PROPERTY);
+    return getInt(raw,-1);
   }
 
-  /**
-   * Used for testing
-   * @param queue
-   * @param val
-   */
-  public void setMaxReduceCap(String queue,int val) {
-    checkIfJobQueue(queue);
-    getCSConf().setInt(toFullPropertyName(queue,MAX_REDUCE_CAP_PROPERTY),val);
-  }
 
   public Configuration getCSConf() {
     return rmConf;
+  }
+
+  float getFloat(String valueString,float defaultValue) {
+    if (valueString == null)
+      return defaultValue;
+    try {
+      return Float.parseFloat(valueString);
+    } catch (NumberFormatException e) {
+      return defaultValue;
+    }
+  }
+
+  int getInt(String valueString,int defaultValue) {
+    if (valueString == null)
+      return defaultValue;
+    try {
+      return Integer.parseInt(valueString);
+    } catch (NumberFormatException e) {
+      return defaultValue;
+    }
   }
 }

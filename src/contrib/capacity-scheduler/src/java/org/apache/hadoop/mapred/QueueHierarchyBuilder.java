@@ -21,7 +21,8 @@ package org.apache.hadoop.mapred;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-import java.util.Set;
+import java.util.List;
+import java.util.Properties;
 
 /**
  * Hierarchy builder for the CapacityScheduler.
@@ -30,45 +31,37 @@ import java.util.Set;
 public class QueueHierarchyBuilder {
 
   static final Log LOG = LogFactory.getLog(CapacityTaskScheduler.class);
-  private final String NAME_SEPERATOR = ".";
   private CapacitySchedulerConf schedConf;
   
   QueueHierarchyBuilder(CapacitySchedulerConf schedConf) {
     this.schedConf = schedConf;
   }
   
+
   /**
    * The first call would expect that parent has children.
    * @param parent       parent Queue
    * @param children     children
    */
   void createHierarchy(
-    AbstractQueue parent, Set<String> children) {
+    AbstractQueue parent, List<JobQueueInfo> children) {
     //check if children have further childrens.
     if (children != null && !children.isEmpty()) {
       float totalCapacity = 0.0f;
-      for (String qName : children) {
-        if(qName.contains(NAME_SEPERATOR)) {
-          throw new IllegalArgumentException( NAME_SEPERATOR  +  "" +
-            " not allowed in queue name \'" + qName + "\'.");
-        }
-        //generate fully qualified name.
-        if (!parent.getName().equals("")) {
-          qName = parent.getName() + NAME_SEPERATOR + qName;
-        }
+      for (JobQueueInfo qs : children) {
+
         //Check if this child has any more children.
-        Set<String> childQueues = schedConf.getSubQueues(qName);
+        List<JobQueueInfo> childQueues = qs.getChildren();
 
         if (childQueues != null && childQueues.size() > 0) {
           //generate a new ContainerQueue and recursively
           //create hierarchy.
           AbstractQueue cq = new ContainerQueue(
             parent,
-            loadContext(
-              qName));
+            loadContext(qs.getProperties() , qs.getQueueName()));
           //update totalCapacity
           totalCapacity += cq.qsc.getCapacityPercent();
-          LOG.info("Created a ContainerQueue " + qName);
+          LOG.info("Created a ContainerQueue " + qs.getQueueName());
           //create child hiearchy
           createHierarchy(cq, childQueues);
         } else {
@@ -77,10 +70,9 @@ public class QueueHierarchyBuilder {
           //create a JobQueue.
           AbstractQueue jq = new JobQueue(
             parent,
-            loadContext(
-              qName));
+            loadContext(qs.getProperties(),qs.getQueueName()));
           totalCapacity += jq.qsc.getCapacityPercent();
-          LOG.info("Created a jobQueue " + qName);
+          LOG.info("Created a jobQueue " + qs.getQueueName());
         }
       }
 
@@ -98,7 +90,9 @@ public class QueueHierarchyBuilder {
 
 
   private QueueSchedulingContext loadContext(
+    Properties props,
     String queueName) {
+    schedConf.setProperties(queueName,props);
     float capacity = schedConf.getCapacity(queueName);
     float stretchCapacity = schedConf.getMaxCapacity(queueName);
     if (capacity == -1.0) {

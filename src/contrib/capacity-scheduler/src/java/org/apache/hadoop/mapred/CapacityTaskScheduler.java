@@ -25,6 +25,8 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Set;
 
 import org.apache.commons.logging.Log;
@@ -700,8 +702,8 @@ class CapacityTaskScheduler extends TaskScheduler {
     QueueManager queueManager = taskTrackerManager.getQueueManager();
 
     //get parent level queues. these are defined in mapred-*.xml
-    Set<String> queues = queueManager.getQueues();
-
+    List<JobQueueInfo> queues = Arrays.asList(queueManager.getRootQueues());
+    LOG.info("Root queues defined " + queues);
     // Sanity check: there should be at least one queue.
     if (0 == queues.size()) {
       throw new IllegalStateException("System has no queue configured");
@@ -735,7 +737,8 @@ class CapacityTaskScheduler extends TaskScheduler {
    * construction of the hierarchy.
    */
   private void updateQueueMaps() {
-    List<AbstractQueue> allQueues = getRoot().getDescendentJobQueues();
+    Set<AbstractQueue> allQueues = getContainerQueues(getRoot());
+    allQueues.addAll(getRoot().getDescendentJobQueues());
     for (AbstractQueue queue : allQueues) {
       if (queue instanceof JobQueue) {
         jobQueuesManager.addQueue((JobQueue)queue);
@@ -745,6 +748,26 @@ class CapacityTaskScheduler extends TaskScheduler {
     }
   }
 
+  /**
+   * returns list of container queues.
+   * @param q
+   * @return the containerQueue for queue q
+   */
+  private Set<AbstractQueue> getContainerQueues(AbstractQueue q) {
+    Set<AbstractQueue> l = new HashSet<AbstractQueue>();
+
+    if(!(q instanceof ContainerQueue)) {
+      return l;
+    }
+    //Add q's children.
+    for (AbstractQueue child : q.getChildren()) {
+      if(child.getChildren() != null && child.getChildren().size() > 0) {
+        l.add(child);
+        l.addAll(getContainerQueues(child));
+      }
+    }
+    return l;
+  }
   /** mostly for testing purposes */
   void setInitializationPoller(JobInitializationPoller p) {
     this.initializationPoller = p;

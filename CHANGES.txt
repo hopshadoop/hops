@@ -96,6 +96,9 @@ Trunk (unreleased changes)
     MAPREDUCE-830. Add support for splittable compression to TextInputFormats.
     (Abdul Qadeer via cdouglas)
 
+    MAPREDUCE-861. Add support for hierarchical queues in the Map/Reduce
+    framework. (Rahul Kumar Singh via yhemanth)
+
   IMPROVEMENTS
 
     MAPREDUCE-816. Rename "local" mysql import to "direct" in Sqoop.

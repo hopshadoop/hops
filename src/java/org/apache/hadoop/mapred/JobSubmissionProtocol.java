@@ -66,8 +66,12 @@ interface JobSubmissionProtocol extends VersionedProtocol {
    * Version 24: Modified ClusterStatus to include BlackListInfo class which 
    *             encapsulates reasons and report for blacklisted node.          
    * Version 25: Added fields to JobStatus for HADOOP-817.
+   *
+   * Version 26: Added properties to JobQueueInfo as part of MAPREDUCE-861.
+   *             added new api's getRootQueues and
+   *             getChildQueues(String queueName)
    */
-  public static final long versionID = 25L;
+  public static final long versionID = 26L;
 
   /**
    * Allocate a name for the job.
@@ -227,4 +231,20 @@ interface JobSubmissionProtocol extends VersionedProtocol {
    * @throws IOException
    */
   public QueueAclsInfo[] getQueueAclsForCurrentUser() throws IOException;
+
+  /**
+   * Gets the root level queues.
+   * @return array of JobQueueInfo object.
+   * @throws IOException
+   */
+  public JobQueueInfo[] getRootQueues() throws IOException;
+  
+
+  /**
+   * Returns immediate children of queueName.
+   * @param queueName
+   * @return array of JobQueueInfo which are children of queueName
+   * @throws IOException
+   */
+  public JobQueueInfo[] getChildQueues(String queueName) throws IOException;
 }

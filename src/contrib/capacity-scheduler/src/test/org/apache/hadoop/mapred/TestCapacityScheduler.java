@@ -64,6 +64,7 @@ public class TestCapacityScheduler extends TestCase {
 
     conf = new JobConf();
     // Don't let the JobInitializationPoller come in our way.
+    conf.set("mapred.queue.names","default");
     resConf = new FakeResourceManagerConf();
     controlledInitializationPoller = new ControlledInitializationPoller(
       scheduler.jobQueuesManager,
@@ -135,11 +136,14 @@ public class TestCapacityScheduler extends TestCase {
     taskTrackerManager.addQueues(new String[]{"default"});
     ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
     queues.add(new FakeQueueInfo("default", 100.0f, false, 1));
-    resConf.setFakeQueues(queues);
-    resConf.setMaxMapCap("default", 2);
-    resConf.setMaxReduceCap("default", -1);
+    resConf.setFakeQueues(queues, taskTrackerManager.getQueueManager()
+    );
     scheduler.setResourceManagerConf(resConf);
     scheduler.start();
+
+    scheduler.getRoot().getChildren().get(0).getQueueSchedulingContext().getMapTSC().setMaxTaskLimit(2);
+    scheduler.getRoot().getChildren().get(0).getQueueSchedulingContext().getReduceTSC().setMaxTaskLimit(-1);
+
 
     //submit the Job
     FakeJobInProgress fjob1 =
@@ -160,7 +164,7 @@ public class TestCapacityScheduler extends TestCase {
     //Now complete the task 1.
     // complete the job
     taskTrackerManager.finishTask(
-      "tt1", task1.get(0).getTaskID().toString(),
+      task1.get(0).getTaskID().toString(),
       fjob1);
     //We have completed the tt1 task which was a map task so we expect one map
     //task to be picked up
@@ -179,11 +183,13 @@ public class TestCapacityScheduler extends TestCase {
     taskTrackerManager.addQueues(new String[]{"default"});
     ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
     queues.add(new FakeQueueInfo("default", 100.0f, false, 1));
-    resConf.setFakeQueues(queues);
-    resConf.setMaxMapCap("default", -1);
-    resConf.setMaxReduceCap("default", 2);
+    resConf.setFakeQueues(queues, taskTrackerManager.getQueueManager()
+    );
     scheduler.setResourceManagerConf(resConf);
     scheduler.start();
+    scheduler.getRoot().getChildren().get(0).getQueueSchedulingContext().getMapTSC().setMaxTaskLimit(-1);
+    scheduler.getRoot().getChildren().get(0).getQueueSchedulingContext().getReduceTSC().setMaxTaskLimit(2);
+
 
     //submit the Job
     FakeJobInProgress fjob1 =
@@ -201,7 +207,7 @@ public class TestCapacityScheduler extends TestCase {
     //Now complete the task 1 i.e map task.
     // complete the job
     taskTrackerManager.finishTask(
-      "tt1", task1.get(0).getTaskID().toString(),
+      task1.get(0).getTaskID().toString(),
       fjob1);
 
     //This should still fail as only map task is done
@@ -210,7 +216,7 @@ public class TestCapacityScheduler extends TestCase {
 
     //Complete the reduce task
     taskTrackerManager.finishTask(
-      "tt2", task2.get(0).getTaskID().toString(), fjob1);
+      task2.get(0).getTaskID().toString(), fjob1);
 
     //One reduce is done hence assign the new reduce.
     checkAssignment(
@@ -224,7 +230,8 @@ public class TestCapacityScheduler extends TestCase {
     taskTrackerManager.addQueues(new String[]{"default"});
     ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
     queues.add(new FakeQueueInfo("default", 100.0f, true, 1));
-    resConf.setFakeQueues(queues);
+    resConf.setFakeQueues(queues, taskTrackerManager.getQueueManager()
+    );
     scheduler.setResourceManagerConf(resConf);
     scheduler.start();
 
@@ -265,7 +272,7 @@ public class TestCapacityScheduler extends TestCase {
 
     // complete the job
     taskTrackerManager.finishTask(
-      "tt1", tasks.get(0).getTaskID().toString(),
+      tasks.get(0).getTaskID().toString(),
       fjob1);
 
     // mark the job as complete
@@ -361,7 +368,8 @@ public class TestCapacityScheduler extends TestCase {
 
     ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
     queues.add(new FakeQueueInfo("default", 50.0f, true, 25));
-    resConf.setFakeQueues(queues);
+    resConf.setFakeQueues(queues, taskTrackerManager.getQueueManager()
+    );
     scheduler.setResourceManagerConf(resConf);
     scheduler.start();
 
@@ -382,8 +390,8 @@ public class TestCapacityScheduler extends TestCase {
       "attempt_test_0001_m_000002_0 on tt1");
 
     // complete tasks
-    taskTrackerManager.finishTask("tt1", "attempt_test_0001_m_000001_0", j1);
-    taskTrackerManager.finishTask("tt1", "attempt_test_0001_m_000002_0", j1);
+    taskTrackerManager.finishTask("attempt_test_0001_m_000001_0", j1);
+    taskTrackerManager.finishTask("attempt_test_0001_m_000002_0", j1);
 
     // II. Check multiple assignments with running tasks across jobs
     // ask for a task from first job
@@ -397,8 +405,8 @@ public class TestCapacityScheduler extends TestCase {
       "attempt_test_0002_m_000001_0 on tt1");
 
     // complete tasks
-    taskTrackerManager.finishTask("tt1", "attempt_test_0002_m_000001_0", j2);
-    taskTrackerManager.finishTask("tt1", "attempt_test_0001_m_000003_0", j1);
+    taskTrackerManager.finishTask("attempt_test_0002_m_000001_0", j2);
+    taskTrackerManager.finishTask("attempt_test_0001_m_000003_0", j1);
 
     // III. Check multiple assignments with completed tasks across jobs
     // ask for a task from the second job
@@ -407,7 +415,7 @@ public class TestCapacityScheduler extends TestCase {
       "attempt_test_0002_m_000002_0 on tt1");
 
     // complete task
-    taskTrackerManager.finishTask("tt1", "attempt_test_0002_m_000002_0", j2);
+    taskTrackerManager.finishTask("attempt_test_0002_m_000002_0", j2);
 
     // IV. Check assignment with completed job
     // finish first job
@@ -420,7 +428,7 @@ public class TestCapacityScheduler extends TestCase {
       "attempt_test_0002_m_000003_0 on tt1");
 
     // complete task
-    taskTrackerManager.finishTask("tt1", "attempt_test_0002_m_000003_0", j2);
+    taskTrackerManager.finishTask("attempt_test_0002_m_000003_0", j2);
   }
 
   // basic tests, should be able to submit to queues
@@ -431,7 +439,8 @@ public class TestCapacityScheduler extends TestCase {
     ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
     queues.add(new FakeQueueInfo("default", 50.0f, true, 25));
     queues.add(new FakeQueueInfo("q2", 50.0f, true, 25));
-    resConf.setFakeQueues(queues);
+    resConf.setFakeQueues(queues, taskTrackerManager.getQueueManager()
+    );
     scheduler.setResourceManagerConf(resConf);
     scheduler.start();
 
@@ -458,7 +467,8 @@ public class TestCapacityScheduler extends TestCase {
     taskTrackerManager.addQueues(qs);
     ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
     queues.add(new FakeQueueInfo("default", 100.0f, true, 100));
-    resConf.setFakeQueues(queues);
+    resConf.setFakeQueues(queues, taskTrackerManager.getQueueManager()
+    );
     scheduler.setResourceManagerConf(resConf);
     scheduler.start();
     HashMap<String, ArrayList<FakeJobInProgress>> subJobsList =
@@ -494,7 +504,8 @@ public class TestCapacityScheduler extends TestCase {
     queues.add(new FakeQueueInfo("qAZ2", -1.0f, true, 25));
     queues.add(new FakeQueueInfo("qAZ3", -1.0f, true, 25));
     queues.add(new FakeQueueInfo("qAZ4", -1.0f, true, 25));
-    resConf.setFakeQueues(queues);
+    resConf.setFakeQueues(queues, taskTrackerManager.getQueueManager()
+    );
     scheduler.setResourceManagerConf(resConf);
     scheduler.start();
     JobQueuesManager jqm = scheduler.jobQueuesManager;
@@ -515,7 +526,8 @@ public class TestCapacityScheduler extends TestCase {
     // the cluster capacity increase slowly.
     queues.add(new FakeQueueInfo("default", 10.0f, true, 25));
     queues.add(new FakeQueueInfo("q2", 90.0f, true, 25));
-    resConf.setFakeQueues(queues);
+    resConf.setFakeQueues(queues, taskTrackerManager.getQueueManager()
+    );
     scheduler.setResourceManagerConf(resConf);
     scheduler.start();
 
@@ -567,7 +579,8 @@ public class TestCapacityScheduler extends TestCase {
     ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
     queues.add(new FakeQueueInfo("default", 50.0f, true, 25));
     queues.add(new FakeQueueInfo("q2", 50.0f, true, 25));
-    resConf.setFakeQueues(queues);
+    resConf.setFakeQueues(queues, taskTrackerManager.getQueueManager()
+    );
     scheduler.setResourceManagerConf(resConf);
     scheduler.start();
 
@@ -609,8 +622,8 @@ public class TestCapacityScheduler extends TestCase {
     taskTrackerManager.addQueues(new String[]{"defaultXYZM"});
     ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
     queues.add(new FakeQueueInfo("defaultXYZM", 100.0f, true, 25));
-    resConf.setFakeQueues(queues);
-    resConf.setMaxMapCap("defaultXYZM", 2);
+    resConf.setFakeQueues(queues, taskTrackerManager.getQueueManager()
+    );
     scheduler.setTaskTrackerManager(taskTrackerManager);
     // enabled memory-based scheduling
     // Normal job in the cluster would be 1GB maps/reduces
@@ -626,6 +639,9 @@ public class TestCapacityScheduler extends TestCase {
       JobTracker.MAPRED_CLUSTER_REDUCE_MEMORY_MB_PROPERTY, 1 * 1024);
     scheduler.setResourceManagerConf(resConf);
     scheduler.start();
+    scheduler.getRoot().getChildren().get(0).getQueueSchedulingContext()
+      .getMapTSC().setMaxTaskLimit(2);
+
 
     // The situation :  Submit 2 jobs with high memory map task
     //Set the max limit for queue to 2 ,
@@ -693,11 +709,13 @@ public class TestCapacityScheduler extends TestCase {
     taskTrackerManager.addQueues(qs);
     ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
     queues.add(new FakeQueueInfo("default", 100.0f, true, 50));
-    resConf.setFakeQueues(queues);
-    resConf.setMaxMapCap("default", 2);
-    resConf.setMaxReduceCap("default", 2);
+    resConf.setFakeQueues(queues, taskTrackerManager.getQueueManager()
+    );
     scheduler.setResourceManagerConf(resConf);
     scheduler.start();
+    scheduler.getRoot().getChildren().get(0).getQueueSchedulingContext().getMapTSC().setMaxTaskLimit(2);
+    scheduler.getRoot().getChildren().get(0).getQueueSchedulingContext().getReduceTSC().setMaxTaskLimit(2);
+
 
     // submit a job
     FakeJobInProgress fjob1 =
@@ -731,7 +749,7 @@ public class TestCapacityScheduler extends TestCase {
       "attempt_test_0002_r_000001_0 on tt4");
 
     taskTrackerManager.finishTask(
-      "tt1", t1.getTaskID().toString(),
+      t1.getTaskID().toString(),
       fjob1);
 
     //tt1 completed the task so we have 1 map slot for u1
@@ -741,7 +759,7 @@ public class TestCapacityScheduler extends TestCase {
       "attempt_test_0001_m_000002_0 on tt1");
 
     taskTrackerManager.finishTask(
-      "tt4", t4.getTaskID().toString(),
+      t4.getTaskID().toString(),
       fjob2);
     //tt4 completed the task , so we have 1 reduce slot for u2
     //we are assigning the 2nd reduce from fjob2
@@ -760,7 +778,8 @@ public class TestCapacityScheduler extends TestCase {
     ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
     queues.add(new FakeQueueInfo("default", 50.0f, true, 25));
     queues.add(new FakeQueueInfo("q2", 50.0f, true, 25));
-    resConf.setFakeQueues(queues);
+    resConf.setFakeQueues(queues, taskTrackerManager.getQueueManager()
+    );
     scheduler.setResourceManagerConf(resConf);
     scheduler.start();
 
@@ -796,7 +815,8 @@ public class TestCapacityScheduler extends TestCase {
     ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
     queues.add(new FakeQueueInfo("default", 50.0f, true, 25));
     queues.add(new FakeQueueInfo("q2", 50.0f, true, 25));
-    resConf.setFakeQueues(queues);
+    resConf.setFakeQueues(queues, taskTrackerManager.getQueueManager()
+    );
     scheduler.setResourceManagerConf(resConf);
     scheduler.start();
 
@@ -832,7 +852,8 @@ public class TestCapacityScheduler extends TestCase {
     ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
     queues.add(new FakeQueueInfo("default", 50.0f, true, 25));
     queues.add(new FakeQueueInfo("q2", 50.0f, true, 25));
-    resConf.setFakeQueues(queues);
+    resConf.setFakeQueues(queues, taskTrackerManager.getQueueManager()
+    );
     scheduler.setResourceManagerConf(resConf);
     scheduler.start();
 
@@ -857,23 +878,23 @@ public class TestCapacityScheduler extends TestCase {
     // Submit another job, from a different user
     FakeJobInProgress j2 = submitJobAndInit(JobStatus.PREP, 10, 10, "q2", "u2");
     // one of the task finishes
-    taskTrackerManager.finishTask("tt1", "attempt_test_0001_m_000001_0", j1);
+    taskTrackerManager.finishTask("attempt_test_0001_m_000001_0", j1);
     // Now if I ask for a map task, it should come from the second job 
     checkAssignment(
       taskTrackerManager, scheduler, "tt1",
       "attempt_test_0002_m_000001_0 on tt1");
     // another task from job1 finishes, another new task to job2
-    taskTrackerManager.finishTask("tt1", "attempt_test_0001_m_000002_0", j1);
+    taskTrackerManager.finishTask("attempt_test_0001_m_000002_0", j1);
     checkAssignment(
       taskTrackerManager, scheduler, "tt1",
       "attempt_test_0002_m_000002_0 on tt1");
     // now we have equal number of tasks from each job. Whichever job's
     // task finishes, that job gets a new task
-    taskTrackerManager.finishTask("tt2", "attempt_test_0001_m_000003_0", j1);
+    taskTrackerManager.finishTask("attempt_test_0001_m_000003_0", j1);
     checkAssignment(
       taskTrackerManager, scheduler, "tt2",
       "attempt_test_0001_m_000005_0 on tt2");
-    taskTrackerManager.finishTask("tt1", "attempt_test_0002_m_000001_0", j2);
+    taskTrackerManager.finishTask("attempt_test_0002_m_000001_0", j2);
     checkAssignment(
       taskTrackerManager, scheduler, "tt1",
       "attempt_test_0002_m_000003_0 on tt1");
@@ -886,7 +907,8 @@ public class TestCapacityScheduler extends TestCase {
     taskTrackerManager.addQueues(qs);
     ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
     queues.add(new FakeQueueInfo("default", 100.0f, true, 25));
-    resConf.setFakeQueues(queues);
+    resConf.setFakeQueues(queues, taskTrackerManager.getQueueManager()
+    );
     scheduler.setResourceManagerConf(resConf);
     scheduler.start();
     // add some more TTs 
@@ -932,7 +954,7 @@ public class TestCapacityScheduler extends TestCase {
       taskTrackerManager, scheduler, "tt5",
       "attempt_test_0001_m_000006_0 on tt5");
     // u1 finishes a task
-    taskTrackerManager.finishTask("tt5", "attempt_test_0001_m_000006_0", j1);
+    taskTrackerManager.finishTask("attempt_test_0001_m_000006_0", j1);
     // u1 submits a few more jobs 
     // All the jobs are inited when submitted
     // because of addition of Eager Job Initializer all jobs in this
@@ -950,12 +972,12 @@ public class TestCapacityScheduler extends TestCase {
       taskTrackerManager, scheduler, "tt5",
       "attempt_test_0007_m_000001_0 on tt5");
     // some other task finishes and u3 gets it
-    taskTrackerManager.finishTask("tt5", "attempt_test_0002_m_000004_0", j1);
+    taskTrackerManager.finishTask("attempt_test_0002_m_000004_0", j1);
     checkAssignment(
       taskTrackerManager, scheduler, "tt5",
       "attempt_test_0007_m_000002_0 on tt5");
     // now, u2 finishes a task
-    taskTrackerManager.finishTask("tt4", "attempt_test_0002_m_000002_0", j1);
+    taskTrackerManager.finishTask("attempt_test_0002_m_000002_0", j1);
     // next slot will go to u1, since u3 has nothing to run and u1's job is 
     // first in the queue
     checkAssignment(
@@ -977,7 +999,8 @@ public class TestCapacityScheduler extends TestCase {
     taskTrackerManager.addQueues(qs);
     ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
     queues.add(new FakeQueueInfo("default", 100.0f, true, 50));
-    resConf.setFakeQueues(queues);
+    resConf.setFakeQueues(queues, taskTrackerManager.getQueueManager()
+    );
     // enabled memory-based scheduling
     // Normal job in the cluster would be 1GB maps/reduces
     scheduler.getConf().setLong(
@@ -1109,7 +1132,8 @@ public class TestCapacityScheduler extends TestCase {
     ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
     queues.add(new FakeQueueInfo("default", 50.0f, true, 25));
     queues.add(new FakeQueueInfo("q2", 50.0f, true, 25));
-    resConf.setFakeQueues(queues);
+    resConf.setFakeQueues(queues, taskTrackerManager.getQueueManager()
+    );
     scheduler.setResourceManagerConf(resConf);
     scheduler.start();
 
@@ -1123,6 +1147,7 @@ public class TestCapacityScheduler extends TestCase {
       queueManager.getJobQueueInfo("default").getSchedulingInfo();
     String schedulingInfo2 =
       queueManager.getJobQueueInfo("q2").getSchedulingInfo();
+
     String[] infoStrings = schedulingInfo.split("\n");
     assertEquals(infoStrings.length, 18);
     assertEquals(infoStrings[0], "Queue configuration");
@@ -1147,6 +1172,7 @@ public class TestCapacityScheduler extends TestCase {
     assertEquals(infoStrings[15], "Job info");
     assertEquals(infoStrings[16], "Number of Waiting Jobs: 0");
     assertEquals(infoStrings[17], "Number of users who have submitted jobs: 0");
+
     assertEquals(schedulingInfo, schedulingInfo2);
 
     //Testing with actual job submission.
@@ -1228,8 +1254,8 @@ public class TestCapacityScheduler extends TestCase {
 
     //Complete the job and check the running tasks count
     FakeJobInProgress u1j1 = userJobs.get(0);
-    taskTrackerManager.finishTask("tt1", t1.getTaskID().toString(), u1j1);
-    taskTrackerManager.finishTask("tt1", t2.getTaskID().toString(), u1j1);
+    taskTrackerManager.finishTask(t1.getTaskID().toString(), u1j1);
+    taskTrackerManager.finishTask(t2.getTaskID().toString(), u1j1);
     taskTrackerManager.finalizeJob(u1j1);
 
     // make sure we update our stats
@@ -1349,7 +1375,8 @@ public class TestCapacityScheduler extends TestCase {
     taskTrackerManager.addQueues(new String[]{"default"});
     ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
     queues.add(new FakeQueueInfo("default", 100.0f, true, 25));
-    resConf.setFakeQueues(queues);
+    resConf.setFakeQueues(queues, taskTrackerManager.getQueueManager()
+    );
     scheduler.setResourceManagerConf(resConf);
     scheduler.setTaskTrackerManager(taskTrackerManager);
     // memory-based scheduling disabled by default.
@@ -1393,7 +1420,8 @@ public class TestCapacityScheduler extends TestCase {
     taskTrackerManager.addQueues(new String[]{"default"});
     ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
     queues.add(new FakeQueueInfo("default", 100.0f, true, 25));
-    resConf.setFakeQueues(queues);
+    resConf.setFakeQueues(queues, taskTrackerManager.getQueueManager()
+    );
     scheduler.setTaskTrackerManager(taskTrackerManager);
     // enabled memory-based scheduling
     // Normal job in the cluster would be 1GB maps/reduces
@@ -1474,7 +1502,8 @@ public class TestCapacityScheduler extends TestCase {
     ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
     queues.add(new FakeQueueInfo("default", 100.0f, true, 25));
     taskTrackerManager.addQueues(new String[]{"default"});
-    resConf.setFakeQueues(queues);
+    resConf.setFakeQueues(queues, taskTrackerManager.getQueueManager()
+    );
     scheduler.setTaskTrackerManager(taskTrackerManager);
     // enabled memory-based scheduling
     // Normal jobs 1GB maps/reduces. 2GB limit on maps/reduces
@@ -1624,7 +1653,8 @@ public class TestCapacityScheduler extends TestCase {
     ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
     queues.add(new FakeQueueInfo("default", 100.0f, true, 100));
     taskTrackerManager.addQueues(new String[]{"default"});
-    resConf.setFakeQueues(queues);
+    resConf.setFakeQueues(queues, taskTrackerManager.getQueueManager()
+    );
     scheduler.setTaskTrackerManager(taskTrackerManager);
     // enabled memory-based scheduling
     LOG.debug("Assume TT has 2GB for maps and 2GB for reduces");
@@ -1711,8 +1741,8 @@ public class TestCapacityScheduler extends TestCase {
     assertNull(scheduler.assignTasks(tracker("tt1")));
 
     // finish the tasks on the tracker.
-    taskTrackerManager.finishTask("tt1", t.getTaskID().toString(), job1);
-    taskTrackerManager.finishTask("tt1", t1.getTaskID().toString(), job1);
+    taskTrackerManager.finishTask(t.getTaskID().toString(), job1);
+    taskTrackerManager.finishTask(t1.getTaskID().toString(), job1);
 
     // now a new task can be assigned.
     t = checkAssignment(
@@ -1749,7 +1779,8 @@ public class TestCapacityScheduler extends TestCase {
     taskTrackerManager.addQueues(qs);
     ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
     queues.add(new FakeQueueInfo("default", 100.0f, true, 100));
-    resConf.setFakeQueues(queues);
+    resConf.setFakeQueues(queues, taskTrackerManager.getQueueManager()
+    );
     scheduler.setResourceManagerConf(resConf);
     scheduler.start();
 
@@ -1831,16 +1862,16 @@ public class TestCapacityScheduler extends TestCase {
       taskTrackerManager, scheduler, "tt2",
       "attempt_test_0002_r_000001_0 on tt2");
     taskTrackerManager.finishTask(
-      "tt1", t1.getTaskID().toString(), u1Jobs.get(
+      t1.getTaskID().toString(), u1Jobs.get(
         0));
     taskTrackerManager.finishTask(
-      "tt1", t2.getTaskID().toString(), u1Jobs.get(
+      t2.getTaskID().toString(), u1Jobs.get(
         0));
     taskTrackerManager.finishTask(
-      "tt2", t3.getTaskID().toString(), u1Jobs.get(
+      t3.getTaskID().toString(), u1Jobs.get(
         1));
     taskTrackerManager.finishTask(
-      "tt2", t4.getTaskID().toString(), u1Jobs.get(
+      t4.getTaskID().toString(), u1Jobs.get(
         1));
 
     // as some jobs have running tasks, the poller will now
@@ -1871,10 +1902,10 @@ public class TestCapacityScheduler extends TestCase {
       taskTrackerManager, scheduler, "tt1",
       "attempt_test_0003_r_000001_0 on tt1");
     taskTrackerManager.finishTask(
-      "tt1", t1.getTaskID().toString(), u1Jobs.get(
+      t1.getTaskID().toString(), u1Jobs.get(
         2));
     taskTrackerManager.finishTask(
-      "tt1", t2.getTaskID().toString(), u1Jobs.get(
+      t2.getTaskID().toString(), u1Jobs.get(
         2));
 
     // no new jobs should be picked up, because max user limit
@@ -1891,10 +1922,10 @@ public class TestCapacityScheduler extends TestCase {
       taskTrackerManager, scheduler, "tt1",
       "attempt_test_0004_r_000001_0 on tt1");
     taskTrackerManager.finishTask(
-      "tt1", t1.getTaskID().toString(), u1Jobs.get(
+      t1.getTaskID().toString(), u1Jobs.get(
         3));
     taskTrackerManager.finishTask(
-      "tt1", t2.getTaskID().toString(), u1Jobs.get(
+      t2.getTaskID().toString(), u1Jobs.get(
         3));
 
     // Now initialised jobs should contain user 4's job, as
@@ -1916,7 +1947,8 @@ public class TestCapacityScheduler extends TestCase {
     taskTrackerManager.addQueues(qs);
     ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
     queues.add(new FakeQueueInfo("default", 100.0f, true, 100));
-    resConf.setFakeQueues(queues);
+    resConf.setFakeQueues(queues, taskTrackerManager.getQueueManager()
+    );
     scheduler.setResourceManagerConf(resConf);
     scheduler.start();
 
@@ -1967,7 +1999,8 @@ public class TestCapacityScheduler extends TestCase {
     taskTrackerManager.addQueues(qs);
     ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
     queues.add(new FakeQueueInfo("default", 100.0f, true, 100));
-    resConf.setFakeQueues(queues);
+    resConf.setFakeQueues(queues, taskTrackerManager.getQueueManager()
+    );
     scheduler.setResourceManagerConf(resConf);
     scheduler.start();
 
@@ -1992,7 +2025,8 @@ public class TestCapacityScheduler extends TestCase {
     taskTrackerManager.addQueues(qs);
     ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
     queues.add(new FakeQueueInfo("q1", 100.0f, true, 100));
-    resConf.setFakeQueues(queues);
+    resConf.setFakeQueues(queues, taskTrackerManager.getQueueManager()
+    );
     scheduler.setResourceManagerConf(resConf);
     //Start the scheduler.
     scheduler.start();
@@ -2014,7 +2048,8 @@ public class TestCapacityScheduler extends TestCase {
     taskTrackerManager.addQueues(qs);
     ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
     queues.add(new FakeQueueInfo("default", 100.0f, true, 100));
-    resConf.setFakeQueues(queues);
+    resConf.setFakeQueues(queues, taskTrackerManager.getQueueManager()
+    );
     scheduler.setResourceManagerConf(resConf);
     scheduler.start();
 
@@ -2068,7 +2103,8 @@ public class TestCapacityScheduler extends TestCase {
     taskTrackerManager.addQueues(qs);
     ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
     queues.add(new FakeQueueInfo("default", 100.0f, true, 100));
-    resConf.setFakeQueues(queues);
+    resConf.setFakeQueues(queues, taskTrackerManager.getQueueManager()
+    );
     scheduler.setResourceManagerConf(resConf);
     scheduler.start();
 
@@ -2112,10 +2148,10 @@ public class TestCapacityScheduler extends TestCase {
       taskTrackerManager, scheduler, "tt2",
       "attempt_test_0001_r_000001_1 on tt2");
 
-    taskTrackerManager.finishTask("tt1", "attempt_test_0001_m_000001_0", fjob1);
-    taskTrackerManager.finishTask("tt2", "attempt_test_0001_m_000001_1", fjob1);
-    taskTrackerManager.finishTask("tt1", "attempt_test_0001_r_000001_0", fjob1);
-    taskTrackerManager.finishTask("tt2", "attempt_test_0001_r_000001_1", fjob1);
+    taskTrackerManager.finishTask("attempt_test_0001_m_000001_0", fjob1);
+    taskTrackerManager.finishTask("attempt_test_0001_m_000001_1", fjob1);
+    taskTrackerManager.finishTask("attempt_test_0001_r_000001_0", fjob1);
+    taskTrackerManager.finishTask("attempt_test_0001_r_000001_1", fjob1);
     taskTrackerManager.finalizeJob(fjob1);
 
     checkAssignment(
@@ -2124,8 +2160,8 @@ public class TestCapacityScheduler extends TestCase {
     checkAssignment(
       taskTrackerManager, scheduler, "tt1",
       "attempt_test_0002_r_000001_0 on tt1");
-    taskTrackerManager.finishTask("tt1", "attempt_test_0002_m_000001_0", fjob2);
-    taskTrackerManager.finishTask("tt2", "attempt_test_0002_r_000001_0", fjob2);
+    taskTrackerManager.finishTask("attempt_test_0002_m_000001_0", fjob2);
+    taskTrackerManager.finishTask("attempt_test_0002_r_000001_0", fjob2);
     taskTrackerManager.finalizeJob(fjob2);
   }
 
@@ -2143,7 +2179,8 @@ public class TestCapacityScheduler extends TestCase {
     taskTrackerManager.addQueues(new String[]{"default"});
     ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
     queues.add(new FakeQueueInfo("default", 100.0f, true, 25));
-    resConf.setFakeQueues(queues);
+    resConf.setFakeQueues(queues, taskTrackerManager.getQueueManager()
+    );
     scheduler.setTaskTrackerManager(taskTrackerManager);
     // enabled memory-based scheduling
     // Normal job in the cluster would be 1GB maps/reduces
@@ -2280,7 +2317,8 @@ public class TestCapacityScheduler extends TestCase {
     ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
     queues.add(new FakeQueueInfo("default", 50.0f, true, 100));
     queues.add(new FakeQueueInfo("q1", 50.0f, true, 100));
-    resConf.setFakeQueues(queues);
+    resConf.setFakeQueues(queues, taskTrackerManager.getQueueManager()
+    );
     // enabled memory-based scheduling
     // Normal job in the cluster would be 1GB maps/reduces
     scheduler.getConf().setLong(
@@ -2458,8 +2496,8 @@ public class TestCapacityScheduler extends TestCase {
       mgr.getJobQueue("default").getWaitingJobs().contains(job));
 
     // complete tasks and job
-    taskTrackerManager.finishTask("tt1", "attempt_test_0001_m_000001_0", job);
-    taskTrackerManager.finishTask("tt1", "attempt_test_0001_r_000001_0", job);
+    taskTrackerManager.finishTask("attempt_test_0001_m_000001_0", job);
+    taskTrackerManager.finishTask("attempt_test_0001_r_000001_0", job);
     taskTrackerManager.finalizeJob(job);
 
     // make sure it is removed from the run queue
@@ -2695,7 +2733,8 @@ public class TestCapacityScheduler extends TestCase {
     taskTrackerManager.addQueues(new String[]{"default"});
     ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
     queues.add(new FakeQueueInfo("default", 100.0f, true, 25));
-    resConf.setFakeQueues(queues);
+    resConf.setFakeQueues(queues, taskTrackerManager.getQueueManager()
+    );
     JobConf conf = (JobConf) (scheduler.getConf());
     conf.set(
       JobConf.UPPER_LIMIT_ON_TASK_VMEM_PROPERTY, String.valueOf(

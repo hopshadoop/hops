@@ -19,11 +19,18 @@ package org.apache.hadoop.mapred;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
-import java.util.*;
-import java.io.IOException;
-
 import org.apache.hadoop.mapreduce.TaskType;
+import org.apache.hadoop.mapred.JobQueueJobInProgressListener.JobSchedulingInfo;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 /**
  *
@@ -42,11 +49,11 @@ public class JobQueue extends AbstractQueue {
     }
     waitingJobs =
       new
-        TreeMap<JobQueueJobInProgressListener.JobSchedulingInfo, JobInProgress>(
+        TreeMap<JobSchedulingInfo, JobInProgress>(
         comparator);
     runningJobs =               
       new
-        TreeMap<JobQueueJobInProgressListener.JobSchedulingInfo, JobInProgress>(
+        TreeMap<JobSchedulingInfo, JobInProgress>(
         comparator);
   }
 
@@ -58,16 +65,16 @@ public class JobQueue extends AbstractQueue {
   * If a queue doesn't support priorities, jobs are
   * sorted based on their start time.
   */
-  static final Comparator<JobQueueJobInProgressListener.JobSchedulingInfo>
+  static final Comparator<JobSchedulingInfo>
     STARTTIME_JOB_COMPARATOR;
 
   static {
     STARTTIME_JOB_COMPARATOR =
-      new Comparator<JobQueueJobInProgressListener.JobSchedulingInfo>() {
+      new Comparator<JobSchedulingInfo>() {
         // comparator for jobs in queues that don't support priorities
         public int compare(
-          JobQueueJobInProgressListener.JobSchedulingInfo o1,
-          JobQueueJobInProgressListener.JobSchedulingInfo o2) {
+          JobSchedulingInfo o1,
+          JobSchedulingInfo o2) {
           // the job that started earlier wins
           if (o1.getStartTime() < o2.getStartTime()) {
             return -1;
@@ -178,12 +185,12 @@ public class JobQueue extends AbstractQueue {
   }
 
 
-  Map<JobQueueJobInProgressListener.JobSchedulingInfo, JobInProgress>
+  Map<JobSchedulingInfo, JobInProgress>
     waitingJobs; // for waiting jobs
-  Map<JobQueueJobInProgressListener.JobSchedulingInfo, JobInProgress>
+  Map<JobSchedulingInfo, JobInProgress>
     runningJobs; // for running jobs
 
-  public Comparator<JobQueueJobInProgressListener.JobSchedulingInfo>
+  public Comparator<JobSchedulingInfo>
     comparator;
 
   Collection<JobInProgress> getWaitingJobs() {
@@ -203,20 +210,20 @@ public class JobQueue extends AbstractQueue {
   private void addRunningJob(JobInProgress job) {
     synchronized (runningJobs) {
       runningJobs.put(
-        new JobQueueJobInProgressListener.JobSchedulingInfo(
+        new JobSchedulingInfo(
           job), job);
     }
   }
 
   private JobInProgress removeRunningJob(
-    JobQueueJobInProgressListener.JobSchedulingInfo jobInfo) {
+    JobSchedulingInfo jobInfo) {
     synchronized (runningJobs) {
       return runningJobs.remove(jobInfo);
     }
   }
 
   JobInProgress removeWaitingJob(
-    JobQueueJobInProgressListener.JobSchedulingInfo schedInfo) {
+    JobSchedulingInfo schedInfo) {
     synchronized (waitingJobs) {
       JobInProgress jip = waitingJobs.remove(schedInfo);
       this.qsc.setNumOfWaitingJobs(waitingJobs.size());
@@ -227,7 +234,7 @@ public class JobQueue extends AbstractQueue {
   private void addWaitingJob(JobInProgress job) {
     synchronized (waitingJobs) {
       waitingJobs.put(
-        new JobQueueJobInProgressListener.JobSchedulingInfo(
+        new JobSchedulingInfo(
           job), job);
       this.qsc.setNumOfWaitingJobs(waitingJobs.size());
     }
@@ -321,7 +328,7 @@ public class JobQueue extends AbstractQueue {
   // This is used to reposition a job in the queue. A job can get repositioned
   // because of the change in the job priority or job start-time.
   private void reorderJobs(
-    JobInProgress job, JobQueueJobInProgressListener.JobSchedulingInfo oldInfo
+    JobInProgress job, JobSchedulingInfo oldInfo
   ) {
 
     if (removeWaitingJob(oldInfo) != null) {
@@ -372,8 +379,8 @@ public class JobQueue extends AbstractQueue {
   // Update the scheduler as job's state has changed
   private void jobStateChanged(JobStatusChangeEvent event) {
     JobInProgress job = event.getJobInProgress();
-    JobQueueJobInProgressListener.JobSchedulingInfo oldJobStateInfo =
-      new JobQueueJobInProgressListener.JobSchedulingInfo(event.getOldStatus());
+    JobSchedulingInfo oldJobStateInfo =
+      new JobSchedulingInfo(event.getOldStatus());
     // Check if the ordering of the job has changed
     // For now priority and start-time can change the job ordering
     if (event.getEventType() == JobStatusChangeEvent.EventType.PRIORITY_CHANGED
@@ -403,7 +410,7 @@ public class JobQueue extends AbstractQueue {
   * job queue manager.
   */
   private void jobCompleted(
-    JobInProgress job, JobQueueJobInProgressListener.JobSchedulingInfo oldInfo
+    JobInProgress job, JobSchedulingInfo oldInfo
   ) {
     LOG.info(
       "Job " + job.getJobID().toString() + " submitted to queue "

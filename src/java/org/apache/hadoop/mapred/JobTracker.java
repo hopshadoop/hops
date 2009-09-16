@@ -2753,7 +2753,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     JobInProgress job = new JobInProgress(jobId, this, this.conf, restartCount);
     
     String queue = job.getProfile().getQueueName();
-    if(!(queueManager.getQueues().contains(queue))) {      
+    if(!(queueManager.getLeafQueueNames().contains(queue))) {
       new CleanupQueue().addToQueue(fs, getSystemDirectoryForJob(jobId));
       throw new IOException("Queue \"" + queue + "\" does not exist");        
     }
@@ -3589,9 +3589,29 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   private static void dumpConfiguration(Writer writer) throws IOException {
     Configuration.dumpConfiguration(new JobConf(), writer);
     writer.write("\n");
-    // get the QueueManager configuration properties
-    QueueManager.dumpConfiguration(writer);
-    writer.write("\n");
+  }
+
+  /**
+   * Gets the root level queues.
+   *
+   * @return array of JobQueueInfo object.
+   * @throws java.io.IOException
+   */
+   @Override
+  public JobQueueInfo[] getRootQueues() throws IOException {
+    return queueManager.getRootQueues();
+  }
+ 
+  /**
+   * Returns immediate children of queueName.
+   *
+   * @param queueName
+   * @return array of JobQueueInfo which are children of queueName
+   * @throws java.io.IOException
+   */
+  @Override
+  public JobQueueInfo[] getChildQueues(String queueName) throws IOException {
+     return queueManager.getChildQueues(queueName);
   }
 
   @Override

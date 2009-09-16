@@ -20,6 +20,9 @@ package org.apache.hadoop.mapred;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Properties;
 
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
@@ -38,13 +41,17 @@ public class JobQueueInfo implements Writable {
   private String schedulingInfo; 
   
   private String queueState;
-  
+
+  private List<JobQueueInfo> children;
+
+  private Properties props;
+
   /**
    * Default constructor for Job Queue Info.
    * 
    */
   public JobQueueInfo() {
-    
+    children = new ArrayList<JobQueueInfo>();
   }
   /**
    * Construct a new JobQueueInfo object using the queue name and the
@@ -59,6 +66,7 @@ public class JobQueueInfo implements Writable {
     this.schedulingInfo = schedulingInfo;
     // make it running by default.
     this.queueState = Queue.QueueState.RUNNING.getStateName();
+    children = new ArrayList<JobQueueInfo>();
   }
   
   
@@ -118,22 +126,49 @@ public class JobQueueInfo implements Writable {
   public String getQueueState() {
     return queueState;
   }
-  
+
+  public List<JobQueueInfo> getChildren() {
+    return children;
+  }
+
+  public void setChildren(List<JobQueueInfo> children) {
+    this.children =  children; 
+  }
+
+  Properties getProperties() {
+    return props;
+  }
+
+  void setProperties(Properties props) {
+    this.props = props;
+  }
+
   @Override
   public void readFields(DataInput in) throws IOException {
     queueName = Text.readString(in);
     queueState = Text.readString(in);
     schedulingInfo = Text.readString(in);
+    int count = in.readInt();
+    children.clear();
+    for (int i = 0; i < count; i++) {
+      JobQueueInfo childQueueInfo = new JobQueueInfo();
+      childQueueInfo.readFields(in);
+      children.add(childQueueInfo);
+    }
   }
 
   @Override
   public void write(DataOutput out) throws IOException {
     Text.writeString(out, queueName);
     Text.writeString(out, queueState);
-    if(schedulingInfo!= null) {
+    if (schedulingInfo != null) {
       Text.writeString(out, schedulingInfo);
-    }else {
+    } else {
       Text.writeString(out, "N/A");
+    }
+    out.writeInt(children.size());
+    for(JobQueueInfo childQueueInfo : children) {
+      childQueueInfo.write(out);
     }
   }
 }

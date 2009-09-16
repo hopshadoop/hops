@@ -38,4 +38,6 @@
 **/TestTaskTrackerBlacklisting.java
 **/TestTaskTrackerLocalization
 **/TestTrackerDistributedCacheManager
-
+**/TestQueueManagerForHierarchialQueues
+**/TestContainerQueue
+**/TestCapacityScheduler

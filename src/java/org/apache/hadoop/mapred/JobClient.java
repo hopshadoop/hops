@@ -1953,7 +1953,29 @@ public class JobClient extends Configured implements MRConstants, Tool  {
     }
     return sysDir;
   }
-  
+
+  /**
+   * Returns an array of queue information objects about root level queues
+   * configured
+   *
+   * @return the array of root level JobQueueInfo objects
+   * @throws IOException
+   */
+  public JobQueueInfo[] getRootQueues() throws IOException {
+    return jobSubmitClient.getRootQueues();
+  }
+
+  /**
+   * Returns an array of queue information objects about immediate children
+   * of queue queueName.
+   * 
+   * @param queueName
+   * @return the array of immediate children JobQueueInfo objects
+   * @throws IOException
+   */
+  public JobQueueInfo[] getChildQueues(String queueName) throws IOException {
+    return jobSubmitClient.getChildQueues(queueName);
+  }
   
   /**
    * Return an array of queue information objects about all the Job Queues

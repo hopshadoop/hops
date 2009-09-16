@@ -306,7 +306,7 @@ public class TestFairScheduler extends TestCase {
     void setQueues(Set<String> queues) {
       this.queues = queues;
     }
-    public synchronized Set<String> getQueues() {
+    public synchronized Set<String> getLeafQueueNames() {
       return queues;
     }
   }

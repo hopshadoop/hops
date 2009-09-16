@@ -167,6 +167,8 @@ public class TestRecoveryManager extends TestCase {
     fs.delete(TEST_DIR, true);
     
     JobConf conf = new JobConf();
+    conf.set(
+      DeprecatedQueueConfigurationParser.MAPRED_QUEUE_NAMES_KEY, "default");
     conf.set("mapred.jobtracker.job.history.block.size", "1024");
     conf.set("mapred.jobtracker.job.history.buffer.size", "1024");
     

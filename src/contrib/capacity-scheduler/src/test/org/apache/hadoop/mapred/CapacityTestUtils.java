@@ -26,9 +26,13 @@ import java.util.*;
 import java.io.IOException;
 
 import org.apache.hadoop.security.SecurityUtil.AccessControlList;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 
 public class CapacityTestUtils {
+  static final Log LOG =
+    LogFactory.getLog(org.apache.hadoop.mapred.CapacityTestUtils.class);
 
 
   /**
@@ -450,8 +454,8 @@ public class CapacityTestUtils {
     private static final AccessControlList allEnabledAcl =
       new AccessControlList("*");
 
-    FakeQueueManager() {
-      super(new Configuration());
+    FakeQueueManager(Configuration conf) {
+      super(conf);
     }
 
     void setQueues(Set<String> queueNames) {
@@ -474,7 +478,7 @@ public class CapacityTestUtils {
       super.setQueues(queues);
     }
 
-    public synchronized Set<String> getQueues() {
+    public synchronized Set<String> getLeafQueueNames() {
       return queueNames;
     }
   }
@@ -487,7 +491,8 @@ public class CapacityTestUtils {
     long ttExpiryInterval = 10 * 60 * 1000L; // default interval
     List<JobInProgressListener> listeners =
       new ArrayList<JobInProgressListener>();
-    FakeQueueManager qm = new FakeQueueManager();
+
+    FakeQueueManager qm = null;
 
     private Map<String, TaskTracker> trackers =
       new HashMap<String, TaskTracker>();
@@ -503,6 +508,9 @@ public class CapacityTestUtils {
     public FakeTaskTrackerManager(
       int numTaskTrackers,
       int maxMapTasksPerTracker, int maxReduceTasksPerTracker) {
+    Configuration cfn = new Configuration();
+    cfn.set("mapred.queue.names","default");
+    qm = new FakeQueueManager(cfn);
       this.maxMapTasksPerTracker = maxMapTasksPerTracker;
       this.maxReduceTasksPerTracker = maxReduceTasksPerTracker;
       for (int i = 1; i < numTaskTrackers + 1; i++) {
@@ -666,7 +674,7 @@ public class CapacityTestUtils {
     }
 
     public void finishTask(
-      String taskTrackerName, String tipId,
+      String tipId,
       FakeJobInProgress j) {
       TaskStatus status = taskStatuses.get(tipId);
       if (status.getIsMap()) {
@@ -732,6 +740,7 @@ public class CapacityTestUtils {
     void addQueues(String[] arr) {
       Set<String> queues = new HashSet<String>();
       for (String s : arr) {
+
         queues.add(s);
       }
       qm.setQueues(queues);
@@ -770,8 +779,13 @@ public class CapacityTestUtils {
     String firstQueue;
 
 
-    void setFakeQueues(List<FakeQueueInfo> queues) {
+    void setFakeQueues(List<FakeQueueInfo> queues, QueueManager qManager) {
+      Properties p = new Properties();
       for (FakeQueueInfo q : queues) {
+        p.setProperty("capacity",q.capacity+"");
+        p.setProperty("supports-priority",q.supportsPrio+"");
+        p.setProperty("minimum-user-limit-percent",q.ulMin+"");
+        qManager.getQueue(q.queueName).setProperties(p);
         queueMap.put(q.queueName, q);
       }
       firstQueue = new String(queues.get(0).queueName);
@@ -786,16 +800,45 @@ public class CapacityTestUtils {
     }*/
 
     public float getCapacity(String queue) {
-      if (queueMap.get(queue) == null) {
-      }
       if (queueMap.get(queue).capacity == -1) {
-        return super.getCapacity(queue);
+        return -1;
       }
       return queueMap.get(queue).capacity;
     }
 
+    public float getMaxCapacity(String queue) {
+      //There is no support for the old testcase for
+      //maxCapacity.
+
+      //MaxCapacity testcases are part of TestContainerQueue
+      return -1;
+    }
+
+    public int getMaxMapCap(String queue) {
+      return -1;
+    }
+
+    public int getMaxReduceCap(String queue) {
+      return -1;
+    }
+
+
     public int getMinimumUserLimitPercent(String queue) {
       return queueMap.get(queue).ulMin;
+    }
+
+    /**
+     * Gets the maximum number of jobs which are allowed to initialize in the
+     * job queue.
+     *
+     * @param queue queue name.
+     * @return maximum number of jobs allowed to be initialized per user.
+     * @throws IllegalArgumentException if maximum number of users is negative
+     *                                  or zero.
+     */
+    @Override
+    public int getMaxJobsPerUserToInitialize(String queue) {
+      return 2;
     }
 
     public boolean isPrioritySupported(String queue) {

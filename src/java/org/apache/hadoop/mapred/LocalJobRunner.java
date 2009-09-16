@@ -531,6 +531,17 @@ class LocalJobRunner implements JobSubmissionProtocol {
     return fs.makeQualified(sysDir).toString();
   }
 
+
+  @Override
+  public JobQueueInfo[] getChildQueues(String queueName) throws IOException {
+    return null;
+  }
+
+  @Override
+  public JobQueueInfo[] getRootQueues() throws IOException {
+    return null;
+  }
+
   @Override
   public JobStatus[] getJobsFromQueue(String queue) throws IOException {
     return null;
