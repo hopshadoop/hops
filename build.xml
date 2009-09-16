@@ -620,7 +620,7 @@
     <fail unless="continueOnFailure">Tests failed!</fail>
   </target>
 
-  <target name="test-contrib" depends="compile,compile-mapred-test" description="Run contrib unit tests">
+  <target name="test-contrib" depends="compile,compile-tools,compile-mapred-test" description="Run contrib unit tests">
     <subant target="test">
        <property name="version" value="${version}"/>
        <property name="clover.jar" value="${clover.jar}"/>
@@ -685,6 +685,7 @@
       <property name="version" value="${version}"/>
       <property name="dist.dir" value="${dist.dir}"/>
       <fileset file="${contrib.dir}/streaming/build.xml"/>
+      <fileset file="${contrib.dir}/gridmix/build.xml"/>
     </subant>
  </target>
 
@@ -714,10 +715,12 @@
       <sourcePath path="${examples.dir}" />
       <sourcePath path="${tools.src}" />
       <sourcePath path="${basedir}/src/contrib/streaming/src/java" />
+      <sourcePath path="${basedir}/src/contrib/gridmix/src/java" />
       <class location="${basedir}/build/${final.name}.jar" />
       <class location="${basedir}/build/${examples.final.name}.jar" />
       <class location="${basedir}/build/${tools.final.name}.jar" />
       <class location="${basedir}/build/contrib/streaming/hadoop-${version}-streaming.jar" />
+      <class location="${basedir}/build/contrib/gridmix/hadoop-${version}-gridmix.jar" />
     </findbugs>
 
         <xslt style="${findbugs.home}/src/xsl/default.xsl"
@@ -793,6 +796,7 @@
     	<packageset dir="src/contrib/streaming/src/java"/>
     	<packageset dir="src/contrib/data_join/src/java"/>
     	<packageset dir="src/contrib/index/src/java"/>
+    	<packageset dir="src/contrib/gridmix/src/java"/>
 
         <link href="${javadoc.link.java}"/>
 
@@ -846,6 +850,7 @@
     	<packageset dir="src/contrib/streaming/src/java"/>
     	<packageset dir="src/contrib/data_join/src/java"/>
     	<packageset dir="src/contrib/index/src/java"/>
+    	<packageset dir="src/contrib/gridmix/src/java"/>
 	
         <link href="${javadoc.link.java}"/>
 

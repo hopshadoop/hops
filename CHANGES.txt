@@ -99,6 +99,9 @@ Trunk (unreleased changes)
     MAPREDUCE-861. Add support for hierarchical queues in the Map/Reduce
     framework. (Rahul Kumar Singh via yhemanth)
 
+    MAPREDUCE-776. Add Gridmix, a benchmark processing Rumen traces to simulate
+    a measured mix of jobs on a cluster. (cdouglas)
+
   IMPROVEMENTS
 
     MAPREDUCE-816. Rename "local" mysql import to "direct" in Sqoop.

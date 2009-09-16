@@ -56,6 +56,7 @@
             value="http://java.sun.com/j2se/1.4/docs/api/"/>
 
   <property name="build.encoding" value="ISO-8859-1"/>
+  <property name="dest.jar" value="${build.dir}/hadoop-${version}-${name}.jar"/>
 
   <fileset id="lib.jars" dir="${root}" includes="lib/*.jar"/>
 
@@ -83,6 +84,7 @@
     <pathelement location="${build.classes}"/>
     <fileset refid="lib.jars"/>
     <pathelement location="${hadoop.root}/build/classes"/>
+    <pathelement location="${hadoop.root}/build/tools"/>
     <fileset dir="${hadoop.root}/lib">
       <include name="**/*.jar" />
     </fileset>
@@ -179,7 +181,7 @@
   <target name="jar" depends="compile" unless="skip.contrib">
     <echo message="contrib: ${name}"/>
     <jar
-      jarfile="${build.dir}/hadoop-${version}-${name}.jar"
+      jarfile="${dest.jar}"
       basedir="${build.classes}"      
     />
   </target>
@@ -206,7 +208,7 @@
     <mkdir dir="${dist.dir}/contrib/${name}"/>
     <copy todir="${dist.dir}/contrib/${name}" includeEmptyDirs="false" flatten="true">
       <fileset dir="${build.dir}">
-        <include name="hadoop-${version}-${name}.jar" />
+        <include name="${dest.jar}" />
       </fileset>
     </copy>
   </target>
@@ -220,7 +222,7 @@
     <mkdir dir="${hadoop.log.dir}"/>
     <junit
       printsummary="yes" showoutput="${test.output}" 
-      haltonfailure="no" fork="yes" maxmemory="256m"
+      haltonfailure="no" fork="yes" maxmemory="512m"
       errorProperty="tests.failed" failureProperty="tests.failed"
       timeout="${test.timeout}">
       
