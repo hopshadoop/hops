@@ -49,13 +49,16 @@
                       status.getMaxReduceTasks())) / status.getTaskTrackers()):
       "-";
     out.print("<table border=\"1\" cellpadding=\"5\" cellspacing=\"0\">\n"+
-              "<tr><th>Maps</th><th>Reduces</th>" + 
+              "<tr><th>Queues</th>" +
+              "<th>Maps</th><th>Reduces</th>" + 
               "<th>Total Submissions</th>" +
               "<th>Nodes</th><th>Map Task Capacity</th>" +
               "<th>Reduce Task Capacity</th><th>Avg. Tasks/Node</th>" + 
               "<th>Blacklisted Nodes</th>" +
               "<th>Excluded Nodes</th></tr>\n");
-    out.print("<tr><td>" + status.getMapTasks() + "</td><td>" +
+    out.print("<tr><td><a href=\"queueinfo.jsp\">" +
+              tracker.getRootQueues().length + "</a></td><td>" + 
+              status.getMapTasks() + "</td><td>" +
               status.getReduceTasks() + "</td><td>" + 
               tracker.getTotalSubmissions() +
               "</td><td><a href=\"machines.jsp?type=active\">" +
@@ -120,37 +123,6 @@
  generateSummaryTable(out, status, tracker); 
 %>
 <hr>
-<h2 id="scheduling_info">Scheduling Information</h2>
-<table border="2" cellpadding="5" cellspacing="2">
-<thead style="font-weight: bold">
-<tr>
-<td> Queue Name </td>
-<td> State </td>
-<td> Scheduling Information</td>
-</tr>
-</thead>
-<tbody>
-<%
-for(JobQueueInfo queue: queues) {
-  String queueName = queue.getQueueName();
-  String state = queue.getQueueState();
-  String schedulingInformation = queue.getSchedulingInfo();
-  if(schedulingInformation == null || schedulingInformation.trim().equals("")) {
-    schedulingInformation = "NA";
-  }
-%>
-<tr>
-<td><a href="jobqueue_details.jsp?queueName=<%=queueName%>"><%=queueName%></a></td>
-<td><%=state%></td>
-<td><%=schedulingInformation.replaceAll("\n","<br/>") %>
-</td>
-</tr>
-<%
-}
-%>
-</tbody>
-</table>
-<hr/>
 <b>Filter (Jobid, Priority, User, Name)</b> <input type="text" id="filter" onkeyup="applyfilter()"> <br>
 <span class="small">Example: 'user:smith 3200' will filter by 'smith' only in the user field and '3200' in all fields</span>
 <hr>

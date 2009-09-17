@@ -105,6 +105,9 @@ Trunk (unreleased changes)
     MAPREDUCE-776. Add Gridmix, a benchmark processing Rumen traces to simulate
     a measured mix of jobs on a cluster. (cdouglas)
 
+    MAPREDUCE-862. Enhance JobTracker UI to display hierarchical queues.
+    (V.V.Chaitanya Krishna via yhemanth)
+
   IMPROVEMENTS
 
     MAPREDUCE-816. Rename "local" mysql import to "direct" in Sqoop.
