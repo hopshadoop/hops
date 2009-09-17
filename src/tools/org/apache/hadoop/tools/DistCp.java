@@ -454,7 +454,7 @@ public class DistCp implements Tool {
           throw new IOException(absdst + " is a directory");
         }
         if (!destFileSys.mkdirs(absdst.getParent())) {
-          throw new IOException("Failed to craete parent dir: " + absdst.getParent());
+          throw new IOException("Failed to create parent dir: " + absdst.getParent());
         }
         rename(tmpfile, absdst);
 
@@ -975,7 +975,10 @@ public class DistCp implements Tool {
   static void fullyDelete(String dir, Configuration conf) throws IOException {
     if (dir != null) {
       Path tmp = new Path(dir);
-      tmp.getFileSystem(conf).delete(tmp, true);
+      boolean success = tmp.getFileSystem(conf).delete(tmp, true);
+      if (!success) {
+        LOG.warn("Could not fully delete " + tmp);
+      }
     }
   }
 
@@ -1291,6 +1294,11 @@ public class DistCp implements Tool {
         (dstExists && !dstIsDir) || (!dstExists && srcCount == 1)?
         args.dst.getParent(): args.dst, "_distcp_tmp_" + randomId);
     jobConf.set(TMP_DIR_LABEL, tmpDir.toUri().toString());
+
+    // Explicitly create the tmpDir to ensure that it can be cleaned
+    // up by fullyDelete() later.
+    tmpDir.getFileSystem(conf).mkdirs(tmpDir);
+
     LOG.info("sourcePathsCount=" + srcCount);
     LOG.info("filesToCopyCount=" + fileCount);
     LOG.info("bytesToCopyCount=" + StringUtils.humanReadableInt(byteCount));

@@ -620,3 +620,6 @@ Trunk (unreleased changes)
 
     MAPREDUCE-988. Fix a packaging issue in the contrib modules. (Hong Tang via
     cdouglas)
+
+    MAPREDUCE-971. distcp does not always remove distcp.tmp.dir. (Aaron Kimball
+    via tomwhite)
