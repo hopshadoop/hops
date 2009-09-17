@@ -612,3 +612,5 @@ Trunk (unreleased changes)
 
     MAPREDUCE-946. Fix a regression in LineRecordReader where the
     maxBytesToConsume parameter is not set correctly. (cdouglas)
+
+    MAPREDUCE-977. Missing jackson jars from Eclipse template. (tomwhite)

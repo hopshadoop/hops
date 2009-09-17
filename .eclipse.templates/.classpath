@@ -39,6 +39,8 @@
 	<classpathentry kind="lib" path="build/ivy/lib/Hadoop/common/commons-net-1.4.1.jar"/>
 	<classpathentry kind="lib" path="build/ivy/lib/Hadoop/common/core-3.1.1.jar"/>
 	<classpathentry kind="lib" path="build/ivy/lib/Hadoop/common/hsqldb-1.8.0.10.jar"/>
+	<classpathentry kind="lib" path="build/ivy/lib/Hadoop/common/jackson-core-asl-1.0.1.jar"/>
+	<classpathentry kind="lib" path="build/ivy/lib/Hadoop/common/jackson-mapper-asl-1.0.1.jar"/>
 	<classpathentry kind="lib" path="build/ivy/lib/Hadoop/common/jasper-compiler-5.5.12.jar"/>
 	<classpathentry kind="lib" path="build/ivy/lib/Hadoop/common/jasper-runtime-5.5.12.jar"/>
 	<classpathentry kind="lib" path="build/ivy/lib/Hadoop/common/jets3t-0.6.1.jar"/>
@@ -50,6 +52,7 @@
 	<classpathentry kind="lib" path="build/ivy/lib/Hadoop/common/kfs-0.3.jar"/>
 	<classpathentry kind="lib" path="build/ivy/lib/Hadoop/common/log4j-1.2.15.jar"/>
 	<classpathentry kind="lib" path="build/ivy/lib/Hadoop/common/oro-2.0.8.jar"/>
+	<classpathentry kind="lib" path="build/ivy/lib/Hadoop/common/paranamer-1.5.jar"/>
 	<classpathentry kind="lib" path="build/ivy/lib/Hadoop/common/servlet-api-2.5-6.1.14.jar"/>
 	<classpathentry kind="lib" path="build/ivy/lib/Hadoop/common/slf4j-api-1.4.3.jar"/>
 	<classpathentry kind="lib" path="build/ivy/lib/Hadoop/common/slf4j-log4j12-1.4.3.jar"/>
