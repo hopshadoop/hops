@@ -355,6 +355,9 @@ Trunk (unreleased changes)
     MAPREDUCE-284. Enables ipc.client.tcpnodelay in Tasktracker's Child.
     (Ravi Gummadi via sharad)
 
+    MAPREDUCE-907. Sqoop should use more intelligent splits. (Aaron Kimball
+    via tomwhite)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 
