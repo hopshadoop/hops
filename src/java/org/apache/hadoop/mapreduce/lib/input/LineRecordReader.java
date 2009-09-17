@@ -104,7 +104,7 @@ public class LineRecordReader extends RecordReader<LongWritable, Text> {
     // because we always (except the last split) read one extra line in
     // next() method.
     if (start != 0) {
-      start += in.readLine(new Text(), 0, maxBytesToConsume());
+      start += in.readLine(new Text(), 0, maxBytesToConsume(start));
     }
     this.pos = start;
   }
@@ -113,12 +113,12 @@ public class LineRecordReader extends RecordReader<LongWritable, Text> {
     return (codec != null);
   }
 
-  private int maxBytesToConsume() {
+  private int maxBytesToConsume(long pos) {
     return isCompressedInput()
       ? Integer.MAX_VALUE
-      : (int) Math.min(Integer.MAX_VALUE, (end - start));
+      : (int) Math.min(Integer.MAX_VALUE, end - pos);
   }
-  
+
   private long getFilePosition() throws IOException {
     long retVal;
     if (isCompressedInput() && null != filePosition) {
@@ -142,7 +142,7 @@ public class LineRecordReader extends RecordReader<LongWritable, Text> {
     // split limit i.e. (end - 1)
     while (getFilePosition() <= end) {
       newSize = in.readLine(value, maxLineLength,
-                            Math.max(maxBytesToConsume(), maxLineLength));
+          Math.max(maxBytesToConsume(pos), maxLineLength));
       if (newSize == 0) {
         break;
       }

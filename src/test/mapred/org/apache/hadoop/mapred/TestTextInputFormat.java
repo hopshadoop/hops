@@ -20,14 +20,17 @@ package org.apache.hadoop.mapred;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.util.BitSet;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.io.LongWritable;
@@ -329,6 +332,37 @@ public class TestTextInputFormat {
       assertEquals("end of file, bufsz: " +bufsz, 0, in.readLine(out));
       assertEquals("total bytes, bufsz: "+bufsz, c, STRLENBYTES);
     }
+  }
+
+  @Test
+  public void testMRMaxLine() throws Exception {
+    final int MAXPOS = 1024 * 1024;
+    final int MAXLINE = 10 * 1024;
+    final int BUF = 64 * 1024;
+    final InputStream infNull = new InputStream() {
+      int position = 0;
+      final int MAXPOSBUF = 1024 * 1024 + BUF; // max LRR pos + LineReader buf
+      @Override
+      public int read() {
+        ++position;
+        return 0;
+      }
+      @Override
+      public int read(byte[] b) {
+        assertTrue("Read too many bytes from the stream", position < MAXPOSBUF);
+        Arrays.fill(b, (byte) 0);
+        position += b.length;
+        return b.length;
+      }
+    };
+    final LongWritable key = new LongWritable();
+    final Text val = new Text();
+    LOG.info("Reading a line from /dev/null");
+    final Configuration conf = new Configuration(false);
+    conf.setInt("mapred.linerecordreader.maxlength", MAXLINE);
+    conf.setInt("io.file.buffer.size", BUF); // used by LRR
+    final LineRecordReader lrr = new LineRecordReader(infNull, 0, MAXPOS, conf);
+    assertFalse("Read a line from null", lrr.next(key, val));
   }
 
   private static void writeFile(FileSystem fs, Path name, 

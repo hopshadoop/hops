@@ -609,3 +609,6 @@ Trunk (unreleased changes)
     MAPREDUCE-648. Fix two distcp bugs: (1) it should not launch a job if all
     src paths are directories, and (2) it does not skip copying when updating
     a single file.  (Ravi Gummadi via szetszwo)
+
+    MAPREDUCE-946. Fix a regression in LineRecordReader where the
+    maxBytesToConsume parameter is not set correctly. (cdouglas)
