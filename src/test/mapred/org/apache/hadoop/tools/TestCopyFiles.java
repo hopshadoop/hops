@@ -702,9 +702,9 @@ public class TestCopyFiles extends TestCase {
                         namenode+"/destdat"});
 
       System.out.println(execCmd(shell, "-lsr", logdir));
-      logs = fs.listStatus(new Path(namenode+"/logs"));
+      logs = fs.globStatus(new Path(namenode+"/logs/part*"));
       assertTrue("Unexpected map count, logs.length=" + logs.length,
-          logs.length == 2);
+          logs.length == 1);
     } finally {
       if (dfs != null) { dfs.shutdown(); }
       if (mr != null) { mr.shutdown(); }

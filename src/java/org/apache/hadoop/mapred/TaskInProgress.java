@@ -36,6 +36,8 @@ import org.apache.hadoop.mapred.JobClient.RawSplit;
 import org.apache.hadoop.mapred.JobInProgress.DataStatistics;
 import org.apache.hadoop.mapred.SortedRanges.Range;
 import org.apache.hadoop.mapreduce.TaskType;
+import org.apache.hadoop.mapreduce.jobhistory.JobHistory;
+import org.apache.hadoop.mapreduce.jobhistory.TaskUpdatedEvent;
 import org.apache.hadoop.net.Node;
 
 
@@ -67,6 +69,7 @@ class TaskInProgress {
   private int numMaps;
   private int partition;
   private JobTracker jobtracker;
+  private JobHistory jobHistory;
   private TaskID id;
   private JobInProgress job;
   private final int numSlotsRequired;
@@ -151,6 +154,9 @@ class TaskInProgress {
     this.numSlotsRequired = numSlotsRequired;
     setMaxTaskAttempts();
     init(jobid);
+    if (jobtracker != null) {
+      this.jobHistory = jobtracker.getJobHistory();
+    }
   }
         
   /**
@@ -170,6 +176,9 @@ class TaskInProgress {
     this.numSlotsRequired = numSlotsRequired;
     setMaxTaskAttempts();
     init(jobid);
+    if (jobtracker != null) {
+      this.jobHistory = jobtracker.getJobHistory();
+    }
   }
   
   /**
@@ -287,7 +296,8 @@ class TaskInProgress {
    */
   public void setExecFinishTime(long finishTime) {
     execFinishTime = finishTime;
-    JobHistory.Task.logUpdates(id, execFinishTime); // log the update
+    TaskUpdatedEvent tue = new TaskUpdatedEvent(id, execFinishTime);
+    jobHistory.logEvent(tue, id.getJobID());
   }
   
   /**

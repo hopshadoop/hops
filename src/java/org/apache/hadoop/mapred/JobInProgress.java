@@ -18,13 +18,15 @@
 package org.apache.hadoop.mapred;
 
 import java.io.DataInputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
@@ -41,10 +43,25 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.mapred.JobHistory.Values;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobCounter;
 import org.apache.hadoop.mapreduce.TaskType;
+import org.apache.hadoop.mapreduce.jobhistory.JobFinishedEvent;
+import org.apache.hadoop.mapreduce.jobhistory.JobHistory;
+import org.apache.hadoop.mapreduce.jobhistory.JobInfoChangeEvent;
+import org.apache.hadoop.mapreduce.jobhistory.JobInitedEvent;
+import org.apache.hadoop.mapreduce.jobhistory.JobPriorityChangeEvent;
+import org.apache.hadoop.mapreduce.jobhistory.JobStatusChangedEvent;
+import org.apache.hadoop.mapreduce.jobhistory.JobSubmittedEvent;
+import org.apache.hadoop.mapreduce.jobhistory.JobUnsuccessfulCompletionEvent;
+import org.apache.hadoop.mapreduce.jobhistory.MapAttemptFinishedEvent;
+import org.apache.hadoop.mapreduce.jobhistory.ReduceAttemptFinishedEvent;
+import org.apache.hadoop.mapreduce.jobhistory.TaskAttemptStartedEvent;
+import org.apache.hadoop.mapreduce.jobhistory.TaskAttemptUnsuccessfulCompletionEvent;
+import org.apache.hadoop.mapreduce.jobhistory.TaskFailedEvent;
+import org.apache.hadoop.mapreduce.jobhistory.TaskFinishedEvent;
+import org.apache.hadoop.mapreduce.jobhistory.TaskStartedEvent;
+import org.apache.hadoop.mapreduce.server.jobtracker.TaskTracker;
 import org.apache.hadoop.metrics.MetricsContext;
 import org.apache.hadoop.metrics.MetricsRecord;
 import org.apache.hadoop.metrics.MetricsUtil;
@@ -52,7 +69,6 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.NetworkTopology;
 import org.apache.hadoop.net.Node;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.mapreduce.server.jobtracker.TaskTracker;
 
 /*************************************************************
  * JobInProgress maintains all the info for keeping
@@ -119,6 +135,8 @@ public class JobInProgress {
 
   JobPriority priority = JobPriority.NORMAL;
   protected JobTracker jobtracker;
+  
+  JobHistory jobHistory;
 
   // NetworkTopology Node to the set of TIPs
   Map<Node, List<TaskInProgress>> nonRunningMapCache;
@@ -314,6 +332,9 @@ public class JobInProgress {
         "mapred.speculative.execution.slowNodeThreshold",1.0f);
     this.jobSetupCleanupNeeded = conf.getBoolean(
         "mapred.committer.job.setup.cleanup.needed", true);
+    if (tracker != null) { // Some mock tests have null tracker
+      this.jobHistory = tracker.getJobHistory();
+    }
   }
   
   /**
@@ -327,7 +348,7 @@ public class JobInProgress {
     String url = "http://" + jobtracker.getJobTrackerMachine() + ":" 
         + jobtracker.getInfoPort() + "/jobdetails.jsp?jobid=" + jobid;
     this.jobtracker = jobtracker;
-    
+    this.jobHistory = jobtracker.getJobHistory();
     this.startTime = System.currentTimeMillis();
     
     this.localFs = jobtracker.getLocalFileSystem();
@@ -540,7 +561,7 @@ public class JobInProgress {
 
     LOG.info("Initializing " + jobId);
 
-    logToJobHistory();
+    logSubmissionToJobHistory();
     
     // log the job priority
     setPriority(this.priority);
@@ -588,8 +609,13 @@ public class JobInProgress {
     }
     
     tasksInited.set(true);
-    JobHistory.JobInfo.logInited(profile.getJobID(), this.launchTime, 
-                                 numMapTasks, numReduceTasks);
+    JobInitedEvent jie = new JobInitedEvent(
+        profile.getJobID(),  this.launchTime,
+        numMapTasks, numReduceTasks,
+        JobStatus.getJobRunState(JobStatus.PREP));
+    
+    jobHistory.logEvent(jie, jobId);
+   
   }
 
   // Returns true if the job is empty (0 maps, 0 reduces and no setup-cleanup)
@@ -612,10 +638,18 @@ public class JobInProgress {
     setupComplete();
   }
 
-  void logToJobHistory() throws IOException {
+  void logSubmissionToJobHistory() throws IOException {
     // log job info
-    JobHistory.JobInfo.logSubmitted(getJobID(), conf, jobFile.toString(), 
-        this.startTime);
+    String username = conf.getUser();
+    if (username == null) { username = ""; }
+    String jobname = conf.getJobName();
+    if (jobname == null) { jobname = ""; }
+    setUpLocalizedJobConf(conf, jobId);
+    jobHistory.setupEventWriter(jobId, conf);
+    JobSubmittedEvent jse = new JobSubmittedEvent(jobId, jobname, username,
+        this.startTime, jobFile.toString());
+    jobHistory.logEvent(jse, jobId);
+    
   }
 
   JobClient.RawSplit[] createSplits() throws IOException {
@@ -708,7 +742,10 @@ public class JobInProgress {
     status.setSetupProgress(1.0f);
     if (this.status.getRunState() == JobStatus.PREP) {
       this.status.setRunState(JobStatus.RUNNING);
-      JobHistory.JobInfo.logStarted(profile.getJobID());
+      JobStatusChangedEvent jse = 
+        new JobStatusChangedEvent(profile.getJobID(),
+         JobStatus.getJobRunState(JobStatus.RUNNING));
+      jobHistory.logEvent(jse, profile.getJobID());
     }
   }
 
@@ -756,6 +793,7 @@ public class JobInProgress {
     return numReduceTasks - runningReduceTasks - failedReduceTIPs - 
     finishedReduceTasks + speculativeReduceTasks;
   }
+ 
   public synchronized int getNumSlotsPerTask(TaskType taskType) {
     if (taskType == TaskType.MAP) {
       return numSlotsPerMap;
@@ -776,7 +814,11 @@ public class JobInProgress {
       this.priority = priority;
       status.setJobPriority(priority);
       // log and change to the job's priority
-      JobHistory.JobInfo.logJobPriority(jobId, priority);
+      JobPriorityChangeEvent prEvent = 
+        new JobPriorityChangeEvent(jobId, priority);
+       
+      jobHistory.logEvent(prEvent, jobId);
+      
     }
   }
 
@@ -785,7 +827,11 @@ public class JobInProgress {
     // log and change to the job's start/launch time
     this.startTime = startTime;
     this.launchTime = launchTime;
-    JobHistory.JobInfo.logJobInfo(jobId, startTime, launchTime);
+    JobInfoChangeEvent event = 
+      new JobInfoChangeEvent(jobId, startTime, launchTime);
+     
+    jobHistory.logEvent(event, jobId);
+    
   }
 
   /**
@@ -1465,18 +1511,18 @@ public class JobInProgress {
     final JobTrackerInstrumentation metrics = jobtracker.getInstrumentation();
 
     // keeping the earlier ordering intact
-    String name;
+    TaskType name;
     String splits = "";
     Enum counter = null;
     if (tip.isJobSetupTask()) {
       launchedSetup = true;
-      name = Values.SETUP.name();
+      name = TaskType.JOB_SETUP;
     } else if (tip.isJobCleanupTask()) {
       launchedCleanup = true;
-      name = Values.CLEANUP.name();
+      name = TaskType.JOB_CLEANUP;
     } else if (tip.isMapTask()) {
       ++runningMapTasks;
-      name = Values.MAP.name();
+      name = TaskType.MAP;
       counter = JobCounter.TOTAL_LAUNCHED_MAPS;
       splits = tip.getSplitNodes();
       if (tip.isSpeculating()) {
@@ -1487,7 +1533,7 @@ public class JobInProgress {
       metrics.launchMap(id);
     } else {
       ++runningReduceTasks;
-      name = Values.REDUCE.name();
+      name = TaskType.REDUCE;
       counter = JobCounter.TOTAL_LAUNCHED_REDUCES;
       if (tip.isSpeculating()) {
         speculativeReduceTasks++;
@@ -1499,8 +1545,12 @@ public class JobInProgress {
     // Note that the logs are for the scheduled tasks only. Tasks that join on 
     // restart has already their logs in place.
     if (tip.isFirstAttempt(id)) {
-      JobHistory.Task.logStarted(tip.getTIPId(), name,
-                                 tip.getExecStartTime(), splits);
+      TaskStartedEvent tse = new TaskStartedEvent(tip.getTIPId(), 
+          tip.getExecStartTime(),
+          name, splits);
+      
+      jobHistory.logEvent(tse, tip.getJob().jobId);
+      
     }
     if (!tip.isJobSetupTask() && !tip.isJobCleanupTask()) {
       jobCounters.incrCounter(counter, 1);
@@ -1540,7 +1590,7 @@ public class JobInProgress {
     }
   }
     
-  static String convertTrackerNameToHostName(String trackerName) {
+  public static String convertTrackerNameToHostName(String trackerName) {
     // Ugly!
     // Convert the trackerName to it's host name
     int indexOfColon = trackerName.indexOf(":");
@@ -2446,35 +2496,45 @@ public class JobInProgress {
     TaskTrackerStatus ttStatus = 
       this.jobtracker.getTaskTrackerStatus(status.getTaskTracker());
     String trackerHostname = jobtracker.getNode(ttStatus.getHost()).toString();
-    String taskType = getTaskType(tip);
+    TaskType taskType = getTaskType(tip);
+
+    TaskAttemptStartedEvent tse = new TaskAttemptStartedEvent(
+        status.getTaskID(), taskType, status.getStartTime(), 
+        status.getTaskTracker(),  ttStatus.getHttpPort());
+    
+    jobHistory.logEvent(tse, status.getTaskID().getJobID());
+    
+
     if (status.getIsMap()){
-      JobHistory.MapAttempt.logStarted(status.getTaskID(), status.getStartTime(), 
-                                       status.getTaskTracker(), 
-                                       ttStatus.getHttpPort(), 
-                                       taskType); 
-      JobHistory.MapAttempt.logFinished(status.getTaskID(),
-                                        status.getMapFinishTime(),
-                                        status.getFinishTime(), 
-                                        trackerHostname, taskType,
-                                        status.getStateString(), 
-                                        status.getCounters()); 
+      MapAttemptFinishedEvent mfe = new MapAttemptFinishedEvent(
+          status.getTaskID(), taskType, TaskStatus.State.SUCCEEDED.toString(),
+          status.getMapFinishTime(),
+          status.getFinishTime(),  trackerHostname,
+          status.getStateString(), 
+          new org.apache.hadoop.mapreduce.Counters(status.getCounters()));
+      
+      jobHistory.logEvent(mfe,  status.getTaskID().getJobID());
+      
     }else{
-      JobHistory.ReduceAttempt.logStarted( status.getTaskID(), status.getStartTime(), 
-                                          status.getTaskTracker(),
-                                          ttStatus.getHttpPort(), 
-                                          taskType); 
-      JobHistory.ReduceAttempt.logFinished(status.getTaskID(), status.getShuffleFinishTime(),
-                                           status.getSortFinishTime(), status.getFinishTime(), 
-                                           trackerHostname, 
-                                           taskType,
-                                           status.getStateString(), 
-                                           status.getCounters()); 
+      ReduceAttemptFinishedEvent rfe = new ReduceAttemptFinishedEvent(
+          status.getTaskID(), taskType, TaskStatus.State.SUCCEEDED.toString(), 
+          status.getShuffleFinishTime(),
+          status.getSortFinishTime(), status.getFinishTime(),
+          trackerHostname, status.getStateString(),
+          new org.apache.hadoop.mapreduce.Counters(status.getCounters()));
+      
+      jobHistory.logEvent(rfe,  status.getTaskID().getJobID());
+      
     }
-    JobHistory.Task.logFinished(tip.getTIPId(), 
-                                taskType,
-                                tip.getExecFinishTime(),
-                                status.getCounters()); 
-        
+
+    TaskFinishedEvent tfe = new TaskFinishedEvent(tip.getTIPId(),
+        tip.getExecFinishTime(), taskType, 
+        TaskStatus.State.SUCCEEDED.toString(),
+        new org.apache.hadoop.mapreduce.Counters(status.getCounters()));
+    
+    jobHistory.logEvent(tfe, tip.getJob().getJobID());
+    
+   
     if (tip.isJobSetupTask()) {
       // setup task has finished. kill the extra setup tip
       killSetupTip(!tip.isMapTask());
@@ -2610,10 +2670,16 @@ public class JobInProgress {
       JobSummary.logJobSummary(this, jobtracker.getClusterStatus(false));
 
       // Log job-history
-      JobHistory.JobInfo.logFinished(this.status.getJobID(), finishTime, 
-                                     this.finishedMapTasks, 
-                                     this.finishedReduceTasks, failedMapTasks, 
-                                     failedReduceTasks, getCounters());
+      JobFinishedEvent jfe = 
+        new JobFinishedEvent(this.status.getJobID(),
+          this.finishTime,
+          this.finishedMapTasks,this.finishedReduceTasks, failedMapTasks, 
+          failedReduceTasks, 
+          new org.apache.hadoop.mapreduce.Counters(getCounters()));
+      
+      jobHistory.logEvent(jfe, this.status.getJobID());
+      jobHistory.closeWriter(this.status.getJobID());
+
       // Note that finalize will close the job history handles which garbage collect
       // might try to finalize
       garbageCollect();
@@ -2634,27 +2700,24 @@ public class JobInProgress {
 
       if (jobTerminationState == JobStatus.FAILED) {
         this.status.setRunState(JobStatus.FAILED);
-        
-        // Log the job summary
-        JobSummary.logJobSummary(this, jobtracker.getClusterStatus(false));
-
-        // Log to job-history
-        JobHistory.JobInfo.logFailed(this.status.getJobID(), finishTime, 
-                                     this.finishedMapTasks, 
-                                     this.finishedReduceTasks);
       } else {
         this.status.setRunState(JobStatus.KILLED);
-
-        // Log the job summary
-        JobSummary.logJobSummary(this, jobtracker.getClusterStatus(false));
-
-        // Log to job-history
-        JobHistory.JobInfo.logKilled(this.status.getJobID(), finishTime, 
-                                     this.finishedMapTasks, 
-                                     this.finishedReduceTasks);
       }
-      garbageCollect();
+      // Log the job summary
+      JobSummary.logJobSummary(this, jobtracker.getClusterStatus(false));
+
+      JobUnsuccessfulCompletionEvent failedEvent = 
+        new JobUnsuccessfulCompletionEvent(this.status.getJobID(),
+            finishTime,
+            this.finishedMapTasks, 
+            this.finishedReduceTasks,
+            JobStatus.getJobRunState(jobTerminationState));
       
+      jobHistory.logEvent(failedEvent, this.status.getJobID());
+      jobHistory.closeWriter(this.status.getJobID());
+
+      garbageCollect();
+
       jobtracker.getInstrumentation().terminateJob(
           this.conf, this.status.getJobID());
     }
@@ -2882,28 +2945,18 @@ public class JobInProgress {
     List<String> taskDiagnosticInfo = tip.getDiagnosticInfo(taskid);
     String diagInfo = taskDiagnosticInfo == null ? "" :
       StringUtils.arrayToString(taskDiagnosticInfo.toArray(new String[0]));
-    String taskType = getTaskType(tip);
-    if (taskStatus.getIsMap()) {
-      JobHistory.MapAttempt.logStarted(taskid, startTime, 
-        taskTrackerName, taskTrackerPort, taskType);
-      if (taskStatus.getRunState() == TaskStatus.State.FAILED) {
-        JobHistory.MapAttempt.logFailed(taskid, finishTime,
-          taskTrackerHostName, diagInfo, taskType);
-      } else {
-        JobHistory.MapAttempt.logKilled(taskid, finishTime,
-          taskTrackerHostName, diagInfo, taskType);
-      }
-    } else {
-      JobHistory.ReduceAttempt.logStarted(taskid, startTime, 
-        taskTrackerName, taskTrackerPort, taskType);
-      if (taskStatus.getRunState() == TaskStatus.State.FAILED) {
-        JobHistory.ReduceAttempt.logFailed(taskid, finishTime,
-          taskTrackerHostName, diagInfo, taskType);
-      } else {
-        JobHistory.ReduceAttempt.logKilled(taskid, finishTime,
-          taskTrackerHostName, diagInfo, taskType);
-      }
-    }
+    TaskType taskType = getTaskType(tip);
+    TaskAttemptStartedEvent tse = new TaskAttemptStartedEvent(
+        taskid, taskType, startTime, taskTrackerName, taskTrackerPort);
+    
+    jobHistory.logEvent(tse, taskid.getJobID());
+   
+    TaskAttemptUnsuccessfulCompletionEvent tue = 
+      new TaskAttemptUnsuccessfulCompletionEvent(taskid, 
+          taskType, taskStatus.getRunState().toString(),
+          finishTime, 
+          taskTrackerHostName, diagInfo);
+    jobHistory.logEvent(tue, taskid.getJobID());
         
     // After this, try to assign tasks with the one after this, so that
     // the failed task goes to the end of the list.
@@ -2944,10 +2997,13 @@ public class JobInProgress {
       
       if (killJob) {
         LOG.info("Aborting job " + profile.getJobID());
-        JobHistory.Task.logFailed(tip.getTIPId(), 
-                                  taskType,  
-                                  finishTime, 
-                                  diagInfo);
+        TaskFailedEvent tfe = 
+          new TaskFailedEvent(tip.getTIPId(), finishTime, taskType, diagInfo,
+              TaskStatus.State.FAILED.toString(),
+              null);
+        
+        jobHistory.logEvent(tfe, tip.getJob().getJobID());
+        
         if (tip.isJobCleanupTask()) {
           // kill the other tip
           if (tip.isMapTask()) {
@@ -3031,9 +3087,14 @@ public class JobInProgress {
     updateTaskStatus(tip, status);
     boolean isComplete = tip.isComplete();
     if (wasComplete && !isComplete) { // mark a successful tip as failed
-      String taskType = getTaskType(tip);
-      JobHistory.Task.logFailed(tip.getTIPId(), taskType, 
-                                tip.getExecFinishTime(), reason, taskid);
+      TaskType taskType = getTaskType(tip);
+      TaskFailedEvent tfe = 
+        new TaskFailedEvent(tip.getTIPId(), tip.getExecFinishTime(), taskType,
+            reason, TaskStatus.State.FAILED.toString(),
+            taskid);
+      
+        jobHistory.logEvent(tfe, tip.getJob().getJobID());
+      
     }
   }
        
@@ -3221,15 +3282,15 @@ public class JobInProgress {
   /**
    * Get the task type for logging it to {@link JobHistory}.
    */
-  private String getTaskType(TaskInProgress tip) {
+  private TaskType getTaskType(TaskInProgress tip) {
     if (tip.isJobCleanupTask()) {
-      return Values.CLEANUP.name();
+      return TaskType.JOB_CLEANUP;
     } else if (tip.isJobSetupTask()) {
-      return Values.SETUP.name();
+      return TaskType.JOB_SETUP;
     } else if (tip.isMapTask()) {
-      return Values.MAP.name();
+      return TaskType.MAP;
     } else {
-      return Values.REDUCE.name();
+      return TaskType.REDUCE;
     }
   }
   
@@ -3324,6 +3385,49 @@ public class JobInProgress {
                                       StringUtils.COMMA +
                "clusterReduceCapacity" + EQUALS + cluster.getMaxReduceTasks()
       );
+    }
+  }
+  
+  /**
+   * Creates the localized copy of job conf
+   * @param jobConf
+   * @param id
+   */
+  void setUpLocalizedJobConf(JobConf jobConf, 
+      org.apache.hadoop.mapreduce.JobID id) {
+    String localJobFilePath = jobtracker.getLocalJobFilePath(id); 
+    File localJobFile = new File(localJobFilePath);
+    FileOutputStream jobOut = null;
+    try {
+      jobOut = new FileOutputStream(localJobFile);
+      jobConf.writeXml(jobOut);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Job conf for " + id + " stored at " 
+            + localJobFile.getAbsolutePath());
+      }
+    } catch (IOException ioe) {
+      LOG.error("Failed to store job conf on the local filesystem ", ioe);
+    } finally {
+      if (jobOut != null) {
+        try {
+          jobOut.close();
+        } catch (IOException ie) {
+          LOG.info("Failed to close the job configuration file " 
+              + StringUtils.stringifyException(ie));
+        }
+      }
+    }
+  }
+
+  /**
+   * Deletes localized copy of job conf
+   */
+  void cleanupLocalizedJobConf(org.apache.hadoop.mapreduce.JobID id) {
+    String localJobFilePath = jobtracker.getLocalJobFilePath(id);
+    File f = new File (localJobFilePath);
+    LOG.info("Deleting localized job conf at " + f);
+    if (!f.delete()) {
+      LOG.debug("Failed to delete file " + f);
     }
   }
 }

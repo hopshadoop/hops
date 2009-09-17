@@ -26,6 +26,7 @@ import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.mapred.FakeObjectUtilities.FakeJobHistory;
 import org.apache.hadoop.mapred.FakeObjectUtilities.FakeJobTracker;
 import org.apache.hadoop.mapred.JobClient.RawSplit;
 import org.apache.hadoop.mapred.UtilsForTests.FakeClock;
@@ -85,6 +86,7 @@ public class TestRackAwareTaskPlacement extends TestCase {
       this.profile = new JobProfile(jc.getUser(), jobid, 
           jobFile.toString(), null, jc.getJobName(),
           jc.getQueueName());
+      this.jobHistory = new FakeJobHistory();
     }
 
     @Override

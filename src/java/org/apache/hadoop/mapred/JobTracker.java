@@ -18,7 +18,9 @@
 package org.apache.hadoop.mapred;
 
 
+import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
@@ -71,6 +73,7 @@ import org.apache.hadoop.mapred.JobInProgress.KillInterruptedException;
 import org.apache.hadoop.mapred.JobStatusChangeEvent.EventType;
 import org.apache.hadoop.mapred.JobTrackerStatistics.TaskTrackerStat;
 import org.apache.hadoop.mapred.TaskTrackerStatus.TaskTrackerHealthStatus;
+import org.apache.hadoop.mapreduce.jobhistory.JobHistory;
 import org.apache.hadoop.mapreduce.server.jobtracker.TaskTracker;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.NetUtils;
@@ -149,6 +152,8 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   
   static final Clock DEFAULT_CLOCK = new Clock();
 
+  private JobHistory jobHistory = null;
+
   /**
    * A client tried to submit a job before the Job Tracker was ready.
    */
@@ -174,6 +179,11 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     return clock == null ? DEFAULT_CLOCK : clock;
   }
   
+  /**
+   * Return the JT's job history handle.
+   * @return the jobhistory handle
+   */
+  JobHistory getJobHistory() { return jobHistory; }
   /**
    * Start the JobTracker with given configuration.
    * 
@@ -418,7 +428,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     }
   }
 
-  synchronized void retireJob(JobID jobid, String historyFile) {
+  public synchronized void retireJob(JobID jobid, String historyFile) {
     synchronized (jobs) {
       JobInProgress job = jobs.get(jobid);
       if (job != null) {
@@ -438,7 +448,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
         }
         status.setTrackingUrl(trackingUrl);
         // clean up job files from the local disk
-        JobHistory.JobInfo.cleanupJob(job.getProfile().getJobID());
+        job.cleanupLocalizedJobConf(job.getProfile().getJobID());
 
         //this configuration is primarily for testing
         //test cases can set this to false to validate job data structures on 
@@ -1346,8 +1356,8 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
         tmpInfoPort == 0, conf);
     infoServer.setAttribute("job.tracker", this);
     // initialize history parameters.
-    boolean historyInitialized = JobHistory.init(this, conf, this.localMachine,
-                                                 this.startTime);
+    jobHistory = new JobHistory();
+    jobHistory.init(this, conf, this.localMachine, this.startTime);
     
     infoServer.addServlet("reducegraph", "/taskgraph", TaskGraphServlet.class);
     infoServer.start();
@@ -1448,14 +1458,12 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     jobConf.deleteLocalFiles(SUBDIR);
 
     // Initialize history DONE folder
-    if (historyInitialized) {
-      JobHistory.initDone(conf, fs);
-      String historyLogDir = 
-        JobHistory.getCompletedJobHistoryLocation().toString();
-      infoServer.setAttribute("historyLogDir", historyLogDir);
-      FileSystem historyFS = new Path(historyLogDir).getFileSystem(conf);
-      infoServer.setAttribute("fileSys", historyFS);
-    }
+    jobHistory.initDone(conf, fs);
+    String historyLogDir = 
+      jobHistory.getCompletedJobHistoryLocation().toString();
+    infoServer.setAttribute("historyLogDir", historyLogDir);
+    FileSystem historyFS = new Path(historyLogDir).getFileSystem(conf);
+    infoServer.setAttribute("fileSys", historyFS);
 
     this.dnsToSwitchMapping = ReflectionUtils.newInstance(
         conf.getClass("topology.node.switch.mapping.impl", ScriptBasedMapping.class,
@@ -1645,6 +1653,11 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
         ex.printStackTrace();
       }
     }
+    
+    if (jobHistory != null) {
+      jobHistory.shutDown();
+    }
+    
     LOG.info("stopped all jobtracker services");
     return;
   }
@@ -1830,7 +1843,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
 
     // mark the job as completed
     try {
-      JobHistory.JobInfo.markCompleted(id);
+      jobHistory.markCompleted(id);
     } catch (IOException ioe) {
       LOG.info("Failed to mark job " + id + " as completed!", ioe);
     }
@@ -3541,14 +3554,6 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     return hostsReader.getExcludedHosts();
   }
 
-  /**
-   * Get the localized job file path on the job trackers local file system
-   * @param jobId id of the job
-   * @return the path of the job conf file on the local file system
-   */
-  public static String getLocalJobFilePath(JobID jobId){
-    return JobHistory.JobInfo.getLocalJobFilePath(jobId);
-  }
   ////////////////////////////////////////////////////////////
   // main()
   ////////////////////////////////////////////////////////////
@@ -3831,5 +3836,13 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     faultyTrackers.incrementFaults(hostName);
   }
   
-  
+  /**
+   * Get the path of the locally stored job file
+   * @param jobId id of the job
+   * @return the path of the job file on the local file system 
+   */
+  String getLocalJobFilePath(org.apache.hadoop.mapreduce.JobID jobId){
+    return System.getProperty("hadoop.log.dir") + 
+           File.separator + jobId + "_conf.xml";
+  }
 }

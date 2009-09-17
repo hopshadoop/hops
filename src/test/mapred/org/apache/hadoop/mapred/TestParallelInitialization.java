@@ -27,6 +27,7 @@ import java.util.Map;
 import junit.framework.TestCase;
 
 import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.mapred.FakeObjectUtilities.FakeJobHistory;
 import org.apache.hadoop.mapred.JobInProgress.KillInterruptedException;
 import org.apache.hadoop.mapred.JobStatusChangeEvent.EventType;
 
@@ -51,6 +52,7 @@ public class TestParallelInitialization extends TestCase {
           jobConf.getJobName(), "", "");
       this.status.setJobPriority(JobPriority.NORMAL);
       this.status.setStartTime(startTime);
+      this.jobHistory = new FakeJobHistory();
     }
 
     @Override

@@ -68,5 +68,13 @@
       name="avro"
       rev="1.0.0"
       conf="common->default"/>
+    <dependency org="org.codehaus.jackson"
+      name="jackson-mapper-asl"
+      rev="${jackson.version}"
+      conf="common->default"/>
+    <dependency org="org.codehaus.jackson"
+      name="jackson-core-asl"
+      rev="${jackson.version}"
+      conf="common->default"/>
   </dependencies>
 </ivy-module>

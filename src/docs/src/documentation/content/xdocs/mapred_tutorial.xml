@@ -1462,23 +1462,16 @@
             monitoring it's status.
           </li>
         </ol>
-        <p> Job history files are also logged to user specified directory
-        <code>hadoop.job.history.user.location</code> 
-        which defaults to job output directory. The files are stored in
-        "_logs/history/" in the specified directory. Hence, by default they
-        will be in mapred.output.dir/_logs/history. User can stop
-        logging by giving the value <code>none</code> for 
-        <code>hadoop.job.history.user.location</code></p>
 
-        <p> User can view the history logs summary in specified directory 
+        <p> User can view the history log summary for a given history file
         using the following command <br/>
-        <code>$ bin/hadoop job -history output-dir</code><br/> 
+        <code>$ bin/hadoop job -history history-file</code><br/> 
         This command will print job details, failed and killed tip
         details. <br/>
         More details about the job such as successful tasks and 
         task attempts made for each task can be viewed using the  
         following command <br/>
-       <code>$ bin/hadoop job -history all output-dir</code><br/></p> 
+       <code>$ bin/hadoop job -history all history-file</code><br/></p> 
             
         <p> User can use 
         <a href="ext:api/org/apache/hadoop/mapred/outputlogfilter">OutputLogFilter</a>

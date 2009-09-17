@@ -32,7 +32,8 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.mapred.JobHistory.JobInfo;
+import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser;
+import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser.JobInfo;
 import org.apache.hadoop.util.ServletUtil;
 import org.apache.hadoop.util.StringUtils;
 
@@ -268,10 +269,10 @@ class JSPUtil {
     synchronized(jobHistoryCache) {
       JobInfo jobInfo = jobHistoryCache.remove(jobid);
       if (jobInfo == null) {
-        jobInfo = new JobHistory.JobInfo(jobid);
+        JobHistoryParser parser = new JobHistoryParser(fs, logFile);
+        jobInfo = parser.parse();
         LOG.info("Loading Job History file "+jobid + ".   Cache size is " +
             jobHistoryCache.size());
-        DefaultJobHistoryParser.parseJobTasks( logFile, jobInfo, fs) ; 
       }
       jobHistoryCache.put(jobid, jobInfo);
       if (jobHistoryCache.size() > CACHE_SIZE) {

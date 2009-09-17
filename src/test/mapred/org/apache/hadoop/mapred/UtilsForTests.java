@@ -226,7 +226,7 @@ public class UtilsForTests {
   /**
    * A utility that waits for specified amount of time
    */
-  static void waitFor(long duration) {
+  public static void waitFor(long duration) {
     try {
       synchronized (waitLock) {
         waitLock.wait(duration);
@@ -582,7 +582,7 @@ public class UtilsForTests {
   }
 
   // Run a job that will be succeeded and wait until it completes
-  static RunningJob runJobSucceed(JobConf conf, Path inDir, Path outDir)
+  public static RunningJob runJobSucceed(JobConf conf, Path inDir, Path outDir)
          throws IOException {
     conf.setJobName("test-job-succeed");
     conf.setMapperClass(IdentityMapper.class);
@@ -601,7 +601,7 @@ public class UtilsForTests {
   }
 
   // Run a job that will be failed and wait until it completes
-  static RunningJob runJobFail(JobConf conf, Path inDir, Path outDir)
+  public static RunningJob runJobFail(JobConf conf, Path inDir, Path outDir)
          throws IOException {
     conf.setJobName("test-job-fail");
     conf.setMapperClass(FailMapper.class);
@@ -620,7 +620,7 @@ public class UtilsForTests {
   }
 
   // Run a job that will be killed and wait until it completes
-  static RunningJob runJobKill(JobConf conf,  Path inDir, Path outDir)
+  public static RunningJob runJobKill(JobConf conf,  Path inDir, Path outDir)
          throws IOException {
 
     conf.setJobName("test-job-kill");

@@ -238,7 +238,7 @@
 					<code>Usage: hadoop job [</code><a href="commands_manual.html#Generic+Options">GENERIC_OPTIONS</a><code>] 
 					[-submit &lt;job-file&gt;] | [-status &lt;job-id&gt;] | 
 					[-counter &lt;job-id&gt; &lt;group-name&gt; &lt;counter-name&gt;] | [-kill &lt;job-id&gt;] | 
-					[-events &lt;job-id&gt; &lt;from-event-#&gt; &lt;#-of-events&gt;] | [-history [all] &lt;jobOutputDir&gt;] |
+					[-events &lt;job-id&gt; &lt;from-event-#&gt; &lt;#-of-events&gt;] | [-history [all] &lt;historyFile&gt;] |
 					[-list [all]] | [-kill-task &lt;task-id&gt;] | [-fail-task &lt;task-id&gt;] | 
           [-set-priority &lt;job-id&gt; &lt;priority&gt;]</code>
 				</p>
@@ -266,8 +266,8 @@
 			            <td>Prints the events' details received by jobtracker for the given range.</td>
 			           </tr>
 			           <tr>
-			          	<td><code>-history [all] &lt;jobOutputDir&gt;</code></td>
-			            <td>-history &lt;jobOutputDir&gt; prints job details, failed and killed tip details. More details 
+			          	<td><code>-history [all] &lt;historyFile&gt;</code></td>
+			            <td>-history &lt;historyFile&gt; prints job details, failed and killed tip details. More details 
 			            about the job such as successful tasks and task attempts made for each task can be viewed by 
 			            specifying the [all] option. </td>
 			           </tr>

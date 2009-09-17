@@ -278,9 +278,11 @@ public class TestSeveral extends TestCase {
     verifyOutput(outDir.getFileSystem(conf), outDir);
 
     //TestJobHistory
-    TestJobHistory.validateJobHistoryFileFormat(jobId, conf, "SUCCESS", false);
+    TestJobHistory.validateJobHistoryFileFormat(
+        mrCluster.getJobTrackerRunner().getJobTracker().getJobHistory(),
+        jobId, conf, "SUCCEEDED", false);
+    
     TestJobHistory.validateJobHistoryFileContent(mrCluster, job, conf);
-    TestJobHistory.validateJobHistoryUserLogLocation(job.getID(), conf);
 
     // Since we keep setKeepTaskFilesPattern, these files should still be
     // present and will not be cleaned up.

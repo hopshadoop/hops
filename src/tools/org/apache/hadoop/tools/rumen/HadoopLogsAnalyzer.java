@@ -35,8 +35,6 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.apache.hadoop.mapred.JobHistory;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -853,7 +851,7 @@ public class HadoopLogsAnalyzer extends Configured implements Tool {
           if (finishTime != null) {
             jobBeingTraced.setFinishTime(Long.parseLong(finishTime));
             if (status != null) {
-              jobBeingTraced.setOutcome(JobHistory.Values.valueOf(status));
+              jobBeingTraced.setOutcome(Pre21JobHistoryConstants.Values.valueOf(status));
             }
 
             maybeMateJobAndConf();
@@ -1025,11 +1023,11 @@ public class HadoopLogsAnalyzer extends Configured implements Tool {
         task.setFinishTime(Long.parseLong(finishTime));
       }
 
-      JobHistory.Values typ;
-      JobHistory.Values stat;
+      Pre21JobHistoryConstants.Values typ;
+      Pre21JobHistoryConstants.Values stat;
 
       try {
-        stat = status == null ? null : JobHistory.Values.valueOf(status);
+        stat = status == null ? null : Pre21JobHistoryConstants.Values.valueOf(status);
       } catch (IllegalArgumentException e) {
         LOG.error("A task status you don't know about is \"" + status + "\".",
             e);
@@ -1039,7 +1037,7 @@ public class HadoopLogsAnalyzer extends Configured implements Tool {
       task.setTaskStatus(stat);
 
       try {
-        typ = taskType == null ? null : JobHistory.Values.valueOf(taskType);
+        typ = taskType == null ? null : Pre21JobHistoryConstants.Values.valueOf(taskType);
       } catch (IllegalArgumentException e) {
         LOG.error("A task type you don't know about is \"" + taskType + "\".",
             e);
@@ -1048,8 +1046,8 @@ public class HadoopLogsAnalyzer extends Configured implements Tool {
 
       task.setTaskType(typ);
 
-      List<LoggedTask> vec = typ == JobHistory.Values.MAP ? jobBeingTraced
-          .getMapTasks() : typ == JobHistory.Values.REDUCE ? jobBeingTraced
+      List<LoggedTask> vec = typ == Pre21JobHistoryConstants.Values.MAP ? jobBeingTraced
+          .getMapTasks() : typ == Pre21JobHistoryConstants.Values.REDUCE ? jobBeingTraced
           .getReduceTasks() : jobBeingTraced.getOtherTasks();
 
       if (!taskAlreadyLogged) {
@@ -1248,10 +1246,10 @@ public class HadoopLogsAnalyzer extends Configured implements Tool {
         task.getAttempts().add(attempt);
       }
 
-      JobHistory.Values stat = null;
+      Pre21JobHistoryConstants.Values stat = null;
 
       try {
-        stat = status == null ? null : JobHistory.Values.valueOf(status);
+        stat = status == null ? null : Pre21JobHistoryConstants.Values.valueOf(status);
       } catch (IllegalArgumentException e) {
         LOG.error("A map attempt status you don't know about is \"" + status
             + "\".", e);
@@ -1301,11 +1299,11 @@ public class HadoopLogsAnalyzer extends Configured implements Tool {
       if (attempt.getStartTime() > 0 && attempt.getFinishTime() > 0) {
         long runtime = attempt.getFinishTime() - attempt.getStartTime();
 
-        if (stat == JobHistory.Values.SUCCESS) {
+        if (stat == Pre21JobHistoryConstants.Values.SUCCESS) {
           successfulMapAttemptTimes[distance].enter(runtime);
         }
 
-        if (stat == JobHistory.Values.FAILED) {
+        if (stat == Pre21JobHistoryConstants.Values.FAILED) {
           failedMapAttemptTimes[distance].enter(runtime);
         }
       }
@@ -1399,10 +1397,10 @@ public class HadoopLogsAnalyzer extends Configured implements Tool {
         task.getAttempts().add(attempt);
       }
 
-      JobHistory.Values stat = null;
+      Pre21JobHistoryConstants.Values stat = null;
 
       try {
-        stat = status == null ? null : JobHistory.Values.valueOf(status);
+        stat = status == null ? null : Pre21JobHistoryConstants.Values.valueOf(status);
       } catch (IllegalArgumentException e) {
         LOG.warn("A map attempt status you don't know about is \"" + status
             + "\".", e);
@@ -1432,11 +1430,11 @@ public class HadoopLogsAnalyzer extends Configured implements Tool {
       if (attempt.getStartTime() > 0 && attempt.getFinishTime() > 0) {
         long runtime = attempt.getFinishTime() - attempt.getStartTime();
 
-        if (stat == JobHistory.Values.SUCCESS) {
+        if (stat == Pre21JobHistoryConstants.Values.SUCCESS) {
           successfulReduceAttemptTimes.enter(runtime);
         }
 
-        if (stat == JobHistory.Values.FAILED) {
+        if (stat == Pre21JobHistoryConstants.Values.FAILED) {
           failedReduceAttemptTimes.enter(runtime);
         }
       }

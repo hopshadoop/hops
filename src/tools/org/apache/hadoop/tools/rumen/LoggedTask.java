@@ -20,8 +20,6 @@ package org.apache.hadoop.tools.rumen;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.hadoop.mapred.JobHistory;
-
 /**
  * A {@link LoggedTask} represents a [hadoop] task that is part of a hadoop job.
  * It knows about the [pssibly empty] sequence of attempts, its I/O footprint,
@@ -39,8 +37,8 @@ public class LoggedTask implements DeepCompare {
   String taskID;
   long startTime = -1L;
   long finishTime = -1L;
-  JobHistory.Values taskType;
-  JobHistory.Values taskStatus;
+  Pre21JobHistoryConstants.Values taskType;
+  Pre21JobHistoryConstants.Values taskStatus;
   List<LoggedTaskAttempt> attempts = new ArrayList<LoggedTaskAttempt>();
 
   ArrayList<LoggedLocation> preferredLocations = new ArrayList<LoggedLocation>();
@@ -140,19 +138,19 @@ public class LoggedTask implements DeepCompare {
     this.numberReduces = numberReduces;
   }
 
-  public JobHistory.Values getTaskStatus() {
+  public Pre21JobHistoryConstants.Values getTaskStatus() {
     return taskStatus;
   }
 
-  void setTaskStatus(JobHistory.Values taskStatus) {
+  void setTaskStatus(Pre21JobHistoryConstants.Values taskStatus) {
     this.taskStatus = taskStatus;
   }
 
-  public JobHistory.Values getTaskType() {
+  public Pre21JobHistoryConstants.Values getTaskType() {
     return taskType;
   }
 
-  void setTaskType(JobHistory.Values taskType) {
+  void setTaskType(Pre21JobHistoryConstants.Values taskType) {
     this.taskType = taskType;
   }
 
@@ -175,7 +173,7 @@ public class LoggedTask implements DeepCompare {
     }
   }
 
-  private void compare1(JobHistory.Values c1, JobHistory.Values c2,
+  private void compare1(Pre21JobHistoryConstants.Values c1, Pre21JobHistoryConstants.Values c2,
       TreePath loc, String eltname) throws DeepInequalityException {
     if (c1 == null && c2 == null) {
       return;

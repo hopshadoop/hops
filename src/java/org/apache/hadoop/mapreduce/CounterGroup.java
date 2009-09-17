@@ -86,12 +86,12 @@ public class CounterGroup implements Writable, Iterable<Counter> {
   }
 
   /**
-   * Internal to find a counter in a group.
+   * Find a counter in a group.
    * @param counterName the name of the counter
    * @param displayName the display name of the counter
    * @return the counter that was found or added
    */
-  protected Counter findCounter(String counterName, String displayName) {
+  public Counter findCounter(String counterName, String displayName) {
     Counter result = counters.get(counterName);
     if (result == null) {
       result = new Counter(counterName, displayName);

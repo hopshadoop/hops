@@ -17,17 +17,30 @@
  */
 package org.apache.hadoop.mapred;
 
-import org.apache.hadoop.io.BytesWritable;
-import org.apache.hadoop.mapreduce.TaskType;
-import org.apache.hadoop.mapreduce.server.jobtracker.TaskTracker;
-import org.apache.hadoop.conf.Configuration;
-import static org.junit.Assert.*;
-import java.util.*;
-import java.io.IOException;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
-import org.apache.hadoop.security.SecurityUtil.AccessControlList;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+import java.util.TreeMap;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.BytesWritable;
+import org.apache.hadoop.mapred.FakeObjectUtilities.FakeJobHistory;
+import org.apache.hadoop.mapreduce.TaskType;
+import org.apache.hadoop.mapreduce.server.jobtracker.TaskTracker;
+import org.apache.hadoop.security.SecurityUtil.AccessControlList;
 
 
 public class CapacityTestUtils {
@@ -216,6 +229,7 @@ public class CapacityTestUtils {
       }
       mapTaskCtr = 0;
       redTaskCtr = 0;
+      this.jobHistory = new FakeJobHistory();
     }
 
     @Override

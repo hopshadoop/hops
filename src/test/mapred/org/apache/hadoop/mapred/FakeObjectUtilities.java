@@ -26,9 +26,12 @@ import javax.security.auth.login.LoginException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.TaskStatus.Phase;
 import org.apache.hadoop.mapreduce.TaskType;
+import org.apache.hadoop.mapreduce.jobhistory.HistoryEvent;
+import org.apache.hadoop.mapreduce.jobhistory.JobHistory;
 
 /** 
  * Utilities used in unit test.
@@ -76,6 +79,7 @@ public class FakeObjectUtilities {
       this.profile = new JobProfile(jobConf.getUser(), getJobID(), 
           jobFile.toString(), null, jobConf.getJobName(),
           jobConf.getQueueName());
+      this.jobHistory = new FakeJobHistory();
     }
 
     @Override
@@ -233,4 +237,28 @@ public class FakeObjectUtilities {
     sendHeartBeat(jt, null, true, tracker, (short) 0);
   }
 
+  static class FakeJobHistory extends JobHistory {
+    @Override
+    public void init(JobTracker jt, 
+        JobConf conf,
+        String hostname, 
+        long jobTrackerStartTime) throws IOException { }
+    
+    @Override
+    public void initDone(JobConf conf, FileSystem fs) throws IOException { }
+    
+    @Override
+    public void markCompleted(org.apache.hadoop.mapreduce.JobID id)
+    throws IOException { }
+    
+    @Override
+    public void shutDown() { }
+
+    @Override
+    public void 
+    logEvent(HistoryEvent event, org.apache.hadoop.mapreduce.JobID id) { }
+    
+    @Override
+    public void closeWriter(org.apache.hadoop.mapreduce.JobID id) { }
+  }
 }

@@ -26,9 +26,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.mapred.JobHistory;
 import org.apache.hadoop.tools.rumen.JobStory;
 import org.apache.hadoop.tools.rumen.JobStoryProducer;
+import org.apache.hadoop.tools.rumen.Pre21JobHistoryConstants;
 import org.apache.hadoop.tools.rumen.ZombieJobProducer;
 
 import org.apache.commons.logging.Log;
@@ -105,7 +105,7 @@ class JobFactory implements Gridmix.Component<Void> {
       do {
         job = jobProducer.getNextJob();
       } while (job != null
-          && (job.getOutcome() != JobHistory.Values.SUCCESS ||
+          && (job.getOutcome() != Pre21JobHistoryConstants.Values.SUCCESS ||
               job.getSubmissionTime() < 0));
       return job;
     }

@@ -28,7 +28,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.mapred.JobHistory;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.TaskType;
@@ -36,6 +35,8 @@ import org.apache.hadoop.tools.rumen.JobStory;
 import org.apache.hadoop.tools.rumen.JobStoryProducer;
 import org.apache.hadoop.tools.rumen.TaskAttemptInfo;
 import org.apache.hadoop.tools.rumen.TaskInfo;
+import org.apache.hadoop.tools.rumen.Pre21JobHistoryConstants.Values;;
+
 
 /**
  * Component generating random job traces for testing on a single node.
@@ -213,8 +214,8 @@ class DebugJobFactory extends JobFactory {
     }
 
     @Override
-    public JobHistory.Values getOutcome() {
-      return JobHistory.Values.SUCCESS;
+    public Values getOutcome() {
+      return Values.SUCCESS;
     }
 
     @Override

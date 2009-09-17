@@ -24,6 +24,7 @@ import java.io.IOException;
 import junit.framework.TestCase;
 
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.mapreduce.jobhistory.JobHistory;
 
 /**
  * Test if the job retire works fine. 
@@ -81,7 +82,7 @@ public class TestJobRetire extends TestCase {
     assertNotNull("Job is not in cache", jobtracker.getJobStatus(id));
     
     // get the job conf filename
-    String name = JobHistory.JobInfo.getLocalJobFilePath(id);
+    String name = jobtracker.getLocalJobFilePath(id);
     File file = new File(name);
  
     assertFalse("JobConf file not deleted", file.exists());

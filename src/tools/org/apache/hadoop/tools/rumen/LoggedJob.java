@@ -26,8 +26,6 @@ import java.util.TreeSet;
 
 import org.codehaus.jackson.annotate.JsonAnySetter;
 
-import org.apache.hadoop.mapred.JobHistory;
-
 /**
  * A {@link LoggedDiscreteCDF} is a representation of an hadoop job, with the
  * details of this class set up to meet the requirements of the Jackson JSON
@@ -61,7 +59,7 @@ public class LoggedJob implements DeepCompare {
   int heapMegabytes = -1;
   int totalMaps = -1;
   int totalReduces = -1;
-  JobHistory.Values outcome = JobHistory.Values.SUCCESS;
+  Pre21JobHistoryConstants.Values outcome = Pre21JobHistoryConstants.Values.SUCCESS;
   JobType jobtype = JobType.JAVA;
   JobPriority priority = JobPriority.NORMAL;
 
@@ -216,11 +214,11 @@ public class LoggedJob implements DeepCompare {
     this.totalReduces = totalReduces;
   }
 
-  public JobHistory.Values getOutcome() {
+  public Pre21JobHistoryConstants.Values getOutcome() {
     return outcome;
   }
 
-  void setOutcome(JobHistory.Values outcome) {
+  void setOutcome(Pre21JobHistoryConstants.Values outcome) {
     this.outcome = outcome;
   }
 
@@ -390,7 +388,7 @@ public class LoggedJob implements DeepCompare {
     }
   }
 
-  private void compare1(JobHistory.Values c1, JobHistory.Values c2,
+  private void compare1(Pre21JobHistoryConstants.Values c1, Pre21JobHistoryConstants.Values c2,
       TreePath loc, String eltname) throws DeepInequalityException {
     if (c1 != c2) {
       throw new DeepInequalityException(eltname + " miscompared", new TreePath(

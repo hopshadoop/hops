@@ -26,9 +26,7 @@ import java.util.HashMap;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.mapred.JobHistory.Values;
 import org.apache.hadoop.mapred.JobConf;
-import org.apache.hadoop.mapred.JobHistory;
 import org.apache.hadoop.mapred.TaskStatus.State;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.JobID;
@@ -36,6 +34,7 @@ import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskID;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.lib.input.FileSplit;
+import org.apache.hadoop.tools.rumen.Pre21JobHistoryConstants.Values;
 
 /**
  * {@link ZombieJob} is a layer above {@link LoggedJob} raw JSON objects.
@@ -97,12 +96,12 @@ public class ZombieJob implements JobStory {
     this(job, cluster, System.nanoTime());
   }
 
-  private static State convertState(JobHistory.Values status) {
-    if (status == JobHistory.Values.SUCCESS) {
+  private static State convertState(Values status) {
+    if (status == Values.SUCCESS) {
       return State.SUCCEEDED;
-    } else if (status == JobHistory.Values.FAILED) {
+    } else if (status == Values.FAILED) {
       return State.FAILED;
-    } else if (status == JobHistory.Values.KILLED) {
+    } else if (status == Values.KILLED) {
       return State.KILLED;
     } else {
       throw new IllegalArgumentException("unknown status " + status);
@@ -226,7 +225,7 @@ public class ZombieJob implements JobStory {
   }
 
   @Override
-  public JobHistory.Values getOutcome() {
+  public Values getOutcome() {
     return job.getOutcome();
   }
 
@@ -378,7 +377,7 @@ public class ZombieJob implements JobStory {
           taskNumber, locality);
     } else {
       // TODO should we handle killed attempts later?
-      if (loggedAttempt.getResult()==JobHistory.Values.KILLED) {
+      if (loggedAttempt.getResult()== Values.KILLED) {
         TaskInfo taskInfo = getTaskInfo(loggedTask);
         return makeUpTaskAttemptInfo(taskType, taskInfo, taskAttemptNumber,
             taskNumber, locality);
@@ -576,8 +575,8 @@ public class ZombieJob implements JobStory {
     long outputRecords = -1;
     long heapMegabytes = -1;
 
-    JobHistory.Values type = loggedTask.getTaskType();
-    if ((type != JobHistory.Values.MAP) && (type != JobHistory.Values.REDUCE)) {
+    Values type = loggedTask.getTaskType();
+    if ((type != Values.MAP) && (type != Values.REDUCE)) {
       throw new IllegalArgumentException(
           "getTaskInfo only supports MAP or REDUCE tasks: " + type.toString());
     }
@@ -586,11 +585,11 @@ public class ZombieJob implements JobStory {
       attempt = sanitizeLoggedTaskAttempt(attempt);
       // ignore bad attempts or unsuccessful attempts.
       if ((attempt == null)
-          || (attempt.getResult() != JobHistory.Values.SUCCESS)) {
+          || (attempt.getResult() != Values.SUCCESS)) {
         continue;
       }
 
-      if (type == JobHistory.Values.MAP) {
+      if (type == Values.MAP) {
         inputBytes = attempt.getHdfsBytesRead();
         inputRecords = attempt.getMapInputRecords();
         outputBytes = attempt.getMapOutputBytes();

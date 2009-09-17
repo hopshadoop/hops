@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.tools.rumen;
 
-import org.apache.hadoop.mapred.JobHistory;
-
 // HACK ALERT!!!  This "should" have have two subclasses, which might be called
 //                LoggedMapTaskAttempt and LoggedReduceTaskAttempt, but 
 //                the Jackson implementation of JSON doesn't handle a 
@@ -36,7 +34,7 @@ import org.apache.hadoop.mapred.JobHistory;
 public class LoggedTaskAttempt implements DeepCompare {
 
   String attemptID;
-  JobHistory.Values result;
+  Pre21JobHistoryConstants.Values result;
   long startTime = -1L;
   long finishTime = -1L;
   String hostName;
@@ -89,11 +87,11 @@ public class LoggedTaskAttempt implements DeepCompare {
     this.attemptID = attemptID;
   }
 
-  public JobHistory.Values getResult() {
+  public Pre21JobHistoryConstants.Values getResult() {
     return result;
   }
 
-  void setResult(JobHistory.Values result) {
+  void setResult(Pre21JobHistoryConstants.Values result) {
     this.result = result;
   }
 
@@ -261,7 +259,7 @@ public class LoggedTaskAttempt implements DeepCompare {
     }
   }
 
-  private void compare1(JobHistory.Values c1, JobHistory.Values c2,
+  private void compare1(Pre21JobHistoryConstants.Values c1, Pre21JobHistoryConstants.Values c2,
       TreePath loc, String eltname) throws DeepInequalityException {
     if (c1 != c2) {
       throw new DeepInequalityException(eltname + " miscompared", new TreePath(

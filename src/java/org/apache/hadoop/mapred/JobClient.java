@@ -67,6 +67,7 @@ import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.mapred.ClusterStatus.BlackListInfo;
 import org.apache.hadoop.mapred.Counters.Counter;
 import org.apache.hadoop.mapred.Counters.Group;
+import org.apache.hadoop.mapreduce.jobhistory.HistoryViewer;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UnixUserGroupInformation;
 import org.apache.hadoop.util.ReflectionUtils;
@@ -1539,7 +1540,7 @@ public class JobClient extends Configured implements MRConstants, Tool  {
     } else if ("-events".equals(cmd)) {
       System.err.println(prefix + "[" + cmd + " <job-id> <from-event-#> <#-of-events>]");
     } else if ("-history".equals(cmd)) {
-      System.err.println(prefix + "[" + cmd + " <jobOutputDir>]");
+      System.err.println(prefix + "[" + cmd + " <jobHistoryFile>]");
     } else if ("-list".equals(cmd)) {
       System.err.println(prefix + "[" + cmd + " [all]]");
     } else if ("-kill-task".equals(cmd) || "-fail-task".equals(cmd)) {
@@ -1567,7 +1568,7 @@ public class JobClient extends Configured implements MRConstants, Tool  {
                                       "Valid values for priorities are: " +
                                       jobPriorityValues + "\n");
       System.err.printf("\t[-events <job-id> <from-event-#> <#-of-events>]\n");
-      System.err.printf("\t[-history <jobOutputDir>]\n");
+      System.err.printf("\t[-history <jobHistoryFile>]\n");
       System.err.printf("\t[-list [all]]\n");
       System.err.printf("\t[-list-active-trackers]\n");
       System.err.printf("\t[-list-blacklisted-trackers]\n");
@@ -1590,7 +1591,7 @@ public class JobClient extends Configured implements MRConstants, Tool  {
     String submitJobFile = null;
     String jobid = null;
     String taskid = null;
-    String outputDir = null;
+    String historyFile = null;
     String counterGroupName = null;
     String counterName = null;
     String newPriority = null;
@@ -1673,9 +1674,9 @@ public class JobClient extends Configured implements MRConstants, Tool  {
       viewHistory = true;
       if (argv.length == 3 && "all".equals(argv[1])) {
          viewAllHistory = true;
-         outputDir = argv[2];
+         historyFile = argv[2];
       } else {
-         outputDir = argv[1];
+         historyFile = argv[1];
       }
     } else if ("-list".equals(cmd)) {
       if (argv.length != 1 && !(argv.length == 2 && "all".equals(argv[1]))) {
@@ -1793,7 +1794,7 @@ public class JobClient extends Configured implements MRConstants, Tool  {
           exitCode = 0;
         } 
       } else if (viewHistory) {
-        viewHistory(outputDir, viewAllHistory);
+        viewHistory(historyFile, viewAllHistory);
         exitCode = 0;
       } else if (listEvents) {
         listEvents(JobID.forName(jobid), fromEvent, nEvents);
@@ -1835,9 +1836,9 @@ public class JobClient extends Configured implements MRConstants, Tool  {
     return exitCode;
   }
 
-  private void viewHistory(String outputDir, boolean all) 
+  private void viewHistory(String historyFile, boolean all) 
     throws IOException {
-    HistoryViewer historyViewer = new HistoryViewer(outputDir,
+    HistoryViewer historyViewer = new HistoryViewer(historyFile,
                                         getConf(), all);
     historyViewer.print();
   }
