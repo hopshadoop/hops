@@ -614,3 +614,6 @@ Trunk (unreleased changes)
     maxBytesToConsume parameter is not set correctly. (cdouglas)
 
     MAPREDUCE-977. Missing jackson jars from Eclipse template. (tomwhite)
+
+    MAPREDUCE-988. Fix a packaging issue in the contrib modules. (Hong Tang via
+    cdouglas)

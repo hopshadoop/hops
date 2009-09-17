@@ -56,7 +56,7 @@
             value="http://java.sun.com/j2se/1.4/docs/api/"/>
 
   <property name="build.encoding" value="ISO-8859-1"/>
-  <property name="dest.jar" value="${build.dir}/hadoop-${version}-${name}.jar"/>
+  <property name="dest.jar" value="hadoop-${version}-${name}.jar"/>
 
   <fileset id="lib.jars" dir="${root}" includes="lib/*.jar"/>
 
@@ -181,7 +181,7 @@
   <target name="jar" depends="compile" unless="skip.contrib">
     <echo message="contrib: ${name}"/>
     <jar
-      jarfile="${dest.jar}"
+      jarfile="${build.dir}/${dest.jar}"
       basedir="${build.classes}"      
     />
   </target>
