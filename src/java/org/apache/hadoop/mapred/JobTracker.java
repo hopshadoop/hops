@@ -3574,6 +3574,9 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
       else {
         if ("-dumpConfiguration".equals(argv[0]) && argv.length == 1) {
           dumpConfiguration(new PrintWriter(System.out));
+          System.out.println();
+          QueueManager.dumpConfiguration(new PrintWriter(System.out),
+              new JobConf());
         }
         else {
           System.out.println("usage: JobTracker [-dumpConfiguration]");

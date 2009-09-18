@@ -23,16 +23,25 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import static org.apache.hadoop.mapred.QueueManagerTestUtils.*;
 import static org.apache.hadoop.mapred.QueueConfigurationParser.*;
+
 import org.apache.hadoop.security.UnixUserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.SecurityUtil.AccessControlList;
+import org.codehaus.jackson.map.ObjectMapper;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
+import org.w3c.dom.Node;
 
 import java.io.File;
+import java.io.StringWriter;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.Map.Entry;
 
 
 public class TestQueueManagerForHierarchialQueues extends TestCase {
@@ -375,5 +384,151 @@ public class TestQueueManagerForHierarchialQueues extends TestCase {
       re.printStackTrace();
       LOG.info(re.getMessage());
     }
+  }
+
+  /**
+   * Class to store the array of queues retrieved by parsing the string 
+   * that is dumped in Json format
+   */
+  static class JsonQueueTree {
+    boolean acls_enabled;
+    
+    JsonQueue[] queues;
+
+    public JsonQueue[] getQueues() {
+      return queues;
+    }
+
+    public void setQueues(JsonQueue[] queues) {
+      this.queues = queues;
+    }
+
+    public boolean isAcls_enabled() {
+      return acls_enabled;
+    }
+
+    public void setAcls_enabled(boolean aclsEnabled) {
+      acls_enabled = aclsEnabled;
+    }
+  }
+  
+  /**
+   * Class to store the contents of each queue that is dumped in JSON format.
+   */
+  static class JsonQueue {
+    String name;
+    String state;
+    String acl_submit_job;
+    String acl_administer_jobs;
+    JsonProperty[] properties;
+    JsonQueue[] children;
+    public String getName() {
+      return name;
+    }
+    public String getState() {
+      return state;
+    }
+    public JsonProperty[] getProperties() {
+      return properties;
+    }
+    public JsonQueue[] getChildren() {
+      return children;
+    }
+    public void setName(String name) {
+      this.name = name;
+    }
+    public void setState(String state) {
+      this.state = state;
+    }
+    public void setProperties(JsonProperty[] properties) {
+      this.properties = properties;
+    }
+    public void setChildren(JsonQueue[] children) {
+      this.children = children;
+    }
+    public String getAcl_submit_job() {
+      return acl_submit_job;
+    }
+    public void setAcl_submit_job(String aclSubmitJob) {
+      acl_submit_job = aclSubmitJob;
+    }
+    public String getAcl_administer_jobs() {
+      return acl_administer_jobs;
+    }
+    public void setAcl_administer_jobs(String aclAdministerJobs) {
+      acl_administer_jobs = aclAdministerJobs;
+    }
+  }
+  
+  /**
+   * Class to store the contents of attribute "properties" in Json dump
+   */
+  static class JsonProperty {
+    String key;
+    String value;
+    public String getKey() {
+      return key;
+    }
+    public void setKey(String key) {
+      this.key = key;
+    }
+    public String getValue() {
+      return value;
+    }
+    public void setValue(String value) {
+      this.value = value;
+    }
+  }
+
+  /**
+   * checks the format of the dump in JSON format when 
+   * QueueManager.dumpConfiguration(Writer) is called.
+   * @throws Exception
+   */
+  public void testDumpConfiguration() throws Exception {
+    checkForConfigFile();
+    Document doc = createDocument();
+    createSimpleDocument(doc);    
+    writeToFile(doc, CONFIG);
+    StringWriter out = new StringWriter();
+    QueueManager.dumpConfiguration(out,CONFIG,null);
+    ObjectMapper mapper = new ObjectMapper();
+    // parse the Json dump
+    JsonQueueTree queueTree =
+      mapper.readValue(out.toString(), JsonQueueTree.class);
+    
+    // check if acls_enabled is correct
+    assertEquals(true, queueTree.isAcls_enabled());
+    // check for the number of top-level queues
+    assertEquals(2, queueTree.getQueues().length);
+    
+    HashMap<String, JsonQueue> topQueues = new HashMap<String, JsonQueue>();
+    for (JsonQueue topQueue : queueTree.getQueues()) {
+      topQueues.put(topQueue.getName(), topQueue);
+    }
+    
+    // check for consistency in number of children
+    assertEquals(2, topQueues.get("p1").getChildren().length);
+    
+    HashMap<String, JsonQueue> childQueues = new HashMap<String, JsonQueue>();
+    for (JsonQueue child : topQueues.get("p1").getChildren()) {
+      childQueues.put(child.getName(), child);
+    }
+    
+    // check for consistency in state
+    assertEquals("stopped", childQueues.get("p1:p12").getState());
+     
+    // check for consistency in properties
+    HashMap<String, JsonProperty> q1_properties =
+      new HashMap<String, JsonProperty>();
+    for (JsonProperty prop : topQueues.get("q1").getProperties()) {
+      q1_properties.put(prop.getKey(), prop);
+    }
+    assertEquals("10", q1_properties.get("capacity").getValue());
+    assertEquals("35", q1_properties.get("maxCapacity").getValue());
+    
+    // check for acls
+    assertEquals("u1", childQueues.get("p1:p12").getAcl_submit_job());
+    assertEquals("u2", childQueues.get("p1:p12").getAcl_administer_jobs());
   }
 }

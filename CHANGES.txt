@@ -632,3 +632,7 @@ Trunk (unreleased changes)
 
     MAPREDUCE-995. Fix a bug in JobHistory where tasks completing after the job
     is closed cause a NPE. (Jothi Padmanabhan via cdouglas)
+
+    MAPREDUCE-953. Fix QueueManager to dump queue configuration in JSON format.
+    (V.V. Chaitanya Krishna via yhemanth)
+

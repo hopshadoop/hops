@@ -21,13 +21,19 @@ package org.apache.hadoop.mapred;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.Queue.QueueState;
 import org.apache.hadoop.security.SecurityUtil.AccessControlList;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.codehaus.jackson.JsonFactory;
+import org.codehaus.jackson.JsonGenerationException;
+import org.codehaus.jackson.JsonGenerator;
 
 import java.io.IOException;
+import java.io.Writer;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.List;
@@ -534,5 +540,134 @@ class QueueManager {
    */
   Queue getRoot() {
     return root;
+  }
+  
+  /**
+   * Dumps the configuration of hierarchy of queues
+   * @param out the writer object to which dump is written
+   * @throws IOException
+   */
+  static void dumpConfiguration(Writer out,Configuration conf) throws IOException {
+    dumpConfiguration(out, null,conf);
+  }
+  
+  /***
+   * Dumps the configuration of hierarchy of queues with 
+   * the xml file path given. It is to be used directly ONLY FOR TESTING.
+   * @param out the writer object to which dump is written to.
+   * @param configFile the filename of xml file
+   * @throws IOException
+   */
+  static void dumpConfiguration(Writer out, String configFile,
+      Configuration conf) throws IOException {
+    if (conf != null && conf.get(DeprecatedQueueConfigurationParser.
+        MAPRED_QUEUE_NAMES_KEY) != null) {
+      return;
+    }
+    JsonFactory dumpFactory = new JsonFactory();
+    JsonGenerator dumpGenerator = dumpFactory.createJsonGenerator(out);
+    QueueConfigurationParser parser;
+    if (configFile != null && !"".equals(configFile)) {
+      parser = new QueueConfigurationParser(configFile);
+    }
+    else {
+      parser = QueueManager.getQueueConfigurationParser(null, false);
+    }
+    dumpGenerator.writeStartObject();
+    dumpGenerator.writeBooleanField("acls_enabled", parser.isAclsEnabled());
+    dumpGenerator.writeFieldName("queues");
+    dumpGenerator.writeStartArray();
+    dumpConfiguration(dumpGenerator,parser.getRoot().getChildren());
+    dumpGenerator.writeEndArray();
+    dumpGenerator.writeEndObject();
+    dumpGenerator.flush();
+  }
+
+  /**
+   * method to perform depth-first search and write the parameters of every 
+   * queue in JSON format.
+   * @param dumpGenerator JsonGenerator object which takes the dump and flushes
+   *  to a writer object
+   * @param rootQueues the top-level queues
+   * @throws JsonGenerationException
+   * @throws IOException
+   */
+  private static void dumpConfiguration(JsonGenerator dumpGenerator,
+      Set<Queue> rootQueues) throws JsonGenerationException, IOException {
+    for (Queue queue : rootQueues) {
+      dumpGenerator.writeStartObject();
+      dumpGenerator.writeStringField("name", queue.getName());
+      dumpGenerator.writeStringField("state", queue.getState().toString());
+      AccessControlList submitJobList = null;
+      AccessControlList administerJobsList = null;
+      if (queue.getAcls() != null) {
+        submitJobList =
+          queue.getAcls().get(QueueManager.toFullPropertyName(queue.getName(),
+              Queue.QueueOperation.SUBMIT_JOB.getAclName()));
+        administerJobsList =
+          queue.getAcls().get(QueueManager.toFullPropertyName(queue.getName(),
+              Queue.QueueOperation.ADMINISTER_JOBS.getAclName()));
+      }
+      StringBuilder aclsSubmitJobValue = new StringBuilder();
+      if (submitJobList != null ) {
+        aclsSubmitJobValue = getAclsInfo(submitJobList);
+      }
+      dumpGenerator.writeStringField("acl_submit_job",
+          aclsSubmitJobValue.toString());
+      StringBuilder aclsAdministerValue = new StringBuilder();
+      if (administerJobsList != null) {
+        aclsAdministerValue = getAclsInfo(administerJobsList);
+      }
+      dumpGenerator.writeStringField("acl_administer_jobs",
+          aclsAdministerValue.toString());
+      dumpGenerator.writeFieldName("properties");
+      dumpGenerator.writeStartArray();
+      if (queue.getProperties() != null) {
+        for (Map.Entry<Object, Object>property :
+          queue.getProperties().entrySet()) {
+          dumpGenerator.writeStartObject();
+          dumpGenerator.writeStringField("key", (String)property.getKey());
+          dumpGenerator.writeStringField("value", (String)property.getValue());
+          dumpGenerator.writeEndObject();
+        }
+      }
+      dumpGenerator.writeEndArray();
+      Set<Queue> childQueues = queue.getChildren();
+      dumpGenerator.writeFieldName("children");
+      dumpGenerator.writeStartArray();
+      if (childQueues != null && childQueues.size() > 0) {
+        dumpConfiguration(dumpGenerator, childQueues);
+      }
+      dumpGenerator.writeEndArray();
+      dumpGenerator.writeEndObject();
+    }
+  }
+
+  private static StringBuilder getAclsInfo(AccessControlList accessControlList) {
+    StringBuilder sb = new StringBuilder();
+    if (accessControlList.getUsers() != null &&
+        accessControlList.getUsers().size() > 0) {
+      Set<String> users = accessControlList.getUsers();
+      Iterator<String> iterator = users.iterator();
+      while (iterator.hasNext()) {
+        sb.append(iterator.next());
+        if (iterator.hasNext()) {
+          sb.append(",");
+        }
+      }
+    }
+    if (accessControlList.getGroups() != null &&
+        accessControlList.getGroups().size() > 0) {
+      sb.append(" ");
+      Set<String> groups = accessControlList.getGroups();
+      Iterator<String> iterator = groups.iterator();
+      while (iterator.hasNext()) {
+        sb.append(iterator.next());
+        if (iterator.hasNext()) {
+          sb.append(",");
+        }
+      }
+    }
+    return sb;
   }
 }
