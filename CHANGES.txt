@@ -629,3 +629,6 @@ Trunk (unreleased changes)
 
     MAPREDUCE-971. distcp does not always remove distcp.tmp.dir. (Aaron Kimball
     via tomwhite)
+
+    MAPREDUCE-995. Fix a bug in JobHistory where tasks completing after the job
+    is closed cause a NPE. (Jothi Padmanabhan via cdouglas)

@@ -21,7 +21,7 @@ package org.apache.hadoop.mapreduce.jobhistory;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Date;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
@@ -55,7 +55,8 @@ public class JobHistory {
   final Log LOG = LogFactory.getLog(JobHistory.class);
 
   private long jobHistoryBlockSize;
-  private Map<JobID, MetaInfo> fileMap;
+  private final Map<JobID, MetaInfo> fileMap =
+    Collections.<JobID,MetaInfo>synchronizedMap(new HashMap<JobID,MetaInfo>());
   private ThreadPoolExecutor executor = null;
   static final FsPermission HISTORY_DIR_PERMISSION =
     FsPermission.createImmutable((short) 0750); // rwxr-x---
@@ -115,8 +116,6 @@ public class JobHistory {
           3 * 1024 * 1024);
     
     jobTracker = jt;
-    
-    fileMap = new HashMap<JobID, MetaInfo> ();
   }
   
   /** Initialize the done directory and start the history cleaner thread */
@@ -305,27 +304,13 @@ public class JobHistory {
   /** Close the event writer for this id */
   public void closeWriter(JobID id) {
     try {
-      EventWriter writer = getWriter(id);
-      writer.close();
+      final MetaInfo mi = fileMap.get(id);
+      if (mi != null) {
+        mi.closeWriter();
+      }
     } catch (IOException e) {
       LOG.info("Error closing writer for JobID: " + id);
     }
-  }
-
-
-  /**
-   * Get the JsonEventWriter for the specified Job Id
-   * @param jobId
-   * @return
-   * @throws IOException if a writer is not available
-   */
-  private EventWriter getWriter(final JobID jobId) throws IOException {
-    EventWriter writer = null;
-    MetaInfo mi = fileMap.get(jobId);
-    if (mi == null || (writer = mi.getEventWriter()) == null) {
-      throw new IOException("History File does not exist for JobID");
-    }
-    return writer;
   }
 
   /**
@@ -335,10 +320,12 @@ public class JobHistory {
    */
   public void logEvent(HistoryEvent event, JobID id) {
     try {
-      EventWriter writer = getWriter(id);
-      writer.write(event);
+      final MetaInfo mi = fileMap.get(id);
+      if (mi != null) {
+        mi.writeEvent(event);
+      }
     } catch (IOException e) {
-      LOG.error("Error creating writer, " + e.getMessage());
+      LOG.error("Error Logging event, " + e.getMessage());
     }
   }
 
@@ -388,7 +375,7 @@ public class JobHistory {
   
   private void moveToDone(final JobID id) {
     final List<Path> paths = new ArrayList<Path>();
-    MetaInfo metaInfo = fileMap.get(id);
+    final MetaInfo metaInfo = fileMap.get(id);
     if (metaInfo == null) {
       LOG.info("No file for job-history with " + id + " found in cache!");
       return;
@@ -456,7 +443,19 @@ public class JobHistory {
 
     Path getHistoryFile() { return historyFile; }
     Path getConfFile() { return confFile; }
-    EventWriter getEventWriter() { return writer; }
+
+    synchronized void closeWriter() throws IOException {
+      if (writer != null) {
+        writer.close();
+      }
+      writer = null;
+    }
+
+    synchronized void writeEvent(HistoryEvent event) throws IOException {
+      if (writer != null) {
+        writer.write(event);
+      }
+    }
   }
 
   /**
