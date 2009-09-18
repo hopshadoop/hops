@@ -113,6 +113,7 @@ class JobQueueClient extends Configured implements Tool {
       throws IOException {
     if (jobQueueInfo == null) {
       writer.write("No queue found.\n");
+      writer.flush();
       return;
     }
     writer.write(String.format("Queue Name : %s \n",
@@ -134,6 +135,7 @@ class JobQueueClient extends Configured implements Tool {
       writer.write("\n");
     }
     writer.write(String.format("======================\n"));
+    writer.flush();
   }
   
   private void displayQueueList() throws IOException {

@@ -658,3 +658,7 @@ Trunk (unreleased changes)
 
     MAPREDUCE-645. Prevent distcp from running a job when the destination is a
     file, but the source is not. (Ravi Gummadi via cdouglas)
+
+    MAPREDUCE-1002. Flushed writer in JobQueueClient so queue information is
+    printed correctly. (V.V. Chaitanya Krishna via yhemanth)
+
