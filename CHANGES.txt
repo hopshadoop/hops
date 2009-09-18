@@ -403,6 +403,8 @@ Trunk (unreleased changes)
     without restarting the JobTracker.
     (Vinod Kumar Vavilapalli and Rahul Kumar Singh via yhemanth)
 
+    MAPREDUCE-1011. Add build.properties to svn and git ignore. (omalley)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 
