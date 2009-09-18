@@ -16,29 +16,53 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.mapreduce;
+package org.apache.hadoop.mapreduce.task;
 
-import org.apache.hadoop.util.Progressable;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.mapreduce.TaskAttemptContext;
+import org.apache.hadoop.mapreduce.TaskAttemptID;
 
 /**
  * The context for task attempts.
  */
-public interface TaskAttemptContext extends JobContext, Progressable {
+public class TaskAttemptContextImpl extends JobContextImpl 
+    implements TaskAttemptContext {
+  private final TaskAttemptID taskId;
+  private String status = "";
+  
+  public TaskAttemptContextImpl(Configuration conf, 
+                                TaskAttemptID taskId) {
+    super(conf, taskId.getJobID());
+    this.taskId = taskId;
+  }
 
   /**
    * Get the unique name for this task attempt.
    */
-  public TaskAttemptID getTaskAttemptID();
+  public TaskAttemptID getTaskAttemptID() {
+    return taskId;
+  }
 
   /**
    * Set the current status of the task to the given string.
    */
-  public void setStatus(String msg);
+  public void setStatus(String msg) {
+    status = msg;
+  }
 
   /**
    * Get the last set status message.
    * @return the current status message
    */
-  public String getStatus();
+  public String getStatus() {
+    return status;
+  }
 
+  /**
+   * Report progress. The subtypes actually do work in this method.
+   */
+  @Override
+  public void progress() { 
+  }
+    
 }

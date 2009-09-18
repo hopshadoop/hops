@@ -198,7 +198,7 @@ public class LocalJobRunner implements ClientProtocol {
     @Override
     public void run() {
       JobID jobId = profile.getJobID();
-      JobContext jContext = new JobContext(job, jobId);
+      JobContext jContext = new JobContextImpl(job, jobId);
       OutputCommitter outputCommitter = job.getOutputCommitter();
       try {
         // split input into minimum number of splits

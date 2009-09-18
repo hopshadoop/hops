@@ -24,11 +24,13 @@ import org.apache.hadoop.mapreduce.Counter;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MapContext;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.StatusReporter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
+import org.apache.hadoop.mapreduce.task.MapContextImpl;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -244,13 +246,15 @@ public class MultithreadedMapper<K1, V1, K2, V2>
     MapRunner(Context context) throws IOException, InterruptedException {
       mapper = ReflectionUtils.newInstance(mapClass, 
                                            context.getConfiguration());
-      subcontext = new Context(outer.getConfiguration(), 
-                            outer.getTaskAttemptID(),
-                            new SubMapRecordReader(),
-                            new SubMapRecordWriter(), 
-                            context.getOutputCommitter(),
-                            new SubMapStatusReporter(),
-                            outer.getInputSplit());
+      MapContext<K1, V1, K2, V2> mapContext = 
+        new MapContextImpl<K1, V1, K2, V2>(outer.getConfiguration(), 
+                                           outer.getTaskAttemptID(),
+                                           new SubMapRecordReader(),
+                                           new SubMapRecordWriter(), 
+                                           context.getOutputCommitter(),
+                                           new SubMapStatusReporter(),
+                                           outer.getInputSplit());
+      subcontext = new WrappedMapper<K1, V1, K2, V2>().getMapContext(mapContext);
     }
 
     public Throwable getThrowable() {

@@ -25,11 +25,11 @@ import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.reduce.WrappedReducer;
 import org.apache.hadoop.mrunit.ReduceDriverBase;
-import org.apache.hadoop.mrunit.mapreduce.mock.MockReduceContextWrapper;
+import org.apache.hadoop.mrunit.mapreduce.mock.MockReduceContext;
 import org.apache.hadoop.mrunit.types.Pair;
 
 /**
@@ -197,11 +197,9 @@ public class ReduceDriver<K1, V1, K2, V2> extends ReduceDriverBase<K1, V1, K2, V
     inputs.add(new Pair<K1, List<V1>>(inputKey, inputValues));
 
     try {
-      MockReduceContextWrapper<K1, V1, K2, V2> wrapper = new MockReduceContextWrapper();
-      MockReduceContextWrapper<K1, V1, K2, V2>.MockReduceContext context =
-          wrapper.getMockContext(inputs, getCounters());
-
-      myReducer.run(context);
+      MockReduceContext<K1, V1, K2, V2> context = 
+        new MockReduceContext<K1, V1, K2, V2>(inputs, getCounters());
+      myReducer.run(new WrappedReducer<K1, V1, K2, V2>().getReducerContext(context));
       return context.getOutputs();
     } catch (InterruptedException ie) {
       throw new IOException(ie);

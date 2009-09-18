@@ -405,6 +405,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-1011. Add build.properties to svn and git ignore. (omalley)
 
+    MAPREDUCE-954. Change Map-Reduce context objects to be interfaces.
+    (acmurthy) 
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 

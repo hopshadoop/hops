@@ -47,6 +47,8 @@ import org.apache.hadoop.io.serializer.SerializationFactory;
 import org.apache.hadoop.mapred.IFile.Writer;
 import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.TaskCounter;
+import org.apache.hadoop.mapreduce.lib.reduce.WrappedReducer;
+import org.apache.hadoop.mapreduce.task.ReduceContextImpl;
 import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.util.Progress;
@@ -433,8 +435,8 @@ abstract public class Task implements Writable, Configurable {
                          boolean useNewApi) throws IOException, 
                                                    ClassNotFoundException,
                                                    InterruptedException {
-    jobContext = new JobContext(job, id, reporter);
-    taskContext = new TaskAttemptContext(job, taskId, reporter);
+    jobContext = new JobContextImpl(job, id, reporter);
+    taskContext = new TaskAttemptContextImpl(job, taskId, reporter);
     if (getState() == TaskStatus.State.UNASSIGNED) {
       setState(TaskStatus.State.RUNNING);
     }
@@ -1060,29 +1062,6 @@ abstract public class Task implements Writable, Configurable {
     }
   }
 
-  private static final Constructor<org.apache.hadoop.mapreduce.Reducer.Context> 
-  contextConstructor;
-  static {
-    try {
-      contextConstructor = 
-        org.apache.hadoop.mapreduce.Reducer.Context.class.getConstructor
-        (new Class[]{org.apache.hadoop.mapreduce.Reducer.class,
-            Configuration.class,
-            org.apache.hadoop.mapreduce.TaskAttemptID.class,
-            RawKeyValueIterator.class,
-            org.apache.hadoop.mapreduce.Counter.class,
-            org.apache.hadoop.mapreduce.Counter.class,
-            org.apache.hadoop.mapreduce.RecordWriter.class,
-            org.apache.hadoop.mapreduce.OutputCommitter.class,
-            org.apache.hadoop.mapreduce.StatusReporter.class,
-            RawComparator.class,
-            Class.class,
-            Class.class});
-    } catch (NoSuchMethodException nme) {
-      throw new IllegalArgumentException("Can't find constructor");
-    }
-  }
-
   @SuppressWarnings("unchecked")
   protected static <INKEY,INVALUE,OUTKEY,OUTVALUE> 
   org.apache.hadoop.mapreduce.Reducer<INKEY,INVALUE,OUTKEY,OUTVALUE>.Context
@@ -1098,21 +1077,26 @@ abstract public class Task implements Writable, Configurable {
                       org.apache.hadoop.mapreduce.StatusReporter reporter,
                       RawComparator<INKEY> comparator,
                       Class<INKEY> keyClass, Class<INVALUE> valueClass
-  ) throws IOException, ClassNotFoundException {
-    try {
+  ) throws IOException, InterruptedException {
+    org.apache.hadoop.mapreduce.ReduceContext<INKEY, INVALUE, OUTKEY, OUTVALUE> 
+    reduceContext = 
+      new ReduceContextImpl<INKEY, INVALUE, OUTKEY, OUTVALUE>(job, taskId, 
+                                                              rIter, 
+                                                              inputKeyCounter, 
+                                                              inputValueCounter, 
+                                                              output, 
+                                                              committer, 
+                                                              reporter, 
+                                                              comparator, 
+                                                              keyClass, 
+                                                              valueClass);
 
-      return contextConstructor.newInstance(reducer, job, taskId,
-                                            rIter, inputKeyCounter, 
-                                            inputValueCounter, output, 
-                                            committer, reporter, comparator, 
-                                            keyClass, valueClass);
-    } catch (InstantiationException e) {
-      throw new IOException("Can't create Context", e);
-    } catch (InvocationTargetException e) {
-      throw new IOException("Can't invoke Context constructor", e);
-    } catch (IllegalAccessException e) {
-      throw new IOException("Can't invoke Context constructor", e);
-    }
+    org.apache.hadoop.mapreduce.Reducer<INKEY,INVALUE,OUTKEY,OUTVALUE>.Context 
+        reducerContext = 
+          new WrappedReducer<INKEY, INVALUE, OUTKEY, OUTVALUE>().getReducerContext(
+              reduceContext);
+
+    return reducerContext;
   }
 
   protected static abstract class CombinerRunner<K,V> {
@@ -1154,7 +1138,7 @@ abstract public class Task implements Writable, Configurable {
       }
       // make a task context so we can get the classes
       org.apache.hadoop.mapreduce.TaskAttemptContext taskContext =
-        new org.apache.hadoop.mapreduce.TaskAttemptContext(job, taskId);
+        new org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl(job, taskId);
       Class<? extends org.apache.hadoop.mapreduce.Reducer<K,V,K,V>> newcls = 
         (Class<? extends org.apache.hadoop.mapreduce.Reducer<K,V,K,V>>)
            taskContext.getCombinerClass();

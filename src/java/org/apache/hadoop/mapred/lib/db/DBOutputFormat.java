@@ -31,6 +31,7 @@ import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
+import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl;
 import org.apache.hadoop.util.Progressable;
 
 /**
@@ -69,7 +70,7 @@ public class DBOutputFormat<K  extends DBWritable, V>
   public RecordWriter<K, V> getRecordWriter(FileSystem filesystem,
       JobConf job, String name, Progressable progress) throws IOException {
     org.apache.hadoop.mapreduce.RecordWriter<K, V> w = super.getRecordWriter(
-      new TaskAttemptContext(job, 
+      new TaskAttemptContextImpl(job, 
             TaskAttemptID.forName(job.get(JobContext.TASK_ATTEMPT_ID))));
     org.apache.hadoop.mapreduce.lib.db.DBOutputFormat.DBRecordWriter writer = 
      (org.apache.hadoop.mapreduce.lib.db.DBOutputFormat.DBRecordWriter) w;

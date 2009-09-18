@@ -47,6 +47,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.mapreduce.filecache.DistributedCache;
+import org.apache.hadoop.mapreduce.task.JobContextImpl;
 import org.apache.hadoop.mapreduce.util.ConfigUtil;
 import org.apache.hadoop.security.UnixUserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
@@ -84,8 +85,9 @@ import org.apache.hadoop.util.StringUtils;
  * 
  * 
  */
-public class Job extends JobContext {  
+public class Job extends JobContextImpl implements JobContext {  
   private static final Log LOG = LogFactory.getLog(Job.class);
+
   public static enum JobState {DEFINE, RUNNING};
   private static final long MAX_JOBSTATUS_AGE = 1000 * 2;
   public static final String OUTPUT_FILTER = "mapreduce.client.output.filter";
@@ -544,7 +546,8 @@ public class Job extends JobContext {
   public void setInputFormatClass(Class<? extends InputFormat> cls
                                   ) throws IllegalStateException {
     ensureState(JobState.DEFINE);
-    conf.setClass(INPUT_FORMAT_CLASS_ATTR, cls, InputFormat.class);
+    conf.setClass(INPUT_FORMAT_CLASS_ATTR, cls, 
+                  InputFormat.class);
   }
 
   /**
@@ -555,7 +558,8 @@ public class Job extends JobContext {
   public void setOutputFormatClass(Class<? extends OutputFormat> cls
                                    ) throws IllegalStateException {
     ensureState(JobState.DEFINE);
-    conf.setClass(OUTPUT_FORMAT_CLASS_ATTR, cls, OutputFormat.class);
+    conf.setClass(OUTPUT_FORMAT_CLASS_ATTR, cls, 
+                  OutputFormat.class);
   }
 
   /**
@@ -626,7 +630,8 @@ public class Job extends JobContext {
   public void setPartitionerClass(Class<? extends Partitioner> cls
                                   ) throws IllegalStateException {
     ensureState(JobState.DEFINE);
-    conf.setClass(PARTITIONER_CLASS_ATTR, cls, Partitioner.class);
+    conf.setClass(PARTITIONER_CLASS_ATTR, cls, 
+                  Partitioner.class);
   }
 
   /**
@@ -919,12 +924,12 @@ public class Job extends JobContext {
       }      
     } else {
       String mode = "map compatability";
-      ensureNotSet(JobContext.INPUT_FORMAT_CLASS_ATTR, mode);
-      ensureNotSet(JobContext.MAP_CLASS_ATTR, mode);
+      ensureNotSet(INPUT_FORMAT_CLASS_ATTR, mode);
+      ensureNotSet(MAP_CLASS_ATTR, mode);
       if (numReduces != 0) {
-        ensureNotSet(JobContext.PARTITIONER_CLASS_ATTR, mode);
+        ensureNotSet(PARTITIONER_CLASS_ATTR, mode);
        } else {
-        ensureNotSet(JobContext.OUTPUT_FORMAT_CLASS_ATTR, mode);
+        ensureNotSet(OUTPUT_FORMAT_CLASS_ATTR, mode);
       }
     }
     if (numReduces != 0) {
@@ -936,8 +941,8 @@ public class Job extends JobContext {
         ensureNotSet(oldReduceClass, mode);   
       } else {
         String mode = "reduce compatability";
-        ensureNotSet(JobContext.OUTPUT_FORMAT_CLASS_ATTR, mode);
-        ensureNotSet(JobContext.REDUCE_CLASS_ATTR, mode);   
+        ensureNotSet(OUTPUT_FORMAT_CLASS_ATTR, mode);
+        ensureNotSet(REDUCE_CLASS_ATTR, mode);   
       }
     }   
   }

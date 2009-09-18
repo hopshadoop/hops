@@ -25,11 +25,11 @@ import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.lib.map.WrappedMapper;
 import org.apache.hadoop.mrunit.MapDriverBase;
-import org.apache.hadoop.mrunit.mapreduce.mock.MockMapContextWrapper;
+import org.apache.hadoop.mrunit.mapreduce.mock.MockMapContext;
 import org.apache.hadoop.mrunit.types.Pair;
 
 /**
@@ -192,11 +192,10 @@ public class MapDriver<K1, V1, K2, V2> extends MapDriverBase<K1, V1, K2, V2> {
     inputs.add(new Pair<K1, V1>(inputKey, inputVal));
 
     try {
-      MockMapContextWrapper<K1, V1, K2, V2> wrapper = new MockMapContextWrapper();
-      MockMapContextWrapper<K1, V1, K2, V2>.MockMapContext context =
-          wrapper.getMockContext(inputs, getCounters());
+      MockMapContext<K1, V1, K2, V2> context =
+        new MockMapContext<K1, V1, K2, V2>(inputs, getCounters());
 
-      myMapper.run(context);
+      myMapper.run(new WrappedMapper<K1, V1, K2, V2>().getMapContext(context));
       return context.getOutputs();
     } catch (InterruptedException ie) {
       throw new IOException(ie);

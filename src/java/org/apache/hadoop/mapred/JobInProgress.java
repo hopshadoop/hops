@@ -384,7 +384,7 @@ public class JobInProgress {
     this.numReduceTasks = conf.getNumReduceTasks();
     this.taskCompletionEvents = new ArrayList<TaskCompletionEvent>
        (numMapTasks + numReduceTasks + 10);
-    JobContext jobContext = new JobContext(conf, jobId);
+    JobContext jobContext = new JobContextImpl(conf, jobId);
     this.jobSetupCleanupNeeded = jobContext.getJobSetupCleanupNeeded();
 
     this.mapFailuresPercent = conf.getMaxMapTaskFailuresPercent();

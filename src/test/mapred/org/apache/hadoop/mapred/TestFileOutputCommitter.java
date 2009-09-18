@@ -23,6 +23,8 @@ import junit.framework.TestCase;
 
 import org.apache.hadoop.fs.*;
 import org.apache.hadoop.io.*;
+import org.apache.hadoop.mapred.JobContextImpl;
+import org.apache.hadoop.mapred.TaskAttemptContextImpl;
 
 public class TestFileOutputCommitter extends TestCase {
   private static Path outDir = new Path(
@@ -38,8 +40,8 @@ public class TestFileOutputCommitter extends TestCase {
     job.set(JobContext.TASK_ATTEMPT_ID, attempt);
     job.setOutputCommitter(FileOutputCommitter.class);
     FileOutputFormat.setOutputPath(job, outDir);
-    JobContext jContext = new JobContext(job, taskID.getJobID());
-    TaskAttemptContext tContext = new TaskAttemptContext(job, taskID);
+    JobContext jContext = new JobContextImpl(job, taskID.getJobID());
+    TaskAttemptContext tContext = new TaskAttemptContextImpl(job, taskID);
     FileOutputCommitter committer = new FileOutputCommitter();
     FileOutputFormat.setWorkOutputPath(job, 
       committer.getTempTaskOutputPath(tContext));

@@ -53,6 +53,8 @@ import org.apache.hadoop.mapred.IFile.Writer;
 import org.apache.hadoop.mapred.Merger.Segment;
 import org.apache.hadoop.mapred.SortedRanges.SkipRangeIterator;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.map.WrappedMapper;
+import org.apache.hadoop.mapreduce.task.MapContextImpl;
 import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.TaskCounter;
@@ -546,7 +548,8 @@ class MapTask extends Task {
                              InterruptedException {
     // make a task context so we can get the classes
     org.apache.hadoop.mapreduce.TaskAttemptContext taskContext =
-      new org.apache.hadoop.mapreduce.TaskAttemptContext(job, getTaskID());
+      new org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl(job, 
+                                                                  getTaskID());
     // make a mapper
     org.apache.hadoop.mapreduce.Mapper<INKEY,INVALUE,OUTKEY,OUTVALUE> mapper =
       (org.apache.hadoop.mapreduce.Mapper<INKEY,INVALUE,OUTKEY,OUTVALUE>)
@@ -573,47 +576,33 @@ class MapTask extends Task {
     
     job.setBoolean(JobContext.SKIP_RECORDS, isSkipping());
     org.apache.hadoop.mapreduce.RecordWriter output = null;
-    org.apache.hadoop.mapreduce.Mapper<INKEY,INVALUE,OUTKEY,OUTVALUE>.Context 
-         mapperContext = null;
-    try {
-      Constructor<org.apache.hadoop.mapreduce.Mapper.Context> contextConstructor =
-        org.apache.hadoop.mapreduce.Mapper.Context.class.getConstructor
-        (new Class[]{org.apache.hadoop.mapreduce.Mapper.class,
-                     Configuration.class,
-                     org.apache.hadoop.mapreduce.TaskAttemptID.class,
-                     org.apache.hadoop.mapreduce.RecordReader.class,
-                     org.apache.hadoop.mapreduce.RecordWriter.class,
-                     org.apache.hadoop.mapreduce.OutputCommitter.class,
-                     org.apache.hadoop.mapreduce.StatusReporter.class,
-                     org.apache.hadoop.mapreduce.InputSplit.class});
-
-      // get an output object
-      if (job.getNumReduceTasks() == 0) {
-        output = outputFormat.getRecordWriter(taskContext);
-      } else {
-        output = new NewOutputCollector(taskContext, job, umbilical, reporter);
-      }
-
-      mapperContext = contextConstructor.newInstance(mapper, job, getTaskID(),
-                                                     input, output, committer,
-                                                     reporter, split);
-
-      input.initialize(split, mapperContext);
-      mapper.run(mapperContext);
-      mapPhase.complete();
-      setPhase(TaskStatus.Phase.SORT);
-      statusUpdate(umbilical);
-      input.close();
-      output.close(mapperContext);
-    } catch (NoSuchMethodException e) {
-      throw new IOException("Can't find Context constructor", e);
-    } catch (InstantiationException e) {
-      throw new IOException("Can't create Context", e);
-    } catch (InvocationTargetException e) {
-      throw new IOException("Can't invoke Context constructor", e);
-    } catch (IllegalAccessException e) {
-      throw new IOException("Can't invoke Context constructor", e);
+    
+    // get an output object
+    if (job.getNumReduceTasks() == 0) {
+      output = outputFormat.getRecordWriter(taskContext);
+    } else {
+      output = new NewOutputCollector(taskContext, job, umbilical, reporter);
     }
+
+    org.apache.hadoop.mapreduce.MapContext<INKEY, INVALUE, OUTKEY, OUTVALUE> 
+    mapContext = 
+      new MapContextImpl<INKEY, INVALUE, OUTKEY, OUTVALUE>(job, getTaskID(), 
+          input, output, 
+          committer, 
+          reporter, split);
+
+    org.apache.hadoop.mapreduce.Mapper<INKEY,INVALUE,OUTKEY,OUTVALUE>.Context 
+        mapperContext = 
+          new WrappedMapper<INKEY, INVALUE, OUTKEY, OUTVALUE>().getMapContext(
+              mapContext);
+
+    input.initialize(split, mapperContext);
+    mapper.run(mapperContext);
+    mapPhase.complete();
+    setPhase(TaskStatus.Phase.SORT);
+    statusUpdate(umbilical);
+    input.close();
+    output.close(mapperContext);
   }
 
   interface MapOutputCollector<K, V> {

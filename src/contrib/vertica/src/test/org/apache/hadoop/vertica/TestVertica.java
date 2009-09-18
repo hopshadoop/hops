@@ -40,8 +40,10 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.JobContextImpl;
 import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
+import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.vertica.VerticaConfiguration;
 import org.apache.hadoop.vertica.VerticaInputFormat;
@@ -232,7 +234,7 @@ public class TestVertica extends VerticaTestCase {
     VerticaInputSplit input = getVerticaSplit(false);
     VerticaRecordReader reader = new VerticaRecordReader(input, input
         .getConfiguration());
-    TaskAttemptContext context = new TaskAttemptContext(input
+    TaskAttemptContext context = new TaskAttemptContextImpl(input
         .getConfiguration(), new TaskAttemptID());
     reader.initialize(input, context);
 
@@ -254,7 +256,7 @@ public class TestVertica extends VerticaTestCase {
 
     Configuration conf = job.getConfiguration();
     conf.setInt("mapred.map.tasks", 1);
-    JobContext context = new JobContext(conf, new JobID());
+    JobContext context = new JobContextImpl(conf, new JobID());
 
     splits = input.getSplits(context);
     assert splits.size() == 1;
@@ -308,7 +310,7 @@ public class TestVertica extends VerticaTestCase {
         "c char(1)", "d date", "f float", "t timestamp", "v varchar",
         "z varbinary");
     output.checkOutputSpecs(job, true);
-    TaskAttemptContext context = new TaskAttemptContext(job.getConfiguration(),
+    TaskAttemptContext context = new TaskAttemptContextImpl(job.getConfiguration(),
         new TaskAttemptID());
     VerticaRecordWriter writer = (VerticaRecordWriter) output
         .getRecordWriter(context);

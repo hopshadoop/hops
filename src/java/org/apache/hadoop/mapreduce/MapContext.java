@@ -18,10 +18,6 @@
 
 package org.apache.hadoop.mapreduce;
 
-import java.io.IOException;
-
-import org.apache.hadoop.conf.Configuration;
-
 /**
  * The context that is given to the {@link Mapper}.
  * @param <KEYIN> the key input type to the Mapper
@@ -29,43 +25,13 @@ import org.apache.hadoop.conf.Configuration;
  * @param <KEYOUT> the key output type from the Mapper
  * @param <VALUEOUT> the value output type from the Mapper
  */
-public class MapContext<KEYIN,VALUEIN,KEYOUT,VALUEOUT> 
+public interface MapContext<KEYIN,VALUEIN,KEYOUT,VALUEOUT> 
   extends TaskInputOutputContext<KEYIN,VALUEIN,KEYOUT,VALUEOUT> {
-  private RecordReader<KEYIN,VALUEIN> reader;
-  private InputSplit split;
-
-  public MapContext(Configuration conf, TaskAttemptID taskid,
-                    RecordReader<KEYIN,VALUEIN> reader,
-                    RecordWriter<KEYOUT,VALUEOUT> writer,
-                    OutputCommitter committer,
-                    StatusReporter reporter,
-                    InputSplit split) {
-    super(conf, taskid, writer, committer, reporter);
-    this.reader = reader;
-    this.split = split;
-  }
 
   /**
    * Get the input split for this map.
    */
-  public InputSplit getInputSplit() {
-    return split;
-  }
-
-  @Override
-  public KEYIN getCurrentKey() throws IOException, InterruptedException {
-    return reader.getCurrentKey();
-  }
-
-  @Override
-  public VALUEIN getCurrentValue() throws IOException, InterruptedException {
-    return reader.getCurrentValue();
-  }
-
-  @Override
-  public boolean nextKeyValue() throws IOException, InterruptedException {
-    return reader.nextKeyValue();
-  }
-
+  public InputSplit getInputSplit();
+  
 }
      

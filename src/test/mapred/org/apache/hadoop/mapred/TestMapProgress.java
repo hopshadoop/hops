@@ -140,7 +140,7 @@ public class TestMapProgress extends TestCase {
             TEST_ROOT_DIR);
     jobId = taskId.getJobID();
     
-    JobContext jContext = new JobContext(job, jobId);
+    JobContext jContext = new JobContextImpl(job, jobId);
     Job.RawSplit[] rawSplits = LocalJobRunner.getRawSplits(jContext, job);
 
     job.setUseNewMapper(true); // use new api

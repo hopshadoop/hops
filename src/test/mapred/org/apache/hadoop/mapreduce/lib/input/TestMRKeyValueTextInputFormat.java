@@ -39,6 +39,7 @@ import org.apache.hadoop.mapreduce.MapContext;
 import org.apache.hadoop.mapreduce.MapReduceTestUtil;
 import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
+import org.apache.hadoop.mapreduce.task.MapContextImpl;
 import org.apache.hadoop.util.LineReader;
 import org.apache.hadoop.util.ReflectionUtils;
 
@@ -118,7 +119,7 @@ public class TestMRKeyValueTextInputFormat {
           assertEquals("reader class is KeyValueLineRecordReader.", 
             KeyValueLineRecordReader.class, clazz);
           MapContext<Text, Text, Text, Text> mcontext = 
-            new MapContext<Text, Text, Text, Text>(job.getConfiguration(), 
+            new MapContextImpl<Text, Text, Text, Text>(job.getConfiguration(), 
             context.getTaskAttemptID(), reader, null, null, 
             MapReduceTestUtil.createDummyReporter(), splits.get(j));
           reader.initialize(splits.get(j), mcontext);
@@ -217,7 +218,7 @@ public class TestMRKeyValueTextInputFormat {
             splits.get(j), context);
           Class<?> clazz = reader.getClass();
           MapContext<Text, Text, Text, Text> mcontext =
-            new MapContext<Text, Text, Text, Text>(job.getConfiguration(),
+            new MapContextImpl<Text, Text, Text, Text>(job.getConfiguration(),
             context.getTaskAttemptID(), reader, null, null,
             MapReduceTestUtil.createDummyReporter(), splits.get(j));
           reader.initialize(splits.get(j), mcontext);
@@ -312,7 +313,7 @@ public class TestMRKeyValueTextInputFormat {
     RecordReader<Text, Text> reader = format.createRecordReader(split, 
       MapReduceTestUtil.createDummyMapTaskAttemptContext(conf));
     MapContext<Text, Text, Text, Text> mcontext = 
-      new MapContext<Text, Text, Text, Text>(conf, 
+      new MapContextImpl<Text, Text, Text, Text>(conf, 
       context.getTaskAttemptID(), reader, null, null,
       MapReduceTestUtil.createDummyReporter(), 
       split);
