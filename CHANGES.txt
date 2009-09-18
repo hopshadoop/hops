@@ -644,3 +644,5 @@ Trunk (unreleased changes)
     MAPREDUCE-953. Fix QueueManager to dump queue configuration in JSON format.
     (V.V. Chaitanya Krishna via yhemanth)
 
+    MAPREDUCE-645. Prevent distcp from running a job when the destination is a
+    file, but the source is not. (Ravi Gummadi via cdouglas)

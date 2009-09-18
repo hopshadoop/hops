@@ -1259,7 +1259,14 @@ public class DistCp implements Tool {
         FileSystem srcfs = src.getFileSystem(conf);
         FileStatus srcfilestat = srcfs.getFileStatus(src);
         Path root = special && srcfilestat.isDir()? src: src.getParent();
-    
+        if (dstExists && !dstIsDir &&
+            (args.srcs.size() > 1 || srcfilestat.isDir())) {
+          // destination should not be a file
+          throw new IOException("Destination " + args.dst + " should be a dir" +
+                                " if multiple source paths are there OR if" +
+                                " the source path is a dir");
+        }
+
         if (basedir != null) {
           root = basedir;
           Path parent = src.getParent().makeQualified(srcfs);
