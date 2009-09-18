@@ -1096,7 +1096,7 @@ public class DistCp implements Tool {
   //Job configuration
   private static JobConf createJobConf(Configuration conf) {
     JobConf jobconf = new JobConf(conf, DistCp.class);
-    jobconf.setJobName(NAME);
+    jobconf.setJobName(conf.get("mapred.job.name", NAME));
 
     // turn off speculative execution, because DFS doesn't handle
     // multiple writers to the same file.

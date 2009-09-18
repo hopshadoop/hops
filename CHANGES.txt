@@ -375,6 +375,9 @@ Trunk (unreleased changes)
     MAPREDUCE-664. Display the number of files deleted by distcp when the
     -delete option is specified. (Ravi Gummadi via cdouglas)
 
+    MAPREDUCE-781. Let the name of distcp jobs be configurable. (Venkatesh S
+    via cdouglas)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 
