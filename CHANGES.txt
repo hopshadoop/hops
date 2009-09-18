@@ -668,3 +668,6 @@ Trunk (unreleased changes)
     MAPREDUCE-1003. Fix compilation problem in eclipse plugin when
     eclipse.home is set. (Ravi Gummadi via yhemanth)
 
+    MAPREDUCE-941. Vaidya script fails on Solaris. (Chad Metcalf
+    via tomwhite)
+
