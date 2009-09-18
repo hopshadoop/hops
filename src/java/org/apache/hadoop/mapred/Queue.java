@@ -330,7 +330,7 @@ class Queue implements Comparable<Queue>{
   JobQueueInfo getJobQueueInfo() {
     JobQueueInfo queueInfo = new JobQueueInfo();
     queueInfo.setQueueName(name);
-    queueInfo.setQueueState(state.getStateName());
+    queueInfo.setQueueState(state.name());
     if (schedulingInfo != null) {
       queueInfo.setSchedulingInfo(schedulingInfo.toString());
     }

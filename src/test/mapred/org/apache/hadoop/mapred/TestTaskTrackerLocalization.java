@@ -28,10 +28,12 @@ import java.util.zip.ZipEntry;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.server.tasktracker.Localizer;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -127,17 +129,16 @@ public class TestTaskTrackerLocalization extends TestCase {
     trackerFConf.setStrings("mapred.local.dir", localDirs);
 
     // Create the job configuration file. Same as trackerConf in this test.
-    JobConf jobConf = trackerFConf;
+    Job job = new Job(trackerFConf);
 
-    // JobClient sets the job credentials.
-    new JobClient().setUGIAndUserGroupNames(jobConf);
+    job.setUGIAndUserGroupNames();
 
     // JobClient uploads the job jar to the file system and sets it in the
     // jobConf.
-    uploadJobJar(jobConf);
+    uploadJobJar(job);
 
     // JobClient uploads the jobConf to the file system.
-    File jobConfFile = uploadJobConf(jobConf);
+    File jobConfFile = uploadJobConf(job.getConfiguration());
 
     // Set up the TaskTracker
     tracker = new TaskTracker();
@@ -155,7 +156,7 @@ public class TestTaskTrackerLocalization extends TestCase {
         new TaskAttemptID(jtIdentifier, jobId.getId(), TaskType.MAP, 1, 0);
     task =
         new MapTask(jobConfFile.toURI().toString(), taskId, 1, null, null, 1);
-    task.setConf(jobConf); // Set conf. Set user name in particular.
+    task.setConf(job.getConfiguration()); // Set conf. Set user name in particular.
 
     taskController = new DefaultTaskController();
     taskController.setConf(trackerFConf);
@@ -166,11 +167,11 @@ public class TestTaskTrackerLocalization extends TestCase {
   }
 
   /**
-   * @param jobConf
+   * @param job
    * @throws IOException
    * @throws FileNotFoundException
    */
-  private void uploadJobJar(JobConf jobConf)
+  private void uploadJobJar(Job job)
       throws IOException,
       FileNotFoundException {
     File jobJarFile = new File(TEST_ROOT_DIR, "jobjar-on-dfs.jar");
@@ -184,21 +185,21 @@ public class TestTaskTrackerLocalization extends TestCase {
     jstream.closeEntry();
     jstream.finish();
     jstream.close();
-    jobConf.setJar(jobJarFile.toURI().toString());
+    job.setJar(jobJarFile.toURI().toString());
   }
 
   /**
-   * @param jobConf
+   * @param conf
    * @return
    * @throws FileNotFoundException
    * @throws IOException
    */
-  protected File uploadJobConf(JobConf jobConf)
+  protected File uploadJobConf(Configuration conf)
       throws FileNotFoundException,
       IOException {
     File jobConfFile = new File(TEST_ROOT_DIR, "jobconf-on-dfs.xml");
     FileOutputStream out = new FileOutputStream(jobConfFile);
-    jobConf.writeXml(out);
+    conf.writeXml(out);
     out.close();
     return jobConfFile;
   }

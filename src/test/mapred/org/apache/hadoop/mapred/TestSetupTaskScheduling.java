@@ -23,6 +23,7 @@ import java.util.List;
 
 import org.apache.hadoop.mapred.FakeObjectUtilities.FakeJobInProgress;
 import org.apache.hadoop.mapred.FakeObjectUtilities.FakeJobTracker;
+import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.server.jobtracker.TaskTracker;
 
@@ -61,7 +62,7 @@ public class TestSetupTaskScheduling extends TestCase {
     @Override
     public synchronized void initTasks() throws IOException {
       super.initTasks();
-      JobClient.RawSplit emptySplit = new JobClient.RawSplit();
+      Job.RawSplit emptySplit = new Job.RawSplit();
       setup = new TaskInProgress[2];
       setup[0] = new TaskInProgress(getJobID(), "test",  emptySplit,
           jobtracker, getJobConf(), this, numMapTasks + 1, 1);

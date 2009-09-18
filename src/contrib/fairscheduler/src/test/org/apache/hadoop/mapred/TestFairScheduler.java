@@ -38,6 +38,7 @@ import junit.framework.TestCase;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.mapred.FairScheduler.JobInfo;
+import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapred.FakeObjectUtilities.FakeJobHistory;
 import org.apache.hadoop.mapred.UtilsForTests.FakeClock;
 import org.apache.hadoop.mapreduce.TaskType;
@@ -230,7 +231,7 @@ public class TestFairScheduler extends TestCase {
     // Constructor for map
     FakeTaskInProgress(JobID jId, int id, JobConf jobConf,
         FakeJobInProgress job, String[] inputLocations) {
-      super(jId, "", new JobClient.RawSplit(), null, jobConf, job, id, 1);
+      super(jId, "", new Job.RawSplit(), null, jobConf, job, id, 1);
       this.isMap = true;
       this.fakeJob = job;
       this.inputLocations = inputLocations;

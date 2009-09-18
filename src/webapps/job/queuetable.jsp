@@ -36,7 +36,7 @@ private static final long serialVersionUID = 1L;
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <%
 JobTracker tracker = (JobTracker) application.getAttribute("job.tracker");
-JobQueueInfo[] queues = tracker.getRootQueues();
+JobQueueInfo[] queues = tracker.getRootJobQueues();
 %>
 <title>Queue Information</title>
 </head>

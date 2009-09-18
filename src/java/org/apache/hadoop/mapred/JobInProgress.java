@@ -43,6 +43,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobCounter;
 import org.apache.hadoop.mapreduce.TaskType;
@@ -461,7 +462,7 @@ public class JobInProgress {
   }
   
   Map<Node, List<TaskInProgress>> createCache(
-                         JobClient.RawSplit[] splits, int maxLevel) {
+                         Job.RawSplit[] splits, int maxLevel) {
     Map<Node, List<TaskInProgress>> cache = 
       new IdentityHashMap<Node, List<TaskInProgress>>(maxLevel);
     
@@ -571,7 +572,7 @@ public class JobInProgress {
     //
     String jobFile = profile.getJobFile();
 
-    JobClient.RawSplit[] splits = createSplits();
+    Job.RawSplit[] splits = createSplits();
     numMapTasks = splits.length;
 
     checkTaskLimits();
@@ -652,12 +653,12 @@ public class JobInProgress {
     
   }
 
-  JobClient.RawSplit[] createSplits() throws IOException {
+  Job.RawSplit[] createSplits() throws IOException {
     DataInputStream splitFile =
       fs.open(new Path(conf.get("mapred.job.split.file")));
-    JobClient.RawSplit[] splits;
+    Job.RawSplit[] splits;
     try {
-      splits = JobClient.readSplitFile(splitFile);
+      splits = Job.readSplitFile(splitFile);
     } finally {
       splitFile.close();
     }
@@ -678,7 +679,7 @@ public class JobInProgress {
     }
   }
 
-  synchronized void createMapTasks(String jobFile, JobClient.RawSplit[] splits) {
+  synchronized void createMapTasks(String jobFile, Job.RawSplit[] splits) {
     maps = new TaskInProgress[numMapTasks];
     for(int i=0; i < numMapTasks; ++i) {
       inputLength += splits[i].getDataLength();
@@ -713,7 +714,7 @@ public class JobInProgress {
 
     // cleanup map tip. This map doesn't use any splits. Just assign an empty
     // split.
-    JobClient.RawSplit emptySplit = new JobClient.RawSplit();
+    Job.RawSplit emptySplit = new Job.RawSplit();
     cleanup[0] = new TaskInProgress(jobId, jobFile, emptySplit, 
             jobtracker, conf, this, numMapTasks, 1);
     cleanup[0].setJobCleanupTask();

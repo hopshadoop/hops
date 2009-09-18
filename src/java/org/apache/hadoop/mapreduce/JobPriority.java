@@ -15,18 +15,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.mapred;
+package org.apache.hadoop.mapreduce;
 
 /**
  * Used to describe the priority of the running job. 
- * @deprecated Use {@link org.apache.hadoop.mapreduce.JobPriority} instead
+ *
  */
 public enum JobPriority {
-
   VERY_HIGH,
   HIGH,
   NORMAL,
   LOW,
   VERY_LOW;
-  
 }

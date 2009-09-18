@@ -73,6 +73,12 @@ import org.apache.hadoop.mapred.JobInProgress.KillInterruptedException;
 import org.apache.hadoop.mapred.JobStatusChangeEvent.EventType;
 import org.apache.hadoop.mapred.JobTrackerStatistics.TaskTrackerStat;
 import org.apache.hadoop.mapred.TaskTrackerStatus.TaskTrackerHealthStatus;
+import org.apache.hadoop.mapreduce.ClusterMetrics;
+import org.apache.hadoop.mapreduce.QueueInfo;
+import org.apache.hadoop.mapreduce.QueueState;
+import org.apache.hadoop.mapreduce.TaskTrackerInfo;
+import org.apache.hadoop.mapreduce.TaskType;
+import org.apache.hadoop.mapreduce.protocol.ClientProtocol;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistory;
 import org.apache.hadoop.mapreduce.server.jobtracker.TaskTracker;
 import org.apache.hadoop.net.DNSToSwitchMapping;
@@ -102,7 +108,7 @@ import org.apache.hadoop.util.VersionInfo;
  *
  *******************************************************/
 public class JobTracker implements MRConstants, InterTrackerProtocol,
-    JobSubmissionProtocol, TaskTrackerManager,
+    ClientProtocol, TaskTrackerManager,
     RefreshAuthorizationPolicyProtocol, AdminOperationsProtocol {
 
   static{
@@ -243,8 +249,8 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
                                  long clientVersion) throws IOException {
     if (protocol.equals(InterTrackerProtocol.class.getName())) {
       return InterTrackerProtocol.versionID;
-    } else if (protocol.equals(JobSubmissionProtocol.class.getName())){
-      return JobSubmissionProtocol.versionID;
+    } else if (protocol.equals(ClientProtocol.class.getName())){
+      return ClientProtocol.versionID;
     } else if (protocol.equals(RefreshAuthorizationPolicyProtocol.class.getName())){
       return RefreshAuthorizationPolicyProtocol.versionID;
     } else if (protocol.equals(AdminOperationsProtocol.class.getName())){
@@ -2736,9 +2742,20 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
 
   /**
    * Allocates a new JobId string.
+   * @deprecated use {@link #getNewJobID()} instead
    */
+  @Deprecated
   public synchronized JobID getNewJobId() throws IOException {
-    return new JobID(getTrackerIdentifier(), nextJobId++);
+    return JobID.downgrade(getNewJobID());
+  }
+
+  /**
+   * Allocates a new JobId string.
+   */
+  public synchronized org.apache.hadoop.mapreduce.JobID getNewJobID()
+      throws IOException {
+    return new org.apache.hadoop.mapreduce.JobID(
+      getTrackerIdentifier(), nextJobId++);
   }
 
   /**
@@ -2749,6 +2766,22 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    * of the JobTracker.  But JobInProgress adds info that's useful for
    * the JobTracker alone.
    */
+  public synchronized org.apache.hadoop.mapreduce.JobStatus submitJob(
+      org.apache.hadoop.mapreduce.JobID jobId) throws IOException {
+    return submitJob(JobID.downgrade(jobId));
+  }
+  
+  /**
+   * JobTracker.submitJob() kicks off a new job.  
+   *
+   * Create a 'JobInProgress' object, which contains both JobProfile
+   * and JobStatus.  Those two sub-objects are sometimes shipped outside
+   * of the JobTracker.  But JobInProgress adds info that's useful for
+   * the JobTracker alone.
+   * @deprecated Use 
+   * {@link #submitJob(org.apache.hadoop.mapreduce.JobID)} instead
+   */
+  @Deprecated
   public synchronized JobStatus submitJob(JobID jobId) throws IOException {
     return submitJob(jobId, 0);
   }
@@ -2884,7 +2917,63 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
       }
     }
   }
-    
+  
+  public synchronized ClusterMetrics getClusterMetrics() {
+    return new ClusterMetrics(totalMaps, totalReduces, totalMapTaskCapacity,
+      totalReduceTaskCapacity, taskTrackers.size() - 
+      getBlacklistedTrackerCount(), 
+      getBlacklistedTrackerCount(), getExcludedNodes().size()) ;
+  }
+
+  public org.apache.hadoop.mapreduce.server.jobtracker.State 
+      getJobTrackerState() {
+    return org.apache.hadoop.mapreduce.server.jobtracker.
+      State.valueOf(state.name());
+  }
+  
+  public long getTaskTrackerExpiryInterval() {
+    return tasktrackerExpiryInterval;
+  }
+  
+  /** 
+   * Get all active trackers in cluster. 
+   * @return array of TaskTrackerInfo
+   */
+  public TaskTrackerInfo[] getActiveTrackers() 
+  throws IOException, InterruptedException {
+    List<String> activeTrackers = taskTrackerNames().get(0);
+    TaskTrackerInfo[] info = new TaskTrackerInfo[activeTrackers.size()];
+    for (int i = 0; i < activeTrackers.size(); i++) {
+      info[i] = new TaskTrackerInfo(activeTrackers.get(i));
+    }
+    return info;
+  }
+
+  /** 
+   * Get all blacklisted trackers in cluster. 
+   * @return array of TaskTrackerInfo
+   */
+  public TaskTrackerInfo[] getBlacklistedTrackers() 
+  throws IOException, InterruptedException {
+    Collection<BlackListInfo> blackListed = getBlackListedTrackers();
+    TaskTrackerInfo[] info = new TaskTrackerInfo[blackListed.size()];
+    int i = 0;
+    for (BlackListInfo binfo : blackListed) {
+      info[i++] = new TaskTrackerInfo(binfo.getTrackerName(),
+        binfo.getReasonForBlackListing(), binfo.getBlackListReport());
+    }
+    return info;
+  }
+
+  public synchronized void killJob(org.apache.hadoop.mapreduce.JobID jobid) 
+      throws IOException {
+    killJob(JobID.downgrade(jobid));
+  }
+  
+  /**
+   * @deprecated Use {@link #killJob(org.apache.hadoop.mapreduce.JobID)} instead 
+   */
+  @Deprecated
   public synchronized void killJob(JobID jobid) throws IOException {
     if (null == jobid) {
       LOG.info("Null jobid object sent to JobTracker.killJob()");
@@ -3012,6 +3101,18 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    * @param jobid id of the job
    * @param priority new priority of the job
    */
+  public synchronized void setJobPriority(org.apache.hadoop.mapreduce.JobID 
+      jobid, String priority) throws IOException {
+    setJobPriority(JobID.downgrade(jobid), priority);
+  }
+  /**
+   * Set the priority of a job
+   * @param jobid id of the job
+   * @param priority new priority of the job
+   * @deprecated Use 
+   * {@link #setJobPriority(org.apache.hadoop.mapreduce.JobID, String)} instead
+   */
+  @Deprecated
   public synchronized void setJobPriority(JobID jobid, 
                                               String priority)
                                                 throws IOException {
@@ -3031,6 +3132,15 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     completedJobStatusStore.store(job);
   }
 
+  public JobProfile getJobProfile(org.apache.hadoop.mapreduce.JobID jobid) {
+    return getJobProfile(JobID.downgrade(jobid));
+  }
+  
+  /**
+   * @deprecated Use {@link #getJobProfile(org.apache.hadoop.mapreduce.JobID)} 
+   * instead
+   */
+  @Deprecated
   public JobProfile getJobProfile(JobID jobid) {
     synchronized (this) {
       JobInProgress job = jobs.get(jobid);
@@ -3040,6 +3150,16 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     }
     return completedJobStatusStore.readJobProfile(jobid);
   }
+  
+  public JobStatus getJobStatus(org.apache.hadoop.mapreduce.JobID jobid) {
+    return getJobStatus(JobID.downgrade(jobid));
+  }
+
+  /**
+   * @deprecated Use 
+   * {@link #getJobStatus(org.apache.hadoop.mapreduce.JobID)} instead
+   */
+  @Deprecated
   public JobStatus getJobStatus(JobID jobid) {
     if (null == jobid) {
       LOG.warn("JobTracker.getJobStatus() cannot get status for null jobid");
@@ -3059,6 +3179,21 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     }
     return completedJobStatusStore.readJobStatus(jobid);
   }
+  
+  public org.apache.hadoop.mapreduce.Counters getJobCounters(
+      org.apache.hadoop.mapreduce.JobID jobid) {
+    Counters counters = getJobCounters(JobID.downgrade(jobid));
+    if (counters != null) {
+      return new org.apache.hadoop.mapreduce.Counters(counters);
+    }
+    return null;
+  }
+  
+  /**
+   * @deprecated Use 
+   * {@link #getJobCounters(org.apache.hadoop.mapreduce.JobID)} instead
+   */
+  @Deprecated
   public Counters getJobCounters(JobID jobid) {
     synchronized (this) {
       JobInProgress job = jobs.get(jobid);
@@ -3068,6 +3203,15 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     }
     return completedJobStatusStore.readCounters(jobid);
   }
+  
+  /**
+   * @param jobid
+   * @return array of TaskReport
+   * @deprecated Use 
+   * {@link #getTaskReports(org.apache.hadoop.mapreduce.JobID, TaskType)} 
+   * instead
+   */
+  @Deprecated
   public synchronized TaskReport[] getMapTaskReports(JobID jobid) {
     JobInProgress job = jobs.get(jobid);
     if (job == null) {
@@ -3090,6 +3234,14 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     }
   }
 
+  /**
+   * @param jobid
+   * @return array of TaskReport
+   * @deprecated Use 
+   * {@link #getTaskReports(org.apache.hadoop.mapreduce.JobID, TaskType)} 
+   * instead
+   */
+  @Deprecated
   public synchronized TaskReport[] getReduceTaskReports(JobID jobid) {
     JobInProgress job = jobs.get(jobid);
     if (job == null) {
@@ -3110,6 +3262,14 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     }
   }
 
+  /**
+   * @param jobid
+   * @return array of TaskReport
+   * @deprecated Use 
+   * {@link #getTaskReports(org.apache.hadoop.mapreduce.JobID, TaskType)} 
+   * instead
+   */
+  @Deprecated
   public synchronized TaskReport[] getCleanupTaskReports(JobID jobid) {
     JobInProgress job = jobs.get(jobid);
     if (job == null) {
@@ -3132,7 +3292,15 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     }
   
   }
-  
+
+  /**
+   * @param jobid
+   * @return array of TaskReport
+   * @deprecated Use 
+   * {@link #getTaskReports(org.apache.hadoop.mapreduce.JobID, TaskType)} 
+   * instead
+   */
+  @Deprecated
   public synchronized TaskReport[] getSetupTaskReports(JobID jobid) {
     JobInProgress job = jobs.get(jobid);
     if (job == null) {
@@ -3154,7 +3322,22 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
       return reports.toArray(new TaskReport[reports.size()]);
     }
   }
-  
+
+  public synchronized TaskReport[] getTaskReports(
+      org.apache.hadoop.mapreduce.JobID jobid, TaskType type) {
+    switch (type) {
+      case MAP :
+        return getMapTaskReports(JobID.downgrade(jobid));
+      case REDUCE :
+        return getReduceTaskReports(JobID.downgrade(jobid));
+      case JOB_SETUP:
+        return getCleanupTaskReports(JobID.downgrade(jobid));
+      case JOB_CLEANUP :
+        return getSetupTaskReports(JobID.downgrade(jobid));
+    }
+    return new TaskReport[0];
+  }
+
   TaskCompletionEvent[] EMPTY_EVENTS = new TaskCompletionEvent[0];
 
   static final String MAPRED_CLUSTER_MAP_MEMORY_MB_PROPERTY =
@@ -3166,12 +3349,24 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
       "mapred.cluster.max.map.memory.mb";
   static final String MAPRED_CLUSTER_MAX_REDUCE_MEMORY_MB_PROPERTY =
       "mapred.cluster.max.reduce.memory.mb";
+
+  /* 
+   * Returns a list of TaskCompletionEvent for the given job, 
+   * starting from fromEventId.
+   */
+  public synchronized TaskCompletionEvent[] getTaskCompletionEvents(
+      org.apache.hadoop.mapreduce.JobID jobid, int fromEventId, int maxEvents)
+      throws IOException {
+    return getTaskCompletionEvents(JobID.downgrade(jobid),
+      fromEventId, maxEvents);
+  }
   
   /* 
    * Returns a list of TaskCompletionEvent for the given job, 
    * starting from fromEventId.
    * @see org.apache.hadoop.mapred.JobSubmissionProtocol#getTaskCompletionEvents(java.lang.String, int, int)
    */
+  @Deprecated
   public synchronized TaskCompletionEvent[] getTaskCompletionEvents(
       JobID jobid, int fromEventId, int maxEvents) throws IOException{
     synchronized (this) {
@@ -3192,6 +3387,17 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    * @param taskId the id of the task
    * @return an array of the diagnostic messages
    */
+  public synchronized String[] getTaskDiagnostics(
+      org.apache.hadoop.mapreduce.TaskAttemptID taskId)  
+      throws IOException {
+    return getTaskDiagnostics(TaskAttemptID.downgrade(taskId));
+  }
+  /**
+   * Get the diagnostics for a given task
+   * @param taskId the id of the task
+   * @return an array of the diagnostic messages
+   */
+  @Deprecated
   public synchronized String[] getTaskDiagnostics(TaskAttemptID taskId)  
     throws IOException {
     List<String> taskDiagnosticInfo = null;
@@ -3247,8 +3453,15 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     JobInProgress job = jobs.get(tipid.getJobID());
     return (job == null ? null : job.getTaskInProgress(tipid));
   }
-    
+
+  public synchronized boolean killTask(
+      org.apache.hadoop.mapreduce.TaskAttemptID taskid,
+      boolean shouldFail) throws IOException {
+    return killTask(TaskAttemptID.downgrade(taskid), shouldFail);
+  }
+  
   /** Mark a Task to be killed */
+  @Deprecated
   public synchronized boolean killTask(TaskAttemptID taskid, boolean shouldFail) throws IOException{
     TaskInProgress tip = taskidToTIPMap.get(taskid);
     if(tip != null) {
@@ -3274,7 +3487,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     return getJobStatus(jobs.values(), true);
   } 
   
-  public JobStatus[] getAllJobs() {
+  public org.apache.hadoop.mapreduce.JobStatus[] getAllJobs() {
     List<JobStatus> list = new ArrayList<JobStatus>();
     list.addAll(Arrays.asList(getJobStatus(jobs.values(),false)));
     list.addAll(retireJobs.getAll());
@@ -3282,7 +3495,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   }
     
   /**
-   * @see org.apache.hadoop.mapred.JobSubmissionProtocol#getSystemDir()
+   * @see org.apache.hadoop.mapreduce.protocol.ClientProtocol#getSystemDir()
    */
   public String getSystemDir() {
     Path sysDir = new Path(conf.get("mapred.system.dir", "/tmp/hadoop/mapred/system"));  
@@ -3602,45 +3815,76 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   /**
    * Gets the root level queues.
    *
-   * @return array of JobQueueInfo object.
+   * @return array of QueueInfo object.
    * @throws java.io.IOException
    */
    @Override
-  public JobQueueInfo[] getRootQueues() throws IOException {
-    return queueManager.getRootQueues();
+  public QueueInfo[] getRootQueues() throws IOException {
+    return getQueueInfoArray(queueManager.getRootQueues());
   }
  
   /**
    * Returns immediate children of queueName.
    *
    * @param queueName
-   * @return array of JobQueueInfo which are children of queueName
+   * @return array of QueueInfo which are children of queueName
    * @throws java.io.IOException
    */
   @Override
-  public JobQueueInfo[] getChildQueues(String queueName) throws IOException {
-     return queueManager.getChildQueues(queueName);
+  public QueueInfo[] getChildQueues(String queueName) throws IOException {
+    return getQueueInfoArray(queueManager.getChildQueues(queueName));
   }
 
-  @Override
-  public JobQueueInfo[] getQueues() throws IOException {
+  /**
+   * Gets the root level queues.
+   *
+   * @return array of JobQueueInfo object.
+   * @throws java.io.IOException
+   */
+   @Deprecated
+  public JobQueueInfo[] getRootJobQueues() throws IOException {
+    return queueManager.getRootQueues();
+  }
+
+  @Deprecated 
+  public JobQueueInfo[] getJobQueues() throws IOException {
     return queueManager.getJobQueueInfos();
   }
 
-
-  @Override
+  @Deprecated 
   public JobQueueInfo getQueueInfo(String queue) throws IOException {
     return queueManager.getJobQueueInfo(queue);
   }
 
+  private QueueInfo[] getQueueInfoArray(JobQueueInfo[] queues) 
+      throws IOException {
+    for (JobQueueInfo queue : queues) {
+      queue.setJobStatuses(getJobsFromQueue(queue.getQueueName()));
+    }
+    return queues;
+  }
+  
   @Override
-  public JobStatus[] getJobsFromQueue(String queue) throws IOException {
+  public QueueInfo[] getQueues() throws IOException {
+    return getQueueInfoArray(queueManager.getJobQueueInfos());
+  }
+
+  @Override
+  public QueueInfo getQueue(String queue) throws IOException {
+    JobQueueInfo jqueue = queueManager.getJobQueueInfo(queue);
+    jqueue.setJobStatuses(getJobsFromQueue(jqueue.getQueueName()));
+    return jqueue;
+  }
+
+  public org.apache.hadoop.mapreduce.JobStatus[] getJobsFromQueue(String queue) 
+      throws IOException {
     Collection<JobInProgress> jips = taskScheduler.getJobs(queue);
     return getJobStatus(jips,false);
   }
   
   @Override
-  public QueueAclsInfo[] getQueueAclsForCurrentUser() throws IOException{
+  public org.apache.hadoop.mapreduce.QueueAclsInfo[] 
+      getQueueAclsForCurrentUser() throws IOException{
     return queueManager.getQueueAcls(
             UserGroupInformation.getCurrentUGI());
   }

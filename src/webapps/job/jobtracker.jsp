@@ -34,7 +34,7 @@
   ClusterStatus status = tracker.getClusterStatus();
   String trackerName = 
            StringUtils.simpleHostname(tracker.getJobTrackerMachine());
-  JobQueueInfo[] queues = tracker.getQueues();
+  JobQueueInfo[] queues = tracker.getJobQueues();
   Vector<JobInProgress> runningJobs = tracker.runningJobs();
   Vector<JobInProgress> completedJobs = tracker.completedJobs();
   Vector<JobInProgress> failedJobs = tracker.failedJobs();

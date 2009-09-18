@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,18 +15,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.mapred;
+package org.apache.hadoop.mapreduce;
 
 /**
- * Used to describe the priority of the running job. 
- * @deprecated Use {@link org.apache.hadoop.mapreduce.JobPriority} instead
+ * Used represent queue state
  */
-public enum JobPriority {
-
-  VERY_HIGH,
-  HIGH,
-  NORMAL,
-  LOW,
-  VERY_LOW;
+public enum QueueState {
+  STOPPED("stopped"), RUNNING("running");
   
+  private String str;
+  
+  QueueState(String str) {
+    this.str = str;
+  }
+  
+  public String toString() {
+    return str;
+  }
 }

@@ -376,8 +376,6 @@ public class TestSeveral extends TestCase {
 
     conf.set("hadoop.job.history.user.location", histDir.toString());
 
-    conf.setNumReduceTasks(numReduces);
-
     FileInputFormat.setInputPaths(conf, inDir);
     FileOutputFormat.setOutputPath(conf, outDir);
 

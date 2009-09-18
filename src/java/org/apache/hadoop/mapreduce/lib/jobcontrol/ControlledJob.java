@@ -228,7 +228,7 @@ public class ControlledJob {
     return this.state == State.READY;
   }
 
-  public void killJob() throws IOException {
+  public void killJob() throws IOException, InterruptedException {
     job.killJob();
   }
   
@@ -236,7 +236,7 @@ public class ControlledJob {
    * Check the state of this running job. The state may 
    * remain the same, become SUCCESS or FAILED.
    */
-  private void checkRunningState() {
+  private void checkRunningState() throws IOException, InterruptedException {
     try {
       if (job.isComplete()) {
         if (job.isSuccessful()) {
@@ -261,7 +261,7 @@ public class ControlledJob {
    * Check and update the state of this job. The state changes  
    * depending on its current state and the states of the depending jobs.
    */
-   synchronized State checkState() {
+   synchronized State checkState() throws IOException, InterruptedException {
     if (this.state == State.RUNNING) {
       checkRunningState();
     }

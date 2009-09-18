@@ -28,9 +28,10 @@ import junit.framework.TestSuite;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.FakeObjectUtilities.FakeJobHistory;
 import org.apache.hadoop.mapred.FakeObjectUtilities.FakeJobTracker;
-import org.apache.hadoop.mapred.JobClient.RawSplit;
 import org.apache.hadoop.mapred.UtilsForTests.FakeClock;
+import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobCounter;
+import org.apache.hadoop.mapreduce.Job.RawSplit;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.StaticMapping;
 
@@ -91,7 +92,7 @@ public class TestRackAwareTaskPlacement extends TestCase {
 
     @Override
     public void initTasks() throws IOException {
-      JobClient.RawSplit[] splits = createSplits();
+      Job.RawSplit[] splits = createSplits();
       numMapTasks = splits.length;
       createMapTasks(null, splits);
       nonRunningMapCache = createCache(splits, maxLevel);
@@ -101,8 +102,8 @@ public class TestRackAwareTaskPlacement extends TestCase {
     }
   
 
-    protected JobClient.RawSplit[] createSplits() throws IOException {
-      RawSplit[] splits = new RawSplit[numMaps];
+    protected Job.RawSplit[] createSplits() throws IOException {
+      Job.RawSplit[] splits = new Job.RawSplit[numMaps];
       // Hand code for now. 
       // M0,2,3 reside in Host1
       // M1 resides in Host3
@@ -110,7 +111,7 @@ public class TestRackAwareTaskPlacement extends TestCase {
       String[] splitHosts0 = new String[] { allHosts[0] };
 
       for (int i = 0; i < numMaps; i++) {
-        splits[i] = new RawSplit();
+        splits[i] = new Job.RawSplit();
         splits[i].setDataLength(0);
       }
 

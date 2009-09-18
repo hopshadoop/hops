@@ -17,42 +17,29 @@
  */
 package org.apache.hadoop.mapred;
 
-import java.io.DataInput;
-import java.io.DataOutput;
-import java.io.IOException;
-import java.util.List;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 
-import org.apache.hadoop.io.Text;
-import org.apache.hadoop.io.Writable;
+import org.apache.hadoop.mapreduce.QueueInfo;
+import org.apache.hadoop.mapreduce.QueueState;
 
 /**
  * Class that contains the information regarding the Job Queues which are 
  * maintained by the Hadoop Map/Reduce framework.
- * 
+ * @deprecated Use {@link QueueInfo} instead
  */
-
-public class JobQueueInfo implements Writable {
-
-  private String queueName = "";
-  //The scheduling Information object is read back as String.
-  //Once the scheduling information is set there is no way to recover it.
-  private String schedulingInfo; 
-  
-  private String queueState;
-
-  private List<JobQueueInfo> children;
-
-  private Properties props;
+@Deprecated
+public class JobQueueInfo extends QueueInfo {
 
   /**
    * Default constructor for Job Queue Info.
    * 
    */
   public JobQueueInfo() {
-    children = new ArrayList<JobQueueInfo>();
+    super();  
   }
+
   /**
    * Construct a new JobQueueInfo object using the queue name and the
    * scheduling information passed.
@@ -62,30 +49,24 @@ public class JobQueueInfo implements Writable {
    * queue
    */
   public JobQueueInfo(String queueName, String schedulingInfo) {
-    this.queueName = queueName;
-    this.schedulingInfo = schedulingInfo;
-    // make it running by default.
-    this.queueState = Queue.QueueState.RUNNING.getStateName();
-    children = new ArrayList<JobQueueInfo>();
+    super(queueName, schedulingInfo);
   }
   
+  JobQueueInfo(QueueInfo queue) {
+    this(queue.getQueueName(), queue.getSchedulingInfo());
+    setQueueState(queue.getState().name());
+    setQueueChildren(queue.getQueueChildren());
+    setProperties(queue.getProperties());
+    setJobStatuses(queue.getJobStatuses());
+  }
   
   /**
    * Set the queue name of the JobQueueInfo
    * 
    * @param queueName Name of the job queue.
    */
-  public void setQueueName(String queueName) {
-    this.queueName = queueName;
-  }
-
-  /**
-   * Get the queue name from JobQueueInfo
-   * 
-   * @return queue name
-   */
-  public String getQueueName() {
-    return queueName;
+  protected void setQueueName(String queueName) {
+    super.setQueueName(queueName);
   }
 
   /**
@@ -93,82 +74,44 @@ public class JobQueueInfo implements Writable {
    * 
    * @param schedulingInfo
    */
-  public void setSchedulingInfo(String schedulingInfo) {
-    this.schedulingInfo = schedulingInfo;
+  protected void setSchedulingInfo(String schedulingInfo) {
+    super.setSchedulingInfo(schedulingInfo);
   }
 
-  /**
-   * Gets the scheduling information associated to particular job queue.
-   * If nothing is set would return <b>"N/A"</b>
-   * 
-   * @return Scheduling information associated to particular Job Queue
-   */
-  public String getSchedulingInfo() {
-    if(schedulingInfo != null) {
-      return schedulingInfo;
-    }else {
-      return "N/A";
-    }
-  }
-  
   /**
    * Set the state of the queue
    * @param state state of the queue.
    */
-  public void setQueueState(String state) {
-    queueState = state;
+  protected void setQueueState(String state) {
+    super.setState(QueueState.valueOf(state));
   }
   
-  /**
-   * Return the queue state
-   * @return the queue state.
-   */
-  public String getQueueState() {
-    return queueState;
+  String getQueueState() {
+    return super.getState().toString();
+  }
+  
+  protected void setChildren(List<JobQueueInfo> children) {
+    List<QueueInfo> list = new ArrayList<QueueInfo>();
+    for (JobQueueInfo q : children) {
+      list.add(q);
+    }
+    super.setQueueChildren(list);
   }
 
   public List<JobQueueInfo> getChildren() {
-    return children;
-  }
-
-  public void setChildren(List<JobQueueInfo> children) {
-    this.children =  children; 
-  }
-
-  Properties getProperties() {
-    return props;
-  }
-
-  void setProperties(Properties props) {
-    this.props = props;
-  }
-
-  @Override
-  public void readFields(DataInput in) throws IOException {
-    queueName = Text.readString(in);
-    queueState = Text.readString(in);
-    schedulingInfo = Text.readString(in);
-    int count = in.readInt();
-    children.clear();
-    for (int i = 0; i < count; i++) {
-      JobQueueInfo childQueueInfo = new JobQueueInfo();
-      childQueueInfo.readFields(in);
-      children.add(childQueueInfo);
+    List<JobQueueInfo> list = new ArrayList<JobQueueInfo>();
+    for (QueueInfo q : super.getQueueChildren()) {
+      list.add(new JobQueueInfo(q));
     }
+    return list;
   }
 
-  @Override
-  public void write(DataOutput out) throws IOException {
-    Text.writeString(out, queueName);
-    Text.writeString(out, queueState);
-    if (schedulingInfo != null) {
-      Text.writeString(out, schedulingInfo);
-    } else {
-      Text.writeString(out, "N/A");
-    }
-    out.writeInt(children.size());
-    for(JobQueueInfo childQueueInfo : children) {
-      childQueueInfo.write(out);
-    }
+  protected void setProperties(Properties props) {
+    super.setProperties(props);
   }
+  
+  protected void setJobStatuses(org.apache.hadoop.mapreduce.JobStatus[] stats) {
+    super.setJobStatuses(stats);
+  }
+
 }

@@ -29,6 +29,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.TaskStatus.Phase;
+import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.jobhistory.HistoryEvent;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistory;
@@ -71,7 +72,7 @@ public class FakeObjectUtilities {
   }
 
   static class FakeJobInProgress extends JobInProgress {
-    JobClient.RawSplit[] rawSplits;
+    Job.RawSplit[] rawSplits;
     @SuppressWarnings("deprecation")
     FakeJobInProgress(JobConf jobConf, JobTracker tracker) throws IOException {
       super(new JobID(jtIdentifier, ++jobCounter), jobConf, tracker);
@@ -85,7 +86,7 @@ public class FakeObjectUtilities {
     @Override
     public synchronized void initTasks() throws IOException {
      
-      JobClient.RawSplit[] splits = createSplits();
+      Job.RawSplit[] splits = createSplits();
       numMapTasks = splits.length;
       createMapTasks(null, splits);
       nonRunningMapCache = createCache(splits, maxLevel);
@@ -95,17 +96,17 @@ public class FakeObjectUtilities {
     }
     
     @Override
-    JobClient.RawSplit[] createSplits(){
-      JobClient.RawSplit[] splits = new JobClient.RawSplit[numMapTasks];
+    Job.RawSplit[] createSplits(){
+      Job.RawSplit[] splits = new Job.RawSplit[numMapTasks];
       for (int i = 0; i < numMapTasks; i++) {
-        splits[i] = new JobClient.RawSplit();
+        splits[i] = new Job.RawSplit();
         splits[i].setLocations(new String[0]);
       }
       return splits;
     }
     
     @Override
-    protected void createMapTasks(String ignored, JobClient.RawSplit[] splits) {
+    protected void createMapTasks(String ignored, Job.RawSplit[] splits) {
       maps = new TaskInProgress[numMapTasks];
       for (int i = 0; i < numMapTasks; i++) {
         maps[i] = new TaskInProgress(getJobID(), "test", 

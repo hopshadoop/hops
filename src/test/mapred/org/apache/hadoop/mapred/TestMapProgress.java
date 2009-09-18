@@ -27,9 +27,10 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.BytesWritable;
+import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.OutputFormat;
+import org.apache.hadoop.mapreduce.Job.RawSplit;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
-import org.apache.hadoop.mapred.JobClient.RawSplit;
 
 /**
  *  Validates map phase progress.
@@ -139,7 +140,7 @@ public class TestMapProgress extends TestCase {
     jobId = taskId.getJobID();
     
     JobContext jContext = new JobContext(job, jobId);
-    RawSplit[] rawSplits = LocalJobRunner.getRawSplits(jContext, job);
+    Job.RawSplit[] rawSplits = LocalJobRunner.getRawSplits(jContext, job);
 
     job.setUseNewMapper(true); // use new api
     for (int i = 0; i < rawSplits.length; i++) {// rawSplits.length is 1

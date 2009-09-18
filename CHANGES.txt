@@ -108,6 +108,9 @@ Trunk (unreleased changes)
     MAPREDUCE-862. Enhance JobTracker UI to display hierarchical queues.
     (V.V.Chaitanya Krishna via yhemanth)
 
+    MAPREDUCE-777. Brand new apis to track and query jobs as a
+    replacement for JobClient. (Amareshwari Sriramadasu via acmurthy)
+
   IMPROVEMENTS
 
     MAPREDUCE-816. Rename "local" mysql import to "direct" in Sqoop.

@@ -1152,7 +1152,7 @@ public class TaskTracker
     List <TaskCompletionEvent> recentMapEvents = 
       new ArrayList<TaskCompletionEvent>();
     for (int i = 0; i < t.length; i++) {
-      if (t[i].isMap) {
+      if (t[i].isMapTask()) {
         recentMapEvents.add(t[i]);
       }
     }

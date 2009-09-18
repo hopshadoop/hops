@@ -30,6 +30,7 @@ import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.lib.IdentityReducer;
+import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.TaskType;
 
 public class TestTaskFail extends TestCase {
@@ -179,7 +180,7 @@ public class TestTaskFail extends TestCase {
       JobConf jobConf = mr.createJobConf();
       // turn down the completion poll interval from the 5 second default
       // for better test performance.
-      jobConf.set(JobClient.NetworkedJob.COMPLETION_POLL_INTERVAL_KEY, "50");
+      jobConf.set(Job.COMPLETION_POLL_INTERVAL_KEY, "50");
       jobConf.setOutputCommitter(CommitterWithLogs.class);
       RunningJob rJob = launchJob(jobConf, inDir, outDir, input);
       rJob.waitForCompletion();

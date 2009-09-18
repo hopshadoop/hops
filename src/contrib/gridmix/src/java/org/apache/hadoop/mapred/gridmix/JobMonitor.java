@@ -118,7 +118,7 @@ class JobMonitor implements Gridmix.Component<Job> {
     /**
      * Check a job for success or failure.
      */
-    public void process(Job job) throws IOException {
+    public void process(Job job) throws IOException, InterruptedException {
       if (job.isSuccessful()) {
         onSuccess(job);
       } else {

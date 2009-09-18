@@ -18,7 +18,9 @@
 package org.apache.hadoop.mapred;
 
 import junit.framework.TestCase;
-import org.apache.hadoop.mapred.JobClient.RawSplit;
+
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Job.RawSplit;
 
 public class TestResourceEstimation extends TestCase {
   
@@ -44,7 +46,7 @@ public class TestResourceEstimation extends TestCase {
       
       TaskStatus ts = new MapTaskStatus();
       ts.setOutputSize(singleMapOutputSize);
-      RawSplit split = new RawSplit();
+      Job.RawSplit split = new Job.RawSplit();
       split.setDataLength(0);
       TaskInProgress tip = new TaskInProgress(jid, "", split, null, jc, jip, 0, 1);
       re.updateWithCompletedTask(ts, tip);
@@ -79,7 +81,7 @@ public class TestResourceEstimation extends TestCase {
       
       TaskStatus ts = new MapTaskStatus();
       ts.setOutputSize(singleMapOutputSize);
-      RawSplit split = new RawSplit();
+      Job.RawSplit split = new Job.RawSplit();
       split.setDataLength(singleMapInputSize);
       TaskInProgress tip = new TaskInProgress(jid, "", split, null, jc, jip, 0, 1);
       re.updateWithCompletedTask(ts, tip);
@@ -91,7 +93,7 @@ public class TestResourceEstimation extends TestCase {
     //add one more map task with input size as 0
     TaskStatus ts = new MapTaskStatus();
     ts.setOutputSize(singleMapOutputSize);
-    RawSplit split = new RawSplit();
+    Job.RawSplit split = new Job.RawSplit();
     split.setDataLength(0);
     TaskInProgress tip = new TaskInProgress(jid, "", split, null, jc, jip, 0, 1);
     re.updateWithCompletedTask(ts, tip);
