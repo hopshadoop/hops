@@ -681,3 +681,5 @@ Trunk (unreleased changes)
     MAPREDUCE-941. Vaidya script fails on Solaris. (Chad Metcalf
     via tomwhite)
 
+    MAPREDUCE-923. Sqoop classpath breaks for jar files with a
+    plus sign in their names. (Aaron Kimball via tomwhite)
