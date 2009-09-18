@@ -1423,8 +1423,10 @@ public class DistCp implements Tool {
     checkDuplication(jobfs, dstfilelist, sorted, conf);
 
     if (dststatus != null && args.flags.contains(Options.DELETE)) {
-      deleteNonexisting(dstfs, dststatus, sorted,
+      long deletedPathsCount = deleteNonexisting(dstfs, dststatus, sorted,
           jobfs, jobDirectory, jobConf, conf);
+      LOG.info("deletedPathsFromDestCount(files+directories)=" +
+               deletedPathsCount);
     }
 
     Path tmpDir = new Path(
@@ -1499,8 +1501,13 @@ public class DistCp implements Tool {
     }
   }
   
-  /** Delete the dst files/dirs which do not exist in src */
-  static private void deleteNonexisting(
+  /**
+   * Delete the dst files/dirs which do not exist in src
+   * 
+   * @return total count of files and directories deleted from destination
+   * @throws IOException
+   */
+  static private long deleteNonexisting(
       FileSystem dstfs, FileStatus dstroot, Path dstsorted,
       FileSystem jobfs, Path jobdir, JobConf jobconf, Configuration conf
       ) throws IOException {
@@ -1541,6 +1548,7 @@ public class DistCp implements Tool {
     //compare lsr list and dst list  
     SequenceFile.Reader lsrin = null;
     SequenceFile.Reader dstin = null;
+    long deletedPathsCount = 0;
     try {
       lsrin = new SequenceFile.Reader(jobfs, sortedlsr, jobconf);
       dstin = new SequenceFile.Reader(jobfs, dstsorted, jobconf);
@@ -1568,6 +1576,7 @@ public class DistCp implements Tool {
         else {
           //lsrpath does not exist, delete it
           String s = new Path(dstroot.getPath(), lsrpath.toString()).toString();
+          ++deletedPathsCount;
           if (shellargs[1] == null || !isAncestorPath(shellargs[1], s)) {
             shellargs[1] = s;
             int r = 0;
@@ -1587,6 +1596,7 @@ public class DistCp implements Tool {
       checkAndClose(lsrin);
       checkAndClose(dstin);
     }
+    return deletedPathsCount;
   }
 
   //is x an ancestor path of y?

@@ -372,6 +372,9 @@ Trunk (unreleased changes)
     file data to be copied, without actually performing the copy. (Ravi Gummadi
     via cdouglas)
 
+    MAPREDUCE-664. Display the number of files deleted by distcp when the
+    -delete option is specified. (Ravi Gummadi via cdouglas)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 
