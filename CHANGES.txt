@@ -361,6 +361,10 @@ Trunk (unreleased changes)
     MAPREDUCE-916. Split the documentation to match the project split.
     (Corinne Chandel via omalley)
 
+    MAPREDUCE-649. Validate a copy by comparing the source and destination
+    checksums in distcp. Also adds an intra-task retry mechanism for errors
+    detected during the copy. (Ravi Gummadi via cdouglas)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 
