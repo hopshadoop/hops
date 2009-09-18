@@ -101,6 +101,9 @@ public class DistCp implements Tool {
     "\n-filelimit <n>         Limit the total number of files to be <= n" +
     "\n-sizelimit <n>         Limit the total size to be <= n bytes" +
     "\n-delete                Delete the files existing in the dst but not in src" +
+    "\n-dryrun                Display count of files and total size of files" +
+    "\n                        in src and then exit. Copy is not done at all." +
+    "\n                        desturl should not be speicified with out -update." +
     "\n-mapredSslConf <f>     Filename of SSL configuration for mapper task" +
     
     "\n\nNOTE 1: if -overwrite or -update are set, each source URI is " +
@@ -431,11 +434,15 @@ public class DistCp implements Tool {
       FSDataOutputStream out = null;
       long bytesCopied = 0L;
       try {
+        Path srcPath = srcstat.getPath();
         // open src file
-        in = srcstat.getPath().getFileSystem(job).open(srcstat.getPath());
+        in = srcPath.getFileSystem(job).open(srcPath);
         reporter.incrCounter(Counter.BYTESEXPECTED, srcstat.getLen());
         // open tmp file
         out = create(tmpfile, reporter, srcstat);
+        LOG.info("Copying file " + srcPath + " of size " +
+                 srcstat.getLen() + " bytes...");
+        
         // copy file
         for(int bytesRead; (bytesRead = in.read(buffer)) >= 0; ) {
           out.write(buffer, 0, bytesRead);
@@ -714,7 +721,7 @@ public class DistCp implements Tool {
 
     final Path dst = new Path(destPath);
     copy(conf, new Arguments(tmp, null, dst, logPath, flags, null,
-        Long.MAX_VALUE, Long.MAX_VALUE, null));
+        Long.MAX_VALUE, Long.MAX_VALUE, null, false));
   }
 
   /** Sanity check for srcPath */
@@ -748,7 +755,9 @@ public class DistCp implements Tool {
   static void copy(final Configuration conf, final Arguments args
       ) throws IOException {
     LOG.info("srcPaths=" + args.srcs);
-    LOG.info("destPath=" + args.dst);
+    if (!args.dryrun || args.flags.contains(Options.UPDATE)) {
+      LOG.info("destPath=" + args.dst);
+    }
     checkSrcPath(conf, args.srcs);
 
     JobConf job = createJobConf(conf);
@@ -764,10 +773,14 @@ public class DistCp implements Tool {
       if (setup(conf, job, args)) {
         JobClient.runJob(job);
       }
-      finalize(conf, job, args.dst, args.preservedAttributes);
+      if(!args.dryrun) {
+        finalize(conf, job, args.dst, args.preservedAttributes);
+      }
     } finally {
-      //delete tmp
-      fullyDelete(job.get(TMP_DIR_LABEL), job);
+      if (!args.dryrun) {
+        //delete tmp
+        fullyDelete(job.get(TMP_DIR_LABEL), job);
+      }
       //delete jobDirectory
       fullyDelete(job.get(JOB_DIR_LABEL), job);
     }
@@ -838,6 +851,7 @@ public class DistCp implements Tool {
     final long filelimit;
     final long sizelimit;
     final String mapredSslConf;
+    final boolean dryrun;
     
     /**
      * Arguments for distcp
@@ -852,7 +866,8 @@ public class DistCp implements Tool {
      */
     Arguments(List<Path> srcs, Path basedir, Path dst, Path log,
         EnumSet<Options> flags, String preservedAttributes,
-        long filelimit, long sizelimit, String mapredSslConf) {
+        long filelimit, long sizelimit, String mapredSslConf,
+        boolean dryrun) {
       this.srcs = srcs;
       this.basedir = basedir;
       this.dst = dst;
@@ -862,6 +877,7 @@ public class DistCp implements Tool {
       this.filelimit = filelimit;
       this.sizelimit = sizelimit;
       this.mapredSslConf = mapredSslConf;
+      this.dryrun = dryrun;
       
       if (LOG.isTraceEnabled()) {
         LOG.trace("this = " + this);
@@ -879,6 +895,7 @@ public class DistCp implements Tool {
       String mapredSslConf = null;
       long filelimit = Long.MAX_VALUE;
       long sizelimit = Long.MAX_VALUE;
+      boolean dryrun = false;
 
       for (int idx = 0; idx < args.length; idx++) {
         Options[] opt = Options.values();
@@ -917,6 +934,9 @@ public class DistCp implements Tool {
             throw new IllegalArgumentException("ssl conf file not specified in -mapredSslConf");
           }
           mapredSslConf = args[idx];
+        } else if ("-dryrun".equals(args[idx])) {
+          dryrun = true;
+          dst = new Path("/tmp/distcp_dummy_dest");//dummy destination
         } else if ("-m".equals(args[idx])) {
           if (++idx == args.length) {
             throw new IllegalArgumentException("num_maps not specified in -m");
@@ -929,7 +949,8 @@ public class DistCp implements Tool {
           }
         } else if ('-' == args[idx].codePointAt(0)) {
           throw new IllegalArgumentException("Invalid switch " + args[idx]);
-        } else if (idx == args.length -1) {
+        } else if (idx == args.length -1 &&
+                   (!dryrun || flags.contains(Options.UPDATE))) {
           dst = new Path(args[idx]);
         } else {
           srcs.add(new Path(args[idx]));
@@ -953,7 +974,7 @@ public class DistCp implements Tool {
             + Options.UPDATE + ".");
       }
       return new Arguments(srcs, basedir, dst, log, flags, presevedAttributes,
-          filelimit, sizelimit, mapredSslConf);
+          filelimit, sizelimit, mapredSslConf, dryrun);
     }
     
     /** {@inheritDoc} */
@@ -1150,7 +1171,8 @@ public class DistCp implements Tool {
 
     //set boolean values
     final boolean update = args.flags.contains(Options.UPDATE);
-    final boolean overwrite = !update && args.flags.contains(Options.OVERWRITE);
+    final boolean overwrite = !update && args.flags.contains(Options.OVERWRITE)
+                              && !args.dryrun;
     jobConf.setBoolean(Options.UPDATE.propertyname, update);
     jobConf.setBoolean(Options.OVERWRITE.propertyname, overwrite);
     jobConf.setBoolean(Options.IGNORE_READ_FAILURES.propertyname,
@@ -1218,7 +1240,8 @@ public class DistCp implements Tool {
     final boolean special =
       (args.srcs.size() == 1 && !dstExists) || update || overwrite;
     int srcCount = 0, cnsyncf = 0, dirsyn = 0;
-    long fileCount = 0L, dirCount = 0L, byteCount = 0L, cbsyncs = 0L;
+    long fileCount = 0L, dirCount = 0L, byteCount = 0L, cbsyncs = 0L,
+         skipFileCount = 0L, skipByteCount = 0L;
     
     Path basedir = null;
     HashSet<Path> parentDirsToCopy = new HashSet<Path>(); 
@@ -1327,6 +1350,13 @@ public class DistCp implements Tool {
                   cbsyncs = 0L;
                 }
               }
+              else {
+                ++skipFileCount;
+                skipByteCount += child.getLen();
+                if (LOG.isTraceEnabled()) {
+                  LOG.trace("skipping file " + child.getPath());
+                }
+              }
             }
 
             if (!skipPath) {
@@ -1353,7 +1383,17 @@ public class DistCp implements Tool {
       checkAndClose(dst_writer);
       checkAndClose(dir_writer);
     }
-
+    LOG.info("sourcePathsCount(files+directories)=" + srcCount);
+    LOG.info("filesToCopyCount=" + fileCount);
+    LOG.info("bytesToCopyCount=" + StringUtils.humanReadableInt(byteCount));
+    if (update) {
+      LOG.info("filesToSkipCopyCount=" + skipFileCount);
+      LOG.info("bytesToSkipCopyCount=" +
+               StringUtils.humanReadableInt(skipByteCount));
+    }
+    if (args.dryrun) {
+      return false;
+    }
     int mapCount = setMapCount(byteCount, jobConf);
     // Increase the replication of _distcp_src_files, if needed
     setReplication(conf, jobConf, srcfilelist, mapCount);

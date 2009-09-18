@@ -365,6 +365,10 @@ Trunk (unreleased changes)
     checksums in distcp. Also adds an intra-task retry mechanism for errors
     detected during the copy. (Ravi Gummadi via cdouglas)
 
+    MAPREDUCE-654. Add a -dryrun option to distcp printing a summary of the
+    file data to be copied, without actually performing the copy. (Ravi Gummadi
+    via cdouglas)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 
