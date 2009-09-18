@@ -381,6 +381,9 @@ Trunk (unreleased changes)
     MAPREDUCE-975. Add an API in job client to get the history file url for 
     a given job id. (sharad)
 
+    MAPREDUCE-905. Add Eclipse launch tasks for MapReduce. (Philip Zeyliger
+    via tomwhite)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 
