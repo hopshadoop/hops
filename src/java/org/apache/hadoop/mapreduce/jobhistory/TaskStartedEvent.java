@@ -22,27 +22,15 @@ import java.io.IOException;
 
 import org.apache.hadoop.mapreduce.TaskID;
 import org.apache.hadoop.mapreduce.TaskType;
-import org.codehaus.jackson.JsonGenerator;
-import org.codehaus.jackson.JsonParser;
-import org.codehaus.jackson.JsonToken;
+
+import org.apache.avro.util.Utf8;
 
 /**
  * Event to record the start of a task
  *
  */
 public class TaskStartedEvent implements HistoryEvent {
-
-  private EventCategory category;
-  private TaskID taskid;
-  private TaskType taskType;
-  private  long startTime;
-  private  String splitLocations;
-
-  enum EventFields { EVENT_CATEGORY,
-                     TASK_ID,
-                     TASK_TYPE,
-                     START_TIME,
-                     SPLIT_LOCATIONS }
+  private Events.TaskStarted datum = new Events.TaskStarted();
 
   /**
    * Create an event to record start of a task
@@ -53,71 +41,30 @@ public class TaskStartedEvent implements HistoryEvent {
    */
   public TaskStartedEvent(TaskID id, long startTime, 
       TaskType taskType, String splitLocations) {
-    this.taskid = id;
-    this.splitLocations = splitLocations;
-    this.startTime = startTime;
-    this.taskType = taskType;
-    this.category = EventCategory.TASK;
+    datum.taskid = new Utf8(id.toString());
+    datum.splitLocations = new Utf8(splitLocations);
+    datum.startTime = startTime;
+    datum.taskType = new Utf8(taskType.name());
   }
 
-  TaskStartedEvent() {
-  }
+  TaskStartedEvent() {}
+
+  public Object getDatum() { return datum; }
+  public void setDatum(Object datum) { this.datum = (Events.TaskStarted)datum; }
 
   /** Get the task id */
-  public TaskID getTaskId() { return taskid; }
-  /** Get the event category */
-  public EventCategory getEventCategory() { return category; }
+  public TaskID getTaskId() { return TaskID.forName(datum.taskid.toString()); }
   /** Get the split locations, applicable for map tasks */
-  public String getSplitLocations() { return splitLocations; }
+  public String getSplitLocations() { return datum.splitLocations.toString(); }
   /** Get the start time of the task */
-  public long getStartTime() { return startTime; }
+  public long getStartTime() { return datum.startTime; }
   /** Get the task type */
-  public TaskType getTaskType() { return taskType; }
+  public TaskType getTaskType() {
+    return TaskType.valueOf(datum.taskType.toString());
+  }
   /** Get the event type */
-  public EventType getEventType() {
-    return EventType.TASK_STARTED;
+  public Events.EventType getEventType() {
+    return Events.EventType.TASK_STARTED;
   }
 
-  public void readFields(JsonParser jp) throws IOException {
-    if (jp.nextToken() != JsonToken.START_OBJECT) {
-      throw new IOException("Unexpected Token while reading");
-    }
-    
-    while (jp.nextToken() != JsonToken.END_OBJECT) {
-      String fieldName = jp.getCurrentName();
-      jp.nextToken(); // Move to the value
-      switch (Enum.valueOf(EventFields.class, fieldName)) {
-      case EVENT_CATEGORY:
-        category = Enum.valueOf(EventCategory.class, jp.getText());
-        break;
-      case TASK_ID:
-        taskid = TaskID.forName(jp.getText());
-        break;
-      case TASK_TYPE:
-        taskType = TaskType.valueOf(jp.getText());
-        break;
-      case START_TIME:
-        startTime = jp.getLongValue();
-        break;
-      case SPLIT_LOCATIONS:
-        splitLocations = jp.getText();
-        break;
-      default: 
-        throw new IOException("Unrecognized field '"+fieldName+"'!");
-      }
-    }
-  }
-
-  public void writeFields(JsonGenerator gen) throws IOException {
-    gen.writeStartObject();
-    gen.writeStringField(EventFields.EVENT_CATEGORY.toString(),
-        category.toString());
-    gen.writeStringField(EventFields.TASK_ID.toString(), taskid.toString());
-    gen.writeStringField(EventFields.TASK_TYPE.toString(),
-        taskType.toString());
-    gen.writeNumberField(EventFields.START_TIME.toString(), startTime);
-    gen.writeStringField(EventFields.SPLIT_LOCATIONS.toString(),
-        splitLocations);
-    gen.writeEndObject();
-  }
 }

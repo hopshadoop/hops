@@ -21,29 +21,15 @@ package org.apache.hadoop.mapreduce.jobhistory;
 import java.io.IOException;
 
 import org.apache.hadoop.mapreduce.JobID;
-import org.codehaus.jackson.JsonGenerator;
-import org.codehaus.jackson.JsonParser;
-import org.codehaus.jackson.JsonToken;
+
+import org.apache.avro.util.Utf8;
 
 /**
  * Event to record the submission of a job
  *
  */
 public class JobSubmittedEvent implements HistoryEvent {
-
-  private EventCategory category;
-  private JobID jobid;
-  private  String jobName;
-  private  String userName;
-  private  long submitTime;
-  private  String jobConfPath;
-
-  enum EventFields { EVENT_CATEGORY,
-                     JOB_ID,
-                     JOB_NAME,
-                     USER_NAME,
-                     SUBMIT_TIME,
-                     JOB_CONF_PATH }
+  private Events.JobSubmitted datum = new Events.JobSubmitted();
 
   /**
    * Create an event to record job submission
@@ -55,64 +41,31 @@ public class JobSubmittedEvent implements HistoryEvent {
    */
   public JobSubmittedEvent(JobID id, String jobName, String userName,
       long submitTime, String jobConfPath) {
-    this.jobid = id;
-    this.jobName = jobName;
-    this.userName = userName;
-    this.submitTime = submitTime;
-    this.jobConfPath = jobConfPath;
-    this.category = EventCategory.JOB;
+    datum.jobid = new Utf8(id.toString());
+    datum.jobName = new Utf8(jobName);
+    datum.userName = new Utf8(userName);
+    datum.submitTime = submitTime;
+    datum.jobConfPath = new Utf8(jobConfPath);
   }
 
-  JobSubmittedEvent() {
+  JobSubmittedEvent() {}
+
+  public Object getDatum() { return datum; }
+  public void setDatum(Object datum) {
+    this.datum = (Events.JobSubmitted)datum;
   }
 
   /** Get the Job Id */
-  public JobID getJobId() { return jobid; }
+  public JobID getJobId() { return JobID.forName(datum.jobid.toString()); }
   /** Get the Job name */
-  public String getJobName() { return jobName; }
+  public String getJobName() { return datum.jobName.toString(); }
   /** Get the user name */
-  public String getUserName() { return userName; }
-  /** Get the event category */
-  public EventCategory getEventCategory() { return category; }
+  public String getUserName() { return datum.userName.toString(); }
   /** Get the submit time */
-  public long getSubmitTime() { return submitTime; }
+  public long getSubmitTime() { return datum.submitTime; }
   /** Get the Path for the Job Configuration file */
-  public String getJobConfPath() { return jobConfPath; }
+  public String getJobConfPath() { return datum.jobConfPath.toString(); }
   /** Get the event type */
-  public EventType getEventType() { return EventType.JOB_SUBMITTED; }
+  public Events.EventType getEventType() { return Events.EventType.JOB_SUBMITTED; }
 
-  public void readFields(JsonParser jp) throws IOException {
-    if (jp.nextToken() != JsonToken.START_OBJECT) {
-      throw new IOException("Unexpected Token while reading");
-    }
-    
-    while (jp.nextToken() != JsonToken.END_OBJECT) {
-      String fieldName = jp.getCurrentName();
-      jp.nextToken(); // Move to the value
-      switch (Enum.valueOf(EventFields.class, fieldName)) {
-      case EVENT_CATEGORY:
-        category = Enum.valueOf(EventCategory.class, jp.getText());
-        break;
-      case JOB_ID: jobid = JobID.forName(jp.getText()); break;
-      case JOB_NAME: jobName = jp.getText(); break;
-      case USER_NAME: userName = jp.getText(); break;
-      case SUBMIT_TIME: submitTime = (long) jp.getLongValue(); break;
-      case JOB_CONF_PATH: jobConfPath = jp.getText(); break;
-      default: 
-        throw new IOException("Unrecognized field '"+fieldName+"'!");
-      }
-    }
-  }
-
-  public void writeFields(JsonGenerator gen) throws IOException {
-    gen.writeStartObject();
-    gen.writeStringField(EventFields.EVENT_CATEGORY.toString(),
-        category.toString());
-    gen.writeStringField(EventFields.JOB_ID.toString(), jobid.toString());
-    gen.writeStringField(EventFields.JOB_NAME.toString(), jobName);
-    gen.writeStringField(EventFields.USER_NAME.toString(), userName);
-    gen.writeNumberField(EventFields.SUBMIT_TIME.toString(), submitTime);
-    gen.writeStringField(EventFields.JOB_CONF_PATH.toString(), jobConfPath);
-    gen.writeEndObject();
-  }
 }

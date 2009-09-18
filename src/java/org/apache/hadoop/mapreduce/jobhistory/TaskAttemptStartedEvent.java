@@ -23,31 +23,15 @@ import java.io.IOException;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskID;
 import org.apache.hadoop.mapreduce.TaskType;
-import org.codehaus.jackson.JsonGenerator;
-import org.codehaus.jackson.JsonParser;
-import org.codehaus.jackson.JsonToken;
+
+import org.apache.avro.util.Utf8;
 
 /**
  * Event to record start of a task attempt
  *
  */
 public class TaskAttemptStartedEvent implements HistoryEvent {
-
-  private EventCategory category;
-  private TaskID taskid;
-  private TaskType taskType;
-  private TaskAttemptID attemptId;
-  private  long startTime;
-  private  String trackerName;
-  private int httpPort;
-
-  enum EventFields { EVENT_CATEGORY,
-                     TASK_ID,
-                     TASK_TYPE,
-                     TASK_ATTEMPT_ID,
-                     START_TIME,
-                     TRACKER_NAME,
-                     HTTP_PORT }
+  private Events.TaskAttemptStarted datum = new Events.TaskAttemptStarted();
 
   /**
    * Create an event to record the start of an attempt
@@ -60,85 +44,40 @@ public class TaskAttemptStartedEvent implements HistoryEvent {
   public TaskAttemptStartedEvent( TaskAttemptID attemptId,  
       TaskType taskType, long startTime, String trackerName,
       int httpPort) {
-    this.attemptId = attemptId;
-    this.taskid = attemptId.getTaskID();
-    this.startTime = startTime;
-    this.taskType = taskType;
-    this.trackerName = trackerName;
-    this.httpPort = httpPort;
-    this.category = EventCategory.TASK_ATTEMPT;
+    datum.attemptId = new Utf8(attemptId.toString());
+    datum.taskid = new Utf8(attemptId.getTaskID().toString());
+    datum.startTime = startTime;
+    datum.taskType = new Utf8(taskType.name());
+    datum.trackerName = new Utf8(trackerName);
+    datum.httpPort = httpPort;
   }
 
-  TaskAttemptStartedEvent() {
+  TaskAttemptStartedEvent() {}
+
+  public Object getDatum() { return datum; }
+  public void setDatum(Object datum) {
+    this.datum = (Events.TaskAttemptStarted)datum;
   }
 
   /** Get the task id */
-  public TaskID getTaskId() { return taskid; }
-  /** Get the event category */
-  public EventCategory getEventCategory() { return category; }
+  public TaskID getTaskId() { return TaskID.forName(datum.taskid.toString()); }
   /** Get the tracker name */
-  public String getTrackerName() { return trackerName; }
+  public String getTrackerName() { return datum.trackerName.toString(); }
   /** Get the start time */
-  public long getStartTime() { return startTime; }
+  public long getStartTime() { return datum.startTime; }
   /** Get the task type */
-  public TaskType getTaskType() { return taskType; }
+  public TaskType getTaskType() {
+    return TaskType.valueOf(datum.taskType.toString());
+  }
   /** Get the HTTP port */
-  public int getHttpPort() { return httpPort; }
+  public int getHttpPort() { return datum.httpPort; }
   /** Get the attempt id */
-  public TaskAttemptID getTaskAttemptId() { return attemptId; }
+  public TaskAttemptID getTaskAttemptId() {
+    return TaskAttemptID.forName(datum.attemptId.toString());
+  }
   /** Get the event type */
-  public EventType getEventType() {
-    return EventType.MAP_ATTEMPT_STARTED;
+  public Events.EventType getEventType() {
+    return Events.EventType.MAP_ATTEMPT_STARTED;
   }
 
-  public void readFields(JsonParser jp) throws IOException {
-    if (jp.nextToken() != JsonToken.START_OBJECT) {
-      throw new IOException("Unexpected Token while reading");
-    }
-    
-    while (jp.nextToken() != JsonToken.END_OBJECT) {
-      String fieldName = jp.getCurrentName();
-      jp.nextToken(); // Move to the value
-      switch (Enum.valueOf(EventFields.class, fieldName)) {
-      case EVENT_CATEGORY:
-        category = Enum.valueOf(EventCategory.class, jp.getText());
-        break;
-      case TASK_ID:
-        taskid = TaskID.forName(jp.getText());
-        break;
-      case TASK_ATTEMPT_ID: 
-        attemptId = TaskAttemptID.forName(jp.getText());
-        break;
-      case TASK_TYPE:
-        taskType = TaskType.valueOf(jp.getText());
-        break;
-      case START_TIME:
-        startTime = jp.getLongValue();
-        break;
-      case TRACKER_NAME:
-        trackerName = jp.getText();
-        break;
-      case HTTP_PORT:
-        httpPort = jp.getIntValue();
-        break;
-      default: 
-        throw new IOException("Unrecognized field '"+fieldName+"'!");
-      }
-    }
-  }
-
-  public void writeFields(JsonGenerator gen) throws IOException {
-    gen.writeStartObject();
-    gen.writeStringField(EventFields.EVENT_CATEGORY.toString(),
-        category.toString());
-    gen.writeStringField(EventFields.TASK_ID.toString(), taskid.toString());
-    gen.writeStringField(EventFields.TASK_ATTEMPT_ID.toString(),
-        attemptId.toString());
-    gen.writeStringField(EventFields.TASK_TYPE.toString(),
-        taskType.toString());
-    gen.writeNumberField(EventFields.START_TIME.toString(), startTime);
-    gen.writeStringField(EventFields.TRACKER_NAME.toString(), trackerName);
-    gen.writeNumberField(EventFields.HTTP_PORT.toString(), httpPort);
-    gen.writeEndObject();
-  }
 }

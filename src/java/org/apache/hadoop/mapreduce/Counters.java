@@ -41,6 +41,11 @@ public class Counters implements Writable,Iterable<CounterGroup> {
     }
   }
 
+  /** Add a group. */
+  public void addGroup(CounterGroup group) {
+    groups.put(group.getName(), group);
+  }
+
   public Counter findCounter(String groupName, String counterName) {
     CounterGroup grp = getGroup(groupName);
     return grp.findCounter(counterName);

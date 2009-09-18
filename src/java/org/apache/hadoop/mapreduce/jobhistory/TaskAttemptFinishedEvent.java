@@ -24,38 +24,15 @@ import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskID;
 import org.apache.hadoop.mapreduce.TaskType;
-import org.codehaus.jackson.JsonGenerator;
-import org.codehaus.jackson.JsonParser;
-import org.codehaus.jackson.JsonToken;
+
+import org.apache.avro.util.Utf8;
 
 /**
  * Event to record successful task completion
  *
  */
 public class TaskAttemptFinishedEvent  implements HistoryEvent {
-
-  private EventCategory category;
-  private TaskID taskid;
-  private TaskAttemptID attemptId;
-  private TaskType taskType;
-  private String taskStatus;
-  private long finishTime;
-  private String hostname;
-  private String state;
-  private Counters counters;
-
-  enum EventFields { EVENT_CATEGORY,
-    TASK_ID,
-    TASK_ATTEMPT_ID,
-    TASK_TYPE,
-    TASK_STATUS,
-    FINISH_TIME,
-    HOSTNAME,
-    STATE,
-    COUNTERS }
-
-  TaskAttemptFinishedEvent() {
-  }
+  private Events.TaskAttemptFinished datum = new Events.TaskAttemptFinished();
 
   /**
    * Create an event to record successful finishes for setup and cleanup 
@@ -72,97 +49,46 @@ public class TaskAttemptFinishedEvent  implements HistoryEvent {
       TaskType taskType, String taskStatus, 
       long finishTime,
       String hostname, String state, Counters counters) {
-    this.taskid = id.getTaskID();
-    this.attemptId = id;
-    this.taskType = taskType;
-    this.taskStatus = taskStatus;
-    this.finishTime = finishTime;
-    this.hostname = hostname;
-    this.state = state;
-    this.counters = counters;
-    this.category = EventCategory.TASK_ATTEMPT;
+    datum.taskid = new Utf8(id.getTaskID().toString());
+    datum.attemptId = new Utf8(id.toString());
+    datum.taskType = new Utf8(taskType.name());
+    datum.taskStatus = new Utf8(taskStatus);
+    datum.finishTime = finishTime;
+    datum.hostname = new Utf8(hostname);
+    datum.state = new Utf8(state);
+    datum.counters = EventWriter.toAvro(counters);
+  }
+
+  TaskAttemptFinishedEvent() {}
+
+  public Object getDatum() { return datum; }
+  public void setDatum(Object datum) {
+    this.datum = (Events.TaskAttemptFinished)datum;
   }
 
   /** Get the task ID */
-  public TaskID getTaskId() { return taskid; }
-  /** Get the event category */
-  public EventCategory getEventCategory() { return category; }
+  public TaskID getTaskId() { return TaskID.forName(datum.taskid.toString()); }
   /** Get the task attempt id */
-  public TaskAttemptID getAttemptId() { return attemptId; }
+  public TaskAttemptID getAttemptId() {
+    return TaskAttemptID.forName(datum.attemptId.toString());
+  }
   /** Get the task type */
-  public TaskType getTaskType() { return taskType; }
+  public TaskType getTaskType() {
+    return TaskType.valueOf(datum.taskType.toString());
+  }
   /** Get the task status */
-  public String getTaskStatus() { return taskStatus; }
+  public String getTaskStatus() { return datum.taskStatus.toString(); }
   /** Get the attempt finish time */
-  public long getFinishTime() { return finishTime; }
+  public long getFinishTime() { return datum.finishTime; }
   /** Get the host where the attempt executed */
-  public String getHostname() { return hostname; }
+  public String getHostname() { return datum.hostname.toString(); }
   /** Get the state string */
-  public String getState() { return state; }
+  public String getState() { return datum.state.toString(); }
   /** Get the counters for the attempt */
-  public Counters getCounters() { return counters; }
+  Counters getCounters() { return EventReader.fromAvro(datum.counters); }
   /** Get the event type */
-  public EventType getEventType() {
-    return EventType.MAP_ATTEMPT_FINISHED;
+  public Events.EventType getEventType() {
+    return Events.EventType.MAP_ATTEMPT_FINISHED;
   }
 
-  public void readFields(JsonParser jp) throws IOException {
-    if (jp.nextToken() != JsonToken.START_OBJECT) {
-      throw new IOException("Unexpected token while reading");
-    }
-
-    while (jp.nextToken() != JsonToken.END_OBJECT) {
-      String fieldname = jp.getCurrentName();
-      jp.nextToken(); // move to value
-      switch (Enum.valueOf(EventFields.class, fieldname)) {
-      case EVENT_CATEGORY:
-        category = Enum.valueOf(EventCategory.class, jp.getText());
-        break;
-      case TASK_ID:
-        taskid = TaskID.forName(jp.getText());
-        break;
-      case TASK_ATTEMPT_ID: 
-        attemptId = TaskAttemptID.forName(jp.getText());
-        break;
-      case TASK_TYPE:
-        taskType = TaskType.valueOf(jp.getText());
-        break;
-      case TASK_STATUS:
-        taskStatus = jp.getText();
-        break;
-      case FINISH_TIME:
-        finishTime = jp.getLongValue();
-        break;
-      case HOSTNAME:
-        hostname = jp.getText();
-        break;
-      case STATE:
-        state = jp.getText();
-        break;
-      case COUNTERS:
-        counters = EventReader.readCounters(jp);
-        break;
-      default: 
-        throw new IOException("Unrecognized field '"+fieldname+"'!");
-      }
-    }
-  }
-
-  public void writeFields(JsonGenerator gen) throws IOException {
-    gen.writeStartObject();
-    gen.writeStringField(EventFields.EVENT_CATEGORY.toString(),
-        category.toString());
-    gen.writeStringField(EventFields.TASK_ID.toString(), taskid.toString());
-    gen.writeStringField(EventFields.TASK_ATTEMPT_ID.toString(),
-        attemptId.toString());
-    gen.writeStringField(EventFields.TASK_TYPE.toString(), 
-        taskType.toString());
-    gen.writeStringField(EventFields.TASK_STATUS.toString(),
-        taskStatus);
-    gen.writeNumberField(EventFields.FINISH_TIME.toString(), finishTime);
-    gen.writeStringField(EventFields.HOSTNAME.toString(), hostname);
-    gen.writeStringField(EventFields.STATE.toString(), state);
-    EventWriter.writeCounters(counters, gen);
-    gen.writeEndObject();
-  }
 }

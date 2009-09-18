@@ -121,6 +121,8 @@ Trunk (unreleased changes)
     MAPREDUCE-679. XML-based metrics as JSP servlet for JobTracker.
     (Aaron Kimball via tomwhite)
 
+    MAPREDUCE-980. Modify JobHistory to use Avro for serialization. (cutting)
+
   IMPROVEMENTS
 
     MAPREDUCE-816. Rename "local" mysql import to "direct" in Sqoop.

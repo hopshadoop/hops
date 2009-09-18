@@ -65,7 +65,7 @@ public class JobHistoryParser {
    */
   public JobHistoryParser(FileSystem fs, Path historyFile) 
   throws IOException {
-    in = fs.open(historyFile);
+    this(fs.open(historyFile));
   }
   
   /**
@@ -105,7 +105,7 @@ public class JobHistoryParser {
   }
   
   private void handleEvent(HistoryEvent event) throws IOException { 
-    EventType type = event.getEventType();
+    Events.EventType type = event.getEventType();
 
     switch (type) {
     case JOB_SUBMITTED:

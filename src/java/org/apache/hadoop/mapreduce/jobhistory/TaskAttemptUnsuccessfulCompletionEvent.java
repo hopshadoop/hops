@@ -23,33 +23,16 @@ import java.io.IOException;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskID;
 import org.apache.hadoop.mapreduce.TaskType;
-import org.codehaus.jackson.JsonGenerator;
-import org.codehaus.jackson.JsonParser;
-import org.codehaus.jackson.JsonToken;
+
+import org.apache.avro.util.Utf8;
 
 /**
  * Event to record unsuccessful (Killed/Failed) completion of task attempts
  *
  */
 public class TaskAttemptUnsuccessfulCompletionEvent implements HistoryEvent {
-
-  private EventCategory category;
-  private TaskID taskid;
-  private TaskType taskType;
-  private TaskAttemptID attemptId;
-  private  long finishTime;
-  private String hostname;
-  private String status;
-  private  String error;
-
-  enum EventFields { EVENT_CATEGORY,
-    TASK_ID,
-    TASK_TYPE,
-    TASK_ATTEMPT_ID,
-    FINISH_TIME,
-    HOSTNAME,
-    STATUS,
-    ERROR }
+  private Events.TaskAttemptUnsuccessfulCompletion datum =
+    new Events.TaskAttemptUnsuccessfulCompletion();
 
   /** 
    * Create an event to record the unsuccessful completion of attempts
@@ -64,92 +47,43 @@ public class TaskAttemptUnsuccessfulCompletionEvent implements HistoryEvent {
       TaskType taskType,
       String status, long finishTime, 
       String hostname, String error) {
-    this.taskid = id.getTaskID();
-    this.taskType = taskType;
-    this.attemptId = id;
-    this.finishTime = finishTime;
-    this.hostname = hostname;
-    this.error = error;
-    this.status = status;
-    this.category = EventCategory.TASK_ATTEMPT;
+    datum.taskid = new Utf8(id.getTaskID().toString());
+    datum.taskType = new Utf8(taskType.name());
+    datum.attemptId = new Utf8(id.toString());
+    datum.finishTime = finishTime;
+    datum.hostname = new Utf8(hostname);
+    datum.error = new Utf8(error);
+    datum.status = new Utf8(status);
   }
 
-  TaskAttemptUnsuccessfulCompletionEvent() {
+  TaskAttemptUnsuccessfulCompletionEvent() {}
+
+  public Object getDatum() { return datum; }
+  public void setDatum(Object datum) {
+    this.datum = (Events.TaskAttemptUnsuccessfulCompletion)datum;
   }
 
-  /** Get the event category */
-  public EventCategory getEventCategory() { return category; }
   /** Get the task id */
-  public TaskID getTaskId() { return taskid; }
+  public TaskID getTaskId() { return TaskID.forName(datum.taskid.toString()); }
   /** Get the task type */
-  public TaskType getTaskType() { return taskType; }
+  public TaskType getTaskType() {
+    return TaskType.valueOf(datum.taskType.toString());
+  }
   /** Get the attempt id */
-  public TaskAttemptID getTaskAttemptId() { return attemptId; }
+  public TaskAttemptID getTaskAttemptId() {
+    return TaskAttemptID.forName(datum.attemptId.toString());
+  }
   /** Get the finish time */
-  public long getFinishTime() { return finishTime; }
+  public long getFinishTime() { return datum.finishTime; }
   /** Get the name of the host where the attempt executed */
-  public String getHostname() { return hostname; }
+  public String getHostname() { return datum.hostname.toString(); }
   /** Get the error string */
-  public String getError() { return error; }
+  public String getError() { return datum.error.toString(); }
   /** Get the task status */
-  public String getTaskStatus() { return status; }
+  public String getTaskStatus() { return datum.status.toString(); }
   /** Get the event type */
-  public EventType getEventType() {
-    return EventType.MAP_ATTEMPT_KILLED;
+  public Events.EventType getEventType() {
+    return Events.EventType.MAP_ATTEMPT_KILLED;
   }
 
-  public void readFields(JsonParser jp) throws IOException {
-    if (jp.nextToken() != JsonToken.START_OBJECT) {
-      throw new IOException("Unexpected Token while reading");
-    }
-
-    while (jp.nextToken() != JsonToken.END_OBJECT) {
-      String fieldName = jp.getCurrentName();
-      jp.nextToken(); // Move to the value
-      switch (Enum.valueOf(EventFields.class, fieldName)) {
-      case EVENT_CATEGORY:
-        category = Enum.valueOf(EventCategory.class, jp.getText());
-        break;
-      case TASK_ID:
-        taskid = TaskID.forName(jp.getText());
-        break;
-      case TASK_TYPE: 
-        taskType = TaskType.valueOf(jp.getText());
-        break;
-      case TASK_ATTEMPT_ID: 
-        attemptId = TaskAttemptID.forName(jp.getText());
-        break;
-      case FINISH_TIME:
-        finishTime = jp.getLongValue();
-        break;
-      case HOSTNAME:
-        hostname = jp.getText();
-        break;
-      case ERROR:
-        error = jp.getText();
-        break;
-      case STATUS:
-        status = jp.getText();
-        break;
-      default: 
-        throw new IOException("Unrecognized field '"+fieldName+"'!");
-      }
-    }
-  }
-
-  public void writeFields(JsonGenerator gen) throws IOException {
-    gen.writeStartObject();
-    gen.writeStringField(EventFields.EVENT_CATEGORY.toString(),
-        category.toString());
-    gen.writeStringField(EventFields.TASK_ID.toString(), taskid.toString());
-    gen.writeStringField(EventFields.TASK_TYPE.toString(),
-        taskType.toString());
-    gen.writeStringField(EventFields.TASK_ATTEMPT_ID.toString(),
-        attemptId.toString());
-    gen.writeNumberField(EventFields.FINISH_TIME.toString(), finishTime);
-    gen.writeStringField(EventFields.HOSTNAME.toString(), hostname);
-    gen.writeStringField(EventFields.ERROR.toString(), error);
-    gen.writeStringField(EventFields.STATUS.toString(), status);
-    gen.writeEndObject();
-  }
 }

@@ -60,7 +60,11 @@ public class CounterGroup implements Writable, Iterable<Counter> {
     displayName = localize("CounterGroupName", name);
   }
   
-  protected CounterGroup(String name, String displayName) {
+  /** Create a CounterGroup.
+   * @param name the name of the group's enum.
+   * @param displayName a name to be displayed for the group.
+   */
+  public CounterGroup(String name, String displayName) {
     this.name = name;
     this.displayName = displayName;
   }
@@ -81,7 +85,8 @@ public class CounterGroup implements Writable, Iterable<Counter> {
     return displayName;
   }
 
-  synchronized void addCounter(Counter counter) {
+  /** Add a counter to this group. */
+  public synchronized void addCounter(Counter counter) {
     counters.put(counter.getName(), counter);
   }
 

@@ -22,39 +22,15 @@ import java.io.IOException;
 
 import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.JobID;
-import org.codehaus.jackson.JsonGenerator;
-import org.codehaus.jackson.JsonParser;
-import org.codehaus.jackson.JsonToken;
+
+import org.apache.avro.util.Utf8;
+
 /**
  * Event to record successful completion of job
  *
  */
 public class JobFinishedEvent  implements HistoryEvent {
-
-  private EventCategory category;
-  private JobID jobid;
-  private long finishTime;
-  private int finishedMaps;
-  private int finishedReduces;
-  private int failedMaps;
-  private int failedReduces;
-  private Counters totalCounters;
-  private Counters mapCounters;
-  private Counters reduceCounters;
-
-  enum EventFields { EVENT_CATEGORY,
-    JOB_ID,
-    FINISH_TIME,
-    FINISHED_MAPS,
-    FINISHED_REDUCES,
-    FAILED_MAPS,
-    FAILED_REDUCES,
-    MAP_COUNTERS,
-    REDUCE_COUNTERS,
-    TOTAL_COUNTERS }
-
-  JobFinishedEvent() {
-  }
+  private Events.JobFinished datum = new Events.JobFinished();
 
   /** 
    * Create an event to record successful job completion
@@ -73,106 +49,50 @@ public class JobFinishedEvent  implements HistoryEvent {
       int failedMaps, int failedReduces,
       Counters mapCounters, Counters reduceCounters,
       Counters totalCounters) {
-    this.jobid = id;
-    this.finishTime = finishTime;
-    this.finishedMaps = finishedMaps;
-    this.finishedReduces = finishedReduces;
-    this.failedMaps = failedMaps;
-    this.failedReduces = failedReduces;
-    this.mapCounters = mapCounters;
-    this.reduceCounters = reduceCounters;
-    this.totalCounters = totalCounters;
-    this.category = EventCategory.JOB;
+    datum.jobid = new Utf8(id.toString());
+    datum.finishTime = finishTime;
+    datum.finishedMaps = finishedMaps;
+    datum.finishedReduces = finishedReduces;
+    datum.failedMaps = failedMaps;
+    datum.failedReduces = failedReduces;
+    datum.mapCounters =
+      EventWriter.toAvro(mapCounters, "MAP_COUNTERS");
+    datum.reduceCounters =
+      EventWriter.toAvro(reduceCounters, "REDUCE_COUNTERS");
+    datum.totalCounters =
+      EventWriter.toAvro(totalCounters, "TOTAL_COUNTERS");
   }
 
-  /** Get the Event Category */
-  public EventCategory getEventCategory() { return category; }
+  JobFinishedEvent() {}
+
+  public Object getDatum() { return datum; }
+  public void setDatum(Object datum) { this.datum = (Events.JobFinished)datum; }
+  public Events.EventType getEventType() {
+    return Events.EventType.JOB_FINISHED;
+  }
+
   /** Get the Job ID */
-  public JobID getJobid() { return jobid; }
+  public JobID getJobid() { return JobID.forName(datum.jobid.toString()); }
   /** Get the job finish time */
-  public long getFinishTime() { return finishTime; }
+  public long getFinishTime() { return datum.finishTime; }
   /** Get the number of finished maps for the job */
-  public int getFinishedMaps() { return finishedMaps; }
+  public int getFinishedMaps() { return datum.finishedMaps; }
   /** Get the number of finished reducers for the job */
-  public int getFinishedReduces() { return finishedReduces; }
+  public int getFinishedReduces() { return datum.finishedReduces; }
   /** Get the number of failed maps for the job */
-  public int getFailedMaps() { return failedMaps; }
+  public int getFailedMaps() { return datum.failedMaps; }
   /** Get the number of failed reducers for the job */
-  public int getFailedReduces() { return failedReduces; }
+  public int getFailedReduces() { return datum.failedReduces; }
   /** Get the counters for the job */
-  public Counters getTotalCounters() { return totalCounters; }
+  public Counters getTotalCounters() {
+    return EventReader.fromAvro(datum.totalCounters);
+  }
   /** Get the Map counters for the job */
-  public Counters getMapCounters() { return mapCounters; }
+  public Counters getMapCounters() {
+    return EventReader.fromAvro(datum.mapCounters);
+  }
   /** Get the reduce counters for the job */
-  public Counters getReduceCounters() { return reduceCounters; }
-  /** Get the event type */
-  public EventType getEventType() { 
-    return EventType.JOB_FINISHED;
-  }
-
-  public void readFields(JsonParser jp) throws IOException {
-    if (jp.nextToken() != JsonToken.START_OBJECT) {
-      throw new IOException("Unexpected token while reading");
-    }
-
-    while (jp.nextToken() != JsonToken.END_OBJECT) {
-      String fieldname = jp.getCurrentName();
-      jp.nextToken(); // move to value
-      switch (Enum.valueOf(EventFields.class, fieldname)) {
-      case EVENT_CATEGORY:
-        category = Enum.valueOf(EventCategory.class, jp.getText());
-        break;
-      case JOB_ID:
-        jobid = JobID.forName(jp.getText());
-        break;
-      case FINISH_TIME:
-        finishTime = jp.getLongValue();
-        break;
-      case FINISHED_MAPS:
-        finishedMaps = jp.getIntValue();
-        break;
-      case FINISHED_REDUCES:
-        finishedReduces = jp.getIntValue();
-        break;
-      case FAILED_MAPS:
-        failedMaps = jp.getIntValue();
-        break;
-      case FAILED_REDUCES:
-        failedReduces = jp.getIntValue();
-        break;
-      case MAP_COUNTERS:
-        mapCounters = EventReader.readCounters(jp);
-        break;
-      case REDUCE_COUNTERS:
-        reduceCounters = EventReader.readCounters(jp);
-        break;
-      case TOTAL_COUNTERS:
-        totalCounters = EventReader.readCounters(jp);
-        break;
-      default: 
-        throw new IOException("Unrecognized field '"+fieldname+"'!");
-      }
-    }
-  }
-
-  public void writeFields(JsonGenerator gen) throws IOException {
-    gen.writeStartObject();
-    gen.writeStringField(EventFields.EVENT_CATEGORY.toString(),
-        category.toString());
-    gen.writeStringField(EventFields.JOB_ID.toString(), jobid.toString());
-    gen.writeNumberField(EventFields.FINISH_TIME.toString(), finishTime);
-    gen.writeNumberField(EventFields.FINISHED_MAPS.toString(), finishedMaps);
-    gen.writeNumberField(EventFields.FINISHED_REDUCES.toString(), 
-        finishedReduces);
-    gen.writeNumberField(EventFields.FAILED_MAPS.toString(), failedMaps);
-    gen.writeNumberField(EventFields.FAILED_REDUCES.toString(),
-        failedReduces);
-    EventWriter.writeCounters(EventFields.MAP_COUNTERS.toString(),
-        mapCounters, gen);
-    EventWriter.writeCounters(EventFields.REDUCE_COUNTERS.toString(),
-        reduceCounters, gen);
-    EventWriter.writeCounters(EventFields.TOTAL_COUNTERS.toString(),
-        totalCounters, gen);
-    gen.writeEndObject();
+  public Counters getReduceCounters() {
+    return EventReader.fromAvro(datum.reduceCounters);
   }
 }

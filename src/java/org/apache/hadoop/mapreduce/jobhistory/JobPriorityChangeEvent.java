@@ -22,79 +22,41 @@ import java.io.IOException;
 
 import org.apache.hadoop.mapred.JobPriority;
 import org.apache.hadoop.mapreduce.JobID;
-import org.codehaus.jackson.JsonGenerator;
-import org.codehaus.jackson.JsonParser;
-import org.codehaus.jackson.JsonToken;
+
+import org.apache.avro.util.Utf8;
 
 /**
  * Event to record the change of priority of a job
  *
  */
 public class JobPriorityChangeEvent implements HistoryEvent {
-
-  private EventCategory category;
-  private JobID jobid;
-  private JobPriority priority;
-
-
-  enum EventFields { EVENT_CATEGORY,
-    JOB_ID,
-    PRIORITY }
+  private Events.JobPriorityChange datum = new Events.JobPriorityChange();
 
   /** Generate an event to record changes in Job priority
    * @param id Job Id
    * @param priority The new priority of the job
    */
   public JobPriorityChangeEvent(JobID id, JobPriority priority) {
-    this.jobid = id;
-    this.priority = priority;
-    this.category = EventCategory.JOB;
+    datum.jobid = new Utf8(id.toString());
+    datum.priority = new Utf8(priority.name());
   }
 
   JobPriorityChangeEvent() { }
 
+  public Object getDatum() { return datum; }
+  public void setDatum(Object datum) {
+    this.datum = (Events.JobPriorityChange)datum;
+  }
+
   /** Get the Job ID */
-  public JobID getJobId() { return jobid; }
+  public JobID getJobId() { return JobID.forName(datum.jobid.toString()); }
   /** Get the job priority */
-  public JobPriority getPriority() { return priority; }
-  /** Get the event category */
-  public EventCategory getEventCategory() { return category; }
+  public JobPriority getPriority() {
+    return JobPriority.valueOf(datum.priority.toString());
+  }
   /** Get the event type */
-  public EventType getEventType() {
-    return EventType.JOB_PRIORITY_CHANGED;
+  public Events.EventType getEventType() {
+    return Events.EventType.JOB_PRIORITY_CHANGED;
   }
 
-  public void readFields(JsonParser jp) throws IOException {
-    if (jp.nextToken() != JsonToken.START_OBJECT) {
-      throw new IOException("Unexpected Token while reading");
-    }
-
-    while (jp.nextToken() != JsonToken.END_OBJECT) {
-      String fieldName = jp.getCurrentName();
-      jp.nextToken(); // Move to the value
-      switch (Enum.valueOf(EventFields.class, fieldName)) {
-      case EVENT_CATEGORY: 
-        category = Enum.valueOf(EventCategory.class, jp.getText());
-        break;
-      case JOB_ID:
-        jobid = JobID.forName(jp.getText());
-        break;
-      case PRIORITY: 
-        priority = Enum.valueOf(JobPriority.class, jp.getText());
-        break;
-      default: 
-        throw new IOException("Unrecognized field '"+fieldName+"'!");
-      }
-    }
-  }
-
-  public void writeFields(JsonGenerator gen) throws IOException {
-    gen.writeStartObject();
-    gen.writeStringField(EventFields.EVENT_CATEGORY.toString(),
-        category.toString());
-    gen.writeStringField(EventFields.JOB_ID.toString(), jobid.toString());
-    gen.writeStringField(EventFields.PRIORITY.toString(), 
-        priority.toString());
-    gen.writeEndObject();
-  }
 }

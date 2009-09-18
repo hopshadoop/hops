@@ -21,29 +21,16 @@ package org.apache.hadoop.mapreduce.jobhistory;
 import java.io.IOException;
 
 import org.apache.hadoop.mapreduce.JobID;
-import org.codehaus.jackson.JsonGenerator;
-import org.codehaus.jackson.JsonParser;
-import org.codehaus.jackson.JsonToken;
+
+import org.apache.avro.util.Utf8;
 
 /**
  * Event to record Failed and Killed completion of jobs
  *
  */
 public class JobUnsuccessfulCompletionEvent implements HistoryEvent {
-
-  private EventCategory category;
-  private JobID jobid;
-  private  long finishTime;
-  private  int finishedMaps;
-  private  int finishedReduces;
-  private  String jobStatus;
-
-  enum EventFields { EVENT_CATEGORY,
-    JOB_ID,
-    FINISH_TIME,
-    FINISHED_MAPS,
-    FINISHED_REDUCES,
-    JOB_STATUS }
+  private Events.JobUnsuccessfulCompletion datum
+    = new Events.JobUnsuccessfulCompletion();
 
   /**
    * Create an event to record unsuccessful completion (killed/failed) of jobs
@@ -56,80 +43,36 @@ public class JobUnsuccessfulCompletionEvent implements HistoryEvent {
   public JobUnsuccessfulCompletionEvent(JobID id, long finishTime,
       int finishedMaps,
       int finishedReduces, String status) {
-    this.jobid = id;
-    this.finishTime = finishTime;
-    this.finishedMaps = finishedMaps;
-    this.finishedReduces = finishedReduces;
-    this.jobStatus = status;
-    this.category = EventCategory.JOB;
+    datum.jobid = new Utf8(id.toString());
+    datum.finishTime = finishTime;
+    datum.finishedMaps = finishedMaps;
+    datum.finishedReduces = finishedReduces;
+    datum.jobStatus = new Utf8(status);
   }
 
-  JobUnsuccessfulCompletionEvent() {
+  JobUnsuccessfulCompletionEvent() {}
+
+  public Object getDatum() { return datum; }
+  public void setDatum(Object datum) {
+    this.datum = (Events.JobUnsuccessfulCompletion)datum;
   }
 
   /** Get the Job ID */
-  public JobID getJobId() { return jobid; }
+  public JobID getJobId() { return JobID.forName(datum.jobid.toString()); }
   /** Get the job finish time */
-  public long getFinishTime() { return finishTime; }
+  public long getFinishTime() { return datum.finishTime; }
   /** Get the number of finished maps */
-  public int getFinishedMaps() { return finishedMaps; }
+  public int getFinishedMaps() { return datum.finishedMaps; }
   /** Get the number of finished reduces */
-  public int getFinishedReduces() { return finishedReduces; }
-  /** Get the event category */
-  public EventCategory getEventCategory() { return category; }
+  public int getFinishedReduces() { return datum.finishedReduces; }
   /** Get the status */
-  public String getStatus() { return jobStatus; }
+  public String getStatus() { return datum.jobStatus.toString(); }
   /** Get the event type */
-  public EventType getEventType() {
-    if ("FAILED".equals(jobStatus)) {
-      return EventType.JOB_FAILED;
+  public Events.EventType getEventType() {
+    if ("FAILED".equals(getStatus())) {
+      return Events.EventType.JOB_FAILED;
     } else
-      return EventType.JOB_KILLED;
+      return Events.EventType.JOB_KILLED;
   }
 
-  public void readFields(JsonParser jp) throws IOException {
-    if (jp.nextToken() != JsonToken.START_OBJECT) {
-      throw new IOException("Unexpected Token while reading");
-    }
-
-    while (jp.nextToken() != JsonToken.END_OBJECT) {
-      String fieldName = jp.getCurrentName();
-      jp.nextToken(); // Move to the value
-      switch (Enum.valueOf(EventFields.class, fieldName)) {
-      case EVENT_CATEGORY:
-        category = Enum.valueOf(EventCategory.class, jp.getText());
-        break;
-      case JOB_ID:
-        jobid = JobID.forName(jp.getText());
-        break;
-      case FINISH_TIME:
-        finishTime = jp.getLongValue();
-        break;
-      case FINISHED_MAPS:
-        finishedMaps = jp.getIntValue();
-        break;
-      case FINISHED_REDUCES:
-        finishedReduces =  jp.getIntValue();
-        break;
-      case JOB_STATUS:
-        jobStatus = jp.getText();
-        break;
-      default: 
-        throw new IOException("Unrecognized field '"+fieldName+"'!");
-      }
-    }
-  }
-
-  public void writeFields(JsonGenerator gen) throws IOException {
-    gen.writeStartObject();
-    gen.writeStringField(EventFields.EVENT_CATEGORY.toString(),
-        category.toString());
-    gen.writeStringField(EventFields.JOB_ID.toString(), jobid.toString());
-    gen.writeNumberField(EventFields.FINISH_TIME.toString(), finishTime);
-    gen.writeNumberField(EventFields.FINISHED_MAPS.toString(), finishedMaps);
-    gen.writeNumberField(EventFields.FINISHED_REDUCES.toString(),
-        finishedReduces);
-    gen.writeStringField(EventFields.JOB_STATUS.toString(), jobStatus);
-    gen.writeEndObject();
-  }
 }

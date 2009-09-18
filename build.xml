@@ -305,7 +305,19 @@
 
   </target>
 
-  <target name="compile-mapred-classes" depends="init">
+  <target name="avro-generate" depends="init">
+    <mkdir dir="${build.src}/org/apache/hadoop/mapreduce/jobhistory"/>
+    <taskdef name="protocol" classname="org.apache.avro.specific.ProtocolTask">
+      <classpath refid="classpath" />
+    </taskdef>
+    <protocol destdir="${build.src}">
+      <fileset dir="${mapred.src.dir}">
+	<include name="**/*.avpr" />
+      </fileset>
+    </protocol>
+  </target>
+
+  <target name="compile-mapred-classes" depends="init,avro-generate">
     <taskdef classname="org.apache.jasper.JspC" name="jsp-compile" >
        <classpath refid="classpath"/>
     </taskdef>

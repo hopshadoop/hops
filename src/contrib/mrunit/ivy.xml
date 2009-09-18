@@ -54,7 +54,7 @@
       conf="common->master"/>
    <dependency org="org.apache.hadoop"
       name="avro"
-      rev="1.0.0"
+      rev="${avro.version}"
       conf="common->default"/>
   </dependencies>
 </ivy-module>

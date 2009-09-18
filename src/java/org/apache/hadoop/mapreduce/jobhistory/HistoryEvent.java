@@ -20,37 +20,18 @@ package org.apache.hadoop.mapreduce.jobhistory;
 
 import java.io.IOException;
 
-import org.codehaus.jackson.JsonGenerator;
-import org.codehaus.jackson.JsonParser;
-
 /**
- * The interface all job history events implement
- *
+ * Interface for event wrapper classes.  Implementations each wrap an
+ * Avro-generated class, adding constructors and accessor methods.
  */
 public interface HistoryEvent {
 
-  // The category that history event belongs to
-  enum EventCategory {
-    JOB, TASK, TASK_ATTEMPT
-  }
-  
-  /**
-   * Serialize the Fields of the event to the JsonGenerator
-   * @param gen JsonGenerator to write to
-   * @throws IOException
-   */
-  void writeFields (JsonGenerator gen) throws IOException;
-  
-  /**
-   * Deserialize the fields of the event from the JsonParser
-   * @param parser JsonParser to read from
-   * @throws IOException
-   */
-  void readFields(JsonParser parser) throws IOException;
-  
-  /** Return the event type */
-  EventType getEventType();
-  
-  /** Retun the event category */
-  EventCategory getEventCategory();
+  /** Return this event's type. */
+  Events.EventType getEventType();
+
+  /** Return the Avro datum wrapped by this. */
+  Object getDatum();
+
+  /** Set the Avro datum wrapped by this. */
+  void setDatum(Object datum);
 }

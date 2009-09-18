@@ -21,23 +21,15 @@ package org.apache.hadoop.mapreduce.jobhistory;
 import java.io.IOException;
 
 import org.apache.hadoop.mapreduce.TaskID;
-import org.codehaus.jackson.JsonGenerator;
-import org.codehaus.jackson.JsonParser;
-import org.codehaus.jackson.JsonToken;
+
+import org.apache.avro.util.Utf8;
 
 /**
  * Event to record updates to a task
  *
  */
 public class TaskUpdatedEvent implements HistoryEvent {
-
-  private EventCategory category;
-  private TaskID taskid;
-  private  long finishTime;
-
-  enum EventFields { EVENT_CATEGORY,
-                     TASK_ID,
-                     FINISH_TIME }
+  private Events.TaskUpdated datum = new Events.TaskUpdated();
 
   /**
    * Create an event to record task updates
@@ -45,54 +37,22 @@ public class TaskUpdatedEvent implements HistoryEvent {
    * @param finishTime Finish time of the task
    */
   public TaskUpdatedEvent(TaskID id, long finishTime) {
-    this.taskid = id;
-    this.finishTime = finishTime;
-    this.category = EventCategory.TASK;
+    datum.taskid = new Utf8(id.toString());
+    datum.finishTime = finishTime;
   }
 
-  TaskUpdatedEvent() {
-  }
+  TaskUpdatedEvent() {}
+
+  public Object getDatum() { return datum; }
+  public void setDatum(Object datum) { this.datum = (Events.TaskUpdated)datum; }
+
   /** Get the task ID */
-  public TaskID getTaskId() { return taskid; }
-  /** Get the event category */
-  public EventCategory getEventCategory() { return category; }
+  public TaskID getTaskId() { return TaskID.forName(datum.taskid.toString()); }
   /** Get the task finish time */
-  public long getFinishTime() { return finishTime; }
+  public long getFinishTime() { return datum.finishTime; }
   /** Get the event type */
-  public EventType getEventType() {
-    return EventType.TASK_UPDATED;
+  public Events.EventType getEventType() {
+    return Events.EventType.TASK_UPDATED;
   }
 
-  public void readFields(JsonParser jp) throws IOException {
-    if (jp.nextToken() != JsonToken.START_OBJECT) {
-      throw new IOException("Unexpected Token while reading");
-    }
-    
-    while (jp.nextToken() != JsonToken.END_OBJECT) {
-      String fieldName = jp.getCurrentName();
-      jp.nextToken(); // Move to the value
-      switch (Enum.valueOf(EventFields.class, fieldName)) {
-      case EVENT_CATEGORY:
-        category = Enum.valueOf(EventCategory.class, jp.getText());
-        break;
-      case TASK_ID:
-        taskid = TaskID.forName(jp.getText());
-        break;
-      case FINISH_TIME:
-        finishTime = jp.getLongValue();
-        break;
-      default: 
-        throw new IOException("Unrecognized field '"+fieldName+"'!");
-      }
-    }
-  }
-
-  public void writeFields(JsonGenerator gen) throws IOException {
-    gen.writeStartObject();
-    gen.writeStringField(EventFields.EVENT_CATEGORY.toString(),
-        category.toString());
-    gen.writeStringField(EventFields.TASK_ID.toString(), taskid.toString());
-    gen.writeNumberField(EventFields.FINISH_TIME.toString(), finishTime);
-    gen.writeEndObject();
-  }
 }

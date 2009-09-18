@@ -25,11 +25,14 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.mapreduce.Counter;
 import org.apache.hadoop.mapreduce.CounterGroup;
 import org.apache.hadoop.mapreduce.Counters;
-import org.apache.hadoop.mapreduce.jobhistory.EventReader.CounterFields;
-import org.apache.hadoop.mapreduce.jobhistory.EventReader.GroupFields;
-import org.codehaus.jackson.JsonEncoding;
-import org.codehaus.jackson.JsonFactory;
-import org.codehaus.jackson.JsonGenerator;
+
+import org.apache.avro.Schema;
+import org.apache.avro.io.Encoder;
+import org.apache.avro.io.BinaryEncoder;
+import org.apache.avro.io.DatumWriter;
+import org.apache.avro.specific.SpecificDatumWriter;
+import org.apache.avro.generic.GenericData;
+import org.apache.avro.util.Utf8;
 
 /**
  * Event Writer is an utility class used to write events to the underlying
@@ -38,91 +41,67 @@ import org.codehaus.jackson.JsonGenerator;
  * 
  */
 class EventWriter {
+  static final String VERSION = "Avro-Binary";
 
-  static final JsonFactory FACTORY = new JsonFactory();
-  private JsonGenerator gen; 
+  private FSDataOutputStream out;
+  private DatumWriter<Object> writer =
+    new SpecificDatumWriter(Events.Event._SCHEMA);
+  private Encoder encoder;
   
   EventWriter(FSDataOutputStream out) throws IOException {
-    gen = FACTORY.createJsonGenerator(out, JsonEncoding.UTF8);
-    // Prefix all log files with the version
-    writeVersionInfo();
+    this.out = out;
+    out.writeBytes(VERSION);
+    out.writeBytes("\n");
+    out.writeBytes(Events.Event._SCHEMA.toString());
+    out.writeBytes("\n");
+    this.encoder = new BinaryEncoder(out);
   }
   
-  private void writeVersionInfo() throws IOException {
-    gen.writeStartObject();
-    gen.writeStringField("HISTORY_VERSION", JobHistory.HISTORY_VERSION);
-    gen.writeEndObject();
-    gen.writeRaw("\n");
-  }
-  
-  synchronized void write(HistoryEvent event)
-  throws IOException { 
-    writeEventType(gen, event.getEventType());
-    event.writeFields(gen);
-    gen.writeRaw("\n");
+  synchronized void write(HistoryEvent event) throws IOException { 
+    Events.Event wrapper = new Events.Event();
+    wrapper.type = event.getEventType();
+    wrapper.event = event.getDatum();
+    writer.write(wrapper, encoder);
   }
   
   void flush() throws IOException { 
-    gen.flush();
+    encoder.flush();
   }
 
   void close() throws IOException {
-    gen.close();
-  }
-  
-  /**
-   * Write the event type to the JsonGenerator
-   * @param gen
-   * @param type
-   * @throws IOException
-   */
-  private void writeEventType(JsonGenerator gen, EventType type) 
-  throws IOException {
-    gen.writeStartObject();
-    gen.writeStringField("EVENT_TYPE", type.toString());
-    gen.writeEndObject();
-  }  
-  
-  static void writeCounters(Counters counters, JsonGenerator gen)
-  throws IOException {
-    writeCounters("COUNTERS", counters, gen);
-  }
-  
-  static void writeCounters(String name, Counters counters, JsonGenerator gen)
-  throws IOException {
-    gen.writeFieldName(name);
-    gen.writeStartArray(); // Start of all groups
-    Iterator<CounterGroup> groupItr = counters.iterator();
-    while (groupItr.hasNext()) {
-      writeOneGroup(gen, groupItr.next());
-    }
-    gen.writeEndArray(); // End of all groups
-  }
-  
-  static void writeOneGroup (JsonGenerator gen, CounterGroup grp)
-  throws IOException {
-    gen.writeStartObject(); // Start of this group
-    gen.writeStringField(GroupFields.ID.toString(), grp.getName());
-    gen.writeStringField(GroupFields.NAME.toString(), grp.getDisplayName());
-  
-    // Write out the List of counters
-    gen.writeFieldName(GroupFields.LIST.toString());
-    gen.writeStartArray(); // Start array of counters
-    Iterator<Counter> ctrItr = grp.iterator();
-    while (ctrItr.hasNext()) {
-      writeOneCounter(gen, ctrItr.next());
-    }
-    gen.writeEndArray(); // End of all counters
-
-    gen.writeEndObject(); // End of this group
+    encoder.flush();
+    out.close();
   }
 
-  static void writeOneCounter(JsonGenerator gen, Counter ctr)
-  throws IOException{
-    gen.writeStartObject();
-    gen.writeStringField(CounterFields.ID.toString(), ctr.getName());
-    gen.writeStringField(CounterFields.NAME.toString(), ctr.getDisplayName());
-    gen.writeNumberField("VALUE", ctr.getValue());
-    gen.writeEndObject();
+  private static final Schema GROUPS =
+    Schema.createArray(Events.CounterGroup._SCHEMA);
+
+  private static final Schema COUNTERS =
+    Schema.createArray(Events.Counter._SCHEMA);
+
+  static Events.Counters toAvro(Counters counters) {
+    return toAvro(counters, "COUNTERS");
   }
+  static Events.Counters toAvro(Counters counters, String name) {
+    Events.Counters result = new Events.Counters();
+    result.name = new Utf8(name);
+    result.groups = new GenericData.Array<Events.CounterGroup>(0, GROUPS);
+    if (counters == null) return result;
+    for (CounterGroup group : counters) {
+      Events.CounterGroup g = new Events.CounterGroup();
+      g.name = new Utf8(group.getName());
+      g.displayName = new Utf8(group.getDisplayName());
+      g.counts = new GenericData.Array<Events.Counter>(group.size(), COUNTERS);
+      for (Counter counter : group) {
+        Events.Counter c = new Events.Counter();
+        c.name = new Utf8(counter.getName());
+        c.displayName = new Utf8(counter.getDisplayName());
+        c.value = counter.getValue();
+        g.counts.add(c);
+      }
+      result.groups.add(g);
+    }
+    return result;
+  }
+
 }
