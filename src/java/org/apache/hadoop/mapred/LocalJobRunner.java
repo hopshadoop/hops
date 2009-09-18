@@ -558,6 +558,9 @@ public class LocalJobRunner implements ClientProtocol {
     return fs.makeQualified(sysDir).toString();
   }
 
+  public String getJobHistoryDir() {
+    return null;
+  }
 
   @Override
   public QueueInfo[] getChildQueues(String queueName) throws IOException {

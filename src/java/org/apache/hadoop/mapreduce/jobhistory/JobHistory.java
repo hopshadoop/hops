@@ -173,15 +173,6 @@ public class JobHistory {
     }
   }
 
-  /** Get the done directory */
-  public synchronized String getDoneJobHistoryFileName(JobConf jobConf,
-      JobID id) throws IOException {
-    if (done == null) {
-      return null;
-    }
-    return getJobHistoryFileName(jobConf, id, done, doneDirFs);
-  }
-
   /**
    * Get the history location
    */
@@ -197,46 +188,11 @@ public class JobHistory {
   }
 
   /**
-   * @param dir The directory where to search.
+   * Get the job history file path
    */
-  private synchronized String getJobHistoryFileName(JobConf jobConf,
-      JobID id, Path dir, FileSystem fs)
-  throws IOException {
-    String user = getUserName(jobConf);
-    // Make the pattern matching the job's history file
-    final Pattern historyFilePattern =
-      Pattern.compile(id.toString() + "_" + user + "+");
-    // a path filter that matches the parts of the filenames namely
-    //  - job-id, user name
-    PathFilter filter = new PathFilter() {
-      public boolean accept(Path path) {
-        String fileName = path.getName();
-        return historyFilePattern.matcher(fileName).find();
-      }
-    };
-  
-    FileStatus[] statuses = fs.listStatus(dir, filter);
-    String filename = null;
-    if (statuses.length == 0) {
-      LOG.info("Nothing to recover for job " + id);
-    } else {
-      filename = statuses[0].getPath().getName();
-      LOG.info("Recovered job history filename for job " + id + " is "
-          + filename);
-    }
-    return filename;
-  }
-
-  String getNewJobHistoryFileName(JobConf conf, JobID jobId) {
-    return jobId.toString() +
-    "_" + getUserName(conf);
-  }
-
-  /**
-   * Get the job history file path given the history filename
-   */
-  private Path getJobHistoryLogLocation(String logFileName) {
-    return logDir == null ? null : new Path(logDir, logFileName);
+  public static Path getJobHistoryFile(Path dir, JobID jobId, 
+      String user) {
+    return new Path(dir, jobId.toString() + "_" + user);
   }
 
   /**
@@ -248,9 +204,7 @@ public class JobHistory {
    */
   public void setupEventWriter(JobID jobId, JobConf jobConf)
   throws IOException {
-    String logFileName = getNewJobHistoryFileName(jobConf, jobId);
-  
-    Path logFile = getJobHistoryLogLocation(logFileName);
+    Path logFile = getJobHistoryFile(logDir, jobId, getUserName(jobConf));
   
     if (logDir == null) {
       LOG.info("Log Directory is null, returning");

@@ -30,18 +30,22 @@ import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.JobTracker;
 import org.apache.hadoop.mapred.LocalJobRunner;
+import org.apache.hadoop.mapreduce.jobhistory.JobHistory;
 import org.apache.hadoop.mapreduce.protocol.ClientProtocol;
 import org.apache.hadoop.mapreduce.server.jobtracker.State;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.security.UnixUserGroupInformation;
 
 /**
  * Provides a way to access information about the map/reduce cluster.
  */
 public class Cluster {
   private ClientProtocol client;
+  private UnixUserGroupInformation ugi;
   private Configuration conf;
   private FileSystem fs = null;
   private Path sysDir = null;
+  private Path jobHistoryDir = null;
 
   static {
     Configuration.addDefaultResource("mapred-default.xml");
@@ -50,19 +54,21 @@ public class Cluster {
   
   public Cluster(Configuration conf) throws IOException {
     this.conf = conf;
+    this.ugi = Job.getUGI(conf);
     client = createClient(conf);
   }
 
   public Cluster(InetSocketAddress jobTrackAddr, Configuration conf) 
       throws IOException {
     this.conf = conf;
+    this.ugi = Job.getUGI(conf);
     client = createRPCProxy(jobTrackAddr, conf);
   }
 
   private ClientProtocol createRPCProxy(InetSocketAddress addr,
       Configuration conf) throws IOException {
     return (ClientProtocol) RPC.getProxy(ClientProtocol.class,
-      ClientProtocol.versionID, addr, Job.getUGI(conf), conf,
+      ClientProtocol.versionID, addr, ugi, conf,
       NetUtils.getSocketFactory(conf, ClientProtocol.class));
   }
 
@@ -215,6 +221,24 @@ public class Cluster {
       sysDir = new Path(client.getSystemDir());
     }
     return sysDir;
+  }
+
+  /**
+   * Get the job history file path for a given job id. The job history file at 
+   * this path may or may not be existing depending on the job completion state.
+   * The file is present only for the completed jobs.
+   * @param jobId the JobID of the job submitted by the current user.
+   * @return the file path of the job history file
+   * @throws IOException
+   * @throws InterruptedException
+   */
+  public String getJobHistoryUrl(JobID jobId) throws IOException, 
+    InterruptedException {
+    if (jobHistoryDir == null) {
+      jobHistoryDir = new Path(client.getJobHistoryDir());
+    }
+    return JobHistory.getJobHistoryFile(jobHistoryDir, jobId, 
+        ugi.getUserName()).toString();
   }
 
   /**

@@ -3502,6 +3502,14 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     return fs.makeQualified(sysDir).toString();
   }
   
+  /**
+   * @see 
+   * org.apache.hadoop.mapreduce.protocol.ClientProtocol#getJobHistoryDir()
+   */
+  public String getJobHistoryDir() {
+    return jobHistory.getCompletedJobHistoryLocation().toString();
+  }
+
   ///////////////////////////////////////////////////////////////
   // JobTracker methods
   ///////////////////////////////////////////////////////////////

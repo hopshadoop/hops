@@ -378,6 +378,9 @@ Trunk (unreleased changes)
     MAPREDUCE-781. Let the name of distcp jobs be configurable. (Venkatesh S
     via cdouglas)
 
+    MAPREDUCE-975. Add an API in job client to get the history file url for 
+    a given job id. (sharad)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 

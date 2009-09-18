@@ -37,6 +37,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.mapreduce.Cluster;
 import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
@@ -577,7 +578,7 @@ public class TestJobHistory extends TestCase {
     validateTaskAttemptLevelKeyValues(mr, job, jobInfo);
   }
 
-  public void testDoneFolderOnHDFS() throws IOException {
+  public void testDoneFolderOnHDFS() throws IOException, InterruptedException {
     MiniMRCluster mr = null;
     try {
       JobConf conf = new JobConf();
@@ -644,6 +645,10 @@ public class TestJobHistory extends TestCase {
       // Framework history log file location
       Path logFile = new Path(doneDir, logFileName);
       FileSystem fileSys = logFile.getFileSystem(conf);
+
+      Cluster cluster = new Cluster(conf);
+      assertEquals("Client returned wrong history url", logFile.toString(), 
+          cluster.getJobHistoryUrl(id));
    
       // Check if the history file exists
       assertTrue("History file does not exist", fileSys.exists(logFile));
@@ -790,9 +795,14 @@ public class TestJobHistory extends TestCase {
       Path doneDir) throws IOException {
     String name = null;
     for (int i = 0; name == null && i < 20; i++) {
-      name = jobHistory.getDoneJobHistoryFileName(conf, id);
+      Path path = JobHistory.getJobHistoryFile(
+          jobHistory.getCompletedJobHistoryLocation(), id, conf.getUser());
+      if (path.getFileSystem(conf).exists(path)) {
+        name = path.toString();
+      }
       UtilsForTests.waitFor(1000);
     }
+    assertNotNull("Job history file not created", name);
     return name;
   }
 

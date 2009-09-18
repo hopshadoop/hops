@@ -20,6 +20,7 @@ package org.apache.hadoop.mapreduce.protocol;
 
 import java.io.IOException;
 
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.ipc.VersionedProtocol;
 import org.apache.hadoop.mapreduce.ClusterMetrics;
 import org.apache.hadoop.mapreduce.Counters;
@@ -82,9 +83,10 @@ public interface ClientProtocol extends VersionedProtocol {
    *              added new api's getRootQueues and
    *              getChildQueues(String queueName)
    * Version 27: Changed protocol to use new api objects. And the protocol is 
-   *             renamed from JobSubmissionProtocol to ClientProtocol.          
+   *             renamed from JobSubmissionProtocol to ClientProtocol.
+   * Version 28: Added getJobHistoryDir() as part of MAPREDUCE-975.
    */
-  public static final long versionID = 27L;
+  public static final long versionID = 28L;
 
   /**
    * Allocate a name for the job.
@@ -216,7 +218,15 @@ public interface ClientProtocol extends VersionedProtocol {
    * @return the system directory where job-specific files are to be placed.
    */
   public String getSystemDir() throws IOException, InterruptedException;  
-  
+
+  /**
+   * Gets the directory location of the completed job history files.
+   * @throws IOException
+   * @throws InterruptedException
+   */
+  public String getJobHistoryDir() 
+  throws IOException, InterruptedException;
+
   /**
    * Gets set of Queues associated with the Job Tracker
    * 
