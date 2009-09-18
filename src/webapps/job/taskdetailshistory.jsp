@@ -27,6 +27,9 @@
   import="org.apache.hadoop.util.*"
   import="java.text.SimpleDateFormat"
   import="org.apache.hadoop.mapreduce.TaskType"
+  import="org.apache.hadoop.mapreduce.Counters"
+  import="org.apache.hadoop.mapreduce.TaskID"
+  import="org.apache.hadoop.mapreduce.TaskAttemptID"
   import="org.apache.hadoop.mapreduce.jobhistory.*"
 %>
 
@@ -56,10 +59,12 @@
 <%
   }
 %>
-<td>Finish Time</td><td>Host</td><td>Error</td><td>Task Logs</td></tr>
+<td>Finish Time</td><td>Host</td><td>Error</td><td>Task Logs</td>
+<td>Counters</td></tr>
+
 <%
   for (JobHistoryParser.TaskAttemptInfo attempt : task.getAllTaskAttempts().values()) {
-    printTaskAttempt(attempt, type, out);
+    printTaskAttempt(attempt, type, out, logFile);
   }
 %>
 </table>
@@ -81,7 +86,7 @@
 %>
 <%!
   private void printTaskAttempt(JobHistoryParser.TaskAttemptInfo taskAttempt,
-                                TaskType type, JspWriter out) 
+                                TaskType type, JspWriter out, String logFile) 
   throws IOException {
     out.print("<tr>"); 
     out.print("<td>" + taskAttempt.getAttemptId() + "</td>");
@@ -116,6 +121,20 @@
         out.print("n/a");
     }
     out.print("</td>");
+    Counters counters = taskAttempt.getCounters();
+    if (counters != null) {
+      TaskAttemptID attemptId = taskAttempt.getAttemptId();
+      TaskID taskId = attemptId.getTaskID();
+      org.apache.hadoop.mapreduce.JobID jobId = taskId.getJobID();
+      out.print("<td>" 
+       + "<a href=\"/taskstatshistory.jsp?jobid=" + jobId
+           + "&taskid=" + taskId
+           + "&attemptid=" + attemptId
+           + "&logFile=" + logFile + "\">"
+           + counters.countCounters() + "</a></td>");
+    } else {
+      out.print("<td></td>");
+    }
     out.print("</tr>"); 
   }
 %>

@@ -387,6 +387,9 @@ Trunk (unreleased changes)
     MAPREDUCE-905. Add Eclipse launch tasks for MapReduce. (Philip Zeyliger
     via tomwhite)
 
+    MAPREDUCE-277. Makes job history counters available on the job history
+    viewers. (Jothi Padmanabhan via ddas)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 

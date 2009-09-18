@@ -75,7 +75,8 @@ public class TestJobHistoryParsing  extends TestCase {
     jh.logEvent(jse, jobId);
 
     JobFinishedEvent jfe =
-      new JobFinishedEvent(jobId, 12346, 1, 1, 0, 0, new Counters());
+      new JobFinishedEvent(jobId, 12346, 1, 1, 0, 0, new Counters(),
+          new Counters(), new Counters());
     jh.logEvent(jfe, jobId);
     jh.closeWriter(jobId);
 

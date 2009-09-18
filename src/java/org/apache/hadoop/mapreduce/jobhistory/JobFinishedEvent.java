@@ -25,7 +25,6 @@ import org.apache.hadoop.mapreduce.JobID;
 import org.codehaus.jackson.JsonGenerator;
 import org.codehaus.jackson.JsonParser;
 import org.codehaus.jackson.JsonToken;
-
 /**
  * Event to record successful completion of job
  *
@@ -39,7 +38,9 @@ public class JobFinishedEvent  implements HistoryEvent {
   private int finishedReduces;
   private int failedMaps;
   private int failedReduces;
-  private Counters counters;
+  private Counters totalCounters;
+  private Counters mapCounters;
+  private Counters reduceCounters;
 
   enum EventFields { EVENT_CATEGORY,
     JOB_ID,
@@ -48,7 +49,9 @@ public class JobFinishedEvent  implements HistoryEvent {
     FINISHED_REDUCES,
     FAILED_MAPS,
     FAILED_REDUCES,
-    COUNTERS }
+    MAP_COUNTERS,
+    REDUCE_COUNTERS,
+    TOTAL_COUNTERS }
 
   JobFinishedEvent() {
   }
@@ -61,19 +64,24 @@ public class JobFinishedEvent  implements HistoryEvent {
    * @param finishedReduces The number of finished reduces
    * @param failedMaps The number of failed maps
    * @param failedReduces The number of failed reduces
-   * @param counters Counters for the job
+   * @param mapCounters Map Counters for the job
+   * @param reduceCounters Reduce Counters for the job
+   * @param totalCounters Total Counters for the job
    */
   public JobFinishedEvent(JobID id, long finishTime,
       int finishedMaps, int finishedReduces,
       int failedMaps, int failedReduces,
-      Counters counters) {
+      Counters mapCounters, Counters reduceCounters,
+      Counters totalCounters) {
     this.jobid = id;
     this.finishTime = finishTime;
     this.finishedMaps = finishedMaps;
     this.finishedReduces = finishedReduces;
     this.failedMaps = failedMaps;
     this.failedReduces = failedReduces;
-    this.counters = counters;
+    this.mapCounters = mapCounters;
+    this.reduceCounters = reduceCounters;
+    this.totalCounters = totalCounters;
     this.category = EventCategory.JOB;
   }
 
@@ -92,7 +100,11 @@ public class JobFinishedEvent  implements HistoryEvent {
   /** Get the number of failed reducers for the job */
   public int getFailedReduces() { return failedReduces; }
   /** Get the counters for the job */
-  public Counters getCounters() { return counters; }
+  public Counters getTotalCounters() { return totalCounters; }
+  /** Get the Map counters for the job */
+  public Counters getMapCounters() { return mapCounters; }
+  /** Get the reduce counters for the job */
+  public Counters getReduceCounters() { return reduceCounters; }
   /** Get the event type */
   public EventType getEventType() { 
     return EventType.JOB_FINISHED;
@@ -128,8 +140,14 @@ public class JobFinishedEvent  implements HistoryEvent {
       case FAILED_REDUCES:
         failedReduces = jp.getIntValue();
         break;
-      case COUNTERS:
-        counters = EventReader.readCounters(jp);
+      case MAP_COUNTERS:
+        mapCounters = EventReader.readCounters(jp);
+        break;
+      case REDUCE_COUNTERS:
+        reduceCounters = EventReader.readCounters(jp);
+        break;
+      case TOTAL_COUNTERS:
+        totalCounters = EventReader.readCounters(jp);
         break;
       default: 
         throw new IOException("Unrecognized field '"+fieldname+"'!");
@@ -149,7 +167,12 @@ public class JobFinishedEvent  implements HistoryEvent {
     gen.writeNumberField(EventFields.FAILED_MAPS.toString(), failedMaps);
     gen.writeNumberField(EventFields.FAILED_REDUCES.toString(),
         failedReduces);
-    EventWriter.writeCounters(counters, gen);
+    EventWriter.writeCounters(EventFields.MAP_COUNTERS.toString(),
+        mapCounters, gen);
+    EventWriter.writeCounters(EventFields.REDUCE_COUNTERS.toString(),
+        reduceCounters, gen);
+    EventWriter.writeCounters(EventFields.TOTAL_COUNTERS.toString(),
+        totalCounters, gen);
     gen.writeEndObject();
   }
 }

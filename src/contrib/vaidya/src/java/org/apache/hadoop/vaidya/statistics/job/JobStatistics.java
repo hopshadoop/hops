@@ -296,7 +296,7 @@ public class JobStatistics implements JobStatisticsInterface {
         String.valueOf(jobInfo.getFinishedReduces())); 
     job.put(JobKeys.STATUS, jobInfo.getJobStatus().toString()); 
     job.put(JobKeys.JOB_PRIORITY, jobInfo.getPriority()); 
-    parseAndAddJobCounters(job, jobInfo.getCounters().toString());
+    parseAndAddJobCounters(job, jobInfo.getTotalCounters().toString());
   }
   
   

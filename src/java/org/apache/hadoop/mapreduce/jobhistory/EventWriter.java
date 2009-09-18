@@ -85,7 +85,12 @@ class EventWriter {
   
   static void writeCounters(Counters counters, JsonGenerator gen)
   throws IOException {
-    gen.writeFieldName("COUNTERS");
+    writeCounters("COUNTERS", counters, gen);
+  }
+  
+  static void writeCounters(String name, Counters counters, JsonGenerator gen)
+  throws IOException {
+    gen.writeFieldName(name);
     gen.writeStartArray(); // Start of all groups
     Iterator<CounterGroup> groupItr = counters.iterator();
     while (groupItr.hasNext()) {

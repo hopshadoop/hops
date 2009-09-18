@@ -31,8 +31,6 @@ import java.util.Set;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.io.Text;
-import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.io.compress.CodecPool;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.io.compress.Decompressor;
@@ -63,6 +61,8 @@ class Fetcher<K,V> extends Thread {
   private final Progressable reporter;
   private static enum ShuffleErrors{IO_ERROR, WRONG_LENGTH, BAD_ID, WRONG_MAP,
                                     CONNECTION, WRONG_REDUCE}
+  
+  private final static String SHUFFLE_ERR_GRP_NAME = "Shuffle Errors";
   private final Counters.Counter connectionErrs;
   private final Counters.Counter ioErrs;
   private final Counters.Counter wrongLengthErrs;
@@ -95,12 +95,18 @@ class Fetcher<K,V> extends Thread {
     this.exceptionReporter = exceptionReporter;
     this.id = ++nextId;
     this.reduce = reduceId.getTaskID().getId();
-    ioErrs = reporter.getCounter(ShuffleErrors.IO_ERROR);
-    wrongLengthErrs = reporter.getCounter(ShuffleErrors.WRONG_LENGTH);
-    badIdErrs = reporter.getCounter(ShuffleErrors.BAD_ID);
-    wrongMapErrs = reporter.getCounter(ShuffleErrors.WRONG_MAP);
-    connectionErrs = reporter.getCounter(ShuffleErrors.CONNECTION);
-    wrongReduceErrs = reporter.getCounter(ShuffleErrors.WRONG_REDUCE);
+    ioErrs = reporter.getCounter(SHUFFLE_ERR_GRP_NAME,
+        ShuffleErrors.IO_ERROR.toString());
+    wrongLengthErrs = reporter.getCounter(SHUFFLE_ERR_GRP_NAME,
+        ShuffleErrors.WRONG_LENGTH.toString());
+    badIdErrs = reporter.getCounter(SHUFFLE_ERR_GRP_NAME,
+        ShuffleErrors.BAD_ID.toString());
+    wrongMapErrs = reporter.getCounter(SHUFFLE_ERR_GRP_NAME,
+        ShuffleErrors.WRONG_MAP.toString());
+    connectionErrs = reporter.getCounter(SHUFFLE_ERR_GRP_NAME,
+        ShuffleErrors.CONNECTION.toString());
+    wrongReduceErrs = reporter.getCounter(SHUFFLE_ERR_GRP_NAME,
+        ShuffleErrors.WRONG_REDUCE.toString());
     
     if (job.getCompressMapOutput()) {
       Class<? extends CompressionCodec> codecClass =

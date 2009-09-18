@@ -25,9 +25,12 @@
   import="org.apache.hadoop.fs.*"
   import="org.apache.hadoop.mapreduce.TaskAttemptID"
   import="org.apache.hadoop.mapreduce.TaskID"
+  import="org.apache.hadoop.mapreduce.Counter"
+  import="org.apache.hadoop.mapreduce.Counters"
+  import="org.apache.hadoop.mapreduce.CounterGroup"
   import="org.apache.hadoop.mapred.*"
   import="org.apache.hadoop.util.*"
-  import="java.text.SimpleDateFormat"
+  import="java.text.*"
   import="org.apache.hadoop.mapreduce.jobhistory.*"
 %>
 <%!private static final long serialVersionUID = 1L;
@@ -45,7 +48,14 @@
     FileSystem fs = (FileSystem) application.getAttribute("fileSys");
     JobHistoryParser.JobInfo job = JSPUtil.getJobInfo(request, fs);
 %>
-<html><body>
+
+<html>
+<head>
+<title>Hadoop Job <%=jobid%> on History Viewer</title>
+<link rel="stylesheet" type="text/css" href="/static/hadoop.css">
+</head>
+<body>
+
 <h2>Hadoop Job <%=jobid %> on <a href="jobhistory.jsp">History Viewer</a></h2>
 
 <b>User: </b> <%=job.getUsername() %><br/> 
@@ -120,6 +130,66 @@
 </tr>
 </table>
 
+<br>
+<br>
+
+<table border=2 cellpadding="5" cellspacing="2">
+  <tr>
+  <th><br/></th>
+  <th>Counter</th>
+  <th>Map</th>
+  <th>Reduce</th>
+  <th>Total</th>
+</tr>
+
+<%  
+
+ Counters totalCounters = job.getTotalCounters();
+ Counters mapCounters = job.getMapCounters();
+ Counters reduceCounters = job.getReduceCounters();
+
+ if (totalCounters != null) {
+   for (String groupName : totalCounters.getGroupNames()) {
+     CounterGroup totalGroup = totalCounters.getGroup(groupName);
+     CounterGroup mapGroup = mapCounters.getGroup(groupName);
+     CounterGroup reduceGroup = reduceCounters.getGroup(groupName);
+  
+     Format decimal = new DecimalFormat();
+  
+     boolean isFirst = true;
+     Iterator<Counter> ctrItr = totalGroup.iterator();
+     while(ctrItr.hasNext()) {
+       Counter counter = ctrItr.next();
+       String name = counter.getName();
+       String mapValue = 
+        decimal.format(mapGroup.findCounter(name).getValue());
+       String reduceValue = 
+        decimal.format(reduceGroup.findCounter(name).getValue());
+       String totalValue = 
+        decimal.format(counter.getValue());
+%>
+       <tr>
+<%
+       if (isFirst) {
+         isFirst = false;
+%>
+         <td rowspan="<%=totalGroup.size()%>"><%=totalGroup.getDisplayName()%></td>
+<%
+       }
+%>
+       <td><%=counter.getDisplayName()%></td>
+       <td align="right"><%=mapValue%></td>
+       <td align="right"><%=reduceValue%></td>
+       <td align="right"><%=totalValue%></td>
+     </tr>
+<%
+      }
+    }
+  }
+%>
+</table>
+<br>
+
 <br/>
  <%
     HistoryViewer.FilteredJob filter = new HistoryViewer.FilteredJob(job,TaskStatus.State.FAILED.toString()); 
@@ -160,6 +230,7 @@
  %>
 </table>
 <br/>
+
  <%
     filter = new HistoryViewer.FilteredJob(job, TaskStatus.State.KILLED.toString());
     badNodes = filter.getFilteredMap(); 

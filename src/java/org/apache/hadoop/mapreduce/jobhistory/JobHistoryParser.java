@@ -219,6 +219,9 @@ public class JobHistoryParser {
     attemptInfo.error = event.getError();
     attemptInfo.status = event.getTaskStatus();
     attemptInfo.hostname = event.getHostname();
+    attemptInfo.shuffleFinishTime = event.getFinishTime();
+    attemptInfo.sortFinishTime = event.getFinishTime();
+    attemptInfo.mapFinishTime = event.getFinishTime();
   }
 
   private void handleTaskAttemptStartedEvent(TaskAttemptStartedEvent event) {
@@ -277,7 +280,9 @@ public class JobHistoryParser {
     info.finishedReduces = event.getFinishedReduces();
     info.failedMaps = event.getFailedMaps();
     info.failedReduces = event.getFailedReduces();
-    info.counters = event.getCounters();
+    info.totalCounters = event.getTotalCounters();
+    info.mapCounters = event.getMapCounters();
+    info.reduceCounters = event.getReduceCounters();
     info.jobStatus = JobStatus.getJobRunState(JobStatus.SUCCEEDED);
   }
 
@@ -322,7 +327,9 @@ public class JobHistoryParser {
     int finishedMaps;
     int finishedReduces;
     String jobStatus;
-    Counters counters;
+    Counters totalCounters;
+    Counters mapCounters;
+    Counters reduceCounters;
     JobPriority priority;
     
     Map<TaskID, TaskInfo> tasksMap;
@@ -348,7 +355,9 @@ public class JobHistoryParser {
       System.out.println("PRIORITY: " + priority);
       System.out.println("TOTAL_MAPS: " + totalMaps);
       System.out.println("TOTAL_REDUCES: " + totalReduces);
-      System.out.println("COUNTERS: " + counters.toString());
+      System.out.println("MAP_COUNTERS:" + mapCounters.toString());
+      System.out.println("REDUCE_COUNTERS:" + reduceCounters.toString());
+      System.out.println("TOTAL_COUNTERS: " + totalCounters.toString());
       
       for (TaskInfo ti: tasksMap.values()) {
         ti.printAll();
@@ -384,7 +393,11 @@ public class JobHistoryParser {
     /** Get the job status */
     public String getJobStatus() { return jobStatus; }
     /** Get the counters for the job */
-    public Counters getCounters() { return counters; }
+    public Counters getTotalCounters() { return totalCounters; }
+    /** Get the map counters for the job */
+    public Counters getMapCounters() { return mapCounters; }
+    /** Get the reduce counters for the job */
+    public Counters getReduceCounters() { return reduceCounters; }
     /** Get the map of all tasks in this job */
     public Map<TaskID, TaskInfo> getAllTasks() { return tasksMap; }
     /** Get the priority of this job */
@@ -417,7 +430,9 @@ public class JobHistoryParser {
       System.out.println("START_TIME: " + startTime);
       System.out.println("FINISH_TIME:" + finishTime);
       System.out.println("TASK_TYPE:" + taskType);
-      System.out.println("COUNTERS:" + counters.toString());
+      if (counters != null) {
+        System.out.println("COUNTERS:" + counters.toString());
+      }
       
       for (TaskAttemptInfo tinfo: attemptsMap.values()) {
         tinfo.printAll();
@@ -491,7 +506,9 @@ public class JobHistoryParser {
       System.out.println("TASK_TYPE:" + taskType);
       System.out.println("TRACKER_NAME:" + trackerName);
       System.out.println("HTTP_PORT:" + httpPort);
-      System.out.println("COUNTERS:" + counters.toString());
+      if (counters != null) {
+        System.out.println("COUNTERS:" + counters.toString());
+      }
     }
 
     /** Get the attempt Id */

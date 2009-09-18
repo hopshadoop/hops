@@ -2676,6 +2676,8 @@ public class JobInProgress {
           this.finishTime,
           this.finishedMapTasks,this.finishedReduceTasks, failedMapTasks, 
           failedReduceTasks, 
+          new org.apache.hadoop.mapreduce.Counters(getMapCounters()),
+          new org.apache.hadoop.mapreduce.Counters(getReduceCounters()),
           new org.apache.hadoop.mapreduce.Counters(getCounters()));
       
       jobHistory.logEvent(jfe, this.status.getJobID());

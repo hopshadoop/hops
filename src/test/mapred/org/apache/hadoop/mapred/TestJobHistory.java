@@ -355,7 +355,7 @@ public class TestJobHistory extends TestCase {
 
     // Validate job counters
     Counters c = new Counters(jip.getCounters());
-    Counters jiCounters = jobInfo.getCounters();
+    Counters jiCounters = jobInfo.getTotalCounters();
     assertTrue("Counters of job obtained from history file did not " +
                "match the expected value",
                c.equals(jiCounters));

@@ -18,10 +18,13 @@
 package org.apache.hadoop.mapreduce.jobhistory;
 
 import java.io.IOException;
+import java.text.DecimalFormat;
+import java.text.Format;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -33,6 +36,8 @@ import org.apache.hadoop.mapred.JobInProgress;
 import org.apache.hadoop.mapred.JobStatus;
 import org.apache.hadoop.mapred.TaskLogServlet;
 import org.apache.hadoop.mapred.TaskStatus;
+import org.apache.hadoop.mapreduce.CounterGroup;
+import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskID;
 import org.apache.hadoop.mapreduce.TaskType;
@@ -139,8 +144,53 @@ public class HistoryViewer {
                         job.getLaunchTime()));
     jobDetails.append("\nStatus: ").append(((job.getJobStatus() == null) ? 
                       "Incomplete" :job.getJobStatus()));
+    printCounters(jobDetails, job.getTotalCounters(), job.getMapCounters(),
+        job.getReduceCounters());
+    jobDetails.append("\n");
     jobDetails.append("\n=====================================");
     System.out.println(jobDetails.toString());
+  }
+
+  private void printCounters(StringBuffer buff, Counters totalCounters,
+      Counters mapCounters, Counters reduceCounters) {
+    // Killed jobs might not have counters
+    if (totalCounters == null) {
+      return;
+    }
+    buff.append("\nCounters: \n\n");
+    buff.append(String.format("|%1$-30s|%2$-30s|%3$-10s|%4$-10s|%5$-10s|", 
+        "Group Name",
+        "Counter name",
+        "Map Value",
+        "Reduce Value",
+        "Total Value"));
+    buff.append("\n------------------------------------------"+
+        "---------------------------------------------");
+    for (String groupName : totalCounters.getGroupNames()) {
+         CounterGroup totalGroup = totalCounters.getGroup(groupName);
+         CounterGroup mapGroup = mapCounters.getGroup(groupName);
+         CounterGroup reduceGroup = reduceCounters.getGroup(groupName);
+      
+         Format decimal = new DecimalFormat();
+         Iterator<org.apache.hadoop.mapreduce.Counter> ctrItr =
+           totalGroup.iterator();
+         while(ctrItr.hasNext()) {
+           org.apache.hadoop.mapreduce.Counter counter = ctrItr.next();
+           String name = counter.getName();
+           String mapValue = 
+             decimal.format(mapGroup.findCounter(name).getValue());
+           String reduceValue = 
+             decimal.format(reduceGroup.findCounter(name).getValue());
+           String totalValue = 
+             decimal.format(counter.getValue());
+
+           buff.append(
+               String.format("\n|%1$-30s|%2$-30s|%3$-10s|%4$-10s|%5$-10s", 
+                   totalGroup.getDisplayName(),
+                   counter.getDisplayName(),
+                   mapValue, reduceValue, totalValue));
+      }
+    }
   }
   
   private void printAllTaskAttempts(TaskType taskType) {
