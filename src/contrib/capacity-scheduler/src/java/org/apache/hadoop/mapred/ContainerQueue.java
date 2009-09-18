@@ -26,7 +26,7 @@ import java.util.Collections;
 /**
  * Composite class for Queue hierarchy.
  */
-public class ContainerQueue extends AbstractQueue {
+class ContainerQueue extends AbstractQueue {
 
   //List of immediate children for this container queue.
   //Duplicate childrens are not allowed.
@@ -102,6 +102,17 @@ public class ContainerQueue extends AbstractQueue {
     return l;
   }
 
+  @Override
+  List<AbstractQueue> getDescendantContainerQueues() {
+    List<AbstractQueue> l = new ArrayList<AbstractQueue>();
+    for (AbstractQueue child : this.getChildren()) {
+      if (child.getChildren() != null && child.getChildren().size() > 0) {
+        l.add(child);
+        l.addAll(child.getDescendantContainerQueues());
+      }
+    }
+    return l;
+  }
 
   /**
    * Used for test only.

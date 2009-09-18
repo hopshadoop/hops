@@ -117,18 +117,6 @@ public class TaskSchedulingContext {
   }
 
   /**
-   * checks if current capacity reached its maximum capacity %
-   *
-   * @return
-   */
-  boolean checkIfReachedMax() {
-    if (maxCapacity < 0) {
-      return false;
-    }
-    return (maxCapacity <= numSlotsOccupied);
-  }
-
-  /**
    * Mutator method for capacity
    *
    * @param capacity

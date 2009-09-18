@@ -20,11 +20,11 @@ package org.apache.hadoop.mapred;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.conf.Configuration;
 
+import java.io.IOException;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.List;
-
 
 /**
  * Parent class for hierarchy of queues.
@@ -46,7 +46,7 @@ import java.util.List;
  * there children level.
  */
 
-public abstract class AbstractQueue {
+abstract class AbstractQueue {
 
   static final Log LOG = LogFactory.getLog(AbstractQueue.class);
 
@@ -55,8 +55,8 @@ public abstract class AbstractQueue {
 
 
   protected AbstractQueue(AbstractQueue parent, QueueSchedulingContext qsc) {
-    this.parent = parent;
-    this.qsc = qsc;
+    setParent(parent);
+    setQueueSchedulingContext(qsc);
     //Incase of root this value would be null
     if (parent != null) {
       parent.addChild(this);
@@ -87,6 +87,16 @@ public abstract class AbstractQueue {
     return qsc;
   }
 
+  /**
+   * Set the {@link QueueSchedulingContext} of this {@link AbstractQueue} to the
+   * passed context.
+   * 
+   * @param qsc
+   */
+  void setQueueSchedulingContext(QueueSchedulingContext qsc) {
+    this.qsc = qsc;
+  }
+
   String getName() {
     return qsc.getQueueName();
   }
@@ -100,11 +110,29 @@ public abstract class AbstractQueue {
   }
 
   /**
-   * Return sorted list of leaf level queues.
-   *
-   * @return
+   * Get a list of all the {@link JobQueue}s in the {@link AbstractQueue}
+   * hierarchy rooted by 'this' {@link AbstractQueue}.
+   * 
+   * <p>
+   * The list is returned in a depth-first order in which the children of each
+   * {@link AbstractQueue}s in the hierarchy are already ordered.
+   * 
+   * @return an unordered list containing all the job-queues in the hierarchy.
    */
-  public abstract List<AbstractQueue> getDescendentJobQueues();
+  abstract List<AbstractQueue> getDescendentJobQueues();
+
+  /**
+   * Get a list of all the {@link ContainerQueue}s in the {@link AbstractQueue}
+   * hierarchy rooted by 'this' {@link AbstractQueue}, excluding this queue.
+   * 
+   * <p>
+   * The list is returned in a depth-first order in which the children of each
+   * {@link AbstractQueue}s in the hierarchy are already ordered.
+   * 
+   * @return an unordered list containing all the container queues in the
+   *         hierarchy.
+   */
+  abstract List<AbstractQueue> getDescendantContainerQueues();
 
   /**
    * Sorts all levels below current level.
@@ -141,6 +169,17 @@ public abstract class AbstractQueue {
             + "\n" + getQueueSchedulingContext().toString();
   }
 
+  /**
+   * Comparator to compare {@link AbstractQueue}s by the natural order of the
+   * corresponding queue names.
+   */
+  static class AbstractQueueComparator implements Comparator<AbstractQueue> {
+    @Override
+    public int compare(AbstractQueue o1, AbstractQueue o2) {
+      return o1.getName().compareTo(o2.getName());
+    }
+  }
+
   @Override
   /**
    * Returns true, if the other object is an AbstractQueue
@@ -161,6 +200,62 @@ public abstract class AbstractQueue {
   @Override
   public int hashCode() {
     return this.getName().hashCode();
+  }
+
+  /**
+   * Copy the configuration enclosed via {@link QueueSchedulingContext} of the
+   * destinationQueue to the sourceQueue recursively.
+   * 
+   * <p>
+   * This method assumes that the total hierarchy of the passed queues is the
+   * same and that the {@link AbstractQueue#getChildren()} on this queue as well
+   * as the sourceQueue are sorted according to the comparator
+   * {@link AbstractQueueComparator} .
+   * 
+   * @param AbstractQueueComparator
+   * @throws IOException
+   */
+  void validateAndCopyQueueContexts(AbstractQueue sourceQueue)
+      throws IOException {
+
+    // Do some validation before copying.
+    QueueSchedulingContext sourceContext =
+        sourceQueue.getQueueSchedulingContext();
+    if (qsc.supportsPriorities() != sourceContext.supportsPriorities()) {
+      throw new IOException("Changing of priorities is not yet supported. "
+          + "Attempt has been made to change priority of the queue "
+          + this.getName());
+    }
+
+    // First update the children queues recursively.
+    List<AbstractQueue> destChildren = getChildren();
+    if (destChildren != null) {
+      Iterator<AbstractQueue> itr1 = destChildren.iterator();
+      Iterator<AbstractQueue> itr2 = sourceQueue.getChildren().iterator();
+      while (itr1.hasNext()) {
+        itr1.next().validateAndCopyQueueContexts(itr2.next());
+      }
+    }
+
+    // Now, copy the configuration for the root-queue itself
+    sourceContext.setNumJobsByUser(qsc.getNumJobsByUser());
+    sourceContext.setNumOfWaitingJobs(qsc.getNumOfWaitingJobs());
+
+    // Task limits are already read from the configuration. Cache them and set
+    // them in the old hierarchy along with the map/reduce TSCs.
+    int maxMapTaskLimit = sourceContext.getMapTSC().getMaxTaskLimit();
+    int maxReduceTaskLimit = sourceContext.getReduceTSC().getMaxTaskLimit();
+    sourceContext.setMapTSC(qsc.getMapTSC());
+    sourceContext.setReduceTSC(qsc.getReduceTSC());
+    sourceContext.getMapTSC().setMaxTaskLimit(maxMapTaskLimit);
+    sourceContext.getReduceTSC().setMaxTaskLimit(maxReduceTaskLimit);
+
+    setQueueSchedulingContext(sourceContext);
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("New Queue-Context for " + sourceQueue.getName() + ": "
+          + sourceQueue.getQueueSchedulingContext());
+    }
   }
 
 }

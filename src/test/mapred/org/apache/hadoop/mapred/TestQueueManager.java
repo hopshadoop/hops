@@ -22,6 +22,10 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
@@ -35,6 +39,8 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
+import org.apache.hadoop.mapreduce.QueueState;
+import org.apache.hadoop.mapreduce.server.jobtracker.TaskTracker;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
@@ -45,7 +51,7 @@ import static org.apache.hadoop.mapred.DeprecatedQueueConfigurationParser.*;
 
 public class TestQueueManager extends TestCase {
 
-  private static final Log LOG = LogFactory.getLog(TestQueueManager.class);
+  static final Log LOG = LogFactory.getLog(TestQueueManager.class);
   
   private MiniDFSCluster miniDFSCluster;
   private MiniMRCluster miniMRCluster;
@@ -265,7 +271,7 @@ public class TestQueueManager extends TestCase {
       hadoopConfProps.put("mapred.queue.q2.acl-submit-job", ugi.getUserName());
       UtilsForTests.setUpConfigFile(hadoopConfProps, hadoopConfigFile);
       //refresh configuration
-      queueManager.refreshQueues(conf);
+      queueManager.refreshQueues(conf, null);
       //Submission should succeed
       assertTrue("User Job Submission failed after refresh.",
           queueManager.hasAccess("default", Queue.QueueOperation.
@@ -284,7 +290,7 @@ public class TestQueueManager extends TestCase {
       hadoopConfProps.put("mapred.acls.enabled", "true");
       hadoopConfProps.put("mapred.queue.default.acl-submit-job", ugi.getUserName());
       UtilsForTests.setUpConfigFile(hadoopConfProps, hadoopConfigFile);
-      queueManager.refreshQueues(conf);
+      queueManager.refreshQueues(conf, null);
       assertTrue("User Job Submission failed after refresh and no queue acls file.",
           queueManager.hasAccess("default", Queue.QueueOperation.
               SUBMIT_JOB, ugi));
@@ -338,10 +344,10 @@ public class TestQueueManager extends TestCase {
 
       // verify state of queues before refresh
       JobQueueInfo queueInfo = queueManager.getJobQueueInfo("default");
-      assertEquals(Queue.QueueState.RUNNING.getStateName(),
+      assertEquals(QueueState.RUNNING.getStateName(),
                     queueInfo.getQueueState());
       queueInfo = queueManager.getJobQueueInfo("qu1");
-      assertEquals(Queue.QueueState.STOPPED.getStateName(),
+      assertEquals(QueueState.STOPPED.getStateName(),
                     queueInfo.getQueueState());
       queueConfProps.put("mapred.queue.names", "default,qu1");
       queueConfProps.put("mapred.acls.enabled", "true");
@@ -350,7 +356,7 @@ public class TestQueueManager extends TestCase {
       UtilsForTests.setUpConfigFile(queueConfProps, hadoopConfigFile);
 
       //refresh configuration
-      queueManager.refreshQueues(conf);
+      queueManager.refreshQueues(conf, null);
 
       //Job Submission should pass now because ugi to be used is set to blank.
       try{
@@ -368,10 +374,10 @@ public class TestQueueManager extends TestCase {
 
       // verify state of queues after refresh
       queueInfo = queueManager.getJobQueueInfo("default");
-      assertEquals(Queue.QueueState.STOPPED.getStateName(),
+      assertEquals(QueueState.STOPPED.getStateName(),
                     queueInfo.getQueueState());
       queueInfo = queueManager.getJobQueueInfo("qu1");
-      assertEquals(Queue.QueueState.RUNNING.getStateName(),
+      assertEquals(QueueState.RUNNING.getStateName(),
                     queueInfo.getQueueState());
     } finally{
       if(hadoopConfigFile.exists()) {
@@ -423,7 +429,7 @@ public class TestQueueManager extends TestCase {
       try {
         //Exception to be thrown by queue manager because configuration passed
         //is invalid.
-        queueManager.refreshQueues(conf);
+        queueManager.refreshQueues(conf, null);
         fail("Refresh of ACLs should have failed with invalid conf file.");
       } catch (Exception e) {
       }
@@ -443,8 +449,7 @@ public class TestQueueManager extends TestCase {
       }
     }
   }
-  
-  
+
   private JobConf setupConf(String aclName, String aclValue) {
     JobConf conf = new JobConf();
     if(conf.get("mapred.queue.names") == null) {

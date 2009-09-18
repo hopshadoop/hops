@@ -55,7 +55,10 @@ public class QueueInfo implements Writable {
    * 
    */
   public QueueInfo() {
+    // make it running by default.
+    this.queueState = queueState.RUNNING;
     children = new ArrayList<QueueInfo>();
+    props = new Properties();
   }
   
   /**
@@ -67,11 +70,9 @@ public class QueueInfo implements Writable {
    * queue
    */
   public QueueInfo(String queueName, String schedulingInfo) {
+    this();
     this.queueName = queueName;
     this.schedulingInfo = schedulingInfo;
-    // make it running by default.
-    this.queueState = QueueState.RUNNING;
-    children = new ArrayList<QueueInfo>();
   }
   
   /**
@@ -83,9 +84,7 @@ public class QueueInfo implements Writable {
    */
   public QueueInfo(String queueName, String schedulingInfo, QueueState state,
                    JobStatus[] stats) {
-    this.queueName = queueName;
-    this.schedulingInfo = schedulingInfo;
-    // make it running by default.
+    this(queueName, schedulingInfo);
     this.queueState = state;
     this.stats = stats;
   }

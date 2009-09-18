@@ -19,6 +19,7 @@ package org.apache.hadoop.mapred;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.mapreduce.QueueState;
 import org.apache.hadoop.security.SecurityUtil.AccessControlList;
 
 import java.util.ArrayList;
@@ -55,32 +56,6 @@ class Queue implements Comparable<Queue>{
   private Set<Queue> children;
 
   private Properties props;
-
-  /**
-   * Enum representing queue state
-   */
-  static enum QueueState {
-
-    STOPPED("stopped"), RUNNING("running");
-    private final String stateName;
-
-    QueueState(String stateName) {
-      this.stateName = stateName;
-    }
-
-    /**
-     * @return the stateName
-     */
-    public String getStateName() {
-      return stateName;
-    }
-
-    @Override
-    public String toString() {
-      return stateName;
-    }
-
-  }
 
   /**
    * Enum representing an operation that can be performed on a queue.
@@ -146,7 +121,7 @@ class Queue implements Comparable<Queue>{
   void setName(String name) {
     this.name = name;
   }
-  
+
   /**
    * Return the ACLs for the queue
    * 
@@ -200,6 +175,27 @@ class Queue implements Comparable<Queue>{
    */
   void setSchedulingInfo(Object schedulingInfo) {
     this.schedulingInfo = schedulingInfo;
+  }
+
+  /**
+   * Copy the scheduling information from the sourceQueue into this queue
+   * recursively.
+   * 
+   * @param sourceQueue
+   */
+  void copySchedulingInfo(Queue sourceQueue) {
+    // First update the children queues recursively.
+    Set<Queue> destChildren = getChildren();
+    if (destChildren != null) {
+      Iterator<Queue> itr1 = destChildren.iterator();
+      Iterator<Queue> itr2 = sourceQueue.getChildren().iterator();
+      while (itr1.hasNext()) {
+        itr1.next().copySchedulingInfo(itr2.next());
+      }
+    }
+
+    // Now, copy the information for the root-queue itself
+    setSchedulingInfo(sourceQueue.getSchedulingInfo());
   }
 
   /**
@@ -277,7 +273,6 @@ class Queue implements Comparable<Queue>{
    *
    * Doesn't return null .
    * Adds itself if this is leaf node.
-   *  
    * @return
    */
   Map<String,Queue> getLeafQueues() {
@@ -330,7 +325,8 @@ class Queue implements Comparable<Queue>{
   JobQueueInfo getJobQueueInfo() {
     JobQueueInfo queueInfo = new JobQueueInfo();
     queueInfo.setQueueName(name);
-    queueInfo.setQueueState(state.name());
+    LOG.debug("created jobQInfo " + queueInfo.getQueueName());
+    queueInfo.setQueueState(state.getStateName());
     if (schedulingInfo != null) {
       queueInfo.setSchedulingInfo(schedulingInfo.toString());
     }
@@ -377,10 +373,19 @@ class Queue implements Comparable<Queue>{
         return false;
       }
     } else if(children.size() > 0) {
-
       //check for the individual children and then see if all of them
       //are updated.
-      if(children.size() != newState.getChildren().size()) {
+      if (newState.getChildren() == null) {
+        LOG.fatal("In the current state, queue " + getName() + " has "
+            + children.size() + " but the new state has none!");
+        return false;
+      }
+      int childrenSize = children.size();
+      int newChildrenSize = newState.getChildren().size();
+      if (childrenSize != newChildrenSize) {
+        LOG.fatal("Number of children for queue " + newState.getName()
+            + " in newState is " + newChildrenSize + " which is not equal to "
+            + childrenSize + " in the current state.");
         return false;
       }
       //children are pre sorted as they are stored in treeset.

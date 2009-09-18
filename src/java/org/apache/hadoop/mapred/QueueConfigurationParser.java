@@ -19,6 +19,7 @@ package org.apache.hadoop.mapred;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.mapreduce.QueueState;
 import org.apache.hadoop.security.SecurityUtil.AccessControlList;
 import static org.apache.hadoop.mapred.QueueManager.toFullPropertyName;
 import org.xml.sax.SAXException;
@@ -100,23 +101,6 @@ class QueueConfigurationParser {
 
   void setAclsEnabled(boolean aclsEnabled) {
     this.aclsEnabled = aclsEnabled;
-  }
-
-  static Queue.QueueState getQueueState(String stateVal) {
-    Queue.QueueState retState = null;
-    for (Queue.QueueState state : Queue.QueueState.values()) {
-      if (state.getStateName().equalsIgnoreCase(stateVal)) {
-        retState = state;
-        break;
-      }
-    }
-
-    if(retState == null) {
-      LOG.error("Improper state value , " +
-        "setting the state to " + Queue.QueueState.RUNNING.getStateName());
-      retState = Queue.QueueState.RUNNING;
-    }
-    return retState;
   }
 
   boolean isAclsEnabled() {
@@ -297,7 +281,7 @@ class QueueConfigurationParser {
 
       if (STATE_TAG.equals(field.getTagName())) {
         String state = field.getTextContent();
-        newQueue.setState(getQueueState(state));
+        newQueue.setState(QueueState.getState(state));
       }
     }
     //Set acls
@@ -385,4 +369,67 @@ class QueueConfigurationParser {
           "tags or state tags are siblings ");
     }
   }
+
+
+  private static String getSimpleQueueName(String fullQName) {
+    int index = fullQName.lastIndexOf(NAME_SEPARATOR);
+    if (index < 0) {
+      return fullQName;
+    }
+    return fullQName.substring(index + 1, fullQName.length());
+  }
+
+  /**
+   * Construct an {@link Element} for a single queue, constructing the inner
+   * queue &lt;name/&gt;, &lt;properties/&gt;, &lt;state/&gt; and the inner
+   * &lt;queue&gt; elements recursively.
+   * 
+   * @param document
+   * @param jqi
+   * @return
+   */
+  static Element getQueueElement(Document document, JobQueueInfo jqi) {
+
+    // Queue
+    Element q = document.createElement(QUEUE_TAG);
+
+    // Queue-name
+    Element qName = document.createElement(QUEUE_NAME_TAG);
+    qName.setTextContent(getSimpleQueueName(jqi.getQueueName()));
+    q.appendChild(qName);
+
+    // Queue-properties
+    Properties props = jqi.getProperties();
+    Element propsElement = document.createElement(PROPERTIES_TAG);
+    if (props != null) {
+      Set<String> propList = props.stringPropertyNames();
+      for (String prop : propList) {
+        Element propertyElement = document.createElement(PROPERTY_TAG);
+        propertyElement.setAttribute(KEY_TAG, prop);
+        propertyElement.setAttribute(VALUE_TAG, (String) props.get(prop));
+        propsElement.appendChild(propertyElement);
+      }
+    }
+    q.appendChild(propsElement);
+
+    // Queue-state
+    String queueState = jqi.getQueueState();
+    if (queueState != null
+        && !queueState.equals(QueueState.UNDEFINED.getStateName())) {
+      Element qStateElement = document.createElement(STATE_TAG);
+      qStateElement.setTextContent(queueState);
+      q.appendChild(qStateElement);
+    }
+
+    // Queue-children
+    List<JobQueueInfo> children = jqi.getChildren();
+    if (children != null) {
+      for (JobQueueInfo child : children) {
+        q.appendChild(getQueueElement(document, child));
+      }
+    }
+
+    return q;
+  }
+
 }

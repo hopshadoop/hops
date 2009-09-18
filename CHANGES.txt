@@ -394,6 +394,10 @@ Trunk (unreleased changes)
     MAPREDUCE-277. Makes job history counters available on the job history
     viewers. (Jothi Padmanabhan via ddas)
 
+    MAPREDUCE-893. Provides an ability to refresh queue configuration
+    without restarting the JobTracker.
+    (Vinod Kumar Vavilapalli and Rahul Kumar Singh via yhemanth)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 

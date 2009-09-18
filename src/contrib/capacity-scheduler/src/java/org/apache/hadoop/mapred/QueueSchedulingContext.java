@@ -241,19 +241,6 @@ public class QueueSchedulingContext {
     this.maxCapacityPercent = maxCapacityPercent;
   }
 
-
-  /**
-   * This method is useful to get a cumulative data.
-   * Adds the @param qcontext data to the this queueschedulingContext data.
-   * @param qcontext
-   * @return
-   */
-  void add(QueueSchedulingContext qcontext) {
-    this.setNumOfWaitingJobs(numOfWaitingJobs+qcontext.getNumOfWaitingJobs());
-    this.getMapTSC().update(qcontext.getMapTSC());
-    this.getReduceTSC().update(qcontext.getReduceTSC());
-  }
-
   void updateContext(int mapClusterCapacity , int reduceClusterCapacity) {
     setMapCapacity(mapClusterCapacity);
     setReduceCapacity(reduceClusterCapacity);

@@ -43,9 +43,9 @@ class JobQueuesManager extends JobInProgressListener {
   }
 
   /**
-   * create an empty queue with the default comparator
-   *
-   * @param queue The jobqueue
+   * Add the given queue to the map of queue name to job-queues.
+   * 
+   * @param queue The job-queue
    */
   public void addQueue(JobQueue queue) {
     jobQueues.put(queue.getName(),queue);
@@ -53,14 +53,15 @@ class JobQueuesManager extends JobInProgressListener {
 
   @Override
   public void jobAdded(JobInProgress job) throws IOException {
-    LOG.info("Job submitted to queue " + job.getProfile().getQueueName());
+    LOG.info("Job " + job.getJobID() + " submitted to queue "
+        + job.getProfile().getQueueName());
     // add job to the right queue
     JobQueue qi = getJobQueue(job.getProfile().getQueueName());
     if (null == qi) {
       // job was submitted to a queue we're not aware of
       LOG.warn(
         "Invalid queue " + job.getProfile().getQueueName() +
-          " specified for job" + job.getProfile().getJobID() +
+          " specified for job " + job.getProfile().getJobID() +
           ". Ignoring job.");
       return;
     }

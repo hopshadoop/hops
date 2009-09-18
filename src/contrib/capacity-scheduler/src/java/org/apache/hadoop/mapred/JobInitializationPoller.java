@@ -265,26 +265,70 @@ public class JobInitializationPoller extends Thread {
 
   void init(Set<String> queues, 
             CapacitySchedulerConf capacityConf) {
-    for (String queue : queues) {
-      int userlimit = capacityConf.getMinimumUserLimitPercent(queue);
-      int maxUsersToInitialize = ((100 / userlimit) + MAX_ADDITIONAL_USERS_TO_INIT);
-      int maxJobsPerUserToInitialize = capacityConf
-          .getMaxJobsPerUserToInitialize(queue);
-      QueueInfo qi = new QueueInfo(queue, maxUsersToInitialize,
-          maxJobsPerUserToInitialize);
-      jobQueues.put(queue, qi);
-    }
-    sleepInterval = capacityConf.getSleepInterval();
-    poolSize = capacityConf.getMaxWorkerThreads();
-    if (poolSize > queues.size()) {
-      poolSize = queues.size();
-    }
+    setupJobInitializerConfiguration(queues, capacityConf);
     assignThreadsToQueues();
     Collection<JobInitializationThread> threads = threadsToQueueMap.values();
     for (JobInitializationThread t : threads) {
       if (!t.isAlive()) {
         t.setDaemon(true);
         t.start();
+      }
+    }
+  }
+
+  /**
+   * Initialize the configuration of the JobInitializer as well as of the specific
+   * queues.
+   * 
+   * @param queues
+   * @param schedulerConf
+   */
+  private void setupJobInitializerConfiguration(Set<String> queues,
+      CapacitySchedulerConf schedulerConf) {
+    for (String queue : queues) {
+      int maxUsersToInitialize = getMaxUsersToInit(schedulerConf, queue);
+      int maxJobsPerUserToInitialize =
+          schedulerConf.getMaxJobsPerUserToInitialize(queue);
+      QueueInfo qi =
+          new QueueInfo(queue, maxUsersToInitialize,
+              maxJobsPerUserToInitialize);
+      jobQueues.put(queue, qi);
+    }
+    sleepInterval = schedulerConf.getSleepInterval();
+    poolSize = schedulerConf.getMaxWorkerThreads();
+    if (poolSize > queues.size()) {
+      poolSize = queues.size();
+    }
+  }
+
+  /**
+   * 
+   * @param schedulerConf
+   * @param queue
+   * @return
+   */
+  private int getMaxUsersToInit(CapacitySchedulerConf schedulerConf,
+      String queue) {
+    int userlimit = schedulerConf.getMinimumUserLimitPercent(queue);
+    return (100 / userlimit) + MAX_ADDITIONAL_USERS_TO_INIT;
+  }
+
+  /**
+   * Refresh the Scheduler configuration cached with the initializer. This
+   * should be called only by
+   * {@link CapacityTaskScheduler.CapacitySchedulerQueueRefresher#refreshQueues()}
+   * . The cached configuration currently is only used by the main thread in the
+   * initializer. So, any updates are picked up automatically by subsequent
+   * iterations of the main thread.
+   */
+  void refreshQueueInfo(CapacitySchedulerConf schedulerConf) {
+    for (String queue : jobQueues.keySet()) {
+      QueueInfo queueInfo = jobQueues.get(queue);
+      synchronized (queueInfo) {
+        queueInfo.maxUsersAllowedToInitialize =
+            getMaxUsersToInit(schedulerConf, queue);
+        queueInfo.maxJobsPerUserToInitialize =
+            schedulerConf.getMaxJobsPerUserToInitialize(queue);
       }
     }
   }
@@ -434,8 +478,12 @@ public class JobInitializationPoller extends Thread {
     ArrayList<JobInProgress> jobsToInitialize = new ArrayList<JobInProgress>();
     // use the configuration parameter which is configured for the particular
     // queue.
-    int maximumUsersAllowedToInitialize = qi.maxUsersAllowedToInitialize;
-    int maxJobsPerUserAllowedToInitialize = qi.maxJobsPerUserToInitialize;
+    int maximumUsersAllowedToInitialize;
+    int maxJobsPerUserAllowedToInitialize;
+    synchronized (qi) {
+      maximumUsersAllowedToInitialize = qi.maxUsersAllowedToInitialize;
+      maxJobsPerUserAllowedToInitialize = qi.maxJobsPerUserToInitialize;
+    }
     int maxJobsPerQueueToInitialize = maximumUsersAllowedToInitialize
         * maxJobsPerUserAllowedToInitialize;
     int countOfJobsInitialized = 0;

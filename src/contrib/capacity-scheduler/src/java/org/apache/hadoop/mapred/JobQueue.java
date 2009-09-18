@@ -35,7 +35,7 @@ import java.util.TreeMap;
 /**
  *
  */
-public class JobQueue extends AbstractQueue {
+class JobQueue extends AbstractQueue {
 
   static final Log LOG = LogFactory.getLog(JobQueue.class);
 
@@ -343,10 +343,15 @@ public class JobQueue extends AbstractQueue {
    * @return
    */
   @Override
-  public List<AbstractQueue> getDescendentJobQueues() {
+  List<AbstractQueue> getDescendentJobQueues() {
     List<AbstractQueue> l = new ArrayList<AbstractQueue>();
     l.add(this);
     return l;
+  }
+
+  @Override
+  List<AbstractQueue> getDescendantContainerQueues() {
+    return new ArrayList<AbstractQueue>();
   }
 
   public void jobUpdated(JobChangeEvent event) {

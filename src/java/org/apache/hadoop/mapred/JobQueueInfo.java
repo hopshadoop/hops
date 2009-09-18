@@ -54,7 +54,7 @@ public class JobQueueInfo extends QueueInfo {
   
   JobQueueInfo(QueueInfo queue) {
     this(queue.getQueueName(), queue.getSchedulingInfo());
-    setQueueState(queue.getState().name());
+    setQueueState(queue.getState().getStateName());
     setQueueChildren(queue.getQueueChildren());
     setProperties(queue.getProperties());
     setJobStatuses(queue.getJobStatuses());
@@ -83,7 +83,7 @@ public class JobQueueInfo extends QueueInfo {
    * @param state state of the queue.
    */
   protected void setQueueState(String state) {
-    super.setState(QueueState.valueOf(state));
+    super.setState(QueueState.getState(state));
   }
   
   String getQueueState() {
@@ -101,7 +101,7 @@ public class JobQueueInfo extends QueueInfo {
   public List<JobQueueInfo> getChildren() {
     List<JobQueueInfo> list = new ArrayList<JobQueueInfo>();
     for (QueueInfo q : super.getQueueChildren()) {
-      list.add(new JobQueueInfo(q));
+      list.add((JobQueueInfo)q);
     }
     return list;
   }
@@ -109,7 +109,36 @@ public class JobQueueInfo extends QueueInfo {
   protected void setProperties(Properties props) {
     super.setProperties(props);
   }
-  
+
+  /**
+   * Add a child {@link JobQueueInfo} to this {@link JobQueueInfo}. Modify the
+   * fully-qualified name of the child {@link JobQueueInfo} to reflect the
+   * hierarchy.
+   * 
+   * Only for testing.
+   * 
+   * @param child
+   */
+  void addChild(JobQueueInfo child) {
+    List<JobQueueInfo> children = getChildren();
+    children.add(child);
+    setChildren(children);
+  }
+
+  /**
+   * Remove the child from this {@link JobQueueInfo}. This also resets the
+   * queue-name of the child from a fully-qualified name to a simple queue name.
+   * 
+   * Only for testing.
+   * 
+   * @param child
+   */
+  void removeChild(JobQueueInfo child) {
+    List<JobQueueInfo> children = getChildren();
+    children.remove(child);
+    setChildren(children);
+  }
+
   protected void setJobStatuses(org.apache.hadoop.mapreduce.JobStatus[] stats) {
     super.setJobStatuses(stats);
   }

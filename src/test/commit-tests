@@ -41,3 +41,5 @@
 **/TestQueueManagerForHierarchialQueues
 **/TestContainerQueue
 **/TestCapacityScheduler
+**/TestRefreshOfQueues
+**/TestQueueManagerRefresh

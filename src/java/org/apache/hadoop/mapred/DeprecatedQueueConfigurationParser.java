@@ -19,6 +19,7 @@
 package org.apache.hadoop.mapred;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.mapreduce.QueueState;
 import org.apache.hadoop.security.SecurityUtil;
 import static org.apache.hadoop.mapred.QueueManager.*;
 import org.apache.commons.logging.Log;
@@ -61,7 +62,7 @@ class DeprecatedQueueConfigurationParser extends QueueConfigurationParser {
       try {
         Map<String, SecurityUtil.AccessControlList> acls = getQueueAcls(
           name, conf);
-        Queue.QueueState state = getQueueState(name, conf);
+        QueueState state = getQueueState(name, conf);
         Queue q = new Queue(name, acls, state);
         list.add(q);
       } catch (Throwable t) {
@@ -75,12 +76,12 @@ class DeprecatedQueueConfigurationParser extends QueueConfigurationParser {
    * Only applicable to leaf level queues
    * Parse ACLs for the queue from the configuration.
    */
-  private Queue.QueueState getQueueState(String name, Configuration conf) {
+  private QueueState getQueueState(String name, Configuration conf) {
     String stateVal = conf.get(
       QueueManager.toFullPropertyName(
         name,"state"),
-      Queue.QueueState.RUNNING.getStateName());
-    return QueueConfigurationParser.getQueueState(stateVal);
+      QueueState.RUNNING.getStateName());
+    return QueueState.getState(stateVal);
   }
 
   /**

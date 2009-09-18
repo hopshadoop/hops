@@ -258,4 +258,8 @@
        <Bug pattern="OBL_UNSATISFIED_OBLIGATION" />
      </Match>
 
+    <Match>
+       <Class name="org.apache.hadoop.mapred.TaskScheduler$QueueRefresher" />
+       <Bug pattern="SIC_INNER_SHOULD_BE_STATIC" />
+     </Match>
  </FindBugsFilter>

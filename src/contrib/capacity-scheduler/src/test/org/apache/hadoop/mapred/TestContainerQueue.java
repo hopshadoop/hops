@@ -28,12 +28,9 @@ import static org.apache.hadoop.mapred.CapacityTestUtils.*;
 
 public class TestContainerQueue extends TestCase {
 
-  static int jobCounter = 0;
   CapacityTestUtils.FakeTaskTrackerManager taskTrackerManager = null;
   CapacityTaskScheduler scheduler = null;
   CapacityTestUtils.FakeClock clock = null;
-  JobConf conf = null;
-  CapacityTestUtils.FakeResourceManagerConf resConf = null;
   CapacityTestUtils.ControlledInitializationPoller
     controlledInitializationPoller;
 
@@ -45,7 +42,6 @@ public class TestContainerQueue extends TestCase {
   private void setUp(
     int numTaskTrackers, int numMapTasksPerTracker,
     int numReduceTasksPerTracker) {
-    jobCounter = 0;
     taskTrackerManager =
       new CapacityTestUtils.FakeTaskTrackerManager(
         numTaskTrackers, numMapTasksPerTracker,
@@ -54,19 +50,12 @@ public class TestContainerQueue extends TestCase {
     scheduler = new CapacityTaskScheduler(clock);
     scheduler.setTaskTrackerManager(taskTrackerManager);
 
-    conf = new JobConf();
     // Don't let the JobInitializationPoller come in our way.
-    resConf = new CapacityTestUtils.FakeResourceManagerConf();
     controlledInitializationPoller =
-      new CapacityTestUtils.ControlledInitializationPoller(
-        scheduler.jobQueuesManager,
-        resConf,
-        resConf.getQueues(), taskTrackerManager);
+        new CapacityTestUtils.ControlledInitializationPoller(
+            scheduler.jobQueuesManager, taskTrackerManager);
     scheduler.setInitializationPoller(controlledInitializationPoller);
-    scheduler.setConf(conf);
-    //by default disable speculative execution.
-    conf.setMapSpeculativeExecution(false);
-    conf.setReduceSpeculativeExecution(false);
+    scheduler.setConf(taskTrackerManager.defaultJobConf);
   }
 
   /**
@@ -77,7 +66,7 @@ public class TestContainerQueue extends TestCase {
    */
   public void testMinCapacity() {
 
-    AbstractQueue rt = scheduler.createRoot();
+    AbstractQueue rt = QueueHierarchyBuilder.createRootAbstractQueue();
 
     //Simple check to make sure that capacity is properly distributed among
     // its children.
@@ -135,7 +124,7 @@ public class TestContainerQueue extends TestCase {
     this.setUp(4,1,1);
     taskTrackerManager.addJobInProgressListener(scheduler.jobQueuesManager);
 
-    AbstractQueue rt = scheduler.createRoot();
+    AbstractQueue rt = QueueHierarchyBuilder.createRootAbstractQueue();
 
     QueueSchedulingContext a1 = new QueueSchedulingContext(
       "R.a", 25, 50, -1, -1, -1);
@@ -159,7 +148,7 @@ public class TestContainerQueue extends TestCase {
     scheduler.updateContextInfoForTests();
 
     // submit a job to the second queue
-    submitJobAndInit(JobStatus.PREP, 20, 0, "R.a", "u1");
+    taskTrackerManager.submitJobAndInit(JobStatus.PREP, 20, 0, "R.a", "u1");
 
     //Queue R.a should not more than 2 slots 
     checkAssignment(
@@ -179,7 +168,7 @@ public class TestContainerQueue extends TestCase {
 
   public void testDistributedUnConfiguredCapacity() {
 
-    AbstractQueue rt = scheduler.createRoot();
+    AbstractQueue rt = QueueHierarchyBuilder.createRootAbstractQueue();
 
     //generate Queuecontext for the children
     QueueSchedulingContext a1 = new QueueSchedulingContext(
@@ -227,7 +216,7 @@ public class TestContainerQueue extends TestCase {
                                     int a, int b, int c, int d) {
     HashMap<String, AbstractQueue> map = new HashMap<String, AbstractQueue>();
 
-    AbstractQueue rt = scheduler.createRoot();
+    AbstractQueue rt = QueueHierarchyBuilder.createRootAbstractQueue();
     map.put(rt.getName(), rt);
     scheduler.setRoot(rt);
 
@@ -298,13 +287,15 @@ public class TestContainerQueue extends TestCase {
         new int[] { 0, 0, 0, 0 });
     
     //Only Allow job submission to leaf queue
-    submitJobAndInit(JobStatus.PREP, 4, 0, "rt.sch.prod", "u1");
+    taskTrackerManager.submitJobAndInit(JobStatus.PREP, 4, 0, "rt.sch.prod",
+        "u1");
 
     // submit a job to the second queue
-    submitJobAndInit(JobStatus.PREP, 4, 0, "rt.sch.misc", "u1");
+    taskTrackerManager.submitJobAndInit(JobStatus.PREP, 4, 0, "rt.sch.misc",
+        "u1");
 
     //submit a job in gta level queue
-    submitJobAndInit(JobStatus.PREP, 4, 0, "rt.gta", "u1");
+    taskTrackerManager.submitJobAndInit(JobStatus.PREP, 4, 0, "rt.gta", "u1");
 
     int counter = 0;
 
@@ -400,10 +391,11 @@ public class TestContainerQueue extends TestCase {
         new int[] { 0, 0, 0, 0 });
 
     // submit a job to the second queue
-    submitJobAndInit(JobStatus.PREP, 20, 0, "rt.sch.misc", "u1");
+    taskTrackerManager.submitJobAndInit(JobStatus.PREP, 20, 0, "rt.sch.misc",
+        "u1");
 
     //submit a job in gta level queue
-    submitJobAndInit(JobStatus.PREP, 20, 0, "rt.gta", "u1");
+    taskTrackerManager.submitJobAndInit(JobStatus.PREP, 20, 0, "rt.gta", "u1");
     int counter = 0;
 
     checkAssignment(taskTrackerManager, scheduler, "tt1",
@@ -485,41 +477,5 @@ public class TestContainerQueue extends TestCase {
         printOrderedQueueData(a);
       }
     }
-  }
-
-  // Submit a job and update the listeners
-  private CapacityTestUtils.FakeJobInProgress submitJobAndInit(
-    int state, int maps, int reduces,
-    String queue, String user)
-    throws IOException {
-    CapacityTestUtils.FakeJobInProgress j = submitJob(
-      state, maps, reduces, queue, user);
-    taskTrackerManager.initJob(j);
-    return j;
-  }
-
-  private CapacityTestUtils.FakeJobInProgress submitJob(
-    int state, int maps, int reduces,
-    String queue, String user) throws IOException {
-    JobConf jobConf = new JobConf(conf);
-    jobConf.setNumMapTasks(maps);
-    jobConf.setNumReduceTasks(reduces);
-    if (queue != null) {
-      jobConf.setQueueName(queue);
-    }
-    jobConf.setUser(user);
-    return submitJob(state, jobConf);
-  }
-
-  private CapacityTestUtils.FakeJobInProgress submitJob(
-    int state, JobConf jobConf) throws IOException {
-    CapacityTestUtils.FakeJobInProgress job =
-      new CapacityTestUtils.FakeJobInProgress(
-        new JobID("test", ++jobCounter),
-        (jobConf == null ? new JobConf(conf) : jobConf), taskTrackerManager,
-        jobConf.getUser());
-    job.getStatus().setRunState(state);
-    taskTrackerManager.submitJob(job);
-    return job;
   }
 }

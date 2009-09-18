@@ -38,6 +38,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.QueueState;
 import org.apache.hadoop.mapred.FakeObjectUtilities.FakeJobHistory;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.server.jobtracker.TaskTracker;
@@ -99,11 +100,8 @@ public class CapacityTestUtils {
     private boolean stopRunning;
     private ArrayList<ControlledJobInitializer> workers;
 
-    public ControlledInitializationPoller(
-      JobQueuesManager mgr,
-      CapacitySchedulerConf rmConf,
-      Set<String> queues,
-      TaskTrackerManager ttm) {
+    public ControlledInitializationPoller(JobQueuesManager mgr,
+        TaskTrackerManager ttm) {
       super(mgr, ttm);
     }
 
@@ -488,7 +486,7 @@ public class CapacityTestUtils {
             oper.getAclName());
           aclsMap.put(key, allEnabledAcl);
         }
-        queues[i++] = new Queue(queueName, aclsMap, Queue.QueueState.RUNNING);
+        queues[i++] = new Queue(queueName, aclsMap, QueueState.RUNNING);
       }
       super.setQueues(queues);
     }
@@ -496,6 +494,7 @@ public class CapacityTestUtils {
     public synchronized Set<String> getLeafQueueNames() {
       return queueNames;
     }
+
   }
 
   static class FakeTaskTrackerManager implements TaskTrackerManager {
@@ -507,7 +506,7 @@ public class CapacityTestUtils {
     List<JobInProgressListener> listeners =
       new ArrayList<JobInProgressListener>();
 
-    FakeQueueManager qm = null;
+    QueueManager qm = null;
 
     private Map<String, TaskTracker> trackers =
       new HashMap<String, TaskTracker>();
@@ -515,6 +514,8 @@ public class CapacityTestUtils {
       new HashMap<String, TaskStatus>();
     private Map<JobID, JobInProgress> jobs =
       new HashMap<JobID, JobInProgress>();
+    protected JobConf defaultJobConf;
+    private int jobCounter = 0;
 
     public FakeTaskTrackerManager() {
       this(2, 2, 1);
@@ -539,6 +540,12 @@ public class CapacityTestUtils {
             maxReduceTasksPerTracker));
         trackers.put(ttName, tt);
       }
+
+      defaultJobConf = new JobConf();
+      defaultJobConf.set("mapred.queue.names","default");
+      //by default disable speculative execution.
+      defaultJobConf.setMapSpeculativeExecution(false);
+      defaultJobConf.setReduceSpeculativeExecution(false);
     }
 
     public void addTaskTracker(String ttName) {
@@ -570,9 +577,31 @@ public class CapacityTestUtils {
       return MRConstants.HEARTBEAT_INTERVAL_MIN;
     }
 
+    /**
+     * Kill Job, and all its tasks on the corresponding TaskTrackers.
+     */
     @Override
     public void killJob(JobID jobid) throws IOException {
+      killJob(jobid, true);
+    }
+
+    /**
+     * Kill the job, and kill the tasks on the corresponding TaskTrackers only
+     * if killTasks is true.
+     * 
+     * @param jobid
+     * @throws IOException
+     */
+    void killJob(JobID jobid, boolean killTasks)
+        throws IOException {
       JobInProgress job = jobs.get(jobid);
+      // Finish all the tasks for this job
+      if (job instanceof FakeJobInProgress && killTasks) {
+        FakeJobInProgress fJob = (FakeJobInProgress) job;
+        for (String tipID : taskStatuses.keySet()) {
+          finishTask(tipID, fJob, TaskStatus.State.KILLED);
+        }
+      }
       finalizeJob(job, JobStatus.KILLED);
       job.kill();
     }
@@ -615,7 +644,7 @@ public class CapacityTestUtils {
       }
     }
 
-    public void removeJob(JobID jobid) {
+    public void retireJob(JobID jobid) {
       jobs.remove(jobid);
     }
 
@@ -650,6 +679,62 @@ public class CapacityTestUtils {
       for (JobInProgressListener listener : listeners) {
         listener.jobAdded(job);
       }
+    }
+
+    FakeJobInProgress submitJob(int state, JobConf jobConf)
+        throws IOException {
+      FakeJobInProgress job =
+          new FakeJobInProgress(new JobID("test", ++jobCounter),
+              (jobConf == null ? new JobConf(defaultJobConf) : jobConf), this,
+              jobConf.getUser());
+      job.getStatus().setRunState(state);
+      this.submitJob(job);
+      return job;
+    }
+
+    FakeJobInProgress submitJobAndInit(int state, JobConf jobConf)
+        throws IOException {
+      FakeJobInProgress j = submitJob(state, jobConf);
+      this.initJob(j);
+      return j;
+    }
+
+    FakeJobInProgress submitJob(int state, int maps, int reduces,
+        String queue, String user)
+        throws IOException {
+      JobConf jobConf = new JobConf(defaultJobConf);
+      jobConf.setNumMapTasks(maps);
+      jobConf.setNumReduceTasks(reduces);
+      if (queue != null) {
+        jobConf.setQueueName(queue);
+      }
+      jobConf.setUser(user);
+      return submitJob(state, jobConf);
+    }
+
+    // Submit a job and update the listeners
+    FakeJobInProgress submitJobAndInit(int state, int maps, int reduces,
+        String queue, String user)
+        throws IOException {
+      FakeJobInProgress j = submitJob(state, maps, reduces, queue, user);
+      this.initJob(j);
+      return j;
+    }
+
+    HashMap<String, ArrayList<FakeJobInProgress>> submitJobs(
+        int numberOfUsers, int numberOfJobsPerUser, String queue)
+        throws Exception {
+      HashMap<String, ArrayList<FakeJobInProgress>> userJobs =
+          new HashMap<String, ArrayList<FakeJobInProgress>>();
+      for (int i = 1; i <= numberOfUsers; i++) {
+        String user = String.valueOf("u" + i);
+        ArrayList<FakeJobInProgress> jips = new ArrayList<FakeJobInProgress>();
+        for (int j = 1; j <= numberOfJobsPerUser; j++) {
+          jips.add(this.submitJob(JobStatus.PREP, 1, 1, queue, user));
+        }
+        userJobs.put(user, jips);
+      }
+      return userJobs;
     }
 
     public TaskTracker getTaskTracker(String trackerID) {
@@ -689,8 +774,13 @@ public class CapacityTestUtils {
     }
 
     public void finishTask(
-      String tipId,
-      FakeJobInProgress j) {
+        String tipId,
+        FakeJobInProgress j) {
+      finishTask(tipId, j, TaskStatus.State.SUCCEEDED);
+    }
+
+    public void finishTask(String tipId, FakeJobInProgress j,
+        TaskStatus.State taskState) {
       TaskStatus status = taskStatuses.get(tipId);
       if (status.getIsMap()) {
         maps--;
@@ -699,7 +789,7 @@ public class CapacityTestUtils {
         reduces--;
         j.reduceTaskFinished();
       }
-      status.setRunState(TaskStatus.State.SUCCEEDED);
+      status.setRunState(taskState);
     }
 
     void finalizeJob(FakeJobInProgress fjob) {
@@ -755,10 +845,27 @@ public class CapacityTestUtils {
     void addQueues(String[] arr) {
       Set<String> queues = new HashSet<String>();
       for (String s : arr) {
-
         queues.add(s);
       }
-      qm.setQueues(queues);
+      ((FakeQueueManager)qm).setQueues(queues);
+    }
+
+    void setFakeQueues(List<CapacityTestUtils.FakeQueueInfo> queues) {
+      for (CapacityTestUtils.FakeQueueInfo q : queues) {
+        Properties p = new Properties();
+        p.setProperty(CapacitySchedulerConf.CAPACITY_PROPERTY,
+            String.valueOf(q.capacity));
+        p.setProperty(CapacitySchedulerConf.SUPPORTS_PRIORITY_PROPERTY,
+            String.valueOf(q.supportsPrio));
+        p.setProperty(
+            CapacitySchedulerConf.MINIMUM_USER_LIMIT_PERCENT_PROPERTY,
+            String.valueOf(q.ulMin));
+        ((FakeQueueManager) qm).getQueue(q.queueName).setProperties(p);
+      }
+    }
+
+    void setQueueManager(QueueManager qManager) {
+      this.qm = qManager;
     }
 
     public QueueManager getQueueManager() {
@@ -769,6 +876,11 @@ public class CapacityTestUtils {
     public boolean killTask(TaskAttemptID taskid, boolean shouldFail) {
       return true;
     }
+
+    public JobID getNextJobID() {
+      return new JobID("test", ++jobCounter);
+    }
+
   }// represents a fake queue configuration info
 
   static class FakeQueueInfo {
@@ -786,88 +898,4 @@ public class CapacityTestUtils {
     }
   }
 
-  static class FakeResourceManagerConf extends CapacitySchedulerConf {
-
-    // map of queue names to queue info
-    private Map<String, FakeQueueInfo> queueMap =
-      new LinkedHashMap<String, FakeQueueInfo>();
-    String firstQueue;
-
-
-    void setFakeQueues(List<FakeQueueInfo> queues, QueueManager qManager) {
-      Properties p = new Properties();
-      for (FakeQueueInfo q : queues) {
-        p.setProperty("capacity",q.capacity+"");
-        p.setProperty("supports-priority",q.supportsPrio+"");
-        p.setProperty("minimum-user-limit-percent",q.ulMin+"");
-        qManager.getQueue(q.queueName).setProperties(p);
-        queueMap.put(q.queueName, q);
-      }
-      firstQueue = new String(queues.get(0).queueName);
-    }
-
-    public synchronized Set<String> getQueues() {
-      return queueMap.keySet();
-    }
-
-    /*public synchronized String getFirstQueue() {
-      return firstQueue;
-    }*/
-
-    public float getCapacity(String queue) {
-      if (queueMap.get(queue).capacity == -1) {
-        return -1;
-      }
-      return queueMap.get(queue).capacity;
-    }
-
-    public float getMaxCapacity(String queue) {
-      //There is no support for the old testcase for
-      //maxCapacity.
-
-      //MaxCapacity testcases are part of TestContainerQueue
-      return -1;
-    }
-
-    public int getMaxMapCap(String queue) {
-      return -1;
-    }
-
-    public int getMaxReduceCap(String queue) {
-      return -1;
-    }
-
-
-    public int getMinimumUserLimitPercent(String queue) {
-      return queueMap.get(queue).ulMin;
-    }
-
-    /**
-     * Gets the maximum number of jobs which are allowed to initialize in the
-     * job queue.
-     *
-     * @param queue queue name.
-     * @return maximum number of jobs allowed to be initialized per user.
-     * @throws IllegalArgumentException if maximum number of users is negative
-     *                                  or zero.
-     */
-    @Override
-    public int getMaxJobsPerUserToInitialize(String queue) {
-      return 2;
-    }
-
-    public boolean isPrioritySupported(String queue) {
-      return queueMap.get(queue).supportsPrio;
-    }
-
-    @Override
-    public long getSleepInterval() {
-      return 1;
-    }
-
-    @Override
-    public int getMaxWorkerThreads() {
-      return 1;
-    }
-  }
 }

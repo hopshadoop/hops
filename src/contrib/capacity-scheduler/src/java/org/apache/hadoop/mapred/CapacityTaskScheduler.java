@@ -25,16 +25,15 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.mapred.AbstractQueue.AbstractQueueComparator;
 import org.apache.hadoop.mapred.JobTracker.IllegalStateException;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.server.jobtracker.TaskTracker;
+import org.apache.hadoop.util.StringUtils;
 
 /**
  * A {@link TaskScheduler} that implements the requirements in HADOOP-3421
@@ -93,6 +92,7 @@ class CapacityTaskScheduler extends TaskScheduler {
     }
   }
 
+
   // this class encapsulates the result of a task lookup
   private static class TaskLookupResult {
 
@@ -118,6 +118,7 @@ class CapacityTaskScheduler extends TaskScheduler {
     }
     
     static TaskLookupResult getTaskFoundResult(Task t) {
+      LOG.debug("Returning task " + t);
       return new TaskLookupResult(t, LookUpStatus.TASK_FOUND);
     }
     static TaskLookupResult getNoTaskFoundResult() {
@@ -219,6 +220,17 @@ class CapacityTaskScheduler extends TaskScheduler {
       return queues.toArray(new String[queues.size()]);
     }
 
+    /**
+     * Return an ordered list of {@link JobQueue}s wrapped as
+     * {@link AbstractQueue}s. Ordering is according to {@link QueueComparator}.
+     * To reflect the true ordering of the JobQueues, the complete hierarchy is
+     * sorted such that {@link AbstractQueue}s are ordered according to their
+     * needs at each level in the hierarchy, after which only the leaf level
+     * {@link JobQueue}s are returned.
+     * 
+     * @return a list of {@link JobQueue}s wrapped as {@link AbstractQueue}s
+     *         sorted by their needs.
+     */
     List<AbstractQueue> getOrderedJobQueues() {
       scheduler.root.sort(queueComparator);
       return scheduler.root.getDescendentJobQueues();
@@ -638,7 +650,7 @@ class CapacityTaskScheduler extends TaskScheduler {
 
   static final Log LOG = LogFactory.getLog(CapacityTaskScheduler.class);
   protected JobQueuesManager jobQueuesManager;
-  protected CapacitySchedulerConf schedConf;
+
   /** whether scheduler has started or not */
   private boolean started = false;
 
@@ -654,6 +666,23 @@ class CapacityTaskScheduler extends TaskScheduler {
   private Clock clock;
   private JobInitializationPoller initializationPoller;
 
+  class CapacitySchedulerQueueRefresher extends QueueRefresher {
+    @Override
+    void refreshQueues(List<JobQueueInfo> newRootQueues)
+        throws Throwable {
+      if (!started) {
+        String msg =
+            "Capacity Scheduler is not in the 'started' state."
+                + " Cannot refresh queues.";
+        LOG.error(msg);
+        throw new IOException(msg);
+      }
+      CapacitySchedulerConf schedConf = new CapacitySchedulerConf();
+      initializeQueues(newRootQueues, schedConf, true);
+      initializationPoller.refreshQueueInfo(schedConf);
+    }
+  }
+
   public CapacityTaskScheduler() {
     this(new Clock());
   }
@@ -661,24 +690,19 @@ class CapacityTaskScheduler extends TaskScheduler {
   // for testing
   public CapacityTaskScheduler(Clock clock) {
     this.jobQueuesManager = new JobQueuesManager();
-    //root schedulingContex ,
-    //we are assuming this to be the context of root queue
-    root = createRoot();
     this.clock = clock;
   }
 
-  AbstractQueue createRoot() {
-    QueueSchedulingContext rootContext =
-      new QueueSchedulingContext("",100,-1,-1, -1,-1);
-    AbstractQueue root = new ContainerQueue(null,rootContext);
-    return root;
-  }
-  
-  /** mostly for testing purposes */
-  public void setResourceManagerConf(CapacitySchedulerConf conf) {
-    this.schedConf = conf;
+  @Override
+  QueueRefresher getQueueRefresher() {
+    return new CapacitySchedulerQueueRefresher();
   }
 
+  /**
+   * Only for testing.
+   * @param type
+   * @return
+   */
   String[] getOrderedQueues(TaskType type) {
     if (type == TaskType.MAP) {
       return mapScheduler.getOrderedQueues();
@@ -692,30 +716,26 @@ class CapacityTaskScheduler extends TaskScheduler {
   public synchronized void start() throws IOException {
     if (started) return;
     super.start();
-    // initialize our queues from the config settings
-    if (null == schedConf) {
-      schedConf = new CapacitySchedulerConf();
-    }
 
+    // Initialize MemoryMatcher
     MemoryMatcher.initializeMemoryRelatedConf(conf);
+
     // read queue info from config file
     QueueManager queueManager = taskTrackerManager.getQueueManager();
 
-    //get parent level queues. these are defined in mapred-*.xml
-    List<JobQueueInfo> queues = Arrays.asList(queueManager.getRootQueues());
-    LOG.info("Root queues defined " + queues);
-    // Sanity check: there should be at least one queue.
-    if (0 == queues.size()) {
-      throw new IllegalStateException("System has no queue configured");
+    // initialize our queues from the config settings
+    CapacitySchedulerConf schedConf = new CapacitySchedulerConf();
+    try {
+      initializeQueues(queueManager.getRoot().getJobQueueInfo().getChildren(),
+          schedConf, false);
+    } catch (Throwable e) {
+      LOG.error("Couldn't initialize queues because of the excecption : "
+          + StringUtils.stringifyException(e));
+      throw new IOException(e);
     }
 
-    QueueHierarchyBuilder builder = new QueueHierarchyBuilder(this.schedConf);
-    //load complete hierarchy of queues.
-    builder.createHierarchy(root,queues);
-    updateQueueMaps();
-    root.distributeUnConfiguredCapacity();
-    
-    // listen to job changes
+    // Queues are ready. Now register jobQueuesManager with the JobTracker so as
+    // to listen to job changes
     taskTrackerManager.addJobInProgressListener(jobQueuesManager);
 
     //Start thread for initialization
@@ -728,46 +748,112 @@ class CapacityTaskScheduler extends TaskScheduler {
     initializationPoller.start();
 
     started = true;
-    LOG.info("Capacity scheduler initialized " + queues.size() + " queues");  
+
+    LOG.info("Capacity scheduler started successfully");  
   }
 
   /**
-   * Updates the classes and data structures that store queues with
-   * hierarchical queues. This API should be called only once after
-   * construction of the hierarchy.
+   * Read the configuration and initialize the queues. This operation should be
+   * done only when either the scheduler is starting or a request is received
+   * from {@link QueueManager} to refresh the queue configuration.
+   * 
+   * <p>
+   * 
+   * Even in case of refresh, we do not explicitly destroy AbstractQueue items,
+   * or the info maps, they will be automatically garbage-collected.
+   * 
+   * <p>
+   * 
+   * We don't explicitly lock the scheduler completely. This method is called at
+   * two times. 1) When the scheduler is starting. During this time, the lock
+   * sequence is JT->scheduler and so we don't need any more locking here. 2)
+   * When refresh is issued to {@link QueueManager}. When this happens, parallel
+   * refreshes are guarded by {@link QueueManager} itself by taking its lock.
+   * 
+   * @param newRootQueues
+   * @param schedConf
+   * @param refreshingQueues
+   * @throws Throwable
    */
-  private void updateQueueMaps() {
-    Set<AbstractQueue> allQueues = getContainerQueues(getRoot());
+  private void initializeQueues(List<JobQueueInfo> newRootQueues,
+      CapacitySchedulerConf schedConf, boolean refreshingQueues)
+      throws Throwable {
+
+    if (newRootQueues == null) {
+      throw new IOException(
+          "Cannot initialize the queues with null root-queues!");
+    }
+
+    // Sanity check: there should be at least one queue.
+    if (0 == newRootQueues.size()) {
+      throw new IllegalStateException("System has no queue configured!");
+    }
+
+    // Create a new queue-hierarchy builder and try loading the complete
+    // hierarchy of queues.
+    AbstractQueue newRootAbstractQueue;
+    try {
+      newRootAbstractQueue =
+          new QueueHierarchyBuilder().createHierarchy(newRootQueues, schedConf);
+
+    } catch (Throwable e) {
+      LOG.error("Exception while tryign to (re)initializing queues : "
+          + StringUtils.stringifyException(e));
+      LOG.info("(Re)initializing the queues with the new configuration "
+          + "failed, so keeping the old configuration.");
+      throw e;
+    }
+
+    // New configuration is successfully validated and applied, set the new
+    // configuration to the current queue-hierarchy.
+
+    if (refreshingQueues) {
+      // Scheduler is being refreshed.
+
+      // Going to commit the changes to the hierarchy. Lock the scheduler.
+      synchronized (this) {
+        AbstractQueueComparator comparator = new AbstractQueueComparator();
+        this.root.sort(comparator);
+        newRootAbstractQueue.sort(comparator);
+        root.validateAndCopyQueueContexts(newRootAbstractQueue);
+      }
+    } else {
+      // Scheduler is just starting.
+
+      this.root = newRootAbstractQueue;
+
+      // JobQueue objects are created. Inform the JobQueuesManager so that it
+      // can track the running/waiting jobs. JobQueuesManager is still not added
+      // as a listener to JobTracker, so no locking needed.
+      addJobQueuesToJobQueuesManager();
+    }
+
+    List<AbstractQueue> allQueues = new ArrayList<AbstractQueue>();
+    allQueues.addAll(getRoot().getDescendantContainerQueues());
     allQueues.addAll(getRoot().getDescendentJobQueues());
     for (AbstractQueue queue : allQueues) {
-      if (queue instanceof JobQueue) {
-        jobQueuesManager.addQueue((JobQueue)queue);
+      if (!refreshingQueues) {
+        // Scheduler is just starting, create the display info also
+        createDisplayInfo(taskTrackerManager.getQueueManager(), queue.getName());
       }
-      addToQueueInfoMap(queue.getQueueSchedulingContext());  
-      createDisplayInfo(taskTrackerManager.getQueueManager(), queue.getName());
+
+      // QueueSchedulingContext objects are created/have changed. Put them
+      // (back) in the queue-info so as to be consumed by the UI.
+      addToQueueInfoMap(queue.getQueueSchedulingContext());
     }
   }
 
   /**
-   * returns list of container queues.
-   * @param q
-   * @return the containerQueue for queue q
+   * Inform the {@link JobQueuesManager} about the newly constructed
+   * {@link JobQueue}s.
    */
-  private Set<AbstractQueue> getContainerQueues(AbstractQueue q) {
-    Set<AbstractQueue> l = new HashSet<AbstractQueue>();
-
-    if(!(q instanceof ContainerQueue)) {
-      return l;
+  private void addJobQueuesToJobQueuesManager() {
+    List<AbstractQueue> allJobQueues = getRoot().getDescendentJobQueues();
+    for (AbstractQueue jobQ : allJobQueues) {
+      jobQueuesManager.addQueue((JobQueue)jobQ);
     }
-    //Add q's children.
-    for (AbstractQueue child : q.getChildren()) {
-      if(child.getChildren() != null && child.getChildren().size() > 0) {
-        l.add(child);
-        l.addAll(getContainerQueues(child));
-      }
-    }
-    return l;
   }
+
   /** mostly for testing purposes */
   void setInitializationPoller(JobInitializationPoller p) {
     this.initializationPoller = p;
@@ -940,7 +1026,7 @@ class CapacityTaskScheduler extends TaskScheduler {
     return initializationPoller;
   }
 
-  synchronized String getDisplayInfo(String queueName) {
+  private synchronized String getDisplayInfo(String queueName) {
     QueueSchedulingContext qsi = queueInfoMap.get(queueName);
     if (null == qsi) {
       return null;
@@ -948,11 +1034,18 @@ class CapacityTaskScheduler extends TaskScheduler {
     return qsi.toString();
   }
 
-  synchronized void addToQueueInfoMap(QueueSchedulingContext qsc) {
+  private synchronized void addToQueueInfoMap(QueueSchedulingContext qsc) {
     queueInfoMap.put(qsc.getQueueName(), qsc);
   }
 
-  void createDisplayInfo(QueueManager queueManager, String queueName) {
+  /**
+   * Create the scheduler information and set it in the {@link QueueManager}.
+   * this should be only called when the scheduler is starting.
+   * 
+   * @param queueManager
+   * @param queueName
+   */
+  private void createDisplayInfo(QueueManager queueManager, String queueName) {
     if (queueManager != null) {
       SchedulingDisplayInfo schedulingInfo =
         new SchedulingDisplayInfo(queueName, this);

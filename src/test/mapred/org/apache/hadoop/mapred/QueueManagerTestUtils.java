@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.mapred;
 
+//import org.apache.hadoop.classification.InterfaceAudience.Private;
+import org.apache.hadoop.mapreduce.QueueState;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import static org.apache.hadoop.mapred.Queue.*;
@@ -34,11 +36,18 @@ import java.util.Properties;
 import java.util.Set;
 import java.io.File;
 
+//@Private
 public class QueueManagerTestUtils {
-  final static String CONFIG = new File("./test-mapred-queues.xml")
+  final static String CONFIG = new File("test-mapred-queues.xml")
     .getAbsolutePath();
 
-  //methods to create hierarchy.
+  /**
+   * Create and return a new instance of a DOM Document object to build a queue
+   * tree with.
+   * 
+   * @return the created {@link Document}
+   * @throws Exception
+   */
   public static Document createDocument() throws Exception {
     Document doc = DocumentBuilderFactory
       .newInstance().newDocumentBuilder().newDocument();
@@ -110,47 +119,13 @@ public class QueueManagerTestUtils {
   }
 
   /**
-   * Adding a new child to q1
-   *
+   * Create the root <queues></queues> element along with the
+   * <aclsEnabled></aclsEnabled> element.
+   * 
    * @param doc
-   * @throws Exception
+   * @param enable
+   * @return the created element.
    */
-  public static void addMoreChildToSimpleDocumentStructure(Document doc)
-    throws Exception {
-    Element queues = createQueuesNode(doc, "true");
-
-    //Create parent level queue q1.
-    Element q1 = createQueue(doc, "q1");
-    Properties props = new Properties();
-    props.setProperty("capacity", "70");
-    props.setProperty("maxCapacity", "35");
-    q1.appendChild(createProperties(doc, props));
-    queues.appendChild(q1);
-
-    //Adding q11 to existing simple document
-    q1.appendChild(createQueue(doc, "q11"));
-
-    //Create another parent level p1
-    Element p1 = createQueue(doc, "p1");
-
-    //append child p11 to p1
-    Element p11 = createQueue(doc, "p11");
-    p11.appendChild(createState(doc, QueueState.STOPPED.getStateName()));
-    p1.appendChild(p11);
-
-    Element p12 = createQueue(doc, "p12");
-
-    p12.appendChild(createState(doc, QueueState.RUNNING.getStateName()));
-    p12.appendChild(createAcls(doc, ACL_SUBMIT_JOB_TAG, "u3"));
-    p12.appendChild(createAcls(doc, ACL_ADMINISTER_JOB_TAG, "u4"));
-
-    //append p12 to p1.
-    p1.appendChild(p12);
-
-
-    queues.appendChild(p1);
-  }
-
   public static Element createQueuesNode(Document doc, String enable) {
     Element queues = doc.createElement("queues");
     doc.appendChild(queues);
@@ -206,5 +181,25 @@ public class QueueManagerTestUtils {
     if (new File(CONFIG).exists()) {
       new File(CONFIG).delete();
     }
+  }
+
+  /**
+   * Write the given queueHierarchy to the given file.
+   * 
+   * @param filePath
+   * 
+   * @param rootQueues
+   * @throws Exception
+   */
+  public static void writeQueueConfigurationFile(String filePath,
+      JobQueueInfo[] rootQueues)
+      throws Exception {
+    Document doc = createDocument();
+    Element queueElements = createQueuesNode(doc, String.valueOf(true));
+    for (JobQueueInfo rootQ : rootQueues) {
+      queueElements.appendChild(QueueConfigurationParser.getQueueElement(doc,
+          rootQ));
+    }
+    writeToFile(doc, filePath);
   }
 }

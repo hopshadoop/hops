@@ -24,6 +24,7 @@ import org.apache.commons.logging.LogFactory;
 import static org.apache.hadoop.mapred.QueueManagerTestUtils.*;
 import static org.apache.hadoop.mapred.QueueConfigurationParser.*;
 
+import org.apache.hadoop.mapreduce.QueueState;
 import org.apache.hadoop.security.UnixUserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.SecurityUtil.AccessControlList;
@@ -48,7 +49,6 @@ public class TestQueueManagerForHierarchialQueues extends TestCase {
 
   private static final Log LOG = LogFactory.getLog(
     TestQueueManagerForHierarchialQueues.class);
-
 
   protected void tearDown() throws Exception {
     super.tearDown();
@@ -114,7 +114,7 @@ public class TestQueueManagerForHierarchialQueues extends TestCase {
           q.getName(),
           ACL_ADMINISTER_JOB_TAG))
         .getUsers().contains("u2"));
-    assertTrue(q.getState().equals(Queue.QueueState.STOPPED));
+    assertTrue(q.getState().equals(QueueState.STOPPED));
   }
 
   public void testhasAccess() throws Exception {
@@ -247,11 +247,11 @@ public class TestQueueManagerForHierarchialQueues extends TestCase {
           if (child.getQueueName().equals(
             "p1" + NAME_SEPARATOR + "p12")) {
             assertEquals(
-              child.getQueueState(), Queue.QueueState.STOPPED.getStateName());
+              child.getQueueState(), QueueState.STOPPED.getStateName());
           } else if (child.getQueueName().equals(
             "p1" + NAME_SEPARATOR + "p11")) {
             assertEquals(
-              child.getQueueState(), Queue.QueueState.RUNNING.getStateName());
+              child.getQueueState(), QueueState.RUNNING.getStateName());
           } else {
             fail("Only 2 children");
           }
@@ -262,6 +262,11 @@ public class TestQueueManagerForHierarchialQueues extends TestCase {
     }
   }
 
+  /**
+   * Test the refresh of queues.
+   * 
+   * @throws Exception
+   */
   public void testRefresh() throws Exception {
     checkForConfigFile();
     Document doc = createDocument();
@@ -295,9 +300,9 @@ public class TestQueueManagerForHierarchialQueues extends TestCase {
                   child.getName(),
                   ACL_ADMINISTER_JOB_TAG))
                 .getUsers().contains("u2"));
-            assertTrue(child.getState().equals(Queue.QueueState.STOPPED));
+            assertTrue(child.getState().equals(QueueState.STOPPED));
           } else {
-            assertTrue(child.getState().equals(Queue.QueueState.RUNNING));
+            assertTrue(child.getState().equals(QueueState.RUNNING));
           }
         }
       }
@@ -339,28 +344,13 @@ public class TestQueueManagerForHierarchialQueues extends TestCase {
                   child.getName(),
                   ACL_ADMINISTER_JOB_TAG))
                 .getUsers().contains("u4"));
-            assertTrue(child.getState().equals(Queue.QueueState.RUNNING));
+            assertTrue(child.getState().equals(QueueState.RUNNING));
           } else {
-            assertTrue(child.getState().equals(Queue.QueueState.STOPPED));
+            assertTrue(child.getState().equals(QueueState.STOPPED));
           }
         }
       }
     }
-  }
-
-  public void testRefreshFailureForHierarchyChange() throws Exception {
-    checkForConfigFile();
-    Document doc = createDocument();
-    createSimpleDocument(doc);
-    writeToFile(doc, CONFIG);
-    QueueManager qm = new QueueManager(CONFIG);
-
-    checkForConfigFile();
-    doc = createDocument();
-    addMoreChildToSimpleDocumentStructure(doc);
-    writeToFile(doc, CONFIG);
-    QueueConfigurationParser cp = new QueueConfigurationParser(CONFIG);
-    assertFalse(qm.getRoot().isHierarchySameAs(cp.getRoot()));
   }
 
   public void testRefreshWithInvalidFile() throws Exception {

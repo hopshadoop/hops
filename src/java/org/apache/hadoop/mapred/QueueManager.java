@@ -22,9 +22,11 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.mapred.Queue.QueueState;
+import org.apache.hadoop.mapred.TaskScheduler.QueueRefresher;
+import org.apache.hadoop.mapreduce.QueueState;
 import org.apache.hadoop.security.SecurityUtil.AccessControlList;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.StringUtils;
 import org.codehaus.jackson.JsonFactory;
 import org.codehaus.jackson.JsonGenerationException;
 import org.codehaus.jackson.JsonGenerator;
@@ -157,6 +159,12 @@ class QueueManager {
     initialize(cp);
   }
 
+  /**
+   * Initialize the queue-manager with the queue hierarchy specified by the
+   * given {@link QueueConfigurationParser}.
+   * 
+   * @param cp
+   */
   private void initialize(QueueConfigurationParser cp) {
     this.root = cp.getRoot();
     leafQueues.clear();
@@ -167,9 +175,7 @@ class QueueManager {
     allQueues.putAll(getRoot().getInnerQueues());
     allQueues.putAll(leafQueues);
 
-    LOG.info(
-      "Leaf queues and allQueues " + allQueues + " " +
-        "leafQueues " + leafQueues);
+    LOG.info("AllQueues : " + allQueues + "; LeafQueues : " + leafQueues);
     this.isAclEnabled = cp.isAclsEnabled();
   }
 
@@ -336,6 +342,15 @@ class QueueManager {
     return null;
   }
 
+  static final String MSG_REFRESH_FAILURE_WITH_CHANGE_OF_HIERARCHY =
+      "Unable to refresh queues because queue-hierarchy changed. "
+          + "Retaining existing configuration. ";
+
+  static final String MSG_REFRESH_FAILURE_WITH_SCHEDULER_FAILURE =
+      "Scheduler couldn't refresh it's queues with the new"
+          + " configuration properties. "
+          + "Retaining existing configuration throughout the system.";
+
   /**
    * Refresh acls, state and scheduler properties for the configured queues.
    * <p/>
@@ -345,18 +360,63 @@ class QueueManager {
    * fire an admin command to reload queue configuration. If there is a
    * problem in reloading configuration, then this method guarantees that
    * existing queue configuration is untouched and in a consistent state.
-   *
+   * 
+   * @param schedulerRefresher
    * @throws IOException when queue configuration file is invalid.
    */
-  synchronized void refreshQueues(Configuration conf) throws IOException {
-    QueueConfigurationParser cp
-      = QueueManager.getQueueConfigurationParser(conf, true);
+  synchronized void refreshQueues(Configuration conf,
+      QueueRefresher schedulerRefresher)
+      throws IOException {
+
+    // Create a new configuration parser using the passed conf object.
+    QueueConfigurationParser cp =
+        QueueManager.getQueueConfigurationParser(conf, true);
+
+    /*
+     * (1) Validate the refresh of properties owned by QueueManager. As of now,
+     * while refreshing queue properties, we only check that the hierarchy is
+     * the same w.r.t queue names, ACLs and state for each queue and don't
+     * support adding new queues or removing old queues
+     */
     if (!root.isHierarchySameAs(cp.getRoot())) {
-      throw new IOException(
-        "unable to refresh queues , queue hierarchy changed " +
-          "retaining existing configuration ");
+      LOG.warn(MSG_REFRESH_FAILURE_WITH_CHANGE_OF_HIERARCHY);
+      throw new IOException(MSG_REFRESH_FAILURE_WITH_CHANGE_OF_HIERARCHY);
     }
+
+    /*
+     * (2) QueueManager owned properties are validated. Now validate and
+     * refresh the properties of scheduler in a single step.
+     */
+    if (schedulerRefresher != null) {
+      try {
+        schedulerRefresher.refreshQueues(cp.getRoot().getJobQueueInfo().getChildren());
+      } catch (Throwable e) {
+        StringBuilder msg =
+            new StringBuilder(
+                "Scheduler's refresh-queues failed with the exception : "
+                    + StringUtils.stringifyException(e));
+        msg.append("\n");
+        msg.append(MSG_REFRESH_FAILURE_WITH_SCHEDULER_FAILURE);
+        LOG.error(msg.toString());
+        throw new IOException(msg.toString());
+      }
+    }
+
+    /*
+     * (3) Scheduler has validated and refreshed its queues successfully, now
+     * refresh the properties owned by QueueManager
+     */
+
+    // First copy the scheduling information recursively into the new
+    // queue-hierarchy. This is done to retain old scheduling information. This
+    // is done after scheduler refresh and not before it because during refresh,
+    // schedulers may wish to change their scheduling info objects too.
+    cp.getRoot().copySchedulingInfo(this.root);
+
+    // Now switch roots.
     initialize(cp);
+
+    LOG.info("Queue configuration is refreshed successfully.");
   }
 
   static final String toFullPropertyName(
