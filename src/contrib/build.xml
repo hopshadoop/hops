@@ -57,6 +57,7 @@
       <fileset dir="." includes="mrunit/build.xml"/> 
       <fileset dir="." includes="dynamic-scheduler/build.xml"/>
       <fileset dir="." includes="gridmix/build.xml"/>
+      <fileset dir="." includes="vertica/build.xml"/>
     </subant>
     <available file="${build.contrib.dir}/testsfailed" property="testsfailed"/>
     <fail if="testsfailed">Tests failed!</fail>

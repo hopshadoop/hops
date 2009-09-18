@@ -114,6 +114,10 @@ Trunk (unreleased changes)
     MAPREDUCE-777. Brand new apis to track and query jobs as a
     replacement for JobClient. (Amareshwari Sriramadasu via acmurthy)
 
+    MAPREDUCE-775. Add native and streaming support for Vertica as an input
+    or output format taking advantage of parallel read and write properties of 
+    the DBMS. (Omer Trajman via ddas)
+
   IMPROVEMENTS
 
     MAPREDUCE-816. Rename "local" mysql import to "direct" in Sqoop.
