@@ -358,6 +358,9 @@ Trunk (unreleased changes)
     MAPREDUCE-907. Sqoop should use more intelligent splits. (Aaron Kimball
     via tomwhite)
 
+    MAPREDUCE-916. Split the documentation to match the project split.
+    (Corinne Chandel via omalley)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 

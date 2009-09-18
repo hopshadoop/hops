@@ -30,7 +30,7 @@
 <title>Hadoop Streaming</title>
 
 <p>
-Hadoop streaming is a utility that comes with the Hadoop distribution. The utility allows you to create and run Map/Reduce jobs with any executable or 
+Hadoop streaming is a utility that comes with the Hadoop distribution. The utility allows you to create and run MapReduce jobs with any executable or 
 script as the mapper and/or the reducer. For example:
 </p>
 <source>
@@ -47,7 +47,7 @@ $HADOOP_HOME/bin/hadoop  jar $HADOOP_HOME/hadoop-streaming.jar \
 <title>How Streaming Works </title>
 <p>
 In the above example, both the mapper and the reducer are executables that read the input from stdin (line by line) and emit the output to stdout. 
-The utility will create a Map/Reduce job, submit the job to an appropriate cluster, and monitor the progress of the job until it completes.
+The utility will create a MapReduce job, submit the job to an appropriate cluster, and monitor the progress of the job until it completes.
 </p>
 <p>
   When an executable is specified for mappers, each mapper task will launch the executable as a separate process when the mapper is initialized. 
@@ -63,7 +63,7 @@ line-oriented outputs from the stdout of the process, converts each line into a 
 prefix of a line up to the first tab character is the key and the rest of the line (excluding the tab character) is the value. However, this can be customized, as discussed later.
 </p>
 <p>
-This is the basis for the communication protocol between the Map/Reduce framework and the streaming mapper/reducer.
+This is the basis for the communication protocol between the MapReduce framework and the streaming mapper/reducer.
 </p>
 <p>
 You can supply a Java class as the mapper and/or the reducer. The above example is equivalent to:
@@ -161,7 +161,7 @@ $HADOOP_HOME/bin/hadoop  jar $HADOOP_HOME/hadoop-streaming.jar \
 <section>
 <title>Specifying Other Plugins for Jobs </title>
 <p>
-Just as with a normal Map/Reduce job, you can specify other plugins for a streaming job:
+Just as with a normal MapReduce job, you can specify other plugins for a streaming job:
 </p>
 <source>
    -inputformat JavaClassName
@@ -188,7 +188,7 @@ Since the TextInputFormat returns keys of LongWritable class, which are actually
 <!-- GENERIC COMMAND OPTIONS-->
 <section>
 <title>Generic Command Options</title>
-<p>Streaming supports <a href="streaming.html#Streaming+Command+Options">streaming command options</a> as well as generic command options.
+<p>Streaming supports generic command options as well as <a href="streaming.html#Streaming+Command+Options">streaming command options</a>.
 The general command line syntax is shown below. </p>
 <p><strong>Note:</strong> Be sure to place the generic options before the streaming options, otherwise the command will fail. 
 For an example, see <a href="streaming.html#Making+Archives+Available+to+Tasks">Making Archives Available to Tasks</a>.</p>
@@ -201,7 +201,7 @@ For an example, see <a href="streaming.html#Making+Archives+Available+to+Tasks">
 <tr><td> -D  property=value </td><td> Optional </td><td> Use value for given property </td></tr>
 <tr><td> -fs host:port or local </td><td> Optional </td><td> Specify a namenode </td></tr>
 <tr><td> -jt host:port or local </td><td> Optional </td><td> Specify a job tracker </td></tr>
-<tr><td> -files </td><td> Optional </td><td> Specify comma-separated files to be copied to the Map/Reduce cluster </td></tr>
+<tr><td> -files </td><td> Optional </td><td> Specify comma-separated files to be copied to the MapReduce cluster </td></tr>
 <tr><td> -libjars  </td><td> Optional </td><td> Specify comma-separated jar files to include in the classpath </td></tr>
 <tr><td> -archives </td><td> Optional </td><td> Specify comma-separated archives to be unarchived on the compute machines </td></tr>
 </table>
@@ -235,7 +235,7 @@ To specify additional local temp directories use:
 <title>Specifying Map-Only Jobs </title>
 <p>
 Often, you may want to process input data using a map function only. To do this, simply set mapred.reduce.tasks to zero. 
-The Map/Reduce framework will not create any reducer tasks. Rather, the outputs of the mapper tasks will be the final output of the job.
+The MapReduce framework will not create any reducer tasks. Rather, the outputs of the mapper tasks will be the final output of the job.
 </p>
 <source>
     -D mapred.reduce.tasks=0
@@ -263,7 +263,7 @@ $HADOOP_HOME/bin/hadoop  jar $HADOOP_HOME/hadoop-streaming.jar \
 <section>
 <title>Customizing How Lines are Split into Key/Value Pairs</title>
 <p>
-As noted earlier, when the Map/Reduce framework reads a line from the stdout of the mapper, it splits the line into a key/value pair. 
+As noted earlier, when the MapReduce framework reads a line from the stdout of the mapper, it splits the line into a key/value pair. 
 By default, the prefix of the line up to the first tab character is the key and the rest of the line (excluding the tab character) is the value.
 </p>
 <p>
@@ -290,7 +290,7 @@ If a line has less than four "."s, then the whole line will be the key and the v
 Similarly, you can use "-D stream.reduce.output.field.separator=SEP" and "-D stream.num.reduce.output.fields=NUM" to specify 
 the nth field separator in a line of the reduce outputs as the separator between the key and the value.
 </p>
-<p> Similarly, you can specify "stream.map.input.field.separator" and "stream.reduce.input.field.separator" as the input separator for Map/Reduce 
+<p> Similarly, you can specify "stream.map.input.field.separator" and "stream.reduce.input.field.separator" as the input separator for MapReduce 
 inputs. By default the separator is the tab character.</p>
 </section>
 
@@ -306,8 +306,7 @@ These files and archives are cached across jobs. You can retrieve the host and f
 <p><strong>Note:</strong>
 The -files and -archives options are generic options.
 Be sure to place the generic options before the command options, otherwise the command will fail. 
-For an example, see <a href="streaming.html#The+-archives+Option">The -archives Option</a>.
-Also see <a href="streaming.html#Other+Supported+Options">Other Supported Options</a>.
+For an example, see <a href="streaming.html#Making+Archives+Available+to+Tasks">Making Archives Available to Tasks</a>.
 </p>
 
 <section>
@@ -401,7 +400,7 @@ This is just the second cache string
 <p>
 Hadoop has a library class, 
 <a href="ext:api/org/apache/hadoop/mapred/lib/keyfieldbasedpartitioner">KeyFieldBasedPartitioner</a>, 
-that is useful for many applications. This class allows the Map/Reduce 
+that is useful for many applications. This class allows the MapReduce 
 framework to partition the map outputs based on certain key fields, not
 the whole keys. For example:
 </p>
@@ -421,8 +420,8 @@ $HADOOP_HOME/bin/hadoop  jar $HADOOP_HOME/hadoop-streaming.jar \
 <p>
 Here, <em>-D stream.map.output.field.separator=.</em> and <em>-D stream.num.map.output.key.fields=4</em> are as explained in previous example. The two variables are used by streaming to identify the key/value pair of mapper. 
 </p><p>
-The map output keys of the above Map/Reduce job normally have four fields
-separated by ".". However, the Map/Reduce framework will partition the map
+The map output keys of the above MapReduce job normally have four fields
+separated by ".". However, the MapReduce framework will partition the map
 outputs by the first two fields of the keys using the 
 <em>-D mapred.text.key.partitioner.options=-k1,2</em> option. 
 Here, <em>-D map.output.key.field.separator=.</em> specifies the separator 
@@ -482,8 +481,8 @@ $HADOOP_HOME/bin/hadoop  jar $HADOOP_HOME/hadoop-streaming.jar \
     -reducer org.apache.hadoop.mapred.lib.IdentityReducer 
 </source>
 <p>
-The map output keys of the above Map/Reduce job normally have four fields
-separated by ".". However, the Map/Reduce framework will sort the 
+The map output keys of the above MapReduce job normally have four fields
+separated by ".". However, the MapReduce framework will sort the 
 outputs by the second field of the keys using the 
 <em>-D mapred.text.key.comparator.options=-k2,2nr</em> option. 
 Here, <em>-n</em> specifies that the sorting is numerical sorting and 
@@ -653,7 +652,7 @@ As an example, consider the problem of zipping (compressing) a set of files acro
 <section>
 <title>How many reducers should I use? </title>
 <p>
-See the Hadoop Wiki for details: <a href="mapred_tutorial.html#Reducer">Reducer</a>
+For details see <a href="mapred_tutorial.html#Reducer">Reducer</a>.
 </p>
 </section>
 
@@ -790,7 +789,7 @@ to stderr.
 <section>
 <title>How do I get the JobConf variables in a streaming job's mapper/reducer?</title>
 <p>
-See <a href="mapred_tutorial.html#Configured+Parameters">Configured Parameters</a>. 
+See the <a href="mapred_tutorial.html#Configured+Parameters">Configured Parameters</a>. 
 During the execution of a streaming job, the names of the "mapred" parameters are transformed. The dots ( . ) become underscores ( _ ).
 For example, mapred.job.id becomes mapred_job_id and mapred.jar becomes mapred_jar. In your code, use the parameter names with the underscores.
 </p>

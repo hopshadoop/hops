@@ -18,7 +18,7 @@
 <!DOCTYPE document PUBLIC "-//APACHE//DTD Documentation V2.0//EN" "http://forrest.apache.org/dtd/document-v20.dtd">
 <document>
   <header>
-    <title>Fair Scheduler Guide</title>
+    <title>Fair Scheduler</title>
   </header>
   <body>
 
@@ -26,7 +26,7 @@
       <title>Purpose</title>
 
       <p>This document describes the Fair Scheduler, a pluggable
-        Map/Reduce scheduler for Hadoop which provides a way to share
+        MapReduce scheduler for Hadoop which provides a way to share
         large clusters.</p>
     </section>
 
@@ -148,7 +148,7 @@
           The following parameters can be set in <em>mapred-site.xml</em>
           to affect the behavior of the fair scheduler:
         </p>
-        <p><strong>Basic Parameters:</strong></p>
+        <p><strong>Basic Parameters</strong></p>
         <table>
           <tr>
           <th>Name</th><th>Description</th>
@@ -195,7 +195,8 @@
           </td>
           </tr>
         </table>
-        <p><strong>Advanced Parameters:</strong></p>
+        <p> <br></br></p>
+        <p><strong>Advanced Parameters</strong> </p>
         <table>
           <tr>
           <th>Name</th><th>Description</th>
@@ -532,7 +533,7 @@
      implementing a "shortest job first" policy which reduces response
      times for interactive jobs even further.
      These extension points are listed in
-     <a href="#Advanced+Parameters">advanced mapred-site.xml properties</a>.
+     <a href="#Scheduler+Parameters+in+mapred-site.xml">Advanced Parameters</a>.
      </p>
     </section>
     -->
