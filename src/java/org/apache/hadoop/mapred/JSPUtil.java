@@ -27,6 +27,7 @@ import java.util.Map;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.jsp.JspWriter;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -257,6 +258,43 @@ class JSPUtil {
     }
     sb.append("</table>\n");
     return sb.toString();
+  }
+
+  @SuppressWarnings("unchecked")
+  public static void generateRetiredJobXml(JspWriter out, JobTracker tracker, int rowId)
+      throws IOException {
+
+    Iterator<JobStatus> iterator =
+      tracker.retireJobs.getAll().descendingIterator();
+
+    for (int i = 0; i < 100 && iterator.hasNext(); i++) {
+      JobStatus status = iterator.next();
+      StringBuilder sb = new StringBuilder();
+      sb.append("<retired_job rowid=\"" + rowId + "\" jobid=\"" + status.getJobId() + "\">");
+      sb.append("<jobid>" + status.getJobId() + "</jobid>");
+      sb.append("<history_url>jobdetailshistory.jsp?jobid=" + status.getJobId()
+          + "&amp;logFile="
+          + URLEncoder.encode(status.getHistoryFile().toString(), "UTF-8")
+          + "</history_url>");
+      sb.append("<priority>" + status.getJobPriority().toString()
+          + "</priority>");
+      sb.append("<user>" + status.getUsername() + "</user>");
+      sb.append("<name>" + status.getJobName() + "</name>");
+      sb.append("<run_state>" + JobStatus.getJobRunState(status.getRunState())
+          + "</run_state>");
+      sb.append("<start_time>" + new Date(status.getStartTime())
+          + "</start_time>");
+      sb.append("<finish_time>" + new Date(status.getFinishTime())
+          + "</finish_time>");
+      sb.append("<map_complete>" + StringUtils.formatPercent(
+          status.mapProgress(), 2) + "</map_complete>");
+      sb.append("<reduce_complete>" + StringUtils.formatPercent(
+          status.reduceProgress(), 2) + "</reduce_complete>");
+      sb.append("<scheduling_info>" + status.getSchedulingInfo() + "</scheduling_info>");
+      sb.append("</retired_job>\n");
+      out.write(sb.toString());
+      rowId++;
+    }
   }
 
   static final boolean privateActionsAllowed() {

@@ -289,15 +289,9 @@
     <copy todir="${build.webapps}">
       <fileset dir="${src.webapps}">
         <exclude name="**/*.jsp" />
+        <exclude name="**/*.jspx" />
       </fileset>
     </copy>
-
-    <unzip src="${lib.dir}/hadoop-hdfs-${hadoop-hdfs.version}.jar"
-        dest="${build.dir}">
-      <patternset>
-        <include name="webapps/**"/>
-      </patternset>
-    </unzip>
 
     <copy todir="${conf.dir}" verbose="true">
       <fileset dir="${conf.dir}" includes="**/*.template"/>

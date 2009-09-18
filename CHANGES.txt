@@ -118,6 +118,9 @@ Trunk (unreleased changes)
     or output format taking advantage of parallel read and write properties of 
     the DBMS. (Omer Trajman via ddas)
 
+    MAPREDUCE-679. XML-based metrics as JSP servlet for JobTracker.
+    (Aaron Kimball via tomwhite)
+
   IMPROVEMENTS
 
     MAPREDUCE-816. Rename "local" mysql import to "direct" in Sqoop.
