@@ -662,3 +662,6 @@ Trunk (unreleased changes)
     MAPREDUCE-1002. Flushed writer in JobQueueClient so queue information is
     printed correctly. (V.V. Chaitanya Krishna via yhemanth)
 
+    MAPREDUCE-1003. Fix compilation problem in eclipse plugin when
+    eclipse.home is set. (Ravi Gummadi via yhemanth)
+
