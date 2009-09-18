@@ -29,6 +29,7 @@ import java.util.Stack;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.examples.RandomTextWriter;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -51,7 +52,15 @@ import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
 public class GenericMRLoadGenerator extends Configured implements Tool {
-
+  public static String MAP_PRESERVE_PERCENT = 
+    "mapreduce.loadgen.sort.map.preserve.percent";
+  public static String REDUCE_PRESERVE_PERCENT = 
+    "mapreduce.loadgen.sort.reduce.preserve.percent";
+  public static String INDIRECT_INPUT_FORMAT = 
+    "mapreduce.loadgen.indirect.input.format";
+  public static String INDIRECT_INPUT_FILE = 
+    "mapreduce.loadgen.indirect.input.file";
+  
   protected static int printUsage() {
     System.err.println(
     "Usage: [-m <maps>] [-r <reduces>]\n" +
@@ -93,17 +102,15 @@ public class GenericMRLoadGenerator extends Configured implements Tool {
           job.setOutputValueClass(
             Class.forName(argv[++i]).asSubclass(Writable.class));
         } else if ("-keepmap".equals(argv[i])) {
-          job.getConfiguration().set("hadoop.sort.map.keep.percent", 
-                argv[++i]);
+          job.getConfiguration().set(MAP_PRESERVE_PERCENT, argv[++i]);
         } else if ("-keepred".equals(argv[i])) {
-          job.getConfiguration().set("hadoop.sort.reduce.keep.percent", 
-                argv[++i]);
+          job.getConfiguration().set(REDUCE_PRESERVE_PERCENT, argv[++i]);
         } else if ("-outdir".equals(argv[i])) {
           FileOutputFormat.setOutputPath(job, new Path(argv[++i]));
         } else if ("-indir".equals(argv[i])) {
           FileInputFormat.addInputPaths(job, argv[++i]);
         } else if ("-inFormatIndirect".equals(argv[i])) {
-          job.getConfiguration().setClass("mapred.indirect.input.format",
+          job.getConfiguration().setClass(INDIRECT_INPUT_FORMAT,
               Class.forName(argv[++i]).asSubclass(InputFormat.class),
               InputFormat.class);
           job.setInputFormatClass(IndirectInputFormat.class);
@@ -140,14 +147,14 @@ public class GenericMRLoadGenerator extends Configured implements Tool {
       // No input dir? Generate random data
       System.err.println("No input path; ignoring InputFormat");
       confRandom(job);
-    } else if (null != conf.getClass("mapred.indirect.input.format", null)) {
+    } else if (null != conf.getClass(INDIRECT_INPUT_FORMAT, null)) {
       // specified IndirectInputFormat? Build src list
       JobClient jClient = new JobClient(conf);  
       Path sysdir = jClient.getSystemDir();
       Random r = new Random();
       Path indirInputFile = new Path(sysdir,
           Integer.toString(r.nextInt(Integer.MAX_VALUE), 36) + "_files");
-      conf.set("mapred.indirect.input.file", indirInputFile.toString());
+      conf.set(INDIRECT_INPUT_FILE, indirInputFile.toString());
       SequenceFile.Writer writer = SequenceFile.createWriter(
           sysdir.getFileSystem(conf), conf, indirInputFile,
           LongWritable.class, Text.class,
@@ -200,7 +207,7 @@ public class GenericMRLoadGenerator extends Configured implements Tool {
   static class RandomInputFormat extends InputFormat<Text, Text> {
 
     public List<InputSplit> getSplits(JobContext job) {
-      int numSplits = job.getConfiguration().getInt("mapred.map.tasks", 1);
+      int numSplits = job.getConfiguration().getInt(JobContext.NUM_MAPS, 1);
       List<InputSplit> splits = new ArrayList<InputSplit>();
       for (int i = 0; i < numSplits; ++i) {
         splits.add(new IndirectInputFormat.IndirectSplit(
@@ -260,12 +267,12 @@ public class GenericMRLoadGenerator extends Configured implements Tool {
 
     public void setup(Context context) {
       Configuration conf = new Configuration();
-      bytesToWrite = conf.getLong("test.randomtextwrite.bytes_per_map",
+      bytesToWrite = conf.getLong(RandomTextWriter.BYTES_PER_MAP,
                                     1*1024*1024*1024);
-      keymin = conf.getInt("test.randomtextwrite.min_words_key", 5);
-      keymax = conf.getInt("test.randomtextwrite.max_words_key", 10);
-      valmin = conf.getInt("test.randomtextwrite.min_words_value", 5);
-      valmax = conf.getInt("test.randomtextwrite.max_words_value", 10);
+      keymin = conf.getInt(RandomTextWriter.MIN_KEY, 5);
+      keymax = conf.getInt(RandomTextWriter.MAX_KEY, 10);
+      valmin = conf.getInt(RandomTextWriter.MIN_VALUE, 5);
+      valmax = conf.getInt(RandomTextWriter.MAX_VALUE, 10);
     }
 
     public void map(Text key, Text val, Context context) 
@@ -303,21 +310,21 @@ public class GenericMRLoadGenerator extends Configured implements Tool {
 
     Configuration conf = job.getConfiguration();
     final ClusterStatus cluster = new JobClient(conf).getClusterStatus();
-    int numMapsPerHost = conf.getInt("test.randomtextwrite.maps_per_host", 10);
+    int numMapsPerHost = conf.getInt(RandomTextWriter.MAPS_PER_HOST, 10);
     long numBytesToWritePerMap =
-      conf.getLong("test.randomtextwrite.bytes_per_map", 1*1024*1024*1024);
+      conf.getLong(RandomTextWriter.BYTES_PER_MAP, 1*1024*1024*1024);
     if (numBytesToWritePerMap == 0) {
       throw new IOException(
-          "Cannot have test.randomtextwrite.bytes_per_map set to 0");
+          "Cannot have " + RandomTextWriter.BYTES_PER_MAP + " set to 0");
     }
-    long totalBytesToWrite = conf.getLong("test.randomtextwrite.total_bytes",
+    long totalBytesToWrite = conf.getLong(RandomTextWriter.TOTAL_BYTES,
          numMapsPerHost * numBytesToWritePerMap * cluster.getTaskTrackers());
     int numMaps = (int)(totalBytesToWrite / numBytesToWritePerMap);
     if (numMaps == 0 && totalBytesToWrite > 0) {
       numMaps = 1;
-      conf.setLong("test.randomtextwrite.bytes_per_map", totalBytesToWrite);
+      conf.setLong(RandomTextWriter.BYTES_PER_MAP, totalBytesToWrite);
     }
-    conf.setInt("mapred.map.tasks", numMaps);
+    conf.setInt(JobContext.NUM_MAPS, numMaps);
   }
 
 
@@ -331,7 +338,7 @@ public class GenericMRLoadGenerator extends Configured implements Tool {
 
     public void setup(Context context) {
       this.keep = context.getConfiguration().
-        getFloat("hadoop.sort.map.keep.percent", (float)100.0) / (float)100.0;
+        getFloat(MAP_PRESERVE_PERCENT, (float)100.0) / (float)100.0;
     }
     
     protected void emit(K key, V val, Context context)
@@ -352,7 +359,7 @@ public class GenericMRLoadGenerator extends Configured implements Tool {
 
     public void setup(Context context) {
       this.keep = context.getConfiguration().getFloat(
-        "hadoop.sort.reduce.keep.percent", (float)100.0) / (float)100.0;
+        REDUCE_PRESERVE_PERCENT, (float)100.0) / (float)100.0;
     }
 
     protected void emit(K key, V val, Context context)
@@ -424,7 +431,7 @@ public class GenericMRLoadGenerator extends Configured implements Tool {
         throws IOException {
 
       Configuration conf = job.getConfiguration();
-      Path src = new Path(conf.get("mapred.indirect.input.file", null));
+      Path src = new Path(conf.get(INDIRECT_INPUT_FILE, null));
       FileSystem fs = src.getFileSystem(conf);
 
       List<InputSplit> splits = new ArrayList<InputSplit>();
@@ -443,7 +450,7 @@ public class GenericMRLoadGenerator extends Configured implements Tool {
         TaskAttemptContext context) throws IOException, InterruptedException {
       Configuration conf = context.getConfiguration();
       InputFormat<K, V> indirIF = (InputFormat)ReflectionUtils.newInstance(
-          conf.getClass("mapred.indirect.input.format",
+          conf.getClass(INDIRECT_INPUT_FORMAT,
             SequenceFileInputFormat.class), conf);
       IndirectSplit is = ((IndirectSplit)split);
       return indirIF.createRecordReader(new FileSplit(is.getPath(), 0,

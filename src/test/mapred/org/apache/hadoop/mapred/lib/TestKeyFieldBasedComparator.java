@@ -30,6 +30,7 @@ import org.apache.hadoop.mapred.FileOutputFormat;
 import org.apache.hadoop.mapred.HadoopTestCase;
 import org.apache.hadoop.mapred.JobClient;
 import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapred.JobContext;
 import org.apache.hadoop.mapred.OutputLogFilter;
 import org.apache.hadoop.mapred.RunningJob;
 import org.apache.hadoop.mapred.TextInputFormat;
@@ -47,7 +48,7 @@ public class TestKeyFieldBasedComparator extends HadoopTestCase {
     super(HadoopTestCase.LOCAL_MR, HadoopTestCase.LOCAL_FS, 1, 1);
     conf = createJobConf();
     localConf = createJobConf();
-    localConf.set("map.output.key.field.separator", " ");
+    localConf.set(JobContext.MAP_OUTPUT_KEY_FIELD_SEPERATOR, " ");
   }
   public void configure(String keySpec, int expect) throws Exception {
     Path testdir = new Path("build/test/test.mapred.spill");
@@ -68,7 +69,7 @@ public class TestKeyFieldBasedComparator extends HadoopTestCase {
     conf.setOutputKeyComparatorClass(KeyFieldBasedComparator.class);
     conf.setKeyFieldComparatorOptions(keySpec);
     conf.setKeyFieldPartitionerOptions("-k1.1,1.1");
-    conf.set("map.output.key.field.separator", " ");
+    conf.set(JobContext.MAP_OUTPUT_KEY_FIELD_SEPERATOR, " ");
     conf.setMapperClass(InverseMapper.class);
     conf.setReducerClass(IdentityReducer.class);
     if (!fs.mkdirs(testdir)) {

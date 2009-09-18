@@ -331,7 +331,7 @@ distcp -update hdfs://nn1:8020/foo/a \
           copied by a previous map on a re-execution will be marked as
           &quot;skipped&quot;.</li>
 
-          <li>If a map fails <code>mapred.map.max.attempts</code> times, the
+          <li>If a map fails <code>mapreduce.map.maxattempts</code> times, the
           remaining map tasks will be killed (unless <code>-i</code> is
           set).</li>
 

@@ -126,8 +126,8 @@ public class GridMixRunner {
       clearDir(outdir);
       try {
         Configuration conf = StreamJob.createJob(args);
-        conf.setBoolean("mapred.output.compress", outputCompressed);
-        conf.setBoolean("mapred.compress.map.output", mapoutputCompressed);
+        conf.setBoolean(FileOutputFormat.COMPRESS, outputCompressed);
+        conf.setBoolean(JobContext.MAP_OUTPUT_COMPRESS, mapoutputCompressed);
         Job job = new Job(conf, "GridmixStreamingSorter." + size);
         ControlledJob cjob = new ControlledJob(job, null);
         gridmix.addJob(cjob);
@@ -149,8 +149,8 @@ public class GridMixRunner {
 
       try {
         Configuration conf = new Configuration();
-        conf.setBoolean("mapred.output.compress", outputCompressed);
-        conf.setBoolean("mapred.compress.map.output", mapoutputCompressed);
+        conf.setBoolean(FileOutputFormat.COMPRESS, outputCompressed);
+        conf.setBoolean(JobContext.MAP_OUTPUT_COMPRESS, mapoutputCompressed);
         Job job = new Job(conf);
         job.setJarByClass(Sort.class);
         job.setJobName("GridmixJavaSorter." + size);

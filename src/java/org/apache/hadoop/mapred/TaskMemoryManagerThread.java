@@ -29,6 +29,7 @@ import org.apache.commons.logging.LogFactory;
 
 import org.apache.hadoop.mapred.TaskTracker;
 import org.apache.hadoop.mapred.TaskTracker.TaskInProgress;
+import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
 import org.apache.hadoop.mapreduce.util.ProcfsBasedProcessTree;
 import org.apache.hadoop.mapreduce.util.ProcessTree;
 import org.apache.hadoop.util.StringUtils;
@@ -52,9 +53,8 @@ class TaskMemoryManagerThread extends Thread {
 
   public TaskMemoryManagerThread(TaskTracker taskTracker) {
     this(taskTracker.getTotalMemoryAllottedForTasksOnTT() * 1024 * 1024L,
-            taskTracker.getJobConf().getLong(
-                "mapred.tasktracker.taskmemorymanager.monitoring-interval", 
-                5000L));         
+      taskTracker.getJobConf().getLong(
+        TTConfig.TT_MEMORY_MANAGER_MONITORING_INTERVAL, 5000L));         
     this.taskTracker = taskTracker;
   }
 
@@ -179,7 +179,7 @@ class TaskMemoryManagerThread extends Thread {
                   taskTracker
                       .getJobConf()
                       .getLong(
-                          "mapred.tasktracker.tasks.sleeptime-before-sigkill",
+                          TTConfig.TT_SLEEP_TIME_BEFORE_SIG_KILL,
                           ProcessTree.DEFAULT_SLEEPTIME_BEFORE_SIGKILL);
 
               // create process tree object

@@ -24,6 +24,7 @@ import javax.security.auth.login.LoginException;
 
 import org.apache.hadoop.mapred.FakeObjectUtilities.FakeJobInProgress;
 import org.apache.hadoop.mapreduce.TaskType;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.mapreduce.server.jobtracker.TaskTracker;
 
 import junit.extensions.TestSetup;
@@ -56,8 +57,8 @@ public class TestTrackerReservation extends TestCase {
     TestSetup setup = new TestSetup(new TestSuite(TestTrackerReservation.class)) {
       protected void setUp() throws Exception {
         JobConf conf = new JobConf();
-        conf.set("mapred.job.tracker", "localhost:0");
-        conf.set("mapred.job.tracker.http.address", "0.0.0.0:0");
+        conf.set(JTConfig.JT_IPC_ADDRESS, "localhost:0");
+        conf.set(JTConfig.JT_HTTP_ADDRESS, "0.0.0.0:0");
         jobTracker = new FakeJobTracker(conf, new Clock(), trackers);
         for (String tracker : trackers) {
           FakeObjectUtilities.establishFirstContact(jobTracker, tracker);
@@ -91,8 +92,7 @@ public class TestTrackerReservation extends TestCase {
     conf.setNumReduceTasks(1);
     conf.setSpeculativeExecution(false);
     
-    conf.setBoolean(
-        "mapred.committer.job.setup.cleanup.needed", false);
+    conf.setBoolean(JobContext.SETUP_CLEANUP_NEEDED, false);
     
     //Set task tracker objects for reservation.
     TaskTracker tt1 = jobTracker.getTaskTracker(trackers[0]);
@@ -179,9 +179,9 @@ public class TestTrackerReservation extends TestCase {
     conf.setSpeculativeExecution(false);
     conf.setNumMapTasks(2);
     conf.setNumReduceTasks(2);
-    conf.set("mapred.max.reduce.failures.percent", ".70");
-    conf.set("mapred.max.map.failures.percent", ".70");
-    conf.setBoolean("mapred.committer.job.setup.cleanup.needed", false);
+    conf.set(JobContext.REDUCE_FAILURES_MAXPERCENT, ".70");
+    conf.set(JobContext.MAP_FAILURES_MAX_PERCENT, ".70");
+    conf.setBoolean(JobContext.SETUP_CLEANUP_NEEDED, false);
     conf.setMaxTaskFailuresPerTracker(1);
     FakeJobInProgress job = new FakeJobInProgress(conf, jobTracker);
     job.setClusterSize(trackers.length);

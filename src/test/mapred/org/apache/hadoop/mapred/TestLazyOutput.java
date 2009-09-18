@@ -56,7 +56,7 @@ public class TestLazyOutput extends TestCase {
     private String id;
 
     public void configure(JobConf job) {
-      id = job.get("mapred.task.id");
+      id = job.get(JobContext.TASK_ATTEMPT_ID);
     }
 
     public void map(LongWritable key, Text val,
@@ -74,7 +74,7 @@ public class TestLazyOutput extends TestCase {
     private String id;
 
     public void configure(JobConf job) {
-      id = job.get("mapred.task.id");
+      id = job.get(JobContext.TASK_ATTEMPT_ID);
     }
 
     /** Writes all keys and values directly to output. */

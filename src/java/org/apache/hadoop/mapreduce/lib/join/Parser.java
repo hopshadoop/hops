@@ -322,7 +322,7 @@ public abstract static class Node extends ComposableInputFormat {
         }
         Configuration conf = getConf(taskContext.getConfiguration());
         TaskAttemptContext context = new TaskAttemptContext(conf, 
-          TaskAttemptID.forName(conf.get("mapred.task.id")));
+          TaskAttemptID.forName(conf.get(JobContext.TASK_ATTEMPT_ID)));
         return rrCstrMap.get(ident).newInstance(id,
             inf.createRecordReader(split, context), cmpcl);
       } catch (IllegalAccessException e) {

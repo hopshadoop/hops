@@ -21,13 +21,14 @@ import junit.framework.Assert;
 import junit.framework.TestCase;
 
 import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapreduce.JobContext;
 
 public class TestJobConf extends TestCase {
 
   public void testProfileParamsDefaults() {
     JobConf configuration = new JobConf();
 
-    Assert.assertNull(configuration.get("mapred.task.profile.params"));
+    Assert.assertNull(configuration.get(JobContext.TASK_PROFILE_PARAMS));
 
     String result = configuration.getProfileParams();
 
@@ -40,13 +41,13 @@ public class TestJobConf extends TestCase {
     JobConf configuration = new JobConf();
 
     configuration.setProfileParams("test");
-    Assert.assertEquals("test", configuration.get("mapred.task.profile.params"));
+    Assert.assertEquals("test", configuration.get(JobContext.TASK_PROFILE_PARAMS));
   }
 
   public void testProfileParamsGetter() {
     JobConf configuration = new JobConf();
 
-    configuration.set("mapred.task.profile.params", "test");
+    configuration.set(JobContext.TASK_PROFILE_PARAMS, "test");
     Assert.assertEquals("test", configuration.getProfileParams());
   }
 
@@ -56,35 +57,35 @@ public class TestJobConf extends TestCase {
    */
   public void testMemoryConfigForMapOrReduceTask(){
     JobConf configuration = new JobConf();
-    configuration.set("mapred.job.map.memory.mb",String.valueOf(300));
-    configuration.set("mapred.job.reduce.memory.mb",String.valueOf(300));
+    configuration.set(JobContext.MAP_MEMORY_MB,String.valueOf(300));
+    configuration.set(JobContext.REDUCE_MEMORY_MB,String.valueOf(300));
     Assert.assertEquals(configuration.getMemoryForMapTask(),300);
     Assert.assertEquals(configuration.getMemoryForReduceTask(),300);
 
     configuration.set("mapred.task.maxvmem" , String.valueOf(2*1024 * 1024));
-    configuration.set("mapred.job.map.memory.mb",String.valueOf(300));
-    configuration.set("mapred.job.reduce.memory.mb",String.valueOf(300));
+    configuration.set(JobContext.MAP_MEMORY_MB,String.valueOf(300));
+    configuration.set(JobContext.REDUCE_MEMORY_MB,String.valueOf(300));
     Assert.assertEquals(configuration.getMemoryForMapTask(),2);
     Assert.assertEquals(configuration.getMemoryForReduceTask(),2);
 
     configuration = new JobConf();
     configuration.set("mapred.task.maxvmem" , "-1");
-    configuration.set("mapred.job.map.memory.mb",String.valueOf(300));
-    configuration.set("mapred.job.reduce.memory.mb",String.valueOf(300));
+    configuration.set(JobContext.MAP_MEMORY_MB,String.valueOf(300));
+    configuration.set(JobContext.REDUCE_MEMORY_MB,String.valueOf(300));
     Assert.assertEquals(configuration.getMemoryForMapTask(),-1);
     Assert.assertEquals(configuration.getMemoryForReduceTask(),-1);
 
     configuration = new JobConf();
     configuration.set("mapred.task.maxvmem" , String.valueOf(2*1024 * 1024));
-    configuration.set("mapred.job.map.memory.mb","-1");
-    configuration.set("mapred.job.reduce.memory.mb","-1");
+    configuration.set(JobContext.MAP_MEMORY_MB,"-1");
+    configuration.set(JobContext.REDUCE_MEMORY_MB,"-1");
     Assert.assertEquals(configuration.getMemoryForMapTask(),2);
     Assert.assertEquals(configuration.getMemoryForReduceTask(),2);
 
     configuration = new JobConf();
     configuration.set("mapred.task.maxvmem" , String.valueOf(-1));
-    configuration.set("mapred.job.map.memory.mb","-1");
-    configuration.set("mapred.job.reduce.memory.mb","-1");
+    configuration.set(JobContext.MAP_MEMORY_MB,"-1");
+    configuration.set(JobContext.REDUCE_MEMORY_MB,"-1");
     Assert.assertEquals(configuration.getMemoryForMapTask(),-1);
     Assert.assertEquals(configuration.getMemoryForReduceTask(),-1);    
 
@@ -101,20 +102,20 @@ public class TestJobConf extends TestCase {
     JobConf configuration = new JobConf();
 
     //get test case
-    configuration.set("mapred.job.map.memory.mb", String.valueOf(300));
-    configuration.set("mapred.job.reduce.memory.mb", String.valueOf(-1));
+    configuration.set(JobContext.MAP_MEMORY_MB, String.valueOf(300));
+    configuration.set(JobContext.REDUCE_MEMORY_MB, String.valueOf(-1));
     Assert.assertEquals(
       configuration.getMaxVirtualMemoryForTask(), 300 * 1024 * 1024);
 
     configuration = new JobConf();
-    configuration.set("mapred.job.map.memory.mb", String.valueOf(-1));
-    configuration.set("mapred.job.reduce.memory.mb", String.valueOf(200));
+    configuration.set(JobContext.MAP_MEMORY_MB, String.valueOf(-1));
+    configuration.set(JobContext.REDUCE_MEMORY_MB, String.valueOf(200));
     Assert.assertEquals(
       configuration.getMaxVirtualMemoryForTask(), 200 * 1024 * 1024);
 
     configuration = new JobConf();
-    configuration.set("mapred.job.map.memory.mb", String.valueOf(-1));
-    configuration.set("mapred.job.reduce.memory.mb", String.valueOf(-1));
+    configuration.set(JobContext.MAP_MEMORY_MB, String.valueOf(-1));
+    configuration.set(JobContext.REDUCE_MEMORY_MB, String.valueOf(-1));
     configuration.set("mapred.task.maxvmem", String.valueOf(1 * 1024 * 1024));
     Assert.assertEquals(
       configuration.getMaxVirtualMemoryForTask(), 1 * 1024 * 1024);
@@ -132,8 +133,8 @@ public class TestJobConf extends TestCase {
     Assert.assertEquals(configuration.getMemoryForReduceTask(), 2);
 
     configuration = new JobConf();   
-    configuration.set("mapred.job.map.memory.mb", String.valueOf(300));
-    configuration.set("mapred.job.reduce.memory.mb", String.valueOf(400));
+    configuration.set(JobContext.MAP_MEMORY_MB, String.valueOf(300));
+    configuration.set(JobContext.REDUCE_MEMORY_MB, String.valueOf(400));
     configuration.setMaxVirtualMemoryForTask(2 * 1024 * 1024);
     Assert.assertEquals(configuration.getMemoryForMapTask(), 2);
     Assert.assertEquals(configuration.getMemoryForReduceTask(), 2);

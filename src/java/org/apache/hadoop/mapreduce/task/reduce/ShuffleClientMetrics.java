@@ -18,6 +18,7 @@
 package org.apache.hadoop.mapreduce.task.reduce;
 
 import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.metrics.MetricsContext;
 import org.apache.hadoop.metrics.MetricsRecord;
@@ -34,7 +35,7 @@ class ShuffleClientMetrics implements Updater {
   private final int numCopiers;
   
   ShuffleClientMetrics(TaskAttemptID reduceId, JobConf jobConf) {
-    this.numCopiers = jobConf.getInt("mapred.reduce.parallel.copies", 5);
+    this.numCopiers = jobConf.getInt(JobContext.SHUFFLE_PARALLEL_COPIES, 5);
 
     MetricsContext metricsContext = MetricsUtil.getContext("mapred");
     this.shuffleMetrics = 

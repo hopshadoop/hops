@@ -32,8 +32,6 @@ import org.apache.commons.cli.BasicParser;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.OptionBuilder;
-import org.apache.commons.cli.OptionGroup;
-import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.cli.Parser;
@@ -41,6 +39,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.filecache.DistributedCache;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -68,6 +67,18 @@ import org.apache.hadoop.util.Tool;
 public class Submitter extends Configured implements Tool {
 
   protected static final Log LOG = LogFactory.getLog(Submitter.class);
+  public static final String PRESERVE_COMMANDFILE = 
+    "mapreduce.pipes.commandfile.preserve";
+  public static final String EXECUTABLE = "mapreduce.pipes.executable";
+  public static final String INTERPRETOR = 
+    "mapreduce.pipes.executable.interpretor";
+  public static final String IS_JAVA_MAP = "mapreduce.pipes.isjavamapper";
+  public static final String IS_JAVA_RR = "mapreduce.pipes.isjavarecordreader";
+  public static final String IS_JAVA_RW = "mapreduce.pipes.isjavarecordwriter";
+  public static final String IS_JAVA_REDUCE = "mapreduce.pipes.isjavareducer";
+  public static final String PARTITIONER = "mapreduce.pipes.partitioner";
+  public static final String INPUT_FORMAT = "mapreduce.pipes.inputformat";
+  public static final String PORT = "mapreduce.pipes.command.port";
   
   public Submitter() {
     this(new Configuration());
@@ -83,9 +94,9 @@ public class Submitter extends Configured implements Tool {
    * @return the URI where the application's executable is located
    */
   public static String getExecutable(JobConf conf) {
-    return conf.get("hadoop.pipes.executable");
+    return conf.get(Submitter.EXECUTABLE);
   }
-  
+
   /**
    * Set the URI for the application's executable. Normally this is a hdfs: 
    * location.
@@ -93,7 +104,7 @@ public class Submitter extends Configured implements Tool {
    * @param executable The URI of the application's executable.
    */
   public static void setExecutable(JobConf conf, String executable) {
-    conf.set("hadoop.pipes.executable", executable);
+    conf.set(Submitter.EXECUTABLE, executable);
   }
 
   /**
@@ -102,7 +113,7 @@ public class Submitter extends Configured implements Tool {
    * @param value the new value
    */
   public static void setIsJavaRecordReader(JobConf conf, boolean value) {
-    conf.setBoolean("hadoop.pipes.java.recordreader", value);
+    conf.setBoolean(Submitter.IS_JAVA_RR, value);
   }
 
   /**
@@ -111,7 +122,7 @@ public class Submitter extends Configured implements Tool {
    * @return is it a Java RecordReader?
    */
   public static boolean getIsJavaRecordReader(JobConf conf) {
-    return conf.getBoolean("hadoop.pipes.java.recordreader", false);
+    return conf.getBoolean(Submitter.IS_JAVA_RR, false);
   }
 
   /**
@@ -120,7 +131,7 @@ public class Submitter extends Configured implements Tool {
    * @param value the new value
    */
   public static void setIsJavaMapper(JobConf conf, boolean value) {
-    conf.setBoolean("hadoop.pipes.java.mapper", value);
+    conf.setBoolean(Submitter.IS_JAVA_MAP, value);
   }
 
   /**
@@ -129,7 +140,7 @@ public class Submitter extends Configured implements Tool {
    * @return is it a Java Mapper?
    */
   public static boolean getIsJavaMapper(JobConf conf) {
-    return conf.getBoolean("hadoop.pipes.java.mapper", false);
+    return conf.getBoolean(Submitter.IS_JAVA_MAP, false);
   }
 
   /**
@@ -138,7 +149,7 @@ public class Submitter extends Configured implements Tool {
    * @param value the new value
    */
   public static void setIsJavaReducer(JobConf conf, boolean value) {
-    conf.setBoolean("hadoop.pipes.java.reducer", value);
+    conf.setBoolean(Submitter.IS_JAVA_REDUCE, value);
   }
 
   /**
@@ -147,7 +158,7 @@ public class Submitter extends Configured implements Tool {
    * @return is it a Java Reducer?
    */
   public static boolean getIsJavaReducer(JobConf conf) {
-    return conf.getBoolean("hadoop.pipes.java.reducer", false);
+    return conf.getBoolean(Submitter.IS_JAVA_REDUCE, false);
   }
 
   /**
@@ -156,7 +167,7 @@ public class Submitter extends Configured implements Tool {
    * @param value the new value to set
    */
   public static void setIsJavaRecordWriter(JobConf conf, boolean value) {
-    conf.setBoolean("hadoop.pipes.java.recordwriter", value);
+    conf.setBoolean(Submitter.IS_JAVA_RW, value);
   }
 
   /**
@@ -165,7 +176,7 @@ public class Submitter extends Configured implements Tool {
    * @return true, if the output of the job will be written by Java
    */
   public static boolean getIsJavaRecordWriter(JobConf conf) {
-    return conf.getBoolean("hadoop.pipes.java.recordwriter", false);
+    return conf.getBoolean(Submitter.IS_JAVA_RW, false);
   }
 
   /**
@@ -187,7 +198,7 @@ public class Submitter extends Configured implements Tool {
    * @param cls the user's partitioner class
    */
   static void setJavaPartitioner(JobConf conf, Class cls) {
-    conf.set("hadoop.pipes.partitioner", cls.getName());
+    conf.set(Submitter.PARTITIONER, cls.getName());
   }
   
   /**
@@ -196,7 +207,7 @@ public class Submitter extends Configured implements Tool {
    * @return the class that the user submitted
    */
   static Class<? extends Partitioner> getJavaPartitioner(JobConf conf) {
-    return conf.getClass("hadoop.pipes.partitioner", 
+    return conf.getClass(Submitter.PARTITIONER, 
                          HashPartitioner.class,
                          Partitioner.class);
   }
@@ -209,12 +220,12 @@ public class Submitter extends Configured implements Tool {
    * JobConf.setKeepFailedTaskFiles(true) to keep the entire directory from
    * being deleted.
    * To run using the data file, set the environment variable 
-   * "hadoop.pipes.command.file" to point to the file.
+   * "mapreduce.pipes.commandfile" to point to the file.
    * @param conf the configuration to check
    * @return will the framework save the command file?
    */
   public static boolean getKeepCommandFile(JobConf conf) {
-    return conf.getBoolean("hadoop.pipes.command-file.keep", false);
+    return conf.getBoolean(Submitter.PRESERVE_COMMANDFILE, false);
   }
 
   /**
@@ -223,7 +234,7 @@ public class Submitter extends Configured implements Tool {
    * @param keep the new value
    */
   public static void setKeepCommandFile(JobConf conf, boolean keep) {
-    conf.setBoolean("hadoop.pipes.command-file.keep", keep);
+    conf.setBoolean(Submitter.PRESERVE_COMMANDFILE, keep);
   }
 
   /**
@@ -279,15 +290,15 @@ public class Submitter extends Configured implements Tool {
       }
     }
     String textClassname = Text.class.getName();
-    setIfUnset(conf, "mapred.mapoutput.key.class", textClassname);
-    setIfUnset(conf, "mapred.mapoutput.value.class", textClassname);
-    setIfUnset(conf, "mapred.output.key.class", textClassname);
-    setIfUnset(conf, "mapred.output.value.class", textClassname);
+    setIfUnset(conf, JobContext.MAP_OUTPUT_KEY_CLASS, textClassname);
+    setIfUnset(conf, JobContext.MAP_OUTPUT_VALUE_CLASS, textClassname);
+    setIfUnset(conf, JobContext.OUTPUT_KEY_CLASS, textClassname);
+    setIfUnset(conf, JobContext.OUTPUT_VALUE_CLASS, textClassname);
     
     // Use PipesNonJavaInputFormat if necessary to handle progress reporting
     // from C++ RecordReaders ...
     if (!getIsJavaRecordReader(conf) && !getIsJavaMapper(conf)) {
-      conf.setClass("mapred.pipes.user.inputformat", 
+      conf.setClass(Submitter.INPUT_FORMAT, 
                     conf.getInputFormat().getClass(), InputFormat.class);
       conf.setInputFormat(PipesNonJavaInputFormat.class);
     }
@@ -302,8 +313,8 @@ public class Submitter extends Configured implements Tool {
       DistributedCache.createSymlink(conf);
       // set default gdb commands for map and reduce task 
       String defScript = "$HADOOP_HOME/src/c++/pipes/debug/pipes-default-script";
-      setIfUnset(conf,"mapred.map.task.debug.script",defScript);
-      setIfUnset(conf,"mapred.reduce.task.debug.script",defScript);
+      setIfUnset(conf, JobContext.MAP_DEBUG_SCRIPT,defScript);
+      setIfUnset(conf, JobContext.REDUCE_DEBUG_SCRIPT,defScript);
     }
     URI[] fileCache = DistributedCache.getCacheFiles(conf);
     if (fileCache == null) {

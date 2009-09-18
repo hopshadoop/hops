@@ -68,7 +68,7 @@ public final class DistSum extends Configured implements Tool {
   private static final Log LOG = LogFactory.getLog(DistSum.class);
 
   private static final String NAME = DistSum.class.getSimpleName();
-  private static final String N_PARTS = NAME + ".nParts";
+  private static final String N_PARTS = "mapreduce.pi." + NAME + ".nParts";
   /////////////////////////////////////////////////////////////////////////////
   /** DistSum job parameters */
   static class Parameters {
@@ -433,10 +433,10 @@ public final class DistSum extends Configured implements Tool {
     SummationWritable.write(sigma, DistSum.class, jobconf);
 
     // disable task timeout
-    jobconf.setLong("mapred.task.timeout", 0);
+    jobconf.setLong(JobContext.TASK_TIMEOUT, 0);
     // do not use speculative execution
-    jobconf.setBoolean("mapred.map.tasks.speculative.execution", false);
-    jobconf.setBoolean("mapred.reduce.tasks.speculative.execution", false);
+    jobconf.setBoolean(JobContext.MAP_SPECULATIVE, false);
+    jobconf.setBoolean(JobContext.REDUCE_SPECULATIVE, false);
 
     return job; 
   }

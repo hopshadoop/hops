@@ -150,7 +150,7 @@ public class TestTrackerDistributedCacheManagerWithLinuxTaskController extends
             "");
     LOG.info("Leading path for cacheFirstFile is : "
         + trailingStringForFirstFile);
-    // The leading mapred.local.dir/0_[0-n]/taskTracker/$user string.
+    // The leading mapreduce.cluster.local.dir/0_[0-n]/taskTracker/$user string.
     String leadingStringForFirstFile =
         cachedFilePath.substring(0, cachedFilePath
             .lastIndexOf(trailingStringForFirstFile));

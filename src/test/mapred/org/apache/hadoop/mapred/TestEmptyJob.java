@@ -34,6 +34,8 @@ import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.lib.IdentityMapper;
 import org.apache.hadoop.mapred.lib.IdentityReducer;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
+import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
 
 /**
  * A JUnit test to test Map-Reduce empty jobs.
@@ -221,10 +223,10 @@ public class TestEmptyJob extends TestCase {
       JobConf conf = new JobConf();
       fileSys = FileSystem.get(conf);
 
-      conf.set("mapred.job.tracker.handler.count", "1");
-      conf.set("mapred.job.tracker", "127.0.0.1:0");
-      conf.set("mapred.job.tracker.http.address", "127.0.0.1:0");
-      conf.set("mapred.task.tracker.http.address", "127.0.0.1:0");
+      conf.set(JTConfig.JT_IPC_HANDLER_COUNT, "1");
+      conf.set(JTConfig.JT_IPC_ADDRESS, "127.0.0.1:0");
+      conf.set(JTConfig.JT_HTTP_ADDRESS, "127.0.0.1:0");
+      conf.set(TTConfig.TT_HTTP_ADDRESS, "127.0.0.1:0");
 
       mr =
           new MiniMRCluster(taskTrackers, fileSys.getUri().toString(), 1,

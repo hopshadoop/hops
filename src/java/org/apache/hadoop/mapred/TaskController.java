@@ -26,6 +26,7 @@ import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapred.JvmManager.JvmEnv;
 import org.apache.hadoop.mapreduce.server.tasktracker.Localizer;
+import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Shell.ShellCommandExecutor;
 
@@ -52,21 +53,21 @@ public abstract class TaskController implements Configurable {
     return conf;
   }
 
-  // The list of directory paths specified in the variable mapred.local.dir.
+  // The list of directory paths specified in the variable Configs.LOCAL_DIR
   // This is used to determine which among the list of directories is picked up
   // for storing data for a particular task.
   protected String[] mapredLocalDirs;
 
   public void setConf(Configuration conf) {
     this.conf = conf;
-    mapredLocalDirs = conf.getStrings("mapred.local.dir");
+    mapredLocalDirs = conf.getStrings(MRConfig.LOCAL_DIR);
   }
 
   /**
    * Sets up the permissions of the following directories on all the configured
    * disks:
    * <ul>
-   * <li>mapred-local directories</li>
+   * <li>mapreduce.cluster.local.directories</li>
    * <li>Job cache directories</li>
    * <li>Archive directories</li>
    * <li>Hadoop log directories</li>
@@ -74,10 +75,10 @@ public abstract class TaskController implements Configurable {
    */
   void setup() {
     for (String localDir : this.mapredLocalDirs) {
-      // Set up the mapred-local directories.
+      // Set up the mapreduce.cluster.local.directories.
       File mapredlocalDir = new File(localDir);
       if (!mapredlocalDir.exists() && !mapredlocalDir.mkdirs()) {
-        LOG.warn("Unable to create mapred-local directory : "
+        LOG.warn("Unable to create mapreduce.cluster.local.directory : "
             + mapredlocalDir.getPath());
       } else {
         Localizer.PermissionsHandler.setPermissions(mapredlocalDir,

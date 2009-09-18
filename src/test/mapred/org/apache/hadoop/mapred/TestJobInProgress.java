@@ -42,6 +42,7 @@ import org.apache.hadoop.mapred.TaskStatus.Phase;
 import org.apache.hadoop.mapred.UtilsForTests.FakeClock;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobCounter;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.mapreduce.Job.RawSplit;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.Node;
@@ -76,8 +77,8 @@ public class TestJobInProgress extends TestCase {
     TestSetup setup = new TestSetup(new TestSuite(TestJobInProgress.class)) {
       protected void setUp() throws Exception {
         JobConf conf = new JobConf();
-        conf.set("mapred.job.tracker", "localhost:0");
-        conf.set("mapred.job.tracker.http.address", "0.0.0.0:0");
+        conf.set(JTConfig.JT_IPC_ADDRESS, "localhost:0");
+        conf.set(JTConfig.JT_HTTP_ADDRESS, "0.0.0.0:0");
         conf.setClass("topology.node.switch.mapping.impl", 
             StaticMapping.class, DNSToSwitchMapping.class);
         jobTracker = new FakeJobTracker(conf, new FakeClock(), trackers);
@@ -166,7 +167,7 @@ public class TestJobInProgress extends TestCase {
     conf.setNumReduceTasks(numReds);
     conf.setSpeculativeExecution(false);
     conf.setBoolean(
-        "mapred.committer.job.setup.cleanup.needed", false);
+        JobContext.SETUP_CLEANUP_NEEDED, false);
     MyFakeJobInProgress job1 = new MyFakeJobInProgress(conf, jobTracker);
     job1.initTasks();
 

@@ -29,6 +29,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapred.JobStatusChangeEvent.EventType;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 
 /**
  * A {@link JobInProgressListener} which initializes the tasks for a job as soon
@@ -87,7 +88,8 @@ class EagerTaskInitializationListener extends JobInProgressListener {
   private TaskTrackerManager ttm;
   
   public EagerTaskInitializationListener(Configuration conf) {
-    numThreads = conf.getInt("mapred.jobinit.threads", DEFAULT_NUM_THREADS);
+    numThreads = 
+      conf.getInt(JTConfig.JT_JOBINIT_THREADS, DEFAULT_NUM_THREADS);
     threadPool = Executors.newFixedThreadPool(numThreads);
   }
   

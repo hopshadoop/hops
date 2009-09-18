@@ -20,7 +20,9 @@ package org.apache.hadoop.mapred;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.TaskType;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.conf.Configuration;
 
 class MemoryMatcher {
@@ -166,11 +168,10 @@ class MemoryMatcher {
 
     memSizeForMapSlotOnJT =
         JobConf.normalizeMemoryConfigValue(conf.getLong(
-            JobTracker.MAPRED_CLUSTER_MAP_MEMORY_MB_PROPERTY,
-            JobConf.DISABLED_MEMORY_LIMIT));
+            MRConfig.MAPMEMORY_MB, JobConf.DISABLED_MEMORY_LIMIT));
     memSizeForReduceSlotOnJT =
         JobConf.normalizeMemoryConfigValue(conf.getLong(
-            JobTracker.MAPRED_CLUSTER_REDUCE_MEMORY_MB_PROPERTY,
+            MRConfig.REDUCEMEMORY_MB,
             JobConf.DISABLED_MEMORY_LIMIT));
 
     //handling @deprecated values
@@ -178,8 +179,8 @@ class MemoryMatcher {
       LOG.warn(
         JobConf.deprecatedString(
           JobConf.UPPER_LIMIT_ON_TASK_VMEM_PROPERTY)+
-          " instead use " +JobTracker.MAPRED_CLUSTER_MAX_MAP_MEMORY_MB_PROPERTY+
-          " and " + JobTracker.MAPRED_CLUSTER_MAX_REDUCE_MEMORY_MB_PROPERTY
+          " instead use " + JTConfig.JT_MAX_MAPMEMORY_MB +
+          " and " + JTConfig.JT_MAX_REDUCEMEMORY_MB
       );
 
       limitMaxMemForMapTasks = limitMaxMemForReduceTasks =
@@ -197,13 +198,11 @@ class MemoryMatcher {
       limitMaxMemForMapTasks =
         JobConf.normalizeMemoryConfigValue(
           conf.getLong(
-            JobTracker.MAPRED_CLUSTER_MAX_MAP_MEMORY_MB_PROPERTY,
-            JobConf.DISABLED_MEMORY_LIMIT));
+            JTConfig.JT_MAX_MAPMEMORY_MB, JobConf.DISABLED_MEMORY_LIMIT));
       limitMaxMemForReduceTasks =
         JobConf.normalizeMemoryConfigValue(
           conf.getLong(
-            JobTracker.MAPRED_CLUSTER_MAX_REDUCE_MEMORY_MB_PROPERTY,
-            JobConf.DISABLED_MEMORY_LIMIT));
+            JTConfig.JT_MAX_REDUCEMEMORY_MB, JobConf.DISABLED_MEMORY_LIMIT));
     }
     LOG.info(String.format("Scheduler configured with "
         + "(memSizeForMapSlotOnJT, memSizeForReduceSlotOnJT, "

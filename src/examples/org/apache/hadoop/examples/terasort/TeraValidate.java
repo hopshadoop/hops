@@ -33,6 +33,7 @@ import org.apache.hadoop.mapred.Mapper;
 import org.apache.hadoop.mapred.OutputCollector;
 import org.apache.hadoop.mapred.Reducer;
 import org.apache.hadoop.mapred.Reporter;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
@@ -140,7 +141,7 @@ public class TeraValidate extends Configured implements Tool {
     // force a single reducer
     job.setNumReduceTasks(1);
     // force a single split 
-    job.setLong("mapred.min.split.size", Long.MAX_VALUE);
+    job.setLong(FileInputFormat.SPLIT_MINSIZE, Long.MAX_VALUE);
     job.setInputFormat(TeraInputFormat.class);
     JobClient.runJob(job);
     return 0;

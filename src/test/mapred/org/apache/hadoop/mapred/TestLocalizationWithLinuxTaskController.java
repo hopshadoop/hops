@@ -27,6 +27,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.ClusterWithLinuxTaskController.MyLinuxTaskController;
 import org.apache.hadoop.mapreduce.server.tasktracker.Localizer;
+import org.apache.hadoop.mapreduce.MRConfig;
 
 /**
  * Test to verify localization of a job and localization of a task on a
@@ -117,7 +118,7 @@ public class TestLocalizationWithLinuxTaskController extends
     for (String dir : localDirs) {
 
       File localDir = new File(dir);
-      assertTrue("mapred.local.dir " + localDir + " isn'task created!",
+      assertTrue(MRConfig.LOCAL_DIR + localDir + " isn'task created!",
           localDir.exists());
 
       File taskTrackerSubDir = new File(localDir, TaskTracker.SUBDIR);
@@ -165,7 +166,7 @@ public class TestLocalizationWithLinuxTaskController extends
   @Override
   protected void checkJobLocalization()
       throws IOException {
-    for (String localDir : trackerFConf.getStrings("mapred.local.dir")) {
+    for (String localDir : trackerFConf.getStrings(MRConfig.LOCAL_DIR)) {
       File jobDir =
           new File(localDir, TaskTracker.getLocalJobDir(task.getUser(), jobId
               .toString()));

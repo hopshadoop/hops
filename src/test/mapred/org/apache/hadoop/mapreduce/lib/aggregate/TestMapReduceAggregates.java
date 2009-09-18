@@ -84,10 +84,10 @@ public class TestMapReduceAggregates extends TestCase {
     System.out.println("inputData:");
     System.out.println(inputData.toString());
 
-    conf.setInt("aggregator.descriptor.num", 1);
-    conf.set("aggregator.descriptor.0", 
+    conf.setInt(ValueAggregatorJobBase.DESCRIPTOR_NUM, 1);
+    conf.set(ValueAggregatorJobBase.DESCRIPTOR + ".0", 
       "UserDefined,org.apache.hadoop.mapreduce.lib.aggregate.AggregatorTests");
-    conf.setLong("aggregate.max.num.unique.values", 14);
+    conf.setLong(UniqValueCount.MAX_NUM_UNIQUE_VALUES, 14);
     
     Job job = new Job(conf);
     FileInputFormat.setInputPaths(job, INPUT_DIR);

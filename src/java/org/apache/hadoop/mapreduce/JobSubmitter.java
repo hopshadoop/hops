@@ -119,7 +119,7 @@ class JobSubmitter {
   private void copyAndConfigureFiles(Job job, Path submitJobDir,
       short replication) throws IOException {
     Configuration conf = job.getConfiguration();
-    if (!(conf.getBoolean("mapred.used.genericoptionsparser", false))) {
+    if (!(conf.getBoolean(Job.USED_GENERIC_PARSER, false))) {
       LOG.warn("Use GenericOptionsParser for parsing the arguments. " +
                "Applications should implement Tool for the same.");
     }
@@ -222,7 +222,7 @@ class JobSubmitter {
   private void configureCommandLineOptions(Job job, Path submitJobDir,
       Path submitJarFile) throws IOException {
     Configuration conf = job.getConfiguration();
-    short replication = (short)conf.getInt("mapred.submit.replication", 10);
+    short replication = (short)conf.getInt(Job.SUBMIT_REPLICATION, 10);
     copyAndConfigureFiles(job, submitJobDir, replication);
     
     /* set this user's id in job configuration, so later job files can be

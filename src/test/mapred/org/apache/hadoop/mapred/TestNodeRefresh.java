@@ -33,6 +33,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UnixUserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -127,13 +128,13 @@ public class TestNodeRefresh extends TestCase {
   }
 
   /**
-   * Check default value of mapred.hosts.exclude. Also check if only 
+   * Check default value of HOSTS_EXCLUDE. Also check if only 
    * owner/supergroup user is allowed to this command.
    */
   public void testMRRefreshDefault() throws IOException {  
     // start a cluster with 2 hosts and no exclude-hosts file
     Configuration conf = new Configuration();
-    conf.set("mapred.hosts.exclude", "");
+    conf.set(JTConfig.JT_HOSTS_EXCLUDE_FILENAME, "");
     startCluster(2, 1, 0, conf);
 
     conf = mr.createJobConf(new JobConf(conf));
@@ -203,7 +204,7 @@ public class TestNodeRefresh extends TestCase {
     UnixUserGroupInformation.saveToConf(conf, 
         UnixUserGroupInformation.UGI_PROPERTY_NAME, ugi);
     // set the supergroup
-    conf.set("mapred.permissions.supergroup", "abc");
+    conf.set(JTConfig.JT_SUPERGROUP, "abc");
     startCluster(2, 1, 0, conf);
 
     conf = mr.createJobConf(new JobConf(conf));

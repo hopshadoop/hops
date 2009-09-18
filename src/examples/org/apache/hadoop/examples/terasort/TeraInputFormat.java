@@ -46,7 +46,7 @@ import org.apache.hadoop.util.QuickSort;
 public class TeraInputFormat extends FileInputFormat<Text,Text> {
 
   static final String PARTITION_FILENAME = "_partition.lst";
-  static final String SAMPLE_SIZE = "terasort.partitions.sample";
+  static final String SAMPLE_SIZE = "mapreduce.terasort.partitions.sample";
   private static JobConf lastConf = null;
   private static InputSplit[] lastResult = null;
 

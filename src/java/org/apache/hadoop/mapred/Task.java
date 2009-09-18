@@ -45,7 +45,9 @@ import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.serializer.Deserializer;
 import org.apache.hadoop.io.serializer.SerializationFactory;
 import org.apache.hadoop.mapred.IFile.Writer;
+import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.TaskCounter;
+import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.util.Progress;
 import org.apache.hadoop.util.Progressable;
@@ -391,11 +393,11 @@ abstract public class Task implements Writable, Configurable {
    * Localize the given JobConf to be specific for this task.
    */
   public void localizeConfiguration(JobConf conf) throws IOException {
-    conf.set("mapred.tip.id", taskId.getTaskID().toString()); 
-    conf.set("mapred.task.id", taskId.toString());
-    conf.setBoolean("mapred.task.is.map", isMapTask());
-    conf.setInt("mapred.task.partition", partition);
-    conf.set("mapred.job.id", taskId.getJobID().toString());
+    conf.set(JobContext.TASK_ID, taskId.getTaskID().toString()); 
+    conf.set(JobContext.TASK_ATTEMPT_ID, taskId.toString());
+    conf.setBoolean(JobContext.TASK_ISMAP, isMapTask());
+    conf.setInt(JobContext.TASK_PARTITION, partition);
+    conf.set(JobContext.ID, taskId.getJobID().toString());
   }
   
   /** Run this task as a part of the named job.  This method is executed in the
@@ -888,11 +890,11 @@ abstract public class Task implements Writable, Configurable {
       this.conf = new JobConf(conf);
     }
     this.mapOutputFile.setConf(this.conf);
-    this.lDirAlloc = new LocalDirAllocator("mapred.local.dir");
+    this.lDirAlloc = new LocalDirAllocator(MRConfig.LOCAL_DIR);
     // add the static resolutions (this is required for the junit to
     // work on testcases that simulate multiple nodes on a single physical
     // node.
-    String hostToResolved[] = conf.getStrings("hadoop.net.static.resolutions");
+    String hostToResolved[] = conf.getStrings(TTConfig.TT_STATIC_RESOLUTIONS);
     if (hostToResolved != null) {
       for (String str : hostToResolved) {
         String name = str.substring(0, str.indexOf('='));

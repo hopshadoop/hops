@@ -99,7 +99,7 @@ public class PoolManager {
                             // used) or a String to specify an absolute path (if
                             // mapred.fairscheduler.allocation.file is used).
   private String poolNameProperty; // Jobconf property to use for determining a
-                                   // job's pool name (default: user.name)
+                                   // job's pool name (default: mapreduce.job.user.name)
   
   private Map<String, Pool> pools = new HashMap<String, Pool>();
   
@@ -115,7 +115,7 @@ public class PoolManager {
       AllocationConfigurationException, ParserConfigurationException {
     Configuration conf = scheduler.getConf();
     this.poolNameProperty = conf.get(
-        "mapred.fairscheduler.poolnameproperty", "user.name");
+        "mapred.fairscheduler.poolnameproperty", JobContext.USER_NAME);
     this.allocFile = conf.get("mapred.fairscheduler.allocation.file");
     if (allocFile == null) {
       // No allocation file specified in jobconf. Use the default allocation

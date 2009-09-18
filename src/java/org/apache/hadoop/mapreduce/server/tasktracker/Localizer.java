@@ -165,9 +165,9 @@ public class Localizer {
    * Initialize the local directories for a particular user on this TT. This
    * involves creation and setting permissions of the following directories
    * <ul>
-   * <li>$mapred.local.dir/taskTracker/$user</li>
-   * <li>$mapred.local.dir/taskTracker/$user/jobcache</li>
-   * <li>$mapred.local.dir/taskTracker/$user/distcache</li>
+   * <li>$mapreduce.cluster.local.dir/taskTracker/$user</li>
+   * <li>$mapreduce.cluster.local.dir/taskTracker/$user/jobcache</li>
+   * <li>$mapreduce.cluster.local.dir/taskTracker/$user/distcache</li>
    * </ul>
    * 
    * @param user

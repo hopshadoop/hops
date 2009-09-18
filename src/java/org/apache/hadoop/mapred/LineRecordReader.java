@@ -77,8 +77,8 @@ public class LineRecordReader implements RecordReader<LongWritable, Text> {
 
   public LineRecordReader(Configuration job, 
                           FileSplit split) throws IOException {
-    this.maxLineLength = job.getInt("mapred.linerecordreader.maxlength",
-                                    Integer.MAX_VALUE);
+    this.maxLineLength = job.getInt(org.apache.hadoop.mapreduce.lib.input.
+      LineRecordReader.MAX_LINE_LENGTH, Integer.MAX_VALUE);
     start = split.getStart();
     end = start + split.getLength();
     final Path file = split.getPath();
@@ -130,8 +130,8 @@ public class LineRecordReader implements RecordReader<LongWritable, Text> {
   public LineRecordReader(InputStream in, long offset, long endOffset, 
                           Configuration job) 
     throws IOException{
-    this.maxLineLength = job.getInt("mapred.linerecordreader.maxlength",
-                                    Integer.MAX_VALUE);
+    this.maxLineLength = job.getInt(org.apache.hadoop.mapreduce.lib.input.
+      LineRecordReader.MAX_LINE_LENGTH, Integer.MAX_VALUE);
     this.in = new LineReader(in, job);
     this.start = offset;
     this.pos = offset;

@@ -45,6 +45,7 @@ import org.apache.hadoop.io.compress.DefaultCodec;
 import org.apache.hadoop.mapred.SortedRanges.SkipRangeIterator;
 import org.apache.hadoop.mapred.TaskTracker.TaskInProgress;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.mapreduce.task.reduce.Shuffle;
 import org.apache.hadoop.util.Progress;
 import org.apache.hadoop.util.Progressable;
@@ -307,7 +308,7 @@ public class ReduceTask extends Task {
   @SuppressWarnings("unchecked")
   public void run(JobConf job, final TaskUmbilicalProtocol umbilical)
     throws IOException, InterruptedException, ClassNotFoundException {
-    job.setBoolean("mapred.skip.on", isSkipping());
+    job.setBoolean(JobContext.SKIP_RECORDS, isSkipping());
 
     if (isMapOrReduce()) {
       copyPhase = getProgress().addPhase("copy");
@@ -337,7 +338,7 @@ public class ReduceTask extends Task {
     // Initialize the codec
     codec = initCodec();
     RawKeyValueIterator rIter = null;
-    boolean isLocal = "local".equals(job.get("mapred.job.tracker", "local"));
+    boolean isLocal = "local".equals(job.get(JTConfig.JT_IPC_ADDRESS, "local"));
     if (!isLocal) {
       Class combinerClass = conf.getCombinerClass();
       CombineOutputCollector combineCollector = 
@@ -360,7 +361,7 @@ public class ReduceTask extends Task {
                            job.getMapOutputValueClass(), codec, 
                            getMapFiles(rfs, true),
                            !conf.getKeepFailedTaskFiles(), 
-                           job.getInt("io.sort.factor", 100),
+                           job.getInt(JobContext.IO_SORT_FACTOR, 100),
                            new Path(getTaskID().toString()), 
                            job.getOutputKeyComparator(),
                            reporter, spilledRecordsCounter, null, null);
@@ -526,6 +527,7 @@ public class ReduceTask extends Task {
     org.apache.hadoop.mapreduce.RecordWriter<OUTKEY,OUTVALUE> trackedRW = 
       new NewTrackingRecordWriter<OUTKEY, OUTVALUE>(output, reduceOutputCounter);
     job.setBoolean("mapred.skip.on", isSkipping());
+    job.setBoolean(JobContext.SKIP_RECORDS, isSkipping());
     org.apache.hadoop.mapreduce.Reducer.Context 
          reducerContext = createReduceContext(reducer, job, getTaskID(),
                                                rIter, reduceInputKeyCounter, 

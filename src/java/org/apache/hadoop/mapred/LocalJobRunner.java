@@ -41,9 +41,11 @@ import org.apache.hadoop.mapreduce.ClusterMetrics;
 import org.apache.hadoop.mapreduce.QueueInfo;
 import org.apache.hadoop.mapreduce.TaskCompletionEvent;
 import org.apache.hadoop.mapreduce.TaskTrackerInfo;
+import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.filecache.TaskDistributedCacheManager;
 import org.apache.hadoop.mapreduce.filecache.TrackerDistributedCacheManager;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.mapreduce.protocol.ClientProtocol;
 import org.apache.hadoop.mapreduce.server.jobtracker.State;
 import org.apache.hadoop.util.ReflectionUtils;
@@ -143,7 +145,7 @@ public class LocalJobRunner implements ClientProtocol {
       this.taskDistributedCacheManager = 
           trackerDistributerdCacheManager.newTaskDistributedCacheManager(conf);
       taskDistributedCacheManager.setup(
-          new LocalDirAllocator("mapred.local.dir"), 
+          new LocalDirAllocator(MRConfig.LOCAL_DIR), 
           new File(systemJobDir.toString()),
           "archive");
       
@@ -554,7 +556,8 @@ public class LocalJobRunner implements ClientProtocol {
    * @see org.apache.hadoop.mapreduce.protocol.ClientProtocol#getSystemDir()
    */
   public String getSystemDir() {
-    Path sysDir = new Path(conf.get("mapred.system.dir", "/tmp/hadoop/mapred/system"));  
+    Path sysDir = new Path(
+      conf.get(JTConfig.JT_SYSTEM_DIR, "/tmp/hadoop/mapred/system"));  
     return fs.makeQualified(sysDir).toString();
   }
 

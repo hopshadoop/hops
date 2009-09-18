@@ -88,10 +88,10 @@ public class TestSpilledRecordsCounter extends TestCase {
 
     conf.setNumMapTasks(3);
     conf.setNumReduceTasks(1);
-    conf.setInt("io.sort.mb", 1);
-    conf.setInt("io.sort.factor", 2);
-    conf.set("io.sort.record.percent", "0.05");
-    conf.set("io.sort.spill.percent", "0.80");
+    conf.setInt(JobContext.IO_SORT_MB, 1);
+    conf.setInt(JobContext.IO_SORT_FACTOR, 2);
+    conf.set(JobContext.MAP_SORT_RECORD_PERCENT, "0.05");
+    conf.set(JobContext.MAP_SORT_SPILL_PERCENT, "0.80");
 
 
     String TEST_ROOT_DIR = new Path(System.getProperty("test.build.data",

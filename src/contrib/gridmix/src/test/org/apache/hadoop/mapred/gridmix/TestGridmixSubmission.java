@@ -32,6 +32,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.mapred.MiniMRCluster;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.tools.rumen.JobStory;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
@@ -62,7 +63,7 @@ public class TestGridmixSubmission {
   @BeforeClass
   public static void initCluster() throws IOException {
     Configuration conf = new Configuration();
-    conf.setBoolean("mapred.job.tracker.retire.jobs", false);
+    conf.setBoolean(JTConfig.JT_RETIREJOBS, false);
     dfsCluster = new MiniDFSCluster(conf, 3, true, null);
     dfs = dfsCluster.getFileSystem();
     mrCluster = new MiniMRCluster(3, dfs.getUri().toString(), 1);

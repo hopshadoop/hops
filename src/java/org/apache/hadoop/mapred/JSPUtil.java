@@ -34,6 +34,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser.JobInfo;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.util.ServletUtil;
 import org.apache.hadoop.util.StringUtils;
 
@@ -47,7 +48,7 @@ class JSPUtil {
     new LinkedHashMap<String, JobInfo>(); 
 
   private static final int CACHE_SIZE = 
-    conf.getInt("mapred.job.tracker.jobhistory.lru.cache.size", 5);
+    conf.getInt(JTConfig.JT_JOBHISTORY_CACHE_SIZE, 5);
 
   private static final Log LOG = LogFactory.getLog(JSPUtil.class);
   /**

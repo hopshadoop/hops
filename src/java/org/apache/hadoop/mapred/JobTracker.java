@@ -101,6 +101,8 @@ import org.apache.hadoop.util.HostsFileReader;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.VersionInfo;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
+import org.apache.hadoop.mapreduce.util.ConfigUtil;
 
 /*******************************************************
  * JobTracker is the central location for submitting and 
@@ -109,11 +111,10 @@ import org.apache.hadoop.util.VersionInfo;
  *******************************************************/
 public class JobTracker implements MRConstants, InterTrackerProtocol,
     ClientProtocol, TaskTrackerManager,
-    RefreshAuthorizationPolicyProtocol, AdminOperationsProtocol {
+    RefreshAuthorizationPolicyProtocol, AdminOperationsProtocol, JTConfig {
 
   static{
-    Configuration.addDefaultResource("mapred-default.xml");
-    Configuration.addDefaultResource("mapred-site.xml");
+    ConfigUtil.loadResources();
   }
 
   private final long tasktrackerExpiryInterval;
@@ -460,7 +461,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
         //test cases can set this to false to validate job data structures on 
         //job completion
         boolean retireJob = 
-          conf.getBoolean("mapred.job.tracker.retire.jobs", true);
+          conf.getBoolean(JT_RETIREJOBS, true);
 
         if (retireJob) {
           //purge the job from memory
@@ -1284,7 +1285,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     // find the owner of the process
     clock = newClock;
     mrOwner = UnixUserGroupInformation.login(conf);
-    supergroup = conf.get("mapred.permissions.supergroup", "supergroup");
+    supergroup = conf.get(JT_SUPERGROUP, "supergroup");
     LOG.info("Starting jobtracker with owner as " + mrOwner.getUserName() 
              + " and supergroup as " + supergroup);
 
@@ -1292,19 +1293,15 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     // Grab some static constants
     //
     tasktrackerExpiryInterval = 
-      conf.getLong("mapred.tasktracker.expiry.interval", 10 * 60 * 1000);
-    retiredJobsCacheSize = 
-      conf.getInt("mapred.job.tracker.retiredjobs.cache.size", 1000);
-    MAX_BLACKLISTS_PER_TRACKER = 
-        conf.getInt("mapred.max.tracker.blacklists", 4);
-    NUM_HEARTBEATS_IN_SECOND = 
-        conf.getInt("mapred.heartbeats.in.second", 100);
+      conf.getLong(JT_TRACKER_EXPIRY_INTERVAL, 10 * 60 * 1000);
+    retiredJobsCacheSize = conf.getInt(JT_RETIREJOB_CACHE_SIZE, 1000);
+    MAX_BLACKLISTS_PER_TRACKER = conf.getInt(JTConfig.JT_MAX_TRACKER_BLACKLISTS, 4);
+    NUM_HEARTBEATS_IN_SECOND = conf.getInt(JT_HEARTBEATS_IN_SECOND, 100);
 
     //This configuration is there solely for tuning purposes and 
     //once this feature has been tested in real clusters and an appropriate
     //value for the threshold has been found, this config might be taken out.
-    AVERAGE_BLACKLIST_THRESHOLD = 
-      conf.getFloat("mapred.cluster.average.blacklist.threshold", 0.5f); 
+    AVERAGE_BLACKLIST_THRESHOLD = conf.getFloat(JTConfig.JT_AVG_BLACKLIST_THRESHOLD, 0.5f); 
 
     // This is a directory of temporary submission files.  We delete it
     // on startup, and can delete any files that we're done with
@@ -1314,15 +1311,15 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     initializeTaskMemoryRelatedConfig();
 
     // Read the hosts/exclude files to restrict access to the jobtracker.
-    this.hostsReader = new HostsFileReader(conf.get("mapred.hosts", ""),
-                                           conf.get("mapred.hosts.exclude", ""));
+    this.hostsReader = new HostsFileReader(conf.get(JTConfig.JT_HOSTS_FILENAME, ""),
+                                           conf.get(JTConfig.JT_HOSTS_EXCLUDE_FILENAME, ""));
 
     Configuration queuesConf = new Configuration(this.conf);
     queueManager = new QueueManager(queuesConf);
     
     // Create the scheduler
     Class<? extends TaskScheduler> schedulerClass
-      = conf.getClass("mapred.jobtracker.taskScheduler",
+      = conf.getClass(JT_TASK_SCHEDULER,
           JobQueueTaskScheduler.class, TaskScheduler.class);
     taskScheduler = (TaskScheduler) ReflectionUtils.newInstance(schedulerClass, conf);
                                            
@@ -1342,7 +1339,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
       SecurityUtil.setPolicy(new ConfiguredPolicy(conf, policyProvider));
     }
     
-    int handlerCount = conf.getInt("mapred.job.tracker.handler.count", 10);
+    int handlerCount = conf.getInt(JT_IPC_HANDLER_COUNT, 10);
     this.interTrackerServer = RPC.getServer(this, addr.getHostName(), addr.getPort(), handlerCount, false, conf);
     if (LOG.isDebugEnabled()) {
       Properties p = System.getProperties();
@@ -1354,7 +1351,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     }
 
     InetSocketAddress infoSocAddr = NetUtils.createSocketAddr(
-        conf.get("mapred.job.tracker.http.address", "0.0.0.0:50030"));
+        conf.get(JT_HTTP_ADDRESS, "0.0.0.0:50030"));
     String infoBindAddress = infoSocAddr.getHostName();
     int tmpInfoPort = infoSocAddr.getPort();
     this.startTime = clock.getTime();
@@ -1389,10 +1386,10 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     // The rpc/web-server ports can be ephemeral ports... 
     // ... ensure we have the correct info
     this.port = interTrackerServer.getListenerAddress().getPort();
-    this.conf.set("mapred.job.tracker", (this.localMachine + ":" + this.port));
+    this.conf.set(JT_IPC_ADDRESS, (this.localMachine + ":" + this.port));
     LOG.info("JobTracker up at: " + this.port);
     this.infoPort = this.infoServer.getPort();
-    this.conf.set("mapred.job.tracker.http.address", 
+    this.conf.set(JT_HTTP_ADDRESS, 
         infoBindAddress + ":" + this.infoPort); 
     LOG.info("JobTracker webserver: " + this.infoServer.getPort());
     
@@ -1420,7 +1417,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
         
         // Check if the history is enabled .. as we can't have persistence with 
         // history disabled
-        if (conf.getBoolean("mapred.jobtracker.restart.recover", false) 
+        if (conf.getBoolean(JT_RESTART_ENABLED, false) 
             && systemDirData != null) {
           for (FileStatus status : systemDirData) {
             try {
@@ -1444,9 +1441,9 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
         }
         LOG.error("Mkdirs failed to create " + systemDir);
       } catch (AccessControlException ace) {
-        LOG.warn("Failed to operate on mapred.system.dir (" + systemDir 
+        LOG.warn("Failed to operate on " + JTConfig.JT_SYSTEM_DIR + "(" + systemDir 
                  + ") because of permissions.");
-        LOG.warn("Manually delete the mapred.system.dir (" + systemDir 
+        LOG.warn("Manually delete the " + JTConfig.JT_SYSTEM_DIR + "(" + systemDir 
                  + ") and then start the JobTracker.");
         LOG.warn("Bailing out ... ");
         throw ace;
@@ -1474,7 +1471,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     this.dnsToSwitchMapping = ReflectionUtils.newInstance(
         conf.getClass("topology.node.switch.mapping.impl", ScriptBasedMapping.class,
             DNSToSwitchMapping.class), conf);
-    this.numTaskCacheLevels = conf.getInt("mapred.task.cache.levels", 
+    this.numTaskCacheLevels = conf.getInt(JT_TASKCACHE_LEVELS, 
         NetworkTopology.DEFAULT_HOST_LEVEL);
 
     //initializes the job status store
@@ -1522,7 +1519,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   }
 
   /**
-   * Get JobTracker's FileSystem. This is the filesystem for mapred.system.dir.
+   * Get JobTracker's FileSystem. This is the filesystem for mapreduce.system.dir.
    */
   FileSystem getFileSystem() {
     return fs;
@@ -1530,7 +1527,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
 
   /**
    * Get the FileSystem for the given path. This can be used to resolve
-   * filesystem for job history, local job files or mapred.system.dir path.
+   * filesystem for job history, local job files or mapreduce.system.dir path.
    */
   FileSystem getFileSystem(Path path) throws IOException {
     return path.getFileSystem(conf);
@@ -1549,12 +1546,12 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   }
 
   public static Class<? extends JobTrackerInstrumentation> getInstrumentationClass(Configuration conf) {
-    return conf.getClass("mapred.jobtracker.instrumentation",
+    return conf.getClass(JT_INSTRUMENTATION,
         JobTrackerMetricsInst.class, JobTrackerInstrumentation.class);
   }
   
   public static void setInstrumentationClass(Configuration conf, Class<? extends JobTrackerInstrumentation> t) {
-    conf.setClass("mapred.jobtracker.instrumentation",
+    conf.setClass(JT_INSTRUMENTATION,
         t, JobTrackerInstrumentation.class);
   }
 
@@ -1564,7 +1561,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
 
   public static InetSocketAddress getAddress(Configuration conf) {
     String jobTrackerStr =
-      conf.get("mapred.job.tracker", "localhost:8012");
+      conf.get(JT_IPC_ADDRESS, "localhost:8012");
     return NetUtils.createSocketAddr(jobTrackerStr);
   }
 
@@ -3340,16 +3337,6 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
 
   TaskCompletionEvent[] EMPTY_EVENTS = new TaskCompletionEvent[0];
 
-  static final String MAPRED_CLUSTER_MAP_MEMORY_MB_PROPERTY =
-      "mapred.cluster.map.memory.mb";
-  static final String MAPRED_CLUSTER_REDUCE_MEMORY_MB_PROPERTY =
-      "mapred.cluster.reduce.memory.mb";
-
-  static final String MAPRED_CLUSTER_MAX_MAP_MEMORY_MB_PROPERTY =
-      "mapred.cluster.max.map.memory.mb";
-  static final String MAPRED_CLUSTER_MAX_REDUCE_MEMORY_MB_PROPERTY =
-      "mapred.cluster.max.reduce.memory.mb";
-
   /* 
    * Returns a list of TaskCompletionEvent for the given job, 
    * starting from fromEventId.
@@ -3498,7 +3485,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    * @see org.apache.hadoop.mapreduce.protocol.ClientProtocol#getSystemDir()
    */
   public String getSystemDir() {
-    Path sysDir = new Path(conf.get("mapred.system.dir", "/tmp/hadoop/mapred/system"));  
+    Path sysDir = new Path(conf.get(JTConfig.JT_SYSTEM_DIR, "/tmp/hadoop/mapred/system"));
     return fs.makeQualified(sysDir).toString();
   }
   
@@ -3723,13 +3710,13 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   }
   
   private synchronized void refreshHosts() throws IOException {
-    // Reread the config to get mapred.hosts and mapred.hosts.exclude filenames.
+    // Reread the config to get HOSTS and HOSTS_EXCLUDE filenames.
     // Update the file names and refresh internal includes and excludes list
     LOG.info("Refreshing hosts information");
     Configuration conf = new Configuration();
 
-    hostsReader.updateFileNames(conf.get("mapred.hosts",""), 
-                                conf.get("mapred.hosts.exclude", ""));
+    hostsReader.updateFileNames(conf.get(JTConfig.JT_HOSTS_FILENAME,""), 
+                                conf.get(JTConfig.JT_HOSTS_EXCLUDE_FILENAME, ""));
     hostsReader.refresh();
     
     Set<String> excludeSet = new HashSet<String>();
@@ -3923,7 +3910,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    * Returns the confgiured maximum number of tasks for a single job
    */
   int getMaxTasksPerJob() {
-    return conf.getInt("mapred.jobtracker.maxtasks.per.job", -1);
+    return conf.getInt(JT_TASKS_PER_JOB, -1);
   }
   
   @Override
@@ -3945,19 +3932,19 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   private void initializeTaskMemoryRelatedConfig() {
     memSizeForMapSlotOnJT =
         JobConf.normalizeMemoryConfigValue(conf.getLong(
-            JobTracker.MAPRED_CLUSTER_MAP_MEMORY_MB_PROPERTY,
+            MAPMEMORY_MB,
             JobConf.DISABLED_MEMORY_LIMIT));
     memSizeForReduceSlotOnJT =
         JobConf.normalizeMemoryConfigValue(conf.getLong(
-            JobTracker.MAPRED_CLUSTER_REDUCE_MEMORY_MB_PROPERTY,
+            REDUCEMEMORY_MB,
             JobConf.DISABLED_MEMORY_LIMIT));
 
     if (conf.get(JobConf.UPPER_LIMIT_ON_TASK_VMEM_PROPERTY) != null) {
       LOG.warn(
         JobConf.deprecatedString(
           JobConf.UPPER_LIMIT_ON_TASK_VMEM_PROPERTY)+
-          " instead use "+JobTracker.MAPRED_CLUSTER_MAX_MAP_MEMORY_MB_PROPERTY+
-          " and " + JobTracker.MAPRED_CLUSTER_MAX_REDUCE_MEMORY_MB_PROPERTY
+          " instead use "+JTConfig.JT_MAX_MAPMEMORY_MB+
+          " and " + JTConfig.JT_MAX_REDUCEMEMORY_MB
       );
 
       limitMaxMemForMapTasks = limitMaxMemForReduceTasks =
@@ -3975,12 +3962,12 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
       limitMaxMemForMapTasks =
         JobConf.normalizeMemoryConfigValue(
           conf.getLong(
-            JobTracker.MAPRED_CLUSTER_MAX_MAP_MEMORY_MB_PROPERTY,
+            JTConfig.JT_MAX_MAPMEMORY_MB,
             JobConf.DISABLED_MEMORY_LIMIT));
       limitMaxMemForReduceTasks =
         JobConf.normalizeMemoryConfigValue(
           conf.getLong(
-            JobTracker.MAPRED_CLUSTER_MAX_REDUCE_MEMORY_MB_PROPERTY,
+            JTConfig.JT_MAX_REDUCEMEMORY_MB,
             JobConf.DISABLED_MEMORY_LIMIT));
     }
 

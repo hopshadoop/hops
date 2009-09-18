@@ -54,7 +54,7 @@ public class TestTypedBytesStreaming extends TestCase {
       "-output", OUTPUT_DIR.getAbsolutePath(),
       "-mapper", map,
       "-reducer", reduce,
-      "-jobconf", "keep.failed.task.files=true",
+      "-jobconf", "mapreduce.task.files.preserve.failedtasks=true",
       "-jobconf", "stream.tmpdir="+System.getProperty("test.build.data","/tmp"),
       "-io", "typedbytes"
     };

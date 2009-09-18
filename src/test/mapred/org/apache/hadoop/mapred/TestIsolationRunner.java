@@ -34,6 +34,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.mapred.lib.IdentityMapper;
 import org.apache.hadoop.mapred.lib.IdentityReducer;
+import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.security.UserGroupInformation;
 
@@ -111,7 +112,7 @@ public class TestIsolationRunner extends TestCase {
       LoginException {
     String taskid =
         new TaskAttemptID(new TaskID(jobId, taskType, 0), 0).toString();
-    return new LocalDirAllocator("mapred.local.dir").getLocalPathToRead(
+    return new LocalDirAllocator(MRConfig.LOCAL_DIR).getLocalPathToRead(
         TaskTracker.getTaskConfFile(UserGroupInformation.login(conf)
             .getUserName(), jobId.toString(), taskid, false), conf);
   }

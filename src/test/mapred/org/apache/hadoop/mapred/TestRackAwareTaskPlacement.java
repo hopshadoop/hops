@@ -31,6 +31,7 @@ import org.apache.hadoop.mapred.FakeObjectUtilities.FakeJobTracker;
 import org.apache.hadoop.mapred.UtilsForTests.FakeClock;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobCounter;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.mapreduce.Job.RawSplit;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.StaticMapping;
@@ -60,8 +61,8 @@ public class TestRackAwareTaskPlacement extends TestCase {
       new TestSetup(new TestSuite(TestRackAwareTaskPlacement.class)) {
       protected void setUp() throws Exception {
         JobConf conf = new JobConf();
-        conf.set("mapred.job.tracker", "localhost:0");
-        conf.set("mapred.job.tracker.http.address", "0.0.0.0:0");
+        conf.set(JTConfig.JT_IPC_ADDRESS, "localhost:0");
+        conf.set(JTConfig.JT_HTTP_ADDRESS, "0.0.0.0:0");
         conf.setClass("topology.node.switch.mapping.impl", 
           StaticMapping.class, DNSToSwitchMapping.class);
         jobTracker = new FakeJobTracker(conf, new FakeClock(), trackers);

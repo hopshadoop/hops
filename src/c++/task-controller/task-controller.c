@@ -206,7 +206,7 @@ char *get_task_log_dir(const char *log_dir, const char *attempt_id) {
 }
 
 /**
- * Function to check if the passed tt_root is present in mapred.local.dir
+ * Function to check if the passed tt_root is present in mapreduce.cluster.local.dir
  * the task-controller is configured with.
  */
 int check_tt_root(const char *tt_root) {
@@ -442,7 +442,7 @@ int prepare_attempt_directories(const char *job_id, const char *attempt_id,
       break;
     }
 
-    // prepare attempt-dir in each of the mapred_local_dir
+    // prepare attempt-dir in each of the mapreduce.cluster.local.dir
     attempt_dir = get_attempt_directory(job_dir, attempt_id);
     if (attempt_dir == NULL) {
       fprintf(LOGFILE, "Couldn't get attempt directory for %s.\n", attempt_id);
@@ -911,7 +911,7 @@ int initialize_task(const char *jobid, const char *taskid, const char *user) {
 
 /*
  * Function used to launch a task as the provided user. It does the following :
- * 1) Checks if the tt_root passed is found in mapred.local.dir
+ * 1) Checks if the tt_root passed is found in mapreduce.cluster.local.dir
  * 2) Prepares attempt_dir and log_dir to be accessible by the child
  * 3) Uses get_task_launcher_file to fetch the task script file path
  * 4) Does an execlp on the same in order to replace the current image with

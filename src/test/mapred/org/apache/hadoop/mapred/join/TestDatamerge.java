@@ -231,7 +231,7 @@ public class TestDatamerge extends TestCase {
     JobConf job = new JobConf(conf, c);
     Path base = cluster.getFileSystem().makeQualified(new Path("/"+jointype));
     Path[] src = writeSimpleSrc(base, conf, srcs);
-    job.set("mapred.join.expr", CompositeInputFormat.compose(jointype,
+    job.set("mapreduce.join.expr", CompositeInputFormat.compose(jointype,
         SequenceFileInputFormat.class, src));
     job.setInt("testdatamerge.sources", srcs);
     job.setInputFormat(CompositeInputFormat.class);
@@ -302,7 +302,7 @@ public class TestDatamerge extends TestCase {
       sb.append(",");
     }
     sb.append(CompositeInputFormat.compose(Fake_IF.class,"raboof") + "))");
-    job.set("mapred.join.expr", sb.toString());
+    job.set("mapreduce.join.expr", sb.toString());
     job.setInputFormat(CompositeInputFormat.class);
     Path outf = new Path(base, "out");
     FileOutputFormat.setOutputPath(job, outf);
@@ -352,7 +352,7 @@ public class TestDatamerge extends TestCase {
     JobConf job = new JobConf();
     Path base = cluster.getFileSystem().makeQualified(new Path("/empty"));
     Path[] src = { new Path(base,"i0"), new Path("i1"), new Path("i2") };
-    job.set("mapred.join.expr", CompositeInputFormat.compose("outer",
+    job.set("mapreduce.join.expr", CompositeInputFormat.compose("outer",
         Fake_IF.class, src));
     job.setInputFormat(CompositeInputFormat.class);
     FileOutputFormat.setOutputPath(job, new Path(base, "out"));

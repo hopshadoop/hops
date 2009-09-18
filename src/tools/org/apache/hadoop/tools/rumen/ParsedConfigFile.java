@@ -28,6 +28,8 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.ParserConfigurationException;
 
+import org.apache.hadoop.mapreduce.MRConfig;
+import org.apache.hadoop.mapreduce.JobContext;
 import org.w3c.dom.Document;
 import org.w3c.dom.NodeList;
 import org.w3c.dom.Node;
@@ -153,21 +155,21 @@ class ParsedConfigFile {
           }
         }
 
-        if ("mapred.job.queue.name".equals(attr) && value != null) {
+        if (JobContext.QUEUE_NAME.equals(attr) && value != null) {
           queue = value;
         }
 
-        if ("mapred.job.name".equals(attr) && value != null) {
+        if (JobContext.JOB_NAME.equals(attr) && value != null) {
           jobName = value;
         }
 
-        clusterMapMB = maybeGetIntValue("mapred.cluster.map.memory.mb", attr,
+        clusterMapMB = maybeGetIntValue(MRConfig.MAPMEMORY_MB, attr,
             value, clusterMapMB);
-        clusterReduceMB = maybeGetIntValue("mapred.cluster.reduce.memory.mb",
+        clusterReduceMB = maybeGetIntValue(MRConfig.REDUCEMEMORY_MB,
             attr, value, clusterReduceMB);
-        jobMapMB = maybeGetIntValue("mapred.job.map.memory.mb", attr, value,
+        jobMapMB = maybeGetIntValue(JobContext.MAP_MEMORY_MB, attr, value,
             jobMapMB);
-        jobReduceMB = maybeGetIntValue("mapred.job.reduce.memory.mb", attr,
+        jobReduceMB = maybeGetIntValue(JobContext.REDUCE_MEMORY_MB, attr,
             value, jobReduceMB);
       }
 

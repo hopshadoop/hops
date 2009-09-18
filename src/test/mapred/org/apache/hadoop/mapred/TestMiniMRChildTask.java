@@ -80,7 +80,7 @@ public class TestMiniMRChildTask extends TestCase {
                                            makeQualified(localFs).toString());
      }
      public void configure(JobConf job) {
-       tmpDir = new Path(job.get("mapred.child.tmp", "./tmp"));
+       tmpDir = new Path(job.get(JobContext.TASK_TEMP_DIR, "./tmp"));
        try {
          localFs = FileSystem.getLocal(job);
        } catch (IOException ioe) {
@@ -343,7 +343,7 @@ public class TestMiniMRChildTask extends TestCase {
   /**
    * Tests task's temp directory.
    * 
-   * In this test, we give different values to mapred.child.tmp
+   * In this test, we give different values to mapreduce.task.tmp.dir
    * both relative and absolute. And check whether the temp directory 
    * is created. We also check whether java.io.tmpdir value is same as 
    * the directory specified. We create a temp file and check if is is 

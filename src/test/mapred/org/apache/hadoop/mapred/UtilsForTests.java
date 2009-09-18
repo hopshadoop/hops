@@ -361,9 +361,9 @@ public class UtilsForTests {
 
     public void configure(JobConf conf) {
       try {
-        String taskId = conf.get("mapred.task.id");
+        String taskId = conf.get(JobContext.TASK_ATTEMPT_ID);
         id = Integer.parseInt(taskId.split("_")[4]);
-        totalMaps = Integer.parseInt(conf.get("mapred.map.tasks"));
+        totalMaps = Integer.parseInt(conf.get(JobContext.NUM_MAPS));
         fs = FileSystem.get(conf);
         signal = new Path(conf.get(getTaskSignalParameter(true)));
       } catch (IOException ioe) {

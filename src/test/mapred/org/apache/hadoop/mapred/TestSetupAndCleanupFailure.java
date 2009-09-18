@@ -27,6 +27,8 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.mapred.lib.IdentityMapper;
 import org.apache.hadoop.mapred.lib.IdentityReducer;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
+import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
 
 /**
  * Tests various failures in setup/cleanup of job, like 
@@ -229,10 +231,9 @@ public class TestSetupAndCleanupFailure extends TestCase {
       dfs = new MiniDFSCluster(conf, 4, true, null);
       fileSys = dfs.getFileSystem();
       JobConf jtConf = new JobConf();
-      jtConf.setInt("mapred.tasktracker.map.tasks.maximum", 1);
-      jtConf.setInt("mapred.tasktracker.reduce.tasks.maximum", 1);
-      jtConf.setLong("mapred.tasktracker.expiry.interval", 10 * 1000);
-      jtConf.setInt("mapred.reduce.copy.backoff", 4);
+      jtConf.setInt(TTConfig.TT_MAP_SLOTS, 1);
+      jtConf.setInt(TTConfig.TT_REDUCE_SLOTS, 1);
+      jtConf.setLong(JTConfig.JT_TRACKER_EXPIRY_INTERVAL, 10 * 1000);
       mr = new MiniMRCluster(taskTrackers, fileSys.getUri().toString(), 1,
                              null, null, jtConf);
       // test setup/cleanup throwing exceptions

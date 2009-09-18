@@ -48,6 +48,8 @@ import org.apache.hadoop.fs.Seekable;
  */
 public class LineRecordReader extends RecordReader<LongWritable, Text> {
   private static final Log LOG = LogFactory.getLog(LineRecordReader.class);
+  public static final String MAX_LINE_LENGTH = 
+    "mapreduce.input.linerecordreader.line.maxlength";
 
   private CompressionCodecFactory compressionCodecs = null;
   private long start;
@@ -69,8 +71,7 @@ public class LineRecordReader extends RecordReader<LongWritable, Text> {
     inputByteCounter = ((MapContext)context).getCounter(
       FileInputFormat.COUNTER_GROUP, FileInputFormat.BYTES_READ);
     Configuration job = context.getConfiguration();
-    this.maxLineLength = job.getInt("mapred.linerecordreader.maxlength",
-                                    Integer.MAX_VALUE);
+    this.maxLineLength = job.getInt(MAX_LINE_LENGTH, Integer.MAX_VALUE);
     start = split.getStart();
     end = start + split.getLength();
     final Path file = split.getPath();

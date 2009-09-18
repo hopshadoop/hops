@@ -23,12 +23,13 @@ import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.mapreduce.MRConfig;
 
 /**
  * Manipulate the working area for the transient store for maps and reduces.
  * This class is used by map and reduce tasks to identify the directories that
  * they need to write to/read from for intermediate files. The callers of 
- * these methods are from child space and see mapred.local.dir as 
+ * these methods are from child space and see mapreduce.cluster.local.dir as 
  * taskTracker/jobCache/jobId/attemptId
  * 
  * <FRAMEWORK-USE-ONLY>
@@ -45,7 +46,7 @@ public class MapOutputFile {
   }
 
   private LocalDirAllocator lDirAlloc = 
-                            new LocalDirAllocator("mapred.local.dir");
+    new LocalDirAllocator(MRConfig.LOCAL_DIR);
   
   /**
    * Return the path to local map output file created earlier

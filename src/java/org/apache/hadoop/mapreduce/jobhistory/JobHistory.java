@@ -43,6 +43,7 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.JobTracker;
 import org.apache.hadoop.mapreduce.JobID;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.util.StringUtils;
 
 /**
@@ -92,7 +93,7 @@ public class JobHistory {
       long jobTrackerStartTime) throws IOException {
 
     // Get and create the log folder
-    String logDirLoc = conf.get("hadoop.job.history.location" ,
+    String logDirLoc = conf.get(JTConfig.JT_JOBHISTORY_LOCATION ,
         "file:///" +
         new File(System.getProperty("hadoop.log.dir")).getAbsolutePath()
         + File.separator + "history");
@@ -109,10 +110,10 @@ public class JobHistory {
             logDir.toString());
       }
     }
-    conf.set("hadoop.job.history.location", logDirLoc);
+    conf.set(JTConfig.JT_JOBHISTORY_LOCATION, logDirLoc);
 
     jobHistoryBlockSize = 
-      conf.getLong("mapred.jobtracker.job.history.block.size", 
+      conf.getLong(JTConfig.JT_JOBHISTORY_BLOCK_SIZE, 
           3 * 1024 * 1024);
     
     jobTracker = jt;
@@ -122,7 +123,7 @@ public class JobHistory {
   public void initDone(JobConf conf, FileSystem fs) throws IOException {
     //if completed job history location is set, use that
     String doneLocation =
-      conf.get("mapred.job.tracker.history.completed.location");
+      conf.get(JTConfig.JT_JOBHISTORY_COMPLETED_LOCATION);
     if (doneLocation != null) {
       done = fs.makeQualified(new Path(doneLocation));
       doneDirFs = fs;
@@ -147,7 +148,7 @@ public class JobHistory {
 
     // Start the History Cleaner Thread
     long maxAgeOfHistoryFiles = conf.getLong(
-        "mapreduce.cluster.jobhistory.maxage", DEFAULT_HISTORY_MAX_AGE);
+        JTConfig.JT_JOBHISTORY_MAXAGE, DEFAULT_HISTORY_MAX_AGE);
     historyCleanerThread = new HistoryCleaner(maxAgeOfHistoryFiles);
     historyCleanerThread.start();
   }

@@ -22,7 +22,9 @@ import junit.framework.TestCase;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.mapred.JobStatusChangeEvent.EventType;
+import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.TaskType;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.mapreduce.server.jobtracker.TaskTracker;
 import static org.apache.hadoop.mapred.CapacityTestUtils.*;
 
@@ -627,16 +629,10 @@ public class TestCapacityScheduler extends TestCase {
     scheduler.setTaskTrackerManager(taskTrackerManager);
     // enabled memory-based scheduling
     // Normal job in the cluster would be 1GB maps/reduces
-    scheduler.getConf().setLong(
-      JobTracker.MAPRED_CLUSTER_MAX_MAP_MEMORY_MB_PROPERTY,
-      2 * 1024);
-    scheduler.getConf().setLong(
-      JobTracker.MAPRED_CLUSTER_MAP_MEMORY_MB_PROPERTY, 1 * 1024);
-    scheduler.getConf().setLong(
-      JobTracker.MAPRED_CLUSTER_MAX_REDUCE_MEMORY_MB_PROPERTY,
-      1 * 1024);
-    scheduler.getConf().setLong(
-      JobTracker.MAPRED_CLUSTER_REDUCE_MEMORY_MB_PROPERTY, 1 * 1024);
+    scheduler.getConf().setLong(JTConfig.JT_MAX_MAPMEMORY_MB, 2 * 1024);
+    scheduler.getConf().setLong(MRConfig.MAPMEMORY_MB, 1 * 1024);
+    scheduler.getConf().setLong(JTConfig.JT_MAX_REDUCEMEMORY_MB, 1 * 1024);
+    scheduler.getConf().setLong(MRConfig.REDUCEMEMORY_MB, 1 * 1024);
     scheduler.setResourceManagerConf(resConf);
     scheduler.start();
     scheduler.getRoot().getChildren().get(0).getQueueSchedulingContext()
@@ -1004,13 +1000,13 @@ public class TestCapacityScheduler extends TestCase {
     // enabled memory-based scheduling
     // Normal job in the cluster would be 1GB maps/reduces
     scheduler.getConf().setLong(
-      JobTracker.MAPRED_CLUSTER_MAX_MAP_MEMORY_MB_PROPERTY, 2 * 1024);
+        JTConfig.JT_MAX_MAPMEMORY_MB, 2 * 1024);
     scheduler.getConf().setLong(
-      JobTracker.MAPRED_CLUSTER_MAP_MEMORY_MB_PROPERTY, 1 * 1024);
+        MRConfig.MAPMEMORY_MB, 1 * 1024);
     scheduler.getConf().setLong(
-      JobTracker.MAPRED_CLUSTER_MAX_REDUCE_MEMORY_MB_PROPERTY, 2 * 1024);
+        JTConfig.JT_MAX_REDUCEMEMORY_MB, 2 * 1024);
     scheduler.getConf().setLong(
-      JobTracker.MAPRED_CLUSTER_REDUCE_MEMORY_MB_PROPERTY, 1 * 1024);
+        MRConfig.REDUCEMEMORY_MB, 1 * 1024);
     scheduler.setResourceManagerConf(resConf);
     scheduler.start();
 
@@ -1425,16 +1421,10 @@ public class TestCapacityScheduler extends TestCase {
     scheduler.setTaskTrackerManager(taskTrackerManager);
     // enabled memory-based scheduling
     // Normal job in the cluster would be 1GB maps/reduces
-    scheduler.getConf().setLong(
-      JobTracker.MAPRED_CLUSTER_MAX_MAP_MEMORY_MB_PROPERTY,
-      2 * 1024);
-    scheduler.getConf().setLong(
-      JobTracker.MAPRED_CLUSTER_MAP_MEMORY_MB_PROPERTY, 1 * 1024);
-    scheduler.getConf().setLong(
-      JobTracker.MAPRED_CLUSTER_MAX_REDUCE_MEMORY_MB_PROPERTY,
-      1 * 1024);
-    scheduler.getConf().setLong(
-      JobTracker.MAPRED_CLUSTER_REDUCE_MEMORY_MB_PROPERTY, 1 * 1024);
+    scheduler.getConf().setLong(JTConfig.JT_MAX_MAPMEMORY_MB, 2 * 1024);
+    scheduler.getConf().setLong(MRConfig.MAPMEMORY_MB, 1 * 1024);
+    scheduler.getConf().setLong(JTConfig.JT_MAX_REDUCEMEMORY_MB, 1 * 1024);
+    scheduler.getConf().setLong(MRConfig.REDUCEMEMORY_MB, 1 * 1024);
     scheduler.setResourceManagerConf(resConf);
     scheduler.start();
 
@@ -1507,16 +1497,10 @@ public class TestCapacityScheduler extends TestCase {
     scheduler.setTaskTrackerManager(taskTrackerManager);
     // enabled memory-based scheduling
     // Normal jobs 1GB maps/reduces. 2GB limit on maps/reduces
-    scheduler.getConf().setLong(
-      JobTracker.MAPRED_CLUSTER_MAX_MAP_MEMORY_MB_PROPERTY,
-      2 * 1024);
-    scheduler.getConf().setLong(
-      JobTracker.MAPRED_CLUSTER_MAP_MEMORY_MB_PROPERTY, 1 * 1024);
-    scheduler.getConf().setLong(
-      JobTracker.MAPRED_CLUSTER_MAX_REDUCE_MEMORY_MB_PROPERTY,
-      2 * 1024);
-    scheduler.getConf().setLong(
-      JobTracker.MAPRED_CLUSTER_REDUCE_MEMORY_MB_PROPERTY, 1 * 1024);
+    scheduler.getConf().setLong(JTConfig.JT_MAX_MAPMEMORY_MB, 2 * 1024);
+    scheduler.getConf().setLong(MRConfig.MAPMEMORY_MB, 1 * 1024);
+    scheduler.getConf().setLong(JTConfig.JT_MAX_REDUCEMEMORY_MB, 2 * 1024);
+    scheduler.getConf().setLong(MRConfig.REDUCEMEMORY_MB, 1 * 1024);
     scheduler.setResourceManagerConf(resConf);
     scheduler.start();
 
@@ -1658,16 +1642,10 @@ public class TestCapacityScheduler extends TestCase {
     scheduler.setTaskTrackerManager(taskTrackerManager);
     // enabled memory-based scheduling
     LOG.debug("Assume TT has 2GB for maps and 2GB for reduces");
-    scheduler.getConf().setLong(
-      JobTracker.MAPRED_CLUSTER_MAX_MAP_MEMORY_MB_PROPERTY,
-      2 * 1024L);
-    scheduler.getConf().setLong(
-      JobTracker.MAPRED_CLUSTER_MAP_MEMORY_MB_PROPERTY, 512);
-    scheduler.getConf().setLong(
-      JobTracker.MAPRED_CLUSTER_MAX_REDUCE_MEMORY_MB_PROPERTY,
-      2 * 1024L);
-    scheduler.getConf().setLong(
-      JobTracker.MAPRED_CLUSTER_REDUCE_MEMORY_MB_PROPERTY, 512);
+    scheduler.getConf().setLong(JTConfig.JT_MAX_MAPMEMORY_MB, 2 * 1024L);
+    scheduler.getConf().setLong(MRConfig.MAPMEMORY_MB, 512);
+    scheduler.getConf().setLong(JTConfig.JT_MAX_REDUCEMEMORY_MB, 2 * 1024L);
+    scheduler.getConf().setLong(MRConfig.REDUCEMEMORY_MB, 512);
     scheduler.setResourceManagerConf(resConf);
     scheduler.start();
 
@@ -2184,14 +2162,10 @@ public class TestCapacityScheduler extends TestCase {
     scheduler.setTaskTrackerManager(taskTrackerManager);
     // enabled memory-based scheduling
     // Normal job in the cluster would be 1GB maps/reduces
-    scheduler.getConf().setLong(
-      JobTracker.MAPRED_CLUSTER_MAX_MAP_MEMORY_MB_PROPERTY, 2 * 1024);
-    scheduler.getConf().setLong(
-      JobTracker.MAPRED_CLUSTER_MAP_MEMORY_MB_PROPERTY, 1 * 1024);
-    scheduler.getConf().setLong(
-      JobTracker.MAPRED_CLUSTER_MAX_REDUCE_MEMORY_MB_PROPERTY, 1 * 1024);
-    scheduler.getConf().setLong(
-      JobTracker.MAPRED_CLUSTER_REDUCE_MEMORY_MB_PROPERTY, 1 * 1024);
+    scheduler.getConf().setLong(JTConfig.JT_MAX_MAPMEMORY_MB, 2 * 1024);
+    scheduler.getConf().setLong(MRConfig.MAPMEMORY_MB, 1 * 1024);
+    scheduler.getConf().setLong(JTConfig.JT_MAX_REDUCEMEMORY_MB, 1 * 1024);
+    scheduler.getConf().setLong(MRConfig.REDUCEMEMORY_MB, 1 * 1024);
     scheduler.setResourceManagerConf(resConf);
     scheduler.start();
 
@@ -2321,14 +2295,10 @@ public class TestCapacityScheduler extends TestCase {
     );
     // enabled memory-based scheduling
     // Normal job in the cluster would be 1GB maps/reduces
-    scheduler.getConf().setLong(
-      JobTracker.MAPRED_CLUSTER_MAX_MAP_MEMORY_MB_PROPERTY, 2 * 1024);
-    scheduler.getConf().setLong(
-      JobTracker.MAPRED_CLUSTER_MAP_MEMORY_MB_PROPERTY, 1 * 1024);
-    scheduler.getConf().setLong(
-      JobTracker.MAPRED_CLUSTER_MAX_REDUCE_MEMORY_MB_PROPERTY, 1 * 1024);
-    scheduler.getConf().setLong(
-      JobTracker.MAPRED_CLUSTER_REDUCE_MEMORY_MB_PROPERTY, 1 * 1024);
+    scheduler.getConf().setLong(JTConfig.JT_MAX_MAPMEMORY_MB, 2 * 1024);
+    scheduler.getConf().setLong(MRConfig.MAPMEMORY_MB, 1 * 1024);
+    scheduler.getConf().setLong(JTConfig.JT_MAX_REDUCEMEMORY_MB, 1 * 1024);
+    scheduler.getConf().setLong(MRConfig.REDUCEMEMORY_MB, 1 * 1024);
     scheduler.setResourceManagerConf(resConf);
     scheduler.start();
 

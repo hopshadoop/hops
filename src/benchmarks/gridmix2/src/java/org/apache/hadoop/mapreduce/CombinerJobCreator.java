@@ -58,8 +58,8 @@ public class CombinerJobCreator {
         return null;
       }
     }
-    conf.setBoolean("mapred.compress.map.output", mapoutputCompressed);
-    conf.setBoolean("mapred.output.compress", outputCompressed);
+    conf.setBoolean(JobContext.MAP_OUTPUT_COMPRESS, mapoutputCompressed);
+    conf.setBoolean(FileOutputFormat.COMPRESS, outputCompressed);
 
     Job job = new Job(conf);
     job.setJobName("GridmixCombinerJob");

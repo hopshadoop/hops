@@ -59,6 +59,7 @@ import org.apache.hadoop.util.ToolRunner;
  */
 public class TeraGen extends Configured implements Tool {
 
+  public static String NUM_ROWS = "mapreduce.terasort.num-rows";
   /**
    * An input format that assigns ranges of longs to each mapper.
    */
@@ -176,11 +177,11 @@ public class TeraGen extends Configured implements Tool {
   }
   
   static long getNumberOfRows(JobConf job) {
-    return job.getLong("terasort.num-rows", 0);
+    return job.getLong(NUM_ROWS, 0);
   }
   
   static void setNumberOfRows(JobConf job, long numRows) {
-    job.setLong("terasort.num-rows", numRows);
+    job.setLong(NUM_ROWS, numRows);
   }
 
   static class RandomGenerator {
@@ -333,7 +334,7 @@ public class TeraGen extends Configured implements Tool {
     }
 
   }
-
+  
   /**
    * @param args the cli arguments
    */

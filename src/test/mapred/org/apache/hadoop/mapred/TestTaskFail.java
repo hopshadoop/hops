@@ -41,7 +41,7 @@ public class TestTaskFail extends TestCase {
   implements Mapper<LongWritable, Text, Text, IntWritable> {
     String taskid;
     public void configure(JobConf job) {
-      taskid = job.get("mapred.task.id");
+      taskid = job.get(JobContext.TASK_ATTEMPT_ID);
     }
     public void map (LongWritable key, Text value, 
                      OutputCollector<Text, IntWritable> output, 

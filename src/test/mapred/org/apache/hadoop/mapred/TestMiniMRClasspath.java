@@ -29,6 +29,7 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 
 /**
  * A JUnit test to test Mini Map-Reduce Cluster with multiple directories
@@ -56,7 +57,7 @@ public class TestMiniMRClasspath extends TestCase {
       file.close();
     }
     FileSystem.setDefaultUri(conf, fileSys);
-    conf.set("mapred.job.tracker", jobTracker);
+    conf.set(JTConfig.JT_IPC_ADDRESS, jobTracker);
     conf.setJobName("wordcount");
     conf.setInputFormat(TextInputFormat.class);
     
@@ -112,14 +113,14 @@ public class TestMiniMRClasspath extends TestCase {
       file.close();
     }
     FileSystem.setDefaultUri(conf, uri);
-    conf.set("mapred.job.tracker", jobTracker);
+    conf.set(JTConfig.JT_IPC_ADDRESS, jobTracker);
     conf.setJobName("wordcount");
     conf.setInputFormat(TextInputFormat.class);
 
     // the keys are counts
     conf.setOutputValueClass(IntWritable.class);
     // the values are the messages
-    conf.set("mapred.output.key.class", "testjar.ExternalWritable");
+    conf.set(JobContext.OUTPUT_KEY_CLASS, "testjar.ExternalWritable");
 
     FileInputFormat.setInputPaths(conf, inDir);
     FileOutputFormat.setOutputPath(conf, outDir);

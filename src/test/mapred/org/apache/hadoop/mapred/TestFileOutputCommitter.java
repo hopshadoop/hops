@@ -35,7 +35,7 @@ public class TestFileOutputCommitter extends TestCase {
   @SuppressWarnings("unchecked")
   public void testCommitter() throws Exception {
     JobConf job = new JobConf();
-    job.set("mapred.task.id", attempt);
+    job.set(JobContext.TASK_ATTEMPT_ID, attempt);
     job.setOutputCommitter(FileOutputCommitter.class);
     FileOutputFormat.setOutputPath(job, outDir);
     JobContext jContext = new JobContext(job, taskID.getJobID());

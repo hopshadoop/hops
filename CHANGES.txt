@@ -39,6 +39,9 @@ Trunk (unreleased changes)
     MAPREDUCE-157. Refactor job history APIs and change the history format to 
     JSON. (Jothi Padmanabhan via sharad)
 
+    MAPREDUCE-849. Rename configuration properties. (Amareshwari Sriramadasu 
+    via sharad)
+
   NEW FEATURES
 
     MAPREDUCE-706. Support for FIFO pools in the fair scheduler.

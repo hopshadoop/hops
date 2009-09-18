@@ -42,6 +42,7 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 
 /**
  * Tests the use of the
@@ -112,7 +113,7 @@ public class TestMRWithDistributedCache extends TestCase {
       // (The symlinks exist in "localRunner/" for local Jobtrackers,
       // but the user has no way to get at them.
       if (!"local".equals(
-          context.getConfiguration().get("mapred.job.tracker"))) {
+          context.getConfiguration().get(JTConfig.JT_IPC_ADDRESS))) {
         File symlinkFile = new File("distributed.first.symlink");
         TestCase.assertTrue(symlinkFile.exists());
         TestCase.assertEquals(1, symlinkFile.length());
@@ -153,7 +154,7 @@ public class TestMRWithDistributedCache extends TestCase {
   /** Tests using the local job runner. */
   public void testLocalJobRunner() throws Exception {
     Configuration c = new Configuration();
-    c.set("mapred.job.tracker", "local");
+    c.set(JTConfig.JT_IPC_ADDRESS, "local");
     c.set("fs.default.name", "file:///");
     testWithConf(c);
   }

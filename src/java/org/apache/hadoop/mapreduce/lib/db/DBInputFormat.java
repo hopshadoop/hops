@@ -226,7 +226,7 @@ public class DBInputFormat<T extends DBWritable>
       results.next();
 
       long count = results.getLong(1);
-      int chunks = job.getConfiguration().getInt("mapred.map.tasks", 1);
+      int chunks = job.getConfiguration().getInt(JobContext.NUM_MAPS, 1);
       long chunkSize = (count / chunks);
 
       results.close();

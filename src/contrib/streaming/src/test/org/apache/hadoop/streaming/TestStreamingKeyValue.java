@@ -66,7 +66,7 @@ public class TestStreamingKeyValue extends TestCase
       "-input", INPUT_FILE.getAbsolutePath(),
       "-output", OUTPUT_DIR.getAbsolutePath(),
       "-mapper", "cat",
-      "-jobconf", "keep.failed.task.files=true",
+      "-jobconf", "mapreduce.task.files.preserve.failedtasks=true",
       "-jobconf", "stream.non.zero.exit.is.failure=true",
       "-jobconf", "stream.tmpdir="+System.getProperty("test.build.data","/tmp")
     };

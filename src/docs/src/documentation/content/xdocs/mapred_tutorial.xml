@@ -900,7 +900,7 @@
  
             <p>The right number of reduces seems to be <code>0.95</code> or 
             <code>1.75</code> multiplied by (&lt;<em>no. of nodes</em>&gt; * 
-            <code>mapred.tasktracker.reduce.tasks.maximum</code>).</p>
+            <code>mapreduce.tasktracker.reduce.tasks.maximum</code>).</p>
  
             <p>With <code>0.95</code> all of the reduces can launch immediately 
             and start transfering map outputs as the maps finish. With 
@@ -962,7 +962,7 @@
           significant amount of time to process individual key/value pairs, 
           this is crucial since the framework might assume that the task has 
           timed-out and kill that task. Another way to avoid this is to 
-          set the configuration parameter <code>mapred.task.timeout</code> to a
+          set the configuration parameter <code>mapreduce.task.timeout</code> to a
           high-enough value (or even set it to <em>zero</em> for no time-outs).
           </p>
 
@@ -1072,7 +1072,7 @@
 
         <p>
           <code>&lt;property&gt;</code><br/>
-          &nbsp;&nbsp;<code>&lt;name&gt;mapred.map.child.java.opts&lt;/name&gt;</code><br/>
+          &nbsp;&nbsp;<code>&lt;name&gt;mapreduce.map.java.opts&lt;/name&gt;</code><br/>
           &nbsp;&nbsp;<code>&lt;value&gt;</code><br/>
           &nbsp;&nbsp;&nbsp;&nbsp;<code>
                     -Xmx512M -Djava.library.path=/home/mycompany/lib
@@ -1086,7 +1086,7 @@
         
         <p>
           <code>&lt;property&gt;</code><br/>
-          &nbsp;&nbsp;<code>&lt;name&gt;mapred.reduce.child.java.opts&lt;/name&gt;</code><br/>
+          &nbsp;&nbsp;<code>&lt;name&gt;mapreduce.reduce.java.opts&lt;/name&gt;</code><br/>
           &nbsp;&nbsp;<code>&lt;value&gt;</code><br/>
           &nbsp;&nbsp;&nbsp;&nbsp;<code>
                     -Xmx1024M -Djava.library.path=/home/mycompany/lib
@@ -1159,26 +1159,28 @@
 
           <table>
             <tr><th>Name</th><th>Type</th><th>Description</th></tr>
-            <tr><td>io.sort.mb</td><td>int</td>
+            <tr><td>mapreduce.task.io.sort.mb</td><td>int</td>
                 <td>The cumulative size of the serialization and accounting
                 buffers storing records emitted from the map, in megabytes.
                 </td></tr>
-            <tr><td>io.sort.record.percent</td><td>float</td>
+            <tr><td>mapreduce.map.sort.record.percent</td><td>float</td>
                 <td>The ratio of serialization to accounting space can be
                 adjusted. Each serialized record requires 16 bytes of
                 accounting information in addition to its serialized size to
                 effect the sort. This percentage of space allocated from
-                <code>io.sort.mb</code> affects the probability of a spill to
+                <code>mapreduce.task.io.sort.mb</code> affects the 
+                probability of a spill to
                 disk being caused by either exhaustion of the serialization
                 buffer or the accounting space. Clearly, for a map outputting
                 small records, a higher value than the default will likely
                 decrease the number of spills to disk.</td></tr>
-            <tr><td>io.sort.spill.percent</td><td>float</td>
+            <tr><td>mapreduce.map.sort.spill.percent</td><td>float</td>
                 <td>This is the threshold for the accounting and serialization
                 buffers. When this percentage of either buffer has filled,
                 their contents will be spilled to disk in the background. Let
-                <code>io.sort.record.percent</code> be <em>r</em>,
-                <code>io.sort.mb</code> be <em>x</em>, and this value be
+                <code>mapreduce.map.sort.record.percent</code> be <em>r</em>,
+                <code>mapreduce.task.io.sort.mb</code> be <em>x</em>, 
+                and this value be
                 <em>q</em>. The maximum number of records collected before the
                 collection thread will spill is <code>r * x * q * 2^16</code>.
                 Note that a higher value may decrease the number of- or even
@@ -1218,7 +1220,7 @@
 
           <table>
             <tr><th>Name</th><th>Type</th><th>Description</th></tr>
-            <tr><td>io.sort.factor</td><td>int</td>
+            <tr><td>mapreduce.task.io.sort.factor</td><td>int</td>
                 <td>Specifies the number of segments on disk to be merged at
                 the same time. It limits the number of open files and
                 compression codecs during the merge. If the number of files
@@ -1226,7 +1228,7 @@
                 Though this limit also applies to the map, most jobs should be
                 configured so that hitting this limit is unlikely
                 there.</td></tr>
-            <tr><td>mapred.inmem.merge.threshold</td><td>int</td>
+            <tr><td>mapreduce.reduce.merge.inmem.threshold</td><td>int</td>
                 <td>The number of sorted map outputs fetched into memory
                 before being merged to disk. Like the spill thresholds in the
                 preceding note, this is not defining a unit of partition, but
@@ -1235,7 +1237,7 @@
                 less expensive than merging from disk (see notes following
                 this table). This threshold influences only the frequency of
                 in-memory merges during the shuffle.</td></tr>
-            <tr><td>mapred.job.shuffle.merge.percent</td><td>float</td>
+            <tr><td>mapreduce.reduce.shuffle.merge.percent</td><td>float</td>
                 <td>The memory threshold for fetched map outputs before an
                 in-memory merge is started, expressed as a percentage of
                 memory allocated to storing map outputs in memory. Since map
@@ -1245,14 +1247,14 @@
                 reduces whose input can fit entirely in memory. This parameter
                 influences only the frequency of in-memory merges during the
                 shuffle.</td></tr>
-            <tr><td>mapred.job.shuffle.input.buffer.percent</td><td>float</td>
+            <tr><td>mapreduce.reduce.shuffle.input.buffer.percent</td><td>float</td>
                 <td>The percentage of memory- relative to the maximum heapsize
-                as typically specified in <code>mapred.reduce.child.java.opts</code>-
+                as typically specified in <code>mapreduce.reduce.java.opts</code>-
                 that can be allocated to storing map outputs during the
                 shuffle. Though some memory should be set aside for the
                 framework, in general it is advantageous to set this high
                 enough to store large and numerous map outputs.</td></tr>
-            <tr><td>mapred.job.reduce.input.buffer.percent</td><td>float</td>
+            <tr><td>mapreduce.reduce.input.buffer.percent</td><td>float</td>
                 <td>The percentage of memory relative to the maximum heapsize
                 in which map outputs may be retained during the reduce. When
                 the reduce begins, map outputs will be merged to disk until
@@ -1277,7 +1279,8 @@
             than aggressively increasing buffer sizes.</li>
             <li>When merging in-memory map outputs to disk to begin the
             reduce, if an intermediate merge is necessary because there are
-            segments to spill and at least <code>io.sort.factor</code>
+            segments to spill and at least 
+            <code>mapreduce.task.io.sort.factor</code>
             segments already on disk, the in-memory map outputs will be part
             of the intermediate merge.</li>
           </ul>
@@ -1287,7 +1290,7 @@
         <section>
         <title> Directory Structure </title>
         <p>The task tracker has local directory,
-        <code> ${mapred.local.dir}/taskTracker/</code> to create localized
+        <code> ${mapreduce.cluster.local.dir}/taskTracker/</code> to create localized
         cache and localized job. It can define multiple local directories 
         (spanning multiple disks) and then each filename is assigned to a
         semi-random local directory. When the job starts, task tracker 
@@ -1295,24 +1298,24 @@
         specified in the configuration. Thus the task tracker directory 
         structure looks the following: </p>         
         <ul>
-        <li><code>${mapred.local.dir}/taskTracker/archive/</code> :
+        <li><code>${mapreduce.cluster.local.dir}/taskTracker/archive/</code> :
         The distributed cache. This directory holds the localized distributed
         cache. Thus localized distributed cache is shared among all
         the tasks and jobs </li>
-        <li><code>${mapred.local.dir}/taskTracker/jobcache/$jobid/</code> :
+        <li><code>${mapreduce.cluster.local.dir}/taskTracker/jobcache/$jobid/</code> :
         The localized job directory 
         <ul>
-        <li><code>${mapred.local.dir}/taskTracker/jobcache/$jobid/work/</code> 
+        <li><code>${mapreduce.cluster.local.dir}/taskTracker/jobcache/$jobid/work/</code> 
         : The job-specific shared directory. The tasks can use this space as 
         scratch space and share files among them. This directory is exposed
         to the users through the configuration property  
-        <code>job.local.dir</code>. The directory can accessed through 
+        <code>mapreduce.job.local.dir</code>. The directory can accessed through 
         api <a href="ext:api/org/apache/hadoop/mapred/jobconf/getjoblocaldir">
         JobConf.getJobLocalDir()</a>. It is available as System property also.
         So, users (streaming etc.) can call 
-        <code>System.getProperty("job.local.dir")</code> to access the 
+        <code>System.getProperty("mapreduce.job.local.dir")</code> to access the 
         directory.</li>
-        <li><code>${mapred.local.dir}/taskTracker/jobcache/$jobid/jars/</code>
+        <li><code>${mapreduce.cluster.local.dir}/taskTracker/jobcache/$jobid/jars/</code>
         : The jars directory, which has the job jar file and expanded jar.
         The <code>job.jar</code> is the application's jar file that is
         automatically distributed to each machine. It is expanded in jars
@@ -1321,29 +1324,29 @@
         <a href="ext:api/org/apache/hadoop/mapred/jobconf/getjar"> 
         JobConf.getJar() </a>. To access the unjarred directory,
         JobConf.getJar().getParent() can be called.</li>
-        <li><code>${mapred.local.dir}/taskTracker/jobcache/$jobid/job.xml</code>
+        <li><code>${mapreduce.cluster.local.dir}/taskTracker/jobcache/$jobid/job.xml</code>
         : The job.xml file, the generic job configuration, localized for 
         the job. </li>
-        <li><code>${mapred.local.dir}/taskTracker/jobcache/$jobid/$taskid</code>
+        <li><code>${mapreduce.cluster.local.dir}/taskTracker/jobcache/$jobid/$taskid</code>
         : The task directory for each task attempt. Each task directory
         again has the following structure :
         <ul>
-        <li><code>${mapred.local.dir}/taskTracker/jobcache/$jobid/$taskid/job.xml</code>
+        <li><code>${mapreduce.cluster.local.dir}/taskTracker/jobcache/$jobid/$taskid/job.xml</code>
         : A job.xml file, task localized job configuration, Task localization
         means that properties have been set that are specific to
         this particular task within the job. The properties localized for 
         each task are described below.</li>
-        <li><code>${mapred.local.dir}/taskTracker/jobcache/$jobid/$taskid/output</code>
+        <li><code>${mapreduce.cluster.local.dir}/taskTracker/jobcache/$jobid/$taskid/output</code>
         : A directory for intermediate output files. This contains the
         temporary map reduce data generated by the framework
         such as map output files etc. </li>
-        <li><code>${mapred.local.dir}/taskTracker/jobcache/$jobid/$taskid/work</code>
+        <li><code>${mapreduce.cluster.local.dir}/taskTracker/jobcache/$jobid/$taskid/work</code>
         : The curernt working directory of the task. 
         With <a href="#Task+JVM+Reuse">jvm reuse</a> enabled for tasks, this 
         directory will be the directory on which the jvm has started</li>
-        <li><code>${mapred.local.dir}/taskTracker/jobcache/$jobid/$taskid/work/tmp</code>
+        <li><code>${mapreduce.cluster.local.dir}/taskTracker/jobcache/$jobid/$taskid/work/tmp</code>
         : The temporary directory for the task. 
-        (User can specify the property <code>mapred.child.tmp</code> to set
+        (User can specify the property <code>mapreduce.task.tmp.dir</code> to set
         the value of temporary directory for map and reduce tasks. This 
         defaults to <code>./tmp</code>. If the value is not an absolute path,
         it is prepended with task's working directory. Otherwise, it is
@@ -1352,7 +1355,7 @@
         <code>-Djava.io.tmpdir='the absolute path of the tmp dir'</code>.
         Anp pipes and streaming are set with environment variable,
         <code>TMPDIR='the absolute path of the tmp dir'</code>). This 
-        directory is created, if <code>mapred.child.tmp</code> has the value
+        directory is created, if <code>mapreduce.task.tmp.dir</code> has the value
         <code>./tmp</code> </li>
         </ul>
         </li>
@@ -1364,7 +1367,7 @@
         <section>
         <title>Task JVM Reuse</title>
         <p>Jobs can enable task JVMs to be reused by specifying the job 
-        configuration <code>mapred.job.reuse.jvm.num.tasks</code>. If the
+        configuration <code>mapreduce.job.jvm.numtasks</code>. If the
         value is 1 (the default), then JVMs are not reused 
         (i.e. 1 task per JVM). If it is -1, there is no limit to the number
         of tasks a JVM can run (of the same job). One can also specify some
@@ -1379,26 +1382,26 @@
          for each task's execution: </p>
         <table>
           <tr><th>Name</th><th>Type</th><th>Description</th></tr>
-          <tr><td>mapred.job.id</td><td>String</td><td>The job id</td></tr>
-          <tr><td>mapred.jar</td><td>String</td>
+          <tr><td>mapreduce.job.id</td><td>String</td><td>The job id</td></tr>
+          <tr><td>mapreduce.job.jar</td><td>String</td>
               <td>job.jar location in job directory</td></tr>
-          <tr><td>job.local.dir</td><td> String</td>
+          <tr><td>mapreduce.job.local.dir</td><td> String</td>
               <td> The job specific shared scratch space</td></tr>
-          <tr><td>mapred.tip.id</td><td> String</td>
+          <tr><td>mapreduce.task.id</td><td> String</td>
               <td> The task id</td></tr>
-          <tr><td>mapred.task.id</td><td> String</td>
+          <tr><td>mapreduce.task.attempt.id</td><td> String</td>
               <td> The task attempt id</td></tr>
-          <tr><td>mapred.task.is.map</td><td> boolean </td>
+          <tr><td>mapreduce.task.ismap</td><td> boolean </td>
               <td>Is this a map task</td></tr>
-          <tr><td>mapred.task.partition</td><td> int </td>
+          <tr><td>mapreduce.task.partition</td><td> int </td>
               <td>The id of the task within the job</td></tr>
-          <tr><td>map.input.file</td><td> String</td>
+          <tr><td>mapreduce.map.input.file</td><td> String</td>
               <td> The filename that the map is reading from</td></tr>
-          <tr><td>map.input.start</td><td> long</td>
+          <tr><td>mapreduce.map.input.start</td><td> long</td>
               <td> The offset of the start of the map input split</td></tr>
-          <tr><td>map.input.length </td><td>long </td>
+          <tr><td>mapreduce.map.input.length </td><td>long </td>
               <td>The number of bytes in the map input split</td></tr>
-          <tr><td>mapred.work.output.dir</td><td> String </td>
+          <tr><td>mapreduce.task.output.dir</td><td> String </td>
               <td>The task's temporary output directory</td></tr>
         </table>
 
@@ -1406,7 +1409,7 @@
         <strong>Note:</strong>
         During the execution of a streaming job, the names of the "mapred" parameters are transformed. 
         The dots ( . ) become underscores ( _ ).
-        For example, mapred.job.id becomes mapred_job_id and mapred.jar becomes mapred_jar. 
+        For example, mapreduce.job.id becomes mapreduce.job.id and mapreduce.job.jar becomes mapreduce.job.jar. 
         To get the values in a streaming job's mapper/reducer use the parameter names with the underscores.
         </p>
         </section>
@@ -1547,7 +1550,7 @@
         <code>InputSplit</code> instances based on the total size, in bytes, of 
         the input files. However, the <code>FileSystem</code> blocksize of the 
         input files is treated as an upper bound for input splits. A lower bound
-        on the split size can be set via <code>mapred.min.split.size</code>.</p>
+        on the split size can be set via <code>mapreduce.input.fileinputformat.split.minsize</code>.</p>
  
         <p>Clearly, logical splits based on input-size is insufficient for many
         applications since record boundaries must be respected. In such cases, 
@@ -1579,7 +1582,7 @@
           
           <p><a href="ext:api/org/apache/hadoop/mapred/filesplit">
           FileSplit</a> is the default <code>InputSplit</code>. It sets 
-          <code>map.input.file</code> to the path of the input file for the
+          <code>mapreduce.map.input.file</code> to the path of the input file for the
           logical split.</p>
         </section>
         
@@ -1710,27 +1713,27 @@
           <p>To avoid these issues the MapReduce framework, when the 
           <code>OutputCommitter</code> is <code>FileOutputCommitter</code>, 
           maintains a special 
-          <code>${mapred.output.dir}/_temporary/_${taskid}</code> sub-directory
-          accessible via <code>${mapred.work.output.dir}</code>
+          <code>${mapreduce.output.fileoutputformat.outputdir}/_temporary/_${taskid}</code> sub-directory
+          accessible via <code>${mapreduce.task.output.dir}</code>
           for each task-attempt on the <code>FileSystem</code> where the output
           of the task-attempt is stored. On successful completion of the 
           task-attempt, the files in the 
-          <code>${mapred.output.dir}/_temporary/_${taskid}</code> (only) 
-          are <em>promoted</em> to <code>${mapred.output.dir}</code>. Of course, 
+          <code>${mapreduce.output.fileoutputformat.outputdir}/_temporary/_${taskid}</code> (only) 
+          are <em>promoted</em> to <code>${mapreduce.output.fileoutputformat.outputdir}</code>. Of course, 
           the framework discards the sub-directory of unsuccessful task-attempts. 
           This process is completely transparent to the application.</p>
  
           <p>The application-writer can take advantage of this feature by 
-          creating any side-files required in <code>${mapred.work.output.dir}</code>
+          creating any side-files required in <code>${mapreduce.task.output.dir}</code>
           during execution of a task via 
           <a href="ext:api/org/apache/hadoop/mapred/fileoutputformat/getworkoutputpath">
           FileOutputFormat.getWorkOutputPath()</a>, and the framework will promote them 
           similarly for succesful task-attempts, thus eliminating the need to 
           pick unique paths per task-attempt.</p>
           
-          <p>Note: The value of <code>${mapred.work.output.dir}</code> during 
+          <p>Note: The value of <code>${mapreduce.task.output.dir}</code> during 
           execution of a particular task-attempt is actually 
-          <code>${mapred.output.dir}/_temporary/_{$taskid}</code>, and this value is 
+          <code>${mapreduce.output.fileoutputformat.outputdir}/_temporary/_{$taskid}</code>, and this value is 
           set by the MapReduce framework. So, just create any side-files in the 
           path  returned by
           <a href="ext:api/org/apache/hadoop/mapred/fileoutputformat/getworkoutputpath">
@@ -1773,7 +1776,7 @@
           support multiple queues.</p>
           
           <p>A job defines the queue it needs to be submitted to through the
-          <code>mapred.job.queue.name</code> property, or through the
+          <code>mapreduce.job.queuename</code> property, or through the
           <a href="ext:api/org/apache/hadoop/mapred/jobconf/setqueuename">setQueueName(String)</a>
           API. Setting the queue name is optional. If a job is submitted 
           without an associated queue name, it is submitted to the 'default' 
@@ -1853,7 +1856,7 @@
           directory</code> of the task via the 
           <a href="ext:api/org/apache/hadoop/filecache/distributedcache/createsymlink">
           DistributedCache.createSymlink(Configuration)</a> api. Or by setting
-          the configuration property <code>mapred.create.symlink</code>
+          the configuration property <code>mapreduce.job.cache.symlink.create</code>
           as <code>yes</code>. The DistributedCache will use the 
           <code>fragment</code> of the URI as the name of the symlink. 
           For example, the URI 
@@ -1872,7 +1875,7 @@
           can be used to cache files/jars and also add them to the 
           <em>classpath</em> of child-jvm. The same can be done by setting
           the configuration properties 
-          <code>mapred.job.classpath.{files|archives}</code>. Similarly the
+          <code>mapreduce.job.classpath.{files|archives}</code>. Similarly the
           cached files that are symlinked into the working directory of the
           task can be used to distribute native libraries and load them.</p>
           
@@ -1991,7 +1994,7 @@
           
           <p>User can specify whether the system should collect profiler
           information for some of the tasks in the job by setting the
-          configuration property <code>mapred.task.profile</code>. The
+          configuration property <code>mapreduce.task.profile</code>. The
           value can be set using the api 
           <a href="ext:api/org/apache/hadoop/mapred/jobconf/setprofileenabled">
           JobConf.setProfileEnabled(boolean)</a>. If the value is set 
@@ -2001,7 +2004,7 @@
           
           <p>Once user configures that profiling is needed, she/he can use
           the configuration property 
-          <code>mapred.task.profile.{maps|reduces}</code> to set the ranges
+          <code>mapreduce.task.profile.{maps|reduces}</code> to set the ranges
           of MapReduce tasks to profile. The value can be set using the api 
           <a href="ext:api/org/apache/hadoop/mapred/jobconf/setprofiletaskrange">
           JobConf.setProfileTaskRange(boolean,String)</a>.
@@ -2009,7 +2012,7 @@
           
           <p>User can also specify the profiler configuration arguments by 
           setting the configuration property 
-          <code>mapred.task.profile.params</code>. The value can be specified 
+          <code>mapreduce.task.profile.params</code>. The value can be specified 
           using the api
           <a href="ext:api/org/apache/hadoop/mapred/jobconf/setprofileparams">
           JobConf.setProfileParams(String)</a>. If the string contains a 
@@ -2044,8 +2047,8 @@
           <section>
           <title> How to submit the script: </title>
           <p> A quick way to submit the debug script is to set values for the 
-          properties <code>mapred.map.task.debug.script</code> and 
-          <code>mapred.reduce.task.debug.script</code>, for debugging map and 
+          properties <code>mapreduce.map.debug.script</code> and 
+          <code>mapreduce.reduce.debug.script</code>, for debugging map and 
           reduce tasks respectively. These properties can also be set by using APIs 
           <a href="ext:api/org/apache/hadoop/mapred/jobconf/setmapdebugscript">
           JobConf.setMapDebugScript(String) </a> and
@@ -2409,7 +2412,7 @@
             <td>30.</td>
             <td>
               &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>inputFile = job.get("map.input.file");</code>
+              <code>inputFile = job.get("mapreduce.map.input.file");</code>
             </td>
           </tr>
           <tr>

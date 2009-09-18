@@ -20,10 +20,8 @@ package org.apache.hadoop.streaming;
 
 import junit.framework.TestCase;
 import java.io.*;
-import java.util.*;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
+
+import org.apache.hadoop.mapreduce.JobContext;
 
 /**
  * This class tests hadoopStreaming in MapReduce local mode.
@@ -65,7 +63,7 @@ public class TestStreamAggregate extends TestCase
       "-reducer", "aggregate",
       //"-verbose",
       //"-jobconf", "stream.debug=set"
-      "-jobconf", "keep.failed.task.files=true",
+      "-jobconf", JobContext.PRESERVE_FAILED_TASK_FILES + "=true",
       "-jobconf", "stream.tmpdir="+System.getProperty("test.build.data","/tmp")
     };
   }

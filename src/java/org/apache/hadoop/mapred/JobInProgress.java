@@ -326,13 +326,13 @@ public class JobInProgress {
     (numMapTasks + numReduceTasks + 10);
     
     this.slowTaskThreshold = Math.max(0.0f,
-        conf.getFloat("mapred.speculative.execution.slowTaskThreshold",1.0f));
+        conf.getFloat(JobContext.SPECULATIVE_SLOWTASK_THRESHOLD,1.0f));
     this.speculativeCap = conf.getFloat(
-        "mapred.speculative.execution.speculativeCap",0.1f);
+        JobContext.SPECULATIVECAP,0.1f);
     this.slowNodeThreshold = conf.getFloat(
-        "mapred.speculative.execution.slowNodeThreshold",1.0f);
+        JobContext.SPECULATIVE_SLOWNODE_THRESHOLD,1.0f);
     this.jobSetupCleanupNeeded = conf.getBoolean(
-        "mapred.committer.job.setup.cleanup.needed", true);
+        JobContext.SETUP_CLEANUP_NEEDED, true);
     if (tracker != null) { // Some mock tests have null tracker
       this.jobHistory = tracker.getJobHistory();
     }
@@ -413,11 +413,11 @@ public class JobInProgress {
     this.nonRunningReduces = new LinkedList<TaskInProgress>();    
     this.runningReduces = new LinkedHashSet<TaskInProgress>();
     this.slowTaskThreshold = Math.max(0.0f,
-        conf.getFloat("mapred.speculative.execution.slowTaskThreshold",1.0f));
+        conf.getFloat(JobContext.SPECULATIVE_SLOWTASK_THRESHOLD,1.0f));
     this.speculativeCap = conf.getFloat(
-        "mapred.speculative.execution.speculativeCap",0.1f);
+        JobContext.SPECULATIVECAP,0.1f);
     this.slowNodeThreshold = conf.getFloat(
-        "mapred.speculative.execution.slowNodeThreshold",1.0f);
+        JobContext.SPECULATIVE_SLOWNODE_THRESHOLD,1.0f);
 
   }
 
@@ -595,7 +595,7 @@ public class JobInProgress {
     // we should start scheduling reduces
     completedMapsForReduceSlowstart = 
       (int)Math.ceil(
-          (conf.getFloat("mapred.reduce.slowstart.completed.maps", 
+          (conf.getFloat(JobContext.COMPLETED_MAPS_FOR_REDUCE_SLOWSTART, 
                          DEFAULT_COMPLETED_MAPS_PERCENT_FOR_REDUCE_SLOWSTART) * 
            numMapTasks));
     
@@ -655,7 +655,7 @@ public class JobInProgress {
 
   Job.RawSplit[] createSplits() throws IOException {
     DataInputStream splitFile =
-      fs.open(new Path(conf.get("mapred.job.split.file")));
+      fs.open(new Path(conf.get(JobContext.SPLIT_FILE)));
     Job.RawSplit[] splits;
     try {
       splits = Job.readSplitFile(splitFile);

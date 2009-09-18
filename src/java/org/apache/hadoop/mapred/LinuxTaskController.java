@@ -42,8 +42,8 @@ import org.apache.hadoop.util.Shell.ShellCommandExecutor;
  * JVM and killing it when needed, and also initializing and
  * finalizing the task environment. 
  * <p> The setuid executable is launched using the command line:</p>
- * <p>task-controller user-name command command-args, where</p>
- * <p>user-name is the name of the owner who submits the job</p>
+ * <p>task-controller mapreduce.job.user.name command command-args, where</p>
+ * <p>mapreduce.job.user.name is the name of the owner who submits the job</p>
  * <p>command is one of the cardinal value of the 
  * {@link LinuxTaskController.TaskCommands} enumeration</p>
  * <p>command-args depends on the command being launched.</p>
@@ -252,7 +252,7 @@ class LinuxTaskController extends TaskController {
   }
 
   // Get the directory from the list of directories configured
-  // in mapred.local.dir chosen for storing data pertaining to
+  // in Configs.LOCAL_DIR chosen for storing data pertaining to
   // this task.
   private String getDirectoryChosenForTask(File directory,
       TaskControllerContext context) {
@@ -280,13 +280,13 @@ class LinuxTaskController extends TaskController {
    * <br/>
    * For launching following is command line argument:
    * <br/>
-   * {@code user-name command tt-root job_id task_id} 
+   * {@code mapreduce.job.user.name command tt-root job_id task_id} 
    * <br/>
    * For terminating/killing task jvm.
-   * {@code user-name command tt-root task-pid}
+   * {@code mapreduce.job.user.name command tt-root task-pid}
    * 
    * @param command command to be executed.
-   * @param userName user name
+   * @param userName mapreduce.job.user.name
    * @param cmdArgs list of extra arguments
    * @param workDir working directory for the task-controller
    * @param env JVM environment variables.

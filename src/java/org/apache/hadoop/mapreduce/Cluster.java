@@ -33,6 +33,7 @@ import org.apache.hadoop.mapred.LocalJobRunner;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistory;
 import org.apache.hadoop.mapreduce.protocol.ClientProtocol;
 import org.apache.hadoop.mapreduce.server.jobtracker.State;
+import org.apache.hadoop.mapreduce.util.ConfigUtil;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UnixUserGroupInformation;
 
@@ -48,8 +49,7 @@ public class Cluster {
   private Path jobHistoryDir = null;
 
   static {
-    Configuration.addDefaultResource("mapred-default.xml");
-    Configuration.addDefaultResource("mapred-site.xml");
+    ConfigUtil.loadResources();
   }
   
   public Cluster(Configuration conf) throws IOException {

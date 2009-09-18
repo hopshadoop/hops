@@ -70,10 +70,10 @@ public class TestStreamDataProtocol extends TestCase
       //"-verbose",
       "-jobconf", "stream.map.output.field.separator=.",
       "-jobconf", "stream.num.map.output.key.fields=2",
-      "-jobconf", "map.output.key.field.separator=.",
+      "-jobconf", "mapreduce.mapreduce.mapreduce.map.output.key.field.separator=.",
       "-jobconf", "num.key.fields.for.partition=1",
-      "-jobconf", "mapred.reduce.tasks=2",
-      "-jobconf", "keep.failed.task.files=true",
+      "-jobconf", "mapreduce.job.reduces=2",
+      "-jobconf", "mapreduce.task.files.preserve.failedtasks=true",
       "-jobconf", "stream.tmpdir="+System.getProperty("test.build.data","/tmp")
     };
   }

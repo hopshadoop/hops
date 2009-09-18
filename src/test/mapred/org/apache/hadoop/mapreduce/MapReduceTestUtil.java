@@ -132,7 +132,7 @@ public class MapReduceTestUtil {
    */
   public static Job createCopyJob(Configuration conf, Path outdir, 
       Path... indirs) throws Exception {
-    conf.setInt("mapred.map.tasks", 3);
+    conf.setInt(JobContext.NUM_MAPS, 3);
     Job theJob = new Job(conf);
     theJob.setJobName("DataMoveJob");
 
@@ -158,7 +158,7 @@ public class MapReduceTestUtil {
   public static Job createFailJob(Configuration conf, Path outdir, 
       Path... indirs) throws Exception {
 
-    conf.setInt("mapred.map.max.attempts", 2);
+    conf.setInt(JobContext.MAP_MAX_ATTEMPTS, 2);
     Job theJob = new Job(conf);
     theJob.setJobName("Fail-Job");
 
@@ -370,7 +370,7 @@ public class MapReduceTestUtil {
   public static TaskAttemptContext createDummyMapTaskAttemptContext(
       Configuration conf) {
     TaskAttemptID tid = new TaskAttemptID("jt", 1, TaskType.MAP, 0, 0);
-    conf.set("mapred.task.id", tid.toString());
+    conf.set(JobContext.TASK_ATTEMPT_ID, tid.toString());
     return new TaskAttemptContext(conf, tid);    
   }
 

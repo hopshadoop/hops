@@ -53,6 +53,7 @@ import org.apache.hadoop.mapred.IFile.Writer;
 import org.apache.hadoop.mapred.Merger.Segment;
 import org.apache.hadoop.mapred.SortedRanges.SkipRangeIterator;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.TaskCounter;
 import org.apache.hadoop.util.IndexedSortable;
@@ -114,7 +115,7 @@ class MapTask extends Task {
         && (conf.getKeepTaskFilesPattern() != null || conf
             .getKeepFailedTaskFiles())) {
       Path localSplit =
-          new LocalDirAllocator("mapred.local.dir").getLocalPathForWrite(
+          new LocalDirAllocator(MRConfig.LOCAL_DIR).getLocalPathForWrite(
               TaskTracker.getLocalSplitFile(conf.getUser(), getJobID()
                   .toString(), getTaskID().toString()), conf);
       LOG.debug("Writing local split to " + localSplit);
@@ -355,7 +356,7 @@ class MapTask extends Task {
     RecordReader<INKEY,INVALUE> in = isSkipping() ? 
         new SkippingRecordReader<INKEY,INVALUE>(rawIn, umbilical, reporter) :
         new TrackedRecordReader<INKEY,INVALUE>(rawIn, reporter);
-    job.setBoolean("mapred.skip.on", isSkipping());
+    job.setBoolean(JobContext.SKIP_RECORDS, isSkipping());
 
 
     int numReduceTasks = conf.getNumReduceTasks();
@@ -390,9 +391,9 @@ class MapTask extends Task {
   private void updateJobWithSplit(final JobConf job, InputSplit inputSplit) {
     if (inputSplit instanceof FileSplit) {
       FileSplit fileSplit = (FileSplit) inputSplit;
-      job.set("map.input.file", fileSplit.getPath().toString());
-      job.setLong("map.input.start", fileSplit.getStart());
-      job.setLong("map.input.length", fileSplit.getLength());
+      job.set(JobContext.MAP_INPUT_FILE, fileSplit.getPath().toString());
+      job.setLong(JobContext.MAP_INPUT_START, fileSplit.getStart());
+      job.setLong(JobContext.MAP_INPUT_PATH, fileSplit.getLength());
     }
   }
 
@@ -570,7 +571,7 @@ class MapTask extends Task {
       new NewTrackingRecordReader<INKEY,INVALUE>
           (inputFormat.createRecordReader(split, taskContext), reporter);
     
-    job.setBoolean("mapred.skip.on", isSkipping());
+    job.setBoolean(JobContext.SKIP_RECORDS, isSkipping());
     org.apache.hadoop.mapreduce.RecordWriter output = null;
     org.apache.hadoop.mapreduce.Mapper<INKEY,INVALUE,OUTKEY,OUTVALUE>.Context 
          mapperContext = null;
@@ -744,21 +745,21 @@ class MapTask extends Task {
       indexCacheList = new ArrayList<SpillRecord>();
       
       //sanity checks
-      final float spillper = job.getFloat("io.sort.spill.percent",(float)0.8);
-      final float recper = job.getFloat("io.sort.record.percent",(float)0.05);
-      final int sortmb = job.getInt("io.sort.mb", 100);
+      final float spillper = job.getFloat(JobContext.MAP_SORT_SPILL_PERCENT,(float)0.8);
+      final float recper = job.getFloat(JobContext.MAP_SORT_RECORD_PERCENT,(float)0.05);
+      final int sortmb = job.getInt(JobContext.IO_SORT_MB, 100);
       if (spillper > (float)1.0 || spillper < (float)0.0) {
-        throw new IOException("Invalid \"io.sort.spill.percent\": " + spillper);
+        throw new IOException("Invalid \"mapreduce.map.sort.spill.percent\": " + spillper);
       }
       if (recper > (float)1.0 || recper < (float)0.01) {
-        throw new IOException("Invalid \"io.sort.record.percent\": " + recper);
+        throw new IOException("Invalid \"mapreduce.map.sort.record.percent\": " + recper);
       }
       if ((sortmb & 0x7FF) != sortmb) {
-        throw new IOException("Invalid \"io.sort.mb\": " + sortmb);
+        throw new IOException("Invalid \"mapreduce.task.mapreduce.task.io.sort.mb\": " + sortmb);
       }
       sorter = ReflectionUtils.newInstance(job.getClass("map.sort.class",
             QuickSort.class, IndexedSorter.class), job);
-      LOG.info("io.sort.mb = " + sortmb);
+      LOG.info("mapreduce.task.mapreduce.task.io.sort.mb = " + sortmb);
       // buffers and accounting
       int maxMemUsage = sortmb << 20;
       int recordCapacity = (int)(maxMemUsage * recper);
@@ -804,7 +805,7 @@ class MapTask extends Task {
       } else {
         combineCollector = null;
       }
-      minSpillsForCombine = job.getInt("min.num.spills.for.combine", 3);
+      minSpillsForCombine = job.getInt(JobContext.MAP_COMBINE_MIN_SPISS, 3);
       spillThread.setDaemon(true);
       spillThread.setName("SpillThread");
       spillLock.lock();
@@ -1539,7 +1540,7 @@ class MapTask extends Task {
             }
           }
 
-          int mergeFactor = job.getInt("io.sort.factor", 100);
+          int mergeFactor = job.getInt(JobContext.IO_SORT_FACTOR, 100);
           // sort the segments only if there are intermediate merges
           boolean sortSegments = segmentList.size() > mergeFactor;
           //merge

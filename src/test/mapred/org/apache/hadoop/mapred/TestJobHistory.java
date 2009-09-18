@@ -43,6 +43,7 @@ import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskID;
 import org.apache.hadoop.mapreduce.TaskType;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistory;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser.JobInfo;
@@ -588,7 +589,7 @@ public class TestJobHistory extends TestCase {
 
       //set the done folder location
       String doneFolder = "history_done";
-      conf.set("mapred.job.tracker.history.completed.location", doneFolder);
+      conf.set(JTConfig.JT_JOBHISTORY_COMPLETED_LOCATION, doneFolder);
 
       String logDir =
         "file:///" + new File(System.getProperty("hadoop.log.dir")).
@@ -704,7 +705,7 @@ public class TestJobHistory extends TestCase {
 
       //set the done folder location
       String doneFolder = TEST_ROOT_DIR + "history_done";
-      conf.set("mapred.job.tracker.history.completed.location", doneFolder);
+      conf.set(JTConfig.JT_JOBHISTORY_COMPLETED_LOCATION, doneFolder);
       
       mr = new MiniMRCluster(2, "file:///", 3, null, null, conf);
 

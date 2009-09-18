@@ -36,6 +36,7 @@ import org.apache.hadoop.io.RawComparator;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.mapred.IFile.Reader;
 import org.apache.hadoop.mapred.IFile.Writer;
+import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.util.PriorityQueue;
 import org.apache.hadoop.util.Progress;
 import org.apache.hadoop.util.Progressable;
@@ -49,7 +50,7 @@ public class Merger {
 
   // Local directories
   private static LocalDirAllocator lDirAlloc = 
-    new LocalDirAllocator("mapred.local.dir");
+    new LocalDirAllocator(MRConfig.LOCAL_DIR);
 
   public static <K extends Object, V extends Object>
   RawKeyValueIterator merge(Configuration conf, FileSystem fs,
@@ -188,7 +189,7 @@ public class Merger {
   void writeFile(RawKeyValueIterator records, Writer<K, V> writer, 
                  Progressable progressable, Configuration conf) 
   throws IOException {
-    long progressBar = conf.getLong("mapred.merge.recordsBeforeProgress",
+    long progressBar = conf.getLong(JobContext.RECORDS_BEFORE_PROGRESS,
         10000);
     long recordCtr = 0;
     while(records.next()) {
@@ -746,7 +747,7 @@ public class Merger {
      * calculating mergeProgress. This simulates the above merge() method and
      * tries to obtain the number of bytes that are going to be merged in all
      * merges(assuming that there is no combiner called while merging).
-     * @param factor io.sort.factor
+     * @param factor mapreduce.task.mapreduce.task.io.sort.factor
      * @param inMem  number of segments in memory to be merged
      */
     long computeBytesInMerges(int factor, int inMem) {

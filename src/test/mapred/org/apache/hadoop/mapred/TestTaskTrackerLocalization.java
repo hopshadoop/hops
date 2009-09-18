@@ -33,6 +33,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.server.tasktracker.Localizer;
@@ -71,7 +72,7 @@ public class TestTaskTrackerLocalization extends TestCase {
   protected Task task;
   protected String[] localDirs;
   protected static LocalDirAllocator lDirAlloc =
-      new LocalDirAllocator("mapred.local.dir");
+      new LocalDirAllocator(MRConfig.LOCAL_DIR);
   protected Path attemptWorkDir;
   protected File[] attemptLogFiles;
   protected JobConf localizedTaskConf;
@@ -126,7 +127,7 @@ public class TestTaskTrackerLocalization extends TestCase {
     for (int i = 0; i < numLocalDirs; i++) {
       localDirs[i] = new File(ROOT_MAPRED_LOCAL_DIR, "0_" + i).getPath();
     }
-    trackerFConf.setStrings("mapred.local.dir", localDirs);
+    trackerFConf.setStrings(MRConfig.LOCAL_DIR, localDirs);
 
     // Create the job configuration file. Same as trackerConf in this test.
     Job job = new Job(trackerFConf);
@@ -293,7 +294,7 @@ public class TestTaskTrackerLocalization extends TestCase {
     for (String dir : localDirs) {
 
       File localDir = new File(dir);
-      assertTrue("mapred.local.dir " + localDir + " isn'task created!",
+      assertTrue(MRConfig.LOCAL_DIR + localDir + " isn'task created!",
           localDir.exists());
 
       File taskTrackerSubDir = new File(localDir, TaskTracker.SUBDIR);
@@ -395,13 +396,13 @@ public class TestTaskTrackerLocalization extends TestCase {
         .getLocalPathToRead(TaskTracker.getJobWorkDir(task.getUser(), jobId
             .toString()), trackerFConf) != null);
 
-    // Check the setting of job.local.dir and job.jar which will eventually be
+    // Check the setting of mapreduce.job.local.dir and job.jar which will eventually be
     // used by the user's task
     boolean jobLocalDirFlag = false, mapredJarFlag = false;
     String localizedJobLocalDir =
         localizedJobConf.get(TaskTracker.JOB_LOCAL_DIR);
     String localizedJobJar = localizedJobConf.getJar();
-    for (String localDir : localizedJobConf.getStrings("mapred.local.dir")) {
+    for (String localDir : localizedJobConf.getStrings(MRConfig.LOCAL_DIR)) {
       if (localizedJobLocalDir.equals(localDir + Path.SEPARATOR
           + TaskTracker.getJobWorkDir(task.getUser(), jobId.toString()))) {
         jobLocalDirFlag = true;
@@ -415,7 +416,7 @@ public class TestTaskTrackerLocalization extends TestCase {
         + " is not set properly to the target users directory : "
         + localizedJobLocalDir, jobLocalDirFlag);
     assertTrue(
-        "mapred.jar is not set properly to the target users directory : "
+        "mapreduce.job.jar is not set properly to the target users directory : "
             + localizedJobJar, mapredJarFlag);
   }
 
@@ -447,7 +448,7 @@ public class TestTaskTrackerLocalization extends TestCase {
     // //////////
 
     // check the functionality of localizeTask
-    for (String dir : trackerFConf.getStrings("mapred.local.dir")) {
+    for (String dir : trackerFConf.getStrings(MRConfig.LOCAL_DIR)) {
       File attemptDir =
           new File(dir, TaskTracker.getLocalTaskDir(task.getUser(), jobId
               .toString(), taskId.toString()));
@@ -501,9 +502,9 @@ public class TestTaskTrackerLocalization extends TestCase {
 
   protected void checkTaskLocalization()
       throws IOException {
-    // Make sure that the mapred.local.dir is sandboxed
+    // Make sure that the mapreduce.cluster.local.dir is sandboxed
     for (String childMapredLocalDir : localizedTaskConf
-        .getStrings("mapred.local.dir")) {
+        .getStrings(MRConfig.LOCAL_DIR)) {
       assertTrue("Local dir " + childMapredLocalDir + " is not sandboxed !!",
           childMapredLocalDir.endsWith(TaskTracker.getLocalTaskDir(task
               .getUser(), jobId.toString(), taskId.toString(), false)));
@@ -601,7 +602,7 @@ public class TestTaskTrackerLocalization extends TestCase {
     assertTrue("Some task files are not deleted!! Number of stale paths is "
         + cleanupQueue.stalePaths.size(), cleanupQueue.stalePaths.size() == 0);
 
-    // Check that the empty $mapred.local.dir/taskTracker/$user dirs are still
+    // Check that the empty $mapreduce.cluster.local.dir/taskTracker/$user dirs are still
     // there.
     for (String localDir : localDirs) {
       Path userDir =

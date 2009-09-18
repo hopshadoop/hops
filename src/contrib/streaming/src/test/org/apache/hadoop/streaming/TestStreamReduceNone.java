@@ -64,7 +64,7 @@ public class TestStreamReduceNone extends TestCase
       "-mapper", map,
       "-reducer", "org.apache.hadoop.mapred.lib.IdentityReducer",
       "-numReduceTasks", "0",
-      "-jobconf", "keep.failed.task.files=true",
+      "-jobconf", "mapreduce.task.files.preserve.failedtasks=true",
       "-jobconf", "stream.tmpdir="+System.getProperty("test.build.data","/tmp")
     };
   }

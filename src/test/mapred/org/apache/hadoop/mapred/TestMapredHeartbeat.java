@@ -22,6 +22,7 @@ import java.io.IOException;
 import junit.framework.TestCase;
 
 import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 
 public class TestMapredHeartbeat extends TestCase {
   public void testJobDirCleanup() throws IOException {
@@ -42,7 +43,7 @@ public class TestMapredHeartbeat extends TestCase {
       
       // test configured heartbeat interval
       taskTrackers = 5;
-      conf.setInt("mapred.heartbeats.in.second", 1);
+      conf.setInt(JTConfig.JT_HEARTBEATS_IN_SECOND, 1);
       mr = new MiniMRCluster(taskTrackers, "file:///", 3, 
           null, null, conf);
       jc = new JobClient(mr.createJobConf());
@@ -55,7 +56,7 @@ public class TestMapredHeartbeat extends TestCase {
       
       // test configured heartbeat interval is capped with min value
       taskTrackers = 5;
-      conf.setInt("mapred.heartbeats.in.second", 10);
+      conf.setInt(JTConfig.JT_HEARTBEATS_IN_SECOND, 10);
       mr = new MiniMRCluster(taskTrackers, "file:///", 3, 
           null, null, conf);
       jc = new JobClient(mr.createJobConf());

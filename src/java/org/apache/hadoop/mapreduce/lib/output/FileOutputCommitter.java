@@ -33,7 +33,7 @@ import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.util.StringUtils;
 
 /** An {@link OutputCommitter} that commits files specified 
- * in job output directory i.e. ${mapred.output.dir}. 
+ * in job output directory i.e. ${mapreduce.output.fileoutputformat.outputdir}. 
  **/
 public class FileOutputCommitter extends OutputCommitter {
 

@@ -34,7 +34,7 @@ import org.apache.hadoop.util.Progressable;
  * A streamlined text output format that writes key, value, and "\r\n".
  */
 public class TeraOutputFormat extends TextOutputFormat<Text,Text> {
-  static final String FINAL_SYNC_ATTRIBUTE = "terasort.final.sync";
+  static final String FINAL_SYNC_ATTRIBUTE = "mapreduce.terasort.final.sync";
 
   /**
    * Set the requirement for a final sync before the stream is closed.

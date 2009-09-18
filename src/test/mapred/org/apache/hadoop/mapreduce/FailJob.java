@@ -45,11 +45,13 @@ import org.apache.hadoop.util.ToolRunner;
  * Mappers emit a token amount of data.
  */
 public class FailJob extends Configured implements Tool {
+  public static String FAIL_MAP = "mapreduce.failjob.map.fail";
+  public static String FAIL_REDUCE = "mapreduce.failjob.reduce.fail";
   public static class FailMapper 
       extends Mapper<LongWritable, Text, LongWritable, NullWritable> {
     public void map(LongWritable key, Text value, Context context
                ) throws IOException, InterruptedException {
-      if (context.getConfiguration().getBoolean("fail.job.map.fail", true)) {
+      if (context.getConfiguration().getBoolean(FAIL_MAP, true)) {
         throw new RuntimeException("Intentional map failure");
       }
       context.write(key, NullWritable.get());
@@ -61,7 +63,7 @@ public class FailJob extends Configured implements Tool {
 
     public void reduce(LongWritable key, Iterable<NullWritable> values,
                        Context context) throws IOException {
-      if (context.getConfiguration().getBoolean("fail.job.reduce.fail", false)) {
+      if (context.getConfiguration().getBoolean(FAIL_REDUCE, false)) {
       	throw new RuntimeException("Intentional reduce failure");
       }
       context.setStatus("No worries");
@@ -76,8 +78,8 @@ public class FailJob extends Configured implements Tool {
   public Job createJob(boolean failMappers, boolean failReducers, Path inputFile) 
       throws IOException {
     Configuration conf = getConf();
-    conf.setBoolean("fail.job.map.fail", failMappers);
-    conf.setBoolean("fail.job.reduce.fail", failReducers);
+    conf.setBoolean(FAIL_MAP, failMappers);
+    conf.setBoolean(FAIL_REDUCE, failReducers);
     Job job = new Job(conf, "fail");
     job.setJarByClass(FailJob.class);
     job.setMapperClass(FailMapper.class);

@@ -42,6 +42,7 @@ import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.filecache.TaskDistributedCacheManager;
 import org.apache.hadoop.mapreduce.filecache.TrackerDistributedCacheManager;
+import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
 import org.apache.hadoop.security.UserGroupInformation;
 
 public class TestTrackerDistributedCacheManager extends TestCase {
@@ -85,7 +86,7 @@ public class TestTrackerDistributedCacheManager extends TestCase {
         new File(TEST_ROOT_DIR, "cachebasedir").getAbsolutePath();
 
     conf = new Configuration();
-    conf.setLong("local.cache.size", LOCAL_CACHE_LIMIT);
+    conf.setLong(TTConfig.TT_LOCAL_CACHE_SIZE, LOCAL_CACHE_LIMIT);
     conf.setStrings(JobConf.MAPRED_LOCAL_DIR_PROPERTY, localDirs);
     conf.set(FileSystem.FS_DEFAULT_NAME_KEY, "file:///");
 

@@ -530,8 +530,8 @@ public class TestValueIterReset extends TestCase {
       job.setMapOutputValueClass(IntWritable.class);
       job.setOutputKeyClass(IntWritable.class);
       job.setOutputValueClass(IntWritable.class);
-      job.getConfiguration().setInt("mapred.job.reduce.markreset.buffer.size",
-                                    128);  
+      job.getConfiguration().
+        setInt(JobContext.REDUCE_MARKRESET_BUFFER_SIZE,128);  
       job.setInputFormatClass(TextInputFormat.class);
       job.setOutputFormatClass(TextOutputFormat.class);
       FileInputFormat.addInputPath(job,

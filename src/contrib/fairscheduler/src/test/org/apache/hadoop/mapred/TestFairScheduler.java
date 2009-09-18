@@ -1390,19 +1390,19 @@ public class TestFairScheduler extends TestCase {
     // Submit jobs, advancing time in-between to make sure that they are
     // all submitted at distinct times.
     JobInProgress job1 = submitJob(JobStatus.RUNNING, 10, 10);
-    job1.getJobConf().set("user.name", "user1");
+    job1.getJobConf().set(JobContext.USER_NAME, "user1");
     JobInfo info1 = scheduler.infos.get(job1);
     advanceTime(10);
     JobInProgress job2 = submitJob(JobStatus.RUNNING, 10, 10);
-    job2.getJobConf().set("user.name", "user1");
+    job2.getJobConf().set(JobContext.USER_NAME, "user1");
     JobInfo info2 = scheduler.infos.get(job2);
     advanceTime(10);
     JobInProgress job3 = submitJob(JobStatus.RUNNING, 10, 10);
-    job3.getJobConf().set("user.name", "user2");
+    job3.getJobConf().set(JobContext.USER_NAME, "user2");
     JobInfo info3 = scheduler.infos.get(job3);
     advanceTime(10);
     JobInProgress job4 = submitJob(JobStatus.RUNNING, 10, 10);
-    job4.getJobConf().set("user.name", "user2");
+    job4.getJobConf().set(JobContext.USER_NAME, "user2");
     JobInfo info4 = scheduler.infos.get(job4);
     
     // Check scheduler variables
@@ -1456,49 +1456,49 @@ public class TestFairScheduler extends TestCase {
     
     // Two jobs for user1; only one should get to run
     JobInProgress job1 = submitJob(JobStatus.RUNNING, 10, 10);
-    job1.getJobConf().set("user.name", "user1");
+    job1.getJobConf().set(JobContext.USER_NAME, "user1");
     JobInfo info1 = scheduler.infos.get(job1);
     advanceTime(10);
     JobInProgress job2 = submitJob(JobStatus.RUNNING, 10, 10);
-    job2.getJobConf().set("user.name", "user1");
+    job2.getJobConf().set(JobContext.USER_NAME, "user1");
     JobInfo info2 = scheduler.infos.get(job2);
     advanceTime(10);
     
     // Three jobs for user2; all should get to run
     JobInProgress job3 = submitJob(JobStatus.RUNNING, 10, 10);
-    job3.getJobConf().set("user.name", "user2");
+    job3.getJobConf().set(JobContext.USER_NAME, "user2");
     JobInfo info3 = scheduler.infos.get(job3);
     advanceTime(10);
     JobInProgress job4 = submitJob(JobStatus.RUNNING, 10, 10);
-    job4.getJobConf().set("user.name", "user2");
+    job4.getJobConf().set(JobContext.USER_NAME, "user2");
     JobInfo info4 = scheduler.infos.get(job4);
     advanceTime(10);
     JobInProgress job5 = submitJob(JobStatus.RUNNING, 10, 10);
-    job5.getJobConf().set("user.name", "user2");
+    job5.getJobConf().set(JobContext.USER_NAME, "user2");
     JobInfo info5 = scheduler.infos.get(job5);
     advanceTime(10);
     
     // Three jobs for user3; only two should get to run
     JobInProgress job6 = submitJob(JobStatus.RUNNING, 10, 10);
-    job6.getJobConf().set("user.name", "user3");
+    job6.getJobConf().set(JobContext.USER_NAME, "user3");
     JobInfo info6 = scheduler.infos.get(job6);
     advanceTime(10);
     JobInProgress job7 = submitJob(JobStatus.RUNNING, 10, 10);
-    job7.getJobConf().set("user.name", "user3");
+    job7.getJobConf().set(JobContext.USER_NAME, "user3");
     JobInfo info7 = scheduler.infos.get(job7);
     advanceTime(10);
     JobInProgress job8 = submitJob(JobStatus.RUNNING, 10, 10);
-    job8.getJobConf().set("user.name", "user3");
+    job8.getJobConf().set(JobContext.USER_NAME, "user3");
     JobInfo info8 = scheduler.infos.get(job8);
     advanceTime(10);
     
     // Two jobs for user4, in poolA; only one should get to run
     JobInProgress job9 = submitJob(JobStatus.RUNNING, 10, 10, "poolA");
-    job9.getJobConf().set("user.name", "user4");
+    job9.getJobConf().set(JobContext.USER_NAME, "user4");
     JobInfo info9 = scheduler.infos.get(job9);
     advanceTime(10);
     JobInProgress job10 = submitJob(JobStatus.RUNNING, 10, 10, "poolA");
-    job10.getJobConf().set("user.name", "user4");
+    job10.getJobConf().set(JobContext.USER_NAME, "user4");
     JobInfo info10 = scheduler.infos.get(job10);
     advanceTime(10);
     

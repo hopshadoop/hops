@@ -52,7 +52,7 @@ public class TestWrappedRRClassloader extends TestCase {
       new CompositeInputFormat<NullWritable>();
     // create dummy TaskAttemptID
     TaskAttemptID tid = new TaskAttemptID("jt", 1, TaskType.MAP, 0, 0);
-    conf.set("mapred.task.id", tid.toString());
+    conf.set(JobContext.TASK_ATTEMPT_ID, tid.toString());
     inputFormat.createRecordReader(inputFormat.getSplits(new Job(conf)).get(0), 
       new TaskAttemptContext(conf, tid));
   }

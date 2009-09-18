@@ -21,6 +21,9 @@ package org.apache.hadoop.mapred;
 import java.util.Properties;
 
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
+import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
 import org.apache.hadoop.mapreduce.SleepJob;
 
 public class TestCapacitySchedulerWithJobTracker extends
@@ -37,11 +40,9 @@ public class TestCapacitySchedulerWithJobTracker extends
     Properties schedulerProps = new Properties();
     Properties clusterProps = new Properties();
     clusterProps.put("mapred.queue.names","default");
-    clusterProps.put("mapred.tasktracker.map.tasks.maximum", String.valueOf(1));
-    clusterProps.put(
-      "mapred.tasktracker.reduce.tasks.maximum", String
-        .valueOf(1));
-    clusterProps.put("mapred.jobtracker.maxtasks.per.job", String.valueOf(1));
+    clusterProps.put(TTConfig.TT_MAP_SLOTS, String.valueOf(1));
+    clusterProps.put(TTConfig.TT_REDUCE_SLOTS, String.valueOf(1));
+    clusterProps.put(JTConfig.JT_TASKS_PER_JOB, String.valueOf(1));
     // cluster capacity 1 maps, 1 reduces
     startCluster(1, clusterProps, schedulerProps);
     CapacityTaskScheduler scheduler = (CapacityTaskScheduler) getJobTracker()
@@ -83,10 +84,8 @@ public class TestCapacitySchedulerWithJobTracker extends
     Job jobs[] = new Job[2];
 
     Properties clusterProps = new Properties();
-    clusterProps.put("mapred.tasktracker.map.tasks.maximum", String.valueOf(2));
-    clusterProps.put(
-      "mapred.tasktracker.reduce.tasks.maximum", String
-        .valueOf(2));
+    clusterProps.put(TTConfig.TT_MAP_SLOTS, String.valueOf(2));
+    clusterProps.put(TTConfig.TT_REDUCE_SLOTS, String.valueOf(2));
     clusterProps.put("mapred.queue.names", queues[0] + "," + queues[1]);
     startCluster(2, clusterProps, schedulerProps);
     CapacityTaskScheduler scheduler = (CapacityTaskScheduler) getJobTracker()
@@ -108,7 +107,7 @@ public class TestCapacitySchedulerWithJobTracker extends
 
     JobConf conf = getJobConf();
     conf.setSpeculativeExecution(false);
-    conf.set("mapred.committer.job.setup.cleanup.needed", "false");
+    conf.set(JobContext.SETUP_CLEANUP_NEEDED, "false");
     conf.setNumTasksToExecutePerJvm(-1);
     conf.setQueueName(queues[0]);
     SleepJob sleepJob1 = new SleepJob();

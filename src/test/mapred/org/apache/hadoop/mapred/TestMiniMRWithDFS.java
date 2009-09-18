@@ -41,6 +41,7 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.security.UnixUserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
@@ -154,7 +155,7 @@ public class TestMiniMRWithDFS extends TestCase {
       File localDir = new File(mr.getTaskTrackerLocalDir(i));
       assertTrue("Local dir " + localDir + " does not exist.", localDir
           .isDirectory());
-      LOG.info("Verifying contents of mapred.local.dir "
+      LOG.info("Verifying contents of " + MRConfig.LOCAL_DIR + " "
           + localDir.getAbsolutePath());
 
       // Verify contents(user-dir) of tracker-sub-dir

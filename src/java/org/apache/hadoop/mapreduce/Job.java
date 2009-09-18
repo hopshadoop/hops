@@ -47,6 +47,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.mapreduce.filecache.DistributedCache;
+import org.apache.hadoop.mapreduce.util.ConfigUtil;
 import org.apache.hadoop.security.UnixUserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
 
@@ -87,24 +88,28 @@ public class Job extends JobContext {
   private static final Log LOG = LogFactory.getLog(Job.class);
   public static enum JobState {DEFINE, RUNNING};
   private static final long MAX_JOBSTATUS_AGE = 1000 * 2;
-  public static final String OUTPUT_FILTER = "jobclient.output.filter";
+  public static final String OUTPUT_FILTER = "mapreduce.client.output.filter";
   /** Key in mapred-*.xml that sets completionPollInvervalMillis */
   public static final String COMPLETION_POLL_INTERVAL_KEY = 
-    "jobclient.completion.poll.interval";
+    "mapreduce.client.completion.pollinterval";
   
   /** Default completionPollIntervalMillis is 5000 ms. */
   static final int DEFAULT_COMPLETION_POLL_INTERVAL = 5000;
   /** Key in mapred-*.xml that sets progMonitorPollIntervalMillis */
   public static final String PROGRESS_MONITOR_POLL_INTERVAL_KEY =
-      "jobclient.progress.monitor.poll.interval";
+    "mapreduce.client.progressmonitor.pollinterval";
   /** Default progMonitorPollIntervalMillis is 1000 ms. */
   static final int DEFAULT_MONITOR_POLL_INTERVAL = 1000;
+
+  public static final String USED_GENERIC_PARSER = 
+    "mapreduce.client.genericoptionsparser.used";
+  public static final String SUBMIT_REPLICATION = 
+    "mapreduce.client.submit.file.replication";
 
   public static enum TaskStatusFilter { NONE, KILLED, FAILED, SUCCEEDED, ALL }
 
   static {
-    Configuration.addDefaultResource("mapred-default.xml");
-    Configuration.addDefaultResource("mapred-site.xml");
+    ConfigUtil.loadResources();
   }
 
   private JobState state = JobState.DEFINE;
@@ -757,7 +762,7 @@ public class Job extends JobContext {
    */
   public void setJobSetupCleanupNeeded(boolean needed) {
     ensureState(JobState.DEFINE);
-    conf.setBoolean("mapred.committer.job.setup.cleanup.needed", needed);
+    conf.setBoolean(SETUP_CLEANUP_NEEDED, needed);
   }
 
   /**

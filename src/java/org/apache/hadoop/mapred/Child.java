@@ -142,7 +142,7 @@ class Child {
         TaskLog.syncLogs(firstTaskid, taskid, isCleanup);
         JobConf job = new JobConf(task.getJobFile());
 
-        // setup the child's mapred-local-dir. The child is now sandboxed and
+        // setup the child's Configs.LOCAL_DIR. The child is now sandboxed and
         // can only see files down and under attemtdir only.
         TaskRunner.setupChildMapredLocalDirs(task, job);
 
@@ -153,7 +153,7 @@ class Child {
 
         numTasksToExecute = job.getNumTasksToExecutePerJvm();
         assert(numTasksToExecute != 0);
-        TaskLog.cleanup(job.getInt("mapred.userlog.retain.hours", 24));
+        TaskLog.cleanup(job.getInt(JobContext.TASK_LOG_RETAIN_HOURS, 24));
 
         task.setConf(job);
 

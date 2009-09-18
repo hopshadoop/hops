@@ -27,6 +27,8 @@ import java.util.TreeMap;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
@@ -124,7 +126,7 @@ public class TrackerDistributedCacheManager {
       }
     }
     // setting the cache size to a default of 10GB
-    long allowedSize = conf.getLong("local.cache.size", DEFAULT_CACHE_SIZE);
+    long allowedSize = conf.getLong(TTConfig.TT_LOCAL_CACHE_SIZE, DEFAULT_CACHE_SIZE);
     if (allowedSize < size) {
       // try some cache deletions
       deleteCache(conf);
@@ -578,7 +580,7 @@ public class TrackerDistributedCacheManager {
    * The order should be the same as the order in which the archives are added.
    */
   static void setArchiveTimestamps(Configuration conf, String timestamps) {
-    conf.set("mapred.cache.archives.timestamps", timestamps);
+    conf.set(JobContext.CACHE_ARCHIVES_TIMESTAMPS, timestamps);
   }
 
   /**
@@ -589,7 +591,7 @@ public class TrackerDistributedCacheManager {
    * The order should be the same as the order in which the files are added.
    */
   static void setFileTimestamps(Configuration conf, String timestamps) {
-    conf.set("mapred.cache.files.timestamps", timestamps);
+    conf.set(JobContext.CACHE_FILE_TIMESTAMPS, timestamps);
   }
   
   /**
@@ -599,7 +601,7 @@ public class TrackerDistributedCacheManager {
    * @param str a comma separated list of local archives
    */
   static void setLocalArchives(Configuration conf, String str) {
-    conf.set("mapred.cache.localArchives", str);
+    conf.set(JobContext.CACHE_LOCALARCHIVES, str);
   }
 
   /**
@@ -609,6 +611,6 @@ public class TrackerDistributedCacheManager {
    * @param str a comma separated list of local files
    */
   static void setLocalFiles(Configuration conf, String str) {
-    conf.set("mapred.cache.localFiles", str);
+    conf.set(JobContext.CACHE_LOCALFILES, str);
   }
 }

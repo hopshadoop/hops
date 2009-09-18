@@ -34,6 +34,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
@@ -672,13 +673,13 @@ public class TestQueueManager extends TestCase {
                              String queueName) 
   throws IOException, InterruptedException, ClassNotFoundException {
     Configuration clientConf = new Configuration();
-    clientConf.set("mapred.job.tracker", "localhost:"
+    clientConf.set(JTConfig.JT_IPC_ADDRESS, "localhost:"
         + miniMRCluster.getJobTrackerPort());
     if (userInfo != null) {
       clientConf.set(UnixUserGroupInformation.UGI_PROPERTY_NAME, userInfo);
     }
     if (queueName != null) {
-      clientConf.set("mapred.job.queue.name", queueName);
+      clientConf.set(JobContext.QUEUE_NAME, queueName);
     }
     SleepJob sleep = new SleepJob();
     sleep.setConf(clientConf);

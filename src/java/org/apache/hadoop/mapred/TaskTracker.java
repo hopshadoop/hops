@@ -68,8 +68,11 @@ import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.mapred.TaskController.JobInitializationContext;
 import org.apache.hadoop.mapred.TaskTrackerStatus.TaskTrackerHealthStatus;
 import org.apache.hadoop.mapred.pipes.Submitter;
+import org.apache.hadoop.mapreduce.MRConfig;
+import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.filecache.TrackerDistributedCacheManager;
+import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
 import org.apache.hadoop.mapreduce.server.tasktracker.Localizer;
 import org.apache.hadoop.mapreduce.task.reduce.ShuffleHeader;
 import org.apache.hadoop.metrics.MetricsContext;
@@ -84,6 +87,7 @@ import org.apache.hadoop.security.authorize.ConfiguredPolicy;
 import org.apache.hadoop.security.authorize.PolicyProvider;
 import org.apache.hadoop.security.authorize.ServiceAuthorizationManager;
 import org.apache.hadoop.util.DiskChecker;
+import org.apache.hadoop.mapreduce.util.ConfigUtil;
 import org.apache.hadoop.mapreduce.util.MemoryCalculatorPlugin;
 import org.apache.hadoop.mapreduce.util.ProcfsBasedProcessTree;
 import org.apache.hadoop.util.ReflectionUtils;
@@ -100,7 +104,7 @@ import org.apache.hadoop.util.Shell.ShellCommandExecutor;
  *
  *******************************************************/
 public class TaskTracker 
-             implements MRConstants, TaskUmbilicalProtocol, Runnable {
+    implements MRConstants, TaskUmbilicalProtocol, Runnable, TTConfig {
   /**
    * @deprecated
    */
@@ -120,8 +124,7 @@ public class TaskTracker
   static enum State {NORMAL, STALE, INTERRUPTED, DENIED}
 
   static{
-    Configuration.addDefaultResource("mapred-default.xml");
-    Configuration.addDefaultResource("mapred-site.xml");
+    ConfigUtil.loadResources();
   }
 
   public static final Log LOG =
@@ -212,7 +215,7 @@ public class TaskTracker
   static final String LOCAL_SPLIT_FILE = "split.dta";
   static final String JOBFILE = "job.xml";
 
-  static final String JOB_LOCAL_DIR = "job.local.dir";
+  static final String JOB_LOCAL_DIR = JobContext.JOB_LOCAL_DIR;
 
   private JobConf fConf;
   FileSystem localFs;
@@ -236,7 +239,7 @@ public class TaskTracker
   private long totalMemoryAllottedForTasks = JobConf.DISABLED_MEMORY_LIMIT;
 
   static final String MAPRED_TASKTRACKER_MEMORY_CALCULATOR_PLUGIN_PROPERTY =
-      "mapred.tasktracker.memory_calculator_plugin";
+      TT_MEMORY_CALCULATOR_PLUGIN;
 
   /**
    * the minimum interval between jobtracker polls
@@ -509,14 +512,14 @@ public class TaskTracker
   synchronized void initialize() throws IOException {
     localFs = FileSystem.getLocal(fConf);
     // use configured nameserver & interface to get local hostname
-    if (fConf.get("slave.host.name") != null) {
-      this.localHostname = fConf.get("slave.host.name");
+    if (fConf.get(TT_HOST_NAME) != null) {
+      this.localHostname = fConf.get(TT_HOST_NAME);
     }
     if (localHostname == null) {
       this.localHostname =
       DNS.getDefaultHost
-      (fConf.get("mapred.tasktracker.dns.interface","default"),
-       fConf.get("mapred.tasktracker.dns.nameserver","default"));
+      (fConf.get(TT_DNS_INTERFACE,"default"),
+       fConf.get(TT_DNS_NAMESERVER,"default"));
     }
  
     //check local disk
@@ -532,10 +535,11 @@ public class TaskTracker
     this.acceptNewTasks = true;
     this.status = null;
 
-    this.minSpaceStart = this.fConf.getLong("mapred.local.dir.minspacestart", 0L);
-    this.minSpaceKill = this.fConf.getLong("mapred.local.dir.minspacekill", 0L);
+    this.minSpaceStart = this.fConf.getLong(TT_LOCAL_DIR_MINSPACE_START, 0L);
+    this.minSpaceKill = this.fConf.getLong(TT_LOCAL_DIR_MINSPACE_KILL, 0L);
     //tweak the probe sample size (make it a function of numCopiers)
-    probe_sample_size = this.fConf.getInt("mapred.tasktracker.events.batchsize", 500);
+    probe_sample_size = 
+      this.fConf.getInt(TT_MAX_TASK_COMPLETION_EVENTS_TO_POLL, 500);
     
     Class<? extends TaskTrackerInstrumentation> metricsInst = getInstrumentationClass(fConf);
     try {
@@ -551,7 +555,7 @@ public class TaskTracker
     
     // bind address
     InetSocketAddress socAddr = NetUtils.createSocketAddr(
-        fConf.get("mapred.task.tracker.report.address", "127.0.0.1:0"));
+        fConf.get(TT_REPORT_ADDRESS, "127.0.0.1:0"));
     String bindAddress = socAddr.getHostName();
     int tmpPort = socAddr.getPort();
     
@@ -579,7 +583,7 @@ public class TaskTracker
 
     // get the assigned address
     this.taskReportAddress = taskReportServer.getListenerAddress();
-    this.fConf.set("mapred.task.tracker.report.address",
+    this.fConf.set(TT_REPORT_ADDRESS,
         taskReportAddress.getHostName() + ":" + taskReportAddress.getPort());
     LOG.info("TaskTracker up at: " + this.taskReportAddress);
 
@@ -616,7 +620,7 @@ public class TaskTracker
     mapLauncher.start();
     reduceLauncher.start();
     Class<? extends TaskController> taskControllerClass 
-                          = fConf.getClass("mapred.task.tracker.task-controller",
+                          = fConf.getClass(TT_TASK_CONTROLLER,
                                             DefaultTaskController.class, 
                                             TaskController.class); 
     taskController = (TaskController)ReflectionUtils.newInstance(
@@ -636,13 +640,13 @@ public class TaskTracker
 
   public static Class<? extends TaskTrackerInstrumentation> getInstrumentationClass(
     Configuration conf) {
-    return conf.getClass("mapred.tasktracker.instrumentation",
+    return conf.getClass(TT_INSTRUMENTATION,
         TaskTrackerMetricsInst.class, TaskTrackerInstrumentation.class);
   }
 
   public static void setInstrumentationClass(
     Configuration conf, Class<? extends TaskTrackerInstrumentation> t) {
-    conf.setClass("mapred.tasktracker.instrumentation",
+    conf.setClass(TT_INSTRUMENTATION,
         t, TaskTrackerInstrumentation.class);
   }
   
@@ -828,7 +832,7 @@ public class TaskTracker
   }
 
   private static LocalDirAllocator lDirAlloc = 
-                              new LocalDirAllocator("mapred.local.dir");
+                              new LocalDirAllocator(MRConfig.LOCAL_DIR);
 
   // intialize the job directory
   private void localizeJob(TaskInProgress tip) throws IOException {
@@ -1073,22 +1077,22 @@ public class TaskTracker
    */
   public TaskTracker(JobConf conf) throws IOException {
     fConf = conf;
-    maxMapSlots = conf.getInt("mapred.tasktracker.map.tasks.maximum", 2);
-    maxReduceSlots = conf.getInt("mapred.tasktracker.reduce.tasks.maximum", 2);
+    maxMapSlots = conf.getInt(TT_MAP_SLOTS, 2);
+    maxReduceSlots = conf.getInt(TT_REDUCE_SLOTS, 2);
     this.jobTrackAddr = JobTracker.getAddress(conf);
     InetSocketAddress infoSocAddr = NetUtils.createSocketAddr(
-        conf.get("mapred.task.tracker.http.address", "0.0.0.0:50060"));
+        conf.get(TT_HTTP_ADDRESS, "0.0.0.0:50060"));
     String httpBindAddress = infoSocAddr.getHostName();
     int httpPort = infoSocAddr.getPort();
     this.server = new HttpServer("task", httpBindAddress, httpPort,
         httpPort == 0, conf);
-    workerThreads = conf.getInt("tasktracker.http.threads", 40);
+    workerThreads = conf.getInt(TT_HTTP_THREADS, 40);
     this.shuffleServerMetrics = new ShuffleServerMetrics(conf);
     server.setThreads(1, workerThreads);
     // let the jsp pages get to the task tracker, config, and other relevant
     // objects
     FileSystem local = FileSystem.getLocal(conf);
-    this.localDirAllocator = new LocalDirAllocator("mapred.local.dir");
+    this.localDirAllocator = new LocalDirAllocator(MRConfig.LOCAL_DIR);
     server.setAttribute("task.tracker", this);
     server.setAttribute("local.file.system", local);
     server.setAttribute("conf", conf);
@@ -1981,12 +1985,11 @@ public class TaskTracker
                     + cwd.toString());
       }
 
-      localJobConf.set("mapred.local.dir",
-                       fConf.get("mapred.local.dir"));
+      localJobConf.set(LOCAL_DIR,
+                       fConf.get(LOCAL_DIR));
 
-      if (fConf.get("slave.host.name") != null) {
-        localJobConf.set("slave.host.name",
-                         fConf.get("slave.host.name"));
+      if (fConf.get(TT_HOST_NAME) != null) {
+        localJobConf.set(TT_HOST_NAME, fConf.get(TT_HOST_NAME));
       }
             
       keepFailedTaskFiles = localJobConf.getKeepFailedTaskFiles();
@@ -2005,7 +2008,7 @@ public class TaskTracker
             str.append(',');
           }
         }
-        localJobConf.set("hadoop.net.static.resolutions", str.toString());
+        localJobConf.set(TT_STATIC_RESOLUTIONS, str.toString());
       }
       if (task.isMapTask()) {
         debugCommand = localJobConf.getMapDebugScript();
@@ -2044,7 +2047,7 @@ public class TaskTracker
     public synchronized void setJobConf(JobConf lconf){
       this.localJobConf = lconf;
       keepFailedTaskFiles = localJobConf.getKeepFailedTaskFiles();
-      taskTimeout = localJobConf.getLong("mapred.task.timeout", 
+      taskTimeout = localJobConf.getLong(JobContext.TASK_TIMEOUT, 
                                          10 * 60 * 1000);
     }
         
@@ -2325,7 +2328,7 @@ public class TaskTracker
 
               // add all lines of debug out to diagnostics
               try {
-                int num = localJobConf.getInt("mapred.debug.out.lines", -1);
+                int num = localJobConf.getInt(JobContext.TASK_DEBUGOUT_LINES, -1);
                 addDiagnostics(FileUtil.makeShellPath(stdout),num,"DEBUG OUT");
               } catch(IOException ioe) {
                 LOG.warn("Exception in add diagnostics!");
@@ -2990,7 +2993,7 @@ public class TaskTracker
       JobConf conf=new JobConf();
       // enable the server to track time spent waiting on locks
       ReflectionUtils.setContentionTracing
-        (conf.getBoolean("tasktracker.contention.tracking", false));
+        (conf.getBoolean(TT_CONTENTION_TRACKING, false));
       new TaskTracker(conf).run();
     } catch (Throwable e) {
       LOG.error("Can not start task tracker because "+
@@ -3279,7 +3282,7 @@ public class TaskTracker
     }
 
     Class<? extends MemoryCalculatorPlugin> clazz =
-        fConf.getClass(MAPRED_TASKTRACKER_MEMORY_CALCULATOR_PLUGIN_PROPERTY,
+        fConf.getClass(TT_MEMORY_CALCULATOR_PLUGIN,
             null, MemoryCalculatorPlugin.class);
     MemoryCalculatorPlugin memoryCalculatorPlugin =
         MemoryCalculatorPlugin
@@ -3303,11 +3306,11 @@ public class TaskTracker
 
     mapSlotMemorySizeOnTT =
         fConf.getLong(
-            JobTracker.MAPRED_CLUSTER_MAP_MEMORY_MB_PROPERTY,
+            MAPMEMORY_MB,
             JobConf.DISABLED_MEMORY_LIMIT);
     reduceSlotSizeMemoryOnTT =
         fConf.getLong(
-            JobTracker.MAPRED_CLUSTER_REDUCE_MEMORY_MB_PROPERTY,
+            REDUCEMEMORY_MB,
             JobConf.DISABLED_MEMORY_LIMIT);
     totalMemoryAllottedForTasks =
         maxMapSlots * mapSlotMemorySizeOnTT + maxReduceSlots

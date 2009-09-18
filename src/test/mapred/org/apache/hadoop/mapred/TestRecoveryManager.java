@@ -30,6 +30,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.mapred.JobTracker.RecoveryManager;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.security.UserGroupInformation;
 
 /**
@@ -62,8 +63,7 @@ public class TestRecoveryManager extends TestCase {
     FileSystem fs = FileSystem.get(new Configuration());
     fs.delete(TEST_DIR, true); // cleanup
     
-    conf.set("mapred.jobtracker.job.history.block.size", "1024");
-    conf.set("mapred.jobtracker.job.history.buffer.size", "1024");
+    conf.set(JTConfig.JT_JOBHISTORY_BLOCK_SIZE, "1024");
     
     MiniMRCluster mr = new MiniMRCluster(1, "file:///", 1, null, null, conf);
     
@@ -126,8 +126,7 @@ public class TestRecoveryManager extends TestCase {
     out.close();
 
     // make sure that the jobtracker is in recovery mode
-    mr.getJobTrackerConf().setBoolean("mapred.jobtracker.restart.recover", 
-                                      true);
+    mr.getJobTrackerConf().setBoolean(JTConfig.JT_RESTART_ENABLED, true);
     // start the jobtracker
     LOG.info("Starting jobtracker");
     mr.startJobTracker();
@@ -167,10 +166,9 @@ public class TestRecoveryManager extends TestCase {
     fs.delete(TEST_DIR, true);
     
     JobConf conf = new JobConf();
+    conf.set(JTConfig.JT_JOBHISTORY_BLOCK_SIZE, "1024");
     conf.set(
       DeprecatedQueueConfigurationParser.MAPRED_QUEUE_NAMES_KEY, "default");
-    conf.set("mapred.jobtracker.job.history.block.size", "1024");
-    conf.set("mapred.jobtracker.job.history.buffer.size", "1024");
     
     MiniMRCluster mr = new MiniMRCluster(1, "file:///", 1, null, null, conf);
     JobTracker jobtracker = mr.getJobTrackerRunner().getJobTracker();
@@ -239,9 +237,9 @@ public class TestRecoveryManager extends TestCase {
     mr.stopJobTracker();
     
     // make sure that the jobtracker is in recovery mode
-    mr.getJobTrackerConf().setBoolean("mapred.jobtracker.restart.recover", 
+    mr.getJobTrackerConf().setBoolean(JTConfig.JT_RESTART_ENABLED, 
                                       true);
-    mr.getJobTrackerConf().setInt("mapred.jobtracker.maxtasks.per.job", 25);
+    mr.getJobTrackerConf().setInt(JTConfig.JT_TASKS_PER_JOB, 25);
     
     mr.getJobTrackerConf().setBoolean("mapred.acls.enabled" , true);
     UserGroupInformation ugi = UserGroupInformation.readFrom(job1);
@@ -293,8 +291,8 @@ public class TestRecoveryManager extends TestCase {
     // start the jobtracker
     JobConf conf = new JobConf();
     FileSystem.setDefaultUri(conf, namenode);
-    conf.set("mapred.job.tracker", "localhost:0");
-    conf.set("mapred.job.tracker.http.address", "127.0.0.1:0");
+    conf.set(JTConfig.JT_IPC_ADDRESS, "localhost:0");
+    conf.set(JTConfig.JT_HTTP_ADDRESS, "127.0.0.1:0");
 
     JobTracker jobtracker = new JobTracker(conf);
 

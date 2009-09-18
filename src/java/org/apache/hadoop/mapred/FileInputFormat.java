@@ -123,7 +123,8 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
    */
   public static void setInputPathFilter(JobConf conf,
                                         Class<? extends PathFilter> filter) {
-    conf.setClass("mapred.input.pathFilter.class", filter, PathFilter.class);
+    conf.setClass(org.apache.hadoop.mapreduce.lib.input.
+      FileInputFormat.PATHFILTER_CLASS, filter, PathFilter.class);
   }
 
   /**
@@ -133,7 +134,8 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
    */
   public static PathFilter getInputPathFilter(JobConf conf) {
     Class<? extends PathFilter> filterClass = conf.getClass(
-	"mapred.input.pathFilter.class", null, PathFilter.class);
+	  org.apache.hadoop.mapreduce.lib.input.FileInputFormat.PATHFILTER_CLASS,
+	  null, PathFilter.class);
     return (filterClass != null) ?
         ReflectionUtils.newInstance(filterClass, conf) : null;
   }
@@ -209,8 +211,8 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
     }
 
     long goalSize = totalSize / (numSplits == 0 ? 1 : numSplits);
-    long minSize = Math.max(job.getLong("mapred.min.split.size", 1),
-                            minSplitSize);
+    long minSize = Math.max(job.getLong(org.apache.hadoop.mapreduce.lib.input.
+      FileInputFormat.SPLIT_MINSIZE, 1), minSplitSize);
 
     // generate splits
     ArrayList<FileSplit> splits = new ArrayList<FileSplit>(numSplits);
@@ -313,7 +315,8 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
       path = new Path(conf.getWorkingDirectory(), inputPaths[i]);
       str.append(StringUtils.escapeString(path.toString()));
     }
-    conf.set("mapred.input.dir", str.toString());
+    conf.set(org.apache.hadoop.mapreduce.lib.input.
+      FileInputFormat.INPUT_DIR, str.toString());
   }
 
   /**
@@ -326,8 +329,10 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
   public static void addInputPath(JobConf conf, Path path ) {
     path = new Path(conf.getWorkingDirectory(), path);
     String dirStr = StringUtils.escapeString(path.toString());
-    String dirs = conf.get("mapred.input.dir");
-    conf.set("mapred.input.dir", dirs == null ? dirStr :
+    String dirs = conf.get(org.apache.hadoop.mapreduce.lib.input.
+      FileInputFormat.INPUT_DIR);
+    conf.set(org.apache.hadoop.mapreduce.lib.input.
+      FileInputFormat.INPUT_DIR, dirs == null ? dirStr :
       dirs + StringUtils.COMMA_STR + dirStr);
   }
          
@@ -377,7 +382,8 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
    * @return the list of input {@link Path}s for the map-reduce job.
    */
   public static Path[] getInputPaths(JobConf conf) {
-    String dirs = conf.get("mapred.input.dir", "");
+    String dirs = conf.get(org.apache.hadoop.mapreduce.lib.input.
+      FileInputFormat.INPUT_DIR, "");
     String [] list = StringUtils.split(dirs);
     Path[] result = new Path[list.length];
     for (int i = 0; i < list.length; i++) {

@@ -38,6 +38,7 @@ import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.mapred.IFile.Reader;
 import org.apache.hadoop.mapred.IFile.Writer;
 import org.apache.hadoop.mapred.Merger.Segment;
+import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 
 /**
@@ -80,10 +81,10 @@ public class BackupStore<K,V> {
   throws IOException {
     
     final float bufferPercent =
-      conf.getFloat("mapred.job.reduce.markreset.buffer.percent", 0f);
+      conf.getFloat(JobContext.REDUCE_MARKRESET_BUFFER_PERCENT, 0f);
 
     if (bufferPercent > 1.0 || bufferPercent < 0.0) {
-      throw new IOException("mapred.job.reduce.markreset.buffer.percent" +
+      throw new IOException(JobContext.REDUCE_MARKRESET_BUFFER_PERCENT +
           bufferPercent);
     }
 
@@ -91,7 +92,7 @@ public class BackupStore<K,V> {
         Runtime.getRuntime().maxMemory() * bufferPercent, Integer.MAX_VALUE);
 
     // Support an absolute size also.
-    int tmp = conf.getInt("mapred.job.reduce.markreset.buffer.size", 0);
+    int tmp = conf.getInt(JobContext.REDUCE_MARKRESET_BUFFER_SIZE, 0);
     if (tmp >  0) {
       maxSize = tmp;
     }
@@ -516,7 +517,7 @@ public class BackupStore<K,V> {
     throws IOException {
       this.conf = conf;
       this.fs = FileSystem.getLocal(conf);
-      this.lDirAlloc = new LocalDirAllocator("mapred.local.dir");
+      this.lDirAlloc = new LocalDirAllocator(MRConfig.LOCAL_DIR);
     }
 
     void write(DataInputBuffer key, DataInputBuffer value)

@@ -135,7 +135,7 @@
               <th>Value</th>
             </tr>
             <tr>
-              <td>mapred.jobtracker.taskScheduler</td>
+              <td>mapreduce.jobtracker.taskscheduler</td>
               <td>org.apache.hadoop.mapred.CapacityTaskScheduler</td>
             </tr>
           </table>
@@ -147,7 +147,7 @@
           You can define multiple queues to which users can submit jobs with
           the Capacity Scheduler. To define multiple queues, you should edit
           the site configuration for Hadoop and modify the
-          <em>mapred.queue.names</em> property.
+          <em>mapreduce.jobtracker.taskscheduler.queue.names</em> property.
         </p>
         <p>
           You can also configure ACLs for controlling which users or groups

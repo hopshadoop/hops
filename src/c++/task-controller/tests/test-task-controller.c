@@ -22,7 +22,7 @@
 int write_config_file(char *file_name) {
   FILE *file;
   char const *str =
-      "mapred.local.dir=/tmp/testing1,/tmp/testing2,/tmp/testing3,/tmp/testing4\n";
+      "mapreduce.cluster.local.dir=/tmp/testing1,/tmp/testing2,/tmp/testing3,/tmp/testing4\n";
 
   file = fopen(file_name, "w");
   if (file == NULL) {
@@ -67,7 +67,7 @@ void test_check_variable_against_config() {
   // Test obtaining a value for a key from the config
   char *config_values[4] = { "/tmp/testing1", "/tmp/testing2",
       "/tmp/testing3", "/tmp/testing4" };
-  char *value = (char *) get_value("mapred.local.dir");
+  char *value = (char *) get_value("mapreduce.cluster.local.dir");
   if (strcmp(value, "/tmp/testing1,/tmp/testing2,/tmp/testing3,/tmp/testing4")
       != 0) {
     printf("Obtaining a value for a key from the config failed.\n");
@@ -75,7 +75,7 @@ void test_check_variable_against_config() {
   }
 
   // Test the parsing of a multiple valued key from the config
-  char **values = (char **) get_values("mapred.local.dir");
+  char **values = (char **)get_values("mapreduce.cluster.local.dir");
   char **values_ptr = values;
   int i = 0;
   while (*values_ptr != NULL) {
@@ -87,12 +87,12 @@ void test_check_variable_against_config() {
     values_ptr++;
   }
 
-  if (check_variable_against_config("mapred.local.dir", "/tmp/testing5") == 0) {
+  if (check_variable_against_config("mapreduce.cluster.local.dir", "/tmp/testing5") == 0) {
     printf("Configuration should not contain /tmp/testing5! \n");
     goto cleanup;
   }
 
-  if (check_variable_against_config("mapred.local.dir", "/tmp/testing4") != 0) {
+  if (check_variable_against_config("mapreduce.cluster.local.dir", "/tmp/testing4") != 0) {
     printf("Configuration should contain /tmp/testing4! \n");
     goto cleanup;
   }
