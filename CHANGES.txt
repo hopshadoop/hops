@@ -697,3 +697,6 @@ Trunk (unreleased changes)
 
     MAPREDUCE-923. Sqoop classpath breaks for jar files with a
     plus sign in their names. (Aaron Kimball via tomwhite)
+
+    MAPREDUCE-912. Add and standardize Apache license headers. (Chad Metcalf
+    via cdouglas)
