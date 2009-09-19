@@ -27,10 +27,9 @@
  
   <property name="Name" value="Hadoop-Mapred"/>
   <property name="name" value="hadoop-mapred"/>
-  <property name="version" value="0.21.0-dev"/>
-  <property name="hadoop-core.version" value="0.21.0-dev"/>
-  <property name="hadoop-mr.version" value="0.21.0-dev"/>
-  <property name="hadoop-hdfs.version" value="0.21.0-dev"/>
+  <property name="version" value="0.22.0-dev"/>
+  <property name="hadoop-core.version" value="0.22.0-dev"/>
+  <property name="hadoop-hdfs.version" value="0.22.0-dev"/>
   <property name="final.name" value="${name}-${version}"/>
   <property name="test.final.name" value="${name}-test-${version}"/>
   <property name="examples.final.name" value="${name}-examples-${version}"/>

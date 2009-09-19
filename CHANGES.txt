@@ -4,6 +4,18 @@ Trunk (unreleased changes)
 
   INCOMPATIBLE CHANGES
 
+  NEW FEATURES
+
+  IMPROVEMENTS
+
+  OPTIMIZATIONS
+
+  BUG FIXES
+
+Release 0.21.0 - Unreleased
+
+  INCOMPATIBLE CHANGES
+
     MAPREDUCE-516. Fix the starvation problem in the Capacity Scheduler 
     when running High RAM Jobs. (Arun Murthy via yhemanth)
 
