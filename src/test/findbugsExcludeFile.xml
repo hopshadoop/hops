@@ -265,5 +265,20 @@
     <Match>
        <Class name="org.apache.hadoop.mapred.TaskScheduler$QueueRefresher" />
        <Bug pattern="SIC_INNER_SHOULD_BE_STATIC" />
+    </Match>
+
+    <Match>
+      <Class name="org.apache.hadoop.examples.terasort.TeraInputFormat$1" />
+      <Method name="run" />
+      <Bug pattern="DM_EXIT" />
+    </Match>
+    <Match>
+      <Class name="org.apache.hadoop.examples.terasort.TeraOutputFormat$TeraOutputCommitter"/>
+      <Bug pattern="NM_WRONG_PACKAGE_INTENTIONAL" />
+    </Match>
+    <Match>
+      <Class name="org.apache.hadoop.examples.terasort.Unsigned16" />
+      <Method name="getHexDigit"/>
+      <Bug pattern="ICAST_QUESTIONABLE_UNSIGNED_RIGHT_SHIFT" />
      </Match>
  </FindBugsFilter>

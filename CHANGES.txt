@@ -408,6 +408,9 @@ Trunk (unreleased changes)
     MAPREDUCE-954. Change Map-Reduce context objects to be interfaces.
     (acmurthy) 
 
+    MAPREDUCE-639. Change Terasort example to reflect the 2009 updates. 
+    (omalley)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 
