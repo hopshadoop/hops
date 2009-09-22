@@ -12,6 +12,8 @@ Trunk (unreleased changes)
 
   BUG FIXES
 
+    MAPREDUCE-1014. Fix the libraries for common and hdfs. (omalley)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
