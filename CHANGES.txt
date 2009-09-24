@@ -717,3 +717,7 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-912. Add and standardize Apache license headers. (Chad Metcalf
     via cdouglas)
+
+    MAPREDUCE-1022. Fix compilation of vertica testcases. (Vinod Kumar 
+    Vavilapalli via acmurthy)
+
