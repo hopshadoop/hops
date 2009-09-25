@@ -31,6 +31,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.TaskStatus.Phase;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.TaskType;
+import org.apache.hadoop.mapreduce.Job.RawSplit;
 import org.apache.hadoop.mapreduce.jobhistory.HistoryEvent;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistory;
 
@@ -188,6 +189,7 @@ public class FakeObjectUtilities {
         String taskTracker) {
       addRunningTaskToTIP(tip, taskId, new TaskTrackerStatus(taskTracker,
           JobInProgress.convertTrackerNameToHostName(taskTracker)), true);
+
       TaskStatus status = TaskStatus.createTaskStatus(tip.isMapTask(), taskId, 
           0.0f, 1, TaskStatus.State.RUNNING, "", "", taskTracker,
           tip.isMapTask() ? Phase.MAP : Phase.REDUCE, new Counters());
@@ -238,6 +240,30 @@ public class FakeObjectUtilities {
     sendHeartBeat(jt, null, true, tracker, (short) 0);
   }
 
+  static class FakeTaskInProgress extends TaskInProgress {
+
+    public FakeTaskInProgress(JobID jobId, String jobFile, int numMaps,
+        int partition, JobTracker jobTracker, JobConf conf, JobInProgress job,
+        int numSlotsRequired) {
+      super(jobId, jobFile, numMaps, partition, jobTracker, conf, job,
+          numSlotsRequired);
+    }
+
+    public FakeTaskInProgress(JobID jobId, String jobFile, RawSplit emptySplit,
+        JobTracker jobTracker, JobConf jobConf,
+        JobInProgress job, int partition, int numSlotsRequired) {
+      super(jobId, jobFile, emptySplit, jobTracker, jobConf, job,
+            partition, numSlotsRequired);
+    }
+
+    @Override
+    synchronized boolean updateStatus(TaskStatus status) {
+      TaskAttemptID taskid = status.getTaskID();
+      taskStatuses.put(taskid, status);
+      return false;
+    }
+  }
+  
   static class FakeJobHistory extends JobHistory {
     @Override
     public void init(JobTracker jt, 

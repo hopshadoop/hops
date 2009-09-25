@@ -726,3 +726,8 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1000. Handle corrupt history files in JobHistory.initDone().
     (Jothi Padmanabhan via sharad)
+
+    MAPREDUCE-1028. Fixed number of slots occupied by cleanup tasks to one
+    irrespective of slot size for the job.
+    (Ravi Gummadi via yhemanth)
+

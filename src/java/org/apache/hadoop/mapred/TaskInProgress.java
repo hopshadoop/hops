@@ -113,7 +113,7 @@ class TaskInProgress {
   /**
    * Map from taskId -> TaskStatus
    */
-  private TreeMap<TaskAttemptID,TaskStatus> taskStatuses = 
+  protected TreeMap<TaskAttemptID,TaskStatus> taskStatuses = 
     new TreeMap<TaskAttemptID,TaskStatus>();
 
   // Map from taskId -> TaskTracker Id, 
@@ -985,6 +985,8 @@ class TaskInProgress {
   public Task addRunningTask(TaskAttemptID taskid, 
                              String taskTracker,
                              boolean taskCleanup) {
+    // 1 slot is enough for taskCleanup task
+    int numSlotsNeeded = taskCleanup ? 1 : numSlotsRequired;
     // create the task
     Task t = null;
     if (isMapTask()) {
@@ -999,9 +1001,9 @@ class TaskInProgress {
         split = new BytesWritable();
       }
       t = new MapTask(jobFile, taskid, partition, splitClass, split,
-                      numSlotsRequired);
+                      numSlotsNeeded);
     } else {
-      t = new ReduceTask(jobFile, taskid, partition, numMaps, numSlotsRequired);
+      t = new ReduceTask(jobFile, taskid, partition, numMaps, numSlotsNeeded);
     }
     if (jobCleanup) {
       t.setJobCleanupTask();
