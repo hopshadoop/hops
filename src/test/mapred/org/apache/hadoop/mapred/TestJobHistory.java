@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -33,8 +34,11 @@ import junit.framework.TestCase;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.mapreduce.Cluster;
@@ -46,6 +50,7 @@ import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistory;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser;
+import org.apache.hadoop.mapreduce.jobhistory.JobSubmittedEvent;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser.JobInfo;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser.TaskAttemptInfo;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser.TaskInfo;
@@ -615,6 +620,16 @@ public class TestJobHistory extends TestCase {
       mr = new MiniMRCluster(2, dfsCluster.getFileSystem().getUri().toString(),
           3, null, null, conf);
 
+      assertEquals("Files in logDir did not move to DONE folder",
+          0, logDirFs.listStatus(logDirPath).length);
+
+      JobHistory jobHistory = 
+        mr.getJobTrackerRunner().getJobTracker().getJobHistory();
+      Path doneDir = jobHistory.getCompletedJobHistoryLocation();
+
+      assertEquals("Files in DONE dir not correct",
+          2, doneDir.getFileSystem(conf).listStatus(doneDir).length);
+
       // run the TCs
       conf = mr.createJobConf();
 
@@ -635,9 +650,6 @@ public class TestJobHistory extends TestCase {
       // Run a job that will be succeeded and validate its history file
       RunningJob job = UtilsForTests.runJobSucceed(conf, inDir, outDir);
       
-      JobHistory jobHistory = 
-        mr.getJobTrackerRunner().getJobTracker().getJobHistory();
-      Path doneDir = jobHistory.getCompletedJobHistoryLocation();
       assertEquals("History DONE folder not correct", 
           doneFolder, doneDir.getName());
       JobID id = job.getID();
@@ -900,4 +912,65 @@ public class TestJobHistory extends TestCase {
     }
   }
 
+  public void testHistoryInitWithCorruptFiles() throws IOException {
+    MiniMRCluster mr = null;
+    try {
+      JobConf conf = new JobConf();
+      Path historyDir = new Path(System.getProperty("test.build.data", "."),
+      "history");
+      conf.set(JTConfig.JT_JOBHISTORY_LOCATION,
+          historyDir.toString());
+      conf.setUser("user");
+
+      FileSystem localFs = FileSystem.getLocal(conf);
+      
+      //there may be some stale files, clean them
+      if (localFs.exists(historyDir)) {
+        boolean deleted = localFs.delete(historyDir, true);
+        LOG.info(historyDir + " deleted " + deleted);
+      }
+
+      // Start the cluster, create a history file
+      mr = new MiniMRCluster(0, "file:///", 3, null, null, conf);
+      JobTracker jt = mr.getJobTrackerRunner().getJobTracker();
+      JobHistory jh = jt.getJobHistory();
+      final JobID jobId = JobID.forName("job_200809171136_0001");
+      jh.setupEventWriter(jobId, conf);
+      JobSubmittedEvent jse =
+        new JobSubmittedEvent(jobId, "job", "user", 12345, "path");
+      jh.logEvent(jse, jobId);
+      jh.closeWriter(jobId);
+
+      // Corrupt the history file. User RawLocalFileSystem so that we
+      // do keep the original CRC file intact.
+      String historyFileName = jobId.toString() + "_" + "user";
+      Path historyFilePath = new Path (historyDir.toString(), historyFileName);
+
+      RawLocalFileSystem fs = (RawLocalFileSystem)
+        FileSystem.getLocal(conf).getRaw();
+
+      FSDataOutputStream out = fs.create(historyFilePath, true);
+      byte[] corruptData = new byte[32];
+      new Random().nextBytes(corruptData);
+      out.write (corruptData, 0, 32);
+      out.close();
+
+      // Stop and start the tracker. The tracker should come up nicely
+      mr.stopJobTracker();
+      mr.startJobTracker();
+      jt = mr.getJobTrackerRunner().getJobTracker();
+      assertNotNull("JobTracker did not come up", jt );
+      jh = jt.getJobHistory();
+      assertNotNull("JobHistory did not get initialized correctly", jh);
+
+      // Only the done folder should remain in the history directory
+      assertEquals("Files in logDir did not move to DONE folder",
+          1, historyDir.getFileSystem(conf).listStatus(historyDir).length);
+    } finally {
+      if (mr != null) {
+        cleanupLocalFiles(mr);
+        mr.shutdown();
+      }
+    }
+  }
 }

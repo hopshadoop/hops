@@ -29,16 +29,15 @@ import java.util.Map;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Pattern;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.ChecksumException;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.JobTracker;
@@ -312,7 +311,7 @@ public class JobHistory {
 
   private void moveOldFiles() throws IOException {
     //move the log files remaining from last run to the DONE folder
-    //suffix the file name based on Jobtracker identifier so that history
+    //suffix the file name based on Job tracker identifier so that history
     //files with same job id don't get over written in case of recovery.
     FileStatus[] files = logDirFs.listStatus(logDir);
     String jtIdentifier = jobTracker.getTrackerIdentifier();
@@ -324,7 +323,25 @@ public class JobHistory {
       }
       LOG.info("Moving log file from last run: " + fromPath);
       Path toPath = new Path(done, fromPath.getName() + fileSuffix);
-      moveToDoneNow(fromPath, toPath);
+      try {
+        moveToDoneNow(fromPath, toPath);
+      } catch (ChecksumException e) {
+        // If there is an exception moving the file to done because of
+        // a checksum exception, just delete it
+        LOG.warn("Unable to move " + fromPath +", deleting it");
+        try {
+          boolean b = logDirFs.delete(fromPath, false);
+          LOG.debug("Deletion of corrupt file " + fromPath + " returned " + b);
+        } catch (IOException ioe) {
+          // Cannot delete either? Just log and carry on
+          LOG.warn("Unable to delete " + fromPath + "Exception: " +
+              ioe.getMessage());
+        }
+      } catch (IOException e) {
+        // Exceptions other than checksum, just log and continue
+        LOG.warn("Error moving file " + fromPath + " to done folder." +
+            "Ignoring.");
+      }
     }
   }
   

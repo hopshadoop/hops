@@ -724,3 +724,5 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-1022. Fix compilation of vertica testcases. (Vinod Kumar 
     Vavilapalli via acmurthy)
 
+    MAPREDUCE-1000. Handle corrupt history files in JobHistory.initDone().
+    (Jothi Padmanabhan via sharad)
