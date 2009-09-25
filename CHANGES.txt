@@ -731,3 +731,7 @@ Release 0.21.0 - Unreleased
     irrespective of slot size for the job.
     (Ravi Gummadi via yhemanth)
 
+    MAPREDUCE-964. Fixed start and finish times of TaskStatus to be
+    consistent, thereby fixing inconsistencies in metering tasks.
+    (Sreekanth Ramakrishnan via yhemanth)
+

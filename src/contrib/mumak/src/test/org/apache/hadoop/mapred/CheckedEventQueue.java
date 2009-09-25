@@ -161,6 +161,7 @@ class CheckedEventQueue extends SimulatorEventQueue {
         org.apache.hadoop.mapred.TaskAttemptID.downgrade(taskId);
     MapTaskStatus status = new MapTaskStatus(taskIdOldApi, 1.0f, 1,
         State.SUCCEEDED, null, null, null, Phase.MAP, null);
+    status.setStartTime(mapStart);
     status.setFinishTime(mapDone);
     TaskAttemptCompletionEvent completionEvent = 
         new TaskAttemptCompletionEvent(taskTracker, status);
@@ -177,6 +178,7 @@ class CheckedEventQueue extends SimulatorEventQueue {
         org.apache.hadoop.mapred.TaskAttemptID.downgrade(taskId);
     ReduceTaskStatus status = new ReduceTaskStatus(taskIdOldApi, 1.0f, 1,
         State.SUCCEEDED, null, null, null, Phase.REDUCE, null);
+    status.setStartTime(mapDone);
     status.setFinishTime(reduceDone);
     TaskAttemptCompletionEvent completionEvent = 
         new TaskAttemptCompletionEvent(taskTracker, status);
