@@ -32,6 +32,7 @@
   <property name="hadoop.root" location="${root}/../../../"/>
   <property name="src.dir"  location="${root}/src/java"/>
   <property name="src.test" location="${root}/src/test"/>
+  <property name="src.test.data" location="${root}/src/test/data"/>
   <property name="src.examples" location="${root}/src/examples"/>
 
   <available file="${src.examples}" type="dir" property="examples.available"/>
@@ -70,8 +71,7 @@
   <property name="ivy.jar" location="${hadoop.root}/ivy/ivy-${ivy.version}.jar"/>
   <property name="ivy_repo_url" 
 	value="http://repo2.maven.org/maven2/org/apache/ivy/ivy/${ivy.version}/ivy-${ivy.version}.jar" />
-  <property name="build.dir" location="build" />
-  <property name="build.ivy.dir" location="${build.dir}/ivy" />
+  <property name="build.ivy.dir" location="${hadoop.root}/build/ivy" />
   <property name="build.ivy.lib.dir" location="${build.ivy.dir}/lib" />
   <property name="build.ivy.report.dir" location="${build.ivy.dir}/report" />
   <property name="common.ivy.lib.dir" location="${build.ivy.lib.dir}/${ant.project.name}/common"/> 
@@ -149,7 +149,7 @@
   <!-- ======================================================= -->
   <!-- Compile a Hadoop contrib's example files (if available) -->
   <!-- ======================================================= -->
-  <target name="compile-examples" depends="compile" if="examples.available">
+  <target name="compile-examples" depends="compile, ivy-retrieve-common" if="examples.available">
     <echo message="contrib: ${name}"/>
     <javac
      encoding="${build.encoding}"
@@ -232,6 +232,7 @@
       <sysproperty key="test.build.data" value="${build.test}/data"/>
       <sysproperty key="build.test" value="${build.test}"/>
       <sysproperty key="test.build.extraconf" value="${test.build.extraconf}" />
+      <sysproperty key="src.test.data" value="${src.test.data}"/>
       <sysproperty key="contrib.name" value="${name}"/>
       
       <!-- requires fork=yes for: 

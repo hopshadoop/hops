@@ -85,7 +85,7 @@ class EagerTaskInitializationListener extends JobInProgressListener {
   private List<JobInProgress> jobInitQueue = new ArrayList<JobInProgress>();
   private ExecutorService threadPool;
   private int numThreads;
-  private TaskTrackerManager ttm;
+  TaskTrackerManager ttm;
   
   public EagerTaskInitializationListener(Configuration conf) {
     numThreads = 

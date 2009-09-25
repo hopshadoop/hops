@@ -689,6 +689,7 @@
       <property name="dist.dir" value="${dist.dir}"/>
       <fileset file="${contrib.dir}/streaming/build.xml"/>
       <fileset file="${contrib.dir}/gridmix/build.xml"/>
+      <fileset file="${contrib.dir}/mumak/build.xml"/>
     </subant>
  </target>
 
@@ -719,11 +720,13 @@
       <sourcePath path="${tools.src}" />
       <sourcePath path="${basedir}/src/contrib/streaming/src/java" />
       <sourcePath path="${basedir}/src/contrib/gridmix/src/java" />
+      <sourcePath path="${basedir}/src/contrib/mumak/src/java" />
       <class location="${basedir}/build/${final.name}.jar" />
       <class location="${basedir}/build/${examples.final.name}.jar" />
       <class location="${basedir}/build/${tools.final.name}.jar" />
       <class location="${basedir}/build/contrib/streaming/hadoop-${version}-streaming.jar" />
       <class location="${basedir}/build/contrib/gridmix/hadoop-${version}-gridmix.jar" />
+      <class location="${basedir}/build/contrib/mumak/hadoop-${version}-mumak.jar" />
     </findbugs>
 
         <xslt style="${findbugs.home}/src/xsl/default.xsl"
@@ -784,6 +787,7 @@
     	<packageset dir="src/contrib/data_join/src/java"/>
     	<packageset dir="src/contrib/index/src/java"/>
     	<packageset dir="src/contrib/gridmix/src/java"/>
+    	<packageset dir="src/contrib/mumak/src/java"/>
 
         <link href="${javadoc.link.java}"/>
 
@@ -794,6 +798,7 @@
           </fileset>
           <path refid="javadoc-classpath"/>
           <pathelement path="${java.class.path}"/>
+          <pathelement path="${lib.dir}/hadoop-core-test-${hadoop-core.version}.jar"/>
           <pathelement location="${build.tools}"/>
         </classpath>
 
@@ -838,6 +843,7 @@
     	<packageset dir="src/contrib/data_join/src/java"/>
     	<packageset dir="src/contrib/index/src/java"/>
     	<packageset dir="src/contrib/gridmix/src/java"/>
+    	<packageset dir="src/contrib/mumak/src/java"/>
 	
         <link href="${javadoc.link.java}"/>
 
@@ -848,6 +854,7 @@
           </fileset>
           <path refid="javadoc-classpath"/>
           <pathelement path="${java.class.path}"/>
+          <pathelement path="${lib.dir}/hadoop-core-test-${hadoop-core.version}.jar"/>
           <pathelement location="${build.tools}"/>
         </classpath>
 

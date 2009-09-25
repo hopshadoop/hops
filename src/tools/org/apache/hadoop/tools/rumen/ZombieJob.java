@@ -128,6 +128,13 @@ public class ZombieJob implements JobStory {
       Path emptyPath = new Path("/");
       int totalHosts = 0; // use to determine avg # of hosts per split.
       for (LoggedTask mapTask : job.getMapTasks()) {
+        Pre21JobHistoryConstants.Values taskType = mapTask.getTaskType();
+        if (taskType != Pre21JobHistoryConstants.Values.MAP) {
+          LOG.warn("TaskType for a MapTask is not Map. task="
+              + mapTask.getTaskID() + " type="
+              + ((taskType == null) ? "null" : taskType.toString()));
+          continue;
+        }
         List<LoggedLocation> locations = mapTask.getPreferredLocations();
         List<String> hostList = new ArrayList<String>();
         if (locations != null) {
@@ -234,6 +241,23 @@ public class ZombieJob implements JobStory {
     return job.getSubmitTime() - job.getRelativeTime();
   }
 
+  /**
+   * Getting the number of map tasks that are actually logged in the trace.
+   * @return The number of map tasks that are actually logged in the trace.
+   */
+  public int getNumLoggedMaps() {
+    return job.getMapTasks().size();
+  }
+
+
+  /**
+   * Getting the number of reduce tasks that are actually logged in the trace.
+   * @return The number of map tasks that are actually logged in the trace.
+   */
+  public int getNumLoggedReduces() {
+    return job.getReduceTasks().size();
+  }
+  
   /**
    * Mask the job ID part in a {@link TaskID}.
    * 
@@ -414,7 +438,6 @@ public class ZombieJob implements JobStory {
       return makeUpTaskAttemptInfo(taskType, taskInfo, taskAttemptNumber,
           taskNumber, locality);
     }
-
     LoggedTaskAttempt loggedAttempt = getLoggedTaskAttempt(taskType,
         taskNumber, taskAttemptNumber);
     if (loggedAttempt == null) {
@@ -578,7 +601,8 @@ public class ZombieJob implements JobStory {
     Values type = loggedTask.getTaskType();
     if ((type != Values.MAP) && (type != Values.REDUCE)) {
       throw new IllegalArgumentException(
-          "getTaskInfo only supports MAP or REDUCE tasks: " + type.toString());
+          "getTaskInfo only supports MAP or REDUCE tasks: " + type.toString() +
+          " for task = " + loggedTask.getTaskID());
     }
 
     for (LoggedTaskAttempt attempt : attempts) {

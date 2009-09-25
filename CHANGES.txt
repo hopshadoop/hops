@@ -137,6 +137,9 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-980. Modify JobHistory to use Avro for serialization. (cutting)
 
+    MAPREDUCE-728. Add Mumak, a Hadoop map/reduce simulator. (Arun C Murthy,
+    Tamas Sarlos, Anirban Dasgupta, Guanying Wang, and Hong Tang via cdouglas)
+
   IMPROVEMENTS
 
     MAPREDUCE-816. Rename "local" mysql import to "direct" in Sqoop.

@@ -116,7 +116,7 @@ public class JobInProgress {
   int failedMapTasks = 0; 
   int failedReduceTasks = 0;
   
-  private static float DEFAULT_COMPLETED_MAPS_PERCENT_FOR_REDUCE_SLOWSTART = 0.05f;
+  static final float DEFAULT_COMPLETED_MAPS_PERCENT_FOR_REDUCE_SLOWSTART = 0.05f;
   int completedMapsForReduceSlowstart = 0;
   
   // runningMapTasks include speculative tasks, so we need to capture 
@@ -170,7 +170,7 @@ public class JobInProgress {
    * {@link #findNewMapTask(TaskTrackerStatus, int, int, int, double)} should
    * schedule any available map tasks for this job, including speculative tasks.
    */
-  private int anyCacheLevel;
+  int anyCacheLevel;
   
   /**
    * A special value indicating that 
@@ -199,7 +199,7 @@ public class JobInProgress {
     new TreeMap<String, Integer>();
     
   //Confine estimation algorithms to an "oracle" class that JIP queries.
-  private ResourceEstimator resourceEstimator; 
+  ResourceEstimator resourceEstimator; 
   
   long startTime;
   long launchTime;
@@ -208,20 +208,20 @@ public class JobInProgress {
   // Indicates how many times the job got restarted
   private final int restartCount;
 
-  private JobConf conf;
+  JobConf conf;
   protected AtomicBoolean tasksInited = new AtomicBoolean(false);
   private JobInitKillStatus jobInitKillStatus = new JobInitKillStatus();
 
-  private LocalFileSystem localFs;
-  private FileSystem fs;
-  private JobID jobId;
+  LocalFileSystem localFs;
+  FileSystem fs;
+  JobID jobId;
   private boolean hasSpeculativeMaps;
   private boolean hasSpeculativeReduces;
-  private long inputLength = 0;
+  long inputLength = 0;
   
-  private Counters jobCounters = new Counters();
+  Counters jobCounters = new Counters();
   
-  private MetricsRecord jobMetrics;
+  MetricsRecord jobMetrics;
   
   // Maximum no. of fetch-failure notifications after which map task is killed
   private static final int MAX_FETCH_FAILURES_NOTIFICATIONS = 3;
@@ -238,9 +238,9 @@ public class JobInProgress {
   private Object schedulingInfo;
 
   //thresholds for speculative execution
-  private float slowTaskThreshold;
-  private float speculativeCap;
-  private float slowNodeThreshold; //standard deviations
+  float slowTaskThreshold;
+  float speculativeCap;
+  float slowNodeThreshold; //standard deviations
 
   //Statistics are maintained for a couple of things
   //mapTaskStats is used for maintaining statistics about
@@ -336,6 +336,11 @@ public class JobInProgress {
     if (tracker != null) { // Some mock tests have null tracker
       this.jobHistory = tracker.getJobHistory();
     }
+  }
+  
+  JobInProgress() {
+    restartCount = 0;
+    jobSetupCleanupNeeded = false;
   }
   
   /**
@@ -739,7 +744,7 @@ public class JobInProgress {
     setup[1].setJobSetupTask();
   }
   
-  private void setupComplete() {
+  void setupComplete() {
     status.setSetupProgress(1.0f);
     if (this.status.getRunState() == JobStatus.PREP) {
       this.status.setRunState(JobStatus.RUNNING);

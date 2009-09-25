@@ -69,7 +69,7 @@ public class ZombieJobProducer implements JobStoryProducer {
   }
 
   @Override
-  public JobStory getNextJob() throws IOException {
+  public ZombieJob getNextJob() throws IOException {
     LoggedJob job = reader.getNext();
     return (job == null) ? null : new ZombieJob(job, cluster);
   }

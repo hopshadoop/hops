@@ -139,10 +139,10 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   private static final int FS_ACCESS_RETRY_PERIOD = 10000;
 
   private DNSToSwitchMapping dnsToSwitchMapping;
-  private NetworkTopology clusterMap = new NetworkTopology();
+  NetworkTopology clusterMap = new NetworkTopology();
   private int numTaskCacheLevels; // the max level to which we cache tasks
   private Set<Node> nodesAtMaxLevel = new HashSet<Node>();
-  private final TaskScheduler taskScheduler;
+  final TaskScheduler taskScheduler;
   private final List<JobInProgressListener> jobInProgressListeners =
     new CopyOnWriteArrayList<JobInProgressListener>();
 
@@ -1256,7 +1256,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   static final String SUBDIR = "jobTracker";
   FileSystem fs = null;
   Path systemDir = null;
-  private JobConf conf;
+  JobConf conf;
   private final UserGroupInformation mrOwner;
   private final String supergroup;
 
@@ -1790,7 +1790,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    * 
    * @param taskTracker tasktracker whose 'non-running' tasks are to be purged
    */
-  private void removeMarkedTasks(String taskTracker) {
+  void removeMarkedTasks(String taskTracker) {
     // Purge all the 'marked' tasks which were running at taskTracker
     Set<TaskAttemptID> markedTaskSet = 
       trackerToMarkedTasksMap.get(taskTracker);
@@ -2086,7 +2086,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    * 
    * @param status Task Tracker's status
    */
-  private void addNewTracker(TaskTracker taskTracker) {
+  void addNewTracker(TaskTracker taskTracker) {
     TaskTrackerStatus status = taskTracker.getStatus();
     trackerExpiryQueue.add(status);
 
@@ -2183,7 +2183,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   
   // Update the listeners about the job
   // Assuming JobTracker is locked on entry.
-  private void updateJobInProgressListeners(JobChangeEvent event) {
+  void updateJobInProgressListeners(JobChangeEvent event) {
     for (JobInProgressListener listener : jobInProgressListeners) {
       listener.jobUpdated(event);
     }
@@ -2393,7 +2393,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    * @param status The new status for the task tracker
    * @return Was an old status found?
    */
-  private boolean updateTaskTrackerStatus(String trackerName,
+  boolean updateTaskTrackerStatus(String trackerName,
                                           TaskTrackerStatus status) {
     TaskTracker tt = getTaskTracker(trackerName);
     TaskTrackerStatus oldStatus = (tt == null) ? null : tt.getStatus();
@@ -2501,7 +2501,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   /**
    * Process incoming heartbeat messages from the task trackers.
    */
-  private synchronized boolean processHeartbeat(
+  synchronized boolean processHeartbeat(
                                  TaskTrackerStatus trackerStatus, 
                                  boolean initialContact) {
     String trackerName = trackerStatus.getTrackerName();
@@ -2547,8 +2547,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    * A tracker wants to know if any of its Tasks have been
    * closed (because the job completed, whether successfully or not)
    */
-  private synchronized List<TaskTrackerAction> getTasksToKill(
-                                                              String taskTracker) {
+  synchronized List<TaskTrackerAction> getTasksToKill(String taskTracker) {
     
     Set<TaskAttemptID> taskIds = trackerToTaskMap.get(taskTracker);
     List<TaskTrackerAction> killList = new ArrayList<TaskTrackerAction>();
@@ -2625,7 +2624,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   /**
    * A tracker wants to know if any of its Tasks can be committed 
    */
-  private synchronized List<TaskTrackerAction> getTasksToSave(
+  synchronized List<TaskTrackerAction> getTasksToSave(
                                                  TaskTrackerStatus tts) {
     List<TaskStatus> taskStatuses = tts.getTaskReports();
     if (taskStatuses != null) {
@@ -4090,7 +4089,105 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   void incrementFaults(String hostName) {
     faultyTrackers.incrementFaults(hostName);
   }
-  
+
+  JobTracker(JobConf conf, Clock clock, boolean ignoredForSimulation) 
+  throws IOException {
+    this.clock = clock;
+    this.conf = conf;
+    trackerIdentifier = getDateFormat().format(new Date());
+
+    if (fs == null) {
+      fs = FileSystem.get(conf);
+    }
+    
+    tasktrackerExpiryInterval = 
+      conf.getLong("mapred.tasktracker.expiry.interval", 10 * 60 * 1000);
+    retiredJobsCacheSize = 
+      conf.getInt("mapred.job.tracker.retiredjobs.cache.size", 1000);
+
+    // min time before retire
+    MAX_BLACKLISTS_PER_TRACKER = 
+        conf.getInt("mapred.max.tracker.blacklists", 4);
+    NUM_HEARTBEATS_IN_SECOND = 
+        conf.getInt("mapred.heartbeats.in.second", 100);
+    
+    try {
+      mrOwner = UnixUserGroupInformation.login(conf);
+    } catch (LoginException e) {
+      throw new IOException(StringUtils.stringifyException(e));
+    }
+    supergroup = conf.get("mapred.permissions.supergroup", "supergroup");
+    
+    this.hostsReader = new HostsFileReader(conf.get("mapred.hosts", ""),
+        conf.get("mapred.hosts.exclude", ""));
+    // queue manager
+    Configuration queuesConf = new Configuration(this.conf);
+    queueManager = new QueueManager(queuesConf);
+
+    // Create the scheduler
+    Class<? extends TaskScheduler> schedulerClass
+      = conf.getClass("mapred.jobtracker.taskScheduler",
+          JobQueueTaskScheduler.class, TaskScheduler.class);
+    taskScheduler = 
+      (TaskScheduler)ReflectionUtils.newInstance(schedulerClass, conf);
+    
+    // Set ports, start RPC servers, setup security policy etc.
+    InetSocketAddress addr = getAddress(conf);
+    this.localMachine = addr.getHostName();
+    this.port = addr.getPort();
+
+    // Create the jetty server
+    InetSocketAddress infoSocAddr = NetUtils.createSocketAddr(
+        conf.get("mapred.job.tracker.http.address", "0.0.0.0:50030"));
+    String infoBindAddress = infoSocAddr.getHostName();
+    int tmpInfoPort = infoSocAddr.getPort();
+    this.startTime = clock.getTime();
+    infoServer = new HttpServer("job", infoBindAddress, tmpInfoPort, 
+        tmpInfoPort == 0, conf);
+    infoServer.setAttribute("job.tracker", this);
+    
+    // initialize history parameters.
+    String historyLogDir = null;
+    FileSystem historyFS = null;
+
+    jobHistory = new JobHistory();
+    jobHistory.init(this, conf, this.localMachine, this.startTime);
+    jobHistory.initDone(conf, fs);
+    historyLogDir = jobHistory.getCompletedJobHistoryLocation().toString();
+    infoServer.setAttribute("historyLogDir", historyLogDir);
+    historyFS = new Path(historyLogDir).getFileSystem(conf);
+
+    infoServer.setAttribute("fileSys", historyFS);
+    infoServer.addServlet("reducegraph", "/taskgraph", TaskGraphServlet.class);
+    infoServer.start();
+    this.infoPort = this.infoServer.getPort();
+
+    // Initialize instrumentation
+    JobTrackerInstrumentation tmp;
+    Class<? extends JobTrackerInstrumentation> metricsInst =
+      getInstrumentationClass(conf);
+    try {
+      java.lang.reflect.Constructor<? extends JobTrackerInstrumentation> c =
+        metricsInst.getConstructor(new Class[] {JobTracker.class, JobConf.class} );
+      tmp = c.newInstance(this, conf);
+    } catch(Exception e) {
+      //Reflection can throw lots of exceptions -- handle them all by 
+      //falling back on the default.
+      LOG.error("failed to initialize job tracker metrics", e);
+      tmp = new JobTrackerMetricsInst(this, conf);
+    }
+    myInstrumentation = tmp;
+    
+    this.dnsToSwitchMapping = ReflectionUtils.newInstance(
+        conf.getClass("topology.node.switch.mapping.impl", ScriptBasedMapping.class,
+            DNSToSwitchMapping.class), conf);
+    this.numTaskCacheLevels = conf.getInt("mapred.task.cache.levels", 
+        NetworkTopology.DEFAULT_HOST_LEVEL);
+
+    //initializes the job status store
+    completedJobStatusStore = new CompletedJobStatusStore(conf);
+  }
+
   /**
    * Get the path of the locally stored job file
    * @param jobId id of the job
