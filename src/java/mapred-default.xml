@@ -333,6 +333,14 @@
 </property>
 
 <property>
+  <name>mapreduce.tasktracker.outofband.heartbeat</name>
+  <value>false</value>
+  <description>Expert: Set this to true to let the tasktracker send an 
+  out-of-band heartbeat on task-completion for better latency.
+  </description>
+</property>
+
+<property>
   <name>mapreduce.jobtracker.jobhistory.lru.cache.size</name>
   <value>5</value>
   <description>The number of job history files loaded in memory. The jobs are 
@@ -665,7 +673,7 @@
   <name>mapreduce.jobtracker.heartbeats.in.second</name>
   <value>100</value>
   <description>Expert: Approximate number of heart-beats that could arrive 
-               JobTracker in a second. Assuming each RPC can be processed 
+               at JobTracker in a second. Assuming each RPC can be processed 
                in 10msec, the default value is made 100 RPCs in a second.
   </description>
 </property> 

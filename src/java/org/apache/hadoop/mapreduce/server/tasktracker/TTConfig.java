@@ -75,5 +75,6 @@ public interface TTConfig extends MRConfig {
     "mapreduce.tasktracker.taskmemorymanager.monitoringinterval";
   public static final String TT_LOCAL_CACHE_SIZE = 
     "mapreduce.tasktracker.cache.local.size";
-
+  public static final String TT_OUTOFBAND_HEARBEAT =
+    "mapreduce.tasktracker.outofband.heartbeat";
 }

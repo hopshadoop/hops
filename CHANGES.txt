@@ -10,6 +10,11 @@ Trunk (unreleased changes)
 
   OPTIMIZATIONS
 
+    MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
+    heartbeat on task-completion for better job-latency. (acmurthy) 
+    Configuration changes:
+      add mapreduce.tasktracker.outofband.heartbeat 
+
   BUG FIXES
 
     MAPREDUCE-1014. Fix the libraries for common and hdfs. (omalley)

@@ -225,6 +225,14 @@ public class TaskTracker
   private int maxMapSlots;
   private int maxReduceSlots;
   private int failures;
+  
+  // Performance-related config knob to send an out-of-band heartbeat
+  // on task completion
+  private volatile boolean oobHeartbeatOnTaskCompletion;
+  
+  // Track number of completed tasks to send an out-of-band heartbeat
+  private IntWritable finishedCount = new IntWritable(0);
+  
   private MapEventsFetcherThread mapEventsFetcher;
   int workerThreads;
   CleanupQueue directoryCleanupThread;
@@ -636,6 +644,9 @@ public class TaskTracker
     if (shouldStartHealthMonitor(this.fConf)) {
       startHealthMonitor(this.fConf);
     }
+    
+    oobHeartbeatOnTaskCompletion = 
+      fConf.getBoolean(TT_OUTOFBAND_HEARBEAT, false);
   }
 
   public static Class<? extends TaskTrackerInstrumentation> getInstrumentationClass(
@@ -1176,8 +1187,14 @@ public class TaskTracker
 
         long waitTime = heartbeatInterval - (now - lastHeartbeat);
         if (waitTime > 0) {
-          // sleeps for the wait time
-          Thread.sleep(waitTime);
+          // sleeps for the wait time or
+          // until there are empty slots to schedule tasks
+          synchronized (finishedCount) {
+            if (finishedCount.get() == 0) {
+              finishedCount.wait(waitTime);
+            }
+            finishedCount.set(0);
+          }
         }
 
         // If the TaskTracker is just starting up:
@@ -1867,6 +1884,19 @@ public class TaskTracker
     }
   }
 
+  /** 
+   * Notify the tasktracker to send an out-of-band heartbeat.
+   */
+  private void notifyTTAboutTaskCompletion() {
+    if (oobHeartbeatOnTaskCompletion) {
+      synchronized (finishedCount) {
+        int value = finishedCount.get();
+        finishedCount.set(value+1);
+        finishedCount.notify();
+      }
+    }
+  }
+  
   /**
    * The server retry loop.  
    * This while-loop attempts to connect to the JobTracker.  It only 
@@ -2185,9 +2215,21 @@ public class TaskTracker
       return wasKilled;
     }
 
-    void reportTaskFinished() {
-      taskFinished();
-      releaseSlot();
+    /**
+     * A task is reporting in as 'done'.
+     * 
+     * We need to notify the tasktracker to send an out-of-band heartbeat.
+     * If isn't <code>commitPending</code>, we need to finalize the task
+     * and release the slot it's occupied.
+     * 
+     * @param commitPending is the task-commit pending?
+     */
+    void reportTaskFinished(boolean commitPending) {
+      if (!commitPending) {
+        taskFinished();
+        releaseSlot();
+      }
+      notifyTTAboutTaskCompletion();
     }
 
     /* State changes:
@@ -2490,6 +2532,7 @@ public class TaskTracker
       taskStatus.setFinishTime(System.currentTimeMillis());
       removeFromMemoryManager(task.getTaskID());
       releaseSlot();
+      notifyTTAboutTaskCompletion();
     }
     
     private synchronized void releaseSlot() {
@@ -2818,9 +2861,7 @@ public class TaskTracker
       tip = tasks.get(taskid);
     }
     if (tip != null) {
-      if (!commitPending) {
-        tip.reportTaskFinished();
-      }
+      tip.reportTaskFinished(commitPending);
     } else {
       LOG.warn("Unknown child task finished: "+taskid+". Ignored.");
     }
