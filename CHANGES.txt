@@ -433,6 +433,8 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-639. Change Terasort example to reflect the 2009 updates. 
     (omalley)
 
+    MAPREDUCE-1063. Document gridmix benchmark. (cdouglas)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 
