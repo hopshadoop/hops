@@ -745,3 +745,7 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-1076. Deprecate ClusterStatus and add javadoc in ClusterMetrics.
     (Amareshwari Sriramadasu via sharad)
 
+    MAPREDUCE-979. Fixed JobConf APIs related to memory parameters to return
+    values of new configuration variables when deprecated variables are
+    disabled. (Sreekanth Ramakrishnan via yhemanth)
+    
