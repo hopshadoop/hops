@@ -71,30 +71,65 @@ public class ClusterMetrics implements Writable {
     this.numDecommissionedTrackers = numDecommisionedNodes;
   }
   
+  /**
+   * Get number of occupied map slots in the cluster.
+   * 
+   * @return occupied map slot count
+   */
   public int getOccupiedMapSlots() { 
     return runningMaps;
   }
   
+  /**
+   * Get the number of occupied reduce slots in the cluster.
+   * 
+   * @return occupied reduce slot count
+   */
   public int getOccupiedReduceSlots() { 
     return runningReduces; 
   }
   
+  /**
+   * Get the total number of map slots in the cluster.
+   * 
+   * @return map slot capacity
+   */
   public int getMapSlotCapacity() {
     return mapSlots;
   }
   
+  /**
+   * Get the total number of reduce slots in the cluster.
+   * 
+   * @return reduce slot capacity
+   */
   public int getReduceSlotCapacity() {
     return reduceSlots;
   }
   
+  /**
+   * Get the number of active trackers in the cluster.
+   * 
+   * @return active tracker count.
+   */
   public int getTaskTrackerCount() {
     return numTrackers;
   }
   
+  /**
+   * Get the number of blacklisted trackers in the cluster.
+   * 
+   * @return blacklisted tracker count
+   */
   public int getBlackListedTaskTrackerCount() {
     return numBlacklistedTrackers;
   }
   
+  /**
+   * Get the number of decommissioned trackers in the cluster.
+   * 
+   * @return decommissioned tracker count
+   */
   public int getDecommissionedTaskTrackerCount() {
     return numDecommissionedTrackers;
   }

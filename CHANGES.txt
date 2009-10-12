@@ -742,3 +742,6 @@ Release 0.21.0 - Unreleased
     consistent, thereby fixing inconsistencies in metering tasks.
     (Sreekanth Ramakrishnan via yhemanth)
 
+    MAPREDUCE-1076. Deprecate ClusterStatus and add javadoc in ClusterMetrics.
+    (Amareshwari Sriramadasu via sharad)
+
