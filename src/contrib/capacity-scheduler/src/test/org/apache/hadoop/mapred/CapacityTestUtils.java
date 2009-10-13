@@ -20,13 +20,13 @@ package org.apache.hadoop.mapred;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -48,6 +48,8 @@ import org.apache.hadoop.security.SecurityUtil.AccessControlList;
 public class CapacityTestUtils {
   static final Log LOG =
     LogFactory.getLog(org.apache.hadoop.mapred.CapacityTestUtils.class);
+  static final String MAP = "map";
+  static final String REDUCE = "reduce";
 
 
   /**
@@ -160,18 +162,116 @@ public class CapacityTestUtils {
     }
   }
 
-
+  /**
+   * The method accepts a attempt string and checks for validity of
+   * assignTask w.r.t attempt string.
+   * 
+   * @param taskTrackerManager
+   * @param scheduler
+   * @param taskTrackerName
+   * @param expectedTaskString
+   * @return
+   * @throws IOException
+   */
   static Task checkAssignment(
     CapacityTestUtils.FakeTaskTrackerManager taskTrackerManager,
     CapacityTaskScheduler scheduler, String taskTrackerName,
     String expectedTaskString) throws IOException {
+    Map<String, String> expectedStrings = new HashMap<String, String>();
+    if (expectedTaskString.contains("_m_")) {
+      expectedStrings.put(MAP, expectedTaskString);
+    } else if (expectedTaskString.contains("_r_")) {
+      expectedStrings.put(REDUCE, expectedTaskString);
+    }
+    List<Task> tasks = checkMultipleTaskAssignment(
+      taskTrackerManager, scheduler, taskTrackerName, expectedStrings);
+    for (Task task : tasks) {
+      if (task.toString().equals(expectedTaskString)) {
+        return task;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Checks the validity of tasks assigned by scheduler's assignTasks method
+   * According to JIRA:1030 every assignTasks call in CapacityScheduler
+   * would result in either MAP or REDUCE or BOTH.
+   *
+   * This method accepts a Map<String,String>.
+   * The map should always have <=2 entried in hashMap.
+   *
+   * sample calling code .
+   *
+   *  Map<String, String> expectedStrings = new HashMap<String, String>();
+   * ......
+   * .......
+   * expectedStrings.clear();
+   * expectedStrings.put(MAP,"attempt_test_0001_m_000001_0 on tt1");
+   * expectedStrings.put(REDUCE,"attempt_test_0001_r_000001_0 on tt1");
+   * checkMultipleTaskAssignment(
+   *   taskTrackerManager, scheduler, "tt1",
+   *   expectedStrings);
+   * 
+   * @param taskTrackerManager
+   * @param scheduler
+   * @param taskTrackerName
+   * @param expectedTaskStrings
+   * @return
+   * @throws IOException
+   */
+  static List<Task> checkMultipleTaskAssignment(
+    CapacityTestUtils.FakeTaskTrackerManager taskTrackerManager,
+    CapacityTaskScheduler scheduler, String taskTrackerName,
+    Map<String,String> expectedTaskStrings) throws IOException {
+    //Call assign task
     List<Task> tasks = scheduler.assignTasks(
       taskTrackerManager.getTaskTracker(
         taskTrackerName));
-    assertNotNull(expectedTaskString, tasks);
-    assertEquals(expectedTaskString, 1, tasks.size());
-    assertEquals(expectedTaskString, tasks.get(0).toString());
-    return tasks.get(0);
+
+    if (tasks==null) {
+      if (expectedTaskStrings.size() > 0) {
+        fail("Expected some tasks to be assigned, but got none.");  
+      } else {
+        return null;
+      }
+    }
+
+    if (expectedTaskStrings.size() > tasks.size()) {
+      StringBuffer sb = new StringBuffer();
+      sb.append("Expected strings different from actual strings.");
+      sb.append(" Expected string count=").append(expectedTaskStrings.size());
+      sb.append(" Actual string count=").append(tasks.size());
+      sb.append(" Expected strings=");
+      for (String expectedTask : expectedTaskStrings.values()) {
+        sb.append(expectedTask).append(",");
+      }
+      sb.append("Actual strings=");
+      for (Task actualTask : tasks) {
+        sb.append(actualTask.toString()).append(",");
+      }
+      fail(sb.toString());
+    }
+    
+    for (Task task : tasks) {
+      LOG.info("tasks are : " + tasks.toString());
+      if (task.isMapTask()) {
+        //check if expected string is set for map or not.
+        if (expectedTaskStrings.get(MAP) != null) {
+          assertEquals(expectedTaskStrings.get(MAP), task.toString());
+        } else {
+          fail("No map task is expected, but got " + task.toString());
+        }
+      } else {
+        //check if expectedStrings is set for reduce or not.
+        if (expectedTaskStrings.get(REDUCE) != null) {
+          assertEquals(expectedTaskStrings.get(REDUCE), task.toString());
+        } else {
+          fail("No reduce task is expected, but got " + task.toString());
+        }
+      }
+    }
+    return tasks;
   }
 
   static void verifyCapacity(

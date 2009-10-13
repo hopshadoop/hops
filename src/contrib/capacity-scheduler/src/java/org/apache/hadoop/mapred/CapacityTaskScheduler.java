@@ -906,8 +906,10 @@ class CapacityTaskScheduler extends TaskScheduler {
 
   /*
    * The grand plan for assigning a task. 
-   * First, decide whether a Map or Reduce task should be given to a TT 
-   * (if the TT can accept either). 
+   * Always assigns 1 reduce and 1 map , if sufficient slots are
+   * available for each of types.
+   * If not , then which ever type of slots are available , that type of task is
+   * assigned.
    * Next, pick a queue. We only look at queues that need a slot. Among these,
    * we first look at queues whose (# of running tasks)/capacity is the least.
    * Next, pick a job in a queue. we pick the job at the front of the queue
@@ -921,12 +923,12 @@ class CapacityTaskScheduler extends TaskScheduler {
     
     TaskLookupResult tlr;
     TaskTrackerStatus taskTrackerStatus = taskTracker.getStatus();
+    List<Task> result = new ArrayList<Task>();
     
     /* 
-     * If TT has Map and Reduce slot free, we need to figure out whether to
-     * give it a Map or Reduce task.
-     * Number of ways to do this. For now, base decision on how much is needed
-     * versus how much is used (default to Map, if equal).
+     * If TT has Map and Reduce slot free, we assign 1 map and 1 reduce
+     * We  base decision on how much is needed
+     * versus how much is used
      */
     ClusterStatus c = taskTrackerManager.getClusterStatus();
     int mapClusterCapacity = c.getMaxMapTasks();
@@ -953,51 +955,26 @@ class CapacityTaskScheduler extends TaskScheduler {
     // make sure we get our map or reduce scheduling object to update its 
     // collection of QSC objects too.
 
-    if ((maxReduceSlots - currentReduceSlots) > 
-    (maxMapSlots - currentMapSlots)) {
-      // get a reduce task first
+    if (maxReduceSlots > currentReduceSlots) {
+      //reduce slot available , try to get a
+      //reduce task
       tlr = reduceScheduler.assignTasks(taskTracker);
       if (TaskLookupResult.LookUpStatus.TASK_FOUND == 
         tlr.getLookUpStatus()) {
-        // found a task; return
-        return Collections.singletonList(tlr.getTask());
-      }
-      // if we didn't get any, look at map tasks, if TT has space
-      else if ((TaskLookupResult.LookUpStatus.TASK_FAILING_MEMORY_REQUIREMENT
-                                  == tlr.getLookUpStatus() ||
-                TaskLookupResult.LookUpStatus.NO_TASK_FOUND
-                                  == tlr.getLookUpStatus())
-          && (maxMapSlots > currentMapSlots)) {
-        tlr = mapScheduler.assignTasks(taskTracker);
-        if (TaskLookupResult.LookUpStatus.TASK_FOUND == 
-          tlr.getLookUpStatus()) {
-          return Collections.singletonList(tlr.getTask());
-        }
-      }
-    }
-    else {
-      // get a map task first
-      tlr = mapScheduler.assignTasks(taskTracker);
-      if (TaskLookupResult.LookUpStatus.TASK_FOUND == 
-        tlr.getLookUpStatus()) {
-        // found a task; return
-        return Collections.singletonList(tlr.getTask());
-      }
-      // if we didn't get any, look at reduce tasks, if TT has space
-      else if ((TaskLookupResult.LookUpStatus.TASK_FAILING_MEMORY_REQUIREMENT
-                                    == tlr.getLookUpStatus()
-                || TaskLookupResult.LookUpStatus.NO_TASK_FOUND
-                                    == tlr.getLookUpStatus())
-          && (maxReduceSlots > currentReduceSlots)) {
-        tlr = reduceScheduler.assignTasks(taskTracker);
-        if (TaskLookupResult.LookUpStatus.TASK_FOUND == 
-          tlr.getLookUpStatus()) {
-          return Collections.singletonList(tlr.getTask());
-        }
+        result.add(tlr.getTask());
       }
     }
 
-    return null;
+    if(maxMapSlots > currentMapSlots) {
+      //map slot available , try to get a map task
+      tlr = mapScheduler.assignTasks(taskTracker);
+      if (TaskLookupResult.LookUpStatus.TASK_FOUND == 
+        tlr.getLookUpStatus()) {
+        result.add(tlr.getTask());
+      }
+    }
+    
+    return (result.isEmpty()) ? null : result;
   }
 
   

@@ -748,4 +748,8 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-979. Fixed JobConf APIs related to memory parameters to return
     values of new configuration variables when deprecated variables are
     disabled. (Sreekanth Ramakrishnan via yhemanth)
-    
+   
+    MAPREDUCE-1030. Modified scheduling algorithm to return a map and reduce
+    task per heartbeat in the capacity scheduler.
+    (Rahul Kumar Singh via yhemanth)
+ 
