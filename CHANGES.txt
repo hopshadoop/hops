@@ -755,3 +755,6 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1071. Use DataInputStream rather than FSDataInputStream in the
     JobHistory EventReader. (Hong Tang via cdouglas)
+
+    MAPREDUCE-986. Fix Rumen to work with truncated task lines. (Dick King via
+    cdouglas)

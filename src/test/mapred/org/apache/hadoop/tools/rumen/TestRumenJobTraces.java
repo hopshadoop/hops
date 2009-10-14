@@ -33,23 +33,36 @@ import static org.junit.Assert.*;
 public class TestRumenJobTraces {
   @Test
   public void testSmallTrace() throws Exception {
+    performSingleTest("sample-job-tracker-logs",
+        "job-tracker-logs-topology-output", "job-tracker-logs-trace-output");
+  }
+
+  @Test
+  public void testTruncatedTask() throws Exception {
+    performSingleTest("truncated-job-tracker-log", "truncated-topology-output",
+        "truncated-trace-output");
+  }
+
+  private void performSingleTest(String jtLogName, String goldTopology,
+      String goldTrace) throws Exception {
     final Configuration conf = new Configuration();
     final FileSystem lfs = FileSystem.getLocal(conf);
 
-    final Path rootInputDir = new Path(
-        System.getProperty("test.tools.input.dir", "")).makeQualified(lfs);
-    final Path rootTempDir = new Path(
-        System.getProperty("test.build.data", "/tmp")).makeQualified(lfs);
-
+    final Path rootInputDir =
+        new Path(System.getProperty("test.tools.input.dir", ""))
+            .makeQualified(lfs);
+    final Path rootTempDir =
+        new Path(System.getProperty("test.build.data", "/tmp"))
+            .makeQualified(lfs);
 
     final Path rootInputFile = new Path(rootInputDir, "rumen/small-trace-test");
     final Path tempDir = new Path(rootTempDir, "TestRumenJobTraces");
     lfs.delete(tempDir, true);
 
-    final Path topologyFile = new Path(tempDir, "topology.json");
-    final Path traceFile = new Path(tempDir, "trace.json");
+    final Path topologyFile = new Path(tempDir, jtLogName + "-topology.json");
+    final Path traceFile = new Path(tempDir, jtLogName + "-trace.json");
 
-    final Path inputFile = new Path(rootInputFile, "sample-job-tracker-logs");
+    final Path inputFile = new Path(rootInputFile, jtLogName);
 
     System.out.println("topology result file = " + topologyFile);
     System.out.println("trace result file = " + traceFile);
@@ -66,10 +79,8 @@ public class TestRumenJobTraces {
 
     args[5] = inputFile.toString();
 
-    final Path topologyGoldFile = new Path(rootInputFile, 
-        "job-tracker-logs-topology-output");
-    final Path traceGoldFile = new Path(rootInputFile,
-        "job-tracker-logs-trace-output");
+    final Path topologyGoldFile = new Path(rootInputFile, goldTopology);
+    final Path traceGoldFile = new Path(rootInputFile, goldTrace);
 
     HadoopLogsAnalyzer analyzer = new HadoopLogsAnalyzer();
     int result = ToolRunner.run(analyzer, args);
@@ -86,11 +97,11 @@ public class TestRumenJobTraces {
       FileSystem lfs, Path result, Path gold, Class<? extends T> clazz,
       String fileDescription) throws IOException {
     InputStream goldStream = lfs.open(gold);
-    JsonObjectMapperParser<T> goldParser = new JsonObjectMapperParser<T>(
-        goldStream, clazz);
+    JsonObjectMapperParser<T> goldParser =
+        new JsonObjectMapperParser<T>(goldStream, clazz);
     InputStream resultStream = lfs.open(result);
-    JsonObjectMapperParser<T> resultParser = new JsonObjectMapperParser<T>(
-        resultStream, clazz);
+    JsonObjectMapperParser<T> resultParser =
+        new JsonObjectMapperParser<T>(resultStream, clazz);
     try {
       while (true) {
         DeepCompare goldJob = goldParser.getNext();

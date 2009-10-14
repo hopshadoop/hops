@@ -1043,6 +1043,10 @@ public class HadoopLogsAnalyzer extends Configured implements Tool {
             e);
         typ = null;
       }
+      
+      if (typ == null) {
+        return;
+      }
 
       task.setTaskType(typ);
 
