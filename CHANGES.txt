@@ -8,6 +8,9 @@ Trunk (unreleased changes)
 
   IMPROVEMENTS
 
+    MAPREDUCE-999. Improve Sqoop test speed and refactor tests.
+    (Aaron Kimball via tomwhite)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
