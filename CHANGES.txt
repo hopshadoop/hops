@@ -758,3 +758,7 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-986. Fix Rumen to work with truncated task lines. (Dick King via
     cdouglas)
+
+    MAPREDUCE-1029. Fix failing TestCopyFiles by restoring the unzipping of
+    HDFS webapps from the hdfs jar. (Aaron Kimball and Jothi Padmanabhan via
+    cdouglas)
