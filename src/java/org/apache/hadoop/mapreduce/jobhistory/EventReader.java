@@ -18,10 +18,11 @@
 
 package org.apache.hadoop.mapreduce.jobhistory;
 
+import java.io.Closeable;
+import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.EOFException;
 
-import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.Counter;
@@ -34,10 +35,10 @@ import org.apache.avro.io.BinaryDecoder;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.specific.SpecificDatumReader;
 
-public class EventReader {
+public class EventReader implements Closeable {
   private String version;
   private Schema schema;
-  private FSDataInputStream in;
+  private DataInputStream in;
   private Decoder decoder;
   private DatumReader reader;
 
@@ -57,7 +58,7 @@ public class EventReader {
    * @throws IOException
    */
   @SuppressWarnings("deprecation")
-  public EventReader(FSDataInputStream in) throws IOException {
+  public EventReader(DataInputStream in) throws IOException {
     this.in = in;
     this.version = in.readLine();
     
@@ -153,6 +154,7 @@ public class EventReader {
    * Close the Event reader
    * @throws IOException
    */
+  @Override
   public void close() throws IOException {
     if (in != null) {
       in.close();
