@@ -1703,6 +1703,14 @@ public class JobInProgress {
     return trackersReservedForReduces.size();
   }
   
+  public int getReservedMapSlots(TaskTracker taskTracker) {
+    return trackersReservedForMaps.get(taskTracker).getNumSlots();
+  }
+
+  public int getReservedReduceSlots(TaskTracker taskTracker) {
+    return trackersReservedForReduces.get(taskTracker).getNumSlots();
+  }
+
   private int getTrackerTaskFailures(String trackerName) {
     String trackerHostName = convertTrackerNameToHostName(trackerName);
     Integer failedTasks = trackerToFailuresMap.get(trackerHostName);

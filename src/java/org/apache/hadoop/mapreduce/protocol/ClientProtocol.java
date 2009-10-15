@@ -85,8 +85,9 @@ public interface ClientProtocol extends VersionedProtocol {
    * Version 27: Changed protocol to use new api objects. And the protocol is 
    *             renamed from JobSubmissionProtocol to ClientProtocol.
    * Version 28: Added getJobHistoryDir() as part of MAPREDUCE-975.
+   * Version 29: Added reservedSlots to ClusterMetrics.
    */
-  public static final long versionID = 28L;
+  public static final long versionID = 29L;
 
   /**
    * Allocate a name for the job.
