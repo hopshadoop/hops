@@ -21,6 +21,7 @@ package org.apache.hadoop.mapred;
  * Used to describe the priority of the running job. 
  * @deprecated Use {@link org.apache.hadoop.mapreduce.JobPriority} instead
  */
+@Deprecated
 public enum JobPriority {
 
   VERY_HIGH,

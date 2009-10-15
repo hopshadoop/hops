@@ -765,3 +765,7 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-1029. Fix failing TestCopyFiles by restoring the unzipping of
     HDFS webapps from the hdfs jar. (Aaron Kimball and Jothi Padmanabhan via
     cdouglas)
+
+    MAPREDUCE-769. Make findbugs and javac warnings to zero.
+    (Amareshwari Sriramadasu via sharad)
+

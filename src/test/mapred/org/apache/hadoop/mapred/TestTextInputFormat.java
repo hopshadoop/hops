@@ -391,7 +391,7 @@ public class TestTextInputFormat {
     Text value = reader.createValue();
     while (reader.next(key, value)) {
       result.add(value);
-      value = (Text) reader.createValue();
+      value = reader.createValue();
     }
     reader.close();
     return result;

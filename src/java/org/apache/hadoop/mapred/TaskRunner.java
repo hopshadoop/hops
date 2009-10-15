@@ -143,6 +143,7 @@ abstract class TaskRunner extends Thread {
    *             set via {@link JobConf#MAPRED_MAP_TASK_ENV} or
    *             {@link JobConf#MAPRED_REDUCE_TASK_ENV}
    */
+  @Deprecated
   public String getChildEnv(JobConf jobConf) {
     return jobConf.get(JobConf.MAPRED_TASK_ENV);
   }

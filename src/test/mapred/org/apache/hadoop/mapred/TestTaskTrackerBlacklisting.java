@@ -174,7 +174,7 @@ public class TestTaskTrackerBlacklisting extends TestCase {
         healthStatus.setLastReported(status.getLastReported());
       }
       jobTracker.heartbeat(tts, false, initialContact, 
-                           false, (short) responseId);
+                           false, responseId);
     }
     responseId++;
   }

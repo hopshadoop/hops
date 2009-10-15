@@ -50,8 +50,8 @@ public class ProcessTree {
       setsidSupported = false;
     } finally { // handle the exit code
       LOG.info("setsid exited with exit code " + shexec.getExitCode());
-      return setsidSupported;
     }
+    return setsidSupported;
   }
 
   /**

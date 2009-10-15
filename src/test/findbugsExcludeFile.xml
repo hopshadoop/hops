@@ -16,6 +16,10 @@
        <Bug pattern="DLS_DEAD_LOCAL_STORE" />
      </Match>
      <Match>
+       <Class name="~.*_jspx" />
+       <Bug pattern="DLS_DEAD_LOCAL_STORE" />
+     </Match>
+     <Match>
        <Field name="_jspx_dependants" />
        <Bug pattern="UWF_UNWRITTEN_FIELD" />
      </Match>
@@ -63,6 +67,14 @@
      <Match>
        <Class name="org.apache.hadoop.mapred.SequenceFileInputFilter$Filter" />
        <Bug pattern="NM_SAME_SIMPLE_NAME_AS_INTERFACE" />
+     </Match>
+     <Match>
+       <Class name="~org.apache.hadoop.util.*" />
+       <Bug pattern="NM_SAME_SIMPLE_NAME_AS_SUPERCLASS" />
+     </Match>
+     <Match>
+       <Class name="~org.apache.hadoop.filecache.*" />
+       <Bug pattern="NM_SAME_SIMPLE_NAME_AS_SUPERCLASS" />
      </Match>
      <!--
        Ignore warnings for usage of System.exit. This is
@@ -116,6 +128,11 @@
        <Class name="org.apache.hadoop.mapred.FileOutputCommitter" />
        <Bug pattern="NM_WRONG_PACKAGE_INTENTIONAL" />
      </Match>
+     <Match>
+       <Class name="org.apache.hadoop.mapred.lib.db.DBInputFormat$DBRecordReader" />
+       <Method name="next" />
+       <Bug pattern="NM_WRONG_PACKAGE_INTENTIONAL" />
+     </Match>
      <!--
        Ignoring this warning as resolving this would need a non-trivial change in code 
      -->
@@ -162,6 +179,11 @@
        <Class name="org.apache.hadoop.mapreduce.task.reduce.MergeThread" />
        <Field name="inputs" />
        <Bug pattern="IS2_INCONSISTENT_SYNC" />
+     </Match>
+     <Match>
+       <Class name="org.apache.hadoop.mapred.JobTracker" />
+       <Method name="updateTaskTrackerStatus" />
+       <Bug pattern="DLS_DEAD_LOCAL_STORE" />
      </Match>
 
     <!--

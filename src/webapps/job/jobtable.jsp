@@ -32,7 +32,7 @@ private static final long serialVersionUID = 1L;
 <%
 JobTracker tracker = (JobTracker) application.getAttribute("job.tracker");
 QueueManager qmgr = tracker.getQueueManager();
-String queue = (String)request.getParameter("queue_name");
+String queue = request.getParameter("queue_name");
 TaskScheduler scheduler = tracker.getTaskScheduler();
 JobQueueInfo queueInfo = tracker.getQueueInfo(queue);
 %>

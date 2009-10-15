@@ -27,6 +27,10 @@
   <jsp:directive.page import="org.apache.hadoop.mapreduce.*" />
   <jsp:directive.page import="org.apache.hadoop.mapred.JSPUtil" />
 
+  <jsp:declaration>
+  private static final long serialVersionUID = 1L;
+  </jsp:declaration>
+
   <jsp:scriptlet>
     response.setHeader("Pragma", "no-cache");
     response.setHeader("Cache-Control", "no-store");

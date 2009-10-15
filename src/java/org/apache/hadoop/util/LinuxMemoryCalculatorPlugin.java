@@ -25,6 +25,7 @@ package org.apache.hadoop.util;
  *             {@link org.apache.hadoop.mapreduce.util.LinuxMemoryCalculatorPlugin}
  *             instead
  */
+@Deprecated
 public class LinuxMemoryCalculatorPlugin extends
     org.apache.hadoop.mapreduce.util.LinuxMemoryCalculatorPlugin {
   // Inherits everything from the super class

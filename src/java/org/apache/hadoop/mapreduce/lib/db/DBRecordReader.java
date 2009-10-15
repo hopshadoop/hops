@@ -70,7 +70,7 @@ public class DBRecordReader<T extends DBWritable> extends
 
   private Connection connection;
 
-  private PreparedStatement statement;
+  protected PreparedStatement statement;
 
   private DBConfiguration dbConf;
 

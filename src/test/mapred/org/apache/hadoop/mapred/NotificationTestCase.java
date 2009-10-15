@@ -96,7 +96,8 @@ public abstract class NotificationTestCase extends HadoopTestCase {
 
   public static class NotificationServlet extends HttpServlet {
     public static int counter = 0;
-
+    private static final long serialVersionUID = 1L;
+    
     protected void doGet(HttpServletRequest req, HttpServletResponse res)
       throws ServletException, IOException {
       switch (counter) {

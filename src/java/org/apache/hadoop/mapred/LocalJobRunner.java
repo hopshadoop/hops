@@ -69,6 +69,7 @@ public class LocalJobRunner implements ClientProtocol {
     return ClientProtocol.versionID;
   }
   
+  @SuppressWarnings("unchecked")
   static RawSplit[] getRawSplits(JobContext jContext, JobConf job)
       throws Exception {
     JobConf jobConf = jContext.getJobConf();

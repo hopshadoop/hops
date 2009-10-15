@@ -214,7 +214,7 @@ public class MapReduceTestUtil {
     throws IOException, InterruptedException {
       Text dumbKey = new Text("");
       while (values.hasNext()) {
-        Text data = (Text) values.next();
+        Text data = values.next();
         context.write(dumbKey, data);
       }
     }
