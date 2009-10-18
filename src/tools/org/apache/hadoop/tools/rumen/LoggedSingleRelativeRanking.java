@@ -17,6 +17,11 @@
  */
 package org.apache.hadoop.tools.rumen;
 
+import java.util.Set;
+import java.util.TreeSet;
+
+import org.codehaus.jackson.annotate.JsonAnySetter;
+
 /**
  * A {@link LoggedSingleRelativeRanking} represents an X-Y coordinate of a
  * single point in a discrete CDF.
@@ -35,6 +40,20 @@ public class LoggedSingleRelativeRanking implements DeepCompare {
    * The X coordinate
    */
   long datum = -1L;
+
+  static private Set<String> alreadySeenAnySetterAttributes =
+      new TreeSet<String>();
+
+  @SuppressWarnings("unused")
+  // for input parameter ignored.
+  @JsonAnySetter
+  public void setUnknownAttribute(String attributeName, Object ignored) {
+    if (!alreadySeenAnySetterAttributes.contains(attributeName)) {
+      alreadySeenAnySetterAttributes.add(attributeName);
+      System.err.println("In LoggedJob, we saw the unknown attribute "
+          + attributeName + ".");
+    }
+  }
 
   public double getRelativeRanking() {
     return relativeRanking;

@@ -19,6 +19,10 @@ package org.apache.hadoop.tools.rumen;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
+
+import org.codehaus.jackson.annotate.JsonAnySetter;
 
 /**
  * A {@link LoggedLocation} is a representation of a point in an hierarchical
@@ -41,8 +45,11 @@ public class LoggedLocation implements DeepCompare {
    * The full path from the root of the network to the host.
    * 
    * NOTE that this assumes that the network topology is a tree.
-   */ 
+   */
   List<String> layers = new ArrayList<String>();
+
+  static private Set<String> alreadySeenAnySetterAttributes =
+      new TreeSet<String>();
 
   public List<String> getLayers() {
     return layers;
@@ -50,6 +57,17 @@ public class LoggedLocation implements DeepCompare {
 
   void setLayers(List<String> layers) {
     this.layers = layers;
+  }
+
+  @SuppressWarnings("unused")
+  // for input parameter ignored.
+  @JsonAnySetter
+  public void setUnknownAttribute(String attributeName, Object ignored) {
+    if (!alreadySeenAnySetterAttributes.contains(attributeName)) {
+      alreadySeenAnySetterAttributes.add(attributeName);
+      System.err.println("In LoggedJob, we saw the unknown attribute "
+          + attributeName + ".");
+    }
   }
 
   // I'll treat this as an atomic object type

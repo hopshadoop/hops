@@ -33,8 +33,8 @@ import static org.junit.Assert.*;
 public class TestRumenJobTraces {
   @Test
   public void testSmallTrace() throws Exception {
-    performSingleTest("sample-job-tracker-logs",
-        "job-tracker-logs-topology-output", "job-tracker-logs-trace-output");
+    performSingleTest("sample-job-tracker-logs.gz",
+        "job-tracker-logs-topology-output", "job-tracker-logs-trace-output.gz");
   }
 
   @Test
@@ -96,9 +96,8 @@ public class TestRumenJobTraces {
   static private <T extends DeepCompare> void jsonFileMatchesGold(
       FileSystem lfs, Path result, Path gold, Class<? extends T> clazz,
       String fileDescription) throws IOException {
-    InputStream goldStream = lfs.open(gold);
     JsonObjectMapperParser<T> goldParser =
-        new JsonObjectMapperParser<T>(goldStream, clazz);
+        new JsonObjectMapperParser<T>(gold, clazz, new Configuration());
     InputStream resultStream = lfs.open(result);
     JsonObjectMapperParser<T> resultParser =
         new JsonObjectMapperParser<T>(resultStream, clazz);

@@ -23,8 +23,12 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.ArrayList;
 import java.util.Comparator;
+
+import org.codehaus.jackson.annotate.JsonAnySetter;
 
 /**
  * A {@link LoggedNetworkTopology} represents a tree that in turn represents a
@@ -39,8 +43,22 @@ public class LoggedNetworkTopology implements DeepCompare {
   String name;
   List<LoggedNetworkTopology> children = new ArrayList<LoggedNetworkTopology>();
 
+  static private Set<String> alreadySeenAnySetterAttributes =
+      new TreeSet<String>();
+
   public LoggedNetworkTopology() {
     super();
+  }
+
+  @SuppressWarnings("unused")
+  // for input parameter ignored.
+  @JsonAnySetter
+  public void setUnknownAttribute(String attributeName, Object ignored) {
+    if (!alreadySeenAnySetterAttributes.contains(attributeName)) {
+      alreadySeenAnySetterAttributes.add(attributeName);
+      System.err.println("In LoggedJob, we saw the unknown attribute "
+          + attributeName + ".");
+    }
   }
 
   /**
@@ -70,7 +88,8 @@ public class LoggedNetworkTopology implements DeepCompare {
     this.children = null;
 
     if (level < ParsedHost.numberOfDistances() - 1) {
-      HashMap<String, HashSet<ParsedHost>> topologies = new HashMap<String, HashSet<ParsedHost>>();
+      HashMap<String, HashSet<ParsedHost>> topologies =
+          new HashMap<String, HashSet<ParsedHost>>();
 
       Iterator<ParsedHost> iter = hosts.iterator();
 

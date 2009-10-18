@@ -22,6 +22,7 @@ package org.apache.hadoop.tools.rumen;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.TreeSet;
 
 import org.codehaus.jackson.annotate.JsonAnySetter;
@@ -44,7 +45,8 @@ public class LoggedJob implements DeepCompare {
     VERY_LOW, LOW, NORMAL, HIGH, VERY_HIGH
   };
 
-  static private TreeSet<String> alreadySeenAnySetterAttributes = new TreeSet<String>();
+  static private Set<String> alreadySeenAnySetterAttributes =
+      new TreeSet<String>();
 
   String jobID;
   String user;
@@ -59,7 +61,7 @@ public class LoggedJob implements DeepCompare {
   int heapMegabytes = -1;
   int totalMaps = -1;
   int totalReduces = -1;
-  Pre21JobHistoryConstants.Values outcome = Pre21JobHistoryConstants.Values.SUCCESS;
+  Pre21JobHistoryConstants.Values outcome = null;
   JobType jobtype = JobType.JAVA;
   JobPriority priority = JobPriority.NORMAL;
 
@@ -100,7 +102,8 @@ public class LoggedJob implements DeepCompare {
     setJobID(jobID);
   }
 
-  @SuppressWarnings("unused") // for input parameter ignored.
+  @SuppressWarnings("unused")
+  // for input parameter ignored.
   @JsonAnySetter
   public void setUnknownAttribute(String attributeName, Object ignored) {
     if (!alreadySeenAnySetterAttributes.contains(attributeName)) {
@@ -388,8 +391,9 @@ public class LoggedJob implements DeepCompare {
     }
   }
 
-  private void compare1(Pre21JobHistoryConstants.Values c1, Pre21JobHistoryConstants.Values c2,
-      TreePath loc, String eltname) throws DeepInequalityException {
+  private void compare1(Pre21JobHistoryConstants.Values c1,
+      Pre21JobHistoryConstants.Values c2, TreePath loc, String eltname)
+      throws DeepInequalityException {
     if (c1 != c2) {
       throw new DeepInequalityException(eltname + " miscompared", new TreePath(
           loc, eltname));

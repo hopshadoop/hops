@@ -19,6 +19,10 @@ package org.apache.hadoop.tools.rumen;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
+
+import org.codehaus.jackson.annotate.JsonAnySetter;
 
 /**
  * A {@link LoggedTask} represents a [hadoop] task that is part of a hadoop job.
@@ -41,10 +45,25 @@ public class LoggedTask implements DeepCompare {
   Pre21JobHistoryConstants.Values taskStatus;
   List<LoggedTaskAttempt> attempts = new ArrayList<LoggedTaskAttempt>();
 
-  ArrayList<LoggedLocation> preferredLocations = new ArrayList<LoggedLocation>();
+  ArrayList<LoggedLocation> preferredLocations =
+      new ArrayList<LoggedLocation>();
 
   int numberMaps = -1;
   int numberReduces = -1;
+
+  static private Set<String> alreadySeenAnySetterAttributes =
+      new TreeSet<String>();
+
+  @SuppressWarnings("unused")
+  // for input parameter ignored.
+  @JsonAnySetter
+  public void setUnknownAttribute(String attributeName, Object ignored) {
+    if (!alreadySeenAnySetterAttributes.contains(attributeName)) {
+      alreadySeenAnySetterAttributes.add(attributeName);
+      System.err.println("In LoggedJob, we saw the unknown attribute "
+          + attributeName + ".");
+    }
+  }
 
   LoggedTask() {
     super();
@@ -173,8 +192,9 @@ public class LoggedTask implements DeepCompare {
     }
   }
 
-  private void compare1(Pre21JobHistoryConstants.Values c1, Pre21JobHistoryConstants.Values c2,
-      TreePath loc, String eltname) throws DeepInequalityException {
+  private void compare1(Pre21JobHistoryConstants.Values c1,
+      Pre21JobHistoryConstants.Values c2, TreePath loc, String eltname)
+      throws DeepInequalityException {
     if (c1 == null && c2 == null) {
       return;
     }

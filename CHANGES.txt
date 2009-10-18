@@ -782,3 +782,6 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1061. Add unit test validating byte specifications for gridmix
     jobs. (cdouglas)
+
+    MAPREDUCE-1077. Fix Rumen so that truncated tasks do not mark the job as
+    successful. (Dick King via cdouglas)

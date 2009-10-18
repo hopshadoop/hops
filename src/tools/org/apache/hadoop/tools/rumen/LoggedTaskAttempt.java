@@ -18,6 +18,11 @@
 
 package org.apache.hadoop.tools.rumen;
 
+import java.util.Set;
+import java.util.TreeSet;
+
+import org.codehaus.jackson.annotate.JsonAnySetter;
+
 // HACK ALERT!!!  This "should" have have two subclasses, which might be called
 //                LoggedMapTaskAttempt and LoggedReduceTaskAttempt, but 
 //                the Jackson implementation of JSON doesn't handle a 
@@ -61,6 +66,20 @@ public class LoggedTaskAttempt implements DeepCompare {
 
   LoggedTaskAttempt() {
     super();
+  }
+
+  static private Set<String> alreadySeenAnySetterAttributes =
+      new TreeSet<String>();
+
+  @SuppressWarnings("unused")
+  // for input parameter ignored.
+  @JsonAnySetter
+  public void setUnknownAttribute(String attributeName, Object ignored) {
+    if (!alreadySeenAnySetterAttributes.contains(attributeName)) {
+      alreadySeenAnySetterAttributes.add(attributeName);
+      System.err.println("In LoggedJob, we saw the unknown attribute "
+          + attributeName + ".");
+    }
   }
 
   public long getShuffleFinished() {
@@ -259,8 +278,9 @@ public class LoggedTaskAttempt implements DeepCompare {
     }
   }
 
-  private void compare1(Pre21JobHistoryConstants.Values c1, Pre21JobHistoryConstants.Values c2,
-      TreePath loc, String eltname) throws DeepInequalityException {
+  private void compare1(Pre21JobHistoryConstants.Values c1,
+      Pre21JobHistoryConstants.Values c2, TreePath loc, String eltname)
+      throws DeepInequalityException {
     if (c1 != c2) {
       throw new DeepInequalityException(eltname + " miscompared", new TreePath(
           loc, eltname));
