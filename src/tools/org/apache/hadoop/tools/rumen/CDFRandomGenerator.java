@@ -39,16 +39,17 @@ public abstract class CDFRandomGenerator {
   final Random random;
 
   CDFRandomGenerator(LoggedDiscreteCDF cdf) {
-    random = new Random();
-    rankings = new double[(int) cdf.getNumberValues() + 2];
-    values = new long[(int) cdf.getNumberValues() + 2];
-    initializeTables(cdf);
+    this(cdf, new Random());
   }
 
   CDFRandomGenerator(LoggedDiscreteCDF cdf, long seed) {
-    random = new Random(seed);
-    rankings = new double[(int) cdf.getNumberValues() + 2];
-    values = new long[(int) cdf.getNumberValues() + 2];
+    this(cdf, new Random(seed));
+  }
+
+  private CDFRandomGenerator(LoggedDiscreteCDF cdf, Random random) {
+    this.random = random;
+    rankings = new double[cdf.getRankings().size() + 2];
+    values = new long[cdf.getRankings().size() + 2];
     initializeTables(cdf);
   }
 

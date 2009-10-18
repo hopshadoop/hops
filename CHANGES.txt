@@ -443,6 +443,9 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1063. Document gridmix benchmark. (cdouglas)
 
+    MAPREDUCE-931. Use built-in interpolation classes for making up task
+    runtimes in Rumen. (Dick King via cdouglas)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 
