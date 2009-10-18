@@ -14,6 +14,8 @@ Trunk (unreleased changes)
     MAPREDUCE-1048. Add occupied/reserved slot usage summary on jobtracker UI.
     (Amareshwari Sriramadasu via sharad)
 
+    MAPREDUCE-906. Update Sqoop documentation. (Aaron Kimball via cdouglas)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
