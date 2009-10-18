@@ -774,3 +774,5 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-769. Make findbugs and javac warnings to zero.
     (Amareshwari Sriramadasu via sharad)
 
+    MAPREDUCE-1104. Initialize RecoveryManager in JobTracker cstr called by
+    Mumak. (Hong Tang via cdouglas)

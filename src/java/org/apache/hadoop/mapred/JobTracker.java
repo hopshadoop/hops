@@ -166,7 +166,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   
   static final Clock DEFAULT_CLOCK = new Clock();
 
-  private JobHistory jobHistory = null;
+  private final JobHistory jobHistory;
 
   /**
    * A client tried to submit a job before the Job Tracker was ready.
@@ -1134,12 +1134,12 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   ////////////////////////////////////////////////////////////////
   int port;
   String localMachine;
-  private String trackerIdentifier;
+  private final String trackerIdentifier;
   long startTime;
   int totalSubmissions = 0;
   private int totalMapTaskCapacity;
   private int totalReduceTaskCapacity;
-  private HostsFileReader hostsReader;
+  private final HostsFileReader hostsReader;
   
   // JobTracker recovery variables
   private volatile boolean hasRecovered = false;
@@ -1229,9 +1229,9 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   Thread expireLaunchingTaskThread = new Thread(expireLaunchingTasks,
                                                 "expireLaunchingTasks");
 
-  CompletedJobStatusStore completedJobStatusStore = null;
+  final CompletedJobStatusStore completedJobStatusStore;
   Thread completedJobsStoreThread = null;
-  RecoveryManager recoveryManager;
+  final RecoveryManager recoveryManager;
 
   /**
    * It might seem like a bug to maintain a TreeSet of tasktracker objects,
@@ -1277,7 +1277,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   long memSizeForMapSlotOnJT;
   long memSizeForReduceSlotOnJT;
 
-  private QueueManager queueManager;
+  private final QueueManager queueManager;
 
   JobTracker(JobConf conf) 
   throws IOException,InterruptedException, LoginException {
@@ -4224,6 +4224,9 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
       tmp = new JobTrackerMetricsInst(this, conf);
     }
     myInstrumentation = tmp;
+    
+    // start the recovery manager
+    recoveryManager = new RecoveryManager();
     
     this.dnsToSwitchMapping = ReflectionUtils.newInstance(
         conf.getClass("topology.node.switch.mapping.impl", ScriptBasedMapping.class,
