@@ -112,13 +112,13 @@ class DebugJobFactory extends JobFactory {
 
     public MockJob(Configuration conf) {
       this(conf.getInt(MIN_BYTES_IN, 1 << 20),
-           conf.getInt(VAR_BYTES_IN, 10 << 20),
+           conf.getInt(VAR_BYTES_IN, 5 << 20),
            conf.getInt(MIN_BYTES_OUT, 1 << 20),
-           conf.getInt(VAR_BYTES_OUT, 10 << 20),
+           conf.getInt(VAR_BYTES_OUT, 5 << 20),
            conf.getInt(MIN_REC_SIZE , 100),
            conf.getInt(VAR_REC_SIZE , 1 << 15),
-           conf.getInt(MAX_MAPS, 6),
-           conf.getInt(MAX_REDS, 4));
+           conf.getInt(MAX_MAPS, 5),
+           conf.getInt(MAX_REDS, 3));
     }
 
     public MockJob(int min_bytes_in, int var_bytes_in,
@@ -126,7 +126,7 @@ class DebugJobFactory extends JobFactory {
                    int min_rec_size, int var_rec_size,
                    int max_maps, int max_reds) {
       final Random r = new Random();
-      name = String.format("MOCKJOB%04d", seq.getAndIncrement());
+      name = String.format("MOCKJOB%05d", seq.getAndIncrement());
       submitTime = timestamp.addAndGet(TimeUnit.MILLISECONDS.convert(
             r.nextInt(10), TimeUnit.SECONDS));
       int iMapBTotal = 0, oMapBTotal = 0, iRedBTotal = 0, oRedBTotal = 0;

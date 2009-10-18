@@ -530,6 +530,16 @@ class GridmixJob implements Callable<Job>, Delayed {
         }
       }
     }
+    @Override
+    protected void cleanup(Context context)
+        throws IOException, InterruptedException {
+      while (written < outBytes) {
+        final int len = (int) Math.min(outBytes - written, val.getCapacity());
+        fillBytes(val, len);
+        context.write(NullWritable.get(), val);
+        written += len;
+      }
+    }
   }
 
   static class GridmixRecordReader

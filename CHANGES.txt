@@ -776,3 +776,6 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1104. Initialize RecoveryManager in JobTracker cstr called by
     Mumak. (Hong Tang via cdouglas)
+
+    MAPREDUCE-1061. Add unit test validating byte specifications for gridmix
+    jobs. (cdouglas)

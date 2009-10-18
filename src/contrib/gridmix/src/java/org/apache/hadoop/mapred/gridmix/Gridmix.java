@@ -200,10 +200,7 @@ public class Gridmix extends Configured implements Tool {
         }
         // scan input dir contents
         submitter.refreshFilePool();
-      } catch (IOException e) {
-        LOG.error("Startup failed", e);
-        if (factory != null) factory.abort(); // abort pipeline
-      } catch (InterruptedException e) {
+      } catch (Throwable e) {
         LOG.error("Startup failed", e);
         if (factory != null) factory.abort(); // abort pipeline
       } finally {
@@ -214,8 +211,10 @@ public class Gridmix extends Configured implements Tool {
       if (factory != null) {
         // wait for input exhaustion
         factory.join();
-        if (null != factory.error()) {
-          throw factory.error();
+        final Throwable badTraceException = factory.error();
+        if (null != badTraceException) {
+          LOG.error("Error in trace", badTraceException);
+          throw new IOException("Error in trace", badTraceException);
         }
         // wait for pending tasks to be submitted
         submitter.shutdown();
