@@ -21,6 +21,9 @@ package org.apache.hadoop.mapreduce;
 import java.io.IOException;
 import java.util.Iterator;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 /**
  * The context passed to the {@link Reducer}.
  * @param <KEYIN> the class of the input keys
@@ -28,6 +31,8 @@ import java.util.Iterator;
  * @param <KEYOUT> the class of the output keys
  * @param <VALUEOUT> the class of the output values
  */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public interface ReduceContext<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
     extends TaskInputOutputContext<KEYIN,VALUEIN,KEYOUT,VALUEOUT> {
 

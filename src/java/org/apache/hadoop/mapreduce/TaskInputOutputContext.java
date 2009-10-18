@@ -20,6 +20,9 @@ package org.apache.hadoop.mapreduce;
 
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 /**
  * A context object that allows input and output from the task. It is only
  * supplied to the {@link Mapper} or {@link Reducer}.
@@ -28,6 +31,8 @@ import java.io.IOException;
  * @param <KEYOUT> the output key type for the task
  * @param <VALUEOUT> the output value type for the task
  */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public interface TaskInputOutputContext<KEYIN,VALUEIN,KEYOUT,VALUEOUT> 
        extends TaskAttemptContext {
 

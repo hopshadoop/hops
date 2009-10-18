@@ -21,6 +21,8 @@ package org.apache.hadoop.mapreduce;
 import java.io.IOException;
 import java.net.URI;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configuration.IntegerRanges;
 import org.apache.hadoop.fs.Path;
@@ -31,6 +33,8 @@ import org.apache.hadoop.mapreduce.Mapper;
  * A read-only view of the job that is provided to the tasks while they
  * are running.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public interface JobContext {
   // Put all of the attribute names in here so that Job and JobContext are
   // consistent.

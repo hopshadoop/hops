@@ -446,6 +446,9 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-931. Use built-in interpolation classes for making up task
     runtimes in Rumen. (Dick King via cdouglas)
 
+    MAPREDUCE-1012. Mark Context interfaces as public evolving. (Tom White via
+    cdouglas)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 
