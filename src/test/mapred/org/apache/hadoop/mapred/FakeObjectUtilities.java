@@ -223,7 +223,7 @@ public class FakeObjectUtilities {
   }
   
   static short sendHeartBeat(JobTracker jt, TaskTrackerStatus status, 
-                             boolean initialContact, boolean acceptNewTasks,
+                                             boolean initialContact, 
                                              String tracker, short responseId) 
     throws IOException {
     if (status == null) {
@@ -231,13 +231,13 @@ public class FakeObjectUtilities {
           JobInProgress.convertTrackerNameToHostName(tracker));
 
     }
-      jt.heartbeat(status, false, initialContact, acceptNewTasks, responseId);
+      jt.heartbeat(status, false, initialContact, false, responseId);
       return ++responseId ;
   }
   
   static void establishFirstContact(JobTracker jt, String tracker) 
     throws IOException {
-    sendHeartBeat(jt, null, true, false, tracker, (short) 0);
+    sendHeartBeat(jt, null, true, tracker, (short) 0);
   }
 
   static class FakeTaskInProgress extends TaskInProgress {

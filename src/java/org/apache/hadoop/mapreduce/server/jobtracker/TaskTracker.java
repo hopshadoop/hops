@@ -100,30 +100,6 @@ public class TaskTracker {
   }
   
   /**
-   * Get the reserved map slots for the tracker.
-   * 
-   * @return reserved map slots
-   */
-  public int getReservedMapSlots() {
-    if (jobForFallowMapSlot != null) {
-      return jobForFallowMapSlot.getReservedMapSlots(this);
-    }
-    return 0;
-  }
-	
-  /**
-   * Get the reserved reduce slots for the tracker.
-   * 
-   * @return reserved reduce slots
-   */
-  public int getReservedReduceSlots() {
-    if (jobForFallowReduceSlot != null) {
-      return jobForFallowReduceSlot.getReservedReduceSlots(this);
-    }
-    return 0;
-  }
-
-  /**
    * Get the {@link JobInProgress} for which the fallow slot(s) are held.
    * @param taskType {@link TaskType} of the task
    * @return the task for which the fallow slot(s) are held, 

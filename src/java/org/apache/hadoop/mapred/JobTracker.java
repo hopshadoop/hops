@@ -20,6 +20,7 @@ package org.apache.hadoop.mapred;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
@@ -1214,10 +1215,6 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   //
   int totalMaps = 0;
   int totalReduces = 0;
-  private int occupiedMapSlots = 0;
-  private int occupiedReduceSlots = 0;
-  private int reservedMapSlots = 0;
-  private int reservedReduceSlots = 0;
   private HashMap<String, TaskTracker> taskTrackers =
     new HashMap<String, TaskTracker>();
   Map<String,Integer>uniqueHostsMap = new ConcurrentHashMap<String, Integer>();
@@ -2317,7 +2314,6 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     HeartbeatResponse response = new HeartbeatResponse(newResponseId, null);
     List<TaskTrackerAction> actions = new ArrayList<TaskTrackerAction>();
     isBlacklisted = faultyTrackers.isBlacklisted(status.getHost());
-    removeTrackerReservations(getTaskTracker(trackerName));
     // Check for new tasks to be executed on the tasktracker
     if (acceptNewTasks && !isBlacklisted) {
       TaskTrackerStatus taskTrackerStatus = getTaskTrackerStatus(trackerName) ;
@@ -2337,7 +2333,6 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
         }
       }
     }
-    addTrackerReservations(getTaskTracker(trackerName));
       
     // Check for tasks to be killed
     List<TaskTrackerAction> killTasksList = getTasksToKill(trackerName);
@@ -2428,8 +2423,6 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     if (oldStatus != null) {
       totalMaps -= oldStatus.countMapTasks();
       totalReduces -= oldStatus.countReduceTasks();
-      occupiedMapSlots  -= oldStatus.countOccupiedMapSlots();
-      occupiedReduceSlots -= oldStatus.countOccupiedReduceSlots();
       if (!faultyTrackers.isBlacklisted(oldStatus.getHost())) {
         int mapSlots = oldStatus.getMaxMapSlots();
         totalMapTaskCapacity -= mapSlots;
@@ -2452,8 +2445,6 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     if (status != null) {
       totalMaps += status.countMapTasks();
       totalReduces += status.countReduceTasks();
-      occupiedMapSlots  += status.countOccupiedMapSlots();
-      occupiedReduceSlots += status.countOccupiedReduceSlots();
       if (!faultyTrackers.isBlacklisted(status.getHost())) {
         int mapSlots = status.getMaxMapSlots();
         totalMapTaskCapacity += mapSlots;
@@ -2522,18 +2513,6 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   }
   
   
-  // remove the tracker reservations from statistics
-  private void removeTrackerReservations(TaskTracker tt) {
-    reservedMapSlots -= tt.getReservedMapSlots();
-    reservedReduceSlots -= tt.getReservedReduceSlots();
-  }
-
-  // add the tracker reservations to statistics
-  private void addTrackerReservations(TaskTracker tt) {
-    reservedMapSlots += tt.getReservedMapSlots();
-    reservedReduceSlots += tt.getReservedReduceSlots();
-  }
-
   private void updateNodeHealthStatus(TaskTrackerStatus trackerStatus) {
     TaskTrackerHealthStatus status = trackerStatus.getHealthStatus();
     synchronized (faultyTrackers) {
@@ -2580,10 +2559,9 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
         }
       }
     }
-    removeTrackerReservations(getTaskTracker(trackerName));
+
     updateTaskStatuses(trackerStatus);
     updateNodeHealthStatus(trackerStatus);
-    addTrackerReservations(getTaskTracker(trackerName));
     
     return true;
   }
@@ -2972,9 +2950,8 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   }
   
   public synchronized ClusterMetrics getClusterMetrics() {
-    return new ClusterMetrics(occupiedMapSlots, occupiedReduceSlots,
-      reservedMapSlots, reservedReduceSlots,
-      totalMapTaskCapacity, totalReduceTaskCapacity, taskTrackers.size() - 
+    return new ClusterMetrics(totalMaps, totalReduces, totalMapTaskCapacity,
+      totalReduceTaskCapacity, taskTrackers.size() - 
       getBlacklistedTrackerCount(), 
       getBlacklistedTrackerCount(), getExcludedNodes().size()) ;
   }
@@ -3747,7 +3724,6 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
 
       // Cleanup
       taskTracker.cancelAllReservations();
-      removeTrackerReservations(taskTracker);
 
       // Purge 'marked' tasks, needs to be done  
       // here to prevent hanging references!

@@ -10,9 +10,6 @@ Trunk (unreleased changes)
 
     MAPREDUCE-999. Improve Sqoop test speed and refactor tests.
     (Aaron Kimball via tomwhite)
-  
-    MAPREDUCE-1048. Add occupied/reserved slot usage summary on jobtracker UI.
-    (Amareshwari Sriramadasu via sharad)
 
     MAPREDUCE-906. Update Sqoop documentation. (Aaron Kimball via cdouglas)
 

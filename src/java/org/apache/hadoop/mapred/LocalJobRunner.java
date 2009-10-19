@@ -506,7 +506,7 @@ public class LocalJobRunner implements ClientProtocol {
   }
   
   public ClusterMetrics getClusterMetrics() {
-    return new ClusterMetrics(map_tasks, reduce_tasks, 0, 0, 1, 1, 1, 0, 0);
+    return new ClusterMetrics(map_tasks, reduce_tasks, 1, 1, 1, 0, 0);
   }
 
   public State getJobTrackerState() throws IOException, InterruptedException {
