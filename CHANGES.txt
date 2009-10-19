@@ -24,6 +24,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-1014. Fix the libraries for common and hdfs. (omalley)
 
+    MAPREDUCE-1111. JT Jetty UI not working if we run mumak.sh 
+    off packaged distribution directory. (hong tang via mahadev)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

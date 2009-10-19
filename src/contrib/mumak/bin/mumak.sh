@@ -112,12 +112,13 @@ if [ $IN_RELEASE = 0 ]; then
     CLASSPATH=${CLASSPATH}:$f;
   done
 else
-  CLASSPATH=${CLASSPATH}:$MUMAK_HOME/hadoop-${HADOOP_VERSION}-${project}.jar
-  CLASSPATH=${CLASSPATH}:$HADOOP_HOME/hadoop-mapred-${HADOOP_VERSION}.jar
-  CLASSPATH=${CLASSPATH}:$HADOOP_HOME/hadoop-mapred-tools-${HADOOP_VERSION}.jar
+  CLASSPATH=${CLASSPATH}:$HADOOP_HOME;
   for f in $HADOOP_HOME/lib/*.jar; do
     CLASSPATH=${CLASSPATH}:$f;
   done
+  CLASSPATH=${CLASSPATH}:$MUMAK_HOME/hadoop-${HADOOP_VERSION}-${project}.jar
+  CLASSPATH=${CLASSPATH}:$HADOOP_HOME/hadoop-mapred-${HADOOP_VERSION}.jar
+  CLASSPATH=${CLASSPATH}:$HADOOP_HOME/hadoop-mapred-tools-${HADOOP_VERSION}.jar
 fi
 
 # check envvars which might override default args
