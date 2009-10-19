@@ -791,3 +791,6 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1041. Make TaskInProgress::taskStatuses map package-private.
     (Jothi Padmanabhan via cdouglas)
+
+    MAPREDUCE-1070. Prevent a deadlock in the fair scheduler servlet.
+    (Todd Lipcon via cdouglas)
