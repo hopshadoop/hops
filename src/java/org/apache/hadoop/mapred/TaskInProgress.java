@@ -113,7 +113,7 @@ class TaskInProgress {
   /**
    * Map from taskId -> TaskStatus
    */
-  protected TreeMap<TaskAttemptID,TaskStatus> taskStatuses = 
+  TreeMap<TaskAttemptID,TaskStatus> taskStatuses = 
     new TreeMap<TaskAttemptID,TaskStatus>();
 
   // Map from taskId -> TaskTracker Id, 

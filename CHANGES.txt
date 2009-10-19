@@ -788,3 +788,6 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1077. Fix Rumen so that truncated tasks do not mark the job as
     successful. (Dick King via cdouglas)
+
+    MAPREDUCE-1041. Make TaskInProgress::taskStatuses map package-private.
+    (Jothi Padmanabhan via cdouglas)
