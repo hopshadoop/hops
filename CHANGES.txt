@@ -794,3 +794,7 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1070. Prevent a deadlock in the fair scheduler servlet.
     (Todd Lipcon via cdouglas)
+
+    MAPREDUCE-1086. Setup Hadoop logging environment for tasks to point to
+    task related parameters. (Ravi Gummadi via yhemanth)
+

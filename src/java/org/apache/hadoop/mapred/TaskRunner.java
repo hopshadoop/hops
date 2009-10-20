@@ -210,7 +210,8 @@ abstract class TaskRunner extends Thread {
           stderr);
 
       Map<String, String> env = new HashMap<String, String>();
-      errorInfo = getVMEnvironment(errorInfo, workDir, conf, env);
+      errorInfo = getVMEnvironment(errorInfo, workDir, conf, env,
+                                   taskid, logSize);
 
       jvmManager.launchJvm(this, 
           jvmManager.constructJvmEnv(setup,vargs,stdout,stderr,logSize, 
@@ -484,6 +485,7 @@ abstract class TaskRunner extends Thread {
   }
 
   /**
+   * sets the environment variables needed for task jvm and its children.
    * @param errorInfo
    * @param workDir
    * @param env
@@ -491,7 +493,7 @@ abstract class TaskRunner extends Thread {
    * @throws Throwable
    */
   private String getVMEnvironment(String errorInfo, File workDir, JobConf conf,
-      Map<String, String> env)
+      Map<String, String> env, TaskAttemptID taskid, long logSize)
       throws Throwable {
     StringBuffer ldLibraryPath = new StringBuffer();
     ldLibraryPath.append(workDir.toString());
@@ -503,6 +505,18 @@ abstract class TaskRunner extends Thread {
     }
     env.put("LD_LIBRARY_PATH", ldLibraryPath.toString());
     
+    // for the child of task jvm, set hadoop.root.logger
+    env.put("HADOOP_ROOT_LOGGER", "INFO,TLA");
+    String hadoopClientOpts = System.getenv("HADOOP_CLIENT_OPTS");
+    if (hadoopClientOpts == null) {
+      hadoopClientOpts = "";
+    } else {
+      hadoopClientOpts = hadoopClientOpts + " ";
+    }
+    hadoopClientOpts = hadoopClientOpts + "-Dhadoop.tasklog.taskid=" + taskid
+                       + " -Dhadoop.tasklog.totalLogFileSize=" + logSize;
+    env.put("HADOOP_CLIENT_OPTS", "\"" + hadoopClientOpts + "\"");
+
     // add the env variables passed by the user
     String mapredChildEnv = getChildEnv(conf);
     if (mapredChildEnv != null && mapredChildEnv.length() > 0) {
