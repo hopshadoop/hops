@@ -106,17 +106,6 @@ class CapacitySchedulerConf {
    * cannot use the capacity of its parent queue.
    */
   static final String MAX_CAPACITY_PROPERTY ="maximum-capacity";
-  /**
-   *  Configuration that provides the maximum cap for the map task in a queue
-   *  at any given point of time.
-   */
-  static final String MAX_MAP_CAP_PROPERTY = "max.map.slots";
-
-  /**
-   *  Configuration that provides the maximum cap for the reduce task in a queue
-   *  at any given point of time.
-   */
-  static final String MAX_REDUCE_CAP_PROPERTY = "max.reduce.slots";
 
   /**
    * The constant which defines the default initialization thread
@@ -223,7 +212,8 @@ class CapacitySchedulerConf {
   }
 
   /**
-   * Get maximum percentage stretch for a queue.
+   * Return the maximum percentage of the cluster capacity that can be
+   * used by the given queue
    * This percentage defines a limit beyond which a
    * sub-queue cannot use the capacity of its parent queue.
    * This provides a means to limit how much excess capacity a
@@ -232,8 +222,8 @@ class CapacitySchedulerConf {
    * The maximum-capacity-stretch of a queue can only be
    * greater than or equal to its minimum capacity.
    * 
-   * @param queue
-   * @return
+   * @param queue name of the queue
+   * @return maximum capacity percent of cluster for the queue
    */
   public float getMaxCapacity(String queue) {
     String raw = getProperty(queue, MAX_CAPACITY_PROPERTY);
@@ -366,28 +356,6 @@ class CapacitySchedulerConf {
     }
     return maxWorkerThreads;
   }
-
-  /**
-   * get the max map slots cap
-   * @param queue
-   * @return
-   */
-  public int getMaxMapCap(String queue) {
-    String raw = getProperty(queue, MAX_MAP_CAP_PROPERTY);
-    return getInt(raw,-1);
-  }
-
-
-  /**
-   * get the max reduce slots cap
-   * @param queue
-   * @return
-   */
-  public int getMaxReduceCap(String queue) {
-    String raw = getProperty(queue, MAX_REDUCE_CAP_PROPERTY);
-    return getInt(raw,-1);
-  }
-
 
   public Configuration getCSConf() {
     return rmConf;

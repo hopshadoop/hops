@@ -229,7 +229,7 @@ public class CapacityTestUtils {
       taskTrackerManager.getTaskTracker(
         taskTrackerName));
 
-    if (tasks==null) {
+    if (tasks==null || tasks.isEmpty()) {
       if (expectedTaskStrings.size() > 0) {
         fail("Expected some tasks to be assigned, but got none.");  
       } else {
@@ -955,6 +955,8 @@ public class CapacityTestUtils {
         Properties p = new Properties();
         p.setProperty(CapacitySchedulerConf.CAPACITY_PROPERTY,
             String.valueOf(q.capacity));
+        p.setProperty(CapacitySchedulerConf.MAX_CAPACITY_PROPERTY,
+            String.valueOf(q.maxCapacity));
         p.setProperty(CapacitySchedulerConf.SUPPORTS_PRIORITY_PROPERTY,
             String.valueOf(q.supportsPrio));
         p.setProperty(
@@ -986,6 +988,7 @@ public class CapacityTestUtils {
   static class FakeQueueInfo {
     String queueName;
     float capacity;
+    float maxCapacity = -1.0f;
     boolean supportsPrio;
     int ulMin;
 

@@ -100,17 +100,14 @@ public class QueueSchedulingContext {
 
   QueueSchedulingContext(
     String queueName, float capacityPercent, float maxCapacityPercent,
-    int ulMin,
-    int mapCap, int reduceCap) {
-      this.setQueueName(new String(queueName));
-      this.setCapacityPercent(capacityPercent);
-      this.setMaxCapacityPercent(maxCapacityPercent);
-      this.setUlMin(ulMin);
-      this.setMapTSC(new TaskSchedulingContext(TaskType.MAP));
-      this.setReduceTSC(new TaskSchedulingContext(TaskType.REDUCE));
-      this.getMapTSC().setMaxTaskLimit(mapCap);
-      this.getReduceTSC().setMaxTaskLimit(reduceCap);
-    }
+    int ulMin) {
+    this.setQueueName(new String(queueName));
+    this.setCapacityPercent(capacityPercent);
+    this.setMaxCapacityPercent(maxCapacityPercent);
+    this.setUlMin(ulMin);
+    this.setMapTSC(new TaskSchedulingContext(TaskType.MAP));
+    this.setReduceTSC(new TaskSchedulingContext(TaskType.REDUCE));
+  }
 
   /**
      * return information about the queue

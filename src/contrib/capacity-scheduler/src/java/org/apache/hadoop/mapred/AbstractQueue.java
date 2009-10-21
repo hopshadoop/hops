@@ -241,15 +241,8 @@ abstract class AbstractQueue {
     sourceContext.setNumJobsByUser(qsc.getNumJobsByUser());
     sourceContext.setNumOfWaitingJobs(qsc.getNumOfWaitingJobs());
 
-    // Task limits are already read from the configuration. Cache them and set
-    // them in the old hierarchy along with the map/reduce TSCs.
-    int maxMapTaskLimit = sourceContext.getMapTSC().getMaxTaskLimit();
-    int maxReduceTaskLimit = sourceContext.getReduceTSC().getMaxTaskLimit();
     sourceContext.setMapTSC(qsc.getMapTSC());
     sourceContext.setReduceTSC(qsc.getReduceTSC());
-    sourceContext.getMapTSC().setMaxTaskLimit(maxMapTaskLimit);
-    sourceContext.getReduceTSC().setMaxTaskLimit(maxReduceTaskLimit);
-
     setQueueSchedulingContext(sourceContext);
 
     if (LOG.isDebugEnabled()) {

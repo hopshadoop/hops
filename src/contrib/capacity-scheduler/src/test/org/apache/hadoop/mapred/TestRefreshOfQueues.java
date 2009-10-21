@@ -104,10 +104,6 @@ public class TestRefreshOfQueues {
       props[i] = queues[i].getProperties();
       props[i].setProperty(CapacitySchedulerConf.CAPACITY_PROPERTY,
           String.valueOf(i + 10));
-      props[i].setProperty(CapacitySchedulerConf.MAX_MAP_CAP_PROPERTY,
-          String.valueOf(i + 20));
-      props[i].setProperty(CapacitySchedulerConf.MAX_REDUCE_CAP_PROPERTY,
-          String.valueOf(i + 25));
       props[i].setProperty(CapacitySchedulerConf.MAX_CAPACITY_PROPERTY,
           String.valueOf(i + 15));
       props[i].setProperty(CapacitySchedulerConf.SUPPORTS_PRIORITY_PROPERTY,
@@ -136,8 +132,6 @@ public class TestRefreshOfQueues {
           allQueues.get(qName).getQueueSchedulingContext();
       LOG.info("Context for queue " + qName + " is : " + qsc);
       assertEquals(i + 10, qsc.getCapacityPercent(), 0);
-      assertEquals(i + 20, qsc.getMapTSC().getMaxTaskLimit());
-      assertEquals(i + 25, qsc.getReduceTSC().getMaxTaskLimit());
       assertEquals(i + 15, qsc.getMaxCapacityPercent(), 0);
       assertEquals(Boolean.valueOf(false),
           Boolean.valueOf(qsc.supportsPriorities()));
@@ -149,10 +143,6 @@ public class TestRefreshOfQueues {
       props[i] = queues[i].getProperties();
       props[i].setProperty(CapacitySchedulerConf.CAPACITY_PROPERTY,
           String.valueOf(i + 20));
-      props[i].setProperty(CapacitySchedulerConf.MAX_MAP_CAP_PROPERTY,
-          String.valueOf(i + 30));
-      props[i].setProperty(CapacitySchedulerConf.MAX_REDUCE_CAP_PROPERTY,
-          String.valueOf(i + 35));
       props[i].setProperty(CapacitySchedulerConf.MAX_CAPACITY_PROPERTY,
           String.valueOf(i + 25));
       props[i].setProperty(CapacitySchedulerConf.SUPPORTS_PRIORITY_PROPERTY,
@@ -183,8 +173,6 @@ public class TestRefreshOfQueues {
       assertEquals(qName, qsc.getQueueName());
       LOG.info("Context for queue " + qName + " is : " + qsc);
       assertEquals(i + 20, qsc.getCapacityPercent(), 0);
-      assertEquals(i + 30, qsc.getMapTSC().getMaxTaskLimit());
-      assertEquals(i + 35, qsc.getReduceTSC().getMaxTaskLimit());
       assertEquals(i + 25, qsc.getMaxCapacityPercent(), 0);
       assertEquals(Boolean.valueOf(false),
           Boolean.valueOf(qsc.supportsPriorities()));

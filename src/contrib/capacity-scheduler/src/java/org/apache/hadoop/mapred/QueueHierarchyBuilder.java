@@ -161,9 +161,8 @@ class QueueHierarchyBuilder {
     int ulMin = schedConf.getMinimumUserLimitPercent(queueName);
     // create our QSC and add to our hashmap
     QueueSchedulingContext qsi = new QueueSchedulingContext(
-      queueName, capacity, stretchCapacity, ulMin,
-      schedConf.getMaxMapCap(
-        queueName), schedConf.getMaxReduceCap(queueName));
+      queueName, capacity, stretchCapacity, ulMin
+    );
     qsi.setSupportsPriorities(
       schedConf.isPrioritySupported(
         queueName));
@@ -179,7 +178,7 @@ class QueueHierarchyBuilder {
    */
   static AbstractQueue createRootAbstractQueue() {
     QueueSchedulingContext rootContext =
-        new QueueSchedulingContext("", 100, -1, -1, -1, -1);
+        new QueueSchedulingContext("", 100, -1, -1);
     AbstractQueue root = new ContainerQueue(null, rootContext);
     return root;
   }

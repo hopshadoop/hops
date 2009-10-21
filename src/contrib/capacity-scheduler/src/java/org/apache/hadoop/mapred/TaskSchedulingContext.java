@@ -42,9 +42,6 @@ import java.util.Set;
 public class TaskSchedulingContext {
 
   private TaskType type;
-  private static final String LIMIT_NORMALIZED_CAPACITY_STRING
-    = "(Capacity is restricted to max limit of %d slots.\n" +
-    "Remaining %d slots will be used by other queues.)\n";
   /**
    * the actual capacity, which depends on how many slots are available
    * in the cluster at any given time.
@@ -58,15 +55,6 @@ public class TaskSchedulingContext {
   //the actual capacity stretch which depends on how many slots are available
   //in cluster at any given time.
   private int maxCapacity = -1;
-
-  /**
-   * max task limit
-   * This value is the maximum slots that can be used in a
-   * queue at any point of time. So for example assuming above config value
-   * is 100 , not more than 100 tasks would be in the queue at any point of
-   * time, assuming each task takes one slot.
-   */
-  private int maxTaskLimit = -1;
 
   /**
    * for each user, we need to keep track of number of slots occupied by
@@ -95,24 +83,11 @@ public class TaskSchedulingContext {
   }
 
 
-  int getMaxTaskLimit() {
-    return maxTaskLimit;
-  }
-
-  void setMaxTaskLimit(int maxTaskCap) {
-    this.maxTaskLimit = maxTaskCap;
-  }
-
   /**
-   * This method checks for maxfinalLimit and
-   * sends minimum of maxTaskLimit and capacity.
-   *
+   * returns the capacity of queue as no of slots.
    * @return
    */
   int getCapacity() {
-    if ((maxTaskLimit >= 0) && (maxTaskLimit < capacity)) {
-      return maxTaskLimit;
-    }
     return capacity;
   }
 
@@ -137,15 +112,8 @@ public class TaskSchedulingContext {
     StringBuffer sb = new StringBuffer();
 
     sb.append("Capacity: " + getCapacity() + " slots\n");
-    //If maxTaskLimit is less than the capacity
-    if (getMaxTaskLimit() >= 0 && getMaxTaskLimit() < getCapacity()) {
-      sb.append(
-        String.format(
-          LIMIT_NORMALIZED_CAPACITY_STRING,
-          getMaxTaskLimit(), (getCapacity() - getMaxTaskLimit())));
-    }
-    if (getMaxTaskLimit() >= 0) {
-      sb.append(String.format("Maximum Slots Limit: %d\n", getMaxTaskLimit()));
+    if(getMaxCapacity() >= 0) {
+      sb.append("Maximum capacity: " + getMaxCapacity() +" slots\n");
     }
     sb.append(
       String.format(

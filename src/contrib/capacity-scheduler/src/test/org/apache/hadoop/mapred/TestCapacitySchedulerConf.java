@@ -149,9 +149,6 @@ public class TestCapacitySchedulerConf extends TestCase {
     prp.setProperty("maximum-capacity","20.5");
     prp.setProperty("supports-priority","false");
     prp.setProperty("minimum-user-limit-percent","23");
-    prp.setProperty(CapacitySchedulerConf.MAX_MAP_CAP_PROPERTY,"43");
-    prp.setProperty(CapacitySchedulerConf.MAX_REDUCE_CAP_PROPERTY,"43");
-
 
     CapacitySchedulerConf conf = new CapacitySchedulerConf();
     conf.setProperties("default",prp);
@@ -160,10 +157,6 @@ public class TestCapacitySchedulerConf extends TestCase {
     assertTrue(conf.getMaxCapacity("default") == 20.5f);
     assertTrue(conf.isPrioritySupported("default") == false);
     assertTrue(conf.getMinimumUserLimitPercent("default")==23);
-    assertTrue(conf.getMaxMapCap("default") == 43);
-    assertTrue(conf.getMaxReduceCap("default") == 43);
-
-
 
     //check for inproper stuff
     prp.setProperty("capacity","h");

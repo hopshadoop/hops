@@ -172,6 +172,15 @@ class ContainerQueue extends AbstractQueue {
       //We dont have to check for 100 - totalCapacity being -ve , as
       //we already do it while loading.
       for (AbstractQueue q : unConfiguredQueues) {
+        if(q.qsc.getMaxCapacityPercent() > 0) {
+          if (q.qsc.getMaxCapacityPercent() < capacityShare) {
+            throw new IllegalStateException(
+              " Capacity share (" + capacityShare + ")for unconfigured queue " +
+                q.getName() +
+                " is greater than its maximum-capacity percentage " +
+                q.qsc.getMaxCapacityPercent());
+          }
+        }
         q.qsc.setCapacityPercent(capacityShare);
         LOG.info("Capacity share for un configured queue " + q.getName() + "" +
           " is " + capacityShare);

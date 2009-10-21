@@ -802,3 +802,7 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-1086. Setup Hadoop logging environment for tasks to point to
     task related parameters. (Ravi Gummadi via yhemanth)
 
+    MAPREDUCE-1105. Remove max limit configuration in capacity scheduler in
+    favor of max capacity percentage thus allowing the limit to go over
+    queue capacity. (Rahul Kumar Singh via yhemanth)
+

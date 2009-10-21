@@ -71,22 +71,22 @@ public class TestContainerQueue extends TestCase {
     // its children.
     //level 1 children
     QueueSchedulingContext a1 = new QueueSchedulingContext(
-      "a", 25, -1, -1, -1, -1);
+      "a", 25, -1, -1);
     QueueSchedulingContext a2 = new QueueSchedulingContext(
-      "b", 25, -1, -1, -1, -1);
+      "b", 25, -1, -1);
 
     AbstractQueue q = new ContainerQueue(rt, a1);
     AbstractQueue ql = new ContainerQueue(rt, a2);
 
     //level 2 children
     QueueSchedulingContext a = new QueueSchedulingContext(
-      "aa", 50, -1, -1, -1, -1);
+      "aa", 50, -1, -1);
     QueueSchedulingContext b = new QueueSchedulingContext(
-      "ab", 50, -1, -1, -1, -1);
+      "ab", 50, -1, -1);
     QueueSchedulingContext c = new QueueSchedulingContext(
-      "ac", 50, -1, -1, -1, -1);
+      "ac", 50, -1, -1);
     QueueSchedulingContext d = new QueueSchedulingContext(
-      "ad", 50, -1, -1, -1, -1);
+      "ad", 50, -1, -1);
 
     AbstractQueue q1 = new JobQueue(q, a);
     AbstractQueue q2 = new JobQueue(q, b);
@@ -126,11 +126,11 @@ public class TestContainerQueue extends TestCase {
     AbstractQueue rt = QueueHierarchyBuilder.createRootAbstractQueue();
 
     QueueSchedulingContext a1 = new QueueSchedulingContext(
-      "R.a", 25, 50, -1, -1, -1);
+      "R.a", 25, 50, -1);
     QueueSchedulingContext a2 = new QueueSchedulingContext(
-      "R.b", 25, 30, -1, -1, -1);
+      "R.b", 25, 30, -1);
     QueueSchedulingContext a3 = new QueueSchedulingContext(
-      "R.c", 50, -1, -1, -1, -1);
+      "R.c", 50, -1, -1);
 
 
     //Test for max capacity
@@ -162,8 +162,6 @@ public class TestContainerQueue extends TestCase {
       taskTrackerManager, scheduler, "tt1",
       expectedStrings);
 
-    //Now the queue has already reached its max limit no further tasks should
-    // be given.
     expectedStrings.clear();
     expectedStrings.put(
       CapacityTestUtils.MAP,
@@ -187,20 +185,20 @@ public class TestContainerQueue extends TestCase {
 
     //generate Queuecontext for the children
     QueueSchedulingContext a1 = new QueueSchedulingContext(
-      "a", 50, -1, -1, -1, -1);
+      "a", 50, -1, -1);
     QueueSchedulingContext a2 = new QueueSchedulingContext(
-      "b", -1, -1, -1, -1, -1);
+      "b", -1, -1, -1);
 
     AbstractQueue rtChild1 = new ContainerQueue(rt, a1);
     AbstractQueue rtChild2 = new ContainerQueue(rt, a2);
 
     //Add further children to rtChild1.    
     QueueSchedulingContext b = new QueueSchedulingContext(
-      "ab", 30, -1, -1, -1, -1);
+      "ab", 30, -1, -1);
     QueueSchedulingContext c = new QueueSchedulingContext(
-      "ac", -1, -1, -1, -1, -1);
+      "ac", -1, -1, -1);
     QueueSchedulingContext d = new QueueSchedulingContext(
-      "ad", 100, -1, -1, -1, -1);
+      "ad", 100, -1, -1);
 
     AbstractQueue q0 = new JobQueue(rtChild1, b);
     AbstractQueue q1 = new JobQueue(rtChild1, c);
@@ -239,9 +237,9 @@ public class TestContainerQueue extends TestCase {
 
     //Firt level
     QueueSchedulingContext sch =
-      new QueueSchedulingContext("rt.sch", a, -1, -1, -1, -1);
+      new QueueSchedulingContext("rt.sch", a, -1, -1);
     QueueSchedulingContext gta =
-      new QueueSchedulingContext("rt.gta", b, -1, -1, -1, -1);
+      new QueueSchedulingContext("rt.gta", b, -1, -1);
 
     AbstractQueue schq = new ContainerQueue(rt, sch);
 
@@ -253,9 +251,9 @@ public class TestContainerQueue extends TestCase {
 
     //Create further children.
     QueueSchedulingContext prod =
-      new QueueSchedulingContext("rt.sch.prod", c, -1, -1, -1, -1);
+      new QueueSchedulingContext("rt.sch.prod", c, -1, -1);
     QueueSchedulingContext misc =
-      new QueueSchedulingContext("rt.sch.misc", d, -1, -1, -1, -1);
+      new QueueSchedulingContext("rt.sch.misc", d, -1, -1);
 
     AbstractQueue prodq = new JobQueue(schq, prod);
     AbstractQueue miscq = new JobQueue(schq, misc);
@@ -594,26 +592,6 @@ public class TestContainerQueue extends TestCase {
       TaskSchedulingContext mapTSC = 
         queueMap.get(queueNames[i]).getQueueSchedulingContext().getMapTSC();
       assertEquals(mapTSC.getNumSlotsOccupied(), expectedUsedSlots[i]);
-    }
-  }
-
-  private void printOrderedQueueData(AbstractQueue rt) {
-    //print data at all levels.
-    List<AbstractQueue> aq = rt.getChildren();
-    System.out.println();
-    for (AbstractQueue a : aq) {
-      System.out.println(
-        "    // " + a.getName() + "->  data " +
-          a.getQueueSchedulingContext().getMapTSC().getCapacity() + " " +
-          " " +
-          a.getQueueSchedulingContext().getMapTSC().getNumSlotsOccupied());
-      double f = ((double) a.getQueueSchedulingContext().getMapTSC()
-        .getNumSlotsOccupied() /
-        (double) a.getQueueSchedulingContext().getMapTSC().getCapacity());
-      System.out.println("    // rating -> " + f);
-      if (a.getChildren() != null) {
-        printOrderedQueueData(a);
-      }
     }
   }
 }

@@ -20,7 +20,6 @@ package org.apache.hadoop.mapred;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -288,6 +287,12 @@ class CapacityTaskScheduler extends TaskScheduler {
         // only look at jobs that can be run. We ignore jobs that haven't
         // initialized, or have completed but haven't been removed from the
         // running queue.
+
+        //Check queue for maximum capacity .
+        if(areTasksInQueueOverMaxCapacity(qsi,j.getNumSlotsPerTask(type))) {
+          continue;
+        }
+        
         if (j.getStatus().getRunState() != JobStatus.RUNNING) {
           continue;
         }
@@ -357,6 +362,13 @@ class CapacityTaskScheduler extends TaskScheduler {
         if (j.getStatus().getRunState() != JobStatus.RUNNING) {
           continue;
         }
+
+        //Check for the maximum-capacity.
+        if(areTasksInQueueOverMaxCapacity(qsi,j.getNumSlotsPerTask(type))) {
+          continue;
+        }
+
+
         if (scheduler.memoryMatcher.matchesMemoryRequirements(j, type,
             taskTrackerStatus)) {
           // We found a suitable job. Get task from it.
@@ -442,9 +454,12 @@ class CapacityTaskScheduler extends TaskScheduler {
           continue;
         }
 
-        if(this.areTasksInQueueOverLimit(qsc)) {
+        //This call is important for optimization purposes , if we
+        //have reached the limit already no need for traversing the queue.
+        if(this.areTasksInQueueOverMaxCapacity(qsc,1)) {
           continue;
         }
+        
         TaskLookupResult tlr = getTaskFromQueue(taskTracker, qsc);
         TaskLookupResult.LookUpStatus lookUpStatus = tlr.getLookUpStatus();
 
@@ -469,37 +484,30 @@ class CapacityTaskScheduler extends TaskScheduler {
 
 
     /**
-     * Check if the max task limit is set for this queue
-     * if set , ignore this qsc if current num of occupied
-     * slots  of a TYPE in the queue is >= getMaxTaskCap() or
-     * if they have reached there Max Capacity.
+     * Check if maximum-capacity is set  for this queue.
+     * If set and greater than 0 ,
+     * check if numofslotsoccupied+numSlotsPerTask is greater than
+     * maximum-Capacity ,if yes , implies this queue is over limit.
+     *
+     * Incase noOfSlotsOccupied is less than maximum-capacity ,but ,
+     * numOfSlotsOccupied+noSlotsPerTask is more than maximum-capacity we still
+     * dont assign the task . This may lead to under utilization of very small
+     * set of slots. But this is ok ,as we strictly respect the maximum-capacity
      * @param qsc
-     * @return
+     * @param noOfSlotsPerTask
+     * @return true if queue is over maximum-capacity
      */
-
-    private boolean areTasksInQueueOverLimit(
-      QueueSchedulingContext qsc) {
+    private boolean areTasksInQueueOverMaxCapacity(
+      QueueSchedulingContext qsc,int noOfSlotsPerTask) {
       TaskSchedulingContext tsi = getTSC(qsc);
-      //check for maxTaskLimit
-
-      if (tsi.getMaxTaskLimit() >= 0) {
-        if (tsi.getNumSlotsOccupied() >= tsi.getCapacity()) {
+      //check for maximum-capacity
+      if(tsi.getMaxCapacity() >= 0) {
+        if ((tsi.getNumSlotsOccupied() + noOfSlotsPerTask) >
+          tsi.getMaxCapacity()) {
           if (LOG.isDebugEnabled()) {
             LOG.debug(
-              "Queue " + qsc.getQueueName() + " has reached its  max " + type +
-                " limit ");
-            LOG.debug("Current running tasks " + tsi.getCapacity());
-          }
-          return true;
-        }
-      }
-
-      if(tsi.getMaxCapacity() >= 0) {
-        if(tsi.getNumSlotsOccupied() >= tsi.getMaxCapacity()) {
-          if(LOG.isDebugEnabled()) {
-            LOG.debug(
-              "Queue " + qsc.getQueueName() + " " +
-                "has reached its  max " + type + "Capacity"  ); 
+              "Queue " + qsc.getQueueName() + " " + "has reached its  max " +
+                type + "Capacity");
             LOG.debug("Current running tasks " + tsi.getCapacity());
 
           }
@@ -523,11 +531,11 @@ class CapacityTaskScheduler extends TaskScheduler {
           s.append(
             String.format(
               " Queue '%s'(%s): runningTasks=%d, "
-                + "occupiedSlots=%d, capacity=%d, runJobs=%d  maxTaskLimit=%d ",
+                + "occupiedSlots=%d, capacity=%d, runJobs=%d  maximumCapacity=%d ",
               qsi.getQueueName(),
               this.type, tsi.getNumRunningTasks(),
               tsi.getNumSlotsOccupied(), tsi.getCapacity(), (runJobs.size()),
-              tsi.getMaxTaskLimit()));
+              tsi.getMaxCapacity()));
         }
         LOG.debug(s);
       }

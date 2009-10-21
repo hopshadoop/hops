@@ -84,107 +84,54 @@ public class TestCapacityScheduler extends TestCase {
   }
 
   /**
-   * Test the max map limit.
-   *
+   * Test max capacity
    * @throws IOException
    */
-  public void testMaxMapCap() throws IOException {
+  public void testMaxCapacity() throws IOException {
     this.setUp(4, 1, 1);
     taskTrackerManager.addQueues(new String[]{"default"});
     ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
-    queues.add(new FakeQueueInfo("default", 100.0f, false, 1));
+    queues.add(new FakeQueueInfo("default", 25.0f, false, 1));
 
 
     taskTrackerManager.setFakeQueues(queues);
     scheduler.start();
-
-    scheduler.getRoot().getChildren().get(0).getQueueSchedulingContext().getMapTSC().setMaxTaskLimit(2);
-    scheduler.getRoot().getChildren().get(0).getQueueSchedulingContext().getReduceTSC().setMaxTaskLimit(-1);
-
+    scheduler.getRoot().getChildren().get(0).getQueueSchedulingContext()
+      .setMaxCapacityPercent(50.0f);
 
     //submit the Job
-    FakeJobInProgress fjob1 =
-      taskTrackerManager.submitJob(JobStatus.PREP, 3, 1, "default", "user");
+    FakeJobInProgress fjob1 = taskTrackerManager.submitJob(
+      JobStatus.PREP, 4, 4, "default", "user");
 
     taskTrackerManager.initJob(fjob1);
+    HashMap<String, String> expectedStrings = new HashMap<String, String>();
 
-    //1 map and 1 reduce assigned
-    List<Task> task1 = scheduler.assignTasks(tracker("tt1"));
-    //2 map are assigned reached the maxlimit
-    List<Task> task2 = scheduler.assignTasks(tracker("tt2"));
-
-    //task3 is null as maxlimit is reached.
-    List<Task> task3 = scheduler.assignTasks(tracker("tt3"));
-    assertNull(task3);
-    //Now complete the task 1.
-    // complete the job
-    for(Task task: task1) {
-    taskTrackerManager.finishTask(
-      task.getTaskID().toString(),
-      fjob1);
-    }
-    //We have completed the tt1 task which was a map task so we expect one map
-    //task to be picked up
-    checkAssignment(
-      taskTrackerManager, scheduler, "tt4",
-      "attempt_test_0001_m_000003_0 on tt4");
-  }
-
-  /**
-   * Test max reduce limit
-   *
-   * @throws IOException
-   */
-  public void testMaxReduceCap() throws IOException {
-    this.setUp(4, 1, 1);
-    taskTrackerManager.addQueues(new String[]{"default"});
-    ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
-    queues.add(new FakeQueueInfo("default", 100.0f, false, 1));
+    expectedStrings.put(MAP, "attempt_test_0001_m_000001_0 on tt1");
+    expectedStrings.put(REDUCE, "attempt_test_0001_r_000001_0 on tt1");
+    List<Task> task1 = checkMultipleTaskAssignment(
+      taskTrackerManager, scheduler, "tt1", expectedStrings);
 
 
-    taskTrackerManager.setFakeQueues(queues);
-    scheduler.start();
-    scheduler.getRoot().getChildren().get(0).getQueueSchedulingContext().getMapTSC().setMaxTaskLimit(-1);
-    scheduler.getRoot().getChildren().get(0).getQueueSchedulingContext().getReduceTSC().setMaxTaskLimit(2);
+    expectedStrings.put(MAP, "attempt_test_0001_m_000002_0 on tt2");
+    expectedStrings.put(REDUCE, "attempt_test_0001_r_000002_0 on tt2");
+    List<Task> task2 = checkMultipleTaskAssignment(
+      taskTrackerManager, scheduler, "tt2", expectedStrings);
 
-
-    //submit the Job
-    FakeJobInProgress fjob1 =
-      taskTrackerManager.submitJob(JobStatus.PREP, 1, 3, "default", "user");
-
-    taskTrackerManager.initJob(fjob1);
-
-    //1 map and 1 reduce
-    List<Task> task1 = scheduler.assignTasks(tracker("tt1"));
-
-    // 1 reduce assigned
-    List<Task> task2 = scheduler.assignTasks(tracker("tt2"));
-
-    // No tasks should be assigned, as we have reached the max cap.
+    //we have already reached the limit
+    //this call would return null
     List<Task> task3 = scheduler.assignTasks(tracker("tt3"));
     assertNull(task3);
 
     //Now complete the task 1 i.e map task.
-    for(Task task: task1) {
-      if (task.isMapTask()) {
+    for (Task task : task1) {
         taskTrackerManager.finishTask(
-          task.getTaskID().toString(),
-          fjob1);
-      }
+          task.getTaskID().toString(), fjob1);
     }
-
-    //Still no slots available for reduce hence no tasks
-    //assigned
-    assertNull(scheduler.assignTasks(tracker("tt1")));
     
-    //Complete the reduce task
-    taskTrackerManager.finishTask(
-      task2.get(0).getTaskID().toString(), fjob1);
-
-    //One reduce is done hence assign the new reduce.
-    checkAssignment(
-      taskTrackerManager, scheduler, "tt4",
-      "attempt_test_0001_r_000003_0 on tt4");
+    expectedStrings.put(MAP, "attempt_test_0001_m_000003_0 on tt1");
+    expectedStrings.put(REDUCE, "attempt_test_0001_r_000003_0 on tt1");
+    task2 = checkMultipleTaskAssignment(
+      taskTrackerManager, scheduler, "tt1", expectedStrings);
   }
 
   // test job run-state change
@@ -486,6 +433,28 @@ public class TestCapacityScheduler extends TestCase {
     assertEquals(18.75f, jqm.getJobQueue("qAZ4").qsc.getCapacityPercent());
   }
 
+  public void testCapacityAllocFailureWithLowerMaxCapacity() throws Exception {
+    String[] qs = {"default", "qAZ1"};
+    taskTrackerManager.addQueues(qs);
+    ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
+    queues.add(new FakeQueueInfo("default", 25.0f, true, 25));
+    FakeQueueInfo qi = new FakeQueueInfo("qAZ1", -1.0f, true, 25);
+    qi.maxCapacity = 40.0f;
+    queues.add(qi);
+    taskTrackerManager.setFakeQueues(queues);
+    try {
+      scheduler.start();
+      fail("scheduler start should fail ");
+    }catch(IOException ise) {
+      Throwable e = ise.getCause();
+      assertTrue(e instanceof IllegalStateException);
+      assertEquals(
+        e.getMessage(),
+        " Capacity share (" + 75.0f + ")for unconfigured queue " + "qAZ1" +
+          " is greater than its maximum-capacity percentage " + 40.0f);
+    }
+  }
+
   // Tests how capacity is computed and assignment of tasks done
   // on the basis of the capacity.
   public void testCapacityBasedAllocation() throws Exception {
@@ -589,21 +558,16 @@ public class TestCapacityScheduler extends TestCase {
   }
 
   /**
-   * Creates a queue with max task limit of 2
-   * submit 1 job in the queue which is high ram(2 slots) . As 2 slots are
-   * given to high ram job and are reserved , no other tasks are accepted .
-   *
+   * test the high memory blocking with max capacity.
    * @throws IOException
    */
-  public void testHighMemoryBlockingWithMaxLimit()
+  public void testHighMemoryBlockingWithMaxCapacity()
     throws IOException {
-
-    // 2 map and 1 reduce slots
-    taskTrackerManager = new FakeTaskTrackerManager(2, 2, 1);
+    taskTrackerManager = new FakeTaskTrackerManager(2, 2, 2);
 
     taskTrackerManager.addQueues(new String[]{"defaultXYZM"});
     ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
-    queues.add(new FakeQueueInfo("defaultXYZM", 100.0f, true, 25));
+    queues.add(new FakeQueueInfo("defaultXYZM", 25.0f, true, 50));
 
 
     scheduler.setTaskTrackerManager(taskTrackerManager);
@@ -611,138 +575,137 @@ public class TestCapacityScheduler extends TestCase {
     // Normal job in the cluster would be 1GB maps/reduces
     scheduler.getConf().setLong(JTConfig.JT_MAX_MAPMEMORY_MB, 2 * 1024);
     scheduler.getConf().setLong(MRConfig.MAPMEMORY_MB, 1 * 1024);
-    scheduler.getConf().setLong(JTConfig.JT_MAX_REDUCEMEMORY_MB, 1 * 1024);
+    scheduler.getConf().setLong(JTConfig.JT_MAX_REDUCEMEMORY_MB, 2 * 1024);
     scheduler.getConf().setLong(MRConfig.REDUCEMEMORY_MB, 1 * 1024);
     taskTrackerManager.setFakeQueues(queues);
     scheduler.start();
     scheduler.getRoot().getChildren().get(0).getQueueSchedulingContext()
-      .getMapTSC().setMaxTaskLimit(2);
+      .setMaxCapacityPercent(50);
 
-
-    // The situation :  Submit 2 jobs with high memory map task
-    //Set the max limit for queue to 2 ,
-    // try submitting more map tasks to the queue , it should not happen
-
-    LOG.debug(
-      "Submit one high memory(2GB maps, 0MB reduces) job of "
-        + "2 map tasks");
     JobConf jConf = new JobConf(conf);
     jConf.setMemoryForMapTask(2 * 1024);
-    jConf.setMemoryForReduceTask(0);
+    jConf.setMemoryForReduceTask(1 * 1024);
     jConf.setNumMapTasks(2);
-    jConf.setNumReduceTasks(0);
+    jConf.setNumReduceTasks(1);
     jConf.setQueueName("defaultXYZM");
     jConf.setUser("u1");
     FakeJobInProgress job1 = taskTrackerManager.submitJobAndInit(
       JobStatus.PREP, jConf);
 
-    LOG.debug(
-      "Submit another regular memory(1GB vmem maps/reduces) job of "
-        + "2 map/red tasks");
     jConf = new JobConf(conf);
     jConf.setMemoryForMapTask(1 * 1024);
-    jConf.setMemoryForReduceTask(1 * 1024);
-    jConf.setNumMapTasks(2);
+    jConf.setMemoryForReduceTask(2 * 1024);
+    jConf.setNumMapTasks(1);
     jConf.setNumReduceTasks(2);
     jConf.setQueueName("defaultXYZM");
     jConf.setUser("u1");
     FakeJobInProgress job2 = taskTrackerManager.submitJobAndInit(
       JobStatus.PREP, jConf);
 
-    // first, a map from j1 will run this is a high memory job so it would
-    // occupy the 2 slots and it would try to assign the reduce task from
-    //job2.
-    Map<String, String> expectedStrings = new HashMap<String, String>();
-    expectedStrings.put(MAP, "attempt_test_0001_m_000001_0 on tt1");
-    expectedStrings.put(REDUCE, "attempt_test_0002_r_000001_0 on tt1");
-    checkMultipleTaskAssignment(
-      taskTrackerManager, scheduler, "tt1",
-      expectedStrings);
+  //high ram map from job 1 and normal reduce task from job 1
+    HashMap<String,String> expectedStrings = new HashMap<String,String>();
+    expectedStrings.put(MAP,"attempt_test_0001_m_000001_0 on tt1");
+    expectedStrings.put(REDUCE,"attempt_test_0001_r_000001_0 on tt1");
 
-    checkOccupiedSlots("defaultXYZM", TaskType.MAP, 1, 2, 100.0f, 1, 1);
+    List<Task> tasks = checkMultipleTaskAssignment(taskTrackerManager,scheduler,
+      "tt1", expectedStrings);
+
+    checkOccupiedSlots("defaultXYZM", TaskType.MAP, 1, 2, 200.0f,1,0);
+    checkOccupiedSlots("defaultXYZM", TaskType.REDUCE, 1, 1, 100.0f,0,2);
     checkMemReservedForTasksOnTT("tt1", 2 * 1024L, 1 * 1024L);
 
-    //at this point , the scheduler tries to schedule another map from j2 for
-    //another task tracker.
-    // This should not happen as all the map slots are taken
-    //by the first task itself.hence reduce task from the second job is given
-    expectedStrings.clear();
-    expectedStrings.put(REDUCE, "attempt_test_0002_r_000002_0 on tt2");
-    checkMultipleTaskAssignment(
-      taskTrackerManager, scheduler, "tt2",
-      expectedStrings);
+    //we have reached the maximum limit for map, so no more map tasks.
+    //we have used 1 reduce already and 1 more reduce slot is left for the
+    //before we reach maxcapacity for reduces.
+    // But current 1 slot + 2 slots for high ram reduce would
+    //mean we are crossing the maxium capacity.hence nothing would be assigned
+    //in this call
+    assertNull(scheduler.assignTasks(tracker("tt2")));
+
+    //complete the high ram job on tt1.
+    for (Task task : tasks) {
+      taskTrackerManager.finishTask(
+        task.getTaskID().toString(),
+        job1);
+    }
+
+    expectedStrings.put(MAP,"attempt_test_0001_m_000002_0 on tt2");
+    expectedStrings.put(REDUCE,"attempt_test_0002_r_000001_0 on tt2");
+
+    tasks = checkMultipleTaskAssignment(taskTrackerManager,scheduler,
+      "tt2", expectedStrings);
+
+    checkOccupiedSlots("defaultXYZM", TaskType.MAP, 1, 2, 200.0f,1,0);
+    checkOccupiedSlots("defaultXYZM", TaskType.REDUCE, 1, 2, 200.0f,0,2);
+    checkMemReservedForTasksOnTT("tt2", 2 * 1024L, 2 * 1024L);
+
+    //complete the high ram job on tt1.
+    for (Task task : tasks) {
+      taskTrackerManager.finishTask(
+        task.getTaskID().toString(),
+        job2);
+    }
+
+
+    expectedStrings.put(MAP,"attempt_test_0002_m_000001_0 on tt2");
+    expectedStrings.put(REDUCE,"attempt_test_0002_r_000002_0 on tt2");
+
+    tasks = checkMultipleTaskAssignment(taskTrackerManager,scheduler,
+      "tt2", expectedStrings);
   }
 
   /**
    * test if user limits automatically adjust to max map or reduce limit
    */
-  public void testUserLimitsWithMaxLimits() throws Exception {
-    setUp(4, 4, 4);
+  public void testUserLimitsWithMaxCapacity() throws Exception {
+    setUp(2, 2, 2);
     // set up some queues
     String[] qs = {"default"};
     taskTrackerManager.addQueues(qs);
     ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
-    queues.add(new FakeQueueInfo("default", 100.0f, true, 50));
+    queues.add(new FakeQueueInfo("default", 50.0f, true, 50));
 
 
     taskTrackerManager.setFakeQueues(queues);
     scheduler.start();
     scheduler.getRoot().getChildren().get(0).getQueueSchedulingContext()
-      .getMapTSC().setMaxTaskLimit(2);
-    scheduler.getRoot().getChildren().get(0).getQueueSchedulingContext()
-      .getReduceTSC().setMaxTaskLimit(2);
-
+      .setMaxCapacityPercent(75);
 
     // submit a job
     FakeJobInProgress fjob1 =
-      taskTrackerManager.submitJobAndInit(
-        JobStatus.PREP, 10, 10, "default", "u1");
+      taskTrackerManager.submitJobAndInit(JobStatus.PREP, 10, 10, "default", "u1");
     FakeJobInProgress fjob2 =
-      taskTrackerManager.submitJobAndInit(
-        JobStatus.PREP, 10, 10, "default", "u2");
+      taskTrackerManager.submitJobAndInit(JobStatus.PREP, 10, 10, "default", "u2");
 
-    // for queue 'default', the capacity for maps is 2.
-    // But the max map limit is 2
-    // hence user should be getting not more than 1 as it is the 50%.
-    //same with reduce
-    Map<String, String> expectedStrings = new HashMap<String, String>();
-    populateExpectedStrings(expectedStrings, 
-                  "attempt_test_0001_m_000001_0 on tt1", 
-                  "attempt_test_0001_r_000001_0 on tt1");
-    List<Task> t1 = checkMultipleTaskAssignment(
-      taskTrackerManager, scheduler, "tt1",
-      expectedStrings);
+    // for queue 'default', maxCapacity for map and reduce is 3.
+    // initial user limit for 50% assuming there are 2 users/queue is.
+    //  1 map and 1 reduce.
+    // after max capacity it is 1.5 each.
 
-    //Now we should get the task from the other job. As the
-    //first user has reached his max map limit.
-    //same with reduce
-    populateExpectedStrings(expectedStrings, 
-                            "attempt_test_0002_m_000001_0 on tt2",
-                            "attempt_test_0002_r_000001_0 on tt2");
-    checkMultipleTaskAssignment(
-      taskTrackerManager, scheduler, "tt2",
-      expectedStrings);
+    //first job would be given 1 job each.
+    HashMap<String,String> expectedStrings = new HashMap<String,String>();
+    expectedStrings.put(MAP,"attempt_test_0001_m_000001_0 on tt1");
+    expectedStrings.put(REDUCE,"attempt_test_0001_r_000001_0 on tt1");
 
-    //Now we are done with map and reduce limit ,
-    //  now if we ask for task we should
-    // get null.
-    List<Task> t3 = scheduler.assignTasks(tracker("tt3"));
-    assertNull(t3);
+    List<Task> tasks = checkMultipleTaskAssignment(taskTrackerManager,scheduler,
+      "tt1", expectedStrings);
 
-    //We completed 1 map and 1 reduce in here
-    for (Task task : t1) {
-      taskTrackerManager.finishTask(
-        task.getTaskID().toString(),
-        fjob1);
-    }
 
-    //again we would assign 1 map and 1 reduce
-    populateExpectedStrings(expectedStrings, 
-                            "attempt_test_0001_m_000002_0 on tt1",
-                            "attempt_test_0001_r_000002_0 on tt1");
-    checkMultipleTaskAssignment(
-      taskTrackerManager, scheduler, "tt1",
-      expectedStrings);
+    //for user u1 we have reached the limit. that is 1 job.
+    //1 more map and reduce tasks.
+    expectedStrings.put(MAP,"attempt_test_0002_m_000001_0 on tt1");
+    expectedStrings.put(REDUCE,"attempt_test_0002_r_000001_0 on tt1");
+
+    tasks = checkMultipleTaskAssignment(taskTrackerManager,scheduler,
+      "tt1", expectedStrings);
+
+    expectedStrings.put(MAP,"attempt_test_0001_m_000002_0 on tt2");
+    expectedStrings.put(REDUCE,"attempt_test_0001_r_000002_0 on tt2");
+
+    tasks = checkMultipleTaskAssignment(taskTrackerManager,scheduler,
+      "tt2", expectedStrings);
+
+    assertNull(scheduler.assignTasks(tracker("tt2")));
   }
 
   // Utility method to construct a map of expected strings
@@ -2728,16 +2691,12 @@ public class TestCapacityScheduler extends TestCase {
    * @param incrReduceIndex
    */
   private void checkOccupiedSlots(
-    String queue,
-    TaskType type, int numActiveUsers,
-    int expectedOccupiedSlots, float expectedOccupiedSlotsPercent,
-    int incrMapIndex
-    , int incrReduceIndex
-  ) {
+    String queue, TaskType type, int numActiveUsers, int expectedOccupiedSlots,
+    float expectedOccupiedSlotsPercent, int incrMapIndex, int incrReduceIndex) {
     scheduler.updateContextInfoForTests();
     QueueManager queueManager = scheduler.taskTrackerManager.getQueueManager();
-    String schedulingInfo =
-      queueManager.getJobQueueInfo(queue).getSchedulingInfo();
+    String schedulingInfo = queueManager.getJobQueueInfo(queue)
+      .getSchedulingInfo();
     String[] infoStrings = schedulingInfo.split("\n");
     int index = -1;
     if (type.equals(TaskType.MAP)) {
@@ -2749,9 +2708,8 @@ public class TestCapacityScheduler extends TestCase {
     LOG.info(infoStrings[index]);
     assertEquals(
       String.format(
-        "Used capacity: %d (%.1f%% of Capacity)",
-        expectedOccupiedSlots, expectedOccupiedSlotsPercent),
-      infoStrings[index]);
+        "Used capacity: %d (%.1f%% of Capacity)", expectedOccupiedSlots,
+        expectedOccupiedSlotsPercent), infoStrings[index]);
   }
 
   /**
