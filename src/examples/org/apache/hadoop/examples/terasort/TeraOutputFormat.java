@@ -106,7 +106,7 @@ public class TeraOutputFormat extends FileOutputFormat<Text,Text> {
   public static class TeraOutputCommitter extends FileOutputCommitter {
 
     @Override
-    public void cleanupJob(JobContext jobContext) {
+    public void commitJob(JobContext jobContext) {
     }
 
     @Override

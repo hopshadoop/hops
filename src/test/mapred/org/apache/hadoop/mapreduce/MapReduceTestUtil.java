@@ -43,7 +43,7 @@ import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableComparable;
-import org.apache.hadoop.mapred.OutputLogFilter;
+import org.apache.hadoop.mapred.Utils;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
@@ -396,7 +396,7 @@ public class MapReduceTestUtil {
     StringBuffer result = new StringBuffer();
 
     Path[] fileList = FileUtil.stat2Paths(fs.listStatus(outDir,
-           new OutputLogFilter()));
+           new Utils.OutputFileUtils.OutputFilesFilter()));
     for (Path outputFile : fileList) {
       LOG.info("Path" + ": "+ outputFile);
       BufferedReader file = 

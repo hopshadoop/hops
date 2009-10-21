@@ -101,7 +101,7 @@ public class TestMRSequenceFileAsBinaryOutputFormat extends TestCase {
       writer.close(context);
     }
     committer.commitTask(context);
-    committer.cleanupJob(job);
+    committer.commitJob(job);
 
     InputFormat<IntWritable, DoubleWritable> iformat =
       new SequenceFileInputFormat<IntWritable, DoubleWritable>();

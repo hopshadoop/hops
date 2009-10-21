@@ -49,16 +49,16 @@ public class TestSetupAndCleanupFailure extends TestCase {
     }
   }
 
-  // Commiter with cleanupJob throwing exception
-  static class CommitterWithFailCleanup extends FileOutputCommitter {
+  // Commiter with commitJob throwing exception
+  static class CommitterWithFailCommit extends FileOutputCommitter {
     @Override
-    public void cleanupJob(JobContext context) throws IOException {
+    public void commitJob(JobContext context) throws IOException {
       throw new IOException();
     }
   }
 
   // Committer waits for a file to be created on dfs.
-  static class CommitterWithLongSetupAndCleanup extends FileOutputCommitter {
+  static class CommitterWithLongSetupAndCommit extends FileOutputCommitter {
     
     private void waitForSignalFile(FileSystem fs, Path signalFile) 
     throws IOException {
@@ -78,9 +78,9 @@ public class TestSetupAndCleanupFailure extends TestCase {
     }
     
     @Override
-    public void cleanupJob(JobContext context) throws IOException {
+    public void commitJob(JobContext context) throws IOException {
       waitForSignalFile(FileSystem.get(context.getJobConf()), cleanupSignalFile);
-      super.cleanupJob(context);
+      super.commitJob(context);
     }
   }
 
@@ -123,7 +123,7 @@ public class TestSetupAndCleanupFailure extends TestCase {
   throws IOException {
     // launch job with waiting setup/cleanup
     JobConf jobConf = mr.createJobConf();
-    jobConf.setOutputCommitter(CommitterWithLongSetupAndCleanup.class);
+    jobConf.setOutputCommitter(CommitterWithLongSetupAndCommit.class);
     RunningJob job = UtilsForTests.runJob(jobConf, inDir, outDir);
     JobTracker jt = mr.getJobTrackerRunner().getJobTracker();
     JobInProgress jip = jt.getJob(job.getID());
@@ -238,7 +238,7 @@ public class TestSetupAndCleanupFailure extends TestCase {
                              null, null, jtConf);
       // test setup/cleanup throwing exceptions
       testFailCommitter(CommitterWithFailSetup.class, mr.createJobConf());
-      testFailCommitter(CommitterWithFailCleanup.class, mr.createJobConf());
+      testFailCommitter(CommitterWithFailCommit.class, mr.createJobConf());
       // test the command-line kill for setup/cleanup attempts. 
       testSetupAndCleanupKill(mr, dfs, true);
       // remove setup/cleanup signal files.

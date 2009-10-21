@@ -50,11 +50,11 @@ public class TestEmptyJob extends TestCase {
 
   MiniMRCluster mr = null;
 
-  /** Committer with cleanup waiting on a signal
+  /** Committer with commit waiting on a signal
    */
-  static class CommitterWithDelayCleanup extends FileOutputCommitter {
+  static class CommitterWithDelayCommit extends FileOutputCommitter {
     @Override
-    public void cleanupJob(JobContext context) throws IOException {
+    public void commitJob(JobContext context) throws IOException {
       Configuration conf = context.getConfiguration();
       Path share = new Path(conf.get("share"));
       FileSystem fs = FileSystem.get(conf);
@@ -66,7 +66,7 @@ public class TestEmptyJob extends TestCase {
         }
         UtilsForTests.waitFor(100);
       }
-      super.cleanupJob(context);
+      super.commitJob(context);
     }
   }
 
@@ -103,7 +103,7 @@ public class TestEmptyJob extends TestCase {
     conf.setJobName("empty");
     // use an InputFormat which returns no split
     conf.setInputFormat(EmptyInputFormat.class);
-    conf.setOutputCommitter(CommitterWithDelayCleanup.class);
+    conf.setOutputCommitter(CommitterWithDelayCommit.class);
     conf.setOutputKeyClass(Text.class);
     conf.setOutputValueClass(IntWritable.class);
     conf.setMapperClass(IdentityMapper.class);
@@ -197,7 +197,8 @@ public class TestEmptyJob extends TestCase {
         + " and not 1.0", runningJob.cleanupProgress() == 1.0);
 
     assertTrue("Job output directory doesn't exit!", fs.exists(outDir));
-    FileStatus[] list = fs.listStatus(outDir, new OutputLogFilter());
+    FileStatus[] list = fs.listStatus(outDir, 
+                          new Utils.OutputFileUtils.OutputFilesFilter());
     assertTrue("Number of part-files is " + list.length + " and not "
         + numReduces, list.length == numReduces);
 

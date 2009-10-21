@@ -38,7 +38,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.mapred.OutputLogFilter;
+import org.apache.hadoop.mapred.Utils;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
@@ -551,7 +551,7 @@ public class TestValueIterReset extends TestCase {
   private void validateOutput() throws IOException {
     Path[] outputFiles = FileUtil.stat2Paths(
         localFs.listStatus(new Path(TEST_ROOT_DIR + "/out"),
-            new OutputLogFilter()));
+            new Utils.OutputFileUtils.OutputFilesFilter()));
     if (outputFiles.length > 0) {
       InputStream is = localFs.open(outputFiles[0]);
       BufferedReader reader = new BufferedReader(new InputStreamReader(is));

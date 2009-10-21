@@ -317,4 +317,9 @@ public class JobStatus extends org.apache.hadoop.mapreduce.JobStatus {
      return super.getReduceProgress(); 
    }
 
+   // A utility to convert new job runstates to the old ones.
+   static int getOldNewJobRunState(
+     org.apache.hadoop.mapreduce.JobStatus.State state) {
+     return state.getValue();
+   }
 }

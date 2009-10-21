@@ -13,6 +13,10 @@ Trunk (unreleased changes)
 
     MAPREDUCE-906. Update Sqoop documentation. (Aaron Kimball via cdouglas)
 
+    MAPREDUCE-947. Added commitJob and abortJob apis to OutputCommitter.
+    Enhanced FileOutputCommitter to create a _SUCCESS file for successful
+    jobs. (Amar Kamat & Jothi Padmanabhan via acmurthy) 
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band

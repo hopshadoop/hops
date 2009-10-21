@@ -257,7 +257,9 @@ public class ClusterWithLinuxTaskController extends TestCase {
    */
   protected void assertOwnerShip(Path outDir, FileSystem fs)
       throws IOException {
-    for (FileStatus status : fs.listStatus(outDir, new OutputLogFilter())) {
+    for (FileStatus status : fs.listStatus(outDir, 
+                                           new Utils.OutputFileUtils
+                                                    .OutputFilesFilter())) {
       String owner = status.getOwner();
       String group = status.getGroup();
       LOG.info("Ownership of the file is " + status.getPath() + " is " + owner

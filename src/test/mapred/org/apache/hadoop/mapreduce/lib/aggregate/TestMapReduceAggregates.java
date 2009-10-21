@@ -21,7 +21,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.io.*;
-import org.apache.hadoop.mapred.OutputLogFilter;
+import org.apache.hadoop.mapred.Utils;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
@@ -127,7 +127,7 @@ public class TestMapReduceAggregates extends TestCase {
     FileSystem fs = outDir.getFileSystem(conf);
     StringBuffer result = new StringBuffer();
     Path[] fileList = FileUtil.stat2Paths(fs.listStatus(outDir,
-                        new OutputLogFilter()));
+                        new Utils.OutputFileUtils.OutputFilesFilter()));
     for(int i=0; i < fileList.length; ++i) {
       BufferedReader file = 
         new BufferedReader(new InputStreamReader(fs.open(fileList[i])));

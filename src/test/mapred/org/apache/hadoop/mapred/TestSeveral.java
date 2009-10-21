@@ -152,7 +152,7 @@ public class TestSeveral extends TestCase {
 
   private void verifyOutput(FileSystem fs, Path outDir) throws IOException {
     Path[] outputFiles = FileUtil.stat2Paths(
-        fs.listStatus(outDir, new OutputLogFilter()));
+        fs.listStatus(outDir, new Utils.OutputFileUtils.OutputFilesFilter()));
     assertEquals(numReduces, outputFiles.length);
     InputStream is = fs.open(outputFiles[0]);
     BufferedReader reader = new BufferedReader(new InputStreamReader(is));

@@ -129,6 +129,15 @@
        <Bug pattern="NM_WRONG_PACKAGE_INTENTIONAL" />
      </Match>
      <Match>
+       <Class name="org.apache.hadoop.mapred.OutputCommitter" />
+       <Or>
+       <Method name="abortJob" />
+       <Method name="commitJob" />
+       <Method name="cleanupJob" />
+       </Or>
+       <Bug pattern="NM_WRONG_PACKAGE_INTENTIONAL" />
+     </Match>
+     <Match>
        <Class name="org.apache.hadoop.mapred.lib.db.DBInputFormat$DBRecordReader" />
        <Method name="next" />
        <Bug pattern="NM_WRONG_PACKAGE_INTENTIONAL" />

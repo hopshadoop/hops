@@ -50,6 +50,7 @@ import org.apache.hadoop.mapred.Reducer;
 import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.mapred.SequenceFileInputFormat;
 import org.apache.hadoop.mapred.SequenceFileOutputFormat;
+import org.apache.hadoop.mapred.Utils;
 import org.apache.hadoop.mapred.lib.IdentityMapper;
 import org.apache.hadoop.mapred.lib.IdentityReducer;
 import org.apache.hadoop.util.ReflectionUtils;
@@ -317,7 +318,8 @@ public class TestDatamerge extends TestCase {
     job.setOutputFormat(SequenceFileOutputFormat.class);
     JobClient.runJob(job);
 
-    FileStatus[] outlist = cluster.getFileSystem().listStatus(outf);
+    FileStatus[] outlist = cluster.getFileSystem().listStatus(outf, 
+                             new Utils.OutputFileUtils.OutputFilesFilter());
     assertEquals(1, outlist.length);
     assertTrue(0 < outlist[0].getLen());
     SequenceFile.Reader r =

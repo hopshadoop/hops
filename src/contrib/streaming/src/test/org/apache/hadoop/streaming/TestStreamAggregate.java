@@ -21,6 +21,7 @@ package org.apache.hadoop.streaming;
 import junit.framework.TestCase;
 import java.io.*;
 
+import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.mapreduce.JobContext;
 
 /**
@@ -72,7 +73,7 @@ public class TestStreamAggregate extends TestCase
   {
     try {
       try {
-        OUTPUT_DIR.getAbsoluteFile().delete();
+        FileUtil.fullyDelete(OUTPUT_DIR.getAbsoluteFile());
       } catch (Exception e) {
       }
 
@@ -92,10 +93,12 @@ public class TestStreamAggregate extends TestCase
     } catch(Exception e) {
       failTrace(e);
     } finally {
-      File outFileCRC = new File(OUTPUT_DIR, ".part-00000.crc").getAbsoluteFile();
-      INPUT_FILE.delete();
-      outFileCRC.delete();
-      OUTPUT_DIR.getAbsoluteFile().delete();
+      try {
+        INPUT_FILE.delete();
+        FileUtil.fullyDelete(OUTPUT_DIR.getAbsoluteFile());
+      } catch (IOException e) {
+        failTrace(e);
+      }
     }
   }
 
