@@ -6,6 +6,9 @@ Trunk (unreleased changes)
 
   NEW FEATURES
 
+    MAPREDUCE-1017. Compression and output splitting for Sqoop.
+    (Aaron Kimball via tomwhite)
+
   IMPROVEMENTS
 
     MAPREDUCE-999. Improve Sqoop test speed and refactor tests.
