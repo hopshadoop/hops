@@ -29,7 +29,7 @@ import org.apache.avro.util.Utf8;
  *
  */
 public class JobStatusChangedEvent implements HistoryEvent {
-  private Events.JobStatusChanged datum = new Events.JobStatusChanged();
+  private JobStatusChanged datum = new JobStatusChanged();
 
   /**
    * Create an event to record the change in the Job Status
@@ -45,7 +45,7 @@ public class JobStatusChangedEvent implements HistoryEvent {
 
   public Object getDatum() { return datum; }
   public void setDatum(Object datum) {
-    this.datum = (Events.JobStatusChanged)datum;
+    this.datum = (JobStatusChanged)datum;
   }
 
   /** Get the Job Id */
@@ -53,8 +53,8 @@ public class JobStatusChangedEvent implements HistoryEvent {
   /** Get the event status */
   public String getStatus() { return datum.jobStatus.toString(); }
   /** Get the event type */
-  public Events.EventType getEventType() {
-    return Events.EventType.JOB_STATUS_CHANGED;
+  public EventType getEventType() {
+    return EventType.JOB_STATUS_CHANGED;
   }
 
 }

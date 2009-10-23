@@ -29,7 +29,7 @@ import org.apache.avro.util.Utf8;
  *
  */
 public class JobInitedEvent implements HistoryEvent {
-  private Events.JobInited datum = new Events.JobInited();
+  private JobInited datum = new JobInited();
 
   /**
    * Create an event to record job initialization
@@ -51,7 +51,7 @@ public class JobInitedEvent implements HistoryEvent {
   JobInitedEvent() { }
 
   public Object getDatum() { return datum; }
-  public void setDatum(Object datum) { this.datum = (Events.JobInited)datum; }
+  public void setDatum(Object datum) { this.datum = (JobInited)datum; }
 
   /** Get the job ID */
   public JobID getJobId() { return JobID.forName(datum.jobid.toString()); }
@@ -64,8 +64,8 @@ public class JobInitedEvent implements HistoryEvent {
   /** Get the status */
   public String getStatus() { return datum.jobStatus.toString(); }
  /** Get the event type */
-  public Events.EventType getEventType() {
-    return Events.EventType.JOB_INITED;
+  public EventType getEventType() {
+    return EventType.JOB_INITED;
   }
 
 }

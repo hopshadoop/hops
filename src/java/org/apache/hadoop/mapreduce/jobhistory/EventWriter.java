@@ -28,7 +28,7 @@ import org.apache.hadoop.mapreduce.Counters;
 
 import org.apache.avro.Schema;
 import org.apache.avro.io.Encoder;
-import org.apache.avro.io.BinaryEncoder;
+import org.apache.avro.io.JsonEncoder;
 import org.apache.avro.io.DatumWriter;
 import org.apache.avro.specific.SpecificDatumWriter;
 import org.apache.avro.generic.GenericData;
@@ -41,27 +41,28 @@ import org.apache.avro.util.Utf8;
  * 
  */
 class EventWriter {
-  static final String VERSION = "Avro-Binary";
+  static final String VERSION = "Avro-Json";
 
   private FSDataOutputStream out;
-  private DatumWriter<Object> writer =
-    new SpecificDatumWriter(Events.Event._SCHEMA);
+  private DatumWriter<Object> writer = new SpecificDatumWriter(Event.class);
   private Encoder encoder;
   
   EventWriter(FSDataOutputStream out) throws IOException {
     this.out = out;
     out.writeBytes(VERSION);
     out.writeBytes("\n");
-    out.writeBytes(Events.Event._SCHEMA.toString());
+    out.writeBytes(Event._SCHEMA.toString());
     out.writeBytes("\n");
-    this.encoder = new BinaryEncoder(out);
+    this.encoder = new JsonEncoder(Event._SCHEMA, out);
   }
   
   synchronized void write(HistoryEvent event) throws IOException { 
-    Events.Event wrapper = new Events.Event();
+    Event wrapper = new Event();
     wrapper.type = event.getEventType();
     wrapper.event = event.getDatum();
     writer.write(wrapper, encoder);
+    encoder.flush();
+    out.writeBytes("\n");
   }
   
   void flush() throws IOException { 
@@ -74,26 +75,26 @@ class EventWriter {
   }
 
   private static final Schema GROUPS =
-    Schema.createArray(Events.CounterGroup._SCHEMA);
+    Schema.createArray(JhCounterGroup._SCHEMA);
 
   private static final Schema COUNTERS =
-    Schema.createArray(Events.Counter._SCHEMA);
+    Schema.createArray(JhCounter._SCHEMA);
 
-  static Events.Counters toAvro(Counters counters) {
+  static JhCounters toAvro(Counters counters) {
     return toAvro(counters, "COUNTERS");
   }
-  static Events.Counters toAvro(Counters counters, String name) {
-    Events.Counters result = new Events.Counters();
+  static JhCounters toAvro(Counters counters, String name) {
+    JhCounters result = new JhCounters();
     result.name = new Utf8(name);
-    result.groups = new GenericData.Array<Events.CounterGroup>(0, GROUPS);
+    result.groups = new GenericData.Array<JhCounterGroup>(0, GROUPS);
     if (counters == null) return result;
     for (CounterGroup group : counters) {
-      Events.CounterGroup g = new Events.CounterGroup();
+      JhCounterGroup g = new JhCounterGroup();
       g.name = new Utf8(group.getName());
       g.displayName = new Utf8(group.getDisplayName());
-      g.counts = new GenericData.Array<Events.Counter>(group.size(), COUNTERS);
+      g.counts = new GenericData.Array<JhCounter>(group.size(), COUNTERS);
       for (Counter counter : group) {
-        Events.Counter c = new Events.Counter();
+        JhCounter c = new JhCounter();
         c.name = new Utf8(counter.getName());
         c.displayName = new Utf8(counter.getDisplayName());
         c.value = counter.getValue();

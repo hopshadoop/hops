@@ -105,7 +105,7 @@ public class JobHistoryParser {
   }
   
   private void handleEvent(HistoryEvent event) throws IOException { 
-    Events.EventType type = event.getEventType();
+    EventType type = event.getEventType();
 
     switch (type) {
     case JOB_SUBMITTED:

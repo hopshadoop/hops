@@ -27,7 +27,7 @@ import java.io.IOException;
 public interface HistoryEvent {
 
   /** Return this event's type. */
-  Events.EventType getEventType();
+  EventType getEventType();
 
   /** Return the Avro datum wrapped by this. */
   Object getDatum();

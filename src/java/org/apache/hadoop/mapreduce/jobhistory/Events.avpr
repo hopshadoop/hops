@@ -21,7 +21,7 @@
 
  "types": [
 
-     {"type": "record", "name": "Counter",
+     {"type": "record", "name": "JhCounter",
       "fields": [
           {"name": "name", "type": "string"},
           {"name": "displayName", "type": "string"},
@@ -29,18 +29,18 @@
       ]
      },
 
-     {"type": "record", "name": "CounterGroup",
+     {"type": "record", "name": "JhCounterGroup",
       "fields": [
           {"name": "name", "type": "string"},
           {"name": "displayName", "type": "string"},
-          {"name": "counts", "type": {"type": "array", "items": "Counter"}}
+          {"name": "counts", "type": {"type": "array", "items": "JhCounter"}}
       ]
      },
 
-     {"type": "record", "name": "Counters",
+     {"type": "record", "name": "JhCounters",
       "fields": [
           {"name": "name", "type": "string"},
-          {"name": "groups", "type": {"type": "array", "items": "CounterGroup"}}
+          {"name": "groups", "type": {"type": "array", "items": "JhCounterGroup"}}
       ]
      },
 
@@ -52,9 +52,9 @@
           {"name": "finishedReduces", "type": "int"},
           {"name": "failedMaps", "type": "int"},
           {"name": "failedReduces", "type": "int"},
-          {"name": "totalCounters", "type": "Counters"},
-          {"name": "mapCounters", "type": "Counters"},
-          {"name": "reduceCounters", "type": "Counters"}
+          {"name": "totalCounters", "type": "JhCounters"},
+          {"name": "mapCounters", "type": "JhCounters"},
+          {"name": "reduceCounters", "type": "JhCounters"}
       ]
      },
 
@@ -120,7 +120,7 @@
           {"name": "finishTime", "type": "long"},
           {"name": "hostname", "type": "string"},
           {"name": "state", "type": "string"},
-          {"name": "counters", "type": "Counters"}
+          {"name": "counters", "type": "JhCounters"}
       ]
      },
 
@@ -135,7 +135,7 @@
           {"name": "finishTime", "type": "long"},
           {"name": "hostname", "type": "string"},
           {"name": "state", "type": "string"},
-          {"name": "counters", "type": "Counters"}
+          {"name": "counters", "type": "JhCounters"}
       ]
      },
 
@@ -148,7 +148,7 @@
           {"name": "finishTime", "type": "long"},
           {"name": "hostname", "type": "string"},
           {"name": "state", "type": "string"},
-          {"name": "counters", "type": "Counters"}
+          {"name": "counters", "type": "JhCounters"}
       ]
      },
 
@@ -192,7 +192,7 @@
           {"name": "taskType", "type": "string"},
           {"name": "finishTime", "type": "long"},
           {"name": "status", "type": "string"},
-          {"name": "counters", "type": "Counters"}
+          {"name": "counters", "type": "JhCounters"}
       ]
      },
 

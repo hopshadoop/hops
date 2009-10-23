@@ -31,7 +31,7 @@ import org.apache.avro.util.Utf8;
  *
  */
 public class TaskFinishedEvent implements HistoryEvent {
-  private Events.TaskFinished datum = new Events.TaskFinished();
+  private TaskFinished datum = new TaskFinished();
   
   /**
    * Create an event to record the successful completion of a task
@@ -55,7 +55,7 @@ public class TaskFinishedEvent implements HistoryEvent {
 
   public Object getDatum() { return datum; }
   public void setDatum(Object datum) {
-    this.datum = (Events.TaskFinished)datum;
+    this.datum = (TaskFinished)datum;
   }
 
   /** Get task id */
@@ -71,8 +71,8 @@ public class TaskFinishedEvent implements HistoryEvent {
   /** Get task status */
   public String getTaskStatus() { return datum.status.toString(); }
   /** Get event type */
-  public Events.EventType getEventType() {
-    return Events.EventType.TASK_FINISHED;
+  public EventType getEventType() {
+    return EventType.TASK_FINISHED;
   }
 
   

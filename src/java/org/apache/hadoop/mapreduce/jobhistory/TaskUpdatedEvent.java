@@ -29,7 +29,7 @@ import org.apache.avro.util.Utf8;
  *
  */
 public class TaskUpdatedEvent implements HistoryEvent {
-  private Events.TaskUpdated datum = new Events.TaskUpdated();
+  private TaskUpdated datum = new TaskUpdated();
 
   /**
    * Create an event to record task updates
@@ -44,15 +44,15 @@ public class TaskUpdatedEvent implements HistoryEvent {
   TaskUpdatedEvent() {}
 
   public Object getDatum() { return datum; }
-  public void setDatum(Object datum) { this.datum = (Events.TaskUpdated)datum; }
+  public void setDatum(Object datum) { this.datum = (TaskUpdated)datum; }
 
   /** Get the task ID */
   public TaskID getTaskId() { return TaskID.forName(datum.taskid.toString()); }
   /** Get the task finish time */
   public long getFinishTime() { return datum.finishTime; }
   /** Get the event type */
-  public Events.EventType getEventType() {
-    return Events.EventType.TASK_UPDATED;
+  public EventType getEventType() {
+    return EventType.TASK_UPDATED;
   }
 
 }

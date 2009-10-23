@@ -30,7 +30,7 @@ import org.apache.avro.util.Utf8;
  *
  */
 public class JobFinishedEvent  implements HistoryEvent {
-  private Events.JobFinished datum = new Events.JobFinished();
+  private JobFinished datum = new JobFinished();
 
   /** 
    * Create an event to record successful job completion
@@ -66,9 +66,9 @@ public class JobFinishedEvent  implements HistoryEvent {
   JobFinishedEvent() {}
 
   public Object getDatum() { return datum; }
-  public void setDatum(Object datum) { this.datum = (Events.JobFinished)datum; }
-  public Events.EventType getEventType() {
-    return Events.EventType.JOB_FINISHED;
+  public void setDatum(Object datum) { this.datum = (JobFinished)datum; }
+  public EventType getEventType() {
+    return EventType.JOB_FINISHED;
   }
 
   /** Get the Job ID */

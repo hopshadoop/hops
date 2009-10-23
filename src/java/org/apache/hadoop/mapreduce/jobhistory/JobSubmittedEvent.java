@@ -29,7 +29,7 @@ import org.apache.avro.util.Utf8;
  *
  */
 public class JobSubmittedEvent implements HistoryEvent {
-  private Events.JobSubmitted datum = new Events.JobSubmitted();
+  private JobSubmitted datum = new JobSubmitted();
 
   /**
    * Create an event to record job submission
@@ -52,7 +52,7 @@ public class JobSubmittedEvent implements HistoryEvent {
 
   public Object getDatum() { return datum; }
   public void setDatum(Object datum) {
-    this.datum = (Events.JobSubmitted)datum;
+    this.datum = (JobSubmitted)datum;
   }
 
   /** Get the Job Id */
@@ -66,6 +66,6 @@ public class JobSubmittedEvent implements HistoryEvent {
   /** Get the Path for the Job Configuration file */
   public String getJobConfPath() { return datum.jobConfPath.toString(); }
   /** Get the event type */
-  public Events.EventType getEventType() { return Events.EventType.JOB_SUBMITTED; }
+  public EventType getEventType() { return EventType.JOB_SUBMITTED; }
 
 }

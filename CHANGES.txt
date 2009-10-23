@@ -814,3 +814,4 @@ Release 0.21.0 - Unreleased
     favor of max capacity percentage thus allowing the limit to go over
     queue capacity. (Rahul Kumar Singh via yhemanth)
 
+    MAPREDUCE-1016.  Make the job history log format JSON.  (cutting)

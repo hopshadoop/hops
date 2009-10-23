@@ -30,7 +30,7 @@ import org.apache.avro.util.Utf8;
  *
  */
 public class JobPriorityChangeEvent implements HistoryEvent {
-  private Events.JobPriorityChange datum = new Events.JobPriorityChange();
+  private JobPriorityChange datum = new JobPriorityChange();
 
   /** Generate an event to record changes in Job priority
    * @param id Job Id
@@ -45,7 +45,7 @@ public class JobPriorityChangeEvent implements HistoryEvent {
 
   public Object getDatum() { return datum; }
   public void setDatum(Object datum) {
-    this.datum = (Events.JobPriorityChange)datum;
+    this.datum = (JobPriorityChange)datum;
   }
 
   /** Get the Job ID */
@@ -55,8 +55,8 @@ public class JobPriorityChangeEvent implements HistoryEvent {
     return JobPriority.valueOf(datum.priority.toString());
   }
   /** Get the event type */
-  public Events.EventType getEventType() {
-    return Events.EventType.JOB_PRIORITY_CHANGED;
+  public EventType getEventType() {
+    return EventType.JOB_PRIORITY_CHANGED;
   }
 
 }

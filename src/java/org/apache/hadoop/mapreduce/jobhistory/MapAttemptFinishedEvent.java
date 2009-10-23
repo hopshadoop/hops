@@ -32,7 +32,7 @@ import org.apache.avro.util.Utf8;
  *
  */
 public class MapAttemptFinishedEvent  implements HistoryEvent {
-  private Events.MapAttemptFinished datum = new Events.MapAttemptFinished();
+  private MapAttemptFinished datum = new MapAttemptFinished();
   
   /** 
    * Create an event for successful completion of map attempts
@@ -64,7 +64,7 @@ public class MapAttemptFinishedEvent  implements HistoryEvent {
 
   public Object getDatum() { return datum; }
   public void setDatum(Object datum) {
-    this.datum = (Events.MapAttemptFinished)datum;
+    this.datum = (MapAttemptFinished)datum;
   }
 
   /** Get the task ID */
@@ -90,8 +90,8 @@ public class MapAttemptFinishedEvent  implements HistoryEvent {
   /** Get the counters */
   Counters getCounters() { return EventReader.fromAvro(datum.counters); }
   /** Get the event type */
-   public Events.EventType getEventType() {
-    return Events.EventType.MAP_ATTEMPT_FINISHED;
+   public EventType getEventType() {
+    return EventType.MAP_ATTEMPT_FINISHED;
   }
   
 }

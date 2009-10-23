@@ -29,7 +29,7 @@ import org.apache.avro.util.Utf8;
  * a job
  */
 public class JobInfoChangeEvent implements HistoryEvent {
-  private Events.JobInfoChange datum = new Events.JobInfoChange();
+  private JobInfoChange datum = new JobInfoChange();
 
   /** 
    * Create a event to record the submit and launch time of a job
@@ -47,7 +47,7 @@ public class JobInfoChangeEvent implements HistoryEvent {
 
   public Object getDatum() { return datum; }
   public void setDatum(Object datum) {
-    this.datum = (Events.JobInfoChange)datum;
+    this.datum = (JobInfoChange)datum;
   }
 
   /** Get the Job ID */
@@ -57,8 +57,8 @@ public class JobInfoChangeEvent implements HistoryEvent {
   /** Get the Job launch time */
   public long getLaunchTime() { return datum.launchTime; }
 
-  public Events.EventType getEventType() {
-    return Events.EventType.JOB_INFO_CHANGED;
+  public EventType getEventType() {
+    return EventType.JOB_INFO_CHANGED;
   }
 
 }

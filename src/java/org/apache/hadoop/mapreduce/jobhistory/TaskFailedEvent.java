@@ -31,7 +31,7 @@ import org.apache.avro.util.Utf8;
  *
  */
 public class TaskFailedEvent implements HistoryEvent {
-  private Events.TaskFailed datum = new Events.TaskFailed();
+  private TaskFailed datum = new TaskFailed();
 
   /**
    * Create an event to record task failure
@@ -58,7 +58,7 @@ public class TaskFailedEvent implements HistoryEvent {
   TaskFailedEvent() {}
 
   public Object getDatum() { return datum; }
-  public void setDatum(Object datum) { this.datum = (Events.TaskFailed)datum; }
+  public void setDatum(Object datum) { this.datum = (TaskFailed)datum; }
 
   /** Get the task id */
   public TaskID getTaskId() { return TaskID.forName(datum.taskid.toString()); }
@@ -79,7 +79,7 @@ public class TaskFailedEvent implements HistoryEvent {
   /** Get the task status */
   public String getTaskStatus() { return datum.status.toString(); }
   /** Get the event type */
-  public Events.EventType getEventType() { return Events.EventType.TASK_FAILED; }
+  public EventType getEventType() { return EventType.TASK_FAILED; }
 
   
 }

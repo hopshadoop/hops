@@ -31,8 +31,8 @@ import org.apache.avro.util.Utf8;
  *
  */
 public class TaskAttemptUnsuccessfulCompletionEvent implements HistoryEvent {
-  private Events.TaskAttemptUnsuccessfulCompletion datum =
-    new Events.TaskAttemptUnsuccessfulCompletion();
+  private TaskAttemptUnsuccessfulCompletion datum =
+    new TaskAttemptUnsuccessfulCompletion();
 
   /** 
    * Create an event to record the unsuccessful completion of attempts
@@ -60,7 +60,7 @@ public class TaskAttemptUnsuccessfulCompletionEvent implements HistoryEvent {
 
   public Object getDatum() { return datum; }
   public void setDatum(Object datum) {
-    this.datum = (Events.TaskAttemptUnsuccessfulCompletion)datum;
+    this.datum = (TaskAttemptUnsuccessfulCompletion)datum;
   }
 
   /** Get the task id */
@@ -82,8 +82,8 @@ public class TaskAttemptUnsuccessfulCompletionEvent implements HistoryEvent {
   /** Get the task status */
   public String getTaskStatus() { return datum.status.toString(); }
   /** Get the event type */
-  public Events.EventType getEventType() {
-    return Events.EventType.MAP_ATTEMPT_KILLED;
+  public EventType getEventType() {
+    return EventType.MAP_ATTEMPT_KILLED;
   }
 
 }

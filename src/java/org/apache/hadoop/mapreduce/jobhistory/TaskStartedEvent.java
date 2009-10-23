@@ -30,7 +30,7 @@ import org.apache.avro.util.Utf8;
  *
  */
 public class TaskStartedEvent implements HistoryEvent {
-  private Events.TaskStarted datum = new Events.TaskStarted();
+  private TaskStarted datum = new TaskStarted();
 
   /**
    * Create an event to record start of a task
@@ -50,7 +50,7 @@ public class TaskStartedEvent implements HistoryEvent {
   TaskStartedEvent() {}
 
   public Object getDatum() { return datum; }
-  public void setDatum(Object datum) { this.datum = (Events.TaskStarted)datum; }
+  public void setDatum(Object datum) { this.datum = (TaskStarted)datum; }
 
   /** Get the task id */
   public TaskID getTaskId() { return TaskID.forName(datum.taskid.toString()); }
@@ -63,8 +63,8 @@ public class TaskStartedEvent implements HistoryEvent {
     return TaskType.valueOf(datum.taskType.toString());
   }
   /** Get the event type */
-  public Events.EventType getEventType() {
-    return Events.EventType.TASK_STARTED;
+  public EventType getEventType() {
+    return EventType.TASK_STARTED;
   }
 
 }

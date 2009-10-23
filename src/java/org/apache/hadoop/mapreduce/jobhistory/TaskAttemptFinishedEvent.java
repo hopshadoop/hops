@@ -32,7 +32,7 @@ import org.apache.avro.util.Utf8;
  *
  */
 public class TaskAttemptFinishedEvent  implements HistoryEvent {
-  private Events.TaskAttemptFinished datum = new Events.TaskAttemptFinished();
+  private TaskAttemptFinished datum = new TaskAttemptFinished();
 
   /**
    * Create an event to record successful finishes for setup and cleanup 
@@ -63,7 +63,7 @@ public class TaskAttemptFinishedEvent  implements HistoryEvent {
 
   public Object getDatum() { return datum; }
   public void setDatum(Object datum) {
-    this.datum = (Events.TaskAttemptFinished)datum;
+    this.datum = (TaskAttemptFinished)datum;
   }
 
   /** Get the task ID */
@@ -87,8 +87,8 @@ public class TaskAttemptFinishedEvent  implements HistoryEvent {
   /** Get the counters for the attempt */
   Counters getCounters() { return EventReader.fromAvro(datum.counters); }
   /** Get the event type */
-  public Events.EventType getEventType() {
-    return Events.EventType.MAP_ATTEMPT_FINISHED;
+  public EventType getEventType() {
+    return EventType.MAP_ATTEMPT_FINISHED;
   }
 
 }

@@ -32,8 +32,8 @@ import org.apache.avro.util.Utf8;
  *
  */
 public class ReduceAttemptFinishedEvent  implements HistoryEvent {
-  private Events.ReduceAttemptFinished datum =
-    new Events.ReduceAttemptFinished();
+  private ReduceAttemptFinished datum =
+    new ReduceAttemptFinished();
 
   /**
    * Create an event to record completion of a reduce attempt
@@ -68,7 +68,7 @@ public class ReduceAttemptFinishedEvent  implements HistoryEvent {
 
   public Object getDatum() { return datum; }
   public void setDatum(Object datum) {
-    this.datum = (Events.ReduceAttemptFinished)datum;
+    this.datum = (ReduceAttemptFinished)datum;
   }
 
   /** Get the Task ID */
@@ -96,8 +96,8 @@ public class ReduceAttemptFinishedEvent  implements HistoryEvent {
   /** Get the counters for the attempt */
   Counters getCounters() { return EventReader.fromAvro(datum.counters); }
   /** Get the event type */
-  public Events.EventType getEventType() {
-    return Events.EventType.REDUCE_ATTEMPT_FINISHED;
+  public EventType getEventType() {
+    return EventType.REDUCE_ATTEMPT_FINISHED;
   }
 
 

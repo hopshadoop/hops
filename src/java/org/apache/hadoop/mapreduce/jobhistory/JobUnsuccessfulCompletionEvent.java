@@ -29,8 +29,8 @@ import org.apache.avro.util.Utf8;
  *
  */
 public class JobUnsuccessfulCompletionEvent implements HistoryEvent {
-  private Events.JobUnsuccessfulCompletion datum
-    = new Events.JobUnsuccessfulCompletion();
+  private JobUnsuccessfulCompletion datum
+    = new JobUnsuccessfulCompletion();
 
   /**
    * Create an event to record unsuccessful completion (killed/failed) of jobs
@@ -54,7 +54,7 @@ public class JobUnsuccessfulCompletionEvent implements HistoryEvent {
 
   public Object getDatum() { return datum; }
   public void setDatum(Object datum) {
-    this.datum = (Events.JobUnsuccessfulCompletion)datum;
+    this.datum = (JobUnsuccessfulCompletion)datum;
   }
 
   /** Get the Job ID */
@@ -68,11 +68,11 @@ public class JobUnsuccessfulCompletionEvent implements HistoryEvent {
   /** Get the status */
   public String getStatus() { return datum.jobStatus.toString(); }
   /** Get the event type */
-  public Events.EventType getEventType() {
+  public EventType getEventType() {
     if ("FAILED".equals(getStatus())) {
-      return Events.EventType.JOB_FAILED;
+      return EventType.JOB_FAILED;
     } else
-      return Events.EventType.JOB_KILLED;
+      return EventType.JOB_KILLED;
   }
 
 }

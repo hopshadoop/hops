@@ -31,7 +31,7 @@ import org.apache.avro.util.Utf8;
  *
  */
 public class TaskAttemptStartedEvent implements HistoryEvent {
-  private Events.TaskAttemptStarted datum = new Events.TaskAttemptStarted();
+  private TaskAttemptStarted datum = new TaskAttemptStarted();
 
   /**
    * Create an event to record the start of an attempt
@@ -56,7 +56,7 @@ public class TaskAttemptStartedEvent implements HistoryEvent {
 
   public Object getDatum() { return datum; }
   public void setDatum(Object datum) {
-    this.datum = (Events.TaskAttemptStarted)datum;
+    this.datum = (TaskAttemptStarted)datum;
   }
 
   /** Get the task id */
@@ -76,8 +76,8 @@ public class TaskAttemptStartedEvent implements HistoryEvent {
     return TaskAttemptID.forName(datum.attemptId.toString());
   }
   /** Get the event type */
-  public Events.EventType getEventType() {
-    return Events.EventType.MAP_ATTEMPT_STARTED;
+  public EventType getEventType() {
+    return EventType.MAP_ATTEMPT_STARTED;
   }
 
 }
