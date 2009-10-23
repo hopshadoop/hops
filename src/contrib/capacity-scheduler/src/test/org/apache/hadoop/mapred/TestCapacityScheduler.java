@@ -2028,7 +2028,7 @@ public class TestCapacityScheduler extends TestCase {
     FakeJobInProgress job =
       new FakeFailingJobInProgress(
         new JobID("test", ++jobCounter),
-        new JobConf(), taskTrackerManager, "u1");
+        new JobConf(), taskTrackerManager, "u1", UtilsForTests.getJobTracker());
     job.getStatus().setRunState(JobStatus.PREP);
     taskTrackerManager.submitJob(job);
     //check if job is present in waiting list.

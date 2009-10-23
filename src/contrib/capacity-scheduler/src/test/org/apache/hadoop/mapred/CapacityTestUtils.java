@@ -307,8 +307,9 @@ public class CapacityTestUtils {
 
     public FakeJobInProgress(
       JobID jId, JobConf jobConf,
-      FakeTaskTrackerManager taskTrackerManager, String user) {
-      super(jId, jobConf, null);
+      FakeTaskTrackerManager taskTrackerManager, String user, 
+      JobTracker jt) throws IOException {
+      super(jId, jobConf, jt);
       this.taskTrackerManager = taskTrackerManager;
       this.startTime = System.currentTimeMillis();
       this.status = new JobStatus(
@@ -472,8 +473,9 @@ public class CapacityTestUtils {
 
     public FakeFailingJobInProgress(
       JobID id, JobConf jobConf,
-      FakeTaskTrackerManager taskTrackerManager, String user) {
-      super(id, jobConf, taskTrackerManager, user);
+      FakeTaskTrackerManager taskTrackerManager, String user, 
+      JobTracker jt) throws IOException {
+      super(id, jobConf, taskTrackerManager, user, jt);
     }
 
     @Override
@@ -786,7 +788,7 @@ public class CapacityTestUtils {
       FakeJobInProgress job =
           new FakeJobInProgress(new JobID("test", ++jobCounter),
               (jobConf == null ? new JobConf(defaultJobConf) : jobConf), this,
-              jobConf.getUser());
+              jobConf.getUser(), UtilsForTests.getJobTracker());
       job.getStatus().setRunState(state);
       this.submitJob(job);
       return job;

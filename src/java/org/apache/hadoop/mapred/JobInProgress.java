@@ -323,6 +323,7 @@ public class JobInProgress {
     this.status = new JobStatus(jobid, 0.0f, 0.0f, JobStatus.PREP, 
         this.profile.getUser(), this.profile.getJobName(), 
         this.profile.getJobFile(), "");
+    this.jobtracker.getInstrumentation().addPrepJob(conf, jobid);
     this.taskCompletionEvents = new ArrayList<TaskCompletionEvent>
     (numMapTasks + numReduceTasks + 10);
     
@@ -377,6 +378,7 @@ public class JobInProgress {
     this.status = new JobStatus(jobid, 0.0f, 0.0f, JobStatus.PREP, 
         profile.getUser(), profile.getJobName(), profile.getJobFile(), 
         profile.getURL().toString());
+    this.jobtracker.getInstrumentation().addPrepJob(conf, jobid);
     status.setStartTime(startTime);
     this.status.setJobPriority(this.priority);
 
@@ -748,7 +750,7 @@ public class JobInProgress {
   void setupComplete() {
     status.setSetupProgress(1.0f);
     if (this.status.getRunState() == JobStatus.PREP) {
-      this.status.setRunState(JobStatus.RUNNING);
+      changeStateTo(JobStatus.RUNNING);
       JobStatusChangedEvent jse = 
         new JobStatusChangedEvent(profile.getJobID(),
          JobStatus.getJobRunState(JobStatus.RUNNING));
@@ -1539,6 +1541,7 @@ public class JobInProgress {
       name = TaskType.JOB_CLEANUP;
     } else if (tip.isMapTask()) {
       ++runningMapTasks;
+      metrics.addRunningMaps(jobId, 1);
       name = TaskType.MAP;
       counter = JobCounter.TOTAL_LAUNCHED_MAPS;
       splits = tip.getSplitNodes();
@@ -1550,6 +1553,7 @@ public class JobInProgress {
       metrics.launchMap(id);
     } else {
       ++runningReduceTasks;
+      metrics.addRunningReduces(jobId, 1);
       name = TaskType.REDUCE;
       counter = JobCounter.TOTAL_LAUNCHED_REDUCES;
       if (tip.isSpeculating()) {
@@ -1661,8 +1665,10 @@ public class JobInProgress {
     long now = System.currentTimeMillis();
     
     FallowSlotInfo info = map.get(taskTracker);
+    int reservedSlots = 0;
     if (info == null) {
       info = new FallowSlotInfo(now, numSlots);
+      reservedSlots = numSlots;
     } else {
       // Increment metering info if the reservation is changing
       if (info.getNumSlots() != numSlots) {
@@ -1674,11 +1680,18 @@ public class JobInProgress {
         jobCounters.incrCounter(counter, fallowSlotMillis);
         
         // Update 
+        reservedSlots = numSlots - info.getNumSlots();
         info.setTimestamp(now);
         info.setNumSlots(numSlots);
       }
     }
     map.put(taskTracker, info);
+    if (type == TaskType.MAP) {
+      jobtracker.getInstrumentation().addReservedMapSlots(reservedSlots);
+    }
+    else {
+      jobtracker.getInstrumentation().addReservedReduceSlots(reservedSlots);
+    }
   }
   
   public synchronized void unreserveTaskTracker(TaskTracker taskTracker,
@@ -1704,6 +1717,13 @@ public class JobInProgress {
     jobCounters.incrCounter(counter, fallowSlotMillis);
 
     map.remove(taskTracker);
+    if (type == TaskType.MAP) {
+      jobtracker.getInstrumentation().decReservedMapSlots(info.getNumSlots());
+    }
+    else {
+      jobtracker.getInstrumentation().decReservedReduceSlots(
+        info.getNumSlots());
+    }
   }
   
   public int getNumReservedTaskTrackersForMaps() {
@@ -2582,6 +2602,7 @@ public class JobInProgress {
       jobtracker.markCompletedTaskAttempt(status.getTaskTracker(), taskid);
     } else if (tip.isMapTask()) {
       runningMapTasks -= 1;
+      metrics.decRunningMaps(jobId, 1);
       finishedMapTasks += 1;
       metrics.completeMap(taskid);
       if (!tip.isJobSetupTask() && hasSpeculativeMaps) {
@@ -2594,6 +2615,7 @@ public class JobInProgress {
       }
     } else {
       runningReduceTasks -= 1;
+      metrics.decRunningReduces(jobId, 1);
       finishedReduceTasks += 1;
       metrics.completeReduce(taskid);
       if (!tip.isJobSetupTask() && hasSpeculativeReduces) {
@@ -2657,7 +2679,32 @@ public class JobInProgress {
   public float getSlowTaskThreshold() {
     return slowTaskThreshold;
   }
-  
+
+  /**
+   * Job state change must happen thru this call
+   */
+  private void changeStateTo(int newState) {
+    int oldState = this.status.getRunState();
+    if (oldState == newState) {
+      return; //old and new states are same
+    }
+    this.status.setRunState(newState);
+    
+    //update the metrics
+    if (oldState == JobStatus.PREP) {
+      this.jobtracker.getInstrumentation().decPrepJob(conf, jobId);
+    } else if (oldState == JobStatus.RUNNING) {
+      this.jobtracker.getInstrumentation().decRunningJob(conf, jobId);
+    }
+    
+    if (newState == JobStatus.PREP) {
+      this.jobtracker.getInstrumentation().addPrepJob(conf, jobId);
+    } else if (newState == JobStatus.RUNNING) {
+      this.jobtracker.getInstrumentation().addRunningJob(conf, jobId);
+    }
+    
+  }
+
   /**
    * The job is done since all it's component tasks are either
    * successful or have failed.
@@ -2669,7 +2716,7 @@ public class JobInProgress {
     //
     if (this.status.getRunState() == JobStatus.RUNNING ||
         this.status.getRunState() == JobStatus.PREP) {
-      this.status.setRunState(JobStatus.SUCCEEDED);
+      changeStateTo(JobStatus.SUCCEEDED);
       this.status.setCleanupProgress(1.0f);
       if (maps.length == 0) {
         this.status.setMapProgress(1.0f);
@@ -2718,9 +2765,9 @@ public class JobInProgress {
       this.status.setFinishTime(this.finishTime);
 
       if (jobTerminationState == JobStatus.FAILED) {
-        this.status.setRunState(JobStatus.FAILED);
+        changeStateTo(JobStatus.FAILED);
       } else {
-        this.status.setRunState(JobStatus.KILLED);
+        changeStateTo(JobStatus.KILLED);
       }
       // Log the job summary
       JobSummary.logJobSummary(this, jobtracker.getClusterStatus(false));
@@ -2739,6 +2786,13 @@ public class JobInProgress {
 
       jobtracker.getInstrumentation().terminateJob(
           this.conf, this.status.getJobID());
+      if (jobTerminationState == JobStatus.FAILED) {
+        jobtracker.getInstrumentation().failedJob(
+            this.conf, this.status.getJobID());
+      } else {
+        jobtracker.getInstrumentation().killedJob(
+            this.conf, this.status.getJobID());
+      }
     }
   }
 
@@ -2910,6 +2964,7 @@ public class JobInProgress {
         launchedSetup = false;
       } else if (tip.isMapTask()) {
         runningMapTasks -= 1;
+        metrics.decRunningMaps(jobId, 1);
         metrics.failedMap(taskid);
         // remove from the running queue and put it in the non-running cache
         // if the tip is not complete i.e if the tip still needs to be run
@@ -2919,6 +2974,7 @@ public class JobInProgress {
         }
       } else {
         runningReduceTasks -= 1;
+        metrics.decRunningReduces(jobId, 1);
         metrics.failedReduce(taskid);
         // remove from the running queue and put in the failed queue if the tip
         // is not complete

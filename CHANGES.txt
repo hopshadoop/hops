@@ -20,6 +20,8 @@ Trunk (unreleased changes)
     Enhanced FileOutputCommitter to create a _SUCCESS file for successful
     jobs. (Amar Kamat & Jothi Padmanabhan via acmurthy) 
 
+    MAPREDUCE-1103. Added more metrics to Jobtracker. (sharad) 
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
