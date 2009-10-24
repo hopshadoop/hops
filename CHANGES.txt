@@ -22,6 +22,10 @@ Trunk (unreleased changes)
 
     MAPREDUCE-1103. Added more metrics to Jobtracker. (sharad) 
 
+    MAPREDUCE-1048. Add occupied/reserved slot usage summary on jobtracker UI.
+    (Amareshwari Sriramadasu and Hemanth Yamijala via sharad)
+
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band

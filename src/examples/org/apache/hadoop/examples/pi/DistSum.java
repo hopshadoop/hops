@@ -38,9 +38,9 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Writable;
-import org.apache.hadoop.mapred.ClusterStatus;
-import org.apache.hadoop.mapred.JobClient;
 import org.apache.hadoop.mapred.JobTracker;
+import org.apache.hadoop.mapreduce.Cluster;
+import org.apache.hadoop.mapreduce.ClusterMetrics;
 import org.apache.hadoop.mapreduce.InputFormat;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.Job;
@@ -379,14 +379,14 @@ public final class DistSum extends Configured implements Tool {
   public static class MixMachine extends Machine {
     private static final MixMachine INSTANCE = new MixMachine();
     
-    private JobClient jobclient;
+    private Cluster cluster;
 
     /** {@inheritDoc} */
     @Override
     public synchronized void init(Job job) throws IOException {
       final Configuration conf = job.getConfiguration();
-      if (jobclient == null)
-        jobclient = new JobClient(JobTracker.getAddress(conf), conf);
+      if (cluster == null)
+        cluster = new Cluster(JobTracker.getAddress(conf), conf);
       chooseMachine(conf).init(job);
     }
 
@@ -398,9 +398,11 @@ public final class DistSum extends Configured implements Tool {
       try {
         for(;; Thread.sleep(2000)) {
           //get cluster status
-          final ClusterStatus status = jobclient.getClusterStatus();
-          final int m = status.getMaxMapTasks() - status.getMapTasks();
-          final int r = status.getMaxReduceTasks() - status.getReduceTasks();
+          final ClusterMetrics status = cluster.getClusterStatus();
+          final int m = 
+            status.getMapSlotCapacity() - status.getOccupiedMapSlots();
+          final int r = 
+            status.getReduceSlotCapacity() - status.getOccupiedReduceSlots();
           if (m >= parts || r >= parts) {
             //favor ReduceSide machine
             final Machine value = r >= parts?
