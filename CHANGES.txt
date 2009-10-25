@@ -25,6 +25,8 @@ Trunk (unreleased changes)
     MAPREDUCE-1048. Add occupied/reserved slot usage summary on jobtracker UI.
     (Amareshwari Sriramadasu and Hemanth Yamijala via sharad)
 
+    MAPREDUCE-1090. Modified log statement in TaskMemoryManagerThread to
+    include task attempt id. (yhemanth)
 
   OPTIMIZATIONS
 
