@@ -129,11 +129,6 @@ public class TestJobTrackerInstrumentation extends TestCase {
     taskAttemptID[1] = job.findMapTask(trackers[1]);
     taskAttemptID[2] = job.findReduceTask(trackers[2]);
     
-    assertTrue("Mismatch in num  running maps",
-        mi.numRunningMaps == numMaps);
-    assertTrue("Mismatch in num running reduces",
-        mi.numRunningReduces == numReds);
-
     job.finishTask(taskAttemptID[0]);
     job.finishTask(taskAttemptID[1]);
     job.finishTask(taskAttemptID[2]);
@@ -254,6 +249,10 @@ public class TestJobTrackerInstrumentation extends TestCase {
       mapSlotsPerTask+mapSlotsPerTask1, mi.numOccupiedMapSlots);
     assertEquals("Mismatch in reduce slots occupied",
       reduceSlotsPerTask+reduceSlotsPerTask1, mi.numOccupiedReduceSlots);
+    assertEquals("Mismatch in num  running maps",
+        2, mi.numRunningMaps);
+      assertEquals("Mismatch in num running reduces",
+        2, mi.numRunningReduces);
     
     //now send heartbeat with no running tasks
     status = new TaskTrackerStatus[1];
@@ -265,6 +264,10 @@ public class TestJobTrackerInstrumentation extends TestCase {
       0, mi.numOccupiedMapSlots);
     assertEquals("Mismatch in reduce slots occupied",
       0, mi.numOccupiedReduceSlots);
+    assertEquals("Mismatch in num  running maps",
+      0, mi.numRunningMaps);
+    assertEquals("Mismatch in num running reduces",
+      0, mi.numRunningReduces);
   }
 
   public void testReservedSlots() throws IOException {
@@ -555,25 +558,25 @@ public class TestJobTrackerInstrumentation extends TestCase {
     }
 
     @Override
-    public synchronized void addRunningMaps(JobID id, int task)
+    public synchronized void addRunningMaps(int task)
     {
       numRunningMaps += task;
     }
 
     @Override
-    public synchronized void decRunningMaps(JobID id, int task) 
+    public synchronized void decRunningMaps(int task) 
     {
       numRunningMaps -= task;
     }
 
     @Override
-    public synchronized void addRunningReduces(JobID id, int task)
+    public synchronized void addRunningReduces(int task)
     {
       numRunningReduces += task;
     }
 
     @Override
-    public synchronized void decRunningReduces(JobID id, int task)
+    public synchronized void decRunningReduces(int task)
     {
       numRunningReduces -= task;
     }

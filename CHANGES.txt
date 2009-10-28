@@ -48,6 +48,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1098. Fixed the distributed-cache to not do i/o while holding a
     global lock. (Amareshwari Sriramadasu via acmurthy)
 
+    MAPREDUCE-1158. Fix JT running maps and running reduces metrics.
+    (sharad)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
