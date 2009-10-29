@@ -37,6 +37,9 @@ Trunk (unreleased changes)
 
   BUG FIXES
 
+    MAPREDUCE-1089. Fix NPE in fair scheduler preemption when tasks are
+    scheduled but not running. (Todd Lipcon via matei)
+
     MAPREDUCE-1014. Fix the libraries for common and hdfs. (omalley)
 
     MAPREDUCE-1111. JT Jetty UI not working if we run mumak.sh 
