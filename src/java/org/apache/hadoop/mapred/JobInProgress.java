@@ -2057,7 +2057,9 @@ public class JobInProgress {
     String taskTrackerName = tts.getTrackerName();
     String taskTrackerHost = tts.getHost();
     if (numMapTasks == 0) {
-      LOG.info("No maps to schedule for " + profile.getJobID());
+      if(LOG.isDebugEnabled()) {
+        LOG.debug("No maps to schedule for " + profile.getJobID());
+      }
       return -1;
     }
 
@@ -2247,7 +2249,9 @@ public class JobInProgress {
     String taskTrackerName = tts.getTrackerName();
     String taskTrackerHost = tts.getHost();
     if (numReduceTasks == 0) {
-      LOG.info("No reduces to schedule for " + profile.getJobID());
+      if(LOG.isDebugEnabled()) {
+        LOG.debug("No reduces to schedule for " + profile.getJobID());
+      }
       return -1;
     }
     TaskInProgress tip = null;

@@ -54,6 +54,10 @@ Trunk (unreleased changes)
     MAPREDUCE-1158. Fix JT running maps and running reduces metrics.
     (sharad)
 
+    MAPREDUCE-1160. Reduce verbosity of log lines in some Map/Reduce classes
+    to avoid filling up jobtracker logs on a busy cluster.
+    (Ravi Gummadi and Hong Tang via yhemanth)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
