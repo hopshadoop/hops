@@ -28,6 +28,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1090. Modified log statement in TaskMemoryManagerThread to
     include task attempt id. (yhemanth)
 
+    MAPREDUCE-1069. Implement Sqoop API refactoring. (Aaron Kimball via
+    tomwhite)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
