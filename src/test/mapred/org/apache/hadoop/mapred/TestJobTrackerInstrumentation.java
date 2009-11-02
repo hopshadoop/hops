@@ -298,6 +298,18 @@ public class TestJobTrackerInstrumentation extends TestCase {
   }
   
   public void testDecomissionedTrackers() throws IOException {
+    // create TaskTrackerStatus and send heartbeats
+    TaskTrackerStatus[] status = new TaskTrackerStatus[trackers.length];
+    status[0] = getTTStatus(trackers[0], new ArrayList<TaskStatus>());
+    status[1] = getTTStatus(trackers[1], new ArrayList<TaskStatus>());
+    status[2] = getTTStatus(trackers[2], new ArrayList<TaskStatus>());
+    for (int i = 0; i< trackers.length; i++) {
+      FakeObjectUtilities.sendHeartBeat(jobTracker, status[i], false,
+          false, trackers[i], responseId);
+    }
+    
+    assertEquals("Mismatch in number of trackers",
+        trackers.length, mi.numTrackers);
     Set<String> dHosts = new HashSet<String>();
     dHosts.add(hosts[1]);
     assertEquals("Mismatch in number of decommissioned trackers",
@@ -305,6 +317,8 @@ public class TestJobTrackerInstrumentation extends TestCase {
     jobTracker.decommissionNodes(dHosts);
     assertEquals("Mismatch in number of decommissioned trackers",
         1, mi.numTrackersDecommissioned);
+    assertEquals("Mismatch in number of trackers",
+        trackers.length - 1, mi.numTrackers);
   }
   
   static class FakeTaskScheduler extends JobQueueTaskScheduler {

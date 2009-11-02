@@ -61,6 +61,9 @@ Trunk (unreleased changes)
     to avoid filling up jobtracker logs on a busy cluster.
     (Ravi Gummadi and Hong Tang via yhemanth)
 
+    MAPREDUCE-1153. Fix tasktracker metrics when trackers are decommissioned.
+    (sharad)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
