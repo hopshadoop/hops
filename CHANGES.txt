@@ -31,6 +31,8 @@ Trunk (unreleased changes)
     MAPREDUCE-1069. Implement Sqoop API refactoring. (Aaron Kimball via
     tomwhite)
 
+    MAPREDUCE-1036. Document Sqoop API. (Aaron Kimball via cdouglas)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
