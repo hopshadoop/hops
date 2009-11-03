@@ -840,3 +840,6 @@ Release 0.21.0 - Unreleased
     queue capacity. (Rahul Kumar Singh via yhemanth)
 
     MAPREDUCE-1016.  Make the job history log format JSON.  (cutting)
+
+    MAPREDUCE-1038. Weave Mumak aspects only if related files have changed.
+    (Aaron Kimball via cdouglas)
