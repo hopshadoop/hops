@@ -317,6 +317,36 @@ distcp -update hdfs://nn1:8020/foo/a \
       </section>
 
       <section>
+        <title>Copying to S3</title>
+
+        <p>DistCp can be used to copy data between HDFS and other filesystems,
+        including those backed by S3. The <code>s3n</code> FileSystem
+        implementation allows DistCp (and Hadoop in general) to use an S3
+        bucket as a source or target for transfers. To transfer data from
+        HDFS to an S3 bucket, invoke DistCp using arguments like the following:
+        </p>
+<source>
+bash$ hadoop distcp hdfs://nn:8020/foo/bar \
+    s3n://$AWS_ACCESS_KEY_ID:$AWS_SECRET_ACCESS_KEY@&lt;bucket&gt;/foo/bar
+</source>
+
+        <p><code>$AWS_ACCESS_KEY_ID</code> and
+        <code>$AWS_SECRET_ACCESS_KEY</code> are environment variables holding
+        S3 access credentials.</p>
+
+        <p>Some FileSystem operations take longer on S3 than on HDFS. If you
+        are transferring large files to S3 (e.g., 1 GB and up), you may
+        experience timeouts during your job. To prevent this, you should set
+        the task timeout to a larger interval than is typically used:
+        </p>
+<source>
+bash$ hadoop distcp -D mapred.task.timeout=1800000 \
+    hdfs://nn:8020/foo/bar \
+    s3n://$AWS_ACCESS_KEY_ID:$AWS_SECRET_ACCESS_KEY@&lt;bucket&gt;/foo/bar
+</source>
+      </section>
+
+      <section>
         <title>MapReduce and Other Side-effects</title>
 
         <p>As has been mentioned in the preceding, should a map fail to copy

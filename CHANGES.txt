@@ -486,6 +486,9 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-1012. Mark Context interfaces as public evolving. (Tom White via
     cdouglas)
 
+    MAPREDUCE-971. Document use of distcp when copying to s3, managing timeouts
+    in particular. (Aaron Kimball via cdouglas)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 
