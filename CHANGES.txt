@@ -854,3 +854,7 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1163. Remove unused, hard-coded paths from libhdfs. (Allen
     Wittenauer via cdouglas)
+
+    MAPREDUCE-962. Fix a NullPointerException while killing task process 
+    trees. (Ravi Gummadi via yhemanth)
+    

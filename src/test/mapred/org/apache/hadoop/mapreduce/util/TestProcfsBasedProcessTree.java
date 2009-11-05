@@ -423,6 +423,34 @@ public class TestProcfsBasedProcessTree extends TestCase {
   }
 
   /**
+   * Verifies ProcfsBasedProcessTree.checkPidPgrpidForMatch() in case of
+   * 'constructProcessInfo() returning null' by not writing stat file for the
+   * mock process
+   * @throws IOException if there was a problem setting up the
+   *                      fake procfs directories or files.
+   */
+  public void testDestroyProcessTree() throws IOException {
+    // test process
+    String pid = "100";
+    // create the fake procfs root directory. 
+    File procfsRootDir = new File(TEST_ROOT_DIR, "proc");
+
+    try {
+      setupProcfsRootDir(procfsRootDir);
+      
+      // crank up the process tree class.
+      ProcfsBasedProcessTree processTree = new ProcfsBasedProcessTree(
+                        pid, true, 100L, procfsRootDir.getAbsolutePath());
+
+      // Let us not create stat file for pid 100.
+      assertTrue(ProcfsBasedProcessTree.checkPidPgrpidForMatch(
+                            pid, procfsRootDir.getAbsolutePath()));
+    } finally {
+      FileUtil.fullyDelete(procfsRootDir);
+    }
+  }
+  
+  /**
    * Test the correctness of process-tree dump.
    * 
    * @throws IOException

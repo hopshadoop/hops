@@ -228,12 +228,19 @@ public class ProcfsBasedProcessTree extends ProcessTree {
 
   /** Verify that the given process id is same as its process group id.
    * @param pidStr Process id of the to-be-verified-process
+   * @param procfsDir  Procfs root dir
    */
-  private static boolean assertPidPgrpidForMatch(String pidStr) {
+  static boolean checkPidPgrpidForMatch(String pidStr, String procfsDir) {
     Integer pId = Integer.parseInt(pidStr);
     // Get information for this process
     ProcessInfo pInfo = new ProcessInfo(pId);
-    pInfo = constructProcessInfo(pInfo);
+    pInfo = constructProcessInfo(pInfo, procfsDir);
+    if (pInfo == null) {
+      // process group leader may have finished execution, but we still need to
+      // kill the subProcesses in the process group.
+      return true;
+    }
+
     //make sure that pId and its pgrpId match
     if (!pInfo.getPgrpId().equals(pId)) {
       LOG.warn("Unexpected: Process with PID " + pId +
@@ -258,7 +265,7 @@ public class ProcfsBasedProcessTree extends ProcessTree {
                        boolean inBackground)
          throws IOException {
     // Make sure that the pid given is a process group leader
-    if (!assertPidPgrpidForMatch(pgrpId)) {
+    if (!checkPidPgrpidForMatch(pgrpId, PROCFS)) {
       throw new IOException("Process with PID " + pgrpId  +
                           " is not a process group leader.");
     }
@@ -391,15 +398,6 @@ public class ProcfsBasedProcessTree extends ProcessTree {
   }
 
   /**
-   * 
-   * Construct the ProcessInfo using the process' PID and procfs and return the
-   * same. Returns null on failing to read from procfs,
-   */
-  private static ProcessInfo constructProcessInfo(ProcessInfo pinfo) {
-    return constructProcessInfo(pinfo, PROCFS);
-  }
-
-  /**
    * Construct the ProcessInfo using the process' PID and procfs rooted at the
    * specified directory and return the same. It is provided mainly to assist
    * testing purposes.
@@ -422,6 +420,8 @@ public class ProcfsBasedProcessTree extends ProcessTree {
       in = new BufferedReader(fReader);
     } catch (FileNotFoundException f) {
       // The process vanished in the interim!
+      LOG.warn("The process " + pinfo.getPid()
+          + " may have finished in the interim.");
       return ret;
     }
 
@@ -435,6 +435,11 @@ public class ProcfsBasedProcessTree extends ProcessTree {
         pinfo.updateProcessInfo(m.group(2), Integer.parseInt(m.group(3)), Integer
             .parseInt(m.group(4)), Integer.parseInt(m.group(5)), Long
             .parseLong(m.group(7)));
+      }
+      else {
+        LOG.warn("Unexpected: procfs stat file is not in the expected format"
+            + " for process with pid " + pinfo.getPid());
+        ret = null;
       }
     } catch (IOException io) {
       LOG.warn("Error reading the stream " + io);
