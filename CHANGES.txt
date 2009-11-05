@@ -848,3 +848,6 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1038. Weave Mumak aspects only if related files have changed.
     (Aaron Kimball via cdouglas)
+
+    MAPREDUCE-1037. Continue running contrib tests if Sqoop tests fail. (Aaron
+    Kimball via cdouglas)
