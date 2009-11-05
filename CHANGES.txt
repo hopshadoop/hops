@@ -66,6 +66,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1153. Fix tasktracker metrics when trackers are decommissioned.
     (sharad)
 
+    MAPREDUCE-1128. Fix MRUnit to prohibit iterating over values twice. (Aaron
+    Kimball via cdouglas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

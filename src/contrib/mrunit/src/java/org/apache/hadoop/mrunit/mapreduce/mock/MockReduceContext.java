@@ -63,20 +63,41 @@ public class MockReduceContext <KEYIN, VALUEIN, KEYOUT, VALUEOUT>
   private class InspectableIterable implements Iterable<VALUEIN> {
     private Iterable<VALUEIN> base;
     private VALUEIN lastVal;
+    private boolean used; // if true, don't re-iterate.
 
     public InspectableIterable(final Iterable<VALUEIN> baseCollection) {
       this.base = baseCollection;
     }
 
     public Iterator<VALUEIN> iterator() {
-      return new InspectableIterator(this.base.iterator());
+      if (used) {
+        return new NullIterator();
+      } else {
+        used = true;
+        return new InspectableIterator(this.base.iterator());
+      }
     }
 
     public VALUEIN getLastVal() {
       return lastVal;
     }
 
-    private class InspectableIterator 
+    private class NullIterator
+        extends ReduceContextImpl<KEYIN, VALUEIN, KEYOUT, VALUEOUT>.ValueIterator
+        implements Iterator<VALUEIN> {
+      public VALUEIN next() {
+        return null;
+      }
+
+      public boolean hasNext() {
+        return false;
+      }
+
+      public void remove() {
+      }
+    }
+
+    private class InspectableIterator
         extends ReduceContextImpl<KEYIN, VALUEIN, KEYOUT, VALUEOUT>.ValueIterator
         implements Iterator<VALUEIN> {
       private Iterator<VALUEIN> iter;
