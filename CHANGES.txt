@@ -851,3 +851,6 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1037. Continue running contrib tests if Sqoop tests fail. (Aaron
     Kimball via cdouglas)
+
+    MAPREDUCE-1163. Remove unused, hard-coded paths from libhdfs. (Allen
+    Wittenauer via cdouglas)
