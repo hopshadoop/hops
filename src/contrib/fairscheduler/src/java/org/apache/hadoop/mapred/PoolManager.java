@@ -61,6 +61,8 @@ public class PoolManager {
    */
   public static final long ALLOC_RELOAD_WAIT = 5 * 1000; 
 
+  public static final String EXPLICIT_POOL_PROPERTY = "mapred.fairscheduler.pool";
+
   private final FairScheduler scheduler;
   
   // Map and reduce minimum allocations for each pool
@@ -391,7 +393,7 @@ public class PoolManager {
    */
   public synchronized void setPool(JobInProgress job, String pool) {
     removeJob(job);
-    job.getJobConf().set(poolNameProperty, pool);
+    job.getJobConf().set(EXPLICIT_POOL_PROPERTY, pool);
     addJob(job);
   }
 
@@ -403,13 +405,16 @@ public class PoolManager {
   }
   
   /**
-   * Get the pool name for a JobInProgress from its configuration. This uses
-   * the "project" property in the jobconf by default, or the property set with
-   * "mapred.fairscheduler.poolnameproperty".
+   * Get the pool name for a JobInProgress from its configuration.  This uses
+   * the value of mapred.fairscheduler.pool if specified, otherwise the value 
+   * of the property named in mapred.fairscheduler.poolnameproperty if that is
+   * specified.  Otherwise if neither is specified it uses the "user.name" property 
+   * in the jobconf by default.
    */
   public String getPoolName(JobInProgress job) {
     Configuration conf = job.getJobConf();
-    return conf.get(poolNameProperty, Pool.DEFAULT_POOL_NAME).trim();
+    return conf.get(EXPLICIT_POOL_PROPERTY,
+      conf.get(poolNameProperty, Pool.DEFAULT_POOL_NAME)).trim();
   }
 
   /**

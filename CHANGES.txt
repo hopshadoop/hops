@@ -11,6 +11,9 @@ Trunk (unreleased changes)
 
   IMPROVEMENTS
 
+    MAPREDUCE-707. Provide a jobconf property for explicitly assigning a job to 
+    a pool in the Fair Scheduler. (Alan Heirich via matei)
+
     MAPREDUCE-999. Improve Sqoop test speed and refactor tests.
     (Aaron Kimball via tomwhite)
 

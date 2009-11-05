@@ -163,6 +163,15 @@
           </tr>
           <tr>
           <td>
+            mapred.fairscheduler.pool
+          </td>
+          <td>
+            Specify the pool that a job belongs in.  
+            If this is specified then mapred.fairscheduler.poolnameproperty is ignored.
+          </td>
+          </tr>
+          <tr>
+          <td>
             mapred.fairscheduler.poolnameproperty
           </td>
           <td>
@@ -171,17 +180,8 @@
             (i.e. one pool for each user). 
             Another useful value is <em>group.name</em> to create a
             pool per Unix group.
-            Finally, a common setting is to use a non-standard property
-            such as <em>pool.name</em> as the pool name property, and make it
-            default to <em>mapreduce.job.mapreduce.job.user.name</em> through the following setting:<br/>
-            <code>&lt;property&gt;</code><br/> 
-            <code>&nbsp;&nbsp;&lt;name&gt;pool.name&lt;/name&gt;</code><br/>
-            <code>&nbsp;&nbsp;&lt;value&gt;${mapreduce.job.mapreduce.job.user.name}&lt;/value&gt;</code><br/>
-            <code>&lt;/property&gt;</code><br/>
-            This allows you to specify the pool name explicitly for some jobs
-            through the jobconf (e.g. passing <em>-Dpool.name=&lt;name&gt;</em>
-            to <em>bin/hadoop jar</em>, while having the default be the user's
-            pool.
+            mapred.fairscheduler. poolnameproperty is used only for jobs in which 
+            mapred.fairscheduler.pool is not explicitly set.
           </td>
           </tr>
           <tr>

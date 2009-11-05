@@ -52,6 +52,7 @@ public class TestFairScheduler extends TestCase {
       "test-pools").getAbsolutePath();
   
   private static final String POOL_PROPERTY = "pool";
+  private static final String EXPLICIT_POOL_PROPERTY = "mapred.fairscheduler.pool";
   
   private static int jobCounter;
   
@@ -2470,6 +2471,87 @@ public class TestFairScheduler extends TestCase {
     checkAssignment("tt2", "attempt_test_0004_m_000000_0 on tt2");
     checkAssignment("tt2", "attempt_test_0001_r_000001_0 on tt2");
     checkAssignment("tt2", "attempt_test_0004_r_000000_0 on tt2");
+  }
+
+  /**
+   * This test uses the mapred.fairscheduler.pool property to assign jobs to pools.
+   */
+  public void testPoolAssignment() throws Exception {
+    // Set up pools file
+    PrintWriter out = new PrintWriter(new FileWriter(ALLOC_FILE));
+    out.println("<?xml version=\"1.0\"?>");
+    out.println("<allocations>");
+    out.println("<pool name=\"default\">");
+    out.println("<schedulingMode>fair</schedulingMode>");
+    out.println("</pool>");
+    out.println("<pool name=\"poolA\">");
+    out.println("<schedulingMode>fair</schedulingMode>");
+    out.println("</pool>");
+    out.println("</allocations>");
+    out.close();
+    scheduler.getPoolManager().reloadAllocs();
+    Pool defaultPool = scheduler.getPoolManager().getPool("default");
+    Pool poolA = scheduler.getPoolManager().getPool("poolA");
+ 
+    // Submit a job to the default pool.  All specifications take default values.
+    JobInProgress job1 = submitJob(JobStatus.RUNNING, 1, 3);
+
+    assertEquals(1,    defaultPool.getMapSchedulable().getDemand());
+    assertEquals(3,    defaultPool.getReduceSchedulable().getDemand());
+    assertEquals(0,    poolA.getMapSchedulable().getDemand());
+    assertEquals(0,    poolA.getReduceSchedulable().getDemand());
+
+    // Submit a job to the default pool and move it to poolA using setPool.
+    JobInProgress job2 = submitJob(JobStatus.RUNNING, 5, 7);
+
+    assertEquals(6,    defaultPool.getMapSchedulable().getDemand());
+    assertEquals(10,   defaultPool.getReduceSchedulable().getDemand());
+    assertEquals(0,    poolA.getMapSchedulable().getDemand());
+    assertEquals(0,    poolA.getReduceSchedulable().getDemand());
+
+    scheduler.getPoolManager().setPool(job2, "poolA");
+    assertEquals("poolA", scheduler.getPoolManager().getPoolName(job2));
+
+    defaultPool.getMapSchedulable().updateDemand();
+    defaultPool.getReduceSchedulable().updateDemand();
+    poolA.getMapSchedulable().updateDemand();
+    poolA.getReduceSchedulable().updateDemand();
+
+    assertEquals(1,    defaultPool.getMapSchedulable().getDemand());
+    assertEquals(3,    defaultPool.getReduceSchedulable().getDemand());
+    assertEquals(5,    poolA.getMapSchedulable().getDemand());
+    assertEquals(7,    poolA.getReduceSchedulable().getDemand());
+
+    // Submit a job to poolA by specifying mapred.fairscheduler.pool
+    JobConf jobConf = new JobConf(conf);
+    jobConf.setNumMapTasks(11);
+    jobConf.setNumReduceTasks(13);
+    jobConf.set(POOL_PROPERTY, "nonsense"); // test that this is overridden
+    jobConf.set(EXPLICIT_POOL_PROPERTY, "poolA");
+    JobInProgress job3 = new FakeJobInProgress(jobConf, taskTrackerManager,
+        null, UtilsForTests.getJobTracker());
+    job3.getStatus().setRunState(JobStatus.RUNNING);
+    taskTrackerManager.submitJob(job3);
+
+    assertEquals(1,    defaultPool.getMapSchedulable().getDemand());
+    assertEquals(3,    defaultPool.getReduceSchedulable().getDemand());
+    assertEquals(16,   poolA.getMapSchedulable().getDemand());
+    assertEquals(20,   poolA.getReduceSchedulable().getDemand());
+
+    // Submit a job to poolA by specifying pool and not mapred.fairscheduler.pool
+    JobConf jobConf2 = new JobConf(conf);
+    jobConf2.setNumMapTasks(17);
+    jobConf2.setNumReduceTasks(19);
+    jobConf2.set(POOL_PROPERTY, "poolA");
+    JobInProgress job4 = new FakeJobInProgress(jobConf2, taskTrackerManager,
+        null, UtilsForTests.getJobTracker());
+    job4.getStatus().setRunState(JobStatus.RUNNING);
+    taskTrackerManager.submitJob(job4);
+
+    assertEquals(1,    defaultPool.getMapSchedulable().getDemand());
+    assertEquals(3,    defaultPool.getReduceSchedulable().getDemand());
+    assertEquals(33,   poolA.getMapSchedulable().getDemand());
+    assertEquals(39,   poolA.getReduceSchedulable().getDemand());
   }
   
   private void advanceTime(long time) {
