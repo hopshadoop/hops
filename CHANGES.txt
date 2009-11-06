@@ -863,4 +863,6 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-962. Fix a NullPointerException while killing task process 
     trees. (Ravi Gummadi via yhemanth)
-    
+
+    MAPREDUCE-1177. Correct setup/cleanup inversion in
+    JobTracker::getTaskReports. (Vinod Kumar Vavilapalli via cdouglas)

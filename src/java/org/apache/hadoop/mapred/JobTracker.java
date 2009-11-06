@@ -3414,9 +3414,9 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
         return getMapTaskReports(JobID.downgrade(jobid));
       case REDUCE :
         return getReduceTaskReports(JobID.downgrade(jobid));
-      case JOB_SETUP:
+      case JOB_CLEANUP:
         return getCleanupTaskReports(JobID.downgrade(jobid));
-      case JOB_CLEANUP :
+      case JOB_SETUP :
         return getSetupTaskReports(JobID.downgrade(jobid));
     }
     return new TaskReport[0];
