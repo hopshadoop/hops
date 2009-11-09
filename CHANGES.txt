@@ -72,6 +72,8 @@ Trunk (unreleased changes)
     MAPREDUCE-1128. Fix MRUnit to prohibit iterating over values twice. (Aaron
     Kimball via cdouglas)
 
+    MAPREDUCE-665. Move libhdfs to HDFS subproject. (Eli Collins via dhruba)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
