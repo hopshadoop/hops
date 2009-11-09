@@ -868,3 +868,7 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1177. Correct setup/cleanup inversion in
     JobTracker::getTaskReports. (Vinod Kumar Vavilapalli via cdouglas)
+
+    MAPREDUCE-1178. Fix ClassCastException in MultipleInputs by adding 
+    a DelegatingRecordReader. (Amareshwari Sriramadasu and Jay Booth 
+    via sharad)
