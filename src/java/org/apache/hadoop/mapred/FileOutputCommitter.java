@@ -64,7 +64,7 @@ public class FileOutputCommitter extends OutputCommitter {
   
   public void commitJob(JobContext context) throws IOException {
     // delete the _temporary folder in the output folder
-    cleanup(context);
+    cleanupJob(context);
     // check if the output-dir marking is required
     if (shouldMarkOutputDir(context.getJobConf())) {
       // create a _success file in the output folder
@@ -85,9 +85,10 @@ public class FileOutputCommitter extends OutputCommitter {
       fileSys.create(filePath).close();
     }
   }
-  
-  // Deletes the _temporary folder in the job's output dir.
-  private void cleanup(JobContext context) throws IOException {
+
+  @Override
+  @Deprecated
+  public void cleanupJob(JobContext context) throws IOException {
     JobConf conf = context.getJobConf();
     // do the clean up of temporary directory
     Path outputPath = FileOutputFormat.getOutputPath(conf);
@@ -107,7 +108,7 @@ public class FileOutputCommitter extends OutputCommitter {
   public void abortJob(JobContext context, int runState) 
   throws IOException {
     // simply delete the _temporary dir from the o/p folder of the job
-    cleanup(context);
+    cleanupJob(context);
   }
   
   public void setupTask(TaskAttemptContext context) throws IOException {

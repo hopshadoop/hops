@@ -74,6 +74,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-665. Move libhdfs to HDFS subproject. (Eli Collins via dhruba)
 
+    MAPREDUCE-1196. Fix FileOutputCommitter to use the deprecated cleanupJob
+    api correctly. (acmurthy)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
