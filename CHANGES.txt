@@ -875,3 +875,6 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-1178. Fix ClassCastException in MultipleInputs by adding 
     a DelegatingRecordReader. (Amareshwari Sriramadasu and Jay Booth 
     via sharad)
+
+    MAPREDUCE-1068. Fix streaming job to show proper message if file is 
+    is not present. (Amareshwari Sriramadasu via sharad)
