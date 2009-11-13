@@ -36,6 +36,8 @@ Trunk (unreleased changes)
 
     MAPREDUCE-1036. Document Sqoop API. (Aaron Kimball via cdouglas)
 
+    MAPREDUCE-1189. Reduce ivy console output to ovservable level (cos)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
