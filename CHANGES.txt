@@ -504,6 +504,11 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-971. Document use of distcp when copying to s3, managing timeouts
     in particular. (Aaron Kimball via cdouglas)
 
+    HDFS-663. DFSIO for append. (shv)
+
+    HDFS-641. Move all of the components that depend on map/reduce to 
+    map/reduce. (omalley)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 
