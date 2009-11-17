@@ -38,6 +38,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-1189. Reduce ivy console output to ovservable level (cos)
 
+    MAPREDUCE-1167. ProcfsBasedProcessTree collects rss memory information.
+    (Scott Chen via dhruba)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band

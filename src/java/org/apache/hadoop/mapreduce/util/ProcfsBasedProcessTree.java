@@ -33,6 +33,7 @@ import java.util.LinkedList;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.util.Shell.ShellCommandExecutor;
 import org.apache.hadoop.util.StringUtils;
 
 /**
@@ -46,10 +47,24 @@ public class ProcfsBasedProcessTree extends ProcessTree {
   private static final String PROCFS = "/proc/";
 
   private static final Pattern PROCFS_STAT_FILE_FORMAT = Pattern
-      .compile("^([0-9-]+)\\s([^\\s]+)\\s[^\\s]\\s([0-9-]+)\\s([0-9-]+)\\s([0-9-]+)\\s([0-9-]+\\s){16}([0-9]+)(\\s[0-9-]+){16}");
+      .compile("^([0-9-]+)\\s([^\\s]+)\\s[^\\s]\\s([0-9-]+)\\s([0-9-]+)\\s([0-9-]+)\\s([0-9-]+\\s){16}([0-9]+)\\s([0-9]+)(\\s[0-9-]+){15}");
 
   static final String PROCFS_STAT_FILE = "stat";
   static final String PROCFS_CMDLINE_FILE = "cmdline";
+  public static final long PAGE_SIZE;
+  static {
+    ShellCommandExecutor shellExecutor =
+            new ShellCommandExecutor(new String[]{"getconf",  "PAGESIZE"});
+    long pageSize = -1;
+    try {
+      shellExecutor.execute();
+      pageSize = Long.parseLong(shellExecutor.getOutput().replace("\n", ""));
+    } catch (IOException e) {
+      LOG.error(StringUtils.stringifyException(e));
+    } finally {
+      PAGE_SIZE = pageSize;
+    }
+  }
 
   // to enable testing, using this variable which can be configured
   // to a test directory.
@@ -309,7 +324,7 @@ public class ProcfsBasedProcessTree extends ProcessTree {
   }
 
   private static final String PROCESSTREE_DUMP_FORMAT =
-      "\t|- %d %d %d %d %s %d %s\n";
+      "\t|- %d %d %d %d %s %d %d %s\n";
 
   /**
    * Get a dump of the process-tree.
@@ -321,12 +336,12 @@ public class ProcfsBasedProcessTree extends ProcessTree {
     StringBuilder ret = new StringBuilder();
     // The header.
     ret.append(String.format("\t|- PID PPID PGRPID SESSID CMD_NAME "
-        + "VMEM_USAGE(BYTES) FULL_CMD_LINE\n"));
+        + "VMEM_USAGE(BYTES) RSSMEM_USAGE(PAGES) FULL_CMD_LINE\n"));
     for (ProcessInfo p : processTree.values()) {
       if (p != null) {
         ret.append(String.format(PROCESSTREE_DUMP_FORMAT, p.getPid(), p
             .getPpid(), p.getPgrpId(), p.getSessionId(), p.getName(), p
-            .getVmem(), p.getCmdLine(procfsDir)));
+            .getVmem(), p.getRssmemPage(), p.getCmdLine(procfsDir)));
       }
     }
     return ret.toString();
@@ -341,6 +356,18 @@ public class ProcfsBasedProcessTree extends ProcessTree {
   public long getCumulativeVmem() {
     // include all processes.. all processes will be older than 0.
     return getCumulativeVmem(0);
+  }
+
+  /**
+   * Get the cumulative resident set size (rss) memory used by all the processes
+   * in the process-tree.
+   *
+   * @return cumulative rss memory used by the process-tree in bytes. return 0
+   *         if it cannot be calculated
+   */
+  public long getCumulativeRssmem() {
+    // include all processes.. all processes will be older than 0.
+    return getCumulativeRssmem(0);
   }
 
   /**
@@ -362,6 +389,29 @@ public class ProcfsBasedProcessTree extends ProcessTree {
     return total;
   }
   
+  /**
+   * Get the cumulative resident set size (rss) memory used by all the processes
+   * in the process-tree that are older than the passed in age.
+   *
+   * @param olderThanAge processes above this age are included in the
+   *                      memory addition
+   * @return cumulative rss memory used by the process-tree in bytes,
+   *          for processes older than this age. return 0 if it cannot be
+   *          calculated
+   */
+  public long getCumulativeRssmem(int olderThanAge) {
+    if (PAGE_SIZE < 0) {
+      return 0;
+    }
+    long totalPages = 0;
+    for (ProcessInfo p : processTree.values()) {
+      if ((p != null) && (p.getAge() > olderThanAge)) {
+        totalPages += p.getRssmemPage();
+      }
+    }
+    return totalPages * PAGE_SIZE; // convert # pages to byte
+  }
+
   private static Integer getValidPID(String pid) {
     Integer retPid = -1;
     try {
@@ -431,10 +481,10 @@ public class ProcfsBasedProcessTree extends ProcessTree {
       Matcher m = PROCFS_STAT_FILE_FORMAT.matcher(str);
       boolean mat = m.find();
       if (mat) {
-        // Set ( name ) ( ppid ) ( pgrpId ) (session ) (vsize )
+        // Set ( name ) ( ppid ) ( pgrpId ) (session ) (vsize ) (rss)
         pinfo.updateProcessInfo(m.group(2), Integer.parseInt(m.group(3)), Integer
             .parseInt(m.group(4)), Integer.parseInt(m.group(5)), Long
-            .parseLong(m.group(7)));
+            .parseLong(m.group(7)), Long.parseLong(m.group(8)));
       }
       else {
         LOG.warn("Unexpected: procfs stat file is not in the expected format"
@@ -485,6 +535,7 @@ public class ProcfsBasedProcessTree extends ProcessTree {
     private Integer ppid; // parent process-id
     private Integer sessionId; // session-id
     private Long vmem; // virtual memory usage
+    private Long rssmemPage; // rss memory usage in # of pages
     // how many times has this process been seen alive
     private int age; 
     private List<ProcessInfo> children = new ArrayList<ProcessInfo>(); // list of children
@@ -519,6 +570,10 @@ public class ProcfsBasedProcessTree extends ProcessTree {
       return vmem;
     }
 
+    public Long getRssmemPage() { // get rss # of pages
+      return rssmemPage;
+    }
+
     public int getAge() {
       return age;
     }
@@ -531,12 +586,13 @@ public class ProcfsBasedProcessTree extends ProcessTree {
     }
 
     public void updateProcessInfo(String name, Integer ppid, Integer pgrpId,
-        Integer sessionId, Long vmem) {
+        Integer sessionId, Long vmem, Long rssmem) {
       this.name = name;
       this.ppid = ppid;
       this.pgrpId = pgrpId;
       this.sessionId = sessionId;
       this.vmem = vmem;
+      this.rssmemPage = rssmem;
     }
 
     public void updateAge(ProcessInfo oldInfo) {
