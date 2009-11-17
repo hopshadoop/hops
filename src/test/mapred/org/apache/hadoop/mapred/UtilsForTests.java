@@ -666,7 +666,8 @@ public class UtilsForTests {
     public void map(WritableComparable key, Writable value,
         OutputCollector<WritableComparable, Writable> out, Reporter reporter)
         throws IOException {
-
+      //NOTE- the next line is required for the TestDebugScript test to succeed
+      System.err.println("failing map");
       throw new RuntimeException("failing map");
     }
   }

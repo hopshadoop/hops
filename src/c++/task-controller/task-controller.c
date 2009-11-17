@@ -910,25 +910,41 @@ int initialize_task(const char *jobid, const char *taskid, const char *user) {
 }
 
 /*
- * Function used to launch a task as the provided user. It does the following :
+ * Function used to launch a task as the provided user.
+ */
+int run_task_as_user(const char * user, const char *jobid, const char *taskid,
+    const char *tt_root) {
+  return run_process_as_user(user, jobid, taskid, tt_root, LAUNCH_TASK_JVM);
+}
+
+/*
+ * Function that is used as a helper to launch task JVMs and debug scripts.
+ * Not meant for launching any other process. It does the following :
  * 1) Checks if the tt_root passed is found in mapreduce.cluster.local.dir
- * 2) Prepares attempt_dir and log_dir to be accessible by the child
+ * 2) Prepares attempt_dir and log_dir to be accessible by the task JVMs
  * 3) Uses get_task_launcher_file to fetch the task script file path
  * 4) Does an execlp on the same in order to replace the current image with
  * task image.
  */
-int run_task_as_user(const char * user, const char *jobid, const char *taskid,
-    const char *tt_root) {
-  int exit_code = 0;
-
+int run_process_as_user(const char * user, const char * jobid, 
+const char *taskid, const char *tt_root, int command) {
+  if (command != LAUNCH_TASK_JVM && command != RUN_DEBUG_SCRIPT) {
+    return INVALID_COMMAND_PROVIDED;
+  }
   if (jobid == NULL || taskid == NULL || tt_root == NULL) {
     return INVALID_ARGUMENT_NUMBER;
   }
+  
+  if (command == LAUNCH_TASK_JVM) {
+    fprintf(LOGFILE, "run_process_as_user launching a JVM for task :%s.\n", taskid);
+  } else if (command == RUN_DEBUG_SCRIPT) {
+    fprintf(LOGFILE, "run_process_as_user launching a debug script for task :%s.\n", taskid);
+  }
 
 #ifdef DEBUG
-  fprintf(LOGFILE, "Job-id passed to run_task_as_user : %s.\n", jobid);
-  fprintf(LOGFILE, "task-d passed to run_task_as_user : %s.\n", taskid);
-  fprintf(LOGFILE, "tt_root passed to run_task_as_user : %s.\n", tt_root);
+  fprintf(LOGFILE, "Job-id passed to run_process_as_user : %s.\n", jobid);
+  fprintf(LOGFILE, "task-d passed to run_process_as_user : %s.\n", taskid);
+  fprintf(LOGFILE, "tt_root passed to run_process_as_user : %s.\n", tt_root);
 #endif
 
   //Check tt_root before switching the user, as reading configuration
@@ -939,9 +955,11 @@ int run_task_as_user(const char * user, const char *jobid, const char *taskid,
     return INVALID_TT_ROOT;
   }
 
+  int exit_code = 0;
   char *job_dir = NULL, *task_script_path = NULL;
 
-  if ((exit_code = initialize_task(jobid, taskid, user)) != 0) {
+  if (command == LAUNCH_TASK_JVM && 
+     (exit_code = initialize_task(jobid, taskid, user)) != 0) {
     fprintf(LOGFILE, "Couldn't initialise the task %s of user %s.\n", taskid,
         user);
     goto cleanup;
@@ -980,9 +998,14 @@ int run_task_as_user(const char * user, const char *jobid, const char *taskid,
   cleanup();
   execlp(task_script_path, task_script_path, NULL);
   if (errno != 0) {
-    fprintf(LOGFILE, "Couldn't execute the task jvm file: %s", strerror(errno));
     free(task_script_path);
-    exit_code = UNABLE_TO_EXECUTE_TASK_SCRIPT;
+    if (command == LAUNCH_TASK_JVM) {
+      fprintf(LOGFILE, "Couldn't execute the task jvm file: %s", strerror(errno));
+      exit_code = UNABLE_TO_EXECUTE_TASK_SCRIPT;
+    } else if (command == RUN_DEBUG_SCRIPT) {
+      fprintf(LOGFILE, "Couldn't execute the task debug script file: %s", strerror(errno));
+      exit_code = UNABLE_TO_EXECUTE_DEBUG_SCRIPT;
+    }
   }
 
   return exit_code;
@@ -998,7 +1021,13 @@ cleanup:
   cleanup();
   return exit_code;
 }
-
+/*
+ * Function used to launch a debug script as the provided user. 
+ */
+int run_debug_script_as_user(const char * user, const char *jobid, const char *taskid,
+    const char *tt_root) {
+  return run_process_as_user(user, jobid, taskid, tt_root, RUN_DEBUG_SCRIPT);
+}
 /**
  * Function used to terminate/kill a task launched by the user.
  * The function sends appropriate signal to the process group

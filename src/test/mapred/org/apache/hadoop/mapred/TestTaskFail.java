@@ -19,6 +19,7 @@ package org.apache.hadoop.mapred;
 
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 
 import junit.framework.TestCase;
 
@@ -118,7 +119,7 @@ public class TestTaskFail extends TestCase {
     assertTrue(ts != null);
     assertEquals(TaskStatus.State.FAILED, ts.getRunState());
     // validate tasklogs for task attempt
-    String log = TestMiniMRMapRedDebugScript.readTaskLog(
+    String log = readTaskLog(
                       TaskLog.LogName.STDERR, attemptId, false);
     assertTrue(log.contains(taskLog));
     if (!isCleanup) {
@@ -127,12 +128,49 @@ public class TestTaskFail extends TestCase {
       assertTrue(log.contains(cleanupLog));
     } else {
       // validate tasklogs for cleanup attempt
-      log = TestMiniMRMapRedDebugScript.readTaskLog(
+      log = readTaskLog(
                  TaskLog.LogName.STDERR, attemptId, true);
       assertTrue(log.contains(cleanupLog));
     }
   }
 
+  /**
+   * Reads tasklog and returns it as string after trimming it.
+   * @param filter Task log filter; can be STDOUT, STDERR,
+   *                SYSLOG, DEBUGOUT, DEBUGERR
+   * @param taskId The task id for which the log has to collected
+   * @param isCleanup whether the task is a cleanup attempt or not.
+   * @return task log as string
+   * @throws IOException
+   */
+  private String readTaskLog(TaskLog.LogName  filter, 
+                                   TaskAttemptID taskId, 
+                                   boolean isCleanup)
+  throws IOException {
+    // string buffer to store task log
+    StringBuffer result = new StringBuffer();
+    int res;
+
+    // reads the whole tasklog into inputstream
+    InputStream taskLogReader = new TaskLog.Reader(taskId, filter, 0, -1, isCleanup);
+    // construct string log from inputstream.
+    byte[] b = new byte[65536];
+    while (true) {
+      res = taskLogReader.read(b);
+      if (res > 0) {
+        result.append(new String(b));
+      } else {
+        break;
+      }
+    }
+    taskLogReader.close();
+    
+    // trim the string and return it
+    String str = result.toString();
+    str = str.trim();
+    return str;
+  }
+  
   private void validateJob(RunningJob job, MiniMRCluster mr) 
   throws IOException {
     assertEquals(JobStatus.SUCCEEDED, job.getJobState());

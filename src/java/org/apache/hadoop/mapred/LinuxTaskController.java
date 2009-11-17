@@ -29,6 +29,7 @@ import java.util.Map.Entry;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.mapred.JvmManager.JvmEnv;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Shell.ShellCommandExecutor;
@@ -87,6 +88,7 @@ class LinuxTaskController extends TaskController {
     INITIALIZE_TASK,
     TERMINATE_TASK_JVM,
     KILL_TASK_JVM,
+    RUN_DEBUG_SCRIPT,
   }
 
   /**
@@ -119,10 +121,12 @@ class LinuxTaskController extends TaskController {
     sb.append(cmdLine);
     // write the command to a file in the
     // task specific cache directory
-    writeCommand(sb.toString(), getTaskCacheDirectory(context));
+    writeCommand(sb.toString(), getTaskCacheDirectory(context, 
+        context.env.workDir));
     
     // Call the taskcontroller with the right parameters.
-    List<String> launchTaskJVMArgs = buildLaunchTaskArgs(context);
+    List<String> launchTaskJVMArgs = buildLaunchTaskArgs(context, 
+        context.env.workDir);
     ShellCommandExecutor shExec =  buildTaskControllerExecutor(
                                     TaskCommands.LAUNCH_TASK_JVM, 
                                     env.conf.getUser(),
@@ -149,7 +153,23 @@ class LinuxTaskController extends TaskController {
       logOutput(shExec.getOutput());
     }
   }
-
+  
+  /**
+   * Launch the debug script process that will run as the owner of the job.
+   * 
+   * This method launches the task debug script process by executing a setuid
+   * executable that will switch to the user and run the task. 
+   */
+  @Override
+  void runDebugScript(DebugScriptContext context) throws IOException {
+    String debugOut = FileUtil.makeShellPath(context.stdout);
+    String cmdLine = TaskLog.buildDebugScriptCommandLine(context.args, debugOut);
+    writeCommand(cmdLine, getTaskCacheDirectory(context, context.workDir));
+    // Call the taskcontroller with the right parameters.
+    List<String> launchTaskJVMArgs = buildLaunchTaskArgs(context, context.workDir);
+    runCommand(TaskCommands.RUN_DEBUG_SCRIPT, context.task.getUser(), 
+        launchTaskJVMArgs, context.workDir, null);
+  }
   /**
    * Helper method that runs a LinuxTaskController command
    * 
@@ -192,7 +212,7 @@ class LinuxTaskController extends TaskController {
    * @param context
    * @return Argument to be used while launching Task VM
    */
-  private List<String> buildInitializeTaskArgs(TaskControllerContext context) {
+  private List<String> buildInitializeTaskArgs(TaskExecContext context) {
     List<String> commandArgs = new ArrayList<String>(3);
     String taskId = context.task.getTaskID().toString();
     String jobId = getJobId(context);
@@ -223,7 +243,7 @@ class LinuxTaskController extends TaskController {
     }
   }
 
-  private String getJobId(TaskControllerContext context) {
+  private String getJobId(TaskExecContext context) {
     String taskId = context.task.getTaskID().toString();
     TaskAttemptID tId = TaskAttemptID.forName(taskId);
     String jobId = tId.getJobID().toString();
@@ -237,15 +257,16 @@ class LinuxTaskController extends TaskController {
    * @param context
    * @return Argument to be used while launching Task VM
    */
-  private List<String> buildLaunchTaskArgs(TaskControllerContext context) {
+  private List<String> buildLaunchTaskArgs(TaskExecContext context, 
+      File workDir) {
     List<String> commandArgs = new ArrayList<String>(3);
     LOG.debug("getting the task directory as: " 
-        + getTaskCacheDirectory(context));
+        + getTaskCacheDirectory(context, workDir));
     LOG.debug("getting the tt_root as " +getDirectoryChosenForTask(
-        new File(getTaskCacheDirectory(context)), 
+        new File(getTaskCacheDirectory(context, workDir)), 
         context) );
     commandArgs.add(getDirectoryChosenForTask(
-        new File(getTaskCacheDirectory(context)), 
+        new File(getTaskCacheDirectory(context, workDir)), 
         context));
     commandArgs.addAll(buildInitializeTaskArgs(context));
     return commandArgs;
@@ -255,7 +276,7 @@ class LinuxTaskController extends TaskController {
   // in Configs.LOCAL_DIR chosen for storing data pertaining to
   // this task.
   private String getDirectoryChosenForTask(File directory,
-      TaskControllerContext context) {
+      TaskExecContext context) {
     String jobId = getJobId(context);
     String taskId = context.task.getTaskID().toString();
     for (String dir : mapredLocalDirs) {
@@ -322,12 +343,13 @@ class LinuxTaskController extends TaskController {
   }
   
   // Return the task specific directory under the cache.
-  private String getTaskCacheDirectory(TaskControllerContext context) {
+  private String getTaskCacheDirectory(TaskExecContext context, 
+      File workDir) {
     // In the case of JVM reuse, the task specific directory
     // is different from what is set with respect with
     // env.workDir. Hence building this from the taskId everytime.
     String taskId = context.task.getTaskID().toString();
-    File cacheDirForJob = context.env.workDir.getParentFile().getParentFile();
+    File cacheDirForJob = workDir.getParentFile().getParentFile();
     if(context.task.isTaskCleanupTask()) {
       taskId = taskId + TaskTracker.TASK_CLEANUP_SUFFIX;
     }
@@ -345,6 +367,9 @@ class LinuxTaskController extends TaskController {
     PrintWriter pw = null;
     String commandFile = directory + File.separator + COMMAND_FILE;
     LOG.info("Writing commands to " + commandFile);
+    LOG.info("--------Commands Begin--------");
+    LOG.info(cmdLine);
+    LOG.info("--------Commands End--------");
     try {
       FileWriter fw = new FileWriter(commandFile);
       BufferedWriter bw = new BufferedWriter(fw);

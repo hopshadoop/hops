@@ -19,6 +19,7 @@ package org.apache.hadoop.mapred;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -29,6 +30,7 @@ import org.apache.hadoop.mapreduce.server.tasktracker.Localizer;
 import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Shell.ShellCommandExecutor;
+import org.apache.hadoop.classification.InterfaceAudience;
 
 /**
  * Controls initialization, finalization and clean up of tasks, and
@@ -40,9 +42,8 @@ import org.apache.hadoop.util.Shell.ShellCommandExecutor;
  * performing the actual actions.
  * 
  * <br/>
- * 
- * NOTE: This class is internal only class and not intended for users!!
  */
+@InterfaceAudience.Private
 public abstract class TaskController implements Configurable {
   
   private Configuration conf;
@@ -171,12 +172,14 @@ public abstract class TaskController implements Configurable {
   abstract void initializeTask(TaskControllerContext context)
       throws IOException;
 
+  static class TaskExecContext {
+    // task being executed
+    Task task;
+  }
   /**
    * Contains task information required for the task controller.  
    */
-  static class TaskControllerContext {
-    // task being executed
-    Task task;
+  static class TaskControllerContext extends TaskExecContext {
     ShellCommandExecutor shExec;     // the Shell executor executing the JVM for this task.
 
     // Information used only when this context is used for launching new tasks.
@@ -198,6 +201,12 @@ public abstract class TaskController implements Configurable {
 
   static class JobInitializationContext extends InitializationContext {
     JobID jobid;
+  }
+  
+  static class DebugScriptContext extends TaskExecContext {
+    List<String> args;
+    File workDir;
+    File stdout;
   }
 
   /**
@@ -223,4 +232,14 @@ public abstract class TaskController implements Configurable {
    */
   public abstract void initializeUser(InitializationContext context)
       throws IOException;
+  
+  /**
+   * Launch the task debug script
+   * 
+   * @param context
+   * @throws IOException
+   */
+  abstract void runDebugScript(DebugScriptContext context) 
+      throws IOException;
+  
 }

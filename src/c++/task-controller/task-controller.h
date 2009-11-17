@@ -44,6 +44,7 @@ enum command {
   INITIALIZE_TASK,
   TERMINATE_TASK_JVM,
   KILL_TASK_JVM,
+  RUN_DEBUG_SCRIPT,
 };
 
 enum errorcodes {
@@ -67,6 +68,7 @@ enum errorcodes {
   OUT_OF_MEMORY, //18
   INITIALIZE_DISTCACHE_FAILED, //19
   INITIALIZE_USER_FAILED, //20
+  UNABLE_TO_EXECUTE_DEBUG_SCRIPT, //21
 };
 
 #define USER_DIR_PATTERN "%s/taskTracker/%s"
@@ -97,6 +99,9 @@ extern struct passwd *user_detail;
 extern FILE *LOGFILE;
 
 int run_task_as_user(const char * user, const char *jobid, const char *taskid,
+    const char *tt_root);
+
+int run_debug_script_as_user(const char * user, const char *jobid, const char *taskid,
     const char *tt_root);
 
 int initialize_user(const char *user);

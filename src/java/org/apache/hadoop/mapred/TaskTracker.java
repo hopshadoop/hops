@@ -65,6 +65,7 @@ import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.mapred.TaskController.DebugScriptContext;
 import org.apache.hadoop.mapred.TaskController.JobInitializationContext;
 import org.apache.hadoop.mapred.TaskTrackerStatus.TaskTrackerHealthStatus;
 import org.apache.hadoop.mapred.pipes.Submitter;
@@ -2297,84 +2298,7 @@ public class TaskTracker
             setTaskFailState(true);
             // call the script here for the failed tasks.
             if (debugCommand != null) {
-              String taskStdout ="";
-              String taskStderr ="";
-              String taskSyslog ="";
-              String jobConf = task.getJobFile();
-              try {
-                // get task's stdout file 
-                taskStdout = FileUtil.makeShellPath(
-                    TaskLog.getRealTaskLogFileLocation
-                                  (task.getTaskID(), TaskLog.LogName.STDOUT));
-                // get task's stderr file 
-                taskStderr = FileUtil.makeShellPath(
-                    TaskLog.getRealTaskLogFileLocation
-                                  (task.getTaskID(), TaskLog.LogName.STDERR));
-                // get task's syslog file 
-                taskSyslog = FileUtil.makeShellPath(
-                    TaskLog.getRealTaskLogFileLocation
-                                  (task.getTaskID(), TaskLog.LogName.SYSLOG));
-              } catch(IOException e){
-                LOG.warn("Exception finding task's stdout/err/syslog files");
-              }
-              File workDir = null;
-              try {
-                workDir =
-                    new File(lDirAlloc.getLocalPathToRead(
-                        TaskTracker.getLocalTaskDir(task.getUser(), task
-                            .getJobID().toString(), task.getTaskID()
-                            .toString(), task.isTaskCleanupTask())
-                            + Path.SEPARATOR + MRConstants.WORKDIR,
-                        localJobConf).toString());
-              } catch (IOException e) {
-                LOG.warn("Working Directory of the task " + task.getTaskID() +
-                                " doesnt exist. Caught exception " +
-                          StringUtils.stringifyException(e));
-              }
-              // Build the command  
-              File stdout = TaskLog.getRealTaskLogFileLocation(
-                                   task.getTaskID(), TaskLog.LogName.DEBUGOUT);
-              // add pipes program as argument if it exists.
-              String program ="";
-              String executable = Submitter.getExecutable(localJobConf);
-              if ( executable != null) {
-            	try {
-            	  program = new URI(executable).getFragment();
-            	} catch (URISyntaxException ur) {
-            	  LOG.warn("Problem in the URI fragment for pipes executable");
-            	}	  
-              }
-              String [] debug = debugCommand.split(" ");
-              Vector<String> vargs = new Vector<String>();
-              for (String component : debug) {
-                vargs.add(component);
-              }
-              vargs.add(taskStdout);
-              vargs.add(taskStderr);
-              vargs.add(taskSyslog);
-              vargs.add(jobConf);
-              vargs.add(program);
-              try {
-                List<String>  wrappedCommand = TaskLog.captureDebugOut
-                                                          (vargs, stdout);
-                // run the script.
-                try {
-                  runScript(wrappedCommand, workDir);
-                } catch (IOException ioe) {
-                  LOG.warn("runScript failed with: " + StringUtils.
-                                                      stringifyException(ioe));
-                }
-              } catch(IOException e) {
-                LOG.warn("Error in preparing wrapped debug command");
-              }
-
-              // add all lines of debug out to diagnostics
-              try {
-                int num = localJobConf.getInt(JobContext.TASK_DEBUGOUT_LINES, -1);
-                addDiagnostics(FileUtil.makeShellPath(stdout),num,"DEBUG OUT");
-              } catch(IOException ioe) {
-                LOG.warn("Exception in add diagnostics!");
-              }
+              runDebugScript();
             }
           }
           taskStatus.setProgress(0.0f);
@@ -2402,21 +2326,84 @@ public class TaskTracker
 
     }
     
-
-    /**
-     * Runs the script given in args
-     * @param args script name followed by its argumnets
-     * @param dir current working directory.
-     * @throws IOException
-     */
-    public void runScript(List<String> args, File dir) throws IOException {
-      ShellCommandExecutor shexec = 
-              new ShellCommandExecutor(args.toArray(new String[0]), dir);
-      shexec.execute();
-      int exitCode = shexec.getExitCode();
-      if (exitCode != 0) {
-        throw new IOException("Task debug script exit with nonzero status of " 
-                              + exitCode + ".");
+    private void runDebugScript() {
+      String taskStdout ="";
+      String taskStderr ="";
+      String taskSyslog ="";
+      String jobConf = task.getJobFile();
+      try {
+        // get task's stdout file 
+        taskStdout = FileUtil.makeShellPath(
+            TaskLog.getRealTaskLogFileLocation
+                          (task.getTaskID(), TaskLog.LogName.STDOUT));
+        // get task's stderr file 
+        taskStderr = FileUtil.makeShellPath(
+            TaskLog.getRealTaskLogFileLocation
+                          (task.getTaskID(), TaskLog.LogName.STDERR));
+        // get task's syslog file 
+        taskSyslog = FileUtil.makeShellPath(
+            TaskLog.getRealTaskLogFileLocation
+                          (task.getTaskID(), TaskLog.LogName.SYSLOG));
+      } catch(IOException e){
+        LOG.warn("Exception finding task's stdout/err/syslog files");
+      }
+      File workDir = null;
+      try {
+        workDir =
+            new File(lDirAlloc.getLocalPathToRead(
+                TaskTracker.getLocalTaskDir(task.getUser(), task
+                    .getJobID().toString(), task.getTaskID()
+                    .toString(), task.isTaskCleanupTask())
+                    + Path.SEPARATOR + MRConstants.WORKDIR,
+                localJobConf).toString());
+      } catch (IOException e) {
+        LOG.warn("Working Directory of the task " + task.getTaskID() +
+                        " doesnt exist. Caught exception " +
+                  StringUtils.stringifyException(e));
+      }
+      // Build the command  
+      File stdout = TaskLog.getRealTaskLogFileLocation(
+                           task.getTaskID(), TaskLog.LogName.DEBUGOUT);
+      // add pipes program as argument if it exists.
+      String program ="";
+      String executable = Submitter.getExecutable(localJobConf);
+      if ( executable != null) {
+        try {
+          program = new URI(executable).getFragment();
+        } catch (URISyntaxException ur) {
+          LOG.warn("Problem in the URI fragment for pipes executable");
+        }     
+      }
+      String [] debug = debugCommand.split(" ");
+      List<String> vargs = new ArrayList<String>();
+      for (String component : debug) {
+        vargs.add(component);
+      }
+      vargs.add(taskStdout);
+      vargs.add(taskStderr);
+      vargs.add(taskSyslog);
+      vargs.add(jobConf);
+      vargs.add(program);
+      DebugScriptContext context = 
+        new TaskController.DebugScriptContext();
+      context.args = vargs;
+      context.stdout = stdout;
+      context.workDir = workDir;
+      context.task = task;
+      try {
+        getTaskController().runDebugScript(context);
+        // add all lines of debug out to diagnostics
+        try {
+          int num = localJobConf.getInt(JobContext.TASK_DEBUGOUT_LINES,
+              -1);
+          addDiagnostics(FileUtil.makeShellPath(stdout),num,
+              "DEBUG OUT");
+        } catch(IOException ioe) {
+          LOG.warn("Exception in add diagnostics!");
+        }
+      } catch (IOException ie) {
+        LOG.warn("runDebugScript failed with: " + StringUtils.
+                                              stringifyException(ie));
       }
     }
 

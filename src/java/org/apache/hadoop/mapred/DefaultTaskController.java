@@ -28,6 +28,7 @@ import org.apache.hadoop.util.Shell.ShellCommandExecutor;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
 
 /**
  * The default implementation for controlling tasks.
@@ -38,8 +39,8 @@ import org.apache.commons.logging.LogFactory;
  * 
  * <br/>
  * 
- *  NOTE: This class is internal only class and not intended for users!!
  */
+@InterfaceAudience.Private
 public class DefaultTaskController extends TaskController {
 
   private static final Log LOG = 
@@ -142,4 +143,18 @@ public class DefaultTaskController extends TaskController {
     // Do nothing.
   }
   
+  @Override
+  void runDebugScript(DebugScriptContext context) throws IOException {
+    List<String>  wrappedCommand = TaskLog.captureDebugOut(context.args, 
+        context.stdout);
+    // run the script.
+    ShellCommandExecutor shexec = 
+      new ShellCommandExecutor(wrappedCommand.toArray(new String[0]), context.workDir);
+    shexec.execute();
+    int exitCode = shexec.getExitCode();
+    if (exitCode != 0) {
+      throw new IOException("Task debug script exit with nonzero status of " 
+          + exitCode + ".");
+    }
+  }
 }

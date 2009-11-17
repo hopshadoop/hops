@@ -135,6 +135,13 @@ int main(int argc, char **argv) {
     task_pid = argv[optind++];
     exit_code = kill_user_task(user_detail->pw_name, task_pid, SIGKILL);
     break;
+  case RUN_DEBUG_SCRIPT:
+    tt_root = argv[optind++];
+    job_id = argv[optind++];
+    task_id = argv[optind++];
+    exit_code
+        = run_debug_script_as_user(user_detail->pw_name, job_id, task_id, tt_root);
+    break;
   default:
     exit_code = INVALID_COMMAND_PROVIDED;
   }

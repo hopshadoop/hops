@@ -891,3 +891,5 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1147. Add map output counters to new API. (Amar Kamat via
     cdouglas)
+
+    MAPREDUCE-915. The debug scripts are run as the job user. (ddas)
