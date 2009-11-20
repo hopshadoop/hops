@@ -21,8 +21,6 @@ package org.apache.hadoop.mapred;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.text.NumberFormat;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -51,12 +49,15 @@ import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.TaskCounter;
 import org.apache.hadoop.mapreduce.lib.reduce.WrappedReducer;
 import org.apache.hadoop.mapreduce.task.ReduceContextImpl;
+import org.apache.hadoop.mapreduce.security.JobTokens;
+import org.apache.hadoop.mapreduce.security.SecureShuffleUtils;
 import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.util.Progress;
 import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.fs.FSDataInputStream;
 
 /** 
  * Base class for tasks.
@@ -159,6 +160,7 @@ abstract public class Task implements Writable, Configurable {
   protected final Counters.Counter mergedMapOutputsCounter;
   private int numSlotsRequired;
   protected TaskUmbilicalProtocol umbilical;
+  protected JobTokens jobTokens=null; // storage of the secret keys
 
   ////////////////////////////////////////////
   // Constructors
@@ -211,6 +213,23 @@ abstract public class Task implements Writable, Configurable {
   public JobID getJobID() {
     return taskId.getJobID();
   }
+
+  /**
+   * set JobToken storage 
+   * @param jt
+   */
+  public void setJobTokens(JobTokens jt) {
+    this.jobTokens = jt;
+  }
+
+  /**
+   * get JobToken storage
+   * @return storage object
+   */
+  public JobTokens getJobTokens() {
+    return this.jobTokens;
+  }
+
   
   /**
    * Get the index of this task within the job.
@@ -1299,7 +1318,6 @@ abstract public class Task implements Writable, Configurable {
                                                 reporter, comparator, keyClass,
                                                 valueClass);
       reducer.run(reducerContext);
-    }
-    
+    } 
   }
 }

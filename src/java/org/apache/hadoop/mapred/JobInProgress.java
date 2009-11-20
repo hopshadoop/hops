@@ -63,6 +63,8 @@ import org.apache.hadoop.mapreduce.jobhistory.TaskAttemptUnsuccessfulCompletionE
 import org.apache.hadoop.mapreduce.jobhistory.TaskFailedEvent;
 import org.apache.hadoop.mapreduce.jobhistory.TaskFinishedEvent;
 import org.apache.hadoop.mapreduce.jobhistory.TaskStartedEvent;
+import org.apache.hadoop.mapreduce.security.JobTokens;
+import org.apache.hadoop.mapreduce.security.SecureShuffleUtils;
 import org.apache.hadoop.mapreduce.server.jobtracker.TaskTracker;
 import org.apache.hadoop.metrics.MetricsContext;
 import org.apache.hadoop.metrics.MetricsRecord;
@@ -71,6 +73,7 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.NetworkTopology;
 import org.apache.hadoop.net.Node;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.fs.FSDataOutputStream;
 
 /*************************************************************
  * JobInProgress maintains all the info for keeping
@@ -574,6 +577,11 @@ public class JobInProgress {
     
     // log the job priority
     setPriority(this.priority);
+    
+    //
+    // generate security keys needed by Tasks
+    //
+    generateJobTokens(jobtracker.getSystemDirectoryForJob(jobId));
     
     //
     // read input splits and create a map per a split
@@ -3505,4 +3513,30 @@ public class JobInProgress {
       LOG.debug("Failed to delete file " + f);
     }
   }
+  
+  /**
+   * generate keys and save it into the file
+   * @param jobDir
+   * @throws IOException
+   */
+  private void generateJobTokens(Path jobDir) throws IOException{
+    Path keysFile = new Path(jobDir, JobTokens.JOB_TOKEN_FILENAME);
+    FSDataOutputStream os = fs.create(keysFile);
+    //create JobTokens file and add key to it
+    JobTokens jt = new JobTokens();
+    byte [] key;
+    try {
+      // new key
+      key = SecureShuffleUtils.getNewEncodedKey();
+    } catch (java.security.GeneralSecurityException e) {
+      throw new IOException(e);
+    }
+    // remember the key 
+    jt.setShuffleJobToken(key);
+    // other keys..
+    jt.write(os);
+    os.close();
+    LOG.debug("jobTokens generated and stored in "+ keysFile.toUri().getPath());
+  }
+
 }

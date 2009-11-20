@@ -32,6 +32,7 @@ import java.util.Vector;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.filecache.DistributedCache;
 import org.apache.hadoop.mapreduce.filecache.TaskDistributedCacheManager;
@@ -504,6 +505,11 @@ abstract class TaskRunner extends Thread {
       ldLibraryPath.append(oldLdLibraryPath);
     }
     env.put("LD_LIBRARY_PATH", ldLibraryPath.toString());
+    
+    // put jobTokenFile name into env
+    String jobTokenFile = conf.get(JobContext.JOB_TOKEN_FILE);
+    LOG.debug("putting jobToken file name into environment fn=" + jobTokenFile);
+    env.put("JOB_TOKEN_FILE", jobTokenFile);
     
     // for the child of task jvm, set hadoop.root.logger
     env.put("HADOOP_ROOT_LOGGER", "INFO,TLA");

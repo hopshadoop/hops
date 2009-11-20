@@ -36,6 +36,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.TaskType;
+import org.apache.hadoop.mapreduce.security.JobTokens;
 import org.apache.hadoop.mapreduce.server.tasktracker.Localizer;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Shell;
@@ -140,14 +141,15 @@ public class TestTaskTrackerLocalization extends TestCase {
 
     // JobClient uploads the jobConf to the file system.
     File jobConfFile = uploadJobConf(job.getConfiguration());
-
-    // Set up the TaskTracker
+    
+        // Set up the TaskTracker
     tracker = new TaskTracker();
     tracker.setConf(trackerFConf);
 
     // for test case system FS is the local FS
     tracker.localFs = tracker.systemFS = FileSystem.getLocal(trackerFConf);
-
+    tracker.systemDirectory = new Path(TEST_ROOT_DIR.getAbsolutePath());
+    
     taskTrackerUGI = UserGroupInformation.login(trackerFConf);
 
     // Set up the task to be localized
@@ -159,6 +161,10 @@ public class TestTaskTrackerLocalization extends TestCase {
         new MapTask(jobConfFile.toURI().toString(), taskId, 1, null, null, 1);
     task.setConf(job.getConfiguration()); // Set conf. Set user name in particular.
 
+    // create jobTokens file
+    uploadJobTokensFile(); 
+    
+    
     taskController = new DefaultTaskController();
     taskController.setConf(trackerFConf);
     taskController.setup();
@@ -203,6 +209,25 @@ public class TestTaskTrackerLocalization extends TestCase {
     conf.writeXml(out);
     out.close();
     return jobConfFile;
+  }
+  
+  /**
+   * create fake JobTokens file
+   * @return
+   * @throws IOException
+   */
+  protected void uploadJobTokensFile() throws IOException {
+    
+    File dir = new File(TEST_ROOT_DIR, jobId.toString());
+    if(!dir.exists())
+      assertTrue("faild to create dir="+dir.getAbsolutePath(), dir.mkdirs());
+    
+    File jobTokenFile = new File(dir, JobTokens.JOB_TOKEN_FILENAME);
+    FileOutputStream fos = new FileOutputStream(jobTokenFile);
+    java.io.DataOutputStream out = new java.io.DataOutputStream(fos);
+    JobTokens jt = new JobTokens();
+    jt.write(out); // writing empty file, we don't the keys for this test 
+    out.close();
   }
 
   @Override

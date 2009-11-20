@@ -9,6 +9,10 @@ Trunk (unreleased changes)
     MAPREDUCE-1017. Compression and output splitting for Sqoop.
     (Aaron Kimball via tomwhite)
 
+    MAPREDUCE-1026. Does mutual authentication of the shuffle
+    transfers using a shared JobTracker generated key.
+    (Boris Shkolnik via ddas)
+
   IMPROVEMENTS
 
     MAPREDUCE-1198. Alternatively schedule different types of tasks in

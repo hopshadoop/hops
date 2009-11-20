@@ -220,6 +220,7 @@ public interface JobContext {
     "mapreduce.reduce.merge.memtomem.threshold";
   public static final String REDUCE_MEMTOMEM_ENABLED = 
     "mapreduce.reduce.merge.memtomem.enabled";
+  public static final String JOB_TOKEN_FILE = "mapreduce.job.jobTokenFile";
 
   /**
    * Return the configuration for the job.

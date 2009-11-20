@@ -41,9 +41,14 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
+import org.apache.hadoop.mapreduce.security.JobTokens;
+import org.apache.hadoop.mapreduce.security.SecureShuffleUtils;
 import org.apache.hadoop.mapreduce.task.reduce.MapOutput.Type;
 import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.ReflectionUtils;
+
+import org.apache.commons.codec.binary.Base64;
+import java.security.GeneralSecurityException;
 
 class Fetcher<K,V> extends Thread {
   
@@ -83,11 +88,12 @@ class Fetcher<K,V> extends Thread {
   // Decompression of map-outputs
   private final CompressionCodec codec;
   private final Decompressor decompressor;
+  private final byte[] shuffleJobToken;
 
   public Fetcher(JobConf job, TaskAttemptID reduceId, 
                  ShuffleScheduler<K,V> scheduler, MergeManager<K,V> merger,
                  Reporter reporter, ShuffleClientMetrics metrics,
-                 ExceptionReporter exceptionReporter) {
+                 ExceptionReporter exceptionReporter, byte [] shuffleJobToken) {
     this.reporter = reporter;
     this.scheduler = scheduler;
     this.merger = merger;
@@ -95,6 +101,7 @@ class Fetcher<K,V> extends Thread {
     this.exceptionReporter = exceptionReporter;
     this.id = ++nextId;
     this.reduce = reduceId.getTaskID().getId();
+    this.shuffleJobToken = shuffleJobToken;
     ioErrs = reporter.getCounter(SHUFFLE_ERR_GRP_NAME,
         ShuffleErrors.IO_ERROR.toString());
     wrongLengthErrs = reporter.getCounter(SHUFFLE_ERR_GRP_NAME,
@@ -185,12 +192,31 @@ class Fetcher<K,V> extends Thread {
     boolean connectSucceeded = false;
     
     try {
-      URLConnection connection = getMapOutputURL(host, maps).openConnection();
+      URL url = getMapOutputURL(host, maps);
+      URLConnection connection = url.openConnection();
+      
+      // generate hash of the url
+      SecureShuffleUtils ssutil = new SecureShuffleUtils(shuffleJobToken);
+      String msgToEncode = SecureShuffleUtils.buildMsgFrom(url);
+      String encHash = ssutil.hashFromString(msgToEncode);
+      
+      // put url hash into http header
+      connection.addRequestProperty(
+          SecureShuffleUtils.HTTP_HEADER_URL_HASH, encHash);
       connectSucceeded = true;
       input = 
         new DataInputStream(getInputStream(connection, connectionTimeout,
                                            readTimeout));
-
+      
+      // get the replyHash which is HMac of the encHash we sent to the server
+      String replyHash = connection.getHeaderField(SecureShuffleUtils.HTTP_HEADER_REPLY_URL_HASH);
+      if(replyHash==null) {
+        throw new IOException("security validation of TT Map output failed");
+      }
+      LOG.debug("url="+msgToEncode+";encHash="+encHash+";replyHash="+replyHash);
+      // verify that replyHash is HMac of encHash
+      ssutil.verifyReply(replyHash, encHash);
+      LOG.info("for url="+msgToEncode+" sent hash and receievd reply");
     } catch (IOException ie) {
       ioErrs.increment(1);
       LOG.warn("Failed to connect to " + host + " with " + remaining.size() + 

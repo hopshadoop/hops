@@ -93,7 +93,7 @@ public class Shuffle<K, V> implements ExceptionReporter {
                                     mergedMapOutputsCounter, 
                                     this, mergePhase);
   }
-  
+
   @SuppressWarnings("unchecked")
   public RawKeyValueIterator run() throws IOException, InterruptedException {
     // Start the map-completion events fetcher thread
@@ -106,7 +106,8 @@ public class Shuffle<K, V> implements ExceptionReporter {
     Fetcher<K,V>[] fetchers = new Fetcher[numFetchers];
     for (int i=0; i < numFetchers; ++i) {
       fetchers[i] = new Fetcher<K,V>(jobConf, reduceId, scheduler, merger, 
-                                     reporter, metrics, this);
+                                     reporter, metrics, this, 
+                                     reduceTask.getJobTokens().getShuffleJobToken());
       fetchers[i].start();
     }
     

@@ -80,5 +80,9 @@
       name="paranamer"
       rev="${paranamer.version}"
       conf="common->default"/>
+	<dependency org="commons-codec"
+      name="commons-codec"
+      rev="${commons-codec.version}"
+      conf="common->default"/>
   </dependencies>
 </ivy-module>
