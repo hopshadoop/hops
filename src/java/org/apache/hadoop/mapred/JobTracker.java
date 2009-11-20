@@ -3962,7 +3962,10 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
 
   public org.apache.hadoop.mapreduce.JobStatus[] getJobsFromQueue(String queue) 
       throws IOException {
-    Collection<JobInProgress> jips = taskScheduler.getJobs(queue);
+    Collection<JobInProgress> jips = null;
+    if (queueManager.getLeafQueueNames().contains(queue)) {
+      jips = taskScheduler.getJobs(queue);
+    }
     return getJobStatus(jips,false);
   }
   

@@ -893,3 +893,7 @@ Release 0.21.0 - Unreleased
     cdouglas)
 
     MAPREDUCE-915. The debug scripts are run as the job user. (ddas)
+
+    MAPREDUCE-1007. Fix NPE in CapacityTaskScheduler.getJobs(). 
+    (V.V.Chaitanya Krishna via sharad)
+

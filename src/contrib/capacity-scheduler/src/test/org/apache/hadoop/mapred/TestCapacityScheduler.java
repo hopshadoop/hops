@@ -28,6 +28,7 @@ import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.mapreduce.server.jobtracker.TaskTracker;
 import static org.apache.hadoop.mapred.CapacityTestUtils.*;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.*;
 
@@ -35,6 +36,11 @@ public class TestCapacityScheduler extends TestCase {
 
   static final Log LOG =
     LogFactory.getLog(org.apache.hadoop.mapred.TestCapacityScheduler.class);
+
+  String queueConfigPath =
+    System.getProperty("test.build.extraconf", "build/test/extraconf");
+  File queueConfigFile =
+    new File(queueConfigPath, QueueManager.QUEUE_CONF_FILE_NAME);
 
   private static int jobCounter;
 
@@ -341,65 +347,55 @@ public class TestCapacityScheduler extends TestCase {
     taskTrackerManager.finishTask("attempt_test_0002_m_000003_0", j2);
   }
 
-  // basic tests, should be able to submit to queues
-  public void testSubmitToQueues() throws Exception {
-    // set up some queues
-    String[] qs = {"default", "q2"};
-    taskTrackerManager.addQueues(qs);
-    ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
-    queues.add(new FakeQueueInfo("default", 50.0f, true, 25));
-    queues.add(new FakeQueueInfo("q2", 50.0f, true, 25));
+  /**
+   * tests the submission of jobs to container and job queues
+   * @throws Exception
+   */
+  public void testJobSubmission() throws Exception {
+    JobQueueInfo[] queues = TestQueueManagerRefresh.getSimpleQueueHierarchy();
 
+    queues[0].getProperties().setProperty(
+        CapacitySchedulerConf.CAPACITY_PROPERTY, String.valueOf(100));
+    queues[1].getProperties().setProperty(
+        CapacitySchedulerConf.CAPACITY_PROPERTY, String.valueOf(50));
+    queues[2].getProperties().setProperty(
+        CapacitySchedulerConf.CAPACITY_PROPERTY, String.valueOf(50));
 
-    taskTrackerManager.setFakeQueues(queues);
+    // write the configuration file
+    QueueManagerTestUtils.writeQueueConfigurationFile(
+        queueConfigFile.getAbsolutePath(), new JobQueueInfo[] { queues[0] });
+    setUp(1, 4, 4);
+    // use the queues from the config file.
+    taskTrackerManager.setQueueManager(new QueueManager());
     scheduler.start();
 
-    // submit a job with no queue specified. It should be accepted
-    // and given to the default queue. 
-    JobInProgress j = taskTrackerManager.submitJobAndInit(JobStatus.PREP, 
-                                                    10, 10, null, "u1");
-    // when we ask for tasks, we should get them for the job submitted
-    Map<String, String> expectedTaskStrings = new HashMap<String, String>();
-    expectedTaskStrings.put(CapacityTestUtils.MAP, 
-                            "attempt_test_0001_m_000001_0 on tt1");
-    expectedTaskStrings.put(CapacityTestUtils.REDUCE, 
-                            "attempt_test_0001_r_000001_0 on tt1");
-    checkMultipleTaskAssignment(taskTrackerManager, scheduler, 
-                                      "tt1", expectedTaskStrings);
+    // submit a job to the container queue
+    try {
+      taskTrackerManager.submitJobAndInit(JobStatus.PREP, 20, 0,
+          queues[0].getQueueName(), "user");
+      fail("Jobs are being able to be submitted to the container queue");
+    } catch (Exception e) {
+      assertTrue(scheduler.getJobs(queues[0].getQueueName()).isEmpty());
+    }
 
-    // submit another job, to a different queue
-    j = taskTrackerManager.submitJobAndInit(JobStatus.PREP, 10, 10, "q2", "u1");
-    // now when we get tasks, it should be from the second job
-    expectedTaskStrings.clear();
-    expectedTaskStrings.put(CapacityTestUtils.MAP,
-                              "attempt_test_0002_m_000001_0 on tt2");
-    expectedTaskStrings.put(CapacityTestUtils.REDUCE,
-                              "attempt_test_0002_r_000001_0 on tt2");
-    checkMultipleTaskAssignment(taskTrackerManager, scheduler, 
-                                  "tt2", expectedTaskStrings);
-  }
+    FakeJobInProgress job = taskTrackerManager.submitJobAndInit(JobStatus.PREP,
+        1, 0, queues[1].getQueueName(), "user");
+    assertEquals(1, scheduler.getJobs(queues[1].getQueueName()).size());
+    assertTrue(scheduler.getJobs(queues[1].getQueueName()).contains(job));
 
-  public void testGetJobs() throws Exception {
-    // need only one queue
-    String[] qs = {"default"};
-    taskTrackerManager.addQueues(qs);
-    ArrayList<FakeQueueInfo> queues = new ArrayList<FakeQueueInfo>();
-    queues.add(new FakeQueueInfo("default", 100.0f, true, 100));
+    // check if the job is submitted
+    checkAssignment(taskTrackerManager, scheduler, "tt1", 
+    "attempt_test_0002_m_000001_0 on tt1");
 
-
-    taskTrackerManager.setFakeQueues(queues);
-    scheduler.start();
+    // test for getJobs
     HashMap<String, ArrayList<FakeJobInProgress>> subJobsList =
-      taskTrackerManager.submitJobs(1, 4, "default");
+      taskTrackerManager.submitJobs(1, 4, queues[2].getQueueName());
 
     JobQueuesManager mgr = scheduler.jobQueuesManager;
-
-    while (mgr.getJobQueue("default").getWaitingJobs().size() < 4) {
-      Thread.sleep(1);
-    }
     //Raise status change events for jobs submitted.
-    raiseStatusChangeEvents(mgr);
-    Collection<JobInProgress> jobs = scheduler.getJobs("default");
+    raiseStatusChangeEvents(mgr, queues[2].getQueueName());
+    Collection<JobInProgress> jobs =
+      scheduler.getJobs(queues[2].getQueueName());
 
     assertTrue(
       "Number of jobs returned by scheduler is wrong"
