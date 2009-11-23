@@ -48,6 +48,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1167. ProcfsBasedProcessTree collects rss memory information.
     (Scott Chen via dhruba)
 
+    MAPREDUCE-1169. Improvements to mysqldump use in Sqoop.
+    (Aaron Kimball via tomwhite)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
