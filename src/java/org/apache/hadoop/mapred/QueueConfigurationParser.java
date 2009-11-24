@@ -19,6 +19,7 @@ package org.apache.hadoop.mapred;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.mapred.Queue.QueueOperation;
 import org.apache.hadoop.mapreduce.QueueState;
 import org.apache.hadoop.security.SecurityUtil.AccessControlList;
 import static org.apache.hadoop.mapred.QueueManager.toFullPropertyName;
@@ -232,6 +233,9 @@ class QueueConfigurationParser {
     validate(queueNode);
     List<Element> subQueues = new ArrayList<Element>();
 
+    String submitKey = "";
+    String adminKey = "";
+    
     for (int j = 0; j < fields.getLength(); j++) {
       Node fieldNode = fields.item(j);
       if (!(fieldNode instanceof Element)) {
@@ -253,6 +257,10 @@ class QueueConfigurationParser {
         //parent.child
         name += nameValue;
         newQueue.setName(name);
+        submitKey = toFullPropertyName(name,
+            Queue.QueueOperation.SUBMIT_JOB.getAclName());
+        adminKey = toFullPropertyName(name,
+            Queue.QueueOperation.ADMINISTER_JOBS.getAclName());
       }
 
       if (QUEUE_TAG.equals(field.getTagName()) && field.hasChildNodes()) {
@@ -260,17 +268,11 @@ class QueueConfigurationParser {
       }
       if(isAclsEnabled()) {
         if (ACL_SUBMIT_JOB_TAG.equals(field.getTagName())) {
-          String submitList = field.getTextContent();
-          String aclKey = toFullPropertyName(
-            name, Queue.QueueOperation.SUBMIT_JOB.getAclName());
-          acls.put(aclKey, new AccessControlList(submitList));
+          acls.put(submitKey, new AccessControlList(field.getTextContent()));
         }
 
         if (ACL_ADMINISTER_JOB_TAG.equals(field.getTagName())) {
-          String administerList = field.getTextContent();
-          String aclKey = toFullPropertyName(
-            name, Queue.QueueOperation.ADMINISTER_JOBS.getAclName());
-          acls.put(aclKey, new AccessControlList(administerList));
+          acls.put(adminKey, new AccessControlList(field.getTextContent()));
         }
       }
 
@@ -284,6 +286,15 @@ class QueueConfigurationParser {
         newQueue.setState(QueueState.getState(state));
       }
     }
+    
+    if (!acls.containsKey(submitKey)) {
+      acls.put(submitKey, new AccessControlList("*"));
+    }
+    
+    if (!acls.containsKey(adminKey)) {
+      acls.put(adminKey, new AccessControlList("*"));
+    }
+    
     //Set acls
     newQueue.setAcls(acls);
     //At this point we have the queue ready at current height level.

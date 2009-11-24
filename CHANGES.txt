@@ -910,3 +910,6 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-1007. Fix NPE in CapacityTaskScheduler.getJobs(). 
     (V.V.Chaitanya Krishna via sharad)
 
+    MAPREDUCE-28. Refactor TestQueueManager and fix default ACLs.
+    (V.V.Chaitanya Krishna and Rahul K Singh via sharad)
+

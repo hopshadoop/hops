@@ -121,7 +121,8 @@ class QueueManager {
       return new DeprecatedQueueConfigurationParser(conf);
     } else {
       URL filePath =
-        ClassLoader.getSystemClassLoader().getResource(QUEUE_CONF_FILE_NAME);
+        Thread.currentThread().getContextClassLoader()
+          .getResource(QUEUE_CONF_FILE_NAME);
       return new QueueConfigurationParser(filePath.getPath());
     }
   }
