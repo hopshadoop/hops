@@ -522,6 +522,9 @@ Release 0.21.0 - Unreleased
     HDFS-641. Move all of the components that depend on map/reduce to 
     map/reduce. (omalley)
 
+    HADOOP-5107. Use Maven ant tasks to publish artifacts. (Giridharan Kesavan
+    via omalley)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 

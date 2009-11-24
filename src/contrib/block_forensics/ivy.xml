@@ -41,4 +41,8 @@
     <!--get the artifact from our module name-->
     <artifact conf="master"/>
   </publications>
+  <dependencies>
+    <dependency org="org.apache.hadoop" name="hadoop-core" 
+                rev="${hadoop-core.version}" conf="common->default"/>  
+  </dependencies>
 </ivy-module>
