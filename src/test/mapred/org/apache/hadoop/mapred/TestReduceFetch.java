@@ -36,7 +36,7 @@ public class TestReduceFetch extends TestReduceFetchFromPartialMem {
     job.set(JobContext.REDUCE_INPUT_BUFFER_PERCENT, "0.0");
     job.setNumMapTasks(MAP_TASKS);
     job.set(JobConf.MAPRED_REDUCE_TASK_JAVA_OPTS, "-Xmx128m");
-    job.setInt(JobContext.REDUCE_MEMORY_TOTAL_BYTES, 128 << 20);
+    job.setLong(JobContext.REDUCE_MEMORY_TOTAL_BYTES, 128 << 20);
     job.set(JobContext.SHUFFLE_INPUT_BUFFER_PERCENT, "0.05");
     job.setInt(JobContext.IO_SORT_FACTOR, 2);
     job.setInt(JobContext.REDUCE_MERGE_INMEM_THRESHOLD, 4);
@@ -58,7 +58,7 @@ public class TestReduceFetch extends TestReduceFetchFromPartialMem {
     JobConf job = mrCluster.createJobConf();
     job.set(JobContext.REDUCE_INPUT_BUFFER_PERCENT, "1.0");
     job.set(JobContext.SHUFFLE_INPUT_BUFFER_PERCENT, "1.0");
-    job.setInt(JobContext.REDUCE_MEMORY_TOTAL_BYTES, 128 << 20);
+    job.setLong(JobContext.REDUCE_MEMORY_TOTAL_BYTES, 128 << 20);
     job.setNumMapTasks(MAP_TASKS);
     Counters c = runJob(job);
     final long spill = c.findCounter(TaskCounter.SPILLED_RECORDS).getCounter();

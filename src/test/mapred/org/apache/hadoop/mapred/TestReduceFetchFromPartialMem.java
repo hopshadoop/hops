@@ -85,7 +85,7 @@ public class TestReduceFetchFromPartialMem extends TestCase {
     job.setInt(JobContext.SHUFFLE_PARALLEL_COPIES, 1);
     job.setInt(JobContext.IO_SORT_MB, 10);
     job.set(JobConf.MAPRED_REDUCE_TASK_JAVA_OPTS, "-Xmx128m");
-    job.setInt(JobContext.REDUCE_MEMORY_TOTAL_BYTES, 128 << 20);
+    job.setLong(JobContext.REDUCE_MEMORY_TOTAL_BYTES, 128 << 20);
     job.set(JobContext.SHUFFLE_INPUT_BUFFER_PERCENT, "0.14");
     job.set(JobContext.SHUFFLE_MERGE_EPRCENT, "1.0");
     Counters c = runJob(job);

@@ -87,12 +87,12 @@ public class MergeManager<K, V> {
   Set<Path> onDiskMapOutputs = new TreeSet<Path>();
   private final OnDiskMerger onDiskMerger;
   
-  private final int memoryLimit;
-  private int usedMemory;
-  private final int maxSingleShuffleLimit;
+  private final long memoryLimit;
+  private long usedMemory;
+  private final long maxSingleShuffleLimit;
   
   private final int memToMemMergeOutputsThreshold; 
-  private final int mergeThreshold;
+  private final long mergeThreshold;
   
   private final int ioSortFactor;
 
@@ -159,17 +159,17 @@ public class MergeManager<K, V> {
 
     // Allow unit tests to fix Runtime memory
     this.memoryLimit = 
-      (int)(jobConf.getInt(JobContext.REDUCE_MEMORY_TOTAL_BYTES,
-          (int)Math.min(Runtime.getRuntime().maxMemory(), Integer.MAX_VALUE))
+      (long)(jobConf.getLong(JobContext.REDUCE_MEMORY_TOTAL_BYTES,
+          Math.min(Runtime.getRuntime().maxMemory(), Integer.MAX_VALUE))
         * maxInMemCopyUse);
  
     this.ioSortFactor = jobConf.getInt(JobContext.IO_SORT_FACTOR, 100);
 
     this.maxSingleShuffleLimit = 
-      (int)(memoryLimit * MAX_SINGLE_SHUFFLE_SEGMENT_FRACTION);
+      (long)(memoryLimit * MAX_SINGLE_SHUFFLE_SEGMENT_FRACTION);
     this.memToMemMergeOutputsThreshold = 
             jobConf.getInt(JobContext.REDUCE_MEMTOMEM_THRESHOLD, ioSortFactor);
-    this.mergeThreshold = (int)(this.memoryLimit * 
+    this.mergeThreshold = (long)(this.memoryLimit * 
                           jobConf.getFloat(JobContext.SHUFFLE_MERGE_EPRCENT, 
                                            0.90f));
     LOG.info("MergerManager: memoryLimit=" + memoryLimit + ", " +

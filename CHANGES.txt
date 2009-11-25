@@ -913,3 +913,6 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-28. Refactor TestQueueManager and fix default ACLs.
     (V.V.Chaitanya Krishna and Rahul K Singh via sharad)
 
+    MAPREDUCE-1182. Fix overflow in reduce causing allocations to exceed the
+    configured threshold. (cdouglas)
+
