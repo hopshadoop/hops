@@ -91,6 +91,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-1196. Fix FileOutputCommitter to use the deprecated cleanupJob
     api correctly. (acmurthy)
+   
+    MAPREDUCE-1239. Fix contrib components build dependencies. 
+    (Giridharan Kesavan and Owen O'Malley) 
 
 Release 0.21.0 - Unreleased
 
