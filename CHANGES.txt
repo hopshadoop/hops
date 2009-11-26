@@ -95,6 +95,8 @@ Trunk (unreleased changes)
     MAPREDUCE-1239. Fix contrib components build dependencies. 
     (Giridharan Kesavan and Owen O'Malley) 
 
+    MAPREDUCE-1244. Fix eclipse-plugin's build dependencies. (gkesavan)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
