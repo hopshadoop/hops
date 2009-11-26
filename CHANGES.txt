@@ -92,9 +92,6 @@ Trunk (unreleased changes)
     MAPREDUCE-1196. Fix FileOutputCommitter to use the deprecated cleanupJob
     api correctly. (acmurthy)
    
-    MAPREDUCE-1239. Fix contrib components build dependencies. 
-    (Giridharan Kesavan and Owen O'Malley) 
-
     MAPREDUCE-1244. Fix eclipse-plugin's build dependencies. (gkesavan)
 
 Release 0.21.0 - Unreleased
@@ -920,4 +917,7 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1182. Fix overflow in reduce causing allocations to exceed the
     configured threshold. (cdouglas)
+
+    MAPREDUCE-1239. Fix contrib components build dependencies. 
+    (Giridharan Kesavan and omalley) 
 
