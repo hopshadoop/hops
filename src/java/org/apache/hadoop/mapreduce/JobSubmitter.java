@@ -160,15 +160,20 @@ class JobSubmitter {
       FileSystem.mkdirs(jtFs, filesDir, mapredSysPerms);
       String[] fileArr = files.split(",");
       for (String tmpFile: fileArr) {
-        Path tmp = new Path(tmpFile);
+        URI tmpURI = null;
+        try {
+          tmpURI = new URI(tmpFile);
+        } catch (URISyntaxException e) {
+          throw new IllegalArgumentException(e);
+        }
+        Path tmp = new Path(tmpURI);
         Path newPath = copyRemoteFiles(filesDir, tmp, conf, replication);
         try {
-          URI pathURI = new URI(newPath.toUri().toString() + "#" 
-                          + newPath.getName());
+          URI pathURI = getPathURI(newPath, tmpURI.getFragment());
           DistributedCache.addCacheFile(pathURI, conf);
         } catch(URISyntaxException ue) {
           //should not throw a uri exception 
-          throw new IOException("Failed to create uri for " + tmpFile);
+          throw new IOException("Failed to create uri for " + tmpFile, ue);
         }
         DistributedCache.createSymlink(conf);
       }
@@ -188,16 +193,21 @@ class JobSubmitter {
       FileSystem.mkdirs(jtFs, archivesDir, mapredSysPerms); 
       String[] archivesArr = archives.split(",");
       for (String tmpArchives: archivesArr) {
-        Path tmp = new Path(tmpArchives);
+        URI tmpURI;
+        try {
+          tmpURI = new URI(tmpArchives);
+        } catch (URISyntaxException e) {
+          throw new IllegalArgumentException(e);
+        }
+        Path tmp = new Path(tmpURI);
         Path newPath = copyRemoteFiles(archivesDir, tmp, conf,
           replication);
         try {
-          URI pathURI = new URI(newPath.toUri().toString() + "#" 
-                          + newPath.getName());
+          URI pathURI = getPathURI(newPath, tmpURI.getFragment());
           DistributedCache.addCacheArchive(pathURI, conf);
         } catch(URISyntaxException ue) {
           //should not throw an uri excpetion
-          throw new IOException("Failed to create uri for " + tmpArchives);
+          throw new IOException("Failed to create uri for " + tmpArchives, ue);
         }
         DistributedCache.createSymlink(conf);
       }
@@ -207,6 +217,19 @@ class JobSubmitter {
     TrackerDistributedCacheManager.determineTimestamps(conf);
   }
 
+  private URI getPathURI(Path destPath, String fragment) 
+      throws URISyntaxException {
+    URI pathURI = destPath.toUri();
+    if (pathURI.getFragment() == null) {
+      if (fragment == null) {
+        pathURI = new URI(pathURI.toString() + "#" + destPath.getName());
+      } else {
+        pathURI = new URI(pathURI.toString() + "#" + fragment);
+      }
+    }
+    return pathURI;
+  }
+  
   private void copyJar(Path originalJarPath, Path submitJarFile,
       short replication) throws IOException {
     jtFs.copyFromLocalFile(originalJarPath, submitJarFile);

@@ -96,7 +96,7 @@ public class TaskDistributedCacheManager {
         Map<String, Path> classPaths = new HashMap<String, Path>();
         if (paths != null) {
           for (Path p : paths) {
-            classPaths.put(p.toString(), p);
+            classPaths.put(p.toUri().getPath().toString(), p);
           }
         }
         for (int i = 0; i < uris.length; ++i) {

@@ -921,3 +921,6 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-1239. Fix contrib components build dependencies. 
     (Giridharan Kesavan and omalley) 
 
+    MAPREDUCE-787. Fix JobSubmitter to honor user given symlink path.
+    (Amareshwari Sriramadasu via sharad)
+
