@@ -94,6 +94,10 @@ Trunk (unreleased changes)
    
     MAPREDUCE-1244. Fix eclipse-plugin's build dependencies. (gkesavan)
 
+    MAPREDUCE-1140. Fix DistributedCache to not decrement reference counts for
+    unreferenced files in error conditions.
+    (Amareshwari Sriramadasu via yhemanth)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
