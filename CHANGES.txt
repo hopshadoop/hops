@@ -54,6 +54,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1231. Added a new DistCp option, -skipcrccheck, so that the CRC
     check during setup can be skipped.  (Jothi Padmanabhan via szetszwo)
 
+    MAPREDUCE-1190. Add package documentation for BBP example.
+    (Tsz Wo (Nicholas) Sze via cdouglas)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
