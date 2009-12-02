@@ -704,15 +704,7 @@ public class UtilsForTests {
   }
 
   static JobTracker getJobTracker() {
-    JobConf conf = new JobConf();
-    conf.set(JTConfig.JT_IPC_ADDRESS, "localhost:0");
-    conf.set(JTConfig.JT_HTTP_ADDRESS, "0.0.0.0:0");
-    JobTracker jt;
-    try {
-      jt = new JobTracker(conf);
-      return jt;
-    } catch (Exception e) {
-      throw new RuntimeException("Could not start jt", e);
-    }
+    JobTracker jt = new JobTracker();
+    return jt;
   }
 }

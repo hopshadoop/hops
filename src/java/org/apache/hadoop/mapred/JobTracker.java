@@ -1294,6 +1294,25 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
 
   private final QueueManager queueManager;
 
+  //TO BE USED BY TEST CLASSES ONLY
+  //ONLY BUILD THE STATE WHICH IS REQUIRED BY TESTS
+  JobTracker() {
+    hostsReader = null;
+    retiredJobsCacheSize = 0;
+    infoServer = null;
+    queueManager = null;
+    supergroup = null;
+    taskScheduler = null;
+    trackerIdentifier = null;
+    recoveryManager = null;
+    jobHistory = null;
+    completedJobStatusStore = null;
+    tasktrackerExpiryInterval = 0;
+    myInstrumentation = new JobTrackerMetricsInst(this, new JobConf());
+    mrOwner = null;
+  }
+
+  
   JobTracker(JobConf conf) 
   throws IOException,InterruptedException, LoginException {
     this(conf, new Clock());

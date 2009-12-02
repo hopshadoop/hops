@@ -104,6 +104,9 @@ Trunk (unreleased changes)
     unreferenced files in error conditions.
     (Amareshwari Sriramadasu via yhemanth)
 
+    MAPREDUCE-1245. Fix TestFairScheduler failures by instantiating lightweight
+    Jobtracker. (sharad)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
