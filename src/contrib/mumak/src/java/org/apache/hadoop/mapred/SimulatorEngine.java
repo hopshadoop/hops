@@ -29,7 +29,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.SimulatorEvent;
 import org.apache.hadoop.mapred.SimulatorEventQueue;
 import org.apache.hadoop.mapred.JobCompleteEvent;
-import org.apache.hadoop.mapred.JobStatus;
 import org.apache.hadoop.mapred.SimulatorJobClient;
 import org.apache.hadoop.mapred.SimulatorJobTracker;
 import org.apache.hadoop.mapred.SimulatorTaskTracker;
@@ -138,7 +137,10 @@ public class SimulatorEngine extends Configured implements Tool {
     JobStoryProducer jobStoryProducer = new SimulatorJobStoryProducer(
         new Path(traceFile), cluster, firstJobStartTime, jobConf);
     
-    jc = new SimulatorJobClient(jt, jobStoryProducer);
+    final SimulatorJobSubmissionPolicy submissionPolicy = SimulatorJobSubmissionPolicy
+        .getPolicy(jobConf);
+    
+    jc = new SimulatorJobClient(jt, jobStoryProducer, submissionPolicy);
     queue.addAll(jc.init(firstJobStartTime));
 
     // create TTs based on topology.json     

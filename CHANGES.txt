@@ -534,6 +534,9 @@ Release 0.21.0 - Unreleased
     HADOOP-5107. Use Maven ant tasks to publish artifacts. (Giridharan Kesavan
     via omalley)
 
+    MAPREDUCE-1229. Allow customization of job submission policy in Mumak.
+    (Hong Tang via cdouglas)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 
