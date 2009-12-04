@@ -285,18 +285,17 @@
 <property>
   <name>mapreduce.reduce.shuffle.connect.timeout</name>
   <value>180000</value>
-  <description>Expert: Cluster-wide configuration. The maximum amount of
-  time (in milli seconds) reduce task spends in trying to connect to a
-  tasktracker for getting map output.
+  <description>Expert: The maximum amount of time (in milli seconds) reduce
+  task spends in trying to connect to a tasktracker for getting map output.
   </description>
 </property>
 
 <property>
   <name>mapreduce.reduce.shuffle.read.timeout</name>
-  <value>30000</value>
-  <description>Expert: Cluster-wide configuration. The maximum amount of time
-  (in milli seconds) reduce task waits for map output data to be available
-  for reading after obtaining connection.
+  <value>180000</value>
+  <description>Expert: The maximum amount of time (in milli seconds) reduce
+  task waits for map output data to be available for reading after obtaining
+  connection.
   </description>
 </property>
 

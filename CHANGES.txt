@@ -943,3 +943,5 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-787. Fix JobSubmitter to honor user given symlink path.
     (Amareshwari Sriramadasu via sharad)
 
+    MAPREDUCE-1249. Update config default value for socket read timeout to
+    match code default. (Amareshwari Sriramadasu via cdouglas)
