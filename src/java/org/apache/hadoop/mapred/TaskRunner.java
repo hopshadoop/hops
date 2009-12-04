@@ -93,6 +93,8 @@ abstract class TaskRunner extends Thread {
   public TaskTracker.TaskInProgress getTaskInProgress() { return tip; }
   public TaskTracker getTracker() { return tracker; }
 
+  public JvmManager getJvmManager() { return jvmManager; }
+
   /** Called to assemble this task's input.  This method is run in the parent
    * process before the child is spawned.  It should not execute user code,
    * only system code. */

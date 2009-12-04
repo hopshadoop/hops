@@ -607,6 +607,7 @@ public class UtilsForTests {
     conf.setJobName("test-job-fail");
     conf.setMapperClass(FailMapper.class);
     conf.setReducerClass(IdentityReducer.class);
+    conf.setMaxMapAttempts(1);
     
     RunningJob job = UtilsForTests.runJob(conf, inDir, outDir);
     while (!job.isComplete()) {

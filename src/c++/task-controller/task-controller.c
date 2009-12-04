@@ -35,6 +35,7 @@ int change_user(const char * user) {
   }
 
   if(initgroups(user_detail->pw_name, user_detail->pw_gid) != 0) {
+    fprintf(LOGFILE, "unable to initgroups : %s\n", strerror(errno));
 	  cleanup();
 	  return SETUID_OPER_FAILED;
   }
@@ -1029,7 +1030,8 @@ int run_debug_script_as_user(const char * user, const char *jobid, const char *t
   return run_process_as_user(user, jobid, taskid, tt_root, RUN_DEBUG_SCRIPT);
 }
 /**
- * Function used to terminate/kill a task launched by the user.
+ * Function used to terminate/kill a task launched by the user,
+ * or dump the process' stack (by sending SIGQUIT).
  * The function sends appropriate signal to the process group
  * specified by the task_pid.
  */

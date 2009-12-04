@@ -58,6 +58,7 @@ int main(int argc, char **argv) {
       NULL, 0 } };
 
   const char* log_file = NULL;
+  int conf_dir_len = 0;
 
   //Minimum number of arguments required to run the task-controller
   //command-name user command tt-root
@@ -67,10 +68,17 @@ int main(int argc, char **argv) {
   }
 
 #ifndef HADOOP_CONF_DIR
-  hadoop_conf_dir = (char *) malloc (sizeof(char) *
-      (strlen(argv[0]) - strlen(EXEC_PATTERN)) + 1);
-  strncpy(hadoop_conf_dir,argv[0],(strlen(argv[0]) - strlen(EXEC_PATTERN)));
-  hadoop_conf_dir[(strlen(argv[0]) - strlen(EXEC_PATTERN))] = '\0';
+  conf_dir_len = (strlen(argv[0]) - strlen(EXEC_PATTERN)) + 1;
+  if (conf_dir_len < 1) {
+    // We didn't get an absolute path to our argv[0]; bail.
+    printf("Cannot find configuration directory.\n");
+    printf("This program must be run with its full absolute path.\n");
+    return INVALID_CONF_DIR;
+  } else {
+    hadoop_conf_dir = (char *) malloc (sizeof(char) * conf_dir_len);
+    strncpy(hadoop_conf_dir,argv[0],(strlen(argv[0]) - strlen(EXEC_PATTERN)));
+    hadoop_conf_dir[(strlen(argv[0]) - strlen(EXEC_PATTERN))] = '\0';
+  }
 #endif
   do {
     next_option = getopt_long(argc, argv, short_options, long_options, NULL);
@@ -141,6 +149,10 @@ int main(int argc, char **argv) {
     task_id = argv[optind++];
     exit_code
         = run_debug_script_as_user(user_detail->pw_name, job_id, task_id, tt_root);
+    break;
+  case SIGQUIT_TASK_JVM:
+    task_pid = argv[optind++];
+    exit_code = kill_user_task(user_detail->pw_name, task_pid, SIGQUIT);
     break;
   default:
     exit_code = INVALID_COMMAND_PROVIDED;

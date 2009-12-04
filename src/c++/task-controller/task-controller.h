@@ -45,6 +45,7 @@ enum command {
   TERMINATE_TASK_JVM,
   KILL_TASK_JVM,
   RUN_DEBUG_SCRIPT,
+  SIGQUIT_TASK_JVM,
 };
 
 enum errorcodes {
@@ -69,6 +70,7 @@ enum errorcodes {
   INITIALIZE_DISTCACHE_FAILED, //19
   INITIALIZE_USER_FAILED, //20
   UNABLE_TO_EXECUTE_DEBUG_SCRIPT, //21
+  INVALID_CONF_DIR, //22
 };
 
 #define USER_DIR_PATTERN "%s/taskTracker/%s"

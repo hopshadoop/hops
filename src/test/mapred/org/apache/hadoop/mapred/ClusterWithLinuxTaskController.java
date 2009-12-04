@@ -33,6 +33,7 @@ import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
 import org.apache.hadoop.security.UnixUserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.StringUtils;
 
 import junit.framework.TestCase;
 
@@ -48,7 +49,10 @@ import junit.framework.TestCase;
  * <li>Make the built binary to setuid executable</li>
  * <li>Execute following targets:
  * <code>ant test -Dcompile.c++=true -Dtaskcontroller-path=<em>path to built binary</em> 
- * -Dtaskcontroller-ugi=<em>user,group</em></code></li>
+ * -Dtaskcontroller-ugi=<em>user,group</em></code>
+ *  <br/>(Note that "path to built binary" means the directory containing task-controller -
+ *  not the actual complete path of the binary itself. This path must end in ".../bin")
+ *  </li>
  * </ol>
  * 
  */
@@ -71,6 +75,24 @@ public class ClusterWithLinuxTaskController extends TestCase {
 
     void setTaskControllerExe(String execPath) {
       this.taskControllerExePath = execPath;
+    }
+
+    volatile static int attemptedSigQuits = 0;
+    volatile static int failedSigQuits = 0;
+
+    /** Work like LinuxTaskController, but also count the number of
+      * attempted and failed SIGQUIT sends via the task-controller
+      * executable.
+      */
+    @Override
+    void dumpTaskStack(TaskControllerContext context) {
+      attemptedSigQuits++;
+      try {
+        signalTask(context, TaskCommands.SIGQUIT_TASK_JVM);
+      } catch (Exception e) {
+        LOG.warn("Execution sending SIGQUIT: " + StringUtils.stringifyException(e));
+        failedSigQuits++;
+      }
     }
   }
 

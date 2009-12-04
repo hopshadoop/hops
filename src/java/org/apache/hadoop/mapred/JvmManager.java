@@ -35,6 +35,7 @@ import org.apache.hadoop.mapred.TaskController.TaskControllerContext;
 import org.apache.hadoop.mapred.TaskTracker.TaskInProgress;
 import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
 import org.apache.hadoop.util.Shell.ShellCommandExecutor;
+import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.mapreduce.util.ProcessTree;
 
 class JvmManager {
@@ -133,6 +134,14 @@ class JvmManager {
       mapJvmManager.taskKilled(tr);
     } else {
       reduceJvmManager.taskKilled(tr);
+    }
+  }
+
+  void dumpStack(TaskRunner tr) {
+    if (tr.getTask().isMapTask()) {
+      mapJvmManager.dumpStack(tr);
+    } else {
+      reduceJvmManager.dumpStack(tr);
     }
   }
 
@@ -243,6 +252,16 @@ class JvmManager {
       }
     }
     
+    synchronized void dumpStack(TaskRunner tr) {
+      JVMId jvmId = runningTaskToJvm.get(tr);
+      if (null != jvmId) {
+        JvmRunner jvmRunner = jvmIdToRunner.get(jvmId);
+        if (null != jvmRunner) {
+          jvmRunner.dumpChildStacks();
+        }
+      }
+    }
+
     synchronized public void stop() {
       //since the kill() method invoked later on would remove
       //an entry from the jvmIdToRunner map, we create a
@@ -459,7 +478,38 @@ class JvmManager {
           removeJvm(jvmId);
         }
       }
-      
+
+      /** Send a signal to the JVM requesting that it dump a stack trace,
+       * and wait for a timeout interval to give this signal time to be
+       * processed.
+       */
+      void dumpChildStacks() {
+        if (!killed) {
+          TaskController controller = tracker.getTaskController();
+          // Check inital context before issuing a signal to prevent situations
+          // where signal is issued before task is launched.
+          if (initalContext != null && initalContext.env != null) {
+            initalContext.pid = jvmIdToPid.get(jvmId);
+            initalContext.sleeptimeBeforeSigkill = tracker.getJobConf()
+                .getLong(TTConfig.TT_SLEEP_TIME_BEFORE_SIG_KILL,
+                    ProcessTree.DEFAULT_SLEEPTIME_BEFORE_SIGKILL);
+
+            // signal the task jvm
+            controller.dumpTaskStack(initalContext);
+
+            // We're going to kill the jvm with SIGKILL after this,
+            // so we should wait for a few seconds first to ensure that
+            // the SIGQUIT has time to be processed.
+            try {
+              Thread.sleep(initalContext.sleeptimeBeforeSigkill);
+            } catch (InterruptedException e) {
+              LOG.warn("Sleep interrupted : " +
+                  StringUtils.stringifyException(e));
+            }
+          }
+        }
+      }
+
       public void taskRan() {
         busy = false;
         numTasksRan++;

@@ -1509,10 +1509,27 @@ public class TaskTracker
           ReflectionUtils.logThreadInfo(LOG, "lost task", 30);
           tip.reportDiagnosticInfo(msg);
           myInstrumentation.timedoutTask(tip.getTask().getTaskID());
+          dumpTaskStack(tip);
           purgeTask(tip, true);
         }
       }
     }
+  }
+
+  /**
+   * Send a signal to a stuck task commanding it to dump stack traces
+   * to stderr before we kill it with purgeTask().
+   *
+   * @param tip {@link TaskInProgress} to dump stack traces.
+   */
+  private void dumpTaskStack(TaskInProgress tip) {
+    TaskRunner runner = tip.getTaskRunner();
+    if (null == runner) {
+      return; // tip is already abandoned.
+    }
+
+    JvmManager jvmMgr = runner.getJvmManager();
+    jvmMgr.dumpStack(runner);
   }
 
   /**

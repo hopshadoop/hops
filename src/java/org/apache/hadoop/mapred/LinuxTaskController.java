@@ -89,6 +89,7 @@ class LinuxTaskController extends TaskController {
     TERMINATE_TASK_JVM,
     KILL_TASK_JVM,
     RUN_DEBUG_SCRIPT,
+    SIGQUIT_TASK_JVM,
   }
 
   /**
@@ -443,16 +444,16 @@ class LinuxTaskController extends TaskController {
   }
   
   /**
-   * Convenience method used to sending appropriate Kill signal to the task 
+   * Convenience method used to sending appropriate signal to the task
    * VM
    * @param context
    * @param command
    * @throws IOException
    */
-  private void finishTask(TaskControllerContext context,
+  protected void signalTask(TaskControllerContext context,
       TaskCommands command) throws IOException{
     if(context.task == null) {
-      LOG.info("Context task null not killing the JVM");
+      LOG.info("Context task is null; not signaling the JVM");
       return;
     }
     ShellCommandExecutor shExec = buildTaskControllerExecutor(
@@ -469,7 +470,7 @@ class LinuxTaskController extends TaskController {
   @Override
   void terminateTask(TaskControllerContext context) {
     try {
-      finishTask(context, TaskCommands.TERMINATE_TASK_JVM);
+      signalTask(context, TaskCommands.TERMINATE_TASK_JVM);
     } catch (Exception e) {
       LOG.warn("Exception thrown while sending kill to the Task VM " + 
           StringUtils.stringifyException(e));
@@ -479,9 +480,19 @@ class LinuxTaskController extends TaskController {
   @Override
   void killTask(TaskControllerContext context) {
     try {
-      finishTask(context, TaskCommands.KILL_TASK_JVM);
+      signalTask(context, TaskCommands.KILL_TASK_JVM);
     } catch (Exception e) {
       LOG.warn("Exception thrown while sending destroy to the Task VM " + 
+          StringUtils.stringifyException(e));
+    }
+  }
+
+  @Override
+  void dumpTaskStack(TaskControllerContext context) {
+    try {
+      signalTask(context, TaskCommands.SIGQUIT_TASK_JVM);
+    } catch (Exception e) {
+      LOG.warn("Exception thrown while sending SIGQUIT to the Task VM " +
           StringUtils.stringifyException(e));
     }
   }

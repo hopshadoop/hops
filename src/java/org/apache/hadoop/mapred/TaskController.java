@@ -134,26 +134,26 @@ public abstract class TaskController implements Configurable {
 
   /**
    * Top level cleanup a task JVM method.
-   *
-   * The current implementation does the following.
    * <ol>
-   * <li>Sends a graceful terminate signal to task JVM allowing its sub-process
+   * <li>Sends a graceful termiante signal to task JVM to allow subprocesses
    * to cleanup.</li>
-   * <li>Waits for stipulated period</li>
    * <li>Sends a forceful kill signal to task JVM, terminating all its
-   * sub-process forcefully.</li>
+   * sub-processes forcefully.</li>
    * </ol>
-   * 
+   *
    * @param context the task for which kill signal has to be sent.
    */
   final void destroyTaskJVM(TaskControllerContext context) {
+    // Send SIGTERM to try to ask for a polite exit.
     terminateTask(context);
+
     try {
       Thread.sleep(context.sleeptimeBeforeSigkill);
     } catch (InterruptedException e) {
-      LOG.warn("Sleep interrupted : " + 
+      LOG.warn("Sleep interrupted : " +
           StringUtils.stringifyException(e));
     }
+
     killTask(context);
   }
 
@@ -223,6 +223,15 @@ public abstract class TaskController implements Configurable {
    * @param context task context
    */
   abstract void killTask(TaskControllerContext context);
+
+
+  /**
+   * Sends a QUIT signal to direct the task JVM (and sub-processes) to
+   * dump their stack to stdout.
+   *
+   * @param context task context.
+   */
+  abstract void dumpTaskStack(TaskControllerContext context);
 
   /**
    * Initialize user on this TaskTracer in a TaskController specific manner.

@@ -119,15 +119,35 @@ public class DefaultTaskController extends TaskController {
     if (shexec != null) {
       if (Shell.WINDOWS) {
         //We don't do send kill process signal in case of windows as 
-        //already we have done a process.destroy() in termintateTaskJVM()
+        //already we have done a process.destroy() in terminateTaskJVM()
         return;
       }
       String pid = context.pid;
       if (pid != null) {
         if(ProcessTree.isSetsidAvailable) {
           ProcessTree.killProcessGroup(pid);
-        }else {
+        } else {
           ProcessTree.killProcess(pid);
+        }
+      }
+    }
+  }
+
+  @Override
+  void dumpTaskStack(TaskControllerContext context) {
+    ShellCommandExecutor shexec = context.shExec;
+    if (shexec != null) {
+      if (Shell.WINDOWS) {
+        // We don't use signals in Windows.
+        return;
+      }
+      String pid = context.pid;
+      if (pid != null) {
+        // Send SIGQUIT to get a stack dump
+        if (ProcessTree.isSetsidAvailable) {
+          ProcessTree.sigQuitProcessGroup(pid);
+        } else {
+          ProcessTree.sigQuitProcess(pid);
         }
       }
     }

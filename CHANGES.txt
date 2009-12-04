@@ -57,6 +57,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1190. Add package documentation for BBP example.
     (Tsz Wo (Nicholas) Sze via cdouglas)
 
+    MAPREDUCE-1119. When tasks fail to report status, show tasks's stack dump
+    before killing. (Aaron Kimball via tomwhite)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
