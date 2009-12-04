@@ -2954,7 +2954,6 @@ public class JobInProgress {
                           TaskStatus status, 
                           TaskTracker taskTracker,
                           boolean wasRunning, boolean wasComplete) {
-    final JobTrackerInstrumentation metrics = jobtracker.getInstrumentation();
     // check if the TIP is already failed
     boolean wasFailed = tip.isFailed();
     boolean wasSpeculating = tip.isSpeculating();
@@ -2974,7 +2973,6 @@ public class JobInProgress {
         launchedSetup = false;
       } else if (tip.isMapTask()) {
         runningMapTasks -= 1;
-        metrics.failedMap(taskid);
         // remove from the running queue and put it in the non-running cache
         // if the tip is not complete i.e if the tip still needs to be run
         if (!isComplete) {
@@ -2983,7 +2981,6 @@ public class JobInProgress {
         }
       } else {
         runningReduceTasks -= 1;
-        metrics.failedReduce(taskid);
         // remove from the running queue and put in the failed queue if the tip
         // is not complete
         if (!isComplete) {

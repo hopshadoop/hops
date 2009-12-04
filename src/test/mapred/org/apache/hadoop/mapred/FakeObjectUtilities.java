@@ -214,6 +214,15 @@ public class FakeObjectUtilities {
       updateTaskStatus(tip, status);
     }
 
+    public void killTask(TaskAttemptID taskId) {
+      TaskInProgress tip = jobtracker.taskidToTIPMap.get(taskId);
+      TaskStatus status = TaskStatus.createTaskStatus(tip.isMapTask(), taskId,
+          1.0f, 1, TaskStatus.State.KILLED, "", "", tip
+              .machineWhereTaskRan(taskId), tip.isMapTask() ? Phase.MAP
+              : Phase.REDUCE, new Counters());
+      updateTaskStatus(tip, status);
+    }
+
     public void cleanUpMetrics() {
     }
     

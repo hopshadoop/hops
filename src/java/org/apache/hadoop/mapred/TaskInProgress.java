@@ -697,6 +697,12 @@ class TaskInProgress {
     if (tasks.contains(taskid)) {
       if (taskState == TaskStatus.State.FAILED) {
         numTaskFailures++;
+        if (isMapTask()) {
+          jobtracker.getInstrumentation().failedMap(taskid);
+        } else {
+          jobtracker.getInstrumentation().failedReduce(taskid);
+        }
+        
         machinesWhereFailed.add(trackerHostName);
         if(maxSkipRecords>0) {
           //skipping feature enabled
@@ -707,6 +713,11 @@ class TaskInProgress {
 
       } else if (taskState == TaskStatus.State.KILLED) {
         numKilledTasks++;
+        if (isMapTask()) {
+            jobtracker.getInstrumentation().killedMap(taskid);
+          } else {
+            jobtracker.getInstrumentation().killedReduce(taskid);
+          }
       }
     }
 
