@@ -951,3 +951,6 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1249. Update config default value for socket read timeout to
     match code default. (Amareshwari Sriramadasu via cdouglas)
+
+    MAPREDUCE-1161. Remove ineffective synchronization in NotificationTestCase.
+    (Owen O'Malley via cdouglas)
