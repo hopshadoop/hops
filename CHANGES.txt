@@ -13,6 +13,9 @@ Trunk (unreleased changes)
     transfers using a shared JobTracker generated key.
     (Boris Shkolnik via ddas)
 
+    MAPREDUCE-1168. Export data to databases via Sqoop. (Aaron Kimball via
+    tomwhite)
+
   IMPROVEMENTS
 
     MAPREDUCE-1198. Alternatively schedule different types of tasks in
