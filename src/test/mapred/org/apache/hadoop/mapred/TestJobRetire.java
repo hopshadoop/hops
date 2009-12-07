@@ -20,6 +20,8 @@ package org.apache.hadoop.mapred;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
 
 import junit.framework.TestCase;
 
@@ -86,6 +88,20 @@ public class TestJobRetire extends TestCase {
     File file = new File(name);
  
     assertFalse("JobConf file not deleted", file.exists());
+    
+    //test redirection
+    URL jobUrl = new URL(rj.getTrackingURL());
+    HttpURLConnection conn = (HttpURLConnection) jobUrl.openConnection();
+    conn.setInstanceFollowRedirects(false);
+    conn.connect();
+    assertEquals(HttpURLConnection.HTTP_MOVED_TEMP, conn.getResponseCode());
+    conn.disconnect();
+    
+    URL redirectedUrl = new URL(conn.getHeaderField("Location"));
+    conn = (HttpURLConnection) redirectedUrl.openConnection();
+    conn.connect();
+    assertEquals(HttpURLConnection.HTTP_OK, conn.getResponseCode());
+    conn.disconnect();
     return id;
   }
 

@@ -27,6 +27,8 @@
   import="java.text.DecimalFormat"
   import="org.apache.hadoop.mapred.*"
   import="org.apache.hadoop.util.*"
+  import="org.apache.hadoop.fs.Path"
+  import="org.apache.hadoop.mapreduce.jobhistory.JobHistory"
 %>
 
 <%!	private static final long serialVersionUID = 1L;
@@ -219,7 +221,14 @@
 
 <% 
     if (job == null) {
-      out.print("<b>Job " + jobId + " not found.</b><br>\n");
+      String historyFile = tracker.getJobHistory().getHistoryFilePath(jobIdObj);
+      if (historyFile == null) {
+        out.println("<h2>Job " + jobId + " not known!</h2>");
+        return;
+      }
+      String historyUrl = "/jobdetailshistory.jsp?jobid=" + 
+        jobId + "&logFile=" + historyFile;
+      response.sendRedirect(response.encodeRedirectURL(historyUrl));
       return;
     }
     JobProfile profile = job.getProfile();

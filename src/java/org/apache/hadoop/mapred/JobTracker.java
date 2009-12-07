@@ -454,19 +454,10 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
       if (job != null) {
         JobStatus status = job.getStatus();
         
-        //set the historyfile and update the tracking url
-        String trackingUrl = "";
+        //set the historyfile
         if (historyFile != null) {
           status.setHistoryFile(historyFile);
-          try {
-            trackingUrl = "http://" + getJobTrackerMachine() + ":" + 
-              getInfoPort() + "/jobdetailshistory.jsp?jobid=" + 
-              jobid + "&logFile=" + URLEncoder.encode(historyFile, "UTF-8");
-          } catch (UnsupportedEncodingException e) {
-            LOG.warn("Could not create trackingUrl", e);
-          }
         }
-        status.setTrackingUrl(trackingUrl);
         // clean up job files from the local disk
         job.cleanupLocalizedJobConf(job.getProfile().getJobID());
 

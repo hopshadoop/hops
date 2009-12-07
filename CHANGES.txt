@@ -60,6 +60,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1119. When tasks fail to report status, show tasks's stack dump
     before killing. (Aaron Kimball via tomwhite)
 
+    MAPREDUCE-1185. Redirect running job url to history url if job is already 
+    retired. (Amareshwari Sriramadasu and Sharad Agarwal via sharad)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
