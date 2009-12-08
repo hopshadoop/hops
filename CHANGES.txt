@@ -961,6 +961,8 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-1161. Remove ineffective synchronization in NotificationTestCase.
     (Owen O'Malley via cdouglas)
 
+    MAPREDUCE-1244. Fix eclipse-plugin's build dependencies. (gkesavan)
+
     MAPREDUCE-1075. Fix JobTracker to not throw an NPE for a non-existent
     queue. (V.V.Chaitanya Krishna via yhemanth)
 
