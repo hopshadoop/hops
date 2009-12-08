@@ -1001,8 +1001,12 @@ public class JobClient extends CLI {
   
   public JobStatus[] getJobsFromQueue(String queueName) throws IOException {
     try {
+      QueueInfo queue = cluster.getQueue(queueName);
+      if (queue == null) {
+        return null;
+      }
       org.apache.hadoop.mapreduce.JobStatus[] stats = 
-        cluster.getQueue(queueName).getJobStatuses();
+        queue.getJobStatuses();
       JobStatus[] ret = new JobStatus[stats.length];
       for (int i = 0 ; i < stats.length; i++ ) {
         ret[i] = JobStatus.downgrade(stats[i]);
@@ -1022,7 +1026,11 @@ public class JobClient extends CLI {
    */
   public JobQueueInfo getQueueInfo(String queueName) throws IOException {
     try {
-      return new JobQueueInfo(cluster.getQueue(queueName));
+      QueueInfo queueInfo = cluster.getQueue(queueName);
+      if (queueInfo != null) {
+        return new JobQueueInfo(queueInfo);
+      }
+      return null;
     } catch (InterruptedException ie) {
       throw new IOException(ie);
     }

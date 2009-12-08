@@ -3966,7 +3966,9 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   @Override
   public QueueInfo getQueue(String queue) throws IOException {
     JobQueueInfo jqueue = queueManager.getJobQueueInfo(queue);
-    jqueue.setJobStatuses(getJobsFromQueue(jqueue.getQueueName()));
+    if (jqueue != null) {
+      jqueue.setJobStatuses(getJobsFromQueue(jqueue.getQueueName()));
+    }
     return jqueue;
   }
 
