@@ -804,17 +804,21 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     private void removeHostCapacity(String hostName) {
       synchronized (taskTrackers) {
         // remove the capacity of trackers on this host
+        int numTrackersOnHost = 0;
         for (TaskTrackerStatus status : getStatusesOnHost(hostName)) {
           int mapSlots = status.getMaxMapSlots();
           totalMapTaskCapacity -= mapSlots;
           int reduceSlots = status.getMaxReduceSlots();
           totalReduceTaskCapacity -= reduceSlots;
+          ++numTrackersOnHost;
           getInstrumentation().addBlackListedMapSlots(
               mapSlots);
           getInstrumentation().addBlackListedReduceSlots(
               reduceSlots);
         }
-        incrBlackListedTrackers(uniqueHostsMap.remove(hostName));
+        // remove the host
+        uniqueHostsMap.remove(hostName);
+        incrBlackListedTrackers(numTrackersOnHost);
       }
     }
     
@@ -2468,12 +2472,14 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
         taskTrackers.remove(trackerName);
         Integer numTaskTrackersInHost = 
           uniqueHostsMap.get(oldStatus.getHost());
-        numTaskTrackersInHost --;
-        if (numTaskTrackersInHost > 0)  {
-          uniqueHostsMap.put(oldStatus.getHost(), numTaskTrackersInHost);
-        }
-        else {
-          uniqueHostsMap.remove(oldStatus.getHost());
+        if (numTaskTrackersInHost != null) {
+          numTaskTrackersInHost --;
+          if (numTaskTrackersInHost > 0)  {
+            uniqueHostsMap.put(oldStatus.getHost(), numTaskTrackersInHost);
+          }
+          else {
+            uniqueHostsMap.remove(oldStatus.getHost());
+          }
         }
       }
     }
@@ -3841,8 +3847,8 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
           Set<TaskTracker> trackers = hostnameToTaskTracker.remove(host);
           if (trackers != null) {
             for (TaskTracker tracker : trackers) {
-              LOG.info("Decommission: Losing tracker " + tracker + 
-                       " on host " + host);
+              LOG.info("Decommission: Losing tracker " 
+                       + tracker.getTrackerName() + " on host " + host);
               removeTracker(tracker);
             }
             trackersDecommissioned += trackers.size();

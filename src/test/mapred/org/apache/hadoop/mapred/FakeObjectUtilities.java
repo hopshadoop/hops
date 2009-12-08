@@ -63,8 +63,10 @@ public class FakeObjectUtilities {
     }
     @Override
     public ClusterStatus getClusterStatus(boolean detailed) {
-      return new ClusterStatus(trackers.length,
-          0, 0, 0, 0, totalSlots/2, totalSlots/2, JobTracker.State.RUNNING, 0);
+      return new ClusterStatus(
+          taskTrackers().size() - getBlacklistedTrackerCount(),
+          getBlacklistedTrackerCount(), 0, 0, 0, totalSlots/2, totalSlots/2, 
+           JobTracker.State.RUNNING, 0);
     }
 
     public void setNumSlots(int totalSlots) {

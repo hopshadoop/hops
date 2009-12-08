@@ -966,3 +966,6 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-1075. Fix JobTracker to not throw an NPE for a non-existent
     queue. (V.V.Chaitanya Krishna via yhemanth)
 
+    MAPREDUCE-754. Fix NPE in expiry thread when a TT is lost. (Amar Kamat 
+    via sharad)
+

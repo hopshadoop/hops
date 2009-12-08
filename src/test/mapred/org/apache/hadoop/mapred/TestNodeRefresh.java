@@ -32,7 +32,11 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.io.Writable;
+import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.mapred.lib.IdentityReducer;
+import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UnixUserGroupInformation;
@@ -374,6 +378,90 @@ public class TestNodeRefresh extends TestCase {
       }
     }
     assertTrue("Tracker from excluded host doesnt exist", seen);
+    
+    stopCluster();
+  }
+  
+  // Mapper that fails once for the first time
+  static class FailOnceMapper extends MapReduceBase implements
+      Mapper<WritableComparable, Writable, WritableComparable, Writable> {
+
+    private boolean shouldFail = false;
+    public void map(WritableComparable key, Writable value,
+        OutputCollector<WritableComparable, Writable> out, Reporter reporter)
+        throws IOException {
+
+      if (shouldFail) {
+        throw new RuntimeException("failing map");
+      }
+    }
+    
+    @Override
+    public void configure(JobConf conf) {
+      TaskAttemptID id = TaskAttemptID.forName(conf.get("mapred.task.id"));
+      shouldFail = id.getId() == 0 && id.getTaskID().getId() == 0; 
+    }
+  }
+  
+  /**
+   * Check refreshNodes for decommissioning blacklisted nodes. 
+   */
+  public void testBlacklistedNodeDecommissioning() throws Exception {
+    LOG.info("Testing blacklisted node decommissioning");
+
+    Configuration conf = new Configuration();
+    conf.set(JTConfig.JT_MAX_TRACKER_BLACKLISTS, "1");
+
+    startCluster(2, 1, 0, conf);
+    
+    assertEquals("Trackers not up", 2,
+           mr.getJobTrackerRunner().getJobTracker().getActiveTrackers().length);
+    // validate the total tracker count
+    assertEquals("Active tracker count mismatch", 
+                 2, jt.getClusterStatus(false).getTaskTrackers());
+    // validate blacklisted count
+    assertEquals("Blacklisted tracker count mismatch", 
+                0, jt.getClusterStatus(false).getBlacklistedTrackers());
+
+    // run a failing job to blacklist the tracker
+    JobConf jConf = mr.createJobConf();
+    jConf.set(JobContext.MAX_TASK_FAILURES_PER_TRACKER, "1");
+    jConf.setJobName("test-job-fail-once");
+    jConf.setMapperClass(FailOnceMapper.class);
+    jConf.setReducerClass(IdentityReducer.class);
+    jConf.setNumMapTasks(1);
+    jConf.setNumReduceTasks(0);
+    
+    RunningJob job = 
+      UtilsForTests.runJob(jConf, new Path("in"), new Path("out"));
+    job.waitForCompletion();
+    
+    // check if the tracker is lost
+    // validate the total tracker count
+    assertEquals("Active tracker count mismatch", 
+                 1, jt.getClusterStatus(false).getTaskTrackers());
+    // validate blacklisted count
+    assertEquals("Blacklisted tracker count mismatch", 
+                1, jt.getClusterStatus(false).getBlacklistedTrackers());
+    
+    // find the tracker to decommission
+    String hostToDecommission = 
+      JobInProgress.convertTrackerNameToHostName(
+          jt.getBlacklistedTrackers()[0].getTaskTrackerName());
+    LOG.info("Decommissioning host " + hostToDecommission);
+    
+    Set<String> decom = new HashSet<String>(1);
+    decom.add(hostToDecommission);
+    jt.decommissionNodes(decom);
+ 
+    // check the cluster status and tracker size
+    assertEquals("Tracker is not lost upon host decommissioning", 
+                 1, jt.getClusterStatus(false).getTaskTrackers());
+    assertEquals("Blacklisted tracker count incorrect in cluster status after "
+                 + "decommissioning", 
+                 0, jt.getClusterStatus(false).getBlacklistedTrackers());
+    assertEquals("Tracker is not lost upon host decommissioning", 
+                 1, jt.taskTrackers().size());
     
     stopCluster();
   }
