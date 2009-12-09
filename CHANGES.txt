@@ -969,3 +969,5 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-754. Fix NPE in expiry thread when a TT is lost. (Amar Kamat 
     via sharad)
 
+    MAPREDUCE-1074. Document Reducer mark/reset functionality. (Jothi
+    Padmanabhan via cdouglas)

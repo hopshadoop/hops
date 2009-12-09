@@ -947,6 +947,177 @@
             map-outputs before writing them out to the <code>FileSystem</code>.
             </p>
           </section>
+
+          <section>
+            <title>Mark-Reset</title>
+
+            <p>While applications iterate through the values for a given key, it is
+            possible to mark the current position and later reset the iterator to
+            this position and continue the iteration process. The corresponding
+            methods are <code>mark()</code> and <code>reset()</code>. 
+            </p>
+
+            <p><code>mark()</code> and <code>reset()</code> can be called any
+            number of times during the iteration cycle.  The <code>reset()</code>
+            method will reset the iterator to the last record before a call to
+            the previous <code>mark()</code>.
+            </p>
+
+            <p>This functionality is available only with the new context based
+               reduce iterator.
+            </p>
+
+            <p> The following code snippet demonstrates the use of this 
+                functionality.
+            </p>
+           
+            <section>
+            <title>Source Code</title>
+
+            <table>
+            <tr><td>
+            <code>
+              public void reduce(IntWritable key, 
+                Iterable&lt;IntWritable&gt; values,
+                Context context) throws IOException, InterruptedException {
+            </code>
+            </td></tr>
+
+            <tr><td></td></tr>
+
+            <tr><td>
+            <code>
+                &nbsp;&nbsp;
+                MarkableIterator&lt;IntWritable&gt; mitr = 
+                  new MarkableIterator&lt;IntWritable&gt;(values.iterator());
+            </code>
+            </td></tr>
+
+            <tr><td></td></tr>
+
+            <tr><td>
+            <code>
+                &nbsp;&nbsp;
+                // Mark the position
+            </code>
+            </td></tr>
+
+            <tr><td>
+            <code>
+                &nbsp;&nbsp;
+                values.mark();
+            </code>
+            </td></tr>
+
+            <tr><td></td></tr>
+
+            <tr><td>
+            <code>
+                &nbsp;&nbsp;
+                while (values.hasNext()) {
+            </code>
+            </td></tr>
+
+            <tr><td>
+            <code>
+                  &nbsp;&nbsp;&nbsp;&nbsp;
+                  i = values.next();
+            </code>
+            </td></tr>
+
+            <tr><td>
+            <code>
+                  &nbsp;&nbsp;&nbsp;&nbsp;
+                  // Do the necessary processing
+            </code>
+            </td></tr>
+
+            <tr><td>
+            <code>
+                &nbsp;&nbsp;
+                }
+            </code>
+            </td></tr>
+
+            <tr><td></td></tr>
+
+            <tr><td>
+            <code>
+                &nbsp;&nbsp;
+                // Reset
+            </code>
+            </td></tr>
+
+            <tr><td>
+            <code>
+                &nbsp;&nbsp;
+                values.reset();
+            </code>
+            </td></tr>
+
+            <tr><td></td></tr>
+
+            <tr><td>
+            <code>
+                &nbsp;&nbsp;
+                // Iterate all over again. Since mark was called before the first
+            </code>
+            </td></tr>
+
+            <tr><td>
+            <code>
+                &nbsp;&nbsp;
+                // call to values.next() in this example, we will iterate over all
+            </code>
+            </td></tr>
+
+            <tr><td>
+            <code>
+                &nbsp;&nbsp;
+                // the values now
+            </code>
+            </td></tr>
+
+            <tr><td>
+            <code>
+                &nbsp;&nbsp;
+                while (values.hasNext()) {
+            </code>
+            </td></tr>
+
+            <tr><td>
+            <code>
+                  &nbsp;&nbsp;&nbsp;&nbsp;
+                  i = values.next();
+            </code>
+            </td></tr>
+
+            <tr><td>
+            <code>
+                  &nbsp;&nbsp;&nbsp;&nbsp;
+                  // Do the necessary processing
+            </code>
+            </td></tr>
+
+            <tr><td>
+            <code>
+                &nbsp;&nbsp;
+                }
+            </code>
+            </td></tr>
+
+            <tr><td></td></tr>
+
+            <tr><td>
+            <code>
+              }
+            </code>
+            </td></tr>
+
+            </table>
+          </section>
+
+          </section>
         </section>
         
         <section>
