@@ -717,7 +717,7 @@
   </property>
 
   <property>
-    <name>mapreduce.client.progerssmonitor.pollinterval</name>
+    <name>mapreduce.client.progressmonitor.pollinterval</name>
     <value>1000</value>
     <description>The interval (in milliseconds) between which the JobClient
     reports status to the console and checks for job completion. You may want to set this

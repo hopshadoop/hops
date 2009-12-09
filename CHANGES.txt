@@ -971,3 +971,5 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1074. Document Reducer mark/reset functionality. (Jothi
     Padmanabhan via cdouglas)
+
+    MAPREDUCE-1267. Fix typo in mapred-default.xml. (Todd Lipcon via cdouglas)
