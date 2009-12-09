@@ -37,6 +37,7 @@ import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Cluster;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
@@ -71,7 +72,8 @@ public class TestVertica extends VerticaTestCase {
 
   public Job getVerticaJob() throws IOException {
     Configuration conf = new Configuration(true);
-    Job job = new Job(conf, "TestVertica");
+    Cluster cluster = new Cluster(conf);
+    Job job = Job.getInstance(cluster);
     job.setJarByClass(VerticaTestMR.class);
 
     VerticaConfiguration.configureVertica(job.getConfiguration(),
@@ -158,6 +160,51 @@ public class TestVertica extends VerticaTestCase {
     values
         .add(new Timestamp(tmstmpfmt.parse("2007-08-09 6:07:05.06").getTime())); // TIMESTAMP
 
+    types.add(Types.BIGINT);
+    values.add(null); // BIGINT
+    types.add(Types.INTEGER);
+    values.add(null); // INTGER
+    types.add(Types.TINYINT);
+    values.add(null); // TINYINT
+    types.add(Types.SMALLINT);
+    values.add(null); // SMALLINT
+    types.add(Types.REAL);
+    values.add(null); // REAL
+    types.add(Types.DECIMAL);
+    values.add(null); // DECIMAL
+    types.add(Types.NUMERIC);
+    values.add(null); // NUMERIC
+    types.add(Types.DOUBLE);
+    values.add(null); // DOUBLE
+    types.add(Types.FLOAT);
+    values.add(null); // FLOAT
+    types.add(Types.BINARY);
+    values.add(null); // BINARY
+    types.add(Types.LONGVARBINARY);
+    values.add(null); // LONGVARBINARY
+    types.add(Types.VARBINARY);
+    values.add(null); // VARBINARY
+    types.add(Types.BOOLEAN);
+    values.add(null); // BOOLEAN
+    types.add(Types.CHAR);
+    values.add(null); // CHAR
+    types.add(Types.LONGNVARCHAR);
+    values.add(null); // LONGNVARCHAR
+    types.add(Types.LONGVARCHAR);
+    values.add(null); // LONGVARCHAR
+    types.add(Types.NCHAR);
+    values.add(null); // NCHAR
+    types.add(Types.VARCHAR);
+    values.add(null); // VARCHAR
+    types.add(Types.DATE);
+    values.add(null); // DATE
+    types.add(Types.TIME);
+    values.add(null); // TIME
+    types.add(Types.TIMESTAMP);
+    values
+        .add(null); // TIMESTAMP
+    
+    
     String sql1 = null;
     sql1 = recordTest(types, values, out, in, true);
     
@@ -191,7 +238,8 @@ public class TestVertica extends VerticaTestCase {
 
     // compare values
     for(int i = 0; i < values.size(); i++)
-      if(values.get(i).getClass().isArray()) {
+      if(values.get(i) == null) assertSame("Vertica Record serialized value " + i + " is null", values.get(i), new_values.get(i));
+      else if(values.get(i).getClass().isArray()) {
         Object a = values.get(i);
         Object b = new_values.get(i);
         for(int j = 0; j < Array.getLength(a); j++)
@@ -255,17 +303,17 @@ public class TestVertica extends VerticaTestCase {
     List<InputSplit> splits = null;
 
     Configuration conf = job.getConfiguration();
-    conf.setInt("mapred.map.tasks", 1);
+    conf.setInt("mapreduce.job.maps", 1);
     JobContext context = new JobContextImpl(conf, new JobID());
 
     splits = input.getSplits(context);
     assert splits.size() == 1;
 
-    conf.setInt("mapred.map.tasks", 3);
+    conf.setInt("mapreduce.job.maps", 3);
     splits = input.getSplits(context);
     assert splits.size() == 3;
 
-    conf.setInt("mapred.map.tasks", 10);
+    conf.setInt("mapreduce.job.maps", 10);
     splits = input.getSplits(context);
     assert splits.size() == 10;
   }

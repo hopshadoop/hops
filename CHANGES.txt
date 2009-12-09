@@ -976,3 +976,6 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-952. Remove inadvertently reintroduced Task.Counter enum. (Jothi
     Padmanabhan via cdouglas)
+
+    MAPREDUCE-1230. Fix handling of null records in VerticaInputFormat. (Omer
+    Trajman via cdouglas)
