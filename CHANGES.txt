@@ -66,6 +66,8 @@ Trunk (unreleased changes)
     MAPREDUCE-1185. Redirect running job url to history url if job is already 
     retired. (Amareshwari Sriramadasu and Sharad Agarwal via sharad)
 
+    MAPREDUCE-1050. Introduce a mock object testing framework. (tomwhite)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band

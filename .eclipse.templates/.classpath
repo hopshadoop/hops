@@ -2,6 +2,7 @@
 <classpath>
 	<classpathentry kind="src" path="src/java"/>
 	<classpathentry kind="src" path="src/test/mapred"/>
+	<classpathentry kind="src" path="src/test/unit"/>
 	<classpathentry kind="src" path="src/benchmarks/gridmix2/src/java"/>
 	<classpathentry kind="src" path="src/examples"/>
 	<classpathentry kind="src" path="src/tools"/>

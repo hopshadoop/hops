@@ -94,6 +94,9 @@
                rev="${lucene-core.version}" conf="javadoc->default"/>
    <dependency org="org.apache.hadoop" name="avro" rev="${avro.version}" 
                conf="common->default"/>
+   <dependency org="org.mockito" name="mockito-all" rev="${mockito-all.version}" 
+               conf="test->default"/>
+
  </dependencies>
   
 </ivy-module>

@@ -476,7 +476,7 @@
 
     <javac 
       encoding="${build.encoding}" 
-      srcdir="${test.src.dir}/mapred"
+      srcdir="${test.src.dir}/mapred;${test.src.dir}/unit"
       includes="org/apache/hadoop/**/*.java"
       destdir="${test.mapred.build.classes}"
       debug="${javac.debug}"
@@ -565,6 +565,7 @@
 
   <macrodef name="macro-test-runner">
     <attribute name="test.file" />
+    <attribute name="suite.type" />
     <sequential>
       <delete dir="${test.build.data}"/>
       <mkdir dir="${test.build.data}"/>
@@ -603,7 +604,7 @@
         <classpath refid="test.classpath"/>
         <formatter type="${test.junit.output.format}" />
         <batchtest todir="${test.build.dir}" unless="testcase">
-          <fileset dir="${test.src.dir}/mapred" excludes="**/${test.exclude}.java">
+          <fileset dir="${test.src.dir}/@{suite.type}" excludes="**/${test.exclude}.java">
             <patternset>
               <includesfile name="@{test.file}"/>
             </patternset>
@@ -611,20 +612,24 @@
         </batchtest>
         <batchtest todir="${test.build.dir}" if="testcase">
           <fileset dir="${test.src.dir}/mapred" includes="**/${testcase}.java"/>
+          <fileset dir="${test.src.dir}/unit" includes="**/${testcase}.java"/>
         </batchtest>
       </junit>
       <antcall target="checkfailure"/>
     </sequential>
   </macrodef>
 
-  <target name="run-test-mapred" depends="compile-mapred-test" description="Run mapred unit tests">
-    <macro-test-runner test.file="${test.mapred.all.tests.file}" />
+  <target name="run-test-mapred" depends="compile-mapred-test" description="Run mapred functional and system tests">
+    <macro-test-runner test.file="${test.mapred.all.tests.file}" suite.type="mapred"/>
   </target> 
 
    <target name="run-commit-test" depends="compile-mapred-test" description="Run approximate 10-minute set of unit tests prior to commiting">
-     <macro-test-runner test.file="${test.mapred.commit.tests.file}" />
+     <macro-test-runner test.file="${test.mapred.commit.tests.file}" suite.type="mapred"/>
    </target>
  
+   <target name="run-test-unit" depends="compile-mapred-test" description="Run unit tests">
+     <macro-test-runner test.file="${test.mapred.all.tests.file}" suite.type="unit"/>
+   </target>
 
 
   <target name="checkfailure" if="tests.failed">
