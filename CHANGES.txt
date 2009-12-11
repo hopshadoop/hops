@@ -992,3 +992,4 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-879. Fix broken unit test TestTaskTrackerLocalization on MacOS.
     (Sreekanth Ramakrishnan via yhemanth)
 
+    MAPREDUCE-1124. Fix imprecise byte counts in Gridmix. (cdouglas)
