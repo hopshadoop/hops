@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.jar.JarOutputStream;
@@ -58,6 +59,10 @@ public class TestTaskTrackerLocalization extends TestCase {
   private File TEST_ROOT_DIR;
   private File ROOT_MAPRED_LOCAL_DIR;
   private File HADOOP_LOG_DIR;
+  private static File PERMISSION_SCRIPT_DIR;
+  private static File PERMISSION_SCRIPT_FILE;
+  private static final String PERMISSION_SCRIPT_CONTENT = "ls -l -d $1 | " +
+  		"awk '{print $1\":\"$3\":\"$4}'";
 
   private int numLocalDirs = 6;
   private static final Log LOG =
@@ -171,6 +176,34 @@ public class TestTaskTrackerLocalization extends TestCase {
 
     tracker.setLocalizer(new Localizer(tracker.localFs, localDirs,
         taskController));
+    setupPermissionScriptDir(TEST_ROOT_DIR);
+  }
+
+  /**
+   * Method to setup the permission script which would be used by the 
+   * checkFilePermissions
+   * 
+   * @param rootDir
+   * @throws FileNotFoundException
+   */
+  static void setupPermissionScriptDir(File rootDir) throws FileNotFoundException {
+    PERMISSION_SCRIPT_DIR = new File(rootDir, "permission_script_dir");
+    PERMISSION_SCRIPT_FILE = new File(PERMISSION_SCRIPT_DIR, "getperms.sh");
+    
+    if(PERMISSION_SCRIPT_FILE.exists()) {
+      PERMISSION_SCRIPT_FILE.delete();
+    }
+    
+    if(PERMISSION_SCRIPT_DIR.exists()) {
+      PERMISSION_SCRIPT_DIR.delete();
+    }
+    
+    PERMISSION_SCRIPT_DIR.mkdir();
+    
+    PrintWriter writer = new PrintWriter(PERMISSION_SCRIPT_FILE);
+    writer.write(PERMISSION_SCRIPT_CONTENT);
+    writer.close();
+    PERMISSION_SCRIPT_FILE.setExecutable(true, true);
   }
 
   /**
@@ -238,10 +271,23 @@ public class TestTaskTrackerLocalization extends TestCase {
 
   protected static String[] getFilePermissionAttrs(String path)
       throws IOException {
-    String output = Shell.execCommand("stat", path, "-c", "%A:%U:%G");
+    String[] command = {"bash",PERMISSION_SCRIPT_FILE.getAbsolutePath(), path};
+    String output=Shell.execCommand(command);
     return output.split(":|\n");
   }
 
+
+  /**
+   * Utility method to check permission of a given path. Requires the permission
+   * script directory to be setup in order to call.
+   * 
+   * 
+   * @param path
+   * @param expectedPermissions
+   * @param expectedOwnerUser
+   * @param expectedOwnerGroup
+   * @throws IOException
+   */
   static void checkFilePermissions(String path, String expectedPermissions,
       String expectedOwnerUser, String expectedOwnerGroup)
       throws IOException {

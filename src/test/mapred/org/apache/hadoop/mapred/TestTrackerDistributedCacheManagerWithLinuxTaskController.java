@@ -57,7 +57,10 @@ public class TestTrackerDistributedCacheManagerWithLinuxTaskController extends
                 .getSimpleName()).getAbsolutePath();
 
     super.setUp();
-
+    //set up for the permission checker script
+    TestTaskTrackerLocalization.setupPermissionScriptDir(new File(
+        TEST_ROOT_DIR));
+    
     taskController = new MyLinuxTaskController();
     String path =
         System.getProperty(ClusterWithLinuxTaskController.TASKCONTROLLER_PATH);

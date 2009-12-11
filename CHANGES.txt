@@ -989,3 +989,6 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-1171. Allow shuffle retries and read-error reporting to be
     configurable. (Amareshwari Sriramadasu via acmurthy)
 
+    MAPREDUCE-879. Fix broken unit test TestTaskTrackerLocalization on MacOS.
+    (Sreekanth Ramakrishnan via yhemanth)
+
