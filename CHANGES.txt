@@ -124,6 +124,10 @@ Trunk (unreleased changes)
     MAPREDUCE-1152. Distinguish between failed and killed tasks in
     JobTrackerInstrumentation. (Sharad Agarwal via cdouglas)
 
+    MAPREDUCE-1285. In DistCp.deleteNonexisting(..), get class from the
+    parameter instead of using FileStatus.class.  (Peter Romianowski via
+    szetszwo)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
