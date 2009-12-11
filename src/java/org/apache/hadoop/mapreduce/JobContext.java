@@ -212,6 +212,10 @@ public interface JobContext {
     "mapreduce.reduce.shuffle.connect.timeout";
   public static final String SHUFFLE_READ_TIMEOUT = 
     "mapreduce.reduce.shuffle.read.timeout";
+  public static final String SHUFFLE_FETCH_FAILURES = 
+    "mapreduce.reduce.shuffle.maxfetchfailures";
+  public static final String SHUFFLE_NOTIFY_READERROR = 
+    "mapreduce.reduce.shuffle.notify.readerror";
   public static final String REDUCE_SKIP_INCR_PROC_COUNT = 
     "mapreduce.reduce.skip.proc-count.auto-incr";
   public static final String REDUCE_SKIP_MAXGROUPS = 

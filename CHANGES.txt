@@ -985,3 +985,7 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1230. Fix handling of null records in VerticaInputFormat. (Omer
     Trajman via cdouglas)
+
+    MAPREDUCE-1171. Allow shuffle retries and read-error reporting to be
+    configurable. (Amareshwari Sriramadasu via acmurthy)
+
