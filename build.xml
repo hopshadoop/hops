@@ -439,6 +439,7 @@
       <fileset file="${conf.dir}/log4j.properties"/>
       <fileset file="${conf.dir}/hadoop-metrics.properties"/> -->
       <zipfileset dir="${build.webapps}" prefix="webapps"/>
+      <fileset file="${jar.extra.properties.list}" />
     </jar>
   </target>
 
@@ -601,6 +602,12 @@
         <syspropertyset dynamic="no">
           <propertyref name="compile.c++"/>
         </syspropertyset>
+        
+        <!-- Pass probability specifications to the spawn JVM -->
+        <syspropertyset id="FaultProbabilityProperties">
+          <propertyref regex="fi.*"/>
+        </syspropertyset>
+        
         <classpath refid="test.classpath"/>
         <formatter type="${test.junit.output.format}" />
         <batchtest todir="${test.build.dir}" unless="testcase">
@@ -613,6 +620,24 @@
         <batchtest todir="${test.build.dir}" if="testcase">
           <fileset dir="${test.src.dir}/mapred" includes="**/${testcase}.java"/>
           <fileset dir="${test.src.dir}/unit" includes="**/${testcase}.java"/>
+        </batchtest>
+        <!--batch test to test all the testcases in aop folder with fault 
+        injection-->
+        <batchtest todir="${test.build.dir}" if="tests.notestcase.fi">
+          <fileset dir="${test.src.dir}/aop"
+            includes="**/${test.include}.java"
+            excludes="**/${test.exclude}.java" />
+        </batchtest>
+        <!-- batch test for testing a single test case in aop folder with
+        fault injection-->
+        <batchtest todir="${test.build.dir}" if="tests.testcase.fi">
+         <fileset dir="${test.src.dir}/aop" includes="**/${testcase}.java"/>
+        </batchtest>
+         <!--The following batch is for very special occasions only when
+         a non-FI tests are needed to be executed against FI-environment -->
+         <batchtest todir="${test.build.dir}" if="tests.testcaseonly.fi">
+          <fileset dir="${test.src.dir}/mapred" 
+            includes="**/${testcase}.java"/>
         </batchtest>
       </junit>
       <antcall target="checkfailure"/>
@@ -1725,6 +1750,86 @@
         failonerror="yes">
     </exec>
   </target>
-
   <!-- end of task-controller targets -->
+  
+  <!-- Begining of fault-injection targets-->
+  <import file="${test.src.dir}/aop/build/aop.xml"/>
+  
+  <!-- declaring mapred.src.dir as java.src.dir for aop.xml -->
+  <property name="java.src.dir" value="${src.dir}/java"/>
+  
+  <!-- target dependency from aop.xml -->
+  <target name="-classes-compilation" 
+    depends="compile-mapred-classes, compile-mapred-test"/>
+  
+  <target name="jar-test-fault-inject" depends="jar-mapred-test-fault-inject"
+            description="Make hadoop-mapred-test-fi.jar files"/>
+  
+  <!-- target to build test-fi.jar-->
+  <target name="jar-mapred-test-fault-inject" depends="injectfaults"
+    description="Make hadoop-mapred-test-fi.jar">
+    <macro-jar-test-fault-inject target.name="jar-test" 
+      jar.final.name="test.final.name"
+      jar.final.value="${name}-test-${version}-fi"/>
+  </target>
+  
+  <!-- target to build the hadoop-fi.jar -->
+  <target name="jar-fault-inject" depends="injectfaults"
+    description="Make hadoop-fi.jar">
+    <macro-jar-fault-inject
+      target.name="jar"
+      jar.final.name="final.name"
+      jar.final.value="${final.name}-fi" />
+  </target>
+  
+  <!-- target to run fault injected test cases will run entire mapred test 
+       suite-->
+  <target name="run-test-mapred-fault-inject" depends="injectfaults"
+    description="Run full suite of unit tests with fault injection">
+    <macro-run-tests-fault-inject target.name="run-test-mapred"
+      testcasesonly="false"/>
+  </target>
+
+  <!-- target to run non-FI tests in a FI environment-->
+  <target name="run-fault-inject-with-testcaseonly" depends="injectfaults">
+    <fail unless="testcase">
+    Can't run this target without -Dtestcase setting!
+    </fail>
+    <macro-run-tests-fault-inject target.name="run-test-mapred"
+      testcasesonly="true"/>
+  </target>
+  <condition property="tests.notestcase">
+    <and>
+      <isfalse value="${test.fault.inject}"/>
+      <not>
+        <isset property="testcase"/>
+      </not>
+    </and>
+  </condition>
+  <condition property="tests.notestcase.fi">
+    <and>
+      <not>
+        <isset property="testcase"/>
+      </not>
+      <istrue value="${test.fault.inject}"/>
+    </and>
+  </condition>
+  <condition property="test.testcase">
+    <and>
+      <isfalse value="${test.fault.inject}"/>
+      <isset property="testcase"/>
+    </and>
+  </condition>
+  <condition property="tests.testcaseonly.fi">
+    <istrue value="${special.fi.testcasesonly}" />
+  </condition>
+  <condition property="tests.testcase.fi">
+    <and>
+      <istrue value="${test.fault.inject}" />
+      <isset property="testcase" />
+      <isfalse value="${special.fi.testcasesonly}" />
+    </and>
+  </condition>
+  <!-- End of fault injection targets-->
+  
 </project>

@@ -68,6 +68,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-1050. Introduce a mock object testing framework. (tomwhite)
 
+    MAPREDUCE-1084. Implementing aspects development and fault injeciton
+    framework for MapReduce. (Sreekanth Ramakrishnan via cos)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
