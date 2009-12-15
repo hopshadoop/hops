@@ -1507,9 +1507,11 @@
         <li><code>${mapreduce.cluster.local.dir}/taskTracker/jobcache/$jobid/jars/</code>
         : The jars directory, which has the job jar file and expanded jar.
         The <code>job.jar</code> is the application's jar file that is
-        automatically distributed to each machine. It is expanded in jars
-        directory before the tasks for the job start. The job.jar location
-        is accessible to the application through the api
+        automatically distributed to each machine. Any library jars that are dependencies
+        of the application code may be packaged inside this jar in a <code>lib/</code> directory.
+        This directory is extracted from <code>job.jar</code> and its contents are
+        automatically added to the classpath for each task.
+        The job.jar location is accessible to the application through the api
         <a href="ext:api/org/apache/hadoop/mapred/jobconf/getjar"> 
         JobConf.getJar() </a>. To access the unjarred directory,
         JobConf.getJar().getParent() can be called.</li>

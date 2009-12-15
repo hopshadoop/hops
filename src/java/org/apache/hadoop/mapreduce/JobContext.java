@@ -55,6 +55,7 @@ public interface JobContext {
   public static final String JAR = "mapreduce.job.jar";
   public static final String ID = "mapreduce.job.id";
   public static final String JOB_NAME = "mapreduce.job.name";
+  public static final String JAR_UNPACK_PATTERN = "mapreduce.job.jar.unpack.pattern";
   public static final String USER_NAME = "mapreduce.job.user.name";
   public static final String PRIORITY = "mapreduce.job.priority";
   public static final String QUEUE_NAME = "mapreduce.job.queuename";

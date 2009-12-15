@@ -649,7 +649,7 @@ abstract class TaskRunner extends Thread {
       }
     }
     classPaths.add(new File(jobCacheDir, "classes").toString());
-    classPaths.add(jobCacheDir.toString());
+    classPaths.add(new File(jobCacheDir, "job.jar").toString());
   }
   
   /**

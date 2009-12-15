@@ -22,6 +22,10 @@ import junit.framework.TestCase;
 import java.io.*;
 
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.conf.Configuration;
+
 
 /**
  * This class tests hadoopStreaming in MapReduce local mode.
@@ -50,11 +54,15 @@ public class TestStreaming extends TestCase
     utilTest.redirectIfAntJunit();
   }
 
+  protected String getInputData() {
+    return input;
+  }
+
   protected void createInput() throws IOException
   {
-    DataOutputStream out = new DataOutputStream(
-                                                new FileOutputStream(INPUT_FILE.getAbsoluteFile()));
-    out.write(input.getBytes("UTF-8"));
+    DataOutputStream out = getFileSystem().create(
+      new Path(INPUT_FILE.getAbsolutePath()));
+    out.write(getInputData().getBytes("UTF-8"));
     out.close();
   }
 
@@ -70,7 +78,29 @@ public class TestStreaming extends TestCase
       "-jobconf", "stream.tmpdir="+System.getProperty("test.build.data","/tmp")
     };
   }
-  
+
+  protected Configuration getConf() {
+    return new Configuration();
+  }
+
+  protected FileSystem getFileSystem() throws IOException {
+    return FileSystem.get(getConf());
+  }
+
+  protected String getExpectedOutput() {
+    return outputExpect;
+  }
+
+  protected void checkOutput() throws IOException {
+    Path outPath = new Path(OUTPUT_DIR.getAbsolutePath(), "part-00000");
+    FileSystem fs = getFileSystem();
+    String output = StreamUtil.slurpHadoop(outPath, fs);
+    fs.delete(outPath, true);
+    System.err.println("outEx1=" + getExpectedOutput());
+    System.err.println("  out1=" + output);
+    assertEquals(getExpectedOutput(), output);
+  }
+
   public void testCommandLine() throws IOException
   {
     try {
@@ -84,14 +114,10 @@ public class TestStreaming extends TestCase
 
       // During tests, the default Configuration will use a local mapred
       // So don't specify -config or -cluster
-      job = new StreamJob(genArgs(), mayExit);      
-      job.go();
-      File outFile = new File(OUTPUT_DIR, "part-00000").getAbsoluteFile();
-      String output = StreamUtil.slurp(outFile);
-      outFile.delete();
-      System.err.println("outEx1=" + outputExpect);
-      System.err.println("  out1=" + output);
-      assertEquals(outputExpect, output);
+      job = new StreamJob(genArgs(), mayExit);
+      int ret = job.go();
+      assertEquals(0, ret);
+      checkOutput();
     } finally {
       try {
         INPUT_FILE.delete();

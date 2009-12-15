@@ -29,6 +29,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
+import java.util.regex.Pattern;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
@@ -272,9 +273,16 @@ public class StreamJob implements Tool {
       
       values = cmdLine.getOptionValues("file");
       if (values != null && values.length > 0) {
+        StringBuilder unpackRegex = new StringBuilder(
+          config_.getPattern(JobContext.JAR_UNPACK_PATTERN,
+                             JobConf.UNPACK_JAR_PATTERN_DEFAULT).pattern());
         for (String file : values) {
           packageFiles_.add(file);
+          String fname = new File(file).getName();
+          unpackRegex.append("|(?:").append(Pattern.quote(fname)).append(")");
         }
+        config_.setPattern(JobContext.JAR_UNPACK_PATTERN,
+                           Pattern.compile(unpackRegex.toString()));
         validate(packageFiles_);
       }
          

@@ -121,6 +121,7 @@ public class TaskTracker
   static final String MAPRED_TASKTRACKER_PMEM_RESERVED_PROPERTY =
     "mapred.tasktracker.pmem.reserved";
 
+
   static final long WAIT_FOR_DONE = 3 * 1000;
   private int httpPort;
 
@@ -1008,10 +1009,11 @@ public class TaskTracker
 
       localJobConf.setJar(localJarFile.toString());
 
-      // Also un-jar the job.jar files. We un-jar it so that classes inside
-      // sub-directories, for e.g., lib/, classes/ are available on class-path
-      RunJar.unJar(new File(localJarFile.toString()), new File(localJarFile
-          .getParent().toString()));
+      // Un-jar the parts of the job.jar that need to be added to the classpath
+      RunJar.unJar(
+        new File(localJarFile.toString()),
+        new File(localJarFile.getParent().toString()),
+        localJobConf.getJarUnpackPattern());
     }
   }
 
