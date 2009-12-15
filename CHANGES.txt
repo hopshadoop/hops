@@ -139,6 +139,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-1251. c++ utils doesn't compile. (Eli Collins via tomwhite)
 
+    MAPREDUCE-1148. SQL identifiers are a superset of Java identifiers.
+    (Aaron Kimball via tomwhite)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
