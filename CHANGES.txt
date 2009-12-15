@@ -81,6 +81,9 @@ Trunk (unreleased changes)
     Configuration changes:
       add mapreduce.tasktracker.outofband.heartbeat 
 
+    MAPREDUCE-1224. Calling "SELECT t.* from <table> AS t" to get meta
+    information is too expensive for big tables. (Spencer Ho via tomwhite)
+
   BUG FIXES
 
     MAPREDUCE-1089. Fix NPE in fair scheduler preemption when tasks are
