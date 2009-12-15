@@ -71,6 +71,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1084. Implementing aspects development and fault injeciton
     framework for MapReduce. (Sreekanth Ramakrishnan via cos)
 
+    MAPREDUCE-1209. Move common specific part of the test TestReflectionUtils
+    out of mapred into common. (Todd Lipcon via tomwhite)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
