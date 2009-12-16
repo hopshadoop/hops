@@ -145,6 +145,8 @@ Trunk (unreleased changes)
     MAPREDUCE-1148. SQL identifiers are a superset of Java identifiers.
     (Aaron Kimball via tomwhite)
 
+    MAPREDUCE-1294. Build fails to pull latest hadoop-core-* artifacts (cos)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
