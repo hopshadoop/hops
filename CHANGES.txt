@@ -147,6 +147,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-1294. Build fails to pull latest hadoop-core-* artifacts (cos)
 
+    MAPREDUCE-1213. TaskTrackers restart is faster because it deletes
+    distributed cache directory asynchronously. (Zheng Shao via dhruba)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

@@ -99,6 +99,7 @@ import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.VersionInfo;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.Shell.ShellCommandExecutor;
+import org.apache.hadoop.mapreduce.util.MRAsyncDiskService;
 
 /*******************************************************
  * TaskTracker is a process that starts and tracks MR Tasks
@@ -265,6 +266,8 @@ public class TaskTracker
 
   private IndexCache indexCache;
 
+  private MRAsyncDiskService asyncDiskService;
+  
   /**
   * Handle to the specific instance of the {@link TaskController} class
   */
@@ -540,9 +543,10 @@ public class TaskTracker
        fConf.get(TT_DNS_NAMESERVER,"default"));
     }
  
-    //check local disk
+    //check local disk and start async disk service
     checkLocalDirs(this.fConf.getLocalDirs());
-    fConf.deleteLocalFiles(SUBDIR);
+    asyncDiskService = new MRAsyncDiskService(FileSystem.getLocal(fConf), fConf.getLocalDirs());
+    asyncDiskService.moveAndDeleteFromEachVolume(SUBDIR);
 
     // Clear out state tables
     this.tasks.clear();

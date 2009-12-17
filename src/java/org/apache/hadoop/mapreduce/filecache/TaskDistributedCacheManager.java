@@ -146,7 +146,7 @@ public class TaskDistributedCacheManager {
   public void setup(LocalDirAllocator lDirAlloc, File workDir, 
       String cacheSubdir) throws IOException {
     setupCalled = true;
-    
+      
     if (cacheFiles.isEmpty()) {
       return;
     }

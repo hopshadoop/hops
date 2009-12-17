@@ -100,6 +100,7 @@ import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.VersionInfo;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
+import org.apache.hadoop.mapreduce.util.MRAsyncDiskService;
 import org.apache.hadoop.mapreduce.util.ConfigUtil;
 
 /*******************************************************
@@ -168,6 +169,8 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
 
   private final JobHistory jobHistory;
 
+  private MRAsyncDiskService asyncDiskService;
+  
   /**
    * A client tried to submit a job before the Job Tracker was ready.
    */
@@ -1511,7 +1514,8 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     }
     
     // Same with 'localDir' except it's always on the local disk.
-    jobConf.deleteLocalFiles(SUBDIR);
+    asyncDiskService = new MRAsyncDiskService(FileSystem.getLocal(conf), conf.getLocalDirs());
+    asyncDiskService.moveAndDeleteFromEachVolume(SUBDIR);
 
     // Initialize history DONE folder
     jobHistory.initDone(conf, fs);
