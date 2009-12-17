@@ -153,6 +153,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1146. Sqoop dependencies break Eclipse build on Linux.
     (Aaron Kimball via tomwhite)
 
+    MAPREDUCE-1174. Sqoop improperly handles table/column names which are
+    reserved sql words. (Aaron Kimball via tomwhite)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
