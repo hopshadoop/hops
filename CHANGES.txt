@@ -150,6 +150,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1213. TaskTrackers restart is faster because it deletes
     distributed cache directory asynchronously. (Zheng Shao via dhruba)
 
+    MAPREDUCE-1146. Sqoop dependencies break Eclipse build on Linux.
+    (Aaron Kimball via tomwhite)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
