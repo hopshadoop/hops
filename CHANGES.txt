@@ -6,6 +6,9 @@ Trunk (unreleased changes)
 
   NEW FEATURES
 
+    MAPREDUCE-698. Per-pool task limits for the fair scheduler.
+    (Kevin Peterson via matei)
+
     MAPREDUCE-1017. Compression and output splitting for Sqoop.
     (Aaron Kimball via tomwhite)
 

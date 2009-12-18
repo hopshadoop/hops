@@ -1640,6 +1640,45 @@ public class TestFairScheduler extends TestCase {
     assertEquals(1.33,  info3.reduceSchedulable.getFairShare(), 0.01);
   }
 
+  public void testPoolMaxMapsReduces() throws Exception {
+    PrintWriter out = new PrintWriter(new FileWriter(ALLOC_FILE));
+    out.println("<?xml version=\"1.0\"?>");
+    out.println("<allocations>");
+    // Pool with upper bound
+    out.println("<pool name=\"poolLimited\">");
+    out.println("<weight>1.0</weight>");
+    out.println("<maxMaps>2</maxMaps>");
+    out.println("<maxReduces>1</maxReduces>");
+    out.println("</pool>");
+    out.println("</allocations>");
+    out.close();
+    scheduler.getPoolManager().reloadAllocs();
+    // Create two jobs with ten maps
+    JobInProgress job1 = submitJob(JobStatus.RUNNING, 10, 5, "poolLimited");
+    advanceTime(10);
+    JobInProgress job2 = submitJob(JobStatus.RUNNING, 10, 5);
+    checkAssignment("tt1", "attempt_test_0002_m_000000_0 on tt1");
+    checkAssignment("tt1", "attempt_test_0002_r_000000_0 on tt1");
+    checkAssignment("tt1", "attempt_test_0001_m_000000_0 on tt1");
+    checkAssignment("tt1", "attempt_test_0001_r_000000_0 on tt1");
+    checkAssignment("tt2", "attempt_test_0002_m_000001_0 on tt2");
+    checkAssignment("tt2", "attempt_test_0002_r_000001_0 on tt2");
+    checkAssignment("tt2", "attempt_test_0001_m_000001_0 on tt2");
+    checkAssignment("tt2", "attempt_test_0002_r_000002_0 on tt2");
+
+    Pool limited = scheduler.getPoolManager().getPool("poolLimited");
+    assertEquals(2, limited.getSchedulable(TaskType.MAP).getRunningTasks());
+    assertEquals(1, limited.getSchedulable(TaskType.REDUCE).getRunningTasks());
+    Pool defaultPool = scheduler.getPoolManager().getPool("default");
+    assertEquals(2, defaultPool.getSchedulable(TaskType.MAP).getRunningTasks());
+    assertEquals(3, defaultPool.getSchedulable(TaskType.REDUCE)
+        .getRunningTasks());
+    assertEquals(2, job1.runningMapTasks);
+    assertEquals(1, job1.runningReduceTasks);
+    assertEquals(2, job2.runningMapTasks);
+    assertEquals(3, job2.runningReduceTasks);
+  }
+
   /**
    * Tests that max-running-tasks per node are set by assigning load
    * equally accross the cluster in CapBasedLoadManager.
