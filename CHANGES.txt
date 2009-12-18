@@ -1027,3 +1027,7 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1222. Add an option to exclude numeric IP addresses in topologies
     processed by Mumak. (Hong Tang via cdouglas)
+
+    MAPREDUCE-1284. Fix fts_open() call in task-controller that was failing
+    LinuxTaskController unit tests. (Ravi Gummadi via yhemanth)
+
