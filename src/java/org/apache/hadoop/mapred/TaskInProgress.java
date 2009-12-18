@@ -335,6 +335,15 @@ class TaskInProgress {
   public boolean isRunning() {
     return !activeTasks.isEmpty();
   }
+
+  /**
+   * Is this TaskAttemptid running
+   * @param taskId
+   * @return true if taskId attempt is running.
+   */
+  boolean isAttemptRunning(TaskAttemptID taskId) {
+    return activeTasks.containsKey(taskId);
+  }
     
   TaskAttemptID getSuccessfulTaskid() {
     return successfulTaskId;

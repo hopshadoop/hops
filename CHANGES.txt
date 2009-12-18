@@ -1031,3 +1031,7 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-1284. Fix fts_open() call in task-controller that was failing
     LinuxTaskController unit tests. (Ravi Gummadi via yhemanth)
 
+    MAPREDUCE-1143. Fix running task counters to be updated correctly
+    when speculative attempts are running for a TIP.
+    (Rahul Kumar Singh via yhemanth)
+
