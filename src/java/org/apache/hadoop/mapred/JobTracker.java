@@ -87,6 +87,7 @@ import org.apache.hadoop.net.NodeBase;
 import org.apache.hadoop.net.ScriptBasedMapping;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.PermissionChecker;
+import org.apache.hadoop.security.RefreshUserToGroupMappingsProtocol;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UnixUserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -109,7 +110,7 @@ import org.apache.hadoop.mapreduce.util.ConfigUtil;
  *
  *******************************************************/
 public class JobTracker implements MRConstants, InterTrackerProtocol,
-    ClientProtocol, TaskTrackerManager,
+    ClientProtocol, TaskTrackerManager, RefreshUserToGroupMappingsProtocol,
     RefreshAuthorizationPolicyProtocol, AdminOperationsProtocol, JTConfig {
 
   static{
@@ -266,6 +267,8 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
       return RefreshAuthorizationPolicyProtocol.versionID;
     } else if (protocol.equals(AdminOperationsProtocol.class.getName())){
       return AdminOperationsProtocol.versionID;
+    } else if (protocol.equals(RefreshUserToGroupMappingsProtocol.class.getName())){
+      return RefreshUserToGroupMappingsProtocol.versionID;
     } else {
       throw new IOException("Unknown protocol to job tracker: " + protocol);
     }
@@ -4094,6 +4097,15 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
             limitMaxMemForReduceTasks).append(")"));
   }
 
+   
+  @Override
+  public void refreshUserToGroupsMappings(Configuration conf) throws IOException {
+    LOG.info("Refreshing all user-to-groups mappings. Requested by user: " + 
+             UserGroupInformation.getCurrentUGI().getUserName());
+    
+    SecurityUtil.getUserToGroupsMappingService(conf).refresh();
+  }
+  
   private boolean perTaskMemoryConfigurationSetOnJT() {
     if (limitMaxMemForMapTasks == JobConf.DISABLED_MEMORY_LIMIT
         || limitMaxMemForReduceTasks == JobConf.DISABLED_MEMORY_LIMIT

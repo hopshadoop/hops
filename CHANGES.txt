@@ -80,6 +80,10 @@ Trunk (unreleased changes)
     MAPREDUCE-967. TaskTracker does not need to fully unjar job jars.
     (Todd Lipcon via tomwhite)
 
+    MAPREDUCE-1083. Changes in MapReduce so that group information of users 
+    can be refreshed in the JobTracker via command line. 
+    (Boris Shkolnik via ddas)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
