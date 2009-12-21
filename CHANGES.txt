@@ -169,6 +169,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1174. Sqoop improperly handles table/column names which are
     reserved sql words. (Aaron Kimball via tomwhite)
 
+    MAPREDUCE-1265. The task attempt error log prints the name of the 
+    tasktracker machine. (Scott Chen via dhruba)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

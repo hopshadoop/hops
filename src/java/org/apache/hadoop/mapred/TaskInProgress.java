@@ -542,15 +542,16 @@ class TaskInProgress {
    * A status message from a client has arrived.
    * It updates the status of a single component-thread-task,
    * which might result in an overall TaskInProgress status update.
-   * @return has the task changed its state noticably?
+   * @return has the task changed its state noticeably?
    */
   synchronized boolean updateStatus(TaskStatus status) {
     TaskAttemptID taskid = status.getTaskID();
+    String tracker = status.getTaskTracker();
     String diagInfo = status.getDiagnosticInfo();
     TaskStatus oldStatus = taskStatuses.get(taskid);
     boolean changed = true;
     if (diagInfo != null && diagInfo.length() > 0) {
-      LOG.info("Error from "+taskid+": "+diagInfo);
+      LOG.info("Error from " + taskid + " on " +  tracker + ": "+ diagInfo);
       addDiagnosticInfo(taskid, diagInfo);
     }
     
