@@ -86,6 +86,8 @@ import org.apache.hadoop.metrics.Updater;
 import org.apache.hadoop.net.DNS;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.SecurityUtil;
+import org.apache.hadoop.security.UnixUserGroupInformation;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.ConfiguredPolicy;
 import org.apache.hadoop.security.authorize.PolicyProvider;
 import org.apache.hadoop.security.authorize.ServiceAuthorizationManager;
@@ -218,6 +220,7 @@ public class TaskTracker
   static final String OUTPUT = "output";
   private static final String JARSDIR = "jars";
   static final String LOCAL_SPLIT_FILE = "split.dta";
+  static final String LOCAL_SPLIT_META_FILE = "split.info";
   static final String JOBFILE = "job.xml";
   static final String JOB_TOKEN_FILE="jobToken"; //localized file
 
@@ -474,11 +477,16 @@ public class TaskTracker
     return getLocalJobDir(user, jobid) + Path.SEPARATOR + MRConstants.WORKDIR;
   }
 
-  static String getLocalSplitFile(String user, String jobid, String taskid) {
+  static String getLocalSplitMetaFile(String user, String jobid, String taskid){
     return TaskTracker.getLocalTaskDir(user, jobid, taskid) + Path.SEPARATOR
-        + TaskTracker.LOCAL_SPLIT_FILE;
+        + TaskTracker.LOCAL_SPLIT_META_FILE;
   }
 
+  static String getLocalSplitFile(String user, String jobid, String taskid) {
+    return TaskTracker.getLocalTaskDir(user, jobid, taskid) + Path.SEPARATOR
+           + TaskTracker.LOCAL_SPLIT_FILE;
+  }
+  
   static String getIntermediateOutputDir(String user, String jobid,
       String taskid) {
     return getLocalTaskDir(user, jobid, taskid) + Path.SEPARATOR
@@ -898,6 +906,13 @@ public class TaskTracker
     launchTaskForJob(tip, new JobConf(rjob.jobConf)); 
   }
 
+  private void setUgi(String user, Configuration conf) {
+    //The dummy-group used here will not be required once we have UGI
+    //object creation with just the user name.
+    conf.set(UnixUserGroupInformation.UGI_PROPERTY_NAME, 
+        user+","+UnixUserGroupInformation.DEFAULT_GROUP);
+  }
+  
   /**
    * Localize the job on this tasktracker. Specifically
    * <ul>
@@ -940,6 +955,7 @@ public class TaskTracker
     }
     System.setProperty(JOB_LOCAL_DIR, workDir.toUri().getPath());
     localJobConf.set(JOB_LOCAL_DIR, workDir.toUri().getPath());
+    setUgi(userName, localJobConf);
 
     // Download the job.jar for this job from the system FS
     localizeJobJarFile(userName, jobId, localFs, localJobConf);
@@ -958,12 +974,17 @@ public class TaskTracker
    */
   private Path localizeJobConfFile(Path jobFile, String user, JobID jobId)
       throws IOException {
-    // Get sizes of JobFile and JarFile
+    JobConf conf = new JobConf(getJobConf());
+    setUgi(user, conf);
+    
+    FileSystem userFs = jobFile.getFileSystem(conf);
+    // Get sizes of JobFile
     // sizes are -1 if they are not present.
     FileStatus status = null;
     long jobFileSize = -1;
     try {
-      status = systemFS.getFileStatus(jobFile);
+      
+      status = userFs.getFileStatus(jobFile);
       jobFileSize = status.getLen();
     } catch(FileNotFoundException fe) {
       jobFileSize = -1;
@@ -974,7 +995,7 @@ public class TaskTracker
             jobFileSize, fConf);
 
     // Download job.xml
-    systemFS.copyToLocalFile(jobFile, localJobFile);
+    userFs.copyToLocalFile(jobFile, localJobFile);
     return localJobFile;
   }
 
@@ -996,8 +1017,9 @@ public class TaskTracker
     long jarFileSize = -1;
     if (jarFile != null) {
       Path jarFilePath = new Path(jarFile);
+      FileSystem fs = jarFilePath.getFileSystem(localJobConf);
       try {
-        status = systemFS.getFileStatus(jarFilePath);
+        status = fs.getFileStatus(jarFilePath);
         jarFileSize = status.getLen();
       } catch (FileNotFoundException fe) {
         jarFileSize = -1;
@@ -1009,7 +1031,7 @@ public class TaskTracker
               getJobJarFile(user, jobId.toString()), 5 * jarFileSize, fConf);
 
       // Download job.jar
-      systemFS.copyToLocalFile(jarFilePath, localJarFile);
+      fs.copyToLocalFile(jarFilePath, localJarFile);
 
       localJobConf.setJar(localJarFile.toString());
 

@@ -92,6 +92,8 @@ public class TestSeveral extends TestCase {
 
         TestMiniMRWithDFSWithDistinctUsers.mkdir(fs, "/user");
         TestMiniMRWithDFSWithDistinctUsers.mkdir(fs, "/mapred");
+        TestMiniMRWithDFSWithDistinctUsers.mkdir(fs, 
+            conf.get(JTConfig.JT_STAGING_AREA_ROOT));
 
         UnixUserGroupInformation MR_UGI = 
           TestMiniMRWithDFSWithDistinctUsers.createUGI(

@@ -20,8 +20,6 @@ package org.apache.hadoop.mapreduce;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.DataInput;
-import java.io.DataOutput;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -30,7 +28,6 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.net.URL;
 import java.net.URLConnection;
-import java.util.Arrays;
 import java.net.URI;
 
 import javax.security.auth.login.LoginException;
@@ -40,12 +37,9 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configuration.IntegerRanges;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.BytesWritable;
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.RawComparator;
-import org.apache.hadoop.io.Text;
-import org.apache.hadoop.io.Writable;
-import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.mapreduce.filecache.DistributedCache;
 import org.apache.hadoop.mapreduce.task.JobContextImpl;
 import org.apache.hadoop.mapreduce.util.ConfigUtil;
@@ -956,7 +950,7 @@ public class Job extends JobContextImpl implements JobContext {
     ensureState(JobState.DEFINE);
     setUseNewAPI();
     status = new JobSubmitter(cluster.getFileSystem(),
-      cluster.getClient()).submitJobInternal(this);
+      cluster.getClient()).submitJobInternal(this, cluster);
     state = JobState.RUNNING;
    }
   
@@ -1211,106 +1205,4 @@ public class Job extends JobContextImpl implements JobContext {
     }
     return ugi;
   }
-
-  /**
-   * Read a splits file into a list of raw splits.
-   * 
-   * @param in the stream to read from
-   * @return the complete list of splits
-   * @throws IOException
-   */
-  public static RawSplit[] readSplitFile(DataInput in) throws IOException {
-    byte[] header = new byte[JobSubmitter.SPLIT_FILE_HEADER.length];
-    in.readFully(header);
-    if (!Arrays.equals(JobSubmitter.SPLIT_FILE_HEADER, header)) {
-      throw new IOException("Invalid header on split file");
-    }
-    int vers = WritableUtils.readVInt(in);
-    if (vers != JobSubmitter.CURRENT_SPLIT_FILE_VERSION) {
-      throw new IOException("Unsupported split version " + vers);
-    }
-    int len = WritableUtils.readVInt(in);
-    RawSplit[] result = new RawSplit[len];
-    for (int i=0; i < len; ++i) {
-      result[i] = new RawSplit();
-      result[i].readFields(in);
-    }
-    return result;
-  }
-
-  public static class RawSplit implements Writable {
-    private String splitClass;
-    private BytesWritable bytes = new BytesWritable();
-    private String[] locations;
-    long dataLength;
-
-    public RawSplit() {
-    }
-    
-    protected RawSplit(String splitClass, BytesWritable bytes,
-        String[] locations, long dataLength) {
-      this.splitClass = splitClass;
-      this.bytes = bytes;
-      this.locations = locations;
-      this.dataLength = dataLength;
-    }
-
-    public void setBytes(byte[] data, int offset, int length) {
-      bytes.set(data, offset, length);
-    }
-
-    public void setClassName(String className) {
-      splitClass = className;
-    }
-      
-    public String getClassName() {
-      return splitClass;
-    }
-      
-    public BytesWritable getBytes() {
-      return bytes;
-    }
-
-    public void clearBytes() {
-      bytes = null;
-    }
-      
-    public void setLocations(String[] locations) {
-      this.locations = locations;
-    }
-      
-    public String[] getLocations() {
-      return locations;
-    }
-
-    public long getDataLength() {
-      return dataLength;
-    }
-
-    public void setDataLength(long l) {
-      dataLength = l;
-    }
-      
-    public void readFields(DataInput in) throws IOException {
-      splitClass = Text.readString(in);
-      dataLength = in.readLong();
-      bytes.readFields(in);
-      int len = WritableUtils.readVInt(in);
-      locations = new String[len];
-      for (int i=0; i < len; ++i) {
-        locations[i] = Text.readString(in);
-      }
-    }
-      
-    public void write(DataOutput out) throws IOException {
-      Text.writeString(out, splitClass);
-      out.writeLong(dataLength);
-      bytes.write(out);
-      WritableUtils.writeVInt(out, locations.length);
-      for (int i = 0; i < locations.length; i++) {
-        Text.writeString(out, locations[i]);
-      }        
-    }
-  }
-
 }

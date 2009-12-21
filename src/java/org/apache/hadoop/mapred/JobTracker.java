@@ -64,6 +64,7 @@ import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.http.HttpServer;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ipc.RPC.VersionMismatch;
@@ -147,6 +148,8 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   public static enum State { INITIALIZING, RUNNING }
   State state = State.INITIALIZING;
   private static final int FS_ACCESS_RETRY_PERIOD = 10000;
+  
+  static final String JOB_INFO_FILE = "job-info";
 
   private DNSToSwitchMapping dnsToSwitchMapping;
   NetworkTopology clusterMap = new NetworkTopology();
@@ -156,9 +159,9 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   private final List<JobInProgressListener> jobInProgressListeners =
     new CopyOnWriteArrayList<JobInProgressListener>();
 
-  // system directories are world-wide readable and owner readable
+  // system directory is completely owned by the JobTracker
   final static FsPermission SYSTEM_DIR_PERMISSION =
-    FsPermission.createImmutable((short) 0733); // rwx-wx-wx
+    FsPermission.createImmutable((short) 0700); // rwx------
 
   // system files should have 700 permission
   final static FsPermission SYSTEM_FILE_PERMISSION =
@@ -171,6 +174,8 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   private final JobHistory jobHistory;
 
   private MRAsyncDiskService asyncDiskService;
+  
+  private final String defaultStagingBaseDir;
   
   /**
    * A client tried to submit a job before the Job Tracker was ready.
@@ -991,36 +996,10 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
       return jobsToRecover;
     }
 
-    /** Check if the given string represents a job-id or not 
-     */
-    private boolean isJobNameValid(String str) {
-      if(str == null) {
-        return false;
-      }
-      String[] parts = str.split("_");
-      if(parts.length == 3) {
-        if(parts[0].equals("job")) {
-            // other 2 parts should be parseable
-            return JobTracker.validateIdentifier(parts[1])
-                   && JobTracker.validateJobNumber(parts[2]);
-        }
-      }
-      return false;
-    }
-    
-    // checks if the job dir has the required files
-    public void checkAndAddJob(FileStatus status) throws IOException {
-      String fileName = status.getPath().getName();
-      if (isJobNameValid(fileName)) {
-        if (JobClient.isJobDirValid(status.getPath(), fs)) {
-          recoveryManager.addJobForRecovery(JobID.forName(fileName));
-          shouldRecover = true; // enable actual recovery if num-files > 1
-        } else {
-          LOG.info("Found an incomplete job directory " + fileName + "." 
-                   + " Deleting it!!");
-          fs.delete(status.getPath(), true);
-        }
-      }
+    // add the job
+    void addJobForRecovery(FileStatus status) throws IOException {
+      recoveryManager.addJobForRecovery(JobID.forName(status.getPath().getName()));
+      shouldRecover = true; // enable actual recovery if num-files > 1
     }
 
    
@@ -1127,7 +1106,16 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
       for (JobID jobId : jobsToRecover) {
         LOG.info("Submitting job "+ jobId);
         try {
-          submitJob(jobId, restartCount);
+          Path jobInfoFile = getSystemFileForJob(jobId);
+          FSDataInputStream in = fs.open(jobInfoFile);
+          JobInfo token = new JobInfo();
+          token.readFields(in);
+          in.close();
+          UnixUserGroupInformation ugi = new UnixUserGroupInformation(
+              token.getUser().toString(), 
+              new String[]{UnixUserGroupInformation.DEFAULT_GROUP});
+          submitJob(token.getJobID(), restartCount, 
+              ugi, token.getJobSubmitDir().toString(), true);
           recovered++;
         } catch (Exception e) {
           LOG.warn("Could not recover job " + jobId, e);
@@ -1311,6 +1299,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     tasktrackerExpiryInterval = 0;
     myInstrumentation = new JobTrackerMetricsInst(this, new JobConf());
     mrOwner = null;
+    defaultStagingBaseDir = "/Users"; 
   }
 
   
@@ -1466,6 +1455,18 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
         if(systemDir == null) {
           systemDir = new Path(getSystemDir());    
         }
+        try {
+          FileStatus systemDirStatus = fs.getFileStatus(systemDir);
+          if (!systemDirStatus.getOwner().equals(mrOwner.getUserName())) {
+            throw new AccessControlException("The systemdir " + systemDir + 
+                " is not owned by " + mrOwner.getUserName());
+          }
+          if (!systemDirStatus.getPermission().equals(SYSTEM_DIR_PERMISSION)) {
+            LOG.warn("Incorrect permissions on " + systemDir + 
+                ". Setting it to " + SYSTEM_DIR_PERMISSION);
+            fs.setPermission(systemDir, SYSTEM_DIR_PERMISSION);
+          }
+        } catch (FileNotFoundException fnf) {} //ignore
         // Make sure that the backup data is preserved
         FileStatus[] systemDirData;
         try {
@@ -1480,7 +1481,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
             && systemDirData != null) {
           for (FileStatus status : systemDirData) {
             try {
-              recoveryManager.checkAndAddJob(status);
+              recoveryManager.addJobForRecovery(status);
             } catch (Throwable t) {
               LOG.warn("Failed to add the job " + status.getPath().getName(), 
                        t);
@@ -1536,6 +1537,8 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
 
     //initializes the job status store
     completedJobStatusStore = new CompletedJobStatusStore(conf);
+    Path homeDir = fs.getHomeDirectory();
+    defaultStagingBaseDir = homeDir.getParent().toString();
   }
 
   private static SimpleDateFormat getDateFormat() {
@@ -2871,8 +2874,8 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    * the JobTracker alone.
    */
   public synchronized org.apache.hadoop.mapreduce.JobStatus submitJob(
-      org.apache.hadoop.mapreduce.JobID jobId) throws IOException {
-    return submitJob(JobID.downgrade(jobId));
+    org.apache.hadoop.mapreduce.JobID jobId, String jobSubmitDir) throws IOException {
+    return submitJob(JobID.downgrade(jobId), jobSubmitDir);
   }
   
   /**
@@ -2883,45 +2886,49 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    * of the JobTracker.  But JobInProgress adds info that's useful for
    * the JobTracker alone.
    * @deprecated Use 
-   * {@link #submitJob(org.apache.hadoop.mapreduce.JobID)} instead
+   * {@link #submitJob(org.apache.hadoop.mapreduce.JobID, String)} instead
    */
   @Deprecated
-  public synchronized JobStatus submitJob(JobID jobId) throws IOException {
-    return submitJob(jobId, 0);
+  public synchronized JobStatus submitJob(JobID jobId, String jobSubmitDir) 
+  throws IOException {
+    return submitJob(jobId, 0, 
+        UserGroupInformation.getCurrentUGI(), 
+        jobSubmitDir, false);
   }
 
   /**
    * Submits either a new job or a job from an earlier run.
    */
-  private synchronized JobStatus submitJob(JobID jobId, 
-      int restartCount) throws IOException {
+  private synchronized JobStatus submitJob(org.apache.hadoop.mapreduce.JobID jobID, 
+      int restartCount, UserGroupInformation ugi, String jobSubmitDir, 
+      boolean recovered) throws IOException {
+    JobID jobId = JobID.downgrade(jobID);
     if(jobs.containsKey(jobId)) {
       //job already running, don't start twice
       return jobs.get(jobId).getStatus();
     }
-    
-    JobInProgress job = new JobInProgress(jobId, this, this.conf, restartCount);
+
+    //the conversion from String to Text for the UGI's username will
+    //not be required when we have the UGI to return us the username as
+    //Text.
+    JobInfo jobInfo = new JobInfo(jobId, new Text(ugi.getUserName()), 
+        new Path(jobSubmitDir));
+    JobInProgress job = new JobInProgress(this, this.conf, restartCount, jobInfo);
     
     String queue = job.getProfile().getQueueName();
     if(!(queueManager.getLeafQueueNames().contains(queue))) {
-      new CleanupQueue().addToQueue(fs, getSystemDirectoryForJob(jobId));
       throw new IOException("Queue \"" + queue + "\" does not exist");        
     }
     
     //check if queue is RUNNING
     if(!queueManager.isRunning(queue)) {
-      new CleanupQueue().addToQueue(fs, getSystemDirectoryForJob(jobId));      
       throw new IOException("Queue \"" + queue + "\" is not running");
     }
     try {
-      // check for access
-      UserGroupInformation ugi =
-        UserGroupInformation.readFrom(job.getJobConf());
       checkAccess(job, Queue.QueueOperation.SUBMIT_JOB, ugi);
     } catch (IOException ioe) {
-       LOG.warn("Access denied for user " + job.getJobConf().getUser() 
-                + ". Ignoring job " + jobId, ioe);
-      new CleanupQueue().addToQueue(fs, getSystemDirectoryForJob(jobId));
+      LOG.warn("Access denied for user " + job.getJobConf().getUser() 
+          + ". Ignoring job " + jobId, ioe);
       throw ioe;
     }
 
@@ -2930,11 +2937,19 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     try {
       checkMemoryRequirements(job);
     } catch (IOException ioe) {
-      new CleanupQueue().addToQueue(fs, getSystemDirectoryForJob(jobId));
       throw ioe;
     }
 
-   return addJob(jobId, job); 
+    if (!recovered) {
+      //Store the information in a file so that the job can be recovered
+      //later (if at all)
+      Path jobDir = getSystemDirectoryForJob(jobId);
+      FileSystem.mkdirs(fs, jobDir, new FsPermission(SYSTEM_DIR_PERMISSION));
+      FSDataOutputStream out = fs.create(getSystemFileForJob(jobId));
+      jobInfo.write(out);
+      out.close();
+    }
+    return addJob(jobId, job); 
   }
 
   /**
@@ -3600,6 +3615,17 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   }
   
   /**
+   * @see org.apache.hadoop.mapreduce.protocol.ClientProtocol#getStagingAreaDir()
+   */
+  public String getStagingAreaDir() {
+    Path stagingRootDir = new Path(conf.get(JTConfig.JT_STAGING_AREA_ROOT, 
+        defaultStagingBaseDir));
+    String user = UserGroupInformation.getCurrentUGI().getUserName();
+    return fs.makeQualified(new Path(stagingRootDir, 
+                                user+"/.staging")).toString();
+  }
+  
+  /**
    * @see 
    * org.apache.hadoop.mapreduce.protocol.ClientProtocol#getJobHistoryDir()
    */
@@ -3614,9 +3640,14 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     return jobs.get(jobid);
   }
 
-  // Get the job directory in system directory
+  //Get the job directory in system directory
   Path getSystemDirectoryForJob(JobID id) {
     return new Path(getSystemDir(), id.toString());
+  }
+  
+  //Get the job token file in system directory
+  Path getSystemFileForJob(JobID id) {
+    return new Path(getSystemDirectoryForJob(id)+"/" + JOB_INFO_FILE);
   }
 
   /**
@@ -4304,6 +4335,8 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
 
     //initializes the job status store
     completedJobStatusStore = new CompletedJobStatusStore(conf);
+    Path homeDir = fs.getHomeDirectory();
+    defaultStagingBaseDir = homeDir.getParent().toString();
   }
 
   /**

@@ -476,6 +476,13 @@ public class JobClient extends CLI {
   }
   
   /**
+   * Get a handle to the Cluster
+   */
+  public Cluster getClusterHandle() {
+    return cluster;
+  }
+  
+  /**
    * Submit a job to the MR system.
    * 
    * This returns a handle to the {@link RunningJob} which can be used to track
@@ -521,37 +528,6 @@ public class JobClient extends CLI {
     } catch (ClassNotFoundException cnfe) {
       throw new IOException("class not found", cnfe);
     }
-  }
-
-  /** 
-   * Checks if the job directory is clean and has all the required components 
-   * for (re) starting the job
-   */
-  public static boolean isJobDirValid(Path jobDirPath, FileSystem fs) 
-  throws IOException {
-    FileStatus[] contents = null;
-    
-    try {
-      contents = fs.listStatus(jobDirPath);
-    } catch(FileNotFoundException fnfe) {
-      return false;
-    }
-    
-    int matchCount = 0;
-    if (contents.length >=2) {
-      for (FileStatus status : contents) {
-        if ("job.xml".equals(status.getPath().getName())) {
-          ++matchCount;
-        }
-        if ("job.split".equals(status.getPath().getName())) {
-          ++matchCount;
-        }
-      }
-      if (matchCount == 2) {
-        return true;
-      }
-    }
-    return false;
   }
 
   /**

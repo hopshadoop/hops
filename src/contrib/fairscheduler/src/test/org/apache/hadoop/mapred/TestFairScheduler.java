@@ -43,6 +43,7 @@ import org.apache.hadoop.mapred.FakeObjectUtilities.FakeJobHistory;
 import org.apache.hadoop.mapred.UtilsForTests.FakeClock;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.server.jobtracker.TaskTracker;
+import org.apache.hadoop.mapreduce.split.JobSplit;
 import org.apache.hadoop.net.Node;
 
 public class TestFairScheduler extends TestCase {
@@ -111,12 +112,14 @@ public class TestFairScheduler extends TestCase {
       // create maps
       numMapTasks = conf.getNumMapTasks();
       maps = new TaskInProgress[numMapTasks];
+      // empty format
+      JobSplit.TaskSplitMetaInfo split = JobSplit.EMPTY_TASK_SPLIT;
       for (int i = 0; i < numMapTasks; i++) {
         String[] inputLocations = null;
         if (mapInputLocations != null)
           inputLocations = mapInputLocations[i];
         maps[i] = new FakeTaskInProgress(getJobID(), i,
-            getJobConf(), this, inputLocations);
+            getJobConf(), this, inputLocations, split);
         if (mapInputLocations == null) // Job has no locality info
           nonLocalMaps.add(maps[i]);
       }
@@ -137,7 +140,8 @@ public class TestFairScheduler extends TestCase {
         if (!tip.isRunning() && !tip.isComplete() &&
             getLocalityLevel(tip, tts) < localityLevel) {
           TaskAttemptID attemptId = getTaskAttemptID(tip);
-          Task task = new MapTask("", attemptId, 0, "", new BytesWritable(), 1) {
+          JobSplit.TaskSplitMetaInfo split = JobSplit.EMPTY_TASK_SPLIT;
+          Task task = new MapTask("", attemptId, 0, split.getSplitIndex(), 1) {
             @Override
             public String toString() {
               return String.format("%s on %s", getTaskID(), tts.getTrackerName());
@@ -231,8 +235,9 @@ public class TestFairScheduler extends TestCase {
     
     // Constructor for map
     FakeTaskInProgress(JobID jId, int id, JobConf jobConf,
-        FakeJobInProgress job, String[] inputLocations) {
-      super(jId, "", new Job.RawSplit(), null, jobConf, job, id, 1);
+        FakeJobInProgress job, String[] inputLocations, 
+        JobSplit.TaskSplitMetaInfo split) {
+      super(jId, "", split, null, jobConf, job, id, 1);
       this.isMap = true;
       this.fakeJob = job;
       this.inputLocations = inputLocations;

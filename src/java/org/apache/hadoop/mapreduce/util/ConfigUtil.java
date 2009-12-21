@@ -185,8 +185,6 @@ public class ConfigUtil {
       new String[] {JobContext.QUEUE_NAME});
     Configuration.addDeprecation("mapred.job.reuse.jvm.num.tasks", 
       new String[] {JobContext.JVM_NUMTASKS_TORUN});
-    Configuration.addDeprecation("mapred.job.split.file", 
-      new String[] {JobContext.SPLIT_FILE});
     Configuration.addDeprecation("mapred.map.tasks", 
       new String[] {JobContext.NUM_MAPS});
     Configuration.addDeprecation("mapred.max.tracker.failures", 

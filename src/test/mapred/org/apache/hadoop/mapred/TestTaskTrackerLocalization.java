@@ -163,7 +163,7 @@ public class TestTaskTrackerLocalization extends TestCase {
     taskId =
         new TaskAttemptID(jtIdentifier, jobId.getId(), TaskType.MAP, 1, 0);
     task =
-        new MapTask(jobConfFile.toURI().toString(), taskId, 1, null, null, 1);
+        new MapTask(jobConfFile.toURI().toString(), taskId, 1, null, 1);
     task.setConf(job.getConfiguration()); // Set conf. Set user name in particular.
 
     // create jobTokens file

@@ -248,6 +248,17 @@
   <description>The class responsible for scheduling the tasks.</description>
 </property>
 
+
+<property>
+  <name>mapreduce.job.split.metainfo.maxsize</name>
+  <value>10000000</value>
+  <description>The maximum permissible size of the split metainfo file. 
+  The JobTracker won't attempt to read split metainfo files bigger than
+  the configured value.
+  No limits if set to -1.
+  </description>
+</property>
+
 <property>
   <name>mapreduce.jobtracker.taskscheduler.maxrunningtasks.perjob</name>
   <value></value>

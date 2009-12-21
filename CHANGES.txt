@@ -84,6 +84,9 @@ Trunk (unreleased changes)
     can be refreshed in the JobTracker via command line. 
     (Boris Shkolnik via ddas)
 
+    MAPREDUCE-181. Changes the job submission process to be secure.
+    (Devaraj Das)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band

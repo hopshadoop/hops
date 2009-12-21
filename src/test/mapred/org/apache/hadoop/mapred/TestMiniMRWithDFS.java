@@ -36,12 +36,14 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.MRConfig;
+import org.apache.hadoop.mapreduce.TaskCounter;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.security.UnixUserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
@@ -289,8 +291,11 @@ public class TestMiniMRWithDFS extends TestCase {
     long hdfsWrite = 
       counters.findCounter(Task.FILESYSTEM_COUNTER_GROUP, 
           Task.getFileSystemCounterNames("hdfs")[1]).getCounter();
+    long rawSplitBytesRead = 
+      counters.findCounter(TaskCounter.SPLIT_RAW_BYTES).getCounter();
     assertEquals(result.output.length(), hdfsWrite);
-    assertEquals(input.length(), hdfsRead);
+    // add the correction factor of 234 as the input split is also streamed
+    assertEquals(input.length() + rawSplitBytesRead, hdfsRead);
 
     // Run a job with input and output going to localfs even though the 
     // default fs is hdfs.
@@ -334,7 +339,7 @@ public class TestMiniMRWithDFS extends TestCase {
     }
   }
   
-  public void testWithDFSWithDefaultPort() throws IOException {
+  public void tesWithDFSWithDefaultPort() throws IOException {
     MiniDFSCluster dfs = null;
     MiniMRCluster mr = null;
     FileSystem fileSys = null;

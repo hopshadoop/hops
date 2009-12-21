@@ -173,7 +173,8 @@ public class SimulatorJobTracker extends JobTracker {
   }
 
   @Override
-  public synchronized JobStatus submitJob(JobID jobId) throws IOException {
+  public synchronized JobStatus submitJob(JobID jobId, String jobSubmitDir) 
+  throws IOException {
     boolean loggingEnabled = LOG.isDebugEnabled();
     if (loggingEnabled) {
       LOG.debug("submitJob for jobname = " + jobId);
@@ -191,7 +192,7 @@ public class SimulatorJobTracker extends JobTracker {
     }
     validateAndSetClock(jobStory.getSubmissionTime());
     
-    SimulatorJobInProgress job = new SimulatorJobInProgress(jobId, this,
+    SimulatorJobInProgress job = new SimulatorJobInProgress(jobId, jobSubmitDir, this,
                                                             this.conf, 
                                                             jobStory);
     return addJob(jobId, job);

@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.mapred;
 
-import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -38,16 +37,16 @@ import java.util.TreeMap;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobCounter;
+import org.apache.hadoop.mapreduce.JobSubmissionFiles;
 import org.apache.hadoop.mapreduce.TaskType;
-import org.apache.hadoop.mapreduce.JobStatus.State;
 import org.apache.hadoop.mapreduce.jobhistory.JobFinishedEvent;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistory;
 import org.apache.hadoop.mapreduce.jobhistory.JobInfoChangeEvent;
@@ -66,12 +65,16 @@ import org.apache.hadoop.mapreduce.jobhistory.TaskStartedEvent;
 import org.apache.hadoop.mapreduce.security.JobTokens;
 import org.apache.hadoop.mapreduce.security.SecureShuffleUtils;
 import org.apache.hadoop.mapreduce.server.jobtracker.TaskTracker;
+import org.apache.hadoop.mapreduce.split.JobSplit;
+import org.apache.hadoop.mapreduce.split.SplitMetaInfoReader;
+import org.apache.hadoop.mapreduce.split.JobSplit.TaskSplitMetaInfo;
 import org.apache.hadoop.metrics.MetricsContext;
 import org.apache.hadoop.metrics.MetricsRecord;
 import org.apache.hadoop.metrics.MetricsUtil;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.NetworkTopology;
 import org.apache.hadoop.net.Node;
+import org.apache.hadoop.security.UnixUserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.fs.FSDataOutputStream;
 
@@ -101,7 +104,6 @@ public class JobInProgress {
   JobStatus status;
   Path jobFile = null;
   Path localJobFile = null;
-  Path localJarFile = null;
 
   TaskInProgress maps[] = new TaskInProgress[0];
   TaskInProgress reduces[] = new TaskInProgress[0];
@@ -298,6 +300,7 @@ public class JobInProgress {
     new HashMap<TaskTracker, FallowSlotInfo>();
   private Map<TaskTracker, FallowSlotInfo> trackersReservedForReduces = 
     new HashMap<TaskTracker, FallowSlotInfo>();
+  private Path jobSubmitDir = null;
   
   /**
    * Create an almost empty JobInProgress, which can be used only for tests
@@ -352,44 +355,51 @@ public class JobInProgress {
    * Create a JobInProgress with the given job file, plus a handle
    * to the tracker.
    */
-  public JobInProgress(JobID jobid, JobTracker jobtracker, 
-                       JobConf default_conf, int rCount) throws IOException {
+  public JobInProgress(JobTracker jobtracker, 
+                       JobConf default_conf, int rCount,
+                       JobInfo jobInfo) throws IOException {
     this.restartCount = rCount;
-    this.jobId = jobid;
+    this.jobId = JobID.downgrade(jobInfo.getJobID());
     String url = "http://" + jobtracker.getJobTrackerMachine() + ":" 
-        + jobtracker.getInfoPort() + "/jobdetails.jsp?jobid=" + jobid;
+        + jobtracker.getInfoPort() + "/jobdetails.jsp?jobid=" + this.jobId;
     this.jobtracker = jobtracker;
     this.jobHistory = jobtracker.getJobHistory();
     this.startTime = System.currentTimeMillis();
     
     this.localFs = jobtracker.getLocalFileSystem();
 
-    JobConf default_job_conf = new JobConf(default_conf);
-    this.localJobFile = default_job_conf.getLocalPath(JobTracker.SUBDIR 
-                                                      +"/"+jobid + ".xml");
-    this.localJarFile = default_job_conf.getLocalPath(JobTracker.SUBDIR
-                                                      +"/"+ jobid + ".jar");
-    Path jobDir = jobtracker.getSystemDirectoryForJob(jobId);
-    fs = jobtracker.getFileSystem(jobDir);
-    jobFile = new Path(jobDir, "job.xml");
+    // use the user supplied token to add user credentials to the conf
+    jobSubmitDir = jobInfo.getJobSubmitDir();
+    String user = jobInfo.getUser().toString();
+    conf = new JobConf();
+    conf.set(UnixUserGroupInformation.UGI_PROPERTY_NAME, 
+        new UnixUserGroupInformation(user, 
+            new String[]{UnixUserGroupInformation.DEFAULT_GROUP}).toString());
+    fs = jobSubmitDir.getFileSystem(conf);
+    
+    this.localJobFile = 
+      default_conf.getLocalPath(JobTracker.SUBDIR + "/" + this.jobId + ".xml");
+    
+    jobFile = JobSubmissionFiles.getJobConfPath(jobSubmitDir);
     fs.copyToLocalFile(jobFile, localJobFile);
     conf = new JobConf(localJobFile);
+    if (conf.getUser() == null) {
+      this.conf.setUser(user);
+    }
+    if (!conf.getUser().equals(user)) {
+      throw new IOException("The username obtained from the conf doesn't " +
+      		"match the username the user authenticated as");
+    }
     this.priority = conf.getJobPriority();
-    this.profile = new JobProfile(conf.getUser(), jobid, 
-                                  jobFile.toString(), url, conf.getJobName(),
-                                  conf.getQueueName());
-    this.status = new JobStatus(jobid, 0.0f, 0.0f, JobStatus.PREP, 
+    this.profile = new JobProfile(conf.getUser(), this.jobId, 
+                                  jobFile.toString(), url, 
+                                  conf.getJobName(), conf.getQueueName());
+    this.status = new JobStatus(this.jobId, 0.0f, 0.0f, JobStatus.PREP, 
         profile.getUser(), profile.getJobName(), profile.getJobFile(), 
         profile.getURL().toString());
-    this.jobtracker.getInstrumentation().addPrepJob(conf, jobid);
+    this.jobtracker.getInstrumentation().addPrepJob(conf, this.jobId);
     status.setStartTime(startTime);
     this.status.setJobPriority(this.priority);
-
-    String jarFile = conf.getJar();
-    if (jarFile != null) {
-      fs.copyToLocalFile(new Path(jarFile), localJarFile);
-      conf.setJar(localJarFile.toString());
-    }
 
     this.numMapTasks = conf.getNumMapTasks();
     this.numReduceTasks = conf.getNumReduceTasks();
@@ -406,7 +416,7 @@ public class JobInProgress {
     this.jobMetrics.setTag("user", conf.getUser());
     this.jobMetrics.setTag("sessionId", conf.getSessionId());
     this.jobMetrics.setTag("jobName", conf.getJobName());
-    this.jobMetrics.setTag("jobId", jobid.toString());
+    this.jobMetrics.setTag("jobId", this.jobId.toString());
     hasSpeculativeMaps = conf.getMapSpeculativeExecution();
     hasSpeculativeReduces = conf.getReduceSpeculativeExecution();
     this.maxLevel = jobtracker.getNumTaskCacheLevels();
@@ -473,7 +483,7 @@ public class JobInProgress {
   }
   
   Map<Node, List<TaskInProgress>> createCache(
-                         Job.RawSplit[] splits, int maxLevel) {
+                         TaskSplitMetaInfo[] splits, int maxLevel) {
     Map<Node, List<TaskInProgress>> cache = 
       new IdentityHashMap<Node, List<TaskInProgress>>(maxLevel);
     
@@ -586,26 +596,25 @@ public class JobInProgress {
     //
     // read input splits and create a map per a split
     //
-    String jobFile = profile.getJobFile();
-
-    Job.RawSplit[] splits = createSplits();
-    numMapTasks = splits.length;
+    TaskSplitMetaInfo[] taskSplitMetaInfo = createSplits(jobId);
+    numMapTasks = taskSplitMetaInfo.length;
 
     checkTaskLimits();
 
     jobtracker.getInstrumentation().addWaitingMaps(getJobID(), numMapTasks);
     jobtracker.getInstrumentation().addWaitingReduces(getJobID(), numReduceTasks);
 
-    createMapTasks(jobFile, splits);
+    createMapTasks(jobFile.toString(), taskSplitMetaInfo);
     
     if (numMapTasks > 0) { 
-      nonRunningMapCache = createCache(splits, maxLevel);
+      nonRunningMapCache = createCache(taskSplitMetaInfo,
+          maxLevel);
     }
         
     // set the launch time
     this.launchTime = JobTracker.getClock().getTime();
 
-    createReduceTasks(jobFile);
+    createReduceTasks(jobFile.toString());
     
     // Calculate the minimum number of maps to be complete before 
     // we should start scheduling reduces
@@ -615,7 +624,7 @@ public class JobInProgress {
                          DEFAULT_COMPLETED_MAPS_PERCENT_FOR_REDUCE_SLOWSTART) * 
            numMapTasks));
     
-    initSetupCleanupTasks(jobFile);
+    initSetupCleanupTasks(jobFile.toString());
     
     synchronized(jobInitKillStatus){
       jobInitKillStatus.initDone = true;
@@ -669,16 +678,11 @@ public class JobInProgress {
     
   }
 
-  Job.RawSplit[] createSplits() throws IOException {
-    DataInputStream splitFile =
-      fs.open(new Path(conf.get(JobContext.SPLIT_FILE)));
-    Job.RawSplit[] splits;
-    try {
-      splits = Job.readSplitFile(splitFile);
-    } finally {
-      splitFile.close();
-    }
-    return splits;
+  TaskSplitMetaInfo[] createSplits(org.apache.hadoop.mapreduce.JobID jobId) 
+  throws IOException {
+    TaskSplitMetaInfo[] allTaskSplitMetaInfo = 
+      SplitMetaInfoReader.readSplitMetaInfo(jobId, fs, conf, jobSubmitDir);
+    return allTaskSplitMetaInfo;
   }
 
   /**
@@ -695,10 +699,11 @@ public class JobInProgress {
     }
   }
 
-  synchronized void createMapTasks(String jobFile, Job.RawSplit[] splits) {
+  synchronized void createMapTasks(String jobFile, 
+		  TaskSplitMetaInfo[] splits) {
     maps = new TaskInProgress[numMapTasks];
     for(int i=0; i < numMapTasks; ++i) {
-      inputLength += splits[i].getDataLength();
+      inputLength += splits[i].getInputDataLength();
       maps[i] = new TaskInProgress(jobId, jobFile, 
                                    splits[i], 
                                    jobtracker, conf, this, 
@@ -720,6 +725,7 @@ public class JobInProgress {
     }
   }
 
+  
   synchronized void initSetupCleanupTasks(String jobFile) {
     if (!jobSetupCleanupNeeded) {
       // nothing to initialize
@@ -730,7 +736,7 @@ public class JobInProgress {
 
     // cleanup map tip. This map doesn't use any splits. Just assign an empty
     // split.
-    Job.RawSplit emptySplit = new Job.RawSplit();
+    TaskSplitMetaInfo emptySplit = JobSplit.EMPTY_TASK_SPLIT;
     cleanup[0] = new TaskInProgress(jobId, jobFile, emptySplit, 
             jobtracker, conf, this, numMapTasks, 1);
     cleanup[0].setJobCleanupTask();
@@ -3216,20 +3222,7 @@ public class JobInProgress {
         localFs.delete(localJobFile, true);
         localJobFile = null;
       }
-      if (localJarFile != null) {
-        localFs.delete(localJarFile, true);
-        localJarFile = null;
-      }
 
-      // clean up splits
-      for (int i = 0; i < maps.length; i++) {
-        maps[i].clearSplit();
-      }
-
-      // JobClient always creates a new directory with job files
-      // so we remove that directory to cleanup
-      // Delete temp dfs dirs created if any, like in case of 
-      // speculative exn of reduces.  
       Path tempDir = jobtracker.getSystemDirectoryForJob(getJobID());
       new CleanupQueue().addToQueue(jobtracker.getFileSystem(tempDir), tempDir); 
     } catch (IOException e) {
@@ -3534,7 +3527,8 @@ public class JobInProgress {
    */
   private void generateJobTokens(Path jobDir) throws IOException{
     Path keysFile = new Path(jobDir, JobTokens.JOB_TOKEN_FILENAME);
-    FSDataOutputStream os = fs.create(keysFile);
+    // we need to create this file using the jobtracker's filesystem
+    FSDataOutputStream os = jobtracker.getFileSystem().create(keysFile);
     //create JobTokens file and add key to it
     JobTokens jt = new JobTokens();
     byte [] key;
