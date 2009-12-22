@@ -28,6 +28,8 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import javax.crypto.SecretKey;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configurable;
@@ -50,8 +52,6 @@ import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.TaskCounter;
 import org.apache.hadoop.mapreduce.lib.reduce.WrappedReducer;
 import org.apache.hadoop.mapreduce.task.ReduceContextImpl;
-import org.apache.hadoop.mapreduce.security.JobTokens;
-import org.apache.hadoop.mapreduce.security.SecureShuffleUtils;
 import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.util.Progress;
@@ -140,7 +140,7 @@ abstract public class Task implements Writable, Configurable {
   protected final Counters.Counter mergedMapOutputsCounter;
   private int numSlotsRequired;
   protected TaskUmbilicalProtocol umbilical;
-  protected JobTokens jobTokens=null; // storage of the secret keys
+  protected SecretKey tokenSecret;
 
   ////////////////////////////////////////////
   // Constructors
@@ -199,19 +199,19 @@ abstract public class Task implements Writable, Configurable {
   }
 
   /**
-   * set JobToken storage 
-   * @param jt
+   * Set the job token secret 
+   * @param tokenSecret the secret
    */
-  public void setJobTokens(JobTokens jt) {
-    this.jobTokens = jt;
+  public void setJobTokenSecret(SecretKey tokenSecret) {
+    this.tokenSecret = tokenSecret;
   }
 
   /**
-   * get JobToken storage
-   * @return storage object
+   * Get the job token secret
+   * @return the token secret
    */
-  public JobTokens getJobTokens() {
-    return this.jobTokens;
+  public SecretKey getJobTokenSecret() {
+    return this.tokenSecret;
   }
 
   

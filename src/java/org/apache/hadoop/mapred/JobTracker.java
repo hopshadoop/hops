@@ -79,6 +79,7 @@ import org.apache.hadoop.mapreduce.TaskTrackerInfo;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.protocol.ClientProtocol;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistory;
+import org.apache.hadoop.mapreduce.security.token.JobTokenSecretManager;
 import org.apache.hadoop.mapreduce.server.jobtracker.TaskTracker;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.NetUtils;
@@ -172,6 +173,13 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   static final Clock DEFAULT_CLOCK = new Clock();
 
   private final JobHistory jobHistory;
+  
+  private final JobTokenSecretManager jobTokenSecretManager 
+    = new JobTokenSecretManager();
+  
+  JobTokenSecretManager getJobTokenSecretManager() {
+    return jobTokenSecretManager;
+  }
 
   private MRAsyncDiskService asyncDiskService;
   

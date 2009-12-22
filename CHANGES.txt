@@ -87,6 +87,9 @@ Trunk (unreleased changes)
     MAPREDUCE-181. Changes the job submission process to be secure.
     (Devaraj Das)
 
+    MAPREDUCE-1250. Refactors the JobToken to use Common's Token interface.
+    (Kan Zhang via ddas)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band

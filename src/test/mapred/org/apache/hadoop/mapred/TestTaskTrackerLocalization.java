@@ -37,9 +37,11 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.TaskType;
-import org.apache.hadoop.mapreduce.security.JobTokens;
+import org.apache.hadoop.mapreduce.security.SecureShuffleUtils;
+import org.apache.hadoop.mapreduce.security.token.JobTokenIdentifier;
 import org.apache.hadoop.mapreduce.server.tasktracker.Localizer;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.mapred.JvmManager.JvmEnv;
@@ -255,10 +257,10 @@ public class TestTaskTrackerLocalization extends TestCase {
     if(!dir.exists())
       assertTrue("faild to create dir="+dir.getAbsolutePath(), dir.mkdirs());
     
-    File jobTokenFile = new File(dir, JobTokens.JOB_TOKEN_FILENAME);
+    File jobTokenFile = new File(dir, SecureShuffleUtils.JOB_TOKEN_FILENAME);
     FileOutputStream fos = new FileOutputStream(jobTokenFile);
     java.io.DataOutputStream out = new java.io.DataOutputStream(fos);
-    JobTokens jt = new JobTokens();
+    Token<JobTokenIdentifier> jt = new Token<JobTokenIdentifier>();
     jt.write(out); // writing empty file, we don't the keys for this test 
     out.close();
   }
