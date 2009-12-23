@@ -183,6 +183,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1235. Fix a MySQL timestamp incompatibility in Sqoop. (Aaron
     Kimball via cdouglas)
 
+    MAPREDUCE-1165. Replace non-portable function name with C99 equivalent.
+    (Allen Wittenauer via cdouglas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
