@@ -178,6 +178,8 @@ Trunk (unreleased changes)
     MAPREDUCE-1201. ProcfsBasedProcessTree collects CPU usage information.
     (Scott Chen via dhruba)
 
+    MAPREDUCE-1326. fi tests don't use fi-site.xml (cos)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

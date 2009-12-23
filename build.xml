@@ -574,6 +574,8 @@
       <mkdir dir="${test.log.dir}"/>
       <copy file="${test.src.dir}/hadoop-policy.xml" 
         todir="${test.build.extraconf}" />
+      <copy file="${test.src.dir}/fi-site.xml"
+        todir="${test.build.extraconf}" />
       <junit showoutput="${test.output}"
         printsummary="${test.junit.printsummary}"
         haltonfailure="${test.junit.haltonfailure}"
