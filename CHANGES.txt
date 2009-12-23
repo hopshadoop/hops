@@ -180,6 +180,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-1326. fi tests don't use fi-site.xml (cos)
 
+    MAPREDUCE-1235. Fix a MySQL timestamp incompatibility in Sqoop. (Aaron
+    Kimball via cdouglas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
