@@ -1064,3 +1064,7 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1241. Use a default queue configuration in JobTracker when
     mapred-queues.xml is unavailable. (Todd Lipcon via cdouglas)
+
+    MAPREDUCE-1301. Fix set up of permission checking script used in 
+    localization tests. (Amareshwari Sriramadasu via yhemanth)
+    

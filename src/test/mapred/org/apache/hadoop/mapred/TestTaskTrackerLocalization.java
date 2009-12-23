@@ -58,7 +58,8 @@ import junit.framework.TestCase;
  */
 public class TestTaskTrackerLocalization extends TestCase {
 
-  private File TEST_ROOT_DIR;
+  private static File TEST_ROOT_DIR = 
+    new File(System.getProperty("test.build.data", "/tmp"));
   private File ROOT_MAPRED_LOCAL_DIR;
   private File HADOOP_LOG_DIR;
   private static File PERMISSION_SCRIPT_DIR;
@@ -178,18 +179,14 @@ public class TestTaskTrackerLocalization extends TestCase {
 
     tracker.setLocalizer(new Localizer(tracker.localFs, localDirs,
         taskController));
-    setupPermissionScriptDir(TEST_ROOT_DIR);
   }
 
   /**
-   * Method to setup the permission script which would be used by the 
+   * static block setting up the permission script which would be used by the 
    * checkFilePermissions
-   * 
-   * @param rootDir
-   * @throws FileNotFoundException
    */
-  static void setupPermissionScriptDir(File rootDir) throws FileNotFoundException {
-    PERMISSION_SCRIPT_DIR = new File(rootDir, "permission_script_dir");
+  static {
+    PERMISSION_SCRIPT_DIR = new File(TEST_ROOT_DIR, "permission_script_dir");
     PERMISSION_SCRIPT_FILE = new File(PERMISSION_SCRIPT_DIR, "getperms.sh");
     
     if(PERMISSION_SCRIPT_FILE.exists()) {
@@ -202,9 +199,13 @@ public class TestTaskTrackerLocalization extends TestCase {
     
     PERMISSION_SCRIPT_DIR.mkdir();
     
-    PrintWriter writer = new PrintWriter(PERMISSION_SCRIPT_FILE);
-    writer.write(PERMISSION_SCRIPT_CONTENT);
-    writer.close();
+    try {
+      PrintWriter writer = new PrintWriter(PERMISSION_SCRIPT_FILE);
+      writer.write(PERMISSION_SCRIPT_CONTENT);
+      writer.close();
+    } catch (FileNotFoundException fe) {
+      fail();
+    }
     PERMISSION_SCRIPT_FILE.setExecutable(true, true);
   }
 
