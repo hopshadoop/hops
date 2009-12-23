@@ -1215,6 +1215,8 @@ public class DistCp implements Tool {
     FileSystem.mkdirs(jClient.getFs(), jobDirectory, mapredSysPerms);
     jobConf.set(JOB_DIR_LABEL, jobDirectory.toString());
 
+    long maxBytesPerMap = conf.getLong(BYTES_PER_MAP_LABEL, BYTES_PER_MAP);
+
     FileSystem dstfs = args.dst.getFileSystem(conf);
     boolean dstExists = dstfs.exists(args.dst);
     boolean dstIsDir = false;
@@ -1381,7 +1383,7 @@ public class DistCp implements Tool {
 
                 ++cnsyncf;
                 cbsyncs += child.getLen();
-                if (cnsyncf > SYNC_FILE_MAX || cbsyncs > BYTES_PER_MAP) {
+                if (cnsyncf > SYNC_FILE_MAX || cbsyncs > maxBytesPerMap) {
                   src_writer.sync();
                   dst_writer.sync();
                   cnsyncf = 0;
