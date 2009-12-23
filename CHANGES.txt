@@ -1073,3 +1073,7 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1059. Use distcp.bytes.per.map when adding sync markers in
     distcp. (Aaron Kimball via cdouglas)
+
+    MAPREDUCE-1009. Update forrest documentation describing hierarchical
+    queues. (Vinod Kumar Vavilapalli via yhemanth)
+

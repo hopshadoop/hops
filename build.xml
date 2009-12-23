@@ -21,6 +21,8 @@
    xmlns:artifact="urn:maven-artifact-ant"
    xmlns:ivy="antlib:org.apache.ivy.ant"> 
 
+  <import file="build-utils.xml" />
+
   <!-- Load all the default properties, and any the user wants    -->
   <!-- to contribute (without having to type -D or edit this file -->
   <property file="${user.home}/build.properties" />
@@ -787,6 +789,8 @@
   <!-- ================================================================== -->
   
   <target name="docs" depends="forrest.check" description="Generate forrest-based documentation. To use, specify -Dforrest.home=&lt;base of Apache Forrest installation&gt; on the command line." if="forrest.home">
+  	<copy file="${conf.dir}/mapred-queues.xml.template"
+  	      tofile="${build.docs}/mapred-queues.xml"/>
     <exec dir="${docs.src}" executable="${forrest.home}/bin/forrest"
 	  failonerror="true">
       <env key="JAVA_HOME" value="${java5.home}"/>
@@ -798,16 +802,12 @@
     <style basedir="${mapred.src.dir}" destdir="${build.docs}"
            includes="mapred-default.xml" style="conf/configuration.xsl"/>
     <antcall target="changes-to-html"/>
+    <subant target="docs">
+       <property name="build.docs" value="${build.docs}"/>
+       <fileset file="${contrib.dir}/build.xml"/>
+    </subant> 
   </target>
 
-  <target name="forrest.check" unless="forrest.home" depends="java5.check">
-    <fail message="'forrest.home' is not defined. Please pass -Dforrest.home=&lt;base of Apache Forrest installation&gt; to Ant on the command-line." />
-  </target>
-
-  <target name="java5.check" unless="java5.home">
-    <fail message="'java5.home' is not defined.  Forrest requires Java 5.  Please pass -Djava5.home=&lt;base of Java 5 distribution&gt; to Ant on the command-line." />
-  </target>
-	
   <target name="javadoc-dev" depends="compile, ivy-retrieve-javadoc" description="Generate javadoc for hadoop developers">
     <mkdir dir="${build.javadoc.dev}"/>
     <javadoc

@@ -41,10 +41,10 @@
       </p> 
       <ul>
         <li>
-          <a href="http://hadoop.apache.org/common/docs/current/single_node_setup.html">Single Node Setup</a> for first-time users.
+          <a href="ext:single-node-setup">Single Node Setup</a> for first-time users.
         </li>
         <li>
-          <a href="http://hadoop.apache.org/common/docs/current/cluster_setup.html">Cluster Setup</a> for large, distributed clusters.
+          <a href="cluster_setup.html">Cluster Setup</a> for large, distributed clusters.
         </li>
       </ul>
     </section>
@@ -152,8 +152,8 @@
       occurences of each word in a given input set.</p>
       
       <p>This example works with a 
-      pseudo-distributed (<a href="http://hadoop.apache.org/common/docs/current/single_node_setup.html#SingleNodeSetup">Single Node Setup</a>) 
-     or fully-distributed (<a href="http://hadoop.apache.org/common/docs/current/cluster_setup.html">Cluster Setup</a>) 
+      pseudo-distributed (<a href="ext:single-node-setup">Single Node Setup</a>) 
+     or fully-distributed (<a href="cluster_setup.html">Cluster Setup</a>) 
       Hadoop installation.</p>   
       
       <section>
@@ -1301,7 +1301,7 @@
         <p>Note: <code>mapred.{map|reduce}.child.java.opts</code> are used only 
         for configuring the launched child tasks from task tracker. Configuring 
         the memory options for daemons is documented under
-        <a href="http://hadoop.apache.org/common/docs/current/cluster_setup.html#Configuring+the+Environment+of+the+Hadoop+Daemons">
+        <a href="cluster_setup.html#Configuring+the+Environment+of+the+Hadoop+Daemons">
         Configuring the Environment of the Hadoop Daemons</a> (Cluster Setup).</p>
         
         <p>The memory available to some parts of the framework is also
@@ -2412,8 +2412,8 @@
       
       <p>This example needs the HDFS to be up and running, especially for the 
       <code>DistributedCache</code>-related features. Hence it only works with a 
-      pseudo-distributed (<a href="http://hadoop.apache.org/common/docs/current/single_node_setup.html#SingleNodeSetup">Single Node Setup</a>) 
-     or fully-distributed (<a href="http://hadoop.apache.org/common/docs/current/cluster_setup.html#Fully-Distributed+Operation">Cluster Setup</a>) 
+      pseudo-distributed (<a href="ext:single-node-setup">Single Node Setup</a>) 
+     or fully-distributed (<a href="cluster_setup.html#Fully-Distributed+Operation">Cluster Setup</a>) 
       Hadoop installation.</p>     
       
       <section>

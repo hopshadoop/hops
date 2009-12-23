@@ -17,20 +17,17 @@
    limitations under the License.
 -->
 
-<!-- 
-Before you can run these subtargets directly, you need 
-to call at top-level: ant deploy-contrib compile-core-test
+<!--
+Contains utilities that are common for the main and contrib builds.
 -->
-<project name="capacity-scheduler" default="jar">
+<project name="build-utils">
 
-  <import file="../build-contrib.xml"/>
-
-  <target name="docs" depends="forrest.check" description="Generate forrest-based documentation. To use, specify -Dforrest.home=&lt;base of Apache Forrest installation&gt; on the command line." if="forrest.home">
-  	<copy file="src/java/mapred-queues.xml.template"
-  	      tofile="${build.docs}/mapred-queues-capacity-scheduler.xml"/>
-    <xslt in="${conf.dir}/capacity-scheduler.xml.template"
-    	out="${build.docs}/capacity-scheduler-conf.html"
-    	style="${conf.dir}/configuration.xsl"/>
+  <target name="java5.check" unless="java5.home">
+    <fail message="'java5.home' is not defined.  Forrest requires Java 5.  Please pass -Djava5.home=&lt;base of Java 5 distribution&gt; to Ant on the command-line." />
   </target>
-
+	
+  <target name="forrest.check" unless="forrest.home" depends="java5.check">
+    <fail message="'forrest.home' is not defined. Please pass -Dforrest.home=&lt;base of Apache Forrest installation&gt; to Ant on the command-line." />
+  </target>
+  
 </project>

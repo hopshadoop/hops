@@ -64,6 +64,12 @@
     <fail if="testsfailed">Tests failed!</fail>
   </target>
 
+  <target name="docs">
+    <subant target="docs">
+      <fileset dir="." includes="capacity-scheduler/build.xml"/> 
+    </subant>
+  </target>
+
   <!-- ====================================================== -->
   <!-- Clean all the contribs.                              -->
   <!-- ====================================================== -->
