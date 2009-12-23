@@ -1067,4 +1067,6 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1301. Fix set up of permission checking script used in 
     localization tests. (Amareshwari Sriramadasu via yhemanth)
-    
+
+    MAPREDUCE-1286. Remove quoting from client opts in TaskRunner. (Yuri
+    Pradkin via cdouglas)

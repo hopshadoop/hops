@@ -523,7 +523,7 @@ abstract class TaskRunner extends Thread {
     }
     hadoopClientOpts = hadoopClientOpts + "-Dhadoop.tasklog.taskid=" + taskid
                        + " -Dhadoop.tasklog.totalLogFileSize=" + logSize;
-    env.put("HADOOP_CLIENT_OPTS", "\"" + hadoopClientOpts + "\"");
+    env.put("HADOOP_CLIENT_OPTS", hadoopClientOpts);
 
     // add the env variables passed by the user
     String mapredChildEnv = getChildEnv(conf);
