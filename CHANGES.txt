@@ -1056,3 +1056,5 @@ Release 0.21.0 - Unreleased
     when speculative attempts are running for a TIP.
     (Rahul Kumar Singh via yhemanth)
 
+    MAPREDUCE-1241. Use a default queue configuration in JobTracker when
+    mapred-queues.xml is unavailable. (Todd Lipcon via cdouglas)
