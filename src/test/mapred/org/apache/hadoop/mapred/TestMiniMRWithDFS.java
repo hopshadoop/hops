@@ -339,7 +339,7 @@ public class TestMiniMRWithDFS extends TestCase {
     }
   }
   
-  public void tesWithDFSWithDefaultPort() throws IOException {
+  public void testWithDFSWithDefaultPort() throws IOException {
     MiniDFSCluster dfs = null;
     MiniMRCluster mr = null;
     FileSystem fileSys = null;

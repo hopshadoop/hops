@@ -186,6 +186,8 @@ Trunk (unreleased changes)
     MAPREDUCE-1165. Replace non-portable function name with C99 equivalent.
     (Allen Wittenauer via cdouglas)
 
+    MAPREDUCE-1331. Fixes a typo in a testcase (Devaraj Das)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
