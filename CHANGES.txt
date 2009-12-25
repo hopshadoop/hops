@@ -19,6 +19,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1168. Export data to databases via Sqoop. (Aaron Kimball via
     tomwhite)
 
+    MAPREDUCE-744. Introduces the notion of a public distributed cache.
+    (Devaraj Das)
+
   IMPROVEMENTS
 
     MAPREDUCE-1198. Alternatively schedule different types of tasks in

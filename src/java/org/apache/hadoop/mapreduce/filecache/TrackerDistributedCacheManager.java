@@ -38,7 +38,10 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsAction;
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.util.RunJar;
+import org.apache.hadoop.classification.InterfaceAudience;
 
 /**
  * Manages a single machine's instance of a cross-job
@@ -46,9 +49,8 @@ import org.apache.hadoop.util.RunJar;
  * by a TaskTracker (or something that emulates it,
  * like LocalJobRunner).
  * 
- * <b>This class is internal to Hadoop, and should not be treated as a public
- * interface.</b>
  */
+@InterfaceAudience.Private
 public class TrackerDistributedCacheManager {
   // cacheID to cacheStatus mapping
   private TreeMap<String, CacheStatus> cachedArchives = 
@@ -304,6 +306,51 @@ public class TrackerDistributedCacheManager {
     Path filePath = new Path(cache.getPath());
 
     return fileSystem.getFileStatus(filePath).getModificationTime();
+  }
+  
+  /**
+   * Returns a boolean to denote whether a cache file is visible to all(public)
+   * or not
+   * @param conf
+   * @param uri
+   * @return true if the path in the uri is visible to all, false otherwise
+   * @throws IOException
+   */
+  static boolean isPublic(Configuration conf, URI uri) throws IOException {
+    FileSystem fs = FileSystem.get(uri, conf);
+    Path current = new Path(uri.getPath());
+    //the leaf level file should be readable by others
+    if (!checkPermissionOfOther(fs, current, FsAction.READ)) {
+      return false;
+    }
+    current = current.getParent();
+    while (current != null) {
+      //the subdirs in the path should have execute permissions for others
+      if (!checkPermissionOfOther(fs, current, FsAction.EXECUTE)) {
+        return false;
+      }
+      current = current.getParent();
+    }
+    return true;
+  }
+  /**
+   * Checks for a given path whether the Other permissions on it 
+   * imply the permission in the passed FsAction
+   * @param fs
+   * @param path
+   * @param action
+   * @return true if the path in the uri is visible to all, false otherwise
+   * @throws IOException
+   */
+  private static boolean checkPermissionOfOther(FileSystem fs, Path path,
+      FsAction action) throws IOException {
+    FileStatus status = fs.getFileStatus(path);
+    FsPermission perms = status.getPermission();
+    FsAction otherAction = perms.getOtherAction();
+    if (otherAction.implies(action)) {
+      return true;
+    }
+    return false;
   }
 
   private Path checkCacheStatusValidity(Configuration conf,
@@ -585,7 +632,59 @@ public class TrackerDistributedCacheManager {
       setFileTimestamps(job, fileTimestamps.toString());
     }
   }
+  /**
+   * Determines the visibilities of the distributed cache files and 
+   * archives. The visibility of a cache path is "public" if the leaf component
+   * has READ permissions for others, and the parent subdirs have 
+   * EXECUTE permissions for others
+   * @param job
+   * @throws IOException
+   */
+  public static void determineCacheVisibilities(Configuration job) 
+  throws IOException {
+    URI[] tarchives = DistributedCache.getCacheArchives(job);
+    if (tarchives != null) {
+      StringBuffer archiveVisibilities = 
+        new StringBuffer(String.valueOf(isPublic(job, tarchives[0])));
+      for (int i = 1; i < tarchives.length; i++) {
+        archiveVisibilities.append(",");
+        archiveVisibilities.append(String.valueOf(isPublic(job, tarchives[i])));
+      }
+      setArchiveVisibilities(job, archiveVisibilities.toString());
+    }
+    URI[] tfiles = DistributedCache.getCacheFiles(job);
+    if (tfiles != null) {
+      StringBuffer fileVisibilities = 
+        new StringBuffer(String.valueOf(isPublic(job, tfiles[0])));
+      for (int i = 1; i < tfiles.length; i++) {
+        fileVisibilities.append(",");
+        fileVisibilities.append(String.valueOf(isPublic(job, tfiles[i])));
+      }
+      setFileVisibilities(job, fileVisibilities.toString());
+    }
+  }
   
+  /**
+   * Get the booleans on whether the files are public or not.  Used by 
+   * internal DistributedCache and MapReduce code.
+   * @param conf The configuration which stored the timestamps
+   * @return a string array of booleans 
+   * @throws IOException
+   */
+  static String[] getFileVisibilities(Configuration conf) {
+    return conf.getStrings(JobContext.CACHE_FILE_VISIBILITIES);
+  }
+
+  /**
+   * Get the booleans on whether the archives are public or not.  Used by 
+   * internal DistributedCache and MapReduce code.
+   * @param conf The configuration which stored the timestamps
+   * @return a string array of booleans 
+   */
+  static String[] getArchiveVisibilities(Configuration conf) {
+    return conf.getStrings(JobContext.CACHE_ARCHIVES_VISIBILITIES);
+  }
+
   /**
    * This method checks if there is a conflict in the fragment names 
    * of the uris. Also makes sure that each uri has a fragment. It 
@@ -630,6 +729,28 @@ public class TrackerDistributedCacheManager {
       }
     }
     return true;
+  }
+  /**
+   * This is to check the public/private visibility of the archives to be
+   * localized.
+   * 
+   * @param conf Configuration which stores the timestamp's
+   * @param booleans comma separated list of booleans (true - public)
+   * The order should be the same as the order in which the archives are added.
+   */
+  static void setArchiveVisibilities(Configuration conf, String booleans) {
+    conf.set(JobContext.CACHE_ARCHIVES_VISIBILITIES, booleans);
+  }
+
+  /**
+   * This is to check the public/private visibility of the files to be localized
+   * 
+   * @param conf Configuration which stores the timestamp's
+   * @param booleans comma separated list of booleans (true - public)
+   * The order should be the same as the order in which the files are added.
+   */
+  static void setFileVisibilities(Configuration conf, String booleans) {
+    conf.set(JobContext.CACHE_FILE_VISIBILITIES, booleans);
   }
 
   /**

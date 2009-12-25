@@ -121,7 +121,7 @@ public class LocalJobRunner implements ClientProtocol {
       taskDistributedCacheManager.setup(
           new LocalDirAllocator(MRConfig.LOCAL_DIR), 
           new File(systemJobDir.toString()),
-          "archive");
+          "archive", "archive");
       
       if (DistributedCache.getSymlink(conf)) {
         // This is not supported largely because, 

@@ -107,6 +107,10 @@ public interface JobContext {
     "mapreduce.job.cache.files.timestamps";
   public static final String CACHE_ARCHIVES_TIMESTAMPS = 
     "mapreduce.job.cache.archives.timestamps";
+  public static final String CACHE_FILE_VISIBILITIES = 
+    "mapreduce.job.cache.files.visibilities";
+  public static final String CACHE_ARCHIVES_VISIBILITIES = 
+    "mapreduce.job.cache.archives.visibilities";
   public static final String CACHE_SYMLINK = 
     "mapreduce.job.cache.symlink.create";
   

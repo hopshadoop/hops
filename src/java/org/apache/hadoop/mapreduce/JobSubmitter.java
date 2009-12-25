@@ -224,6 +224,8 @@ class JobSubmitter {
 
     //  set the timestamps of the archives and files
     TrackerDistributedCacheManager.determineTimestamps(conf);
+    //  set the public/private visibility of the archives and files
+    TrackerDistributedCacheManager.determineCacheVisibilities(conf);
   }
   
   private URI getPathURI(Path destPath, String fragment) 
