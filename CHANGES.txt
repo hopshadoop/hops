@@ -93,6 +93,10 @@ Trunk (unreleased changes)
     MAPREDUCE-1250. Refactors the JobToken to use Common's Token interface.
     (Kan Zhang via ddas)
 
+    MAPREDUCE-896. Enhance tasktracker to cleanup files that might have
+    been created by user tasks with non-writable permissions.
+    (Ravi Gummadi via yhemanth)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band

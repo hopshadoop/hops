@@ -46,6 +46,7 @@ enum command {
   KILL_TASK_JVM,
   RUN_DEBUG_SCRIPT,
   SIGQUIT_TASK_JVM,
+  ENABLE_TASK_FOR_CLEANUP
 };
 
 enum errorcodes {
@@ -71,6 +72,7 @@ enum errorcodes {
   INITIALIZE_USER_FAILED, //20
   UNABLE_TO_EXECUTE_DEBUG_SCRIPT, //21
   INVALID_CONF_DIR, //22
+  UNABLE_TO_BUILD_PATH //23
 };
 
 #define USER_DIR_PATTERN "%s/taskTracker/%s"
@@ -86,6 +88,8 @@ enum errorcodes {
 #define ATTEMPT_LOG_DIR_PATTERN "%s/userlogs/%s"
 
 #define TASK_SCRIPT_PATTERN "%s/%s/taskjvm.sh"
+
+#define TT_LOCAL_TASK_DIR_PATTERN    "%s/taskTracker/%s/jobcache/%s/%s"
 
 #define TT_SYS_DIR_KEY "mapreduce.cluster.local.dir"
 
@@ -115,6 +119,9 @@ int initialize_job(const char *jobid, const char *user);
 int initialize_distributed_cache(const char *user);
 
 int kill_user_task(const char *user, const char *task_pid, int sig);
+
+int enable_task_for_cleanup(const char *tt_root, const char *user,
+                            const char *jobid, const char *dir_to_be_deleted);
 
 int prepare_attempt_directory(const char *attempt_dir, const char *user);
 

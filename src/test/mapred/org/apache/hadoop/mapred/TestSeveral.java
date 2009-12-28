@@ -107,6 +107,10 @@ public class TestSeveral extends TestCase {
         mrCluster =   new MiniMRCluster(0, 0,
             numTT, dfs.getFileSystem().getUri().toString(), 
             1, null, null, MR_UGI, new JobConf());
+        // make cleanup inline sothat validation of existence of these directories
+        // can be done
+        mrCluster.setInlineCleanupThreads();
+
         mrCluster.getJobTrackerRunner().getJobTracker()
         .addJobInProgressListener(myListener);
       }
