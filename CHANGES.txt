@@ -195,6 +195,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-1331. Fixes a typo in a testcase (Devaraj Das)
 
+    MAPREDUCE-1293. AutoInputFormat doesn't work with non-default FileSystems.
+    (Andrew Hitchcock via tomwhite)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
