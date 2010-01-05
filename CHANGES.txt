@@ -201,6 +201,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1131. Using profilers other than hprof can cause JobClient to
     report job failure. (Aaron Kimball via tomwhite)
 
+    MAPREDUCE-1155. Streaming tests swallow exceptions.
+    (Todd Lipcon via tomwhite)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

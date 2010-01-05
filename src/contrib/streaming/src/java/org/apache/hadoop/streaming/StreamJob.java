@@ -124,13 +124,13 @@ public class StreamJob implements Tool {
       postProcessArgs();
   
       setJobConf();
-      return submitAndMonitorJob();
     }catch (IllegalArgumentException ex) {
       //ignore, since log will already be printed
       // print the log in debug mode.
       LOG.debug("Error in streaming job", ex);
       return 1;
     }
+    return submitAndMonitorJob();
   }
   
   /**
