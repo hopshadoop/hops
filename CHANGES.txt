@@ -97,6 +97,9 @@ Trunk (unreleased changes)
     been created by user tasks with non-writable permissions.
     (Ravi Gummadi via yhemanth)
 
+    MAPREDUCE-372. Change org.apache.hadoop.mapred.lib.ChainMapper/Reducer 
+    to use new mapreduce api. (Amareshwari Sriramadasu via sharad)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
