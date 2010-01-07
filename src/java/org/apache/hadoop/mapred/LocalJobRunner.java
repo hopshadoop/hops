@@ -115,7 +115,7 @@ public class LocalJobRunner implements ClientProtocol {
       // Manage the distributed cache.  If there are files to be copied,
       // this will trigger localFile to be re-written again.
       this.trackerDistributerdCacheManager =
-          new TrackerDistributedCacheManager(conf);
+          new TrackerDistributedCacheManager(conf, new DefaultTaskController());
       this.taskDistributedCacheManager = 
           trackerDistributerdCacheManager.newTaskDistributedCacheManager(conf);
       taskDistributedCacheManager.setup(

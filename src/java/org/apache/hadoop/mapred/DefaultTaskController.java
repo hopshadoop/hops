@@ -31,6 +31,8 @@ import org.apache.hadoop.util.Shell.ShellCommandExecutor;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.fs.Path;
 
 /**
  * The default implementation for controlling tasks.
@@ -156,8 +158,17 @@ public class DefaultTaskController extends TaskController {
   }
 
   @Override
-  public void initializeDistributedCache(InitializationContext context) {
-    // Do nothing.
+  public void initializeDistributedCacheFile(DistributedCacheFileContext context)
+      throws IOException {
+    Path localizedUniqueDir = context.getLocalizedUniqueDir();
+    try {
+      // Setting recursive execute permission on localized dir
+      LOG.info("Doing chmod on localdir :" + localizedUniqueDir);
+      FileUtil.chmod(localizedUniqueDir.toString(), "+x", true);
+    } catch (InterruptedException ie) {
+      LOG.warn("Exception in doing chmod on" + localizedUniqueDir, ie);
+      throw new IOException(ie);
+    }
   }
 
   @Override

@@ -110,6 +110,10 @@ Trunk (unreleased changes)
     MAPREDUCE-1224. Calling "SELECT t.* from <table> AS t" to get meta
     information is too expensive for big tables. (Spencer Ho via tomwhite)
 
+    MAPREDUCE-1186. Modified code in distributed cache to set permissions
+    only on required set of localized paths.
+    (Amareshwari Sriramadasu via yhemanth)
+
   BUG FIXES
 
     MAPREDUCE-1258. Fix fair scheduler event log not logging job info.
