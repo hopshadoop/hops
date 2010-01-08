@@ -103,6 +103,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1295. Add a tool in Rumen for folding and manipulating job
     traces. (Dick King via cdouglas)
 
+    MAPREDUCE-1317. Reduce the memory footprint of Rumen objects by interning
+    host Strings. (Hong Tang via cdouglas)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
