@@ -100,6 +100,9 @@ Trunk (unreleased changes)
     MAPREDUCE-372. Change org.apache.hadoop.mapred.lib.ChainMapper/Reducer 
     to use new mapreduce api. (Amareshwari Sriramadasu via sharad)
 
+    MAPREDUCE-1295. Add a tool in Rumen for folding and manipulating job
+    traces. (Dick King via cdouglas)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band

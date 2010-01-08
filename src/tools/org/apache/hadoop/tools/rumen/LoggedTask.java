@@ -69,6 +69,15 @@ public class LoggedTask implements DeepCompare {
     super();
   }
 
+  void adjustTimes(long adjustment) {
+    startTime += adjustment;
+    finishTime += adjustment;
+
+    for (LoggedTaskAttempt attempt : attempts) {
+      attempt.adjustTimes(adjustment);
+    }
+  }
+
   public long getInputBytes() {
     return inputBytes;
   }
