@@ -45,6 +45,7 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
+import org.apache.hadoop.mapreduce.lib.jobdata.WritableJobData;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
@@ -315,8 +316,10 @@ public class BaileyBorweinPlouffe extends Configured implements Tool {
 
     // setup mapper
     job.setMapperClass(BbpMapper.class);
-    job.setMapOutputKeyClass(LongWritable.class);
-    job.setMapOutputValueClass(BytesWritable.class);
+    WritableJobData.setMapOutputKeyClass(job.getConfiguration(),
+        LongWritable.class);
+    WritableJobData.setMapOutputValueClass(job.getConfiguration(),
+        BytesWritable.class);
 
     // setup reducer
     job.setReducerClass(BbpReducer.class);

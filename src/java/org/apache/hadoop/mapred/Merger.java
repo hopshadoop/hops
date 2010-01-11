@@ -54,7 +54,6 @@ public class Merger {
 
   public static <K extends Object, V extends Object>
   RawKeyValueIterator merge(Configuration conf, FileSystem fs,
-                            Class<K> keyClass, Class<V> valueClass, 
                             CompressionCodec codec,
                             Path[] inputs, boolean deleteInputs, 
                             int mergeFactor, Path tmpDir,
@@ -65,7 +64,7 @@ public class Merger {
   throws IOException {
     return 
       new MergeQueue<K, V>(conf, fs, inputs, deleteInputs, codec, comparator, 
-                           reporter, null).merge(keyClass, valueClass,
+                           reporter, null).merge(
                                            mergeFactor, tmpDir,
                                            readsCounter, writesCounter, 
                                            mergePhase);
@@ -73,7 +72,6 @@ public class Merger {
 
   public static <K extends Object, V extends Object>
   RawKeyValueIterator merge(Configuration conf, FileSystem fs,
-                            Class<K> keyClass, Class<V> valueClass, 
                             CompressionCodec codec,
                             Path[] inputs, boolean deleteInputs, 
                             int mergeFactor, Path tmpDir,
@@ -87,7 +85,6 @@ public class Merger {
     return 
       new MergeQueue<K, V>(conf, fs, inputs, deleteInputs, codec, comparator, 
                            reporter, mergedMapOutputsCounter).merge(
-                                           keyClass, valueClass,
                                            mergeFactor, tmpDir,
                                            readsCounter, writesCounter,
                                            mergePhase);
@@ -95,7 +92,6 @@ public class Merger {
   
   public static <K extends Object, V extends Object>
   RawKeyValueIterator merge(Configuration conf, FileSystem fs, 
-                            Class<K> keyClass, Class<V> valueClass, 
                             List<Segment<K, V>> segments, 
                             int mergeFactor, Path tmpDir,
                             RawComparator<K> comparator, Progressable reporter,
@@ -103,14 +99,13 @@ public class Merger {
                             Counters.Counter writesCounter,
                             Progress mergePhase)
       throws IOException {
-    return merge(conf, fs, keyClass, valueClass, segments, mergeFactor, tmpDir,
+    return merge(conf, fs, segments, mergeFactor, tmpDir,
                  comparator, reporter, false, readsCounter, writesCounter,
                  mergePhase);
   }
 
   public static <K extends Object, V extends Object>
   RawKeyValueIterator merge(Configuration conf, FileSystem fs,
-                            Class<K> keyClass, Class<V> valueClass,
                             List<Segment<K, V>> segments,
                             int mergeFactor, Path tmpDir,
                             RawComparator<K> comparator, Progressable reporter,
@@ -120,7 +115,7 @@ public class Merger {
                             Progress mergePhase)
       throws IOException {
     return new MergeQueue<K, V>(conf, fs, segments, comparator, reporter,
-                           sortSegments).merge(keyClass, valueClass,
+                           sortSegments).merge(
                                                mergeFactor, tmpDir,
                                                readsCounter, writesCounter,
                                                mergePhase);
@@ -128,7 +123,6 @@ public class Merger {
 
   public static <K extends Object, V extends Object>
   RawKeyValueIterator merge(Configuration conf, FileSystem fs,
-                            Class<K> keyClass, Class<V> valueClass,
                             CompressionCodec codec,
                             List<Segment<K, V>> segments,
                             int mergeFactor, Path tmpDir,
@@ -139,7 +133,7 @@ public class Merger {
                             Progress mergePhase)
       throws IOException {
     return new MergeQueue<K, V>(conf, fs, segments, comparator, reporter,
-                           sortSegments, codec).merge(keyClass, valueClass,
+                           sortSegments, codec).merge(
                                                mergeFactor, tmpDir,
                                                readsCounter, writesCounter,
                                                mergePhase);
@@ -147,7 +141,6 @@ public class Merger {
 
   public static <K extends Object, V extends Object>
     RawKeyValueIterator merge(Configuration conf, FileSystem fs,
-                            Class<K> keyClass, Class<V> valueClass,
                             List<Segment<K, V>> segments,
                             int mergeFactor, int inMemSegments, Path tmpDir,
                             RawComparator<K> comparator, Progressable reporter,
@@ -157,7 +150,7 @@ public class Merger {
                             Progress mergePhase)
       throws IOException {
     return new MergeQueue<K, V>(conf, fs, segments, comparator, reporter,
-                           sortSegments).merge(keyClass, valueClass,
+                           sortSegments).merge(
                                                mergeFactor, inMemSegments,
                                                tmpDir,
                                                readsCounter, writesCounter,
@@ -167,7 +160,6 @@ public class Merger {
 
   static <K extends Object, V extends Object>
   RawKeyValueIterator merge(Configuration conf, FileSystem fs,
-                          Class<K> keyClass, Class<V> valueClass,
                           CompressionCodec codec,
                           List<Segment<K, V>> segments,
                           int mergeFactor, int inMemSegments, Path tmpDir,
@@ -178,7 +170,7 @@ public class Merger {
                           Progress mergePhase)
     throws IOException {
   return new MergeQueue<K, V>(conf, fs, segments, comparator, reporter,
-                         sortSegments, codec).merge(keyClass, valueClass,
+                         sortSegments, codec).merge(
                                              mergeFactor, inMemSegments,
                                              tmpDir,
                                              readsCounter, writesCounter,
@@ -524,21 +516,19 @@ public class Merger {
       return comparator.compare(key1.getData(), s1, l1, key2.getData(), s2, l2) < 0;
     }
     
-    public RawKeyValueIterator merge(Class<K> keyClass, Class<V> valueClass,
-                                     int factor, Path tmpDir,
+    public RawKeyValueIterator merge(int factor, Path tmpDir,
                                      Counters.Counter readsCounter,
                                      Counters.Counter writesCounter,
                                      Progress mergePhase)
         throws IOException {
-      return merge(keyClass, valueClass, factor, 0, tmpDir,
+      return merge(factor, 0, tmpDir,
                    readsCounter, writesCounter, mergePhase);
     }
 
-    RawKeyValueIterator merge(Class<K> keyClass, Class<V> valueClass,
-                                     int factor, int inMem, Path tmpDir,
-                                     Counters.Counter readsCounter,
-                                     Counters.Counter writesCounter,
-                                     Progress mergePhase)
+    RawKeyValueIterator merge(int factor, int inMem, Path tmpDir,
+                              Counters.Counter readsCounter,
+                              Counters.Counter writesCounter,
+                              Progress mergePhase)
         throws IOException {
       LOG.info("Merging " + segments.size() + " sorted segments");
 
@@ -667,7 +657,7 @@ public class Merger {
                                               approxOutputSize, conf);
 
           Writer<K, V> writer = 
-            new Writer<K, V>(conf, fs, outputFile, keyClass, valueClass, codec,
+            new Writer<K, V>(conf, fs, outputFile, true, codec,
                              writesCounter);
           writeFile(this, writer, reporter, conf);
           writer.close();

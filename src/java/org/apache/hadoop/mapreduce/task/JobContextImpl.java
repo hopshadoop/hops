@@ -20,11 +20,17 @@ package org.apache.hadoop.mapreduce.task;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.Map;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configuration.IntegerRanges;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.RawComparator;
+import org.apache.hadoop.io.serializer.DeserializerBase;
+import org.apache.hadoop.io.serializer.SerializationFactory;
+import org.apache.hadoop.io.serializer.SerializerBase;
 import org.apache.hadoop.mapreduce.InputFormat;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
@@ -35,6 +41,7 @@ import org.apache.hadoop.mapreduce.Partitioner;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.filecache.DistributedCache;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
+import org.apache.hadoop.mapreduce.lib.jobdata.ClassBasedJobData;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.mapreduce.lib.partition.HashPartitioner;
 
@@ -43,6 +50,8 @@ import org.apache.hadoop.mapreduce.lib.partition.HashPartitioner;
  * are running.
  */
 public class JobContextImpl implements JobContext {
+
+  private final static Log LOG = LogFactory.getLog(JobContextImpl.class.getName());
 
   protected final org.apache.hadoop.mapred.JobConf conf;
   private final JobID jobId;
@@ -102,6 +111,7 @@ public class JobContextImpl implements JobContext {
     return conf.getOutputValueClass();
   }
 
+  @Deprecated
   /**
    * Get the key class for the map output data. If it is not set, use the
    * (final) output key class. This allows the map output key class to be
@@ -109,9 +119,12 @@ public class JobContextImpl implements JobContext {
    * @return the map output key class.
    */
   public Class<?> getMapOutputKeyClass() {
-    return conf.getMapOutputKeyClass();
+    LOG.warn(
+        "Deprecated: Use ClassBasedJobData.getMapOutputKeyClass() instead");
+    return ClassBasedJobData.getMapOutputKeyClass(conf);
   }
 
+  @Deprecated
   /**
    * Get the value class for the map output data. If it is not set, use the
    * (final) output value class This allows the map output value class to be
@@ -120,7 +133,9 @@ public class JobContextImpl implements JobContext {
    * @return the map output value class.
    */
   public Class<?> getMapOutputValueClass() {
-    return conf.getMapOutputValueClass();
+    LOG.warn("Deprecated: Use ClassBasedJobData.getMapOutputValueClass() "
+        + "instead");
+    return ClassBasedJobData.getMapOutputValueClass(conf);
   }
 
   /**
@@ -203,6 +218,42 @@ public class JobContextImpl implements JobContext {
      throws ClassNotFoundException {
     return (Class<? extends Partitioner<?,?>>) 
       conf.getClass(PARTITIONER_CLASS_ATTR, HashPartitioner.class);
+  }
+
+  /**
+   * Get the serializer to encode keys from the mapper.
+   *
+   * @return the {@link SerializerBase} for the mapper output keys.
+   */
+  public <T> SerializerBase<T> getMapOutputKeySerializer() {
+    return conf.getMapOutputKeySerializer();
+  }
+
+  /**
+   * Get the deserializer to decode keys from the mapper.
+   *
+   * @return the {@link DeserializerBase} for the mapper output keys.
+   */
+  public <T> DeserializerBase<T> getMapOutputKeyDeserializer() {
+    return conf.getMapOutputKeyDeserializer();
+  }
+
+  /**
+   * Get the serializer to encode values from the mapper.
+   *
+   * @return the {@link SerializerBase} for the mapper output values.
+   */
+  public <T> SerializerBase<T> getMapOutputValueSerializer() {
+    return conf.getMapOutputValueSerializer();
+  }
+
+  /**
+   * Get the deserializer to decode values from the mapper.
+   *
+   * @return the {@link DeserializerBase} for the mapper output values.
+   */
+  public <T> DeserializerBase<T> getMapOutputValueDeserializer() {
+    return conf.getMapOutputValueDeserializer();
   }
 
   /**
@@ -383,5 +434,26 @@ public class JobContextImpl implements JobContext {
   public String getUser() {
     return conf.getUser();
   }
-  
+
+  /**
+   * Get the metadata used by the serialization framework to instantiate
+   * (de)serializers for key data emitted by mappers.
+   *
+   * @return the metadata used by the serialization framework for the mapper
+   * output key.
+   */
+  public Map<String, String> getMapOutputKeySerializationMetadata() {
+    return conf.getMapOutputKeySerializationMetadata();
+  }
+
+  /**
+   * Get the metadata used by the serialization framework to instantiate
+   * (de)serializers for value data emitted by mappers.
+   *
+   * @return the metadata used by the serialization framework for the mapper
+   * output value.
+   */
+  public Map<String, String> getMapOutputValueSerializationMetadata() {
+    return conf.getMapOutputValueSerializationMetadata();
+  }
 }

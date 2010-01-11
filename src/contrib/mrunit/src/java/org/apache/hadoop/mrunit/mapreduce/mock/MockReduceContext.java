@@ -20,9 +20,11 @@ package org.apache.hadoop.mrunit.mapreduce.mock;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.serializer.SerializationBase;
 import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskType;
@@ -42,6 +44,13 @@ public class MockReduceContext <KEYIN, VALUEIN, KEYOUT, VALUEOUT>
 
   private MockOutputCollector<KEYOUT, VALUEOUT> output;
 
+  /** Return a metadata map that will instantiate serializers
+   * for Writable classes.
+   */
+  private static Map<String, String> getWritableSerializationMap() {
+    return SerializationBase.getMetadataFromClass(Text.class);
+  }
+
   public MockReduceContext(final List<Pair<KEYIN, List<VALUEIN>>> in, 
                            final Counters counters) 
   throws IOException, InterruptedException {
@@ -49,7 +58,7 @@ public class MockReduceContext <KEYIN, VALUEIN, KEYOUT, VALUEOUT>
           new TaskAttemptID("mrunit-jt", 0, TaskType.REDUCE, 0, 0),
           new MockRawKeyValueIterator(), null, null, null,
           new MockOutputCommitter(), new MockReporter(counters), null,
-          (Class) Text.class, (Class) Text.class);
+          getWritableSerializationMap(), getWritableSerializationMap());
     this.inputIter = in.iterator();
     this.output = new MockOutputCollector<KEYOUT, VALUEOUT>();
   }

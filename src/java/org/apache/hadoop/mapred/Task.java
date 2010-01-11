@@ -43,7 +43,7 @@ import org.apache.hadoop.io.RawComparator;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
-import org.apache.hadoop.io.serializer.Deserializer;
+import org.apache.hadoop.io.serializer.DeserializerBase;
 import org.apache.hadoop.io.serializer.SerializationFactory;
 import org.apache.hadoop.mapred.IFile.Writer;
 import org.apache.hadoop.mapreduce.TaskCounter;
@@ -1004,24 +1004,28 @@ abstract public class Task implements Writable, Configurable {
     private boolean more;                         // more in file
     private RawComparator<KEY> comparator;
     protected Progressable reporter;
-    private Deserializer<KEY> keyDeserializer;
-    private Deserializer<VALUE> valDeserializer;
+    private DeserializerBase<KEY> keyDeserializer;
+    private DeserializerBase<VALUE> valDeserializer;
     private DataInputBuffer keyIn = new DataInputBuffer();
     private DataInputBuffer valueIn = new DataInputBuffer();
     
     public ValuesIterator (RawKeyValueIterator in, 
                            RawComparator<KEY> comparator, 
-                           Class<KEY> keyClass,
-                           Class<VALUE> valClass, Configuration conf, 
+                           Map<String, String> keyMetadata,
+                           Map<String, String> valueMetadata,
+                           Configuration conf,
                            Progressable reporter)
       throws IOException {
       this.in = in;
       this.comparator = comparator;
       this.reporter = reporter;
-      SerializationFactory serializationFactory = new SerializationFactory(conf);
-      this.keyDeserializer = serializationFactory.getDeserializer(keyClass);
+      SerializationFactory serializationFactory =
+          new SerializationFactory(conf);
+      this.keyDeserializer =
+          serializationFactory.getDeserializer(keyMetadata);
       this.keyDeserializer.open(keyIn);
-      this.valDeserializer = serializationFactory.getDeserializer(valClass);
+      this.valDeserializer =
+          serializationFactory.getDeserializer(valueMetadata);
       this.valDeserializer.open(this.valueIn);
       readNextKey();
       key = nextKey;
@@ -1112,10 +1116,10 @@ abstract public class Task implements Writable, Configurable {
     private final Counters.Counter combineInputCounter;
 
     public CombineValuesIterator(RawKeyValueIterator in,
-        RawComparator<KEY> comparator, Class<KEY> keyClass,
-        Class<VALUE> valClass, Configuration conf, Reporter reporter,
+        RawComparator<KEY> comparator, Map<String, String> keyMetadata,
+        Map<String, String> valueMetadata, Configuration conf, Reporter reporter,
         Counters.Counter combineInputCounter) throws IOException {
-      super(in, comparator, keyClass, valClass, conf, reporter);
+      super(in, comparator, keyMetadata, valueMetadata, conf, reporter);
       this.combineInputCounter = combineInputCounter;
     }
 
@@ -1139,7 +1143,8 @@ abstract public class Task implements Writable, Configurable {
                       org.apache.hadoop.mapreduce.OutputCommitter committer,
                       org.apache.hadoop.mapreduce.StatusReporter reporter,
                       RawComparator<INKEY> comparator,
-                      Class<INKEY> keyClass, Class<INVALUE> valueClass
+                      Map<String, String> inKeyMetadata,
+                      Map<String, String> inValMetadata
   ) throws IOException, InterruptedException {
     org.apache.hadoop.mapreduce.ReduceContext<INKEY, INVALUE, OUTKEY, OUTVALUE> 
     reduceContext = 
@@ -1151,8 +1156,8 @@ abstract public class Task implements Writable, Configurable {
                                                               committer, 
                                                               reporter, 
                                                               comparator, 
-                                                              keyClass, 
-                                                              valueClass);
+                                                              inKeyMetadata,
+                                                              inValMetadata);
 
     org.apache.hadoop.mapreduce.Reducer<INKEY,INVALUE,OUTKEY,OUTVALUE>.Context 
         reducerContext = 
@@ -1216,8 +1221,8 @@ abstract public class Task implements Writable, Configurable {
   
   protected static class OldCombinerRunner<K,V> extends CombinerRunner<K,V> {
     private final Class<? extends Reducer<K,V,K,V>> combinerClass;
-    private final Class<K> keyClass;
-    private final Class<V> valueClass;
+    private final Map<String, String> keyMetadata;
+    private final Map<String, String> valueMetadata;
     private final RawComparator<K> comparator;
 
     @SuppressWarnings("unchecked")
@@ -1227,8 +1232,8 @@ abstract public class Task implements Writable, Configurable {
                                 TaskReporter reporter) {
       super(inputCounter, conf, reporter);
       combinerClass = cls;
-      keyClass = (Class<K>) job.getMapOutputKeyClass();
-      valueClass = (Class<V>) job.getMapOutputValueClass();
+      keyMetadata = job.getMapOutputKeySerializationMetadata();
+      valueMetadata = job.getMapOutputValueSerializationMetadata();
       comparator = (RawComparator<K>) job.getOutputKeyComparator();
     }
 
@@ -1240,8 +1245,8 @@ abstract public class Task implements Writable, Configurable {
         ReflectionUtils.newInstance(combinerClass, job);
       try {
         CombineValuesIterator<K,V> values = 
-          new CombineValuesIterator<K,V>(kvIter, comparator, keyClass, 
-                                         valueClass, job, Reporter.NULL,
+          new CombineValuesIterator<K,V>(kvIter, comparator, keyMetadata,
+                                         valueMetadata, job, Reporter.NULL,
                                          inputCounter);
         while (values.more()) {
           combiner.reduce(values.getKey(), values, combineCollector,
@@ -1259,8 +1264,8 @@ abstract public class Task implements Writable, Configurable {
         reducerClass;
     private final org.apache.hadoop.mapreduce.TaskAttemptID taskId;
     private final RawComparator<K> comparator;
-    private final Class<K> keyClass;
-    private final Class<V> valueClass;
+    private final Map<String, String> keyMetadata;
+    private final Map<String, String> valueMetadata;
     private final org.apache.hadoop.mapreduce.OutputCommitter committer;
 
     @SuppressWarnings("unchecked")
@@ -1274,8 +1279,8 @@ abstract public class Task implements Writable, Configurable {
       super(inputCounter, job, reporter);
       this.reducerClass = reducerClass;
       this.taskId = taskId;
-      keyClass = (Class<K>) context.getMapOutputKeyClass();
-      valueClass = (Class<V>) context.getMapOutputValueClass();
+      keyMetadata = context.getMapOutputKeySerializationMetadata();
+      valueMetadata = context.getMapOutputValueSerializationMetadata();
       comparator = (RawComparator<K>) context.getSortComparator();
       this.committer = committer;
     }
@@ -1313,8 +1318,9 @@ abstract public class Task implements Writable, Configurable {
                                                 iterator, null, inputCounter, 
                                                 new OutputConverter(collector),
                                                 committer,
-                                                reporter, comparator, keyClass,
-                                                valueClass);
+                                                reporter, comparator,
+                                                keyMetadata,
+                                                valueMetadata);
       reducer.run(reducerContext);
     } 
   }

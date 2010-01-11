@@ -51,6 +51,7 @@ import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.TaskInputOutputContext;
+import org.apache.hadoop.mapreduce.lib.jobdata.WritableJobData;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
@@ -247,8 +248,10 @@ public final class DistSum extends Configured implements Tool {
     public void init(Job job) {
       // setup mapper
       job.setMapperClass(SummingMapper.class);
-      job.setMapOutputKeyClass(NullWritable.class);
-      job.setMapOutputValueClass(TaskResult.class);
+      WritableJobData.setMapOutputKeyClass(job.getConfiguration(),
+          NullWritable.class);
+      WritableJobData.setMapOutputValueClass(job.getConfiguration(),
+          TaskResult.class);
 
       // zero reducer
       job.setNumReduceTasks(0);
@@ -300,8 +303,10 @@ public final class DistSum extends Configured implements Tool {
     public void init(Job job) {
       // setup mapper
       job.setMapperClass(PartitionMapper.class);
-      job.setMapOutputKeyClass(IntWritable.class);
-      job.setMapOutputValueClass(SummationWritable.class);
+      WritableJobData.setMapOutputKeyClass(job.getConfiguration(),
+          IntWritable.class);
+      WritableJobData.setMapOutputValueClass(job.getConfiguration(),
+          SummationWritable.class);
 
       // setup partitioner
       job.setPartitionerClass(IndexPartitioner.class);

@@ -48,9 +48,10 @@ import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.io.SequenceFile.CompressionType;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.io.compress.DefaultCodec;
-import org.apache.hadoop.io.serializer.Deserializer;
+import org.apache.hadoop.io.serializer.DeserializerBase;
+import org.apache.hadoop.io.serializer.SerializationBase;
 import org.apache.hadoop.io.serializer.SerializationFactory;
-import org.apache.hadoop.io.serializer.Serializer;
+import org.apache.hadoop.io.serializer.SerializerBase;
 import org.apache.hadoop.mapred.IFile.Writer;
 import org.apache.hadoop.mapred.Merger.Segment;
 import org.apache.hadoop.mapred.SortedRanges.SkipRangeIterator;
@@ -346,8 +347,9 @@ class MapTask extends Task {
      throw wrap;
    }
    SerializationFactory factory = new SerializationFactory(conf);
-   Deserializer<T> deserializer = 
-     (Deserializer<T>) factory.getDeserializer(cls);
+   DeserializerBase<T> deserializer = 
+       (DeserializerBase<T>) factory.getDeserializer(
+       SerializationBase.getMetadataFromClass(cls));
    deserializer.open(inFile);
    T split = deserializer.deserialize(null);
    long pos = inFile.getPos();
@@ -614,8 +616,8 @@ class MapTask extends Task {
       (org.apache.hadoop.mapreduce.InputFormat<INKEY,INVALUE>)
         ReflectionUtils.newInstance(taskContext.getInputFormatClass(), job);
     // rebuild the input split
-    org.apache.hadoop.mapreduce.InputSplit split = null;
-    split = getSplitDetails(new Path(splitIndex.getSplitLocation()),
+    org.apache.hadoop.mapreduce.InputSplit split =
+        getSplitDetails(new Path(splitIndex.getSplitLocation()),
         splitIndex.getStartOffset());
 
     org.apache.hadoop.mapreduce.RecordReader<INKEY,INVALUE> input =
@@ -710,12 +712,9 @@ class MapTask extends Task {
     private final int partitions;
     private final JobConf job;
     private final TaskReporter reporter;
-    private final Class<K> keyClass;
-    private final Class<V> valClass;
     private final RawComparator<K> comparator;
-    private final SerializationFactory serializationFactory;
-    private final Serializer<K> keySerializer;
-    private final Serializer<V> valSerializer;
+    private final SerializerBase<K> keySerializer;
+    private final SerializerBase<V> valSerializer;
     private final CombinerRunner<K,V> combinerRunner;
     private final CombineOutputCollector<K, V> combineCollector;
     
@@ -815,12 +814,9 @@ class MapTask extends Task {
       LOG.info("record buffer = " + softRecordLimit + "/" + kvoffsets.length);
       // k/v serialization
       comparator = job.getOutputKeyComparator();
-      keyClass = (Class<K>)job.getMapOutputKeyClass();
-      valClass = (Class<V>)job.getMapOutputValueClass();
-      serializationFactory = new SerializationFactory(job);
-      keySerializer = serializationFactory.getSerializer(keyClass);
+      keySerializer = job.getMapOutputKeySerializer();
       keySerializer.open(bb);
-      valSerializer = serializationFactory.getSerializer(valClass);
+      valSerializer = job.getMapOutputValueSerializer();
       valSerializer.open(bb);
       // counters
       mapOutputByteCounter = reporter.getCounter(TaskCounter.MAP_OUTPUT_BYTES);
@@ -867,16 +863,6 @@ class MapTask extends Task {
     public synchronized void collect(K key, V value, int partition
                                      ) throws IOException {
       reporter.progress();
-      if (key.getClass() != keyClass) {
-        throw new IOException("Type mismatch in key from map: expected "
-                              + keyClass.getName() + ", recieved "
-                              + key.getClass().getName());
-      }
-      if (value.getClass() != valClass) {
-        throw new IOException("Type mismatch in value from map: expected "
-                              + valClass.getName() + ", recieved "
-                              + value.getClass().getName());
-      }
       final int kvnext = (kvindex + 1) % kvoffsets.length;
       if (--recordRemaining <= 0) {
         // Possible for check to remain < zero, if soft limit remains
@@ -1291,8 +1277,7 @@ class MapTask extends Task {
           IFile.Writer<K, V> writer = null;
           try {
             long segmentStart = out.getPos();
-            writer = new Writer<K, V>(job, out, keyClass, valClass, codec,
-                                      spilledRecordsCounter);
+            writer = new Writer<K, V>(job, out, true, codec, spilledRecordsCounter);
             if (combinerRunner == null) {
               // spill directly
               DataInputBuffer key = new DataInputBuffer();
@@ -1380,8 +1365,8 @@ class MapTask extends Task {
           try {
             long segmentStart = out.getPos();
             // Create a new codec, don't care!
-            writer = new IFile.Writer<K,V>(job, out, keyClass, valClass, codec,
-                                            spilledRecordsCounter);
+            writer = new IFile.Writer<K,V>(job, out, true, codec,
+                spilledRecordsCounter);
 
             if (i == partition) {
               final long recordStart = out.getPos();
@@ -1540,7 +1525,7 @@ class MapTask extends Task {
           for (int i = 0; i < partitions; i++) {
             long segmentStart = finalOut.getPos();
             Writer<K, V> writer =
-              new Writer<K, V>(job, finalOut, keyClass, valClass, codec, null);
+              new Writer<K, V>(job, finalOut, true, codec, null);
             writer.close();
             rec.startOffset = segmentStart;
             rec.rawLength = writer.getRawLength();
@@ -1584,17 +1569,15 @@ class MapTask extends Task {
           //merge
           @SuppressWarnings("unchecked")
           RawKeyValueIterator kvIter = Merger.merge(job, rfs,
-                         keyClass, valClass, codec,
-                         segmentList, mergeFactor,
+                         codec, segmentList, mergeFactor,
                          new Path(mapId.toString()),
                          job.getOutputKeyComparator(), reporter, sortSegments,
                          null, spilledRecordsCounter, sortPhase.phase());
 
           //write merged output to disk
           long segmentStart = finalOut.getPos();
-          Writer<K, V> writer =
-              new Writer<K, V>(job, finalOut, keyClass, valClass, codec,
-                               spilledRecordsCounter);
+          Writer<K, V> writer = new Writer<K, V>(job, finalOut, true, codec,
+              spilledRecordsCounter);
           if (combinerRunner == null || numSpills < minSpillsForCombine) {
             Merger.writeFile(kvIter, writer, reporter, job);
           } else {

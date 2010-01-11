@@ -322,7 +322,7 @@
     </taskdef>
     <protocol destdir="${build.src}">
       <fileset dir="${mapred.src.dir}">
-	<include name="**/*.avpr" />
+        <include name="**/*.avpr" />
       </fileset>
     </protocol>
   </target>
@@ -472,7 +472,20 @@
   <!-- Compile test code                                                  --> 
   <!-- ================================================================== -->
 
-  <target name="compile-mapred-test" depends="compile-mapred-classes, compile-examples, ivy-retrieve-test">
+  <target name="avro-generate-test">
+    <!-- generate avro record instances for tests -->
+    <taskdef name="schema" classname="org.apache.avro.specific.SchemaTask">
+      <classpath refid="classpath" />
+    </taskdef>
+    <schema destdir="${test.generated.dir}">
+      <fileset dir="${test.src.dir}">
+        <include name="**/*.avsc" />
+      </fileset>
+    </schema>
+  </target>
+
+  <target name="compile-mapred-test" depends="compile-mapred-classes, compile-examples,
+      ivy-retrieve-test, avro-generate-test">
 
     <mkdir dir="${test.mapred.build.classes}"/>
     <mkdir dir="${test.mapred.build.testjar}"/>
@@ -480,7 +493,7 @@
 
     <javac 
       encoding="${build.encoding}" 
-      srcdir="${test.src.dir}/mapred;${test.src.dir}/unit"
+      srcdir="${test.src.dir}/mapred;${test.src.dir}/unit;${test.generated.dir}"
       includes="org/apache/hadoop/**/*.java"
       destdir="${test.mapred.build.classes}"
       debug="${javac.debug}"

@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -362,8 +363,6 @@ public class MergeManager<K, V> {
 
       RawKeyValueIterator rIter = 
         Merger.merge(jobConf, rfs,
-                     (Class<K>)jobConf.getMapOutputKeyClass(),
-                     (Class<V>)jobConf.getMapOutputValueClass(),
                      inMemorySegments, inMemorySegments.size(),
                      new Path(reduceId.toString()),
                      (RawComparator<K>)jobConf.getOutputKeyComparator(),
@@ -418,9 +417,7 @@ public class MergeManager<K, V> {
                                                Task.MERGED_OUTPUT_PREFIX);
 
       Writer<K,V> writer = 
-        new Writer<K,V>(jobConf, rfs, outputPath,
-                        (Class<K>) jobConf.getMapOutputKeyClass(),
-                        (Class<V>) jobConf.getMapOutputValueClass(),
+        new Writer<K,V>(jobConf, rfs, outputPath, true,
                         codec, null);
 
       RawKeyValueIterator rIter = null;
@@ -429,8 +426,6 @@ public class MergeManager<K, V> {
                  " segments...");
         
         rIter = Merger.merge(jobConf, rfs,
-                             (Class<K>)jobConf.getMapOutputKeyClass(),
-                             (Class<V>)jobConf.getMapOutputValueClass(),
                              inMemorySegments, inMemorySegments.size(),
                              new Path(reduceId.toString()),
                              (RawComparator<K>)jobConf.getOutputKeyComparator(),
@@ -499,16 +494,12 @@ public class MergeManager<K, V> {
         localDirAllocator.getLocalPathForWrite(inputs.get(0).toString(), 
             approxOutputSize, jobConf).suffix(Task.MERGED_OUTPUT_PREFIX);
       Writer<K,V> writer = 
-        new Writer<K,V>(jobConf, rfs, outputPath, 
-                        (Class<K>) jobConf.getMapOutputKeyClass(), 
-                        (Class<V>) jobConf.getMapOutputValueClass(),
+        new Writer<K,V>(jobConf, rfs, outputPath,  true,
                         codec, null);
       RawKeyValueIterator iter  = null;
       Path tmpDir = new Path(reduceId.toString());
       try {
         iter = Merger.merge(jobConf, rfs,
-                            (Class<K>) jobConf.getMapOutputKeyClass(),
-                            (Class<V>) jobConf.getMapOutputValueClass(),
                             codec, inputs.toArray(new Path[inputs.size()]), 
                             true, ioSortFactor, tmpDir, 
                             (RawComparator<K>) jobConf.getOutputKeyComparator(), 
@@ -538,13 +529,15 @@ public class MergeManager<K, V> {
       Counters.Counter inCounter) throws IOException {
     JobConf job = jobConf;
     Reducer combiner = ReflectionUtils.newInstance(combinerClass, job);
-    Class<K> keyClass = (Class<K>) job.getMapOutputKeyClass();
-    Class<V> valClass = (Class<V>) job.getMapOutputValueClass();
+    Map<String, String> keyMetadata =
+        job.getMapOutputKeySerializationMetadata();
+    Map<String, String> valueMetadata =
+        job.getMapOutputValueSerializationMetadata();
     RawComparator<K> comparator = 
       (RawComparator<K>)job.getOutputKeyComparator();
     try {
       CombineValuesIterator values = new CombineValuesIterator(
-          kvIter, comparator, keyClass, valClass, job, Reporter.NULL,
+          kvIter, comparator, keyMetadata, valueMetadata, job, Reporter.NULL,
           inCounter);
       while (values.more()) {
         combiner.reduce(values.getKey(), values, combineCollector,
@@ -638,8 +631,6 @@ public class MergeManager<K, V> {
     
 
     // merge config params
-    Class<K> keyClass = (Class<K>)job.getMapOutputKeyClass();
-    Class<V> valueClass = (Class<V>)job.getMapOutputValueClass();
     boolean keepInputs = job.getKeepFailedTaskFiles();
     final Path tmpDir = new Path(reduceId.toString());
     final RawComparator<K> comparator =
@@ -672,11 +663,11 @@ public class MergeManager<K, V> {
                                              inMemToDiskBytes).suffix(
                                                  Task.MERGED_OUTPUT_PREFIX);
         final RawKeyValueIterator rIter = Merger.merge(job, fs,
-            keyClass, valueClass, memDiskSegments, numMemDiskSegments,
+            memDiskSegments, numMemDiskSegments,
             tmpDir, comparator, reporter, spilledRecordsCounter, null, 
             mergePhase);
         final Writer<K,V> writer = new Writer<K,V>(job, fs, outputPath,
-            keyClass, valueClass, codec, null);
+            true, codec, null);
         try {
           Merger.writeFile(rIter, writer, reporter, job);
           // add to list of final disk outputs.
@@ -746,7 +737,7 @@ public class MergeManager<K, V> {
       // merges. See comment where mergePhaseFinished is being set
       Progress thisPhase = (mergePhaseFinished) ? null : mergePhase; 
       RawKeyValueIterator diskMerge = Merger.merge(
-          job, fs, keyClass, valueClass, diskSegments,
+          job, fs, diskSegments,
           ioSortFactor, numInMemSegments, tmpDir, comparator,
           reporter, false, spilledRecordsCounter, null, thisPhase);
       diskSegments.clear();
@@ -756,7 +747,7 @@ public class MergeManager<K, V> {
       finalSegments.add(new Segment<K,V>(
             new RawKVIteratorReader(diskMerge, onDiskBytes), true));
     }
-    return Merger.merge(job, fs, keyClass, valueClass,
+    return Merger.merge(job, fs,
                  finalSegments, finalSegments.size(), tmpDir,
                  comparator, reporter, spilledRecordsCounter, null,
                  null);

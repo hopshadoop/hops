@@ -20,11 +20,14 @@ package org.apache.hadoop.mapreduce.lib.reduce;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configuration.IntegerRanges;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.RawComparator;
+import org.apache.hadoop.io.serializer.DeserializerBase;
+import org.apache.hadoop.io.serializer.SerializerBase;
 import org.apache.hadoop.mapreduce.Counter;
 import org.apache.hadoop.mapreduce.InputFormat;
 import org.apache.hadoop.mapreduce.JobID;
@@ -197,11 +200,13 @@ public class WrappedReducer<KEYIN, VALUEIN, KEYOUT, VALUEOUT>
     }
 
     @Override
+    @Deprecated
     public Class<?> getMapOutputKeyClass() {
       return reduceContext.getMapOutputKeyClass();
     }
 
     @Override
+    @Deprecated
     public Class<?> getMapOutputValueClass() {
       return reduceContext.getMapOutputValueClass();
     }
@@ -241,6 +246,36 @@ public class WrappedReducer<KEYIN, VALUEIN, KEYOUT, VALUEOUT>
     @Override
     public Class<?> getOutputValueClass() {
       return reduceContext.getOutputValueClass();
+    }
+
+    @Override
+    public <T> SerializerBase<T> getMapOutputKeySerializer() {
+      return reduceContext.getMapOutputKeySerializer();
+    }
+
+    @Override
+    public <T> SerializerBase<T> getMapOutputValueSerializer() {
+      return reduceContext.getMapOutputValueSerializer();
+    }
+
+    @Override
+    public <T> DeserializerBase<T> getMapOutputKeyDeserializer() {
+      return reduceContext.getMapOutputKeyDeserializer();
+    }
+
+    @Override
+    public <T> DeserializerBase<T> getMapOutputValueDeserializer() {
+      return reduceContext.getMapOutputValueDeserializer();
+    }
+
+    @Override
+    public Map<String, String> getMapOutputKeySerializationMetadata() {
+      return reduceContext.getMapOutputKeySerializationMetadata();
+    }
+
+    @Override
+    public Map<String, String> getMapOutputValueSerializationMetadata() {
+      return reduceContext.getMapOutputValueSerializationMetadata();
     }
 
     @Override

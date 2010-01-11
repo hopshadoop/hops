@@ -32,6 +32,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.io.WritableComparator;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.jobdata.WritableJobData;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
@@ -224,8 +225,10 @@ public class SecondarySort {
     job.setGroupingComparatorClass(FirstGroupingComparator.class);
 
     // the map output is IntPair, IntWritable
-    job.setMapOutputKeyClass(IntPair.class);
-    job.setMapOutputValueClass(IntWritable.class);
+    WritableJobData.setMapOutputKeyClass(job.getConfiguration(),
+        IntPair.class);
+    WritableJobData.setMapOutputValueClass(job.getConfiguration(),
+        IntWritable.class);
 
     // the reduce output is Text, IntWritable
     job.setOutputKeyClass(Text.class);

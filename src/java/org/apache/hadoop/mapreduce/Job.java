@@ -26,9 +26,11 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
-import java.net.URI;
+import java.util.Arrays;
+import java.util.Map;
 
 import javax.security.auth.login.LoginException;
 
@@ -41,6 +43,7 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.RawComparator;
 import org.apache.hadoop.mapreduce.filecache.DistributedCache;
+import org.apache.hadoop.mapreduce.lib.jobdata.ClassBasedJobData;
 import org.apache.hadoop.mapreduce.task.JobContextImpl;
 import org.apache.hadoop.mapreduce.util.ConfigUtil;
 import org.apache.hadoop.security.UnixUserGroupInformation;
@@ -628,32 +631,41 @@ public class Job extends JobContextImpl implements JobContext {
                   Partitioner.class);
   }
 
+  @Deprecated
   /**
    * Set the key class for the map output data. This allows the user to
    * specify the map output key class to be different than the final output
    * value class.
-   * 
+   *
+   * Deprecated: Use ClassBasedJobData.setMapOutputKeyClass() instead
+   *
    * @param theClass the map output key class.
    * @throws IllegalStateException if the job is submitted
    */
   public void setMapOutputKeyClass(Class<?> theClass
                                    ) throws IllegalStateException {
-    ensureState(JobState.DEFINE);
-    conf.setMapOutputKeyClass(theClass);
+    LOG.warn(
+        "Deprecated: Use ClassBasedJobData.setMapOutputKeyClass() instead");
+    ClassBasedJobData.setMapOutputKeyClass(conf, theClass);
   }
 
+  @Deprecated
   /**
    * Set the value class for the map output data. This allows the user to
    * specify the map output value class to be different than the final output
    * value class.
-   * 
+   *
+   * Deprecated: Use ClassBasedJobData.setMapOutputValueClass() instead
+   *
    * @param theClass the map output value class.
    * @throws IllegalStateException if the job is submitted
    */
   public void setMapOutputValueClass(Class<?> theClass
                                      ) throws IllegalStateException {
-    ensureState(JobState.DEFINE);
-    conf.setMapOutputValueClass(theClass);
+    LOG.warn(
+        "Deprecated: Use ClassBasedJobData.setMapOutputValueClass() "
+        + "instead");
+    ClassBasedJobData.setMapOutputValueClass(conf, theClass);
   }
 
   /**
@@ -853,6 +865,32 @@ public class Job extends JobContextImpl implements JobContext {
   public void setMaxReduceAttempts(int n) {
     ensureState(JobState.DEFINE);
     conf.setMaxReduceAttempts(n);
+  }
+
+  /**
+   * Set the metadata used by the serialization framework to instantiate
+   * (de)serializers for key data emitted by mappers.
+   *
+   * @param metadata the metadata used by the serialization framework for
+   * the mapper output key.
+   */
+  public void setMapOutputKeySerializationMetadata(
+      Map<String, String> metadata) {
+    ensureState(JobState.DEFINE);
+    conf.setMap(MAP_OUTPUT_KEY_METADATA, metadata);
+  }
+
+  /**
+   * Set the metadata used by the serialization framework to instantiate
+   * (de)serializers for value data emitted by mappers.
+   *
+   * @param metadata the metadata used by the serialization framework for
+   * the mapper output value.
+   */
+  public void setMapOutputValueSerializationMetadata(
+      Map<String, String> metadata) {
+    ensureState(JobState.DEFINE);
+    conf.setMap(MAP_OUTPUT_VALUE_METADATA, metadata);
   }
 
   /**

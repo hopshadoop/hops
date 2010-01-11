@@ -20,6 +20,7 @@ package org.apache.hadoop.mapreduce;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.Map;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -27,6 +28,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configuration.IntegerRanges;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.RawComparator;
+import org.apache.hadoop.io.serializer.DeserializerBase;
+import org.apache.hadoop.io.serializer.SerializerBase;
 import org.apache.hadoop.mapreduce.Mapper;
 
 /**
@@ -173,10 +176,20 @@ public interface JobContext {
     "mapreduce.map.output.compress";
   public static final String MAP_OUTPUT_COMPRESS_CODEC = 
     "mapreduce.map.output.compress.codec";
+  @Deprecated
   public static final String MAP_OUTPUT_KEY_CLASS = 
     "mapreduce.map.output.key.class";
+  public static final String MAP_OUTPUT_KEY_METADATA =
+    "mapreduce.map.output.key.metadata";
+  public static final String MAP_OUTPUT_KEY_METADATA_SET =
+    "mapreduce.map.output.key.metadata.jobdata.initialized";
+  @Deprecated
   public static final String MAP_OUTPUT_VALUE_CLASS = 
     "mapreduce.map.output.value.class";
+  public static final String MAP_OUTPUT_VALUE_METADATA =
+    "mapreduce.map.output.value.metadata";
+  public static final String MAP_OUTPUT_VALUE_METADATA_SET =
+    "mapreduce.map.output.value.metadata.jobdata.initialized";
   public static final String MAP_OUTPUT_KEY_FIELD_SEPERATOR = 
     "mapreduce.map.output.key.field.separator";
   public static final String MAP_LOG_LEVEL = "mapreduce.map.log.level";
@@ -269,19 +282,24 @@ public interface JobContext {
    */
   public Class<?> getOutputValueClass();
 
+  @Deprecated
   /**
    * Get the key class for the map output data. If it is not set, use the
    * (final) output key class. This allows the map output key class to be
    * different than the final output key class.
+   *
+   * (Deprecated: Use ClassBasedJobData.getMapOutputKeyClass())
    * @return the map output key class.
    */
   public Class<?> getMapOutputKeyClass();
 
+  @Deprecated
   /**
    * Get the value class for the map output data. If it is not set, use the
    * (final) output value class This allows the map output value class to be
    * different than the final output value class.
-   *  
+   *
+   * (Deprecated: Use ClassBasedJobData.getMapOutputValueClass())
    * @return the map output value class.
    */
   public Class<?> getMapOutputValueClass();
@@ -341,6 +359,34 @@ public interface JobContext {
    */
   public Class<? extends Partitioner<?,?>> getPartitionerClass() 
      throws ClassNotFoundException;
+
+  /**
+   * Get the serializer to encode keys from the mapper.
+   *
+   * @return the {@link SerializerBase} for the mapper output keys.
+   */
+  public <T> SerializerBase<T> getMapOutputKeySerializer();
+
+  /**
+   * Get the deserializer to decode keys from the mapper.
+   *
+   * @return the {@link DeserializerBase} for the mapper output keys.
+   */
+  public <T> DeserializerBase<T> getMapOutputKeyDeserializer();
+
+  /**
+   * Get the serializer to encode values from the mapper.
+   *
+   * @return the {@link SerializerBase} for the mapper output values.
+   */
+  public <T> SerializerBase<T> getMapOutputValueSerializer();
+
+  /**
+   * Get the deserializer to decode values from the mapper.
+   *
+   * @return the {@link DeserializerBase} for the mapper output values.
+   */
+  public <T> DeserializerBase<T> getMapOutputValueDeserializer();
 
   /**
    * Get the {@link RawComparator} comparator used to compare keys.
@@ -481,4 +527,21 @@ public interface JobContext {
    */
   public int getMaxReduceAttempts();
 
+  /**
+   * Get the metadata used by the serialization framework to instantiate
+   * (de)serializers for key data emitted by mappers.
+   *
+   * @return the metadata used by the serialization framework for the mapper
+   * output key.
+   */
+  public Map<String, String> getMapOutputKeySerializationMetadata();
+
+  /**
+   * Get the metadata used by the serialization framework to instantiate
+   * (de)serializers for value data emitted by mappers.
+   *
+   * @return the metadata used by the serialization framework for the mapper
+   * output value.
+   */
+  public Map<String, String> getMapOutputValueSerializationMetadata();
 }

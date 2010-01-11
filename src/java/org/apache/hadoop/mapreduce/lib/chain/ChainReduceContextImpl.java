@@ -18,12 +18,15 @@
 package org.apache.hadoop.mapreduce.lib.chain;
 
 import java.io.IOException;
+import java.util.Map;
 import java.net.URI;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configuration.IntegerRanges;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.RawComparator;
+import org.apache.hadoop.io.serializer.DeserializerBase;
+import org.apache.hadoop.io.serializer.SerializerBase;
 import org.apache.hadoop.mapreduce.Counter;
 import org.apache.hadoop.mapreduce.InputFormat;
 import org.apache.hadoop.mapreduce.JobID;
@@ -244,6 +247,36 @@ class ChainReduceContextImpl<KEYIN, VALUEIN, KEYOUT, VALUEOUT> implements
   @Override
   public Class<?> getOutputValueClass() {
     return base.getOutputValueClass();
+  }
+
+  @Override
+  public <T> SerializerBase<T> getMapOutputKeySerializer() {
+    return base.getMapOutputKeySerializer();
+  }
+
+  @Override
+  public <T> SerializerBase<T> getMapOutputValueSerializer() {
+    return base.getMapOutputValueSerializer();
+  }
+
+  @Override
+  public <T> DeserializerBase<T> getMapOutputKeyDeserializer() {
+    return base.getMapOutputKeyDeserializer();
+  }
+
+  @Override
+  public <T> DeserializerBase<T> getMapOutputValueDeserializer() {
+    return base.getMapOutputValueDeserializer();
+  }
+
+  @Override
+  public Map<String, String> getMapOutputKeySerializationMetadata() {
+    return base.getMapOutputKeySerializationMetadata();
+  }
+
+  @Override
+  public Map<String, String> getMapOutputValueSerializationMetadata() {
+    return base.getMapOutputValueSerializationMetadata();
   }
 
   @Override

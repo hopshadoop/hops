@@ -21,6 +21,7 @@ package org.apache.hadoop.mapreduce.task;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.NoSuchElementException;
 
 import org.apache.hadoop.conf.Configuration;
@@ -70,8 +71,8 @@ public class ReduceContextImpl<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
   private boolean isMarked = false;
   private BackupStore<KEYIN,VALUEIN> backupStore;
   private final SerializationFactory serializationFactory;
-  private final Class<KEYIN> keyClass;
-  private final Class<VALUEIN> valueClass;
+  private final Map<String, String> keyMetadata;
+  private final Map<String, String> valueMetadata;
   private final Configuration conf;
   private final TaskAttemptID taskid;
   private int currentKeyLength = -1;
@@ -85,8 +86,8 @@ public class ReduceContextImpl<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
                            OutputCommitter committer,
                            StatusReporter reporter,
                            RawComparator<KEYIN> comparator,
-                           Class<KEYIN> keyClass,
-                           Class<VALUEIN> valueClass
+                           Map<String, String> keyMetadata,
+                           Map<String, String> valueMetadata
                           ) throws InterruptedException, IOException{
     super(conf, taskid, output, committer, reporter);
     this.input = input;
@@ -94,13 +95,13 @@ public class ReduceContextImpl<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
     this.inputValueCounter = inputValueCounter;
     this.comparator = comparator;
     this.serializationFactory = new SerializationFactory(conf);
-    this.keyDeserializer = serializationFactory.getDeserializer(keyClass);
+    this.keyMetadata = keyMetadata;
+    this.valueMetadata = valueMetadata;
+    this.keyDeserializer = serializationFactory.getDeserializer(keyMetadata);
     this.keyDeserializer.open(buffer);
-    this.valueDeserializer = serializationFactory.getDeserializer(valueClass);
+    this.valueDeserializer = serializationFactory.getDeserializer(valueMetadata);
     this.valueDeserializer.open(buffer);
     hasMore = input.next();
-    this.keyClass = keyClass;
-    this.valueClass = valueClass;
     this.conf = conf;
     this.taskid = taskid;
   }
@@ -326,12 +327,12 @@ public class ReduceContextImpl<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
       WritableUtils.writeVInt(out, currentKeyLength);
       WritableUtils.writeVInt(out, currentValueLength);
       Serializer<KEYIN> keySerializer = 
-        serializationFactory.getSerializer(keyClass);
+        serializationFactory.getSerializer(keyMetadata);
       keySerializer.open(out);
       keySerializer.serialize(getCurrentKey());
 
       Serializer<VALUEIN> valueSerializer = 
-        serializationFactory.getSerializer(valueClass);
+        serializationFactory.getSerializer(valueMetadata);
       valueSerializer.open(out);
       valueSerializer.serialize(getCurrentValue());
     }

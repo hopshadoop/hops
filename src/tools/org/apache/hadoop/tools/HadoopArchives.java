@@ -63,6 +63,7 @@ import org.apache.hadoop.mapreduce.Cluster;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobSubmissionFiles;
+import org.apache.hadoop.mapreduce.lib.jobdata.WritableJobData;
 import org.apache.hadoop.security.UnixUserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Tool;
@@ -441,8 +442,8 @@ public class HadoopArchives implements Tool {
     conf.setOutputFormat(NullOutputFormat.class);
     conf.setMapperClass(HArchivesMapper.class);
     conf.setReducerClass(HArchivesReducer.class);
-    conf.setMapOutputKeyClass(IntWritable.class);
-    conf.setMapOutputValueClass(Text.class);
+    WritableJobData.setMapOutputKeyClass(conf, IntWritable.class);
+    WritableJobData.setMapOutputValueClass(conf, Text.class);
     conf.set(JobContext.HISTORY_LOCATION, "none");
     FileInputFormat.addInputPath(conf, jobDirectory);
     //make sure no speculative execution is done
