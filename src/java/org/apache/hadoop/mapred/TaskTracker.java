@@ -90,7 +90,6 @@ import org.apache.hadoop.net.DNS;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UnixUserGroupInformation;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.ConfiguredPolicy;
 import org.apache.hadoop.security.authorize.PolicyProvider;
 import org.apache.hadoop.security.authorize.ServiceAuthorizationManager;
@@ -566,10 +565,11 @@ public class TaskTracker
        fConf.get(TT_DNS_NAMESERVER,"default"));
     }
  
-    //check local disk and start async disk service
+    // Check local disk, start async disk service, and clean up all 
+    // local directories.
     checkLocalDirs(this.fConf.getLocalDirs());
-    asyncDiskService = new MRAsyncDiskService(FileSystem.getLocal(fConf), fConf.getLocalDirs());
-    asyncDiskService.moveAndDeleteFromEachVolume(SUBDIR);
+    asyncDiskService = new MRAsyncDiskService(fConf);
+    asyncDiskService.cleanupAllVolumes();
 
     // Clear out state tables
     this.tasks.clear();
@@ -640,12 +640,14 @@ public class TaskTracker
     taskController = (TaskController) ReflectionUtils.newInstance(
         taskControllerClass, fConf);
 
+
     // setup and create jobcache directory with appropriate permissions
     taskController.setup();
 
     // Initialize DistributedCache
-    this.distributedCacheManager = new TrackerDistributedCacheManager(
-        this.fConf, taskController);
+    this.distributedCacheManager = 
+        new TrackerDistributedCacheManager(this.fConf, taskController,
+        asyncDiskService);
 
     this.jobClient = (InterTrackerProtocol) 
       RPC.waitForProxy(InterTrackerProtocol.class,
@@ -694,10 +696,14 @@ public class TaskTracker
         t, TaskTrackerInstrumentation.class);
   }
   
-  /** 
-   * Removes all contents of temporary storage.  Called upon 
+  /**
+   * Removes all contents of temporary storage.  Called upon
    * startup, to remove any leftovers from previous run.
+   * 
+   * Use MRAsyncDiskService.moveAndDeleteAllVolumes instead.
+   * @see org.apache.hadoop.mapreduce.util.MRAsyncDiskService#cleanupAllVolumes()
    */
+  @Deprecated
   public void cleanupStorage() throws IOException {
     this.fConf.deleteLocalFiles();
   }
@@ -1092,9 +1098,23 @@ public class TaskTracker
 
     this.running = false;
 
-    // Clear local storage
-    cleanupStorage();
-        
+    if (asyncDiskService != null) {
+      // Clear local storage
+      asyncDiskService.cleanupAllVolumes();
+      
+      // Shutdown all async deletion threads with up to 10 seconds of delay
+      asyncDiskService.shutdown();
+      try {
+        if (!asyncDiskService.awaitTermination(10000)) {
+          asyncDiskService.shutdownNow();
+          asyncDiskService = null;
+        }
+      } catch (InterruptedException e) {
+        asyncDiskService.shutdownNow();
+        asyncDiskService = null;
+      }
+    }
+    
     // Shutdown the fetcher thread
     this.mapEventsFetcher.interrupt();
     

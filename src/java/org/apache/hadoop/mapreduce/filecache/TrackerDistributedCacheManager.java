@@ -35,6 +35,7 @@ import org.apache.hadoop.mapred.TaskController;
 import org.apache.hadoop.mapred.TaskController.DistributedCacheFileContext;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
+import org.apache.hadoop.mapreduce.util.MRAsyncDiskService;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
@@ -77,12 +78,26 @@ public class TrackerDistributedCacheManager {
   
   private Random random = new Random();
 
+  private MRAsyncDiskService asyncDiskService;
+  
   public TrackerDistributedCacheManager(Configuration conf,
       TaskController taskController) throws IOException {
     this.localFs = FileSystem.getLocal(conf);
     this.trackerConf = conf;
     this.lDirAllocator = new LocalDirAllocator(TTConfig.LOCAL_DIR);
     this.taskController = taskController;
+  }
+
+  /**
+   * Creates a TrackerDistributedCacheManager with a MRAsyncDiskService.
+   * @param asyncDiskService Provides a set of ThreadPools for async disk 
+   *                         operations.  
+   */
+  public TrackerDistributedCacheManager(Configuration conf,
+      TaskController taskController, MRAsyncDiskService asyncDiskService)
+      throws IOException {
+    this(conf, taskController);
+    this.asyncDiskService = asyncDiskService;
   }
 
   /**
@@ -252,8 +267,8 @@ public class TrackerDistributedCacheManager {
     // do the deletion, after releasing the global lock
     for (CacheStatus lcacheStatus : deleteSet) {
       synchronized (lcacheStatus) {
-        FileSystem.getLocal(conf).delete(lcacheStatus.localizedLoadPath, true);
-        LOG.info("Deleted path " + lcacheStatus.localizedLoadPath);
+        deleteLocalPath(asyncDiskService,
+            FileSystem.getLocal(conf), lcacheStatus.localizedLoadPath);
         // decrement the size of the cache from baseDirSize
         synchronized (baseDirSize) {
           Long dirSize = baseDirSize.get(lcacheStatus.localizedBaseDir);
@@ -269,6 +284,30 @@ public class TrackerDistributedCacheManager {
     }
   }
 
+  /**
+   * Delete a local path with asyncDiskService if available,
+   * or otherwise synchronously with local file system.
+   */
+  private static void deleteLocalPath(MRAsyncDiskService asyncDiskService,
+      LocalFileSystem fs, Path path) throws IOException {
+    boolean deleted = false;
+    if (asyncDiskService != null) {
+      // Try to delete using asyncDiskService
+      String localPathToDelete = 
+        path.toUri().getPath();
+      deleted = asyncDiskService.moveAndDeleteAbsolutePath(localPathToDelete);
+      if (!deleted) {
+        LOG.warn("Cannot find DistributedCache path " + localPathToDelete
+            + " on any of the asyncDiskService volumes!");
+      }
+    }
+    if (!deleted) {
+      // If no asyncDiskService, we will delete the files synchronously
+      fs.delete(path, true);
+    }
+    LOG.info("Deleted path " + path);
+  }
+  
   /*
    * Returns the relative path of the dir this cache will be localized in
    * relative path that this cache will be localized in. For
@@ -620,7 +659,7 @@ public class TrackerDistributedCacheManager {
     synchronized (cachedArchives) {
       for (Map.Entry<String,CacheStatus> f: cachedArchives.entrySet()) {
         try {
-          localFs.delete(f.getValue().localizedLoadPath, true);
+          deleteLocalPath(asyncDiskService, localFs, f.getValue().localizedLoadPath);
         } catch (IOException ie) {
           LOG.debug("Error cleaning up cache", ie);
         }

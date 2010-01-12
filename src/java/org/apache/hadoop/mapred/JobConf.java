@@ -456,6 +456,11 @@ public class JobConf extends Configuration {
     return getStrings(MRConfig.LOCAL_DIR);
   }
 
+  /**
+   * Use MRAsyncDiskService.moveAndDeleteAllVolumes instead.
+   * @see org.apache.hadoop.mapreduce.util.MRAsyncDiskService#cleanupAllVolumes()
+   */
+  @Deprecated
   public void deleteLocalFiles() throws IOException {
     String[] localDirs = getLocalDirs();
     for (int i = 0; i < localDirs.length; i++) {
