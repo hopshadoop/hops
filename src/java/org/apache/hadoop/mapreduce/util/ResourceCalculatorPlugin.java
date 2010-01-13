@@ -23,13 +23,10 @@ import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.util.ReflectionUtils;
 
 /**
- * Plugin to calculate virtual and physical memories on the system.
- * @deprecated Use
- *             {@link org.apache.hadoop.mapreduce.util.ResourceCalculatorPlugin}
- *             instead
+ * Plugin to calculate resource information on the system.
+ * 
  */
-@Deprecated
-public abstract class MemoryCalculatorPlugin extends Configured {
+public abstract class ResourceCalculatorPlugin extends Configured {
 
   /**
    * Obtain the total size of the virtual memory present in the system.
@@ -46,16 +43,60 @@ public abstract class MemoryCalculatorPlugin extends Configured {
   public abstract long getPhysicalMemorySize();
 
   /**
-   * Get the MemoryCalculatorPlugin from the class name and configure it. If
+   * Obtain the total size of the available virtual memory present
+   * in the system.
+   *
+   * @return available virtual memory size in bytes.
+   */
+  public abstract long getAvailableVirtualMemorySize();
+
+  /**
+   * Obtain the total size of the available physical memory present
+   * in the system.
+   *
+   * @return available physical memory size bytes.
+   */
+  public abstract long getAvailablePhysicalMemorySize();
+
+  /**
+   * Obtain the total number of processors present on the system.
+   *
+   * @return number of processors
+   */
+  public abstract int getNumProcessors();
+
+  /**
+   * Obtain the CPU frequency of on the system.
+   *
+   * @return CPU frequency in kHz
+   */
+  public abstract long getCpuFrequency();
+
+  /**
+   * Obtain the cumulative CPU time since the system is on.
+   *
+   * @return cumulative CPU time in milliseconds
+   */
+  public abstract long getCumulativeCpuTime();
+
+  /**
+   * Obtain the CPU usage % of the machine. Return -1 if it is unavailable
+   *
+   * @return CPU usage in %
+   */
+  public abstract float getCpuUsage();
+
+  /**
+   * Get the ResourceCalculatorPlugin from the class name and configure it. If
    * class name is null, this method will try and return a memory calculator
    * plugin available for this system.
    * 
    * @param clazz class-name
    * @param conf configure the plugin with this.
-   * @return MemoryCalculatorPlugin
+   * @return ResourceCalculatorPlugin
    */
-  public static MemoryCalculatorPlugin getMemoryCalculatorPlugin(
-      Class<? extends MemoryCalculatorPlugin> clazz, Configuration conf) {
+  public static ResourceCalculatorPlugin getResourceCalculatorPlugin(
+      Class<? extends ResourceCalculatorPlugin> clazz, Configuration conf) {
 
     if (clazz != null) {
       return ReflectionUtils.newInstance(clazz, conf);
@@ -65,7 +106,7 @@ public abstract class MemoryCalculatorPlugin extends Configured {
     try {
       String osName = System.getProperty("os.name");
       if (osName.startsWith("Linux")) {
-        return new LinuxMemoryCalculatorPlugin();
+        return new LinuxResourceCalculatorPlugin();
       }
     } catch (SecurityException se) {
       // Failed to get Operating System name.

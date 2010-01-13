@@ -111,6 +111,9 @@ Trunk (unreleased changes)
     asynchronously, thus reducing task initialization delays.
     (Zheng Shao via dhruba)
 
+    MAPREDUCE-1218. TaskTrackers send cpu and memory usage of
+    node to JobTracker. (Scott Chen via dhruba)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band

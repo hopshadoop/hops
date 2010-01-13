@@ -144,7 +144,9 @@ public class ConfigUtil {
     Configuration.addDeprecation("mapred.tasktracker.map.tasks.maximum", 
       new String[] {TTConfig.TT_MAP_SLOTS});
     Configuration.addDeprecation("mapred.tasktracker.memory_calculator_plugin", 
-      new String[] {TTConfig.TT_MEMORY_CALCULATOR_PLUGIN});
+      new String[] {TTConfig.TT_RESOURCE_CALCULATOR_PLUGIN});
+    Configuration.addDeprecation("mapred.tasktracker.memorycalculatorplugin", 
+      new String[] {TTConfig.TT_RESOURCE_CALCULATOR_PLUGIN});
     Configuration.addDeprecation("mapred.tasktracker.reduce.tasks.maximum", 
       new String[] {TTConfig.TT_REDUCE_SLOTS});
     Configuration.addDeprecation(
