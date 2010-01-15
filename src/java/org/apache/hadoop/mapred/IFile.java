@@ -37,7 +37,8 @@ import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.io.compress.CompressionOutputStream;
 import org.apache.hadoop.io.compress.Compressor;
 import org.apache.hadoop.io.compress.Decompressor;
-import org.apache.hadoop.io.serializer.SerializerBase;
+import org.apache.hadoop.io.serializer.SerializationFactory;
+import org.apache.hadoop.io.serializer.Serializer;
 
 /**
  * <code>IFile</code> is the simple <key-len, value-len, key, value> format
@@ -77,16 +78,18 @@ public class IFile {
 
     IFileOutputStream checksumOut;
 
-    SerializerBase<K> keySerializer;
-    SerializerBase<V> valueSerializer;
+    Class<K> keyClass;
+    Class<V> valueClass;
+    Serializer<K> keySerializer;
+    Serializer<V> valueSerializer;
     
     DataOutputBuffer buffer = new DataOutputBuffer();
 
     public Writer(Configuration conf, FileSystem fs, Path file, 
-                  boolean createSerializers,
+                  Class<K> keyClass, Class<V> valueClass,
                   CompressionCodec codec,
                   Counters.Counter writesCounter) throws IOException {
-      this(conf, fs.create(file), createSerializers, codec,
+      this(conf, fs.create(file), keyClass, valueClass, codec,
            writesCounter);
       ownOutputStream = true;
     }
@@ -96,7 +99,7 @@ public class IFile {
     }
 
     public Writer(Configuration conf, FSDataOutputStream out, 
-        boolean createSerializers,
+        Class<K> keyClass, Class<V> valueClass,
         CompressionCodec codec, Counters.Counter writesCounter)
         throws IOException {
       this.writtenRecordsCounter = writesCounter;
@@ -114,27 +117,30 @@ public class IFile {
         this.out = new FSDataOutputStream(checksumOut,null);
       }
       
+      this.keyClass = keyClass;
+      this.valueClass = valueClass;
 
-      if (createSerializers) {
-        JobConf job = new JobConf(conf);
-        this.keySerializer = job.getMapOutputKeySerializer();
-        this.valueSerializer = job.getMapOutputValueSerializer();
+      if (keyClass != null) {
+        SerializationFactory serializationFactory = 
+          new SerializationFactory(conf);
+        this.keySerializer = serializationFactory.getSerializer(keyClass);
         this.keySerializer.open(buffer);
+        this.valueSerializer = serializationFactory.getSerializer(valueClass);
         this.valueSerializer.open(buffer);
       }
     }
 
     public Writer(Configuration conf, FileSystem fs, Path file) 
     throws IOException {
-      this(conf, fs, file, false, null, null);
+      this(conf, fs, file, null, null, null, null);
     }
 
     public void close() throws IOException {
 
       // When IFile writer is created by BackupStore, we do not have
-      // serializers created. So, check before closing the
+      // Key and Value classes set. So, check before closing the
       // serializers
-      if (null != keySerializer) {
+      if (keyClass != null) {
         keySerializer.close();
         valueSerializer.close();
       }
@@ -177,6 +183,12 @@ public class IFile {
     }
 
     public void append(K key, V value) throws IOException {
+      if (key.getClass() != keyClass)
+        throw new IOException("wrong key class: "+ key.getClass()
+                              +" is not "+ keyClass);
+      if (value.getClass() != valueClass)
+        throw new IOException("wrong value class: "+ value.getClass()
+                              +" is not "+ valueClass);
 
       // Append the 'key'
       keySerializer.serialize(key);

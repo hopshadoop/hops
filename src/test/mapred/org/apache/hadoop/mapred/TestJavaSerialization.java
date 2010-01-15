@@ -104,6 +104,7 @@ public class TestJavaSerialization extends TestCase {
 
     conf.setOutputKeyClass(String.class);
     conf.setOutputValueClass(Long.class);
+    conf.setOutputKeyComparatorClass(JavaSerializationComparator.class);
 
     conf.setMapperClass(WordCountMapper.class);
     conf.setReducerClass(SumReducer.class);

@@ -25,7 +25,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.mapreduce.lib.jobdata.WritableJobData;
 
 import java.io.*;
 
@@ -67,8 +66,8 @@ public class TestNoDefaultsJobConf extends HadoopTestCase {
 
     conf.setInputFormat(TextInputFormat.class);
 
-    WritableJobData.setMapOutputKeyClass(conf, LongWritable.class);
-    WritableJobData.setMapOutputValueClass(conf, Text.class);
+    conf.setMapOutputKeyClass(LongWritable.class);
+    conf.setMapOutputValueClass(Text.class);
 
     conf.setOutputFormat(TextOutputFormat.class);
     conf.setOutputKeyClass(LongWritable.class);

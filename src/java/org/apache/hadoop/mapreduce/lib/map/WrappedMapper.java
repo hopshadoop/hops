@@ -20,14 +20,11 @@ package org.apache.hadoop.mapreduce.lib.map;
 
 import java.io.IOException;
 import java.net.URI;
-import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configuration.IntegerRanges;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.RawComparator;
-import org.apache.hadoop.io.serializer.DeserializerBase;
-import org.apache.hadoop.io.serializer.SerializerBase;
 import org.apache.hadoop.mapreduce.Counter;
 import org.apache.hadoop.mapreduce.InputFormat;
 import org.apache.hadoop.mapreduce.InputSplit;
@@ -244,45 +241,13 @@ public class WrappedMapper<KEYIN, VALUEIN, KEYOUT, VALUEOUT>
     }
 
     @Override
-    @Deprecated
     public Class<?> getOutputKeyClass() {
       return mapContext.getOutputKeyClass();
     }
 
     @Override
-    @Deprecated
     public Class<?> getOutputValueClass() {
       return mapContext.getOutputValueClass();
-    }
-
-    @Override
-    public <T> SerializerBase<T> getMapOutputKeySerializer() {
-      return mapContext.getMapOutputKeySerializer();
-    }
-
-    @Override
-    public <T> SerializerBase<T> getMapOutputValueSerializer() {
-      return mapContext.getMapOutputValueSerializer();
-    }
-
-    @Override
-    public <T> DeserializerBase<T> getMapOutputKeyDeserializer() {
-      return mapContext.getMapOutputKeyDeserializer();
-    }
-
-    @Override
-    public <T> DeserializerBase<T> getMapOutputValueDeserializer() {
-      return mapContext.getMapOutputValueDeserializer();
-    }
-
-    @Override
-    public Map<String, String> getMapOutputKeySerializationMetadata() {
-      return mapContext.getMapOutputKeySerializationMetadata();
-    }
-
-    @Override
-    public Map<String, String> getMapOutputValueSerializationMetadata() {
-      return mapContext.getMapOutputValueSerializationMetadata();
     }
 
     @Override

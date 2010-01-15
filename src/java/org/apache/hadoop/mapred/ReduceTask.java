@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
@@ -43,7 +42,6 @@ import org.apache.hadoop.io.WritableFactory;
 import org.apache.hadoop.io.SequenceFile.CompressionType;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.io.compress.DefaultCodec;
-import org.apache.hadoop.io.serializer.SerializationBase;
 import org.apache.hadoop.mapred.SortedRanges.SkipRangeIterator;
 import org.apache.hadoop.mapred.TaskTracker.TaskInProgress;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
@@ -196,11 +194,11 @@ public class ReduceTask extends Task {
           extends ValuesIterator<KEY,VALUE> {
     public ReduceValuesIterator (RawKeyValueIterator in,
                                  RawComparator<KEY> comparator, 
-                                 Map<String, String> keyMetadata,
-                                 Map<String, String> valueMetadata,
+                                 Class<KEY> keyClass,
+                                 Class<VALUE> valClass,
                                  Configuration conf, Progressable reporter)
       throws IOException {
-      super(in, comparator, keyMetadata, valueMetadata, conf, reporter);
+      super(in, comparator, keyClass, valClass, conf, reporter);
     }
 
     @Override
@@ -226,19 +224,18 @@ public class ReduceTask extends Task {
      private Counters.Counter skipGroupCounter;
      private Counters.Counter skipRecCounter;
      private long grpIndex = -1;
-     private Map<String, String> keyMetadata;
-     private Map<String, String> valueMetadata;
+     private Class<KEY> keyClass;
+     private Class<VALUE> valClass;
      private SequenceFile.Writer skipWriter;
      private boolean toWriteSkipRecs;
      private boolean hasNext;
      private TaskReporter reporter;
      
      public SkippingReduceValuesIterator(RawKeyValueIterator in,
-         RawComparator<KEY> comparator,
-         Map<String, String> keyMetadata, Map<String, String> valueMetadata,
-         Configuration conf, TaskReporter reporter,
+         RawComparator<KEY> comparator, Class<KEY> keyClass,
+         Class<VALUE> valClass, Configuration conf, TaskReporter reporter,
          TaskUmbilicalProtocol umbilical) throws IOException {
-       super(in, comparator, keyMetadata, valueMetadata, conf, reporter);
+       super(in, comparator, keyClass, valClass, conf, reporter);
        this.umbilical = umbilical;
        this.skipGroupCounter = 
          reporter.getCounter(TaskCounter.REDUCE_SKIPPED_GROUPS);
@@ -246,8 +243,8 @@ public class ReduceTask extends Task {
          reporter.getCounter(TaskCounter.REDUCE_SKIPPED_RECORDS);
        this.toWriteSkipRecs = toWriteSkipRecs() &&  
          SkipBadRecords.getSkipOutputPath(conf)!=null;
-       this.keyMetadata = keyMetadata;
-       this.valueMetadata = valueMetadata;
+       this.keyClass = keyClass;
+       this.valClass = valClass;
        this.reporter = reporter;
        skipIt = getSkipRanges().skipRangeIterator();
        mayBeSkip();
@@ -293,39 +290,15 @@ public class ReduceTask extends Task {
        skipRecCounter.increment(skipRec);
        reportNextRecordRange(umbilical, grpIndex);
      }
-
-     private Class<?> getClassFromMetadata(Map<String, String> metadata)
-         throws IOException {
-       String classname = metadata.get(SerializationBase.CLASS_KEY);
-       if (classname == null) {
-         throw new IOException(
-             "No key class name specified; Record-skipping requires the use of "
-             + "Writable serialization");
-       }
-       try {
-         return conf.getClassByName(classname);
-       } catch (ClassNotFoundException e) {
-         throw new IOException(e);
-       }
-     }
-
+     
      @SuppressWarnings("unchecked")
      private void writeSkippedRec(KEY key, VALUE value) throws IOException{
        if(skipWriter==null) {
-         // Skipped record writing is currently done with SequenceFiles
-         // which are based on Writable serialization. This can only
-         // be done with Writable key and value types. Extract the
-         // key and value class names from the metadata. If this can't
-         // be done, then throw an IOException.
-         Class<?> keyClass = getClassFromMetadata(keyMetadata);
-         Class<?> valClass = getClassFromMetadata(valueMetadata);
-
-         // Now actually open the skipWriter.
          Path skipDir = SkipBadRecords.getSkipOutputPath(conf);
          Path skipFile = new Path(skipDir, getTaskID().toString());
          skipWriter = SequenceFile.createWriter(
                skipFile.getFileSystem(conf), conf, skipFile,
-               keyClass, valClass,
+               keyClass, valClass, 
                CompressionType.BLOCK, reporter);
        }
        skipWriter.append(key, value);
@@ -385,8 +358,8 @@ public class ReduceTask extends Task {
       rIter = shuffle.run();
     } else {
       final FileSystem rfs = FileSystem.getLocal(job).getRaw();
-      rIter = Merger.merge(job, rfs,
-                           codec,
+      rIter = Merger.merge(job, rfs, job.getMapOutputKeyClass(),
+                           job.getMapOutputValueClass(), codec, 
                            getMapFiles(rfs, true),
                            !conf.getKeepFailedTaskFiles(), 
                            job.getInt(JobContext.IO_SORT_FACTOR, 100),
@@ -400,18 +373,16 @@ public class ReduceTask extends Task {
     sortPhase.complete();                         // sort is complete
     setPhase(TaskStatus.Phase.REDUCE); 
     statusUpdate(umbilical);
-    Map<String, String> keyMetadata =
-        job.getMapOutputKeySerializationMetadata();
-    Map<String, String> valueMetadata =
-        job.getMapOutputValueSerializationMetadata();
+    Class keyClass = job.getMapOutputKeyClass();
+    Class valueClass = job.getMapOutputValueClass();
     RawComparator comparator = job.getOutputValueGroupingComparator();
 
     if (useNewApi) {
-      runNewReducer(job, umbilical, reporter, rIter, comparator,
-                    keyMetadata, valueMetadata);
+      runNewReducer(job, umbilical, reporter, rIter, comparator, 
+                    keyClass, valueClass);
     } else {
-      runOldReducer(job, umbilical, reporter, rIter, comparator,
-                    keyMetadata, valueMetadata);
+      runOldReducer(job, umbilical, reporter, rIter, comparator, 
+                    keyClass, valueClass);
     }
     done(umbilical, reporter);
   }
@@ -423,8 +394,8 @@ public class ReduceTask extends Task {
                      final TaskReporter reporter,
                      RawKeyValueIterator rIter,
                      RawComparator<INKEY> comparator,
-                     Map<String, String> keyMetadata,
-                     Map<String, String> valueMetadata) throws IOException {
+                     Class<INKEY> keyClass,
+                     Class<INVALUE> valueClass) throws IOException {
     Reducer<INKEY,INVALUE,OUTKEY,OUTVALUE> reducer = 
       ReflectionUtils.newInstance(job.getReducerClass(), job);
     // make output collector
@@ -454,10 +425,10 @@ public class ReduceTask extends Task {
       
       ReduceValuesIterator<INKEY,INVALUE> values = isSkipping() ? 
           new SkippingReduceValuesIterator<INKEY,INVALUE>(rIter, 
-              comparator, keyMetadata, valueMetadata,
+              comparator, keyClass, valueClass, 
               job, reporter, umbilical) :
           new ReduceValuesIterator<INKEY,INVALUE>(rIter, 
-          job.getOutputValueGroupingComparator(), keyMetadata, valueMetadata,
+          job.getOutputValueGroupingComparator(), keyClass, valueClass, 
           job, reporter);
       values.informReduceProgress();
       while (values.more()) {
@@ -519,8 +490,8 @@ public class ReduceTask extends Task {
                      final TaskReporter reporter,
                      RawKeyValueIterator rIter,
                      RawComparator<INKEY> comparator,
-                     Map<String, String> keyMetadata,
-                     Map<String, String> valueMetadata
+                     Class<INKEY> keyClass,
+                     Class<INVALUE> valueClass
                      ) throws IOException,InterruptedException, 
                               ClassNotFoundException {
     // wrap value iterator to report progress.
@@ -564,8 +535,8 @@ public class ReduceTask extends Task {
                                                reduceInputValueCounter, 
                                                trackedRW,
                                                committer,
-                                               reporter, comparator,
-                                               keyMetadata, valueMetadata);
+                                               reporter, comparator, keyClass,
+                                               valueClass);
     reducer.run(reducerContext);
     output.close(reducerContext);
   }

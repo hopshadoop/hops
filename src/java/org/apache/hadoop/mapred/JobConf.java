@@ -24,8 +24,6 @@ import java.io.IOException;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.regex.Pattern;
 
 import org.apache.commons.logging.Log;
@@ -38,11 +36,6 @@ import org.apache.hadoop.conf.Configuration;
 
 import org.apache.hadoop.io.*;
 import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.hadoop.io.serializer.DeserializerBase;
-import org.apache.hadoop.io.serializer.SerializationBase;
-import org.apache.hadoop.io.serializer.SerializationFactory;
-import org.apache.hadoop.io.serializer.SerializerBase;
-import org.apache.hadoop.io.serializer.WritableSerialization;
 
 import org.apache.hadoop.mapred.lib.IdentityMapper;
 import org.apache.hadoop.mapred.lib.IdentityReducer;
@@ -50,7 +43,6 @@ import org.apache.hadoop.mapred.lib.HashPartitioner;
 import org.apache.hadoop.mapred.lib.KeyFieldBasedComparator;
 import org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner;
 import org.apache.hadoop.mapreduce.MRConfig;
-import org.apache.hadoop.mapreduce.lib.jobdata.ClassBasedJobData;
 import org.apache.hadoop.mapreduce.util.ConfigUtil;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Tool;
@@ -718,111 +710,6 @@ public class JobConf extends Configuration {
   }
   
   /**
-   * Get the metadata used by the serialization framework to instantiate
-   * (de)serializers for key data emitted by mappers.
-   *
-   * @return the metadata used by the serialization framework for the mapper
-   * output key.
-   */
-  public Map<String, String> getMapOutputKeySerializationMetadata() {
-    Map<String, String> metadata = null;
-    if (getBoolean(JobContext.MAP_OUTPUT_KEY_METADATA_SET, false)) {
-      metadata = getMap(JobContext.MAP_OUTPUT_KEY_METADATA);
-    } else {
-      // Wasn't set via the new metadata map. Maybe it was set by the deprecated
-      // class name?
-      metadata = new HashMap<String, String>();
-      String deprecatedKeyClassName = get(JobContext.MAP_OUTPUT_KEY_CLASS);
-      if (null != deprecatedKeyClassName) {
-        // Yes, it was.
-        metadata.put(WritableSerialization.CLASS_KEY, deprecatedKeyClassName);
-      } else {
-        // Intermediate (k, v) types weren't explicitly set. Build a metadata
-        // map based on the final (k, v) types.
-        metadata.put(WritableSerialization.CLASS_KEY,
-            getOutputKeyClass().getName());
-      }
-    }
-
-    return metadata;
-  }
-
-  /**
-   * Get the metadata used by the serialization framework to instantiate
-   * (de)serializers for value data emitted by mappers.
-   *
-   * @return the metadata used by the serialization framework for the mapper
-   * output value.
-   */
-  public Map<String, String> getMapOutputValueSerializationMetadata() {
-    Map<String, String> metadata = null;
-    if (getBoolean(JobContext.MAP_OUTPUT_VALUE_METADATA_SET, false)) {
-      metadata = getMap(JobContext.MAP_OUTPUT_VALUE_METADATA);
-    } else {
-      // Wasn't set via the new metadata map. Maybe it was set by the deprecated
-      // class name?
-      metadata = new HashMap<String, String>();
-      String deprecatedValClassName = get(JobContext.MAP_OUTPUT_VALUE_CLASS);
-      if (null != deprecatedValClassName) {
-        // Yes, it was.
-        metadata.put(WritableSerialization.CLASS_KEY, deprecatedValClassName);
-      } else {
-        // Intermediate (k, v) types weren't explicitly set. Build a metadata
-        // map based on the final (k, v) types.
-        metadata.put(WritableSerialization.CLASS_KEY,
-            getOutputValueClass().getName());
-      }
-    }
-
-    return metadata;
-  }
-
-  /**
-   * Get the serializer to encode keys from the mapper.
-   *
-   * @return the {@link SerializerBase} for the mapper output keys.
-   */
-  public <T> SerializerBase<T> getMapOutputKeySerializer() {
-    Map<String, String> metadata = getMapOutputKeySerializationMetadata();
-    SerializationFactory factory = new SerializationFactory(this);
-    return factory.getSerializer(metadata);
-  }
-
-  /**
-   * Get the deserializer to decode keys from the mapper.
-   *
-   * @return the {@link DeserializerBase} for the mapper output keys.
-   */
-  public <T> DeserializerBase<T> getMapOutputKeyDeserializer() {
-    Map<String, String> metadata = getMapOutputKeySerializationMetadata();
-    SerializationFactory factory = new SerializationFactory(this);
-    return factory.getDeserializer(metadata);
-  }
-
-  /**
-   * Get the serializer to encode values from the mapper.
-   *
-   * @return the {@link SerializerBase} for the mapper output values.
-   */
-  public <T> SerializerBase<T> getMapOutputValueSerializer() {
-    Map<String, String> metadata = getMapOutputValueSerializationMetadata();
-    SerializationFactory factory = new SerializationFactory(this);
-    return factory.getSerializer(metadata);
-  }
-
-  /**
-   * Get the deserializer to decode values from the mapper.
-   *
-   * @return the {@link DeserializerBase} for the mapper output values.
-   */
-  public <T> DeserializerBase<T> getMapOutputValueDeserializer() {
-    Map<String, String> metadata = getMapOutputValueSerializationMetadata();
-    SerializationFactory factory = new SerializationFactory(this);
-    return factory.getDeserializer(metadata);
-  }
-
-  @Deprecated
-  /**
    * Get the key class for the map output data. If it is not set, use the
    * (final) output key class. This allows the map output key class to be
    * different than the final output key class.
@@ -830,10 +717,13 @@ public class JobConf extends Configuration {
    * @return the map output key class.
    */
   public Class<?> getMapOutputKeyClass() {
-    return ClassBasedJobData.getMapOutputKeyClass(this);
+    Class<?> retv = getClass(JobContext.MAP_OUTPUT_KEY_CLASS, null, Object.class);
+    if (retv == null) {
+      retv = getOutputKeyClass();
+    }
+    return retv;
   }
   
-  @Deprecated
   /**
    * Set the key class for the map output data. This allows the user to
    * specify the map output key class to be different than the final output
@@ -842,10 +732,9 @@ public class JobConf extends Configuration {
    * @param theClass the map output key class.
    */
   public void setMapOutputKeyClass(Class<?> theClass) {
-    ClassBasedJobData.setMapOutputKeyClass(this, theClass);
+    setClass(JobContext.MAP_OUTPUT_KEY_CLASS, theClass, Object.class);
   }
   
-  @Deprecated
   /**
    * Get the value class for the map output data. If it is not set, use the
    * (final) output value class This allows the map output value class to be
@@ -854,10 +743,14 @@ public class JobConf extends Configuration {
    * @return the map output value class.
    */
   public Class<?> getMapOutputValueClass() {
-    return ClassBasedJobData.getMapOutputValueClass(this);
+    Class<?> retv = getClass(JobContext.MAP_OUTPUT_VALUE_CLASS, null,
+        Object.class);
+    if (retv == null) {
+      retv = getOutputValueClass();
+    }
+    return retv;
   }
   
-  @Deprecated
   /**
    * Set the value class for the map output data. This allows the user to
    * specify the map output value class to be different than the final output
@@ -866,7 +759,7 @@ public class JobConf extends Configuration {
    * @param theClass the map output value class.
    */
   public void setMapOutputValueClass(Class<?> theClass) {
-    ClassBasedJobData.setMapOutputValueClass(this, theClass);
+    setClass(JobContext.MAP_OUTPUT_VALUE_CLASS, theClass, Object.class);
   }
   
   /**
@@ -893,16 +786,12 @@ public class JobConf extends Configuration {
    * 
    * @return the {@link RawComparator} comparator used to compare keys.
    */
-  @SuppressWarnings("unchecked")
   public RawComparator getOutputKeyComparator() {
     Class<? extends RawComparator> theClass = getClass(
       JobContext.KEY_COMPARATOR, null, RawComparator.class);
     if (theClass != null)
       return ReflectionUtils.newInstance(theClass, this);
-    SerializationFactory factory = new SerializationFactory(this);
-    Map<String, String> metadata = getMapOutputKeySerializationMetadata();
-    SerializationBase serialization = factory.getSerialization(metadata);
-    return serialization.getRawComparator(metadata);
+    return WritableComparator.get(getMapOutputKeyClass().asSubclass(WritableComparable.class));
   }
 
   /**

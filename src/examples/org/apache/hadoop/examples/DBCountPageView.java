@@ -45,7 +45,6 @@ import org.apache.hadoop.mapreduce.lib.db.DBConfiguration;
 import org.apache.hadoop.mapreduce.lib.db.DBInputFormat;
 import org.apache.hadoop.mapreduce.lib.db.DBOutputFormat;
 import org.apache.hadoop.mapreduce.lib.db.DBWritable;
-import org.apache.hadoop.mapreduce.lib.jobdata.WritableJobData;
 import org.apache.hadoop.mapreduce.lib.reduce.LongSumReducer;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Tool;
@@ -400,10 +399,8 @@ public class DBCountPageView extends Configured implements Tool {
 
     DBOutputFormat.setOutput(job, "Pageview", PageviewFieldNames);
     
-    WritableJobData.setMapOutputKeyClass(job.getConfiguration(),
-        Text.class);
-    WritableJobData.setMapOutputValueClass(job.getConfiguration(),
-        LongWritable.class);
+    job.setMapOutputKeyClass(Text.class);
+    job.setMapOutputValueClass(LongWritable.class);
 
     job.setOutputKeyClass(PageviewRecord.class);
     job.setOutputValueClass(NullWritable.class);
