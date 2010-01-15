@@ -27,11 +27,11 @@
     <dependency org="org.apache.hadoop" name="hadoop-core" 
                 rev="${hadoop-core.version}" conf="common->default"/>
     <dependency org="org.apache.hadoop" name="hadoop-core-test" 
-                rev="${hadoop-core.version}" conf="common->default"/>
+                rev="${hadoop-core.version}" conf="test->default"/>
     <dependency org="org.apache.hadoop" name="hadoop-hdfs" 
                 rev="${hadoop-hdfs.version}" conf="common->default"/>
     <dependency org="org.apache.hadoop" name="hadoop-hdfs-test"
-                rev="${hadoop-hdfs.version}" conf="common->default"/>
+                rev="${hadoop-hdfs.version}" conf="test->default"/>
     <dependency org="commons-cli" name="commons-cli" 
                 rev="${commons-cli.version}" conf="common->default"/>
     <dependency org="commons-logging" name="commons-logging" 
@@ -56,7 +56,5 @@
                 rev="${avro.version}" conf="common->default"/>
     <dependency org="org.slf4j" name="slf4j-api" 
                 rev="${slf4j-api.version}" conf="common->master"/>
-    <dependency org="org.slf4j" name="slf4j-log4j12" 
-                rev="${slf4j-log4j12.version}" conf="common->master"/>
   </dependencies>
 </ivy-module>

@@ -15,6 +15,7 @@
 
     <conf name="common" visibility="private" 
       description="artifacts needed to compile/test the application"/>
+    <conf name="test" visibility="private" extends="runtime"/>
   </configurations>
 
   <publications>
@@ -25,11 +26,11 @@
     <dependency org="org.apache.hadoop" name="hadoop-core" 
                 rev="${hadoop-core.version}" conf="common->default"/>
     <dependency org="org.apache.hadoop" name="hadoop-core-test" 
-                rev="${hadoop-core.version}" conf="common->default"/>
+                rev="${hadoop-core.version}" conf="test->default"/>
     <dependency org="org.apache.hadoop" name="hadoop-hdfs" 
                 rev="${hadoop-core.version}" conf="common->default"/>
     <dependency org="org.apache.hadoop" name="hadoop-hdfs-test" 
-                rev="${hadoop-core.version}" conf="common->default"/>
+                rev="${hadoop-core.version}" conf="test->default"/>
     <dependency org="commons-logging"
       name="commons-logging"
       rev="${commons-logging.version}"
