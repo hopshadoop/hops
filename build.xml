@@ -1268,14 +1268,33 @@
       classpathref="releaseaudit-classpath"/>
   </target>
 
+  <!--<target name="releaseaudit" depends="package, rats-taskdef" description="Release Audit activities"> -->
   <target name="releaseaudit" depends="package, rats-taskdef" description="Release Audit activities">
    <rat:report xmlns:rat="antlib:org.apache.rat.anttasks">
       <fileset dir="${dist.dir}">
         <exclude name="CHANGES.txt"/>
-        <exclude name="docs/"/>
+        <exclude name="**/conf/*"/>
+        <exclude name="**/docs/"/>
+        <exclude name="**/VERSION"/>
+        <exclude name="webapps/**/WEB-INF/web.xml"/>
         <exclude name="lib/jdiff/"/>
         <exclude name="src/test/all-tests"/>
         <exclude name="src/test/commit-tests"/>
+        <exclude name="src/test/mapred/org/apache/hadoop/mapred/test.tgz"/>
+        <exclude name="src/test/tools/data/rumen/**/*"/>
+        <exclude name="src/test/mapred/org/apache/hadoop/mapred/*.txt"/>
+        <exclude name="src/contrib/sqoop/testdata/hive/scripts/*.q"/>
+        <exclude name="src/contrib/mumak/src/test/data/*.json"/>
+        <exclude name="src/contrib/index/sample/*.txt"/>
+        <exclude name="src/test/mapred/org/apache/hadoop/cli/data60bytes"/>
+        <exclude name="src/examples/org/apache/hadoop/examples/dancing/puzzle1.dta"/>
+        <exclude name="src/contrib/eclipse-plugin/META-INF/MANIFEST.MF"/>
+        <exclude name="src/c++/librecordio/*"/>
+        <exclude name="src/c++/pipes/*"/>
+        <exclude name="src/c++/utils/*"/>
+        <exclude name="src/c++/task-controller/*"/>
+        <exclude name="src/examples/pipes/*"/>
+        <exclude name="src/c++/pipes/debug/*"/>
       </fileset>
     </rat:report>
   </target>
