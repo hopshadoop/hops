@@ -1768,8 +1768,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   // and TaskInProgress
   ///////////////////////////////////////////////////////
   void createTaskEntry(TaskAttemptID taskid, String taskTracker, TaskInProgress tip) {
-    LOG.info("Adding task " + 
-      (tip.isCleanupAttempt(taskid) ? "(cleanup)" : "") + 
+    LOG.info("Adding task (" + tip.getAttemptType(taskid) + ") " + 
       "'"  + taskid + "' to tip " + 
       tip.getTIPId() + ", for tracker '" + taskTracker + "'");
 
@@ -1802,9 +1801,10 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     }
 
     // taskid --> TIP
-    taskidToTIPMap.remove(taskid);
-        
-    LOG.debug("Removing task '" + taskid + "'");
+    if (taskidToTIPMap.remove(taskid) != null) {
+      // log the task removal in case of success
+      LOG.info("Removing task '" + taskid + "'");
+    }
   }
     
   /**
@@ -1833,7 +1833,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    * @param job the completed job
    */
   void markCompletedJob(JobInProgress job) {
-    for (TaskInProgress tip : job.getSetupTasks()) {
+    for (TaskInProgress tip : job.getTasks(TaskType.JOB_SETUP)) {
       for (TaskStatus taskStatus : tip.getTaskStatuses()) {
         if (taskStatus.getRunState() != TaskStatus.State.RUNNING && 
             taskStatus.getRunState() != TaskStatus.State.COMMIT_PENDING &&
@@ -1843,7 +1843,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
         }
       }
     }
-    for (TaskInProgress tip : job.getMapTasks()) {
+    for (TaskInProgress tip : job.getTasks(TaskType.MAP)) {
       for (TaskStatus taskStatus : tip.getTaskStatuses()) {
         if (taskStatus.getRunState() != TaskStatus.State.RUNNING && 
             taskStatus.getRunState() != TaskStatus.State.COMMIT_PENDING &&
@@ -1855,7 +1855,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
         }
       }
     }
-    for (TaskInProgress tip : job.getReduceTasks()) {
+    for (TaskInProgress tip : job.getTasks(TaskType.REDUCE)) {
       for (TaskStatus taskStatus : tip.getTaskStatuses()) {
         if (taskStatus.getRunState() != TaskStatus.State.RUNNING &&
             taskStatus.getRunState() != TaskStatus.State.COMMIT_PENDING &&
@@ -1883,8 +1883,10 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     if (markedTaskSet != null) {
       for (TaskAttemptID taskid : markedTaskSet) {
         removeTaskEntry(taskid);
-        LOG.info("Removed completed task '" + taskid + "' from '" + 
-                 taskTracker + "'");
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Removed marked completed task '" + taskid + "' from '" + 
+                    taskTracker + "'");
+        }
       }
       // Clear
       trackerToMarkedTasksMap.remove(taskTracker);
@@ -1898,15 +1900,16 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    * 
    * @param job the job about to be 'retired'
    */
-  synchronized private void removeJobTasks(JobInProgress job) { 
-    for (TaskInProgress tip : job.getMapTasks()) {
-      for (TaskStatus taskStatus : tip.getTaskStatuses()) {
-        removeTaskEntry(taskStatus.getTaskID());
-      }
-    }
-    for (TaskInProgress tip : job.getReduceTasks()) {
-      for (TaskStatus taskStatus : tip.getTaskStatuses()) {
-        removeTaskEntry(taskStatus.getTaskID());
+  synchronized void removeJobTasks(JobInProgress job) { 
+    // iterate over all the task types
+    for (TaskType type : TaskType.values()) {
+      // iterate over all the tips of the type under consideration
+      for (TaskInProgress tip : job.getTasks(type)) {
+        // iterate over all the task-ids in the tip under consideration
+        for (TaskAttemptID id : tip.getAllTaskAttemptIDs()) {
+          // remove the task-id entry from the jobtracker
+          removeTaskEntry(id);
+        }
       }
     }
   }
@@ -3008,6 +3011,9 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
       }
     }
     myInstrumentation.submitJob(job.getJobConf(), jobId);
+    LOG.info("Job " + jobId + " added successfully for user '" 
+             + job.getJobConf().getUser() + "' to queue '" 
+             + job.getJobConf().getQueueName() + "'");
     return job.getStatus();
   }
 

@@ -1127,3 +1127,6 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-1342. Fixed deadlock in global blacklisting of tasktrackers.
     (Amareshwari Sriramadasu via acmurthy)
 
+    MAPREDUCE-1316. Fixes a memory leak of TaskInProgress instances in
+    the jobtracker. (Amar Kamat via yhemanth)
+

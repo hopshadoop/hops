@@ -645,6 +645,9 @@ public class JobInProgress {
     
     jobHistory.logEvent(jie, jobId);
    
+    // Log the number of map and reduce tasks
+    LOG.info("Job " + jobId + " initialized successfully with " + numMapTasks 
+             + " map tasks and " + numReduceTasks + " reduce tasks.");
   }
 
   // Returns true if the job is empty (0 maps, 0 reduces and no setup-cleanup)
@@ -731,6 +734,7 @@ public class JobInProgress {
   
   synchronized void initSetupCleanupTasks(String jobFile) {
     if (!jobSetupCleanupNeeded) {
+      LOG.info("Setup/Cleanup not needed for job " + jobId);
       // nothing to initialize
       return;
     }
@@ -879,36 +883,42 @@ public class JobInProgress {
     return launchedSetup;
   }
 
-  /**
-   * Get the list of map tasks
-   * @return the raw array of maps for this job
+  /** 
+   * Get all the tasks of the desired type in this job.
+   * @param type {@link TaskType} of the tasks required
+   * @return An array of {@link TaskInProgress} matching the given type. 
+   *         Returns an empty array if no tasks are found for the given type.  
    */
-  TaskInProgress[] getMapTasks() {
-    return maps;
-  }
-    
-  /**
-   * Get the list of cleanup tasks
-   * @return the array of cleanup tasks for the job
-   */
-  TaskInProgress[] getCleanupTasks() {
-    return cleanup;
-  }
-  
-  /**
-   * Get the list of setup tasks
-   * @return the array of setup tasks for the job
-   */
-  TaskInProgress[] getSetupTasks() {
-    return setup;
-  }
-  
-  /**
-   * Get the list of reduce tasks
-   * @return the raw array of reduce tasks for this job
-   */
-  TaskInProgress[] getReduceTasks() {
-    return reduces;
+  TaskInProgress[] getTasks(TaskType type) {
+    TaskInProgress[] tasks = null;
+    switch (type) {
+      case MAP:
+      {
+        tasks = maps;
+      }
+      break;
+      case REDUCE:
+      {
+        tasks = reduces;
+      }
+      break;
+      case JOB_SETUP: 
+      {
+        tasks = setup;
+      }
+      break;
+      case JOB_CLEANUP:
+      {
+        tasks = cleanup;
+      }
+      break;
+      default:
+      {
+          tasks = new TaskInProgress[0];
+      }
+      break;
+    }
+    return tasks;
   }
 
   /**
@@ -3458,11 +3468,11 @@ public class JobInProgress {
                "submitTime" + EQUALS + job.getStartTime() + StringUtils.COMMA +
                "launchTime" + EQUALS + job.getLaunchTime() + StringUtils.COMMA +
                "finishTime" + EQUALS + job.getFinishTime() + StringUtils.COMMA +
-               "numMaps" + EQUALS + job.getMapTasks().length + 
+               "numMaps" + EQUALS + job.getTasks(TaskType.MAP).length + 
                            StringUtils.COMMA +
                "numSlotsPerMap" + EQUALS + job.getNumSlotsPerMap() + 
                                   StringUtils.COMMA +
-               "numReduces" + EQUALS + job.getReduceTasks().length + 
+               "numReduces" + EQUALS + job.getTasks(TaskType.REDUCE).length + 
                               StringUtils.COMMA +
                "numSlotsPerReduce" + EQUALS + job.getNumSlotsPerReduce() + 
                                      StringUtils.COMMA +

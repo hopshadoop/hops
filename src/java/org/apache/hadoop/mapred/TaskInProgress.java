@@ -21,6 +21,7 @@ package org.apache.hadoop.mapred;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -318,6 +319,32 @@ class TaskInProgress {
     return splitInfo != null;
   }
     
+  /**
+   * Returns the {@link TaskType} of the {@link TaskAttemptID} passed. 
+   * The type of an attempt is determined by the nature of the task and not its 
+   * id. 
+   * For example,
+   * - Attempt 'attempt_123_01_m_01_0' might be a job-setup task even though it 
+   *   has a _m_ in its id. Hence the task type of this attempt is JOB_SETUP 
+   *   instead of MAP.
+   * - Similarly reduce attempt 'attempt_123_01_r_01_0' might have failed and is
+   *   now supposed to do the task-level cleanup. In such a case this attempt 
+   *   will be of type TASK_CLEANUP instead of REDUCE.
+   */
+  TaskType getAttemptType (TaskAttemptID id) {
+    if (isCleanupAttempt(id)) {
+      return TaskType.TASK_CLEANUP;
+    } else if (isJobSetupTask()) {
+      return TaskType.JOB_SETUP;
+    } else if (isJobCleanupTask()) {
+      return TaskType.JOB_CLEANUP;
+    } else if (isMapTask()) {
+      return TaskType.MAP;
+    } else {
+      return TaskType.REDUCE;
+    }
+  }
+  
   /**
    * Is the Task associated with taskid is the first attempt of the tip? 
    * @param taskId
@@ -819,6 +846,13 @@ class TaskInProgress {
     return taskStatuses.values().toArray(new TaskStatus[taskStatuses.size()]);
   }
 
+  /**
+   * Get all the {@link TaskAttemptID}s in this {@link TaskInProgress}
+   */
+  TaskAttemptID[] getAllTaskAttemptIDs() {
+    return tasks.toArray(new TaskAttemptID[tasks.size()]);
+  }
+  
   /**
    * Get the status of the specified task
    * @param taskid
