@@ -230,6 +230,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1212. Mapreduce contrib project ivy dependencies are not included
     in binary target. (Aaron Kimball via tomwhite)
 
+    MAPREDUCE-1359. TypedBytes TestIO doesn't mkdir its test dir first.
+    (Anatoli Fomenko via cos)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
