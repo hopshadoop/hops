@@ -22,11 +22,9 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.net.BindException;
 import java.net.InetSocketAddress;
-import java.net.URLEncoder;
 import java.net.UnknownHostException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -77,10 +75,14 @@ import org.apache.hadoop.mapreduce.ClusterMetrics;
 import org.apache.hadoop.mapreduce.QueueInfo;
 import org.apache.hadoop.mapreduce.TaskTrackerInfo;
 import org.apache.hadoop.mapreduce.TaskType;
-import org.apache.hadoop.mapreduce.protocol.ClientProtocol;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistory;
+import org.apache.hadoop.mapreduce.protocol.ClientProtocol;
+import org.apache.hadoop.mapreduce.security.TokenStorage;
 import org.apache.hadoop.mapreduce.security.token.JobTokenSecretManager;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.mapreduce.server.jobtracker.TaskTracker;
+import org.apache.hadoop.mapreduce.util.ConfigUtil;
+import org.apache.hadoop.mapreduce.util.MRAsyncDiskService;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.NetworkTopology;
@@ -102,9 +104,6 @@ import org.apache.hadoop.util.HostsFileReader;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.VersionInfo;
-import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
-import org.apache.hadoop.mapreduce.util.MRAsyncDiskService;
-import org.apache.hadoop.mapreduce.util.ConfigUtil;
 
 /*******************************************************
  * JobTracker is the central location for submitting and 
@@ -1137,7 +1136,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
               token.getUser().toString(), 
               new String[]{UnixUserGroupInformation.DEFAULT_GROUP});
           submitJob(token.getJobID(), restartCount, 
-              ugi, token.getJobSubmitDir().toString(), true);
+              ugi, token.getJobSubmitDir().toString(), true, null);
           recovered++;
         } catch (Exception e) {
           LOG.warn("Could not recover job " + jobId, e);
@@ -2911,8 +2910,9 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    * the JobTracker alone.
    */
   public synchronized org.apache.hadoop.mapreduce.JobStatus submitJob(
-    org.apache.hadoop.mapreduce.JobID jobId, String jobSubmitDir) throws IOException {
-    return submitJob(JobID.downgrade(jobId), jobSubmitDir);
+    org.apache.hadoop.mapreduce.JobID jobId,String jobSubmitDir, TokenStorage ts) 
+  throws IOException {  
+    return submitJob(JobID.downgrade(jobId), jobSubmitDir, ts);
   }
   
   /**
@@ -2923,14 +2923,16 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    * of the JobTracker.  But JobInProgress adds info that's useful for
    * the JobTracker alone.
    * @deprecated Use 
-   * {@link #submitJob(org.apache.hadoop.mapreduce.JobID, String)} instead
+   * {@link #submitJob(org.apache.hadoop.mapreduce.JobID, String, TokenStorage)}
+   *  instead
    */
   @Deprecated
-  public synchronized JobStatus submitJob(JobID jobId, String jobSubmitDir) 
+  public synchronized JobStatus submitJob(
+      JobID jobId, String jobSubmitDir, TokenStorage ts) 
   throws IOException {
     return submitJob(jobId, 0, 
         UserGroupInformation.getCurrentUGI(), 
-        jobSubmitDir, false);
+        jobSubmitDir, false, ts);
   }
 
   /**
@@ -2938,7 +2940,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    */
   private synchronized JobStatus submitJob(org.apache.hadoop.mapreduce.JobID jobID, 
       int restartCount, UserGroupInformation ugi, String jobSubmitDir, 
-      boolean recovered) throws IOException {
+      boolean recovered, TokenStorage ts) throws IOException {
     JobID jobId = JobID.downgrade(jobID);
     if(jobs.containsKey(jobId)) {
       //job already running, don't start twice
@@ -2950,7 +2952,8 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     //Text.
     JobInfo jobInfo = new JobInfo(jobId, new Text(ugi.getUserName()), 
         new Path(jobSubmitDir));
-    JobInProgress job = new JobInProgress(this, this.conf, restartCount, jobInfo);
+    JobInProgress job = 
+      new JobInProgress(this, this.conf, restartCount, jobInfo, ts);
     
     String queue = job.getProfile().getQueueName();
     if(!(queueManager.getLeafQueueNames().contains(queue))) {

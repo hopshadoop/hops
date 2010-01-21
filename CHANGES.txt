@@ -22,6 +22,10 @@ Trunk (unreleased changes)
     MAPREDUCE-744. Introduces the notion of a public distributed cache.
     (Devaraj Das)
 
+    MAPREDUCE-1338. Introduces the notion of token cache using which
+    tokens and secrets can be sent by the Job client to the JobTracker.
+    (Boris Shkolnik via ddas)
+
   IMPROVEMENTS
 
     MAPREDUCE-1198. Alternatively schedule different types of tasks in

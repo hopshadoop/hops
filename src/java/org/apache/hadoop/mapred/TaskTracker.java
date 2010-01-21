@@ -76,6 +76,8 @@ import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.filecache.TrackerDistributedCacheManager;
 import org.apache.hadoop.mapreduce.security.SecureShuffleUtils;
+import org.apache.hadoop.mapreduce.security.TokenCache;
+import org.apache.hadoop.mapreduce.security.TokenStorage;
 import org.apache.hadoop.mapreduce.security.token.JobTokenIdentifier;
 import org.apache.hadoop.mapreduce.security.token.JobTokenSecretManager;
 import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
@@ -916,10 +918,8 @@ public class TaskTracker
         rjob.jobConf = localJobConf;
         rjob.keepJobFiles = ((localJobConf.getKeepTaskFilesPattern() != null) ||
                              localJobConf.getKeepFailedTaskFiles());
-        FSDataInputStream in = localFs.open(new Path(
-            rjob.jobConf.get(JobContext.JOB_TOKEN_FILE)));
-        Token<JobTokenIdentifier> jt = new Token<JobTokenIdentifier>();
-        jt.readFields(in); 
+        TokenStorage ts = TokenCache.loadTokens(rjob.jobConf);
+        Token<JobTokenIdentifier> jt = (Token<JobTokenIdentifier>)ts.getJobToken(); 
         getJobTokenSecretManager().addTokenForJob(jobId.toString(), jt);
         rjob.localized = true;
       }

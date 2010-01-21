@@ -32,6 +32,7 @@ import org.apache.hadoop.mapreduce.TaskCompletionEvent;
 import org.apache.hadoop.mapreduce.TaskReport;
 import org.apache.hadoop.mapreduce.TaskTrackerInfo;
 import org.apache.hadoop.mapreduce.TaskType;
+import org.apache.hadoop.mapreduce.security.TokenStorage;
 import org.apache.hadoop.mapreduce.server.jobtracker.State;
 
 /** 
@@ -88,9 +89,10 @@ public interface ClientProtocol extends VersionedProtocol {
    *             to ClusterMetrics as part of MAPREDUCE-1048.
    * Version 30: Job submission files are uploaded to a staging area under
    *             user home dir. JobTracker reads the required files from the
-   *             staging area using user credentials passed via the rpc.          
+   *             staging area using user credentials passed via the rpc.
+   * Version 31: Added TokenStorage to submitJob          
    */
-  public static final long versionID = 30L;
+  public static final long versionID = 31L;
 
   /**
    * Allocate a name for the job.
@@ -103,7 +105,7 @@ public interface ClientProtocol extends VersionedProtocol {
    * Submit a Job for execution.  Returns the latest profile for
    * that job.
    */
-  public JobStatus submitJob(JobID jobId, String jobSubmitDir) 
+  public JobStatus submitJob(JobID jobId, String jobSubmitDir, TokenStorage ts) 
   throws IOException, InterruptedException;
 
   /**

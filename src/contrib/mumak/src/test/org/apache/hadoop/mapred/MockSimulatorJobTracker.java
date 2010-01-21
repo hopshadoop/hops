@@ -35,6 +35,7 @@ import org.apache.hadoop.mapreduce.JobPriority;
 import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.QueueAclsInfo;
 import org.apache.hadoop.mapreduce.QueueInfo;
+import org.apache.hadoop.mapreduce.security.TokenStorage;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskReport;
 import org.apache.hadoop.mapreduce.TaskTrackerInfo;
@@ -77,7 +78,8 @@ public class MockSimulatorJobTracker implements InterTrackerProtocol,
   }
 
   @Override
-  public JobStatus submitJob(JobID jobId, String jobSubmitDir) throws IOException {
+  public JobStatus submitJob(
+      JobID jobId, String jobSubmitDir, TokenStorage ts) throws IOException {
     JobStatus status = new JobStatus(jobId, 0.0f, 0.0f, 0.0f, 0.0f,
         JobStatus.State.RUNNING, JobPriority.NORMAL, "", "", "", "");
     return status;

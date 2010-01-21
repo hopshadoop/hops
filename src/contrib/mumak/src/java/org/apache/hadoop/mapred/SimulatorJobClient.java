@@ -349,6 +349,6 @@ public class SimulatorJobClient implements SimulatorEventListener {
     }
     
     SimulatorJobCache.put(org.apache.hadoop.mapred.JobID.downgrade(jobId), job);
-    return jobTracker.submitJob(jobId, "dummy-path");
+    return jobTracker.submitJob(jobId, "dummy-path", null);
   }
 }

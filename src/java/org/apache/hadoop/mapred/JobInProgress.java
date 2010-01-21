@@ -37,9 +37,9 @@ import java.util.TreeMap;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
@@ -64,8 +64,9 @@ import org.apache.hadoop.mapreduce.jobhistory.TaskAttemptUnsuccessfulCompletionE
 import org.apache.hadoop.mapreduce.jobhistory.TaskFailedEvent;
 import org.apache.hadoop.mapreduce.jobhistory.TaskFinishedEvent;
 import org.apache.hadoop.mapreduce.jobhistory.TaskStartedEvent;
-import org.apache.hadoop.mapreduce.security.token.JobTokenIdentifier;
 import org.apache.hadoop.mapreduce.security.SecureShuffleUtils;
+import org.apache.hadoop.mapreduce.security.TokenStorage;
+import org.apache.hadoop.mapreduce.security.token.JobTokenIdentifier;
 import org.apache.hadoop.mapreduce.server.jobtracker.TaskTracker;
 import org.apache.hadoop.mapreduce.split.JobSplit;
 import org.apache.hadoop.mapreduce.split.SplitMetaInfoReader;
@@ -76,10 +77,9 @@ import org.apache.hadoop.metrics.MetricsUtil;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.NetworkTopology;
 import org.apache.hadoop.net.Node;
-import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.UnixUserGroupInformation;
+import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.fs.FSDataOutputStream;
 
 /*************************************************************
  * JobInProgress maintains all the info for keeping
@@ -145,6 +145,8 @@ public class JobInProgress {
 
   JobPriority priority = JobPriority.NORMAL;
   protected JobTracker jobtracker;
+  
+  protected TokenStorage tokenStorage;
   
   JobHistory jobHistory;
 
@@ -347,6 +349,7 @@ public class JobInProgress {
     if (tracker != null) { // Some mock tests have null tracker
       this.jobHistory = tracker.getJobHistory();
     }
+    this.tokenStorage = null;
   }
   
   JobInProgress() {
@@ -360,7 +363,7 @@ public class JobInProgress {
    */
   public JobInProgress(JobTracker jobtracker, 
                        JobConf default_conf, int rCount,
-                       JobInfo jobInfo) throws IOException {
+                       JobInfo jobInfo, TokenStorage ts) throws IOException {
     this.restartCount = rCount;
     this.jobId = JobID.downgrade(jobInfo.getJobID());
     String url = "http://" + jobtracker.getJobTrackerMachine() + ":" 
@@ -442,6 +445,7 @@ public class JobInProgress {
         JobContext.SPECULATIVECAP,0.1f);
     this.slowNodeThreshold = conf.getFloat(
         JobContext.SPECULATIVE_SLOWNODE_THRESHOLD,1.0f);
+    this.tokenStorage = ts;
 
   }
 
@@ -594,7 +598,7 @@ public class JobInProgress {
     //
     // generate security keys needed by Tasks
     //
-    generateJobToken();
+    generateAndStoreTokens();
     
     //
     // read input splits and create a map per a split
@@ -3538,20 +3542,30 @@ public class JobInProgress {
    * generate job token and save it into the file
    * @throws IOException
    */
-  private void generateJobToken() throws IOException{
+  private void generateAndStoreTokens() throws IOException{
     Path jobDir = jobtracker.getSystemDirectoryForJob(jobId);
     Path keysFile = new Path(jobDir, SecureShuffleUtils.JOB_TOKEN_FILENAME);
     // we need to create this file using the jobtracker's filesystem
     FSDataOutputStream os = jobtracker.getFileSystem().create(keysFile);
+    
     //create JobToken file and write token to it
     JobTokenIdentifier identifier = new JobTokenIdentifier(new Text(jobId
         .toString()));
     Token<JobTokenIdentifier> token = new Token<JobTokenIdentifier>(identifier,
         jobtracker.getJobTokenSecretManager());
     token.setService(identifier.getJobId());
-    token.write(os);
+    
+    // add this token to the tokenStorage
+    if(tokenStorage == null)
+      tokenStorage = new TokenStorage();
+    
+    tokenStorage.setJobToken(token);
+    
+    // write TokenStorage out
+    tokenStorage.write(os);
     os.close();
-    LOG.debug("jobToken generated and stored in "+ keysFile.toUri().getPath());
+    LOG.info("jobToken generated and stored with users keys in "
+        + keysFile.toUri().getPath());
   }
 
 }

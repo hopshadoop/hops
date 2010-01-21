@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.mapreduce;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.URI;
@@ -25,6 +26,7 @@ import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -38,8 +40,11 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapreduce.filecache.DistributedCache;
 import org.apache.hadoop.mapreduce.filecache.TrackerDistributedCacheManager;
 import org.apache.hadoop.mapreduce.protocol.ClientProtocol;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.security.TokenStorage;
 import org.apache.hadoop.mapreduce.split.JobSplitWriter;
 import org.apache.hadoop.util.ReflectionUtils;
+import org.codehaus.jackson.map.ObjectMapper;
 
 class JobSubmitter {
   protected static final Log LOG = LogFactory.getLog(JobSubmitter.class);
@@ -296,6 +301,7 @@ class JobSubmitter {
    * @throws InterruptedException
    * @throws IOException
    */
+  @SuppressWarnings("unchecked")
   JobStatus submitJobInternal(Job job, Cluster cluster) 
   throws ClassNotFoundException, InterruptedException, IOException {
     /*
@@ -319,6 +325,24 @@ class JobSubmitter {
       Path submitJobFile = JobSubmissionFiles.getJobConfPath(submitJobDir);
 
       checkSpecs(job);
+      
+      // create TokenStorage object with user secretKeys
+      String tokensFileName = conf.get("tokenCacheFile");
+      TokenStorage tokenStorage = null;
+      if(tokensFileName != null) {
+        LOG.info("loading secret keys from " + tokensFileName);
+        String localFileName = new Path(tokensFileName).toUri().getPath();
+        tokenStorage = new TokenStorage();
+        // read JSON
+        ObjectMapper mapper = new ObjectMapper();
+        Map<String, String> nm = 
+          mapper.readValue(new File(localFileName), Map.class);
+        
+        for(Map.Entry<String, String> ent: nm.entrySet()) {
+          LOG.debug("adding secret key alias="+ent.getKey());
+          tokenStorage.addSecretKey(new Text(ent.getKey()), ent.getValue().getBytes());
+        }
+      }
 
       // Create the splits for the job
       LOG.debug("Creating splits at " + jtFs.makeQualified(submitJobDir));
@@ -331,7 +355,7 @@ class JobSubmitter {
       //
       // Now, actually submit the job (using the submit name)
       //
-      status = submitClient.submitJob(jobId, submitJobDir.toString());
+      status = submitClient.submitJob(jobId, submitJobDir.toString(), tokenStorage);
       if (status != null) {
         return status;
       } else {

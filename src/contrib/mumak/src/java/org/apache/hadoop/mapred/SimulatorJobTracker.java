@@ -35,10 +35,11 @@ import org.apache.hadoop.tools.rumen.JobStory;
 import org.apache.hadoop.tools.rumen.TaskAttemptInfo;
 import org.apache.hadoop.mapred.SimulatorJobInProgress;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.mapreduce.security.TokenStorage;
 
 /**
  * {@link SimulatorJobTracker} extends {@link JobTracker}. It implements the
- * {@link JobSubmissionProtocol} and the {@link InterTrackerProtocol} protocols.
+ * {@link InterTrackerProtocol} protocols.
  */
 @SuppressWarnings("deprecation")
 public class SimulatorJobTracker extends JobTracker {
@@ -173,7 +174,8 @@ public class SimulatorJobTracker extends JobTracker {
   }
 
   @Override
-  public synchronized JobStatus submitJob(JobID jobId, String jobSubmitDir) 
+  public synchronized JobStatus submitJob(
+      JobID jobId, String jobSubmitDir, TokenStorage ts) 
   throws IOException {
     boolean loggingEnabled = LOG.isDebugEnabled();
     if (loggingEnabled) {
