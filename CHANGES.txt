@@ -234,6 +234,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1212. Mapreduce contrib project ivy dependencies are not included
     in binary target. (Aaron Kimball via tomwhite)
 
+    MAPREDUCE-1388. Move the HDFS RAID package from HDFS to MAPREDUCE.
+    (Eli Collins via dhruba)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
