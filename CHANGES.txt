@@ -26,6 +26,10 @@ Trunk (unreleased changes)
     tokens and secrets can be sent by the Job client to the JobTracker.
     (Boris Shkolnik via ddas)
 
+    HDFS-503. This patch implements an optional layer over HDFS that 
+    implements offline erasure-coding.  It can be used to reduce the 
+    total storage requirements of HDFS.  (dhruba)
+
   IMPROVEMENTS
 
     MAPREDUCE-1198. Alternatively schedule different types of tasks in
