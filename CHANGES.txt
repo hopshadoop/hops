@@ -241,6 +241,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1388. Move the HDFS RAID package from HDFS to MAPREDUCE.
     (Eli Collins via dhruba)
 
+    MAPREDUCE-1313. Fix NPE in Sqoop when table with null fields uses escape
+    during import. (Aaron Kimball via cdouglas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
