@@ -843,7 +843,7 @@ class MapTask extends Task {
       } else {
         combineCollector = null;
       }
-      minSpillsForCombine = job.getInt(JobContext.MAP_COMBINE_MIN_SPISS, 3);
+      minSpillsForCombine = job.getInt(JobContext.MAP_COMBINE_MIN_SPILLS, 3);
       spillThread.setDaemon(true);
       spillThread.setName("SpillThread");
       spillLock.lock();

@@ -167,7 +167,7 @@ public interface JobContext {
     "mapreduce.map.skip.proc-count.auto-incr";
   public static final String MAP_SKIP_MAX_RECORDS = 
     "mapreduce.map.skip.maxrecords";
-  public static final String MAP_COMBINE_MIN_SPISS = 
+  public static final String MAP_COMBINE_MIN_SPILLS = 
     "mapreduce.map.combine.minspills";
   public static final String MAP_OUTPUT_COMPRESS = 
     "mapreduce.map.output.compress";

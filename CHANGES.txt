@@ -1161,3 +1161,6 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1365. Restore accidentally renamed test in
     TestTaskTrackerBloacklisting. (Amareshwari Sriramadasu via cdouglas)
+
+    MAPREDUCE-1406. Fix spelling of JobContext.MAP_COMBINE_MIN_SPILLS.
+    (cdouglas)

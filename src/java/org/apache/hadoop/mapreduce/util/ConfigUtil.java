@@ -324,7 +324,7 @@ public class ConfigUtil {
     Configuration.addDeprecation("mapred.skip.map.max.skip.records", 
       new String[] {JobContext.MAP_SKIP_MAX_RECORDS});
     Configuration.addDeprecation("min.num.spills.for.combine", 
-      new String[] {JobContext.MAP_COMBINE_MIN_SPISS});
+      new String[] {JobContext.MAP_COMBINE_MIN_SPILLS});
     Configuration.addDeprecation("mapred.compress.map.output", 
       new String[] {JobContext.MAP_OUTPUT_COMPRESS});
     Configuration.addDeprecation("mapred.map.output.compression.codec", 
