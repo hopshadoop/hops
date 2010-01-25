@@ -689,6 +689,9 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-1317. Reduce the memory footprint of Rumen objects by interning
     host Strings. (Hong Tang via cdouglas)
 
+    MAPREDUCE-1097. Add support for Vertica 3.5 to its contrib module. (Omer
+    Trajman via cdouglas)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 

@@ -20,6 +20,7 @@ package org.apache.hadoop.vertica;
 
 import java.io.IOException;
 import java.lang.reflect.Array;
+import java.math.BigDecimal;
 import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
@@ -125,11 +126,11 @@ public class TestVertica extends VerticaTestCase {
     types.add(Types.SMALLINT);
     values.add((short) 4); // SMALLINT
     types.add(Types.REAL);
-    values.add(15234342345.532637); // REAL
+    values.add(new BigDecimal(15234342345.532637)); // REAL
     types.add(Types.DECIMAL);
-    values.add(346223093.4256); // DECIMAL
+    values.add(new BigDecimal(346223093.4256)); // DECIMAL
     types.add(Types.NUMERIC);
-    values.add(209232301132.4203); // NUMERIC
+    values.add(new BigDecimal(209232301132.4203)); // NUMERIC
     types.add(Types.DOUBLE);
     values.add(934029342.234); // DOUBLE
     types.add(Types.FLOAT);

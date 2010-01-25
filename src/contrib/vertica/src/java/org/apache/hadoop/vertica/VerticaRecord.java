@@ -21,6 +21,7 @@ package org.apache.hadoop.vertica;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.sql.Date;
 import java.sql.ResultSet;
@@ -204,6 +205,9 @@ public class VerticaRecord implements Writable {
       case Types.REAL:
       case Types.DECIMAL:
       case Types.NUMERIC:
+        if (!(value instanceof BigDecimal))
+          throw new ClassCastException("Cannot cast "
+              + value.getClass().getName() + " to BigDecimal");
       case Types.DOUBLE:
         if (!(value instanceof Double) && !(value instanceof Float)
             && !(value instanceof DoubleWritable)
@@ -291,6 +295,8 @@ public class VerticaRecord implements Writable {
         this.types.add(Types.INTEGER);
       } else if (obj instanceof Short) {
         this.types.add(Types.SMALLINT);
+      } else if (obj instanceof BigDecimal) {
+        this.types.add(Types.NUMERIC);
       } else if (obj instanceof DoubleWritable) {
         this.types.add(Types.DOUBLE);
       } else if (obj instanceof Double) {
@@ -348,18 +354,18 @@ public class VerticaRecord implements Writable {
         break;
       case Types.BIGINT:
         if (obj instanceof Long) {
-          sb.append(((Long) obj).toString());
+          sb.append(obj.toString());
           break;
         }
       case Types.INTEGER:
         if (obj instanceof Integer) {
-          sb.append(((Integer) obj).toString());
+          sb.append(obj.toString());
           break;
         }
       case Types.TINYINT:
       case Types.SMALLINT:
         if (obj instanceof Short) {
-          sb.append(((Short) obj).toString());
+          sb.append(obj.toString());
           break;
         }
         if (obj instanceof LongWritable) {
@@ -377,18 +383,22 @@ public class VerticaRecord implements Writable {
       case Types.REAL:
       case Types.DECIMAL:
       case Types.NUMERIC:
+        if (obj instanceof BigDecimal) {
+          sb.append(obj.toString());
+          break;
+        }
       case Types.DOUBLE:
         if (obj instanceof Double) {
-          sb.append(((Double) obj).toString());
+          sb.append(obj.toString());
           break;
         }
         if (obj instanceof DoubleWritable) {
-          sb.append(((DoubleWritable) obj).toString());
+          sb.append(((DoubleWritable) obj).get());
           break;
         }
       case Types.FLOAT:
         if (obj instanceof Float) {
-          sb.append(((Float) obj).toString());
+          sb.append(obj.toString());
           break;
         }
         if (obj instanceof FloatWritable) {
@@ -494,6 +504,8 @@ public class VerticaRecord implements Writable {
       case Types.REAL:
       case Types.DECIMAL:
       case Types.NUMERIC:
+        values.add(new BigDecimal(Text.readString(in)));
+        break;
       case Types.DOUBLE:
         values.add(in.readDouble());
         break;
@@ -587,6 +599,8 @@ public class VerticaRecord implements Writable {
       case Types.REAL:
       case Types.DECIMAL:
       case Types.NUMERIC:
+        Text.writeString(out, obj.toString());
+        break;
       case Types.DOUBLE:
         out.writeDouble((Double) obj);
         break;
