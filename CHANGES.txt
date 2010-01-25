@@ -127,6 +127,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1337. Use generics in StreamJob to improve readability of that
     class. (Kay Kay via cdouglas)
 
+    MAPREDUCE-361. Port terasort example to the new mapreduce API. (Amareshwari
+    Sriramadasu via cdouglas)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
