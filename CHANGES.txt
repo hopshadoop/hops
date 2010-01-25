@@ -244,6 +244,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1313. Fix NPE in Sqoop when table with null fields uses escape
     during import. (Aaron Kimball via cdouglas)
 
+    MAPREDUCE-1327. Fix Sqoop handling of Oracle timezone with timestamp data
+    types in import. (Leonid Furman via cdouglas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
