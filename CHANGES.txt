@@ -124,6 +124,9 @@ Trunk (unreleased changes)
     MAPREDUCE-847. Fix Releaseaudit warning count to zero
     (Giridharan Kesavan)
 
+    MAPREDUCE-1337. Use generics in StreamJob to improve readability of that
+    class. (Kay Kay via cdouglas)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
