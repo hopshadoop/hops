@@ -793,11 +793,11 @@ class MapTask extends Task {
         throw new IOException("Invalid \"mapreduce.map.sort.record.percent\": " + recper);
       }
       if ((sortmb & 0x7FF) != sortmb) {
-        throw new IOException("Invalid \"mapreduce.task.mapreduce.task.io.sort.mb\": " + sortmb);
+        throw new IOException("Invalid " + JobContext.IO_SORT_MB + ": " + sortmb);
       }
       sorter = ReflectionUtils.newInstance(job.getClass("map.sort.class",
             QuickSort.class, IndexedSorter.class), job);
-      LOG.info("mapreduce.task.mapreduce.task.io.sort.mb = " + sortmb);
+      LOG.info(JobContext.IO_SORT_MB + " = " + sortmb);
       // buffers and accounting
       int maxMemUsage = sortmb << 20;
       int recordCapacity = (int)(maxMemUsage * recper);

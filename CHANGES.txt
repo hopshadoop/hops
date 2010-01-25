@@ -1150,3 +1150,5 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-1359. TypedBytes TestIO doesn't mkdir its test dir first.
     (Anatoli Fomenko via cos)
 
+    MAPREDUCE-1314. Correct errant mapreduce.x.mapreduce.x replacements from
+    bulk change. (Amareshwari Sriramadasu via cdouglas)

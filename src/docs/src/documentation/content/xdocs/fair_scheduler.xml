@@ -183,7 +183,7 @@
           </td>
           <td>
             Specify which jobconf property is used to determine the pool that a
-            job belongs in. String, default: <em>mapreduce.job.mapreduce.job.user.name</em>
+            job belongs in. String, default: <em>mapreduce.job.user.name</em>
             (i.e. one pool for each user). 
             Another useful value is <em>group.name</em> to create a
             pool per Unix group.
@@ -411,7 +411,7 @@
     &lt;maxReduces&gt;25&lt;/maxReduces&gt;
     &lt;minSharePreemptionTimeout&gt;300&lt;/minSharePreemptionTimeout&gt;
   &lt;/pool&gt;
-  &lt;mapreduce.job.mapreduce.job.user.name="sample_user"&gt;
+  &lt;mapreduce.job.user.name="sample_user"&gt;
     &lt;maxRunningJobs&gt;6&lt;/maxRunningJobs&gt;
   &lt;/user&gt;
   &lt;userMaxJobsDefault&gt;3&lt;/userMaxJobsDefault&gt;

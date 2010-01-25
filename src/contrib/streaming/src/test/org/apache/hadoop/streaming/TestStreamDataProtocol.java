@@ -73,7 +73,7 @@ public class TestStreamDataProtocol
       //"-verbose",
       "-jobconf", "stream.map.output.field.separator=.",
       "-jobconf", "stream.num.map.output.key.fields=2",
-      "-jobconf", "mapreduce.mapreduce.mapreduce.map.output.key.field.separator=.",
+      "-jobconf", "mapreduce.map.output.key.field.separator=.",
       "-jobconf", "num.key.fields.for.partition=1",
       "-jobconf", "mapreduce.job.reduces=2",
       "-jobconf", "mapreduce.task.files.preserve.failedtasks=true",
