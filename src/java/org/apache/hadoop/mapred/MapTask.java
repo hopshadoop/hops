@@ -483,7 +483,7 @@ class MapTask extends Task {
     @SuppressWarnings("unchecked")
     OldOutputCollector(MapOutputCollector<K,V> collector, JobConf conf) {
       numPartitions = conf.getNumReduceTasks();
-      if (numPartitions > 0) {
+      if (numPartitions > 1) {
         partitioner = (Partitioner<K,V>)
           ReflectionUtils.newInstance(conf.getPartitionerClass(), conf);
       } else {
@@ -492,7 +492,7 @@ class MapTask extends Task {
           public void configure(JobConf job) { }
           @Override
           public int getPartition(K key, V value, int numPartitions) {
-            return -1;
+            return numPartitions - 1;
           }
         };
       }
@@ -562,14 +562,14 @@ class MapTask extends Task {
                        ) throws IOException, ClassNotFoundException {
       collector = new MapOutputBuffer<K,V>(umbilical, job, reporter);
       partitions = jobContext.getNumReduceTasks();
-      if (partitions > 0) {
+      if (partitions > 1) {
         partitioner = (org.apache.hadoop.mapreduce.Partitioner<K,V>)
           ReflectionUtils.newInstance(jobContext.getPartitionerClass(), job);
       } else {
         partitioner = new org.apache.hadoop.mapreduce.Partitioner<K,V>() {
           @Override
           public int getPartition(K key, V value, int numPartitions) {
-            return -1;
+            return partitions - 1;
           }
         };
       }

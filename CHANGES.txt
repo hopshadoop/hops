@@ -4,6 +4,9 @@ Trunk (unreleased changes)
 
   INCOMPATIBLE CHANGES
 
+    MAPREDUCE-1287. Only call the partitioner with more than one reducer.
+    (cdouglas)
+
   NEW FEATURES
 
     MAPREDUCE-698. Per-pool task limits for the fair scheduler.
