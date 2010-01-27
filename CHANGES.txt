@@ -256,6 +256,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1327. Fix Sqoop handling of Oracle timezone with timestamp data
     types in import. (Leonid Furman via cdouglas)
 
+    MAPREDUCE-1394. Sqoop generates incorrect URIs in paths sent to Hive.
+    (Aaron Kimball via tomwhite)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
