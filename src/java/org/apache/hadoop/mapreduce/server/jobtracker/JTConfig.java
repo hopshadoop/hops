@@ -90,6 +90,9 @@ public interface JTConfig extends MRConfig {
     "mapreduce.jobtracker.maxmapmemory.mb";
   public static final String JT_MAX_REDUCEMEMORY_MB = 
     "mapreduce.jobtracker.maxreducememory.mb";
-  public static final String MAX_JOB_SPLIT_METAINFO_SIZE = 
-  "mapreduce.job.split.metainfo.maxsize";
+  public static final String JT_MAX_JOB_SPLIT_METAINFO_SIZE = 
+  "mapreduce.jobtracker.split.metainfo.maxsize";
+  public static final String JT_USER_NAME = "mapreduce.jobtracker.user.name";
+  public static final String JT_KEYTAB_FILE = 
+    "mapreduce.jobtracker.keytab.file";
 }

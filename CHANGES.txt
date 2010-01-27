@@ -7,6 +7,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1287. Only call the partitioner with more than one reducer.
     (cdouglas)
 
+    MAPREDUCE-1385. Use the new UserGroupInformation from HADOOP-6299.
+    (ddas via omalley)
+
   NEW FEATURES
 
     MAPREDUCE-698. Per-pool task limits for the fair scheduler.

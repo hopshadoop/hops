@@ -20,6 +20,8 @@ package org.apache.hadoop.mapreduce.protocol;
 
 import java.io.IOException;
 
+import javax.security.auth.login.LoginException;
+
 import org.apache.hadoop.ipc.VersionedProtocol;
 import org.apache.hadoop.mapreduce.ClusterMetrics;
 import org.apache.hadoop.mapreduce.Counters;

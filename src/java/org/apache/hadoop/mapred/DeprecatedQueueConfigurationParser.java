@@ -20,7 +20,7 @@ package org.apache.hadoop.mapred;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.QueueState;
-import org.apache.hadoop.security.SecurityUtil;
+import org.apache.hadoop.security.authorize.AccessControlList;
 import static org.apache.hadoop.mapred.QueueManager.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -60,7 +60,7 @@ class DeprecatedQueueConfigurationParser extends QueueConfigurationParser {
     List<Queue> list = new ArrayList<Queue>();
     for (String name : queueNameValues) {
       try {
-        Map<String, SecurityUtil.AccessControlList> acls = getQueueAcls(
+        Map<String, AccessControlList> acls = getQueueAcls(
           name, conf);
         QueueState state = getQueueState(name, conf);
         Queue q = new Queue(name, acls, state);
@@ -143,15 +143,15 @@ class DeprecatedQueueConfigurationParser extends QueueConfigurationParser {
   /**
    * Parse ACLs for the queue from the configuration.
    */
-  private Map<String, SecurityUtil.AccessControlList> getQueueAcls(
+  private Map<String, AccessControlList> getQueueAcls(
     String name,
     Configuration conf) {
-    HashMap<String, SecurityUtil.AccessControlList> map =
-      new HashMap<String, SecurityUtil.AccessControlList>();
+    HashMap<String, AccessControlList> map =
+      new HashMap<String, AccessControlList>();
     for (Queue.QueueOperation oper : Queue.QueueOperation.values()) {
       String aclKey = toFullPropertyName(name, oper.getAclName());
       map.put(
-        aclKey, new SecurityUtil.AccessControlList(
+        aclKey, new AccessControlList(
           conf.get(
             aclKey, "*")));
     }

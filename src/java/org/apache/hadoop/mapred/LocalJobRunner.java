@@ -199,6 +199,8 @@ public class LocalJobRunner implements ClientProtocol {
             MapTask map = new MapTask(systemJobFile.toString(),  
                                       mapId, i,
                                       taskSplitMetaInfos[i].getSplitIndex(), 1);
+            map.setUser(UserGroupInformation.getCurrentUser().
+                getShortUserName());
             JobConf localConf = new JobConf(job);
             TaskRunner.setupChildMapredLocalDirs(map, localConf);
 
@@ -207,6 +209,7 @@ public class LocalJobRunner implements ClientProtocol {
             mapOutputFiles.put(mapId, mapOutput);
 
             map.setJobFile(localJobFile.toString());
+            localConf.setUser(map.getUser());
             map.localizeConfiguration(localConf);
             map.setConf(localConf);
             map_tasks += 1;
@@ -225,6 +228,8 @@ public class LocalJobRunner implements ClientProtocol {
           if (numReduceTasks > 0) {
             ReduceTask reduce = new ReduceTask(systemJobFile.toString(), 
                 reduceId, 0, mapIds.size(), 1);
+            reduce.setUser(UserGroupInformation.getCurrentUser().
+                getShortUserName());
             JobConf localConf = new JobConf(job);
             TaskRunner.setupChildMapredLocalDirs(reduce, localConf);
             // move map output to reduce input  
@@ -249,6 +254,7 @@ public class LocalJobRunner implements ClientProtocol {
             }
             if (!this.isInterrupted()) {
               reduce.setJobFile(localJobFile.toString());
+              localConf.setUser(reduce.getUser());
               reduce.localizeConfiguration(localConf);
               reduce.setConf(localConf);
               reduce_tasks += 1;
@@ -525,10 +531,10 @@ public class LocalJobRunner implements ClientProtocol {
   /**
    * @see org.apache.hadoop.mapreduce.protocol.ClientProtocol#getStagingAreaDir()
    */
-  public String getStagingAreaDir() {
+  public String getStagingAreaDir() throws IOException {
     Path stagingRootDir = new Path(conf.get(JTConfig.JT_STAGING_AREA_ROOT, 
         "/tmp/hadoop/mapred/staging"));
-    UserGroupInformation ugi = UserGroupInformation.getCurrentUGI();
+    UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     String user;
     if (ugi != null) {
       user = ugi.getUserName() + rand.nextInt();

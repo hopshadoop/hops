@@ -20,6 +20,7 @@ package org.apache.hadoop.mapreduce;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -35,14 +36,14 @@ import org.apache.hadoop.mapreduce.protocol.ClientProtocol;
 import org.apache.hadoop.mapreduce.server.jobtracker.State;
 import org.apache.hadoop.mapreduce.util.ConfigUtil;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.security.UnixUserGroupInformation;
+import org.apache.hadoop.security.UserGroupInformation;
 
 /**
  * Provides a way to access information about the map/reduce cluster.
  */
 public class Cluster {
   private ClientProtocol client;
-  private UnixUserGroupInformation ugi;
+  private UserGroupInformation ugi;
   private Configuration conf;
   private FileSystem fs = null;
   private Path sysDir = null;
@@ -55,14 +56,14 @@ public class Cluster {
   
   public Cluster(Configuration conf) throws IOException {
     this.conf = conf;
-    this.ugi = Job.getUGI(conf);
+    this.ugi = UserGroupInformation.getCurrentUser();
     client = createClient(conf);
   }
 
   public Cluster(InetSocketAddress jobTrackAddr, Configuration conf) 
       throws IOException {
     this.conf = conf;
-    this.ugi = Job.getUGI(conf);
+    this.ugi = UserGroupInformation.getCurrentUser();
     client = createRPCProxy(jobTrackAddr, conf);
   }
 
@@ -120,7 +121,7 @@ public class Cluster {
   public synchronized FileSystem getFileSystem() 
       throws IOException, InterruptedException {
     if (this.fs == null) {
-      Path sysDir = new Path(client.getSystemDir());
+      final Path sysDir = new Path(client.getSystemDir());
       this.fs = sysDir.getFileSystem(getConf());
     }
     return fs;

@@ -54,6 +54,7 @@ import org.apache.hadoop.mapreduce.jobhistory.JobSubmittedEvent;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser.JobInfo;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser.TaskAttemptInfo;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser.TaskInfo;
+import org.apache.hadoop.security.UserGroupInformation;
 
 /**
  *
@@ -352,10 +353,10 @@ public class TestJobHistory extends TestCase {
                "match the expected value", 
                conf.getJobName().equals(
                jobInfo.getJobname()));
-
+    String user = UserGroupInformation.getCurrentUser().getUserName();
     assertTrue("User Name of job obtained from history file did not " +
                "match the expected value", 
-               conf.getUser().equals(
+               user.equals(
                jobInfo.getUsername()));
 
     // Validate job counters
@@ -807,9 +808,10 @@ public class TestJobHistory extends TestCase {
       JobConf conf, JobID id, 
       Path doneDir) throws IOException {
     String name = null;
+    String user = UserGroupInformation.getCurrentUser().getUserName();
     for (int i = 0; name == null && i < 20; i++) {
       Path path = JobHistory.getJobHistoryFile(
-          jobHistory.getCompletedJobHistoryLocation(), id, conf.getUser());
+          jobHistory.getCompletedJobHistoryLocation(), id, user);
       if (path.getFileSystem(conf).exists(path)) {
         name = path.toString();
       }

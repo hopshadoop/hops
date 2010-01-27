@@ -24,6 +24,7 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -43,6 +44,8 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.mapred.TaskController.InitializationContext;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.log4j.Level;
@@ -165,16 +168,24 @@ abstract class TaskRunner extends Thread {
       //before preparing the job localize 
       //all the archives
       TaskAttemptID taskid = t.getTaskID();
-      LocalDirAllocator lDirAlloc = new LocalDirAllocator(MRConfig.LOCAL_DIR);
-      File workDir = formWorkDir(lDirAlloc, taskid, t.isTaskCleanupTask(), conf);
+      final LocalDirAllocator lDirAlloc = new LocalDirAllocator(MRConfig.LOCAL_DIR);
+      final File workDir = formWorkDir(lDirAlloc, taskid, t.isTaskCleanupTask(), conf);
 
       // We don't create any symlinks yet, so presence/absence of workDir
       // actually on the file system doesn't matter.
-      taskDistributedCacheManager = tracker.getTrackerDistributedCacheManager()
-          .newTaskDistributedCacheManager(conf);
-      taskDistributedCacheManager.setup(lDirAlloc, workDir, TaskTracker
-          .getPrivateDistributedCacheDir(conf.getUser()), 
+      UserGroupInformation ugi = 
+        UserGroupInformation.createRemoteUser(conf.getUser());
+      ugi.doAs(new PrivilegedExceptionAction<Void>() {
+        public Void run() throws IOException {
+          taskDistributedCacheManager = 
+            tracker.getTrackerDistributedCacheManager()
+            .newTaskDistributedCacheManager(conf);
+          taskDistributedCacheManager.setup(lDirAlloc, workDir, TaskTracker
+              .getPrivateDistributedCacheDir(conf.getUser()), 
           TaskTracker.getPublicDistributedCacheDir());
+          return null;
+        }
+      });
 
       // Set up the child task's configuration. After this call, no localization
       // of files should happen in the TaskTracker's process space. Any changes to

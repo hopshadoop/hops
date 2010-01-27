@@ -46,6 +46,7 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.JobTracker;
 import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
 
 /**
@@ -229,7 +230,8 @@ public class JobHistory {
    */
   public void setupEventWriter(JobID jobId, JobConf jobConf)
   throws IOException {
-    Path logFile = getJobHistoryFile(logDir, jobId, getUserName(jobConf));
+    Path logFile = getJobHistoryFile(logDir, jobId, 
+        UserGroupInformation.createRemoteUser(getUserName(jobConf)).getShortUserName());
   
     if (logDir == null) {
       LOG.info("Log Directory is null, returning");

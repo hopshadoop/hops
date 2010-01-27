@@ -135,6 +135,8 @@ class TaskInProgress {
   private HashMap<TaskAttemptID, Long> dispatchTimeMap = 
     new HashMap<TaskAttemptID, Long>();
   
+  private String user;
+  
 
   /**
    * Constructor for MapTask
@@ -157,6 +159,7 @@ class TaskInProgress {
     if (jobtracker != null) {
       this.jobHistory = jobtracker.getJobHistory();
     }
+    this.user = job.getUser();
   }
         
   /**
@@ -179,6 +182,7 @@ class TaskInProgress {
     if (jobtracker != null) {
       this.jobHistory = jobtracker.getJobHistory();
     }
+    this.user = job.getUser();
   }
   
   /**
@@ -382,7 +386,14 @@ class TaskInProgress {
   private void resetSuccessfulTaskid() {
     this.successfulTaskId = null; 
   }
+
+  String getUser() {
+    return user;
+  }
   
+  void setUser(String user) {
+    this.user = user;
+  }
   /**
    * Is this tip complete?
    * 
@@ -1063,6 +1074,7 @@ class TaskInProgress {
       cleanupTasks.put(taskid, taskTracker);
     }
     t.setConf(conf);
+    t.setUser(getUser());
     LOG.debug("Launching task with skipRanges:"+failedRanges.getSkipRanges());
     t.setSkipRanges(failedRanges.getSkipRanges());
     t.setSkipping(skipping);

@@ -27,6 +27,10 @@
   <value>10</value>
 </property>
 <property>
+  <name>hadoop.security.authentication</name>
+  <value>simple</value>
+</property>
+<property>
   <name>mapreduce.jobtracker.hosts.exclude.filename</name>
   <value>hosts.exclude</value>
   <description></description>

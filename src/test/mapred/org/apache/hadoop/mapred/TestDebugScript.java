@@ -23,10 +23,13 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
-import org.apache.hadoop.security.UnixUserGroupInformation;
+import org.apache.hadoop.security.Groups;
+import org.apache.hadoop.security.ShellBasedUnixGroupsMapping;
+import org.apache.hadoop.security.UserGroupInformation;
 import static org.junit.Assert.*;
 
 import org.junit.After;
@@ -158,7 +161,8 @@ public class TestDebugScript {
     assertTrue(out.contains("failing map"));
     if (expectedPerms != null && expectedUser != null) {
       //check whether the debugout file ownership/permissions are as expected
-      String ttGroup = UnixUserGroupInformation.login().getGroupNames()[0];
+      Groups groups = new Groups(new Configuration());
+      String ttGroup = groups.getGroups(expectedUser).get(0);
       TestTaskTrackerLocalization.checkFilePermissions(output.getAbsolutePath(),
           expectedPerms, expectedUser, ttGroup);
     }

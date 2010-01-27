@@ -157,7 +157,9 @@ public class TestMapProgress extends TestCase {
       ReflectionUtils.newInstance(jContext.getInputFormatClass(), job);
 
     List<InputSplit> splits = input.getSplits(jContext);
-    JobSplitWriter.createSplitFiles(new Path(TEST_ROOT_DIR), job, splits);
+    JobSplitWriter.createSplitFiles(new Path(TEST_ROOT_DIR), job, 
+                   new Path(TEST_ROOT_DIR).getFileSystem(job),
+                   splits);
     TaskSplitMetaInfo[] splitMetaInfo = 
       SplitMetaInfoReader.readSplitMetaInfo(jobId, fs, job, new Path(TEST_ROOT_DIR));
     job.setUseNewMapper(true); // use new api    

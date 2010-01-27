@@ -23,6 +23,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.security.PrivilegedExceptionAction;
 import java.util.Iterator;
 
 import junit.extensions.TestSetup;
@@ -45,7 +46,7 @@ import org.apache.hadoop.mapred.UtilsForTests.KillMapper;
 import org.apache.hadoop.mapred.lib.NullOutputFormat;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
-import org.apache.hadoop.security.UnixUserGroupInformation;
+import org.apache.hadoop.security.UserGroupInformation;
 
 /** 
  * This is a test case that tests several miscellaneous functionality. 
@@ -64,11 +65,11 @@ import org.apache.hadoop.security.UnixUserGroupInformation;
 @SuppressWarnings("deprecation")
 public class TestSeveral extends TestCase {
 
-  static final UnixUserGroupInformation DFS_UGI = 
+  static final UserGroupInformation DFS_UGI = 
     TestMiniMRWithDFSWithDistinctUsers.createUGI("dfs", true); 
-  static final UnixUserGroupInformation TEST1_UGI = 
+  static final UserGroupInformation TEST1_UGI = 
     TestMiniMRWithDFSWithDistinctUsers.createUGI("pi", false); 
-  static final UnixUserGroupInformation TEST2_UGI = 
+  static final UserGroupInformation TEST2_UGI = 
     TestMiniMRWithDFSWithDistinctUsers.createUGI("wc", false);
 
   private static MiniMRCluster mrCluster = null;
@@ -85,19 +86,19 @@ public class TestSeveral extends TestCase {
 
         Configuration conf = new Configuration();
         conf.setInt("dfs.replication", 1);
-        UnixUserGroupInformation.saveToConf(conf,
-            UnixUserGroupInformation.UGI_PROPERTY_NAME, DFS_UGI);
         dfs = new MiniDFSCluster(conf, numTT, true, null);
-        fs = dfs.getFileSystem();
+        fs = DFS_UGI.doAs(new PrivilegedExceptionAction<FileSystem>() {
+          public FileSystem run() throws IOException {
+            return dfs.getFileSystem();
+          }
+        });
 
         TestMiniMRWithDFSWithDistinctUsers.mkdir(fs, "/user");
         TestMiniMRWithDFSWithDistinctUsers.mkdir(fs, "/mapred");
         TestMiniMRWithDFSWithDistinctUsers.mkdir(fs, 
             conf.get(JTConfig.JT_STAGING_AREA_ROOT));
 
-        UnixUserGroupInformation MR_UGI = 
-          TestMiniMRWithDFSWithDistinctUsers.createUGI(
-              UnixUserGroupInformation.login().getUserName(), false); 
+        UserGroupInformation MR_UGI = UserGroupInformation.getLoginUser(); 
 
         // Create a TestJobInProgressListener.MyListener and associate
         // it with the MiniMRCluster
@@ -105,7 +106,7 @@ public class TestSeveral extends TestCase {
         myListener = new MyListener();
         conf.set(JTConfig.JT_IPC_HANDLER_COUNT, "1");
         mrCluster =   new MiniMRCluster(0, 0,
-            numTT, dfs.getFileSystem().getUri().toString(), 
+            numTT, fs.getUri().toString(), 
             1, null, null, MR_UGI, new JobConf());
         // make cleanup inline sothat validation of existence of these directories
         // can be done
@@ -193,7 +194,7 @@ public class TestSeveral extends TestCase {
    * @throws Exception
    */
   public void testSuccessfulJob() throws Exception {
-    JobConf conf = mrCluster.createJobConf();
+    final JobConf conf = mrCluster.createJobConf();
 
     // Set a complex Job name (TestJobName)
     conf.setJobName("[name][some other value that gets" +
@@ -226,20 +227,27 @@ public class TestSeveral extends TestCase {
       TaskAttemptID.getTaskAttemptIDsPattern(null, null, TaskType.MAP, 1, null);
     conf.setKeepTaskFilesPattern(pattern);
 
-    UnixUserGroupInformation.saveToConf(conf,
-        UnixUserGroupInformation.UGI_PROPERTY_NAME, TEST1_UGI);
-
     final Path inDir = new Path("./test/input");
     final Path outDir = new Path("./test/output");
 
-    FileInputFormat.setInputPaths(conf, inDir);
-    FileOutputFormat.setOutputPath(conf, outDir);
+    TEST1_UGI.doAs(new PrivilegedExceptionAction<Void>() {
+      public Void run() {
+        FileInputFormat.setInputPaths(conf, inDir);
+        FileOutputFormat.setOutputPath(conf, outDir);   
+        return null;
+      }
+    });
 
     clean(fs, outDir);
-    makeInput(inDir, conf);
-    JobClient jobClient = new JobClient(conf);
-    RunningJob job = jobClient.submitJob(conf);
-    JobID jobId = job.getID();
+    final RunningJob job = TEST1_UGI.doAs(new PrivilegedExceptionAction<RunningJob>() {
+      public RunningJob run() throws IOException {
+        makeInput(inDir, conf);
+        JobClient jobClient = new JobClient(conf);
+        return jobClient.submitJob(conf);
+      }
+    });
+    
+    final JobID jobId = job.getID();
 
     while (job.getJobState() != JobStatus.RUNNING) {
       try {
@@ -283,24 +291,31 @@ public class TestSeveral extends TestCase {
     TestJobClient.verifyJobPriority(jobId.toString(), "HIGH", conf);
     
     // Basic check if the job did run fine
-    verifyOutput(outDir.getFileSystem(conf), outDir);
+    TEST1_UGI.doAs(new PrivilegedExceptionAction<Void>() {
+      public Void run() throws IOException {
+        verifyOutput(outDir.getFileSystem(conf), outDir);
 
-    //TestJobHistory
-    TestJobHistory.validateJobHistoryFileFormat(
-        mrCluster.getJobTrackerRunner().getJobTracker().getJobHistory(),
-        jobId, conf, "SUCCEEDED", false);
+
+        //TestJobHistory
+        TestJobHistory.validateJobHistoryFileFormat(
+            mrCluster.getJobTrackerRunner().getJobTracker().getJobHistory(),
+            jobId, conf, "SUCCEEDED", false);
+
+        TestJobHistory.validateJobHistoryFileContent(mrCluster, job, conf);
+
+        // Since we keep setKeepTaskFilesPattern, these files should still be
+        // present and will not be cleaned up.
+        for(int i=0; i < numTT; ++i) {
+          Path jobDirPath =
+            new Path(mrCluster.getTaskTrackerLocalDir(i), TaskTracker
+                .getJobCacheSubdir(TEST1_UGI.getUserName()));
+          boolean b = FileSystem.getLocal(conf).delete(jobDirPath, true);
+          assertTrue(b);
+        }
+        return null;
+      }
+    });
     
-    TestJobHistory.validateJobHistoryFileContent(mrCluster, job, conf);
-
-    // Since we keep setKeepTaskFilesPattern, these files should still be
-    // present and will not be cleaned up.
-    for(int i=0; i < numTT; ++i) {
-      Path jobDirPath =
-          new Path(mrCluster.getTaskTrackerLocalDir(i), TaskTracker
-              .getJobCacheSubdir(TEST1_UGI.getUserName()));
-      boolean b = FileSystem.getLocal(conf).delete(jobDirPath, true);
-      assertTrue(b);
-    }
   }
 
   /**

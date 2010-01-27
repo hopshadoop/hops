@@ -22,12 +22,13 @@ package org.apache.hadoop.mapred;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.mapreduce.Cluster;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.QueueState;
 import org.apache.hadoop.mapreduce.SleepJob;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
-import org.apache.hadoop.security.UnixUserGroupInformation;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import static org.apache.hadoop.mapred.Queue.*;
@@ -46,6 +47,8 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.OutputKeys;
 import javax.xml.transform.stream.StreamResult;
 import javax.xml.transform.dom.DOMSource;
+
+import java.security.PrivilegedExceptionAction;
 import java.util.Properties;
 import java.util.Set;
 import java.io.File;
@@ -283,22 +286,32 @@ public class QueueManagerTestUtils {
     }
   }
 
-  static Job submitSleepJob(int numMappers, int numReducers, long mapSleepTime,
-      long reduceSleepTime, boolean shouldComplete, String userInfo,
+  static Job submitSleepJob(final int numMappers, final int numReducers, final long mapSleepTime,
+      final long reduceSleepTime, boolean shouldComplete, String userInfo,
       String queueName, Configuration clientConf) throws IOException,
       InterruptedException, ClassNotFoundException {
     clientConf.set(JTConfig.JT_IPC_ADDRESS, "localhost:"
         + miniMRCluster.getJobTrackerPort());
+    UserGroupInformation ugi;
     if (userInfo != null) {
-      clientConf.set(UnixUserGroupInformation.UGI_PROPERTY_NAME, userInfo);
+      String[] splits = userInfo.split(",");
+      String[] groups = new String[splits.length - 1];
+      System.arraycopy(splits, 1, groups, 0, splits.length - 1);
+      ugi = UserGroupInformation.createUserForTesting(splits[0], groups);
+    } else {
+      ugi = UserGroupInformation.getCurrentUser();
     }
     if (queueName != null) {
       clientConf.set(JobContext.QUEUE_NAME, queueName);
     }
-    SleepJob sleep = new SleepJob();
+    final SleepJob sleep = new SleepJob();
     sleep.setConf(clientConf);
-    Job job = sleep.createJob(numMappers, numReducers, mapSleepTime,
-        (int) mapSleepTime, reduceSleepTime, (int) reduceSleepTime);
+    
+    Job job = ugi.doAs(new PrivilegedExceptionAction<Job>() {
+        public Job run() throws IOException {
+          return sleep.createJob(numMappers, numReducers, mapSleepTime,
+              (int) mapSleepTime, reduceSleepTime, (int) reduceSleepTime);
+      }});
     if (shouldComplete) {
       job.waitForCompletion(false);
     } else {

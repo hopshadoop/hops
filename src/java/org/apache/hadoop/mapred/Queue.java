@@ -20,7 +20,7 @@ package org.apache.hadoop.mapred;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.mapreduce.QueueState;
-import org.apache.hadoop.security.SecurityUtil.AccessControlList;
+import org.apache.hadoop.security.authorize.AccessControlList;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -42,7 +42,8 @@ class Queue implements Comparable<Queue>{
   private String name = null;
 
   //acls list
-  private Map<String, AccessControlList> acls;
+  private Map<String, 
+              org.apache.hadoop.security.authorize.AccessControlList> acls;
 
   //Queue State
   private QueueState state = QueueState.RUNNING;
@@ -132,7 +133,7 @@ class Queue implements Comparable<Queue>{
    * @return Map containing the operations that can be performed and
    *          who can perform the operations.
    */
-  Map<String, AccessControlList> getAcls() {
+  Map<String, org.apache.hadoop.security.authorize.AccessControlList> getAcls() {
     return acls;
   }
   

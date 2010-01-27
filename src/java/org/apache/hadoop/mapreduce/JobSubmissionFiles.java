@@ -20,13 +20,10 @@ package org.apache.hadoop.mapreduce;
 
 import java.io.IOException;
 
-import javax.security.auth.login.LoginException;
-
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.security.UnixUserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
@@ -94,25 +91,19 @@ public class JobSubmissionFiles {
    * @param conf
    */
   public static Path getStagingDir(Cluster cluster, Configuration conf) 
-  throws IOException, InterruptedException {
+  throws IOException,InterruptedException {
     Path stagingArea = cluster.getStagingAreaDir();
     FileSystem fs = stagingArea.getFileSystem(conf);
     String realUser;
     String currentUser;
-    try {
-      UserGroupInformation ugi = UnixUserGroupInformation.login();
-      realUser = ugi.getUserName();
-      ugi = UnixUserGroupInformation.login(conf);
-      currentUser = ugi.getUserName();
-    } catch (LoginException le) {
-      throw new IOException(le);
-    }
+    UserGroupInformation ugi = UserGroupInformation.getLoginUser();
+    realUser = ugi.getUserName();
+    currentUser = UserGroupInformation.getCurrentUser().getUserName();
     if (fs.exists(stagingArea)) {
       FileStatus fsStatus = fs.getFileStatus(stagingArea);
       String owner = fsStatus.getOwner();
       if (!(owner.equals(currentUser) || owner.equals(realUser)) || 
-          !fsStatus.getPermission().
-                               equals(JOB_DIR_PERMISSION)) {
+          !fsStatus.getPermission().equals(JOB_DIR_PERMISSION)) {
          throw new IOException("The ownership/permissions on the staging " +
                       "directory " + stagingArea + " is not as expected. " + 
                       "It is owned by " + owner + " and permissions are "+ 

@@ -135,7 +135,7 @@ public class TestJobRetire extends TestCase {
    */
   class WaitingTaskTracker extends TaskTracker {
     
-    WaitingTaskTracker(JobConf conf) throws IOException {
+    WaitingTaskTracker(JobConf conf) throws IOException, InterruptedException {
       super(conf);
     }
     
@@ -198,7 +198,8 @@ public class TestJobRetire extends TestCase {
       TaskTrackerRunner testTrackerRunner = 
         mr.new TaskTrackerRunner(1, 1, null, mr.createJobConf()) {
         @Override
-        TaskTracker createTaskTracker(JobConf conf) throws IOException {
+        TaskTracker createTaskTracker(JobConf conf) 
+        throws IOException, InterruptedException {
           return new WaitingTaskTracker(conf);
         }
       };

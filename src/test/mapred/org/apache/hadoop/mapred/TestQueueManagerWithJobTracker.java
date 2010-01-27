@@ -39,6 +39,7 @@ import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.IOException;
+import java.security.PrivilegedExceptionAction;
 import java.util.Properties;
 
 import org.apache.hadoop.conf.Configuration;
@@ -48,7 +49,6 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.QueueState;
 import org.apache.hadoop.mapreduce.JobStatus.State;
-import org.apache.hadoop.security.UnixUserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -105,7 +105,6 @@ public class TestQueueManagerWithJobTracker {
   @Test
   public void testAclsForSubmitJob() throws Exception {
     Job job;
-    UserGroupInformation.setCurrentUGI(UnixUserGroupInformation.login());
     // submit job to queue p1:p13 with unspecified acls 
     job = submitSleepJob(0, 0, 0, 0, true, "u1,g1", "p1" + NAME_SEPARATOR
         + "p13", conf);
@@ -133,8 +132,7 @@ public class TestQueueManagerWithJobTracker {
   public void testAccessToKillJob() throws Exception {
     Job job = submitSleepJob(1, 1, 100, 100, false, "u1,g1", "p1"
         + NAME_SEPARATOR + "p11", conf);
-    UserGroupInformation.setCurrentUGI(UnixUserGroupInformation.login());
-    JobConf jobConf = miniMRCluster.createJobConf();
+    final JobConf jobConf = miniMRCluster.createJobConf();
     Cluster cluster = null;
     JobID jobID = job.getStatus().getJobID();
     //Ensure that the jobinprogress is initied before we issue a kill 
@@ -147,9 +145,14 @@ public class TestQueueManagerWithJobTracker {
       tracker.killJob(jobID);
       fail("current user is neither u1 nor in the administer group list");
     } catch (Exception e) {
-      Configuration userConf = new Configuration(miniMRCluster.createJobConf());
-      userConf.set("hadoop.job.ugi", "u1,g1");
-      cluster = new Cluster(userConf);
+      final Configuration userConf = new Configuration(miniMRCluster.createJobConf());
+      UserGroupInformation ugi = 
+        UserGroupInformation.createUserForTesting("u1",new String[]{"g1"});
+      cluster = ugi.doAs(new PrivilegedExceptionAction<Cluster>() {
+        public Cluster run() throws IOException {
+          return new Cluster(userConf);
+        }
+      });
       cluster.getJob(jobID).killJob();
       // kill the running job
       assertEquals("job submitted for u1 and queue p1:p11 is not killed.",
@@ -168,9 +171,14 @@ public class TestQueueManagerWithJobTracker {
     assertEquals("job submitted for u1 and queue p1:p11 is not killed.",
         cluster.getJob(jobID).getStatus().getState(), (State.KILLED));
     
-    Configuration userConf = new Configuration(miniMRCluster.createJobConf());
-    userConf.set("hadoop.job.ugi", "u1,g1");
-    cluster = new Cluster(userConf);
+    final Configuration userConf = new Configuration(miniMRCluster.createJobConf());
+    UserGroupInformation ugi = 
+      UserGroupInformation.createUserForTesting("u1",new String[]{"g1"});
+    cluster = ugi.doAs(new PrivilegedExceptionAction<Cluster>() {
+      public Cluster run() throws IOException {
+        return new Cluster(userConf);
+      }
+    });
     job = submitSleepJob(1, 1, 10, 10, false, "u1,g1", "p1" + NAME_SEPARATOR
         + "p11", conf);
     jobID = job.getStatus().getJobID();
@@ -178,15 +186,25 @@ public class TestQueueManagerWithJobTracker {
     //signal to the job.
     jip =  tracker.getJob(org.apache.hadoop.mapred.JobID.downgrade(jobID));
     tracker.initJob(jip);
-    jobConf.set("hadoop.job.ugi", "u3,g3");
-    cluster = new Cluster(jobConf);
+    ugi = 
+      UserGroupInformation.createUserForTesting("u3",new String[]{"g3"});
+    cluster = ugi.doAs(new PrivilegedExceptionAction<Cluster>() {
+      public Cluster run() throws IOException {
+        return new Cluster(jobConf);
+      }
+    });
     // try killing job with user not in administer list
     try {
       cluster.getJob(jobID).killJob();
       fail("u3 not in administer list");
     } catch (Exception e) {
-      jobConf.set("hadoop.job.ugi", "u1,g1");
-      cluster = new Cluster(jobConf);
+      ugi = 
+        UserGroupInformation.createUserForTesting("u1",new String[]{"g1"});
+      cluster = ugi.doAs(new PrivilegedExceptionAction<Cluster>() {
+        public Cluster run() throws IOException {
+          return new Cluster(jobConf);
+        }
+      });
       assertFalse(cluster.getJob(jobID).isComplete());
       cluster.getJob(jobID).killJob();
       // kill the running job
@@ -277,7 +295,6 @@ public class TestQueueManagerWithJobTracker {
     MRAdmin admin = new MRAdmin(miniMRCluster.createJobConf());
     admin.run(new String[] { "-refreshQueues" });
 
-    UserGroupInformation.setCurrentUGI(UnixUserGroupInformation.login());
     // submit job to queue p1:p11 by any user not in acls-submit-job
     Job job = submitSleepJob(0, 0, 0, 0, true, "u2,g1", "p1" + NAME_SEPARATOR
         + "p11", conf);
@@ -293,9 +310,14 @@ public class TestQueueManagerWithJobTracker {
     job = submitSleepJob(1, 1, 0, 0, false, "u1,g1", "p1" + NAME_SEPARATOR
         + "p11", conf);
     // kill the job by any user    
-    JobConf jobConf = miniMRCluster.createJobConf();
-    jobConf.set("hadoop.job.ugi", "u3,g3");
-    Cluster cluster = new Cluster(jobConf);
+    final JobConf jobConf = miniMRCluster.createJobConf();
+    UserGroupInformation ugi = 
+      UserGroupInformation.createUserForTesting("u3",new String[]{"g3"});
+    Cluster cluster = ugi.doAs(new PrivilegedExceptionAction<Cluster>() {
+      public Cluster run() throws IOException {
+        return new Cluster(jobConf);
+      }
+    });
     JobID jobID = job.getStatus().getJobID();
     //Ensure that the jobinprogress is initied before we issue a kill 
     //signal to the job.

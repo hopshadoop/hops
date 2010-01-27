@@ -44,24 +44,6 @@
       </comparators>
     </test>
     
-    <test> <!--Tested -->
-      <description>refreshServiceAcl: verifying error message while refreshing security authorization policy for jobtracker</description>
-      <test-commands>
-        <!-- hadoop-policy.xml for tests has 
-             security.refresh.policy.protocol.acl = ${user.name} -->
-        <mr-admin-command>-jt JOBTRACKER -Dhadoop.job.ugi=blah,blah -refreshServiceAcl </mr-admin-command>
-      </test-commands>
-      <cleanup-commands>
-        <!-- No cleanup -->
-      </cleanup-commands>
-      <comparators>
-        <comparator>
-          <type>SubstringComparator</type>
-          <expected-output>access denied</expected-output>
-        </comparator>
-      </comparators>
-    </test>
-
     <!-- Test for Archive -->
     <test> <!-- TESTED -->
       <description>Archive: Archive does not occur in the destination</description>

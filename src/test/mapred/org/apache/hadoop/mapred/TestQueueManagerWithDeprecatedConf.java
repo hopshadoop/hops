@@ -45,7 +45,6 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.mapreduce.SleepJob;
-import org.apache.hadoop.security.UnixUserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation;
 import static org.apache.hadoop.mapred.DeprecatedQueueConfigurationParser.*;
 import static org.apache.hadoop.mapred.QueueManagerTestUtils.*;
@@ -92,7 +91,7 @@ public class TestQueueManagerWithDeprecatedConf extends TestCase {
 
       //properties for mapred-queue-acls.xml
       UserGroupInformation ugi =
-        new UnixUserGroupInformation("unknownUser",new String[]{" "});
+        UserGroupInformation.createRemoteUser("unknownUser");
       hadoopConfProps.put("mapred.queue.default.acl-submit-job", ugi.getUserName());
       hadoopConfProps.put("mapred.queue.q1.acl-submit-job", "u1");
       hadoopConfProps.put("mapred.queue.q2.acl-submit-job", "*");

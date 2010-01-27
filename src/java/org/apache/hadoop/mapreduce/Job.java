@@ -43,7 +43,7 @@ import org.apache.hadoop.io.RawComparator;
 import org.apache.hadoop.mapreduce.filecache.DistributedCache;
 import org.apache.hadoop.mapreduce.task.JobContextImpl;
 import org.apache.hadoop.mapreduce.util.ConfigUtil;
-import org.apache.hadoop.security.UnixUserGroupInformation;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
 
 /**
@@ -1170,22 +1170,6 @@ public class Job extends JobContextImpl implements JobContext {
     return (baseUrl + "/tasklog?plaintext=true&taskid=" + taskId); 
   }
 
-  /**
-   * Set the UGI, user name and the group name for the job.
-   * 
-   * This method is called by job submission code while submitting the job.
-   * Internal to MapReduce project. 
-   * @throws IOException
-   */
-  public void setUGIAndUserGroupNames()
-      throws IOException {
-    UnixUserGroupInformation ugi = Job.getUGI(conf);
-    setUser(ugi.getUserName());
-    if (ugi.getGroupNames().length > 0) {
-      conf.set("group.name", ugi.getGroupNames()[0]);
-    }
-  }
-
   /** The interval at which monitorAndPrintJob() prints status */
   public static int getProgressPollInterval(Configuration conf) {
     // Read progress monitor poll interval from config. Default is 1 second.
@@ -1234,15 +1218,4 @@ public class Job extends JobContextImpl implements JobContext {
     conf.set(Job.OUTPUT_FILTER, newValue.toString());
   }
 
-  public static UnixUserGroupInformation getUGI(Configuration job) 
-      throws IOException {
-    UnixUserGroupInformation ugi = null;
-    try {
-      ugi = UnixUserGroupInformation.login(job, true);
-    } catch (LoginException e) {
-      throw (IOException)(new IOException(
-        "Failed to get the current user's information.").initCause(e));
-    }
-    return ugi;
-  }
 }

@@ -37,7 +37,7 @@ import org.apache.hadoop.util.ToolRunner;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryProxy;
-import org.apache.hadoop.security.UnixUserGroupInformation;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.fs.Path;
 
 import org.apache.hadoop.raid.protocol.PolicyInfo;
@@ -52,7 +52,7 @@ public class RaidShell extends Configured implements Tool {
   public static final Log LOG = LogFactory.getLog( "org.apache.hadoop.RaidShell");
   public RaidProtocol raidnode;
   final RaidProtocol rpcRaidnode;
-  private UnixUserGroupInformation ugi;
+  private UserGroupInformation ugi;
   volatile boolean clientRunning = true;
   private Configuration conf;
 
@@ -75,11 +75,7 @@ public class RaidShell extends Configured implements Tool {
    */
   public RaidShell(Configuration conf) throws IOException {
     super(conf);
-    try {
-      this.ugi = UnixUserGroupInformation.login(conf, true);
-    } catch (LoginException e) {
-      throw (IOException)(new IOException().initCause(e));
-    }
+    this.ugi = UserGroupInformation.getCurrentUser();
 
     this.rpcRaidnode = createRPCRaidnode(RaidNode.getAddress(conf), conf, ugi);
     this.raidnode = createRaidnode(rpcRaidnode);
@@ -91,16 +87,13 @@ public class RaidShell extends Configured implements Tool {
 
   public static RaidProtocol createRaidnode(InetSocketAddress raidNodeAddr,
       Configuration conf) throws IOException {
-    try {
-      return createRaidnode(createRPCRaidnode(raidNodeAddr, conf,
-        UnixUserGroupInformation.login(conf, true)));
-    } catch (LoginException e) {
-      throw (IOException)(new IOException().initCause(e));
-    }
+    return createRaidnode(createRPCRaidnode(raidNodeAddr, conf,
+      UserGroupInformation.getCurrentUser()));
+
   }
 
   private static RaidProtocol createRPCRaidnode(InetSocketAddress raidNodeAddr,
-      Configuration conf, UnixUserGroupInformation ugi)
+      Configuration conf, UserGroupInformation ugi)
     throws IOException {
     LOG.info("RaidShell connecting to " + raidNodeAddr);
     return (RaidProtocol)RPC.getProxy(RaidProtocol.class,

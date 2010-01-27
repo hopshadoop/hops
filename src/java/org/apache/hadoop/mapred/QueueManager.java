@@ -25,8 +25,8 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.mapred.TaskScheduler.QueueRefresher;
 import org.apache.hadoop.mapreduce.QueueState;
-import org.apache.hadoop.security.SecurityUtil.AccessControlList;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authorize.AccessControlList;
 import org.apache.hadoop.util.StringUtils;
 import org.codehaus.jackson.JsonFactory;
 import org.codehaus.jackson.JsonGenerationException;
@@ -295,20 +295,11 @@ class QueueManager {
     }
 
     // Check the ACL list
-    boolean allowed = acl.allAllowed();
+    boolean allowed = acl.isAllAllowed();
     if (!allowed) {
       // Check the allowed users list
-      if (acl.getUsers().contains(ugi.getUserName())) {
+      if (acl.isUserAllowed(ugi)) {
         allowed = true;
-      } else {
-        // Check the allowed groups list
-        Set<String> allowedGroups = acl.getGroups();
-        for (String group : ugi.getGroupNames()) {
-          if (allowedGroups.contains(group)) {
-            allowed = true;
-            break;
-          }
-        }
       }
     }
 
@@ -722,31 +713,7 @@ class QueueManager {
     }
   }
 
-  private static StringBuilder getAclsInfo(AccessControlList accessControlList) {
-    StringBuilder sb = new StringBuilder();
-    if (accessControlList.getUsers() != null &&
-        accessControlList.getUsers().size() > 0) {
-      Set<String> users = accessControlList.getUsers();
-      Iterator<String> iterator = users.iterator();
-      while (iterator.hasNext()) {
-        sb.append(iterator.next());
-        if (iterator.hasNext()) {
-          sb.append(",");
-        }
-      }
-    }
-    if (accessControlList.getGroups() != null &&
-        accessControlList.getGroups().size() > 0) {
-      sb.append(" ");
-      Set<String> groups = accessControlList.getGroups();
-      Iterator<String> iterator = groups.iterator();
-      while (iterator.hasNext()) {
-        sb.append(iterator.next());
-        if (iterator.hasNext()) {
-          sb.append(",");
-        }
-      }
-    }
-    return sb;
+  private static StringBuilder getAclsInfo(AccessControlList accessControlList){
+    return new StringBuilder(accessControlList.toString());
   }
 }

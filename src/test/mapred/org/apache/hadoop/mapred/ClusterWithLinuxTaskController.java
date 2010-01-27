@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.security.PrivilegedExceptionAction;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -33,7 +34,6 @@ import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
-import org.apache.hadoop.security.UnixUserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
 
@@ -112,14 +112,14 @@ public class ClusterWithLinuxTaskController extends TestCase {
 
   private File configurationFile = null;
 
-  private UserGroupInformation taskControllerUser;
+  protected UserGroupInformation taskControllerUser;
 
   /*
    * Utility method which subclasses use to start and configure the MR Cluster
    * so they can directly submit a job.
    */
   protected void startCluster()
-      throws IOException {
+      throws IOException, InterruptedException {
     JobConf conf = new JobConf();
     dfsCluster = new MiniDFSCluster(conf, NUMBER_OF_NODES, true, null);
     conf.set(TTConfig.TT_TASK_CONTROLLER,
@@ -142,8 +142,8 @@ public class ClusterWithLinuxTaskController extends TestCase {
     String ugi = System.getProperty(TASKCONTROLLER_UGI);
     clusterConf = mrCluster.createJobConf();
     String[] splits = ugi.split(",");
-    taskControllerUser = new UnixUserGroupInformation(splits);
-    clusterConf.set(UnixUserGroupInformation.UGI_PROPERTY_NAME, ugi);
+    taskControllerUser = UserGroupInformation.createUserForTesting(splits[0], 
+        new String[]{splits[1]});
     createHomeAndStagingDirectory(clusterConf);
   }
 
@@ -154,16 +154,15 @@ public class ClusterWithLinuxTaskController extends TestCase {
     homeDirectory = new Path(path);
     LOG.info("Creating Home directory : " + homeDirectory);
     fs.mkdirs(homeDirectory);
-    changePermission(conf, homeDirectory);
+    changePermission(fs);
     Path stagingArea = new Path(conf.get(JTConfig.JT_STAGING_AREA_ROOT));
     LOG.info("Creating Staging root directory : " + stagingArea);
     fs.mkdirs(stagingArea);
     fs.setPermission(stagingArea, new FsPermission((short)0777));
   }
 
-  private void changePermission(JobConf conf, Path p)
+  private void changePermission(FileSystem fs)
       throws IOException {
-    FileSystem fs = dfsCluster.getFileSystem();
     fs.setOwner(homeDirectory, taskControllerUser.getUserName(),
         taskControllerUser.getGroupNames()[0]);
   }

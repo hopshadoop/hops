@@ -18,9 +18,13 @@
 
 package org.apache.hadoop.mapred;
 
+import java.io.IOException;
+import java.security.PrivilegedExceptionAction;
+
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.TaskType;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.Test;
 
 public class TestDebugScriptWithLinuxTaskController extends
@@ -33,21 +37,28 @@ public class TestDebugScriptWithLinuxTaskController extends
     }
     super.startCluster();
     TestDebugScript.setupDebugScriptDirs();
-    Path inDir = new Path("input");
-    Path outDir = new Path("output");
+    final Path inDir = new Path("input");
+    final Path outDir = new Path("output");
     JobConf conf = super.getClusterConf();
     FileSystem fs = inDir.getFileSystem(conf);
     fs.mkdirs(inDir);
     Path p = new Path(inDir, "1.txt");
     fs.createNewFile(p);
-    JobID jobId = TestDebugScript.runFailingMapJob(super.getClusterConf(), 
-        inDir, outDir);
-    String ugi = System
-        .getProperty(ClusterWithLinuxTaskController.TASKCONTROLLER_UGI);
+    String splits[] = System
+          .getProperty(ClusterWithLinuxTaskController.TASKCONTROLLER_UGI).
+          split(",");
+    JobID jobId = UserGroupInformation.createUserForTesting(splits[0], 
+        new String[]{splits[1]}).doAs(new PrivilegedExceptionAction<JobID>() {
+          public JobID run() throws IOException{
+          return TestDebugScript.runFailingMapJob(
+              TestDebugScriptWithLinuxTaskController.this.getClusterConf(), 
+              inDir, outDir);
+          }
+        });
     // construct the task id of first map task of failmap
     TaskAttemptID taskId = new TaskAttemptID(
         new TaskID(jobId,TaskType.MAP, 0), 0);
-    TestDebugScript.verifyDebugScriptOutput(taskId, ugi.split(",")[0],
+    TestDebugScript.verifyDebugScriptOutput(taskId, splits[0],
         "-rw-rw----");
     TestDebugScript.cleanupDebugScriptDirs();
   }

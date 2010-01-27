@@ -370,6 +370,10 @@ abstract public class Task implements Writable, Configurable {
   String getUser() {
     return user;
   }
+  
+  void setUser(String user) {
+    this.user = user;
+  }
 
   ////////////////////////////////////////////
   // Writable methods
@@ -967,7 +971,6 @@ abstract public class Task implements Writable, Configurable {
         NetUtils.addStaticResolution(name, resolvedName);
       }
     }
-    this.user = this.conf.getUser();
   }
 
   public Configuration getConf() {

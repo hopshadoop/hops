@@ -25,9 +25,8 @@ import static org.apache.hadoop.mapred.QueueConfigurationParser.*;
 import static org.junit.Assert.*;
 
 import org.apache.hadoop.mapreduce.QueueState;
-import org.apache.hadoop.security.UnixUserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.SecurityUtil.AccessControlList;
+import org.apache.hadoop.security.authorize.AccessControlList;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.junit.After;
 import org.junit.Test;
@@ -109,15 +108,15 @@ public class TestQueueManager {
     assertTrue(
       q.getAcls().get(
         QueueManager.toFullPropertyName(
-          q.getName(), ACL_SUBMIT_JOB_TAG)).getUsers().contains(
-        "u1"));
+          q.getName(), ACL_SUBMIT_JOB_TAG)).isUserAllowed(
+        UserGroupInformation.createRemoteUser("u1")));
 
     assertTrue(
       q.getAcls().get(
         QueueManager.toFullPropertyName(
           q.getName(),
           ACL_ADMINISTER_JOB_TAG))
-        .getUsers().contains("u2"));
+        .isUserAllowed(UserGroupInformation.createRemoteUser("u2")));
     assertTrue(q.getState().equals(QueueState.STOPPED));
   }
 
@@ -131,26 +130,26 @@ public class TestQueueManager {
 
     UserGroupInformation ugi;
     // test for acls access when acls are set with *
-    ugi = new UnixUserGroupInformation("u1", new String[]{" "});
+    ugi = UserGroupInformation.createRemoteUser("u1");
     assertTrue(qm.hasAccess("p1" + NAME_SEPARATOR + "p12",
         Queue.QueueOperation.SUBMIT_JOB, ugi));
-    ugi = new UnixUserGroupInformation("u2", new String[]{" "});
+    ugi = UserGroupInformation.createRemoteUser("u2");
     assertTrue(qm.hasAccess("p1" + NAME_SEPARATOR + "p12",
         Queue.QueueOperation.ADMINISTER_JOBS, ugi));
     
     // test for acls access when acls are not set with *
-    ugi = new UnixUserGroupInformation("u1", new String[]{" "});
+    ugi = UserGroupInformation.createRemoteUser("u1");
     assertTrue(qm.hasAccess("p1" + NAME_SEPARATOR + "p11",
         Queue.QueueOperation.SUBMIT_JOB, ugi));
-    ugi = new UnixUserGroupInformation("u2", new String[]{" "});
+    ugi = UserGroupInformation.createRemoteUser("u2");
     assertTrue(qm.hasAccess("p1" + NAME_SEPARATOR + "p11",
         Queue.QueueOperation.ADMINISTER_JOBS, ugi));
     
     // test for acls access when acls are not specified but acls is enabled
-    ugi = new UnixUserGroupInformation("u1", new String[]{" "});
+    ugi = UserGroupInformation.createRemoteUser("u1");
     assertTrue(qm.hasAccess("p1" + NAME_SEPARATOR + "p13",
         Queue.QueueOperation.SUBMIT_JOB, ugi));
-    ugi = new UnixUserGroupInformation("u2", new String[]{" "});
+    ugi = UserGroupInformation.createRemoteUser("u2");
     assertTrue(qm.hasAccess("p1" + NAME_SEPARATOR + "p13",
         Queue.QueueOperation.ADMINISTER_JOBS, ugi));
     
@@ -190,7 +189,7 @@ public class TestQueueManager {
     QueueManager qm = new QueueManager(CONFIG);
 
     UserGroupInformation ugi =
-      new UnixUserGroupInformation("u1", new String[]{" "});
+      UserGroupInformation.createRemoteUser("u1");
     assertFalse(
       qm.hasAccess(
         "p1",
@@ -369,14 +368,14 @@ public class TestQueueManager {
               child.getAcls().get(
                 QueueManager.toFullPropertyName(
                   child.getName(), ACL_SUBMIT_JOB_TAG))
-                .getUsers().contains("u1"));
+                .isUserAllowed(UserGroupInformation.createRemoteUser("u1")));
 
             assertTrue(
               child.getAcls().get(
                 QueueManager.toFullPropertyName(
                   child.getName(),
                   ACL_ADMINISTER_JOB_TAG))
-                .getUsers().contains("u2"));
+                .isUserAllowed(UserGroupInformation.createRemoteUser("u2")));
             assertTrue(child.getState().equals(QueueState.STOPPED));
           } else {
             assertTrue(child.getState().equals(QueueState.RUNNING));
@@ -413,14 +412,14 @@ public class TestQueueManager {
                 QueueManager.toFullPropertyName(
                   child.getName(),
                   ACL_SUBMIT_JOB_TAG))
-                .getUsers().contains("u3"));
+                .isUserAllowed(UserGroupInformation.createRemoteUser("u3")));
 
             assertTrue(
               child.getAcls().get(
                 QueueManager.toFullPropertyName(
                   child.getName(),
                   ACL_ADMINISTER_JOB_TAG))
-                .getUsers().contains("u4"));
+                .isUserAllowed(UserGroupInformation.createRemoteUser("u4")));
             assertTrue(child.getState().equals(QueueState.RUNNING));
           } else {
             assertTrue(child.getState().equals(QueueState.STOPPED));

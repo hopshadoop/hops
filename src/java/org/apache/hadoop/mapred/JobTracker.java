@@ -26,6 +26,7 @@ import java.io.Writer;
 import java.net.BindException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.security.PrivilegedExceptionAction;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -48,8 +49,6 @@ import java.util.TreeSet;
 import java.util.Vector;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
-
-import javax.security.auth.login.LoginException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -90,14 +89,10 @@ import org.apache.hadoop.net.Node;
 import org.apache.hadoop.net.NodeBase;
 import org.apache.hadoop.net.ScriptBasedMapping;
 import org.apache.hadoop.security.AccessControlException;
-import org.apache.hadoop.security.PermissionChecker;
+import org.apache.hadoop.security.Groups;
 import org.apache.hadoop.security.RefreshUserToGroupMappingsProtocol;
-import org.apache.hadoop.security.SecurityUtil;
-import org.apache.hadoop.security.UnixUserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AuthorizationException;
-import org.apache.hadoop.security.authorize.ConfiguredPolicy;
-import org.apache.hadoop.security.authorize.PolicyProvider;
 import org.apache.hadoop.security.authorize.RefreshAuthorizationPolicyProtocol;
 import org.apache.hadoop.security.authorize.ServiceAuthorizationManager;
 import org.apache.hadoop.util.HostsFileReader;
@@ -225,17 +220,17 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    * @throws IOException
    */
   public static JobTracker startTracker(JobConf conf) 
-  throws IOException, InterruptedException, LoginException {
+  throws IOException, InterruptedException {
     return startTracker(conf, DEFAULT_CLOCK);
   }
 
   static JobTracker startTracker(JobConf conf, Clock clock) 
-  throws IOException, InterruptedException, LoginException {
+  throws IOException, InterruptedException {
     return startTracker(conf, clock, generateNewIdentifier());
   }
 
   static JobTracker startTracker(JobConf conf, Clock clock, String identifier) 
-  throws IOException, InterruptedException, LoginException {
+  throws IOException, InterruptedException {
     JobTracker result = null;
     while (true) {
       try {
@@ -1047,7 +1042,6 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     void updateRestartCount() throws IOException {
       Path restartFile = getRestartCountFile();
       Path tmpRestartFile = getTempRestartCountFile();
-      FileSystem fs = restartFile.getFileSystem(conf);
       FsPermission filePerm = new FsPermission(SYSTEM_FILE_PERMISSION);
 
       // read the count from the jobtracker info file
@@ -1132,9 +1126,8 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
           JobInfo token = new JobInfo();
           token.readFields(in);
           in.close();
-          UnixUserGroupInformation ugi = new UnixUserGroupInformation(
-              token.getUser().toString(), 
-              new String[]{UnixUserGroupInformation.DEFAULT_GROUP});
+          UserGroupInformation ugi = 
+            UserGroupInformation.createRemoteUser(token.getUser().toString());
           submitJob(token.getJobID(), restartCount, 
               ugi, token.getJobSubmitDir().toString(), true, null);
           recovered++;
@@ -1325,25 +1318,37 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
 
   
   JobTracker(JobConf conf) 
-  throws IOException,InterruptedException, LoginException {
+  throws IOException,InterruptedException {
     this(conf, new Clock());
   }
   /**
    * Start the JobTracker process, listen on the indicated port
    */
   JobTracker(JobConf conf, Clock clock) 
-  throws IOException, InterruptedException, LoginException {
+  throws IOException, InterruptedException {
     this(conf, clock, generateNewIdentifier());
   }
 
-  JobTracker(JobConf conf, Clock newClock, String jobtrackerIndentifier) 
-  throws IOException, InterruptedException, LoginException {
+  JobTracker(final JobConf conf, Clock newClock, String jobtrackerIndentifier) 
+  throws IOException, InterruptedException {
     // find the owner of the process
-    clock = newClock;
-    mrOwner = UnixUserGroupInformation.login(conf);
+    // get the desired principal to load
+    String keytabFilename = conf.get(JTConfig.JT_KEYTAB_FILE);
+    UserGroupInformation.setConfiguration(conf);
+    if (keytabFilename != null) {
+      String desiredUser = conf.get(JTConfig.JT_USER_NAME,
+                                    System.getProperty("user.name"));
+      UserGroupInformation.loginUserFromKeytab(desiredUser, 
+                                               keytabFilename);
+      mrOwner = UserGroupInformation.getLoginUser();
+    } else {
+      mrOwner = UserGroupInformation.getCurrentUser();
+    }
+    
     supergroup = conf.get(JT_SUPERGROUP, "supergroup");
     LOG.info("Starting jobtracker with owner as " + mrOwner.getUserName() 
              + " and supergroup as " + supergroup);
+    clock = newClock;
 
     //
     // Grab some static constants
@@ -1400,12 +1405,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     // Set service-level authorization security policy
     if (conf.getBoolean(
           ServiceAuthorizationManager.SERVICE_AUTHORIZATION_CONFIG, false)) {
-      PolicyProvider policyProvider = 
-        (PolicyProvider)(ReflectionUtils.newInstance(
-            conf.getClass(PolicyProvider.POLICY_PROVIDER_CONFIG, 
-                MapReducePolicyProvider.class, PolicyProvider.class), 
-            conf));
-      SecurityUtil.setPolicy(new ConfiguredPolicy(conf, policyProvider));
+      ServiceAuthorizationManager.refresh(conf, new MapReducePolicyProvider());
     }
     
     int handlerCount = conf.getInt(JT_IPC_HANDLER_COUNT, 10);
@@ -1469,7 +1469,10 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
       try {
         // if we haven't contacted the namenode go ahead and do it
         if (fs == null) {
-          fs = FileSystem.get(conf);
+          fs = mrOwner.doAs(new PrivilegedExceptionAction<FileSystem>() {
+            public FileSystem run() throws IOException {
+              return FileSystem.get(conf);
+          }});
         }
         // clean up the system dir, which will only work if hdfs is out of 
         // safe mode
@@ -1485,7 +1488,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
           if (!systemDirStatus.getPermission().equals(SYSTEM_DIR_PERMISSION)) {
             LOG.warn("Incorrect permissions on " + systemDir + 
                 ". Setting it to " + SYSTEM_DIR_PERMISSION);
-            fs.setPermission(systemDir, SYSTEM_DIR_PERMISSION);
+            fs.setPermission(systemDir,new FsPermission(SYSTEM_DIR_PERMISSION));
           }
         } catch (FileNotFoundException fnf) {} //ignore
         // Make sure that the backup data is preserved
@@ -1544,10 +1547,14 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
 
     // Initialize history DONE folder
     jobHistory.initDone(conf, fs);
-    String historyLogDir = 
+    final String historyLogDir = 
       jobHistory.getCompletedJobHistoryLocation().toString();
     infoServer.setAttribute("historyLogDir", historyLogDir);
-    FileSystem historyFS = new Path(historyLogDir).getFileSystem(conf);
+    FileSystem historyFS = mrOwner.doAs(new PrivilegedExceptionAction<FileSystem>() {
+      public FileSystem run() throws IOException {
+        return new Path(historyLogDir).getFileSystem(conf);
+      }
+    });
     infoServer.setAttribute("fileSys", historyFS);
 
     this.dnsToSwitchMapping = ReflectionUtils.newInstance(
@@ -1607,14 +1614,6 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    */
   FileSystem getFileSystem() {
     return fs;
-  }
-
-  /**
-   * Get the FileSystem for the given path. This can be used to resolve
-   * filesystem for job history, local job files or mapreduce.system.dir path.
-   */
-  FileSystem getFileSystem(Path path) throws IOException {
-    return path.getFileSystem(conf);
   }
 
   /**
@@ -2909,9 +2908,11 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    * of the JobTracker.  But JobInProgress adds info that's useful for
    * the JobTracker alone.
    */
-  public synchronized org.apache.hadoop.mapreduce.JobStatus submitJob(
-    org.apache.hadoop.mapreduce.JobID jobId,String jobSubmitDir, TokenStorage ts) 
-  throws IOException {  
+  public synchronized 
+  org.apache.hadoop.mapreduce.JobStatus 
+    submitJob(org.apache.hadoop.mapreduce.JobID jobId, String jobSubmitDir,
+              TokenStorage ts
+              ) throws IOException, InterruptedException {
     return submitJob(JobID.downgrade(jobId), jobSubmitDir, ts);
   }
   
@@ -2927,20 +2928,23 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    *  instead
    */
   @Deprecated
-  public synchronized JobStatus submitJob(
-      JobID jobId, String jobSubmitDir, TokenStorage ts) 
-  throws IOException {
-    return submitJob(jobId, 0, 
-        UserGroupInformation.getCurrentUGI(), 
-        jobSubmitDir, false, ts);
+  public synchronized JobStatus submitJob(JobID jobId, 
+                                          String jobSubmitDir,
+                                          TokenStorage ts
+                                         ) throws IOException, 
+                                                  InterruptedException {
+    return submitJob(jobId, 0, UserGroupInformation.getCurrentUser(), 
+                     jobSubmitDir, false, ts);
   }
 
   /**
    * Submits either a new job or a job from an earlier run.
    */
-  private synchronized JobStatus submitJob(org.apache.hadoop.mapreduce.JobID jobID, 
-      int restartCount, UserGroupInformation ugi, String jobSubmitDir, 
-      boolean recovered, TokenStorage ts) throws IOException {
+  private synchronized 
+  JobStatus submitJob(org.apache.hadoop.mapreduce.JobID jobID, 
+                      int restartCount, UserGroupInformation ugi, 
+                      String jobSubmitDir, boolean recovered, TokenStorage ts
+                      ) throws IOException, InterruptedException {
     JobID jobId = JobID.downgrade(jobID);
     if(jobs.containsKey(jobId)) {
       //job already running, don't start twice
@@ -3026,7 +3030,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
                                 Queue.QueueOperation oper) 
                                   throws IOException {
     // get the user group info
-    UserGroupInformation ugi = UserGroupInformation.getCurrentUGI();
+    UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     checkAccess(job, oper, ugi);
   }
 
@@ -3279,8 +3283,8 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    */
   @Deprecated
   public synchronized void setJobPriority(JobID jobid, 
-                                              String priority)
-                                                throws IOException {
+                                          String priority)
+                                          throws IOException {
     JobInProgress job = jobs.get(jobid);
     if (null == job) {
         LOG.info("setJobPriority(): JobId " + jobid.toString()
@@ -3617,7 +3621,8 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   
   /** Mark a Task to be killed */
   @Deprecated
-  public synchronized boolean killTask(TaskAttemptID taskid, boolean shouldFail) throws IOException{
+  public synchronized boolean killTask(TaskAttemptID taskid, 
+      boolean shouldFail) throws IOException {
     TaskInProgress tip = taskidToTIPMap.get(taskid);
     if(tip != null) {
       checkAccess(tip.getJob(), Queue.QueueOperation.ADMINISTER_JOBS);
@@ -3658,12 +3663,13 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   }
   
   /**
+   * @throws LoginException 
    * @see org.apache.hadoop.mapreduce.protocol.ClientProtocol#getStagingAreaDir()
    */
-  public String getStagingAreaDir() {
+  public String getStagingAreaDir() throws IOException {
     Path stagingRootDir = new Path(conf.get(JTConfig.JT_STAGING_AREA_ROOT, 
         defaultStagingBaseDir));
-    String user = UserGroupInformation.getCurrentUGI().getUserName();
+    String user = UserGroupInformation.getCurrentUser().getUserName();
     return fs.makeQualified(new Path(stagingRootDir, 
                                 user+"/.staging")).toString();
   }
@@ -3882,12 +3888,35 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   }
   
   /**
+   * Is the current user a super user?
+   * @return true, if it is a super user
+   * @throws IOException if there are problems getting the current user
+   */
+  private synchronized boolean isSuperUser() throws IOException {
+    UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+    if (mrOwner.getUserName().equals(ugi.getUserName()) ) {
+      return true;
+    }
+    String[] groups = ugi.getGroupNames();
+    for(int i=0; i < groups.length; ++i) {
+      if (groups[i].equals(supergroup)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
    * Rereads the config to get hosts and exclude list file names.
    * Rereads the files to update the hosts and exclude lists.
    */
   public synchronized void refreshNodes() throws IOException {
     // check access
-    PermissionChecker.checkSuperuserPrivilege(mrOwner, supergroup);
+    if (!isSuperUser()) {
+      String user = UserGroupInformation.getCurrentUser().getUserName();
+      throw new AccessControlException(user + 
+                                       " is not authorized to refresh nodes.");
+    }
     
     // call the actual api
     refreshHosts();
@@ -4070,10 +4099,10 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   
   @Override
   public org.apache.hadoop.mapreduce.QueueAclsInfo[] 
-      getQueueAclsForCurrentUser() throws IOException{
-    return queueManager.getQueueAcls(
-            UserGroupInformation.getCurrentUGI());
+      getQueueAclsForCurrentUser() throws IOException {
+    return queueManager.getQueueAcls(UserGroupInformation.getCurrentUser());
   }
+
   private synchronized JobStatus[] getJobStatus(Collection<JobInProgress> jips,
       boolean toComplete) {
     if(jips == null || jips.isEmpty()) {
@@ -4110,13 +4139,13 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
             ServiceAuthorizationManager.SERVICE_AUTHORIZATION_CONFIG, false)) {
       throw new AuthorizationException("Service Level Authorization not enabled!");
     }
-    SecurityUtil.getPolicy().refresh();
+    ServiceAuthorizationManager.refresh(conf, new MapReducePolicyProvider());
   }
 
   @Override
   public void refreshQueues() throws IOException{
     LOG.info("Refreshing queue information. requested by : " + 
-        UserGroupInformation.getCurrentUGI().getUserName());
+             UserGroupInformation.getCurrentUser().getUserName());
     this.queueManager.refreshQueues(new Configuration(this.conf),
         taskScheduler.getQueueRefresher());
   }
@@ -4171,13 +4200,13 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
             limitMaxMemForReduceTasks).append(")"));
   }
 
-   
+    
   @Override
   public void refreshUserToGroupsMappings(Configuration conf) throws IOException {
     LOG.info("Refreshing all user-to-groups mappings. Requested by user: " + 
-             UserGroupInformation.getCurrentUGI().getUserName());
+             UserGroupInformation.getCurrentUser().getUserName());
     
-    SecurityUtil.getUserToGroupsMappingService(conf).refresh();
+    Groups.getUserToGroupsMappingService(conf).refresh();
   }
   
   private boolean perTaskMemoryConfigurationSetOnJT() {
@@ -4282,7 +4311,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     faultyTrackers.incrementFaults(hostName);
   }
 
-  JobTracker(JobConf conf, Clock clock, boolean ignoredForSimulation) 
+  JobTracker(final JobConf conf, Clock clock, boolean ignoredForSimulation) 
   throws IOException {
     this.clock = clock;
     this.conf = conf;
@@ -4303,10 +4332,16 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     NUM_HEARTBEATS_IN_SECOND = 
         conf.getInt("mapred.heartbeats.in.second", 100);
     
-    try {
-      mrOwner = UnixUserGroupInformation.login(conf);
-    } catch (LoginException e) {
-      throw new IOException(StringUtils.stringifyException(e));
+    // get the desired principal to load
+    String keytabFilename = conf.get(JTConfig.JT_KEYTAB_FILE);
+    if (keytabFilename != null) {
+      String desiredUser = conf.get(JTConfig.JT_USER_NAME,
+                                    System.getProperty("user.name"));
+      UserGroupInformation.loginUserFromKeytab(desiredUser, 
+                                               keytabFilename);
+      mrOwner = UserGroupInformation.getLoginUser();
+    } else {
+      mrOwner = UserGroupInformation.getCurrentUser();
     }
     supergroup = conf.get("mapred.permissions.supergroup", "supergroup");
     
@@ -4339,15 +4374,22 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     infoServer.setAttribute("job.tracker", this);
     
     // initialize history parameters.
-    String historyLogDir = null;
     FileSystem historyFS = null;
 
     jobHistory = new JobHistory();
     jobHistory.init(this, conf, this.localMachine, this.startTime);
     jobHistory.initDone(conf, fs);
-    historyLogDir = jobHistory.getCompletedJobHistoryLocation().toString();
+    final String historyLogDir = jobHistory.getCompletedJobHistoryLocation().toString();
     infoServer.setAttribute("historyLogDir", historyLogDir);
-    historyFS = new Path(historyLogDir).getFileSystem(conf);
+    try {
+      historyFS = mrOwner.doAs(new PrivilegedExceptionAction<FileSystem>() {
+        public FileSystem run() throws IOException {
+          return new Path(historyLogDir).getFileSystem(conf);
+        }
+      });
+    } catch (InterruptedException e1) {
+      throw (IOException) new IOException().initCause(e1);
+    }
 
     infoServer.setAttribute("fileSys", historyFS);
     infoServer.addServlet("reducegraph", "/taskgraph", TaskGraphServlet.class);

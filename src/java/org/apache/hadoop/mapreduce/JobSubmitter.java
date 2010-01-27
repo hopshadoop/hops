@@ -304,11 +304,6 @@ class JobSubmitter {
   @SuppressWarnings("unchecked")
   JobStatus submitJobInternal(Job job, Cluster cluster) 
   throws ClassNotFoundException, InterruptedException, IOException {
-    /*
-     * set this user's id in job configuration, so later job files can be
-     * accessed using this user's id
-     */
-    job.setUGIAndUserGroupNames();
 
     Path jobStagingArea = JobSubmissionFiles.getStagingDir(cluster, 
                                                      job.getConfiguration());
@@ -412,7 +407,8 @@ class JobSubmitter {
     // sort the splits into order based on size, so that the biggest
     // go first
     Arrays.sort(array, new SplitComparator());
-    JobSplitWriter.createSplitFiles(jobSubmitDir, conf, array);
+    JobSplitWriter.createSplitFiles(jobSubmitDir, conf, 
+        jobSubmitDir.getFileSystem(conf), array);
     return array.length;
   }
   
@@ -454,7 +450,8 @@ class JobSubmitter {
         }
       }
     });
-    JobSplitWriter.createSplitFiles(jobSubmitDir, job, splits);
+    JobSplitWriter.createSplitFiles(jobSubmitDir, job, 
+        jobSubmitDir.getFileSystem(job), splits);
     return splits.length;
   }
   

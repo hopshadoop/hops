@@ -83,4 +83,7 @@ public interface TTConfig extends MRConfig {
     "mapreduce.tasktracker.cache.local.size";
   public static final String TT_OUTOFBAND_HEARBEAT =
     "mapreduce.tasktracker.outofband.heartbeat";
+  public static final String TT_USER_NAME = "mapreduce.tasktracker.user.name";
+  public static final String TT_KEYTAB_FILE = 
+    "mapreduce.tasktracker.keytab.file";
 }

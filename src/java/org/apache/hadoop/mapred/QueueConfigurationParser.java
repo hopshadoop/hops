@@ -22,7 +22,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.mapred.Queue.QueueOperation;
 import org.apache.hadoop.mapreduce.QueueState;
-import org.apache.hadoop.security.SecurityUtil.AccessControlList;
+import org.apache.hadoop.security.authorize.AccessControlList;
 import static org.apache.hadoop.mapred.QueueManager.toFullPropertyName;
 import org.xml.sax.SAXException;
 import org.w3c.dom.Document;
