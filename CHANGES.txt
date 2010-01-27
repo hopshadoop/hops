@@ -259,6 +259,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1394. Sqoop generates incorrect URIs in paths sent to Hive.
     (Aaron Kimball via tomwhite)
 
+    MAPREDUCE-1395. Sqoop does not check return value of Job.waitForCompletion().
+    (Aaron Kimball via tomwhite)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
