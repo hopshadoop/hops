@@ -229,7 +229,9 @@ public interface JobContext {
     "mapreduce.reduce.merge.memtomem.threshold";
   public static final String REDUCE_MEMTOMEM_ENABLED = 
     "mapreduce.reduce.merge.memtomem.enabled";
-  public static final String JOB_TOKEN_FILE = "mapreduce.job.jobTokenFile";
+  public static final String JOB_NAMENODES = "mapreduce.job.hdfs-servers";
+  public static final String JOB_JOBTRACKER_ID = "mapreduce.job.kerberos.jtprinicipal";
+  
 
   /**
    * Return the configuration for the job.

@@ -34,6 +34,7 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.TaskController;
 import org.apache.hadoop.mapred.TaskController.DistributedCacheFileContext;
 import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.security.TokenCache;
 import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
 import org.apache.hadoop.mapreduce.util.MRAsyncDiskService;
 import org.apache.hadoop.fs.FileStatus;
@@ -709,6 +710,35 @@ public class TrackerDistributedCacheManager {
       setFileTimestamps(job, fileTimestamps.toString());
     }
   }
+  
+  /**
+   * For each archive or cache file - get the corresponding delegation token
+   * @param job
+   * @throws IOException
+   */
+  public static void getDelegationTokens(Configuration job) throws IOException {
+    URI[] tarchives = DistributedCache.getCacheArchives(job);
+    URI[] tfiles = DistributedCache.getCacheFiles(job);
+    
+    int size = (tarchives!=null? tarchives.length : 0) + (tfiles!=null ? tfiles.length :0);
+    Path[] ps = new Path[size];
+    
+    int i = 0;
+    if (tarchives != null) {
+      for (i=0; i < tarchives.length; i++) {
+        ps[i] = new Path(tarchives[i].toString());
+      }
+    }
+    
+    if (tfiles != null) {
+      for(int j=0; j< tfiles.length; j++) {
+        ps[i+j] = new Path(tfiles[j].toString());
+      }
+    }
+    
+    TokenCache.obtainTokensForNamenodes(ps, job);
+  }
+  
   /**
    * Determines the visibilities of the distributed cache files and 
    * archives. The visibility of a cache path is "public" if the leaf component

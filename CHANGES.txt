@@ -12,6 +12,12 @@ Trunk (unreleased changes)
 
   NEW FEATURES
 
+    MAPREDUCE-1383. Automates fetching of delegation tokens in File*Formats
+    Distributed Cache and Distcp. Also, provides a config 
+    mapreduce.job.hdfs-servers that the jobs can populate with a comma
+    separated list of namenodes. The job client automatically fetches
+    delegation tokens from those namenodes. (Boris Shkolnik via ddas)    
+
     MAPREDUCE-698. Per-pool task limits for the fair scheduler.
     (Kevin Peterson via matei)
 

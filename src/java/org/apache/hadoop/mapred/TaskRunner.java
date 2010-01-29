@@ -38,6 +38,7 @@ import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.filecache.DistributedCache;
 import org.apache.hadoop.mapreduce.filecache.TaskDistributedCacheManager;
 import org.apache.hadoop.mapreduce.filecache.TrackerDistributedCacheManager;
+import org.apache.hadoop.mapreduce.security.TokenCache;
 import org.apache.hadoop.mapreduce.server.tasktracker.Localizer;
 import org.apache.hadoop.fs.FSError;
 import org.apache.hadoop.fs.FileSystem;
@@ -515,7 +516,7 @@ abstract class TaskRunner extends Thread {
     env.put("LD_LIBRARY_PATH", ldLibraryPath.toString());
     
     // put jobTokenFile name into env
-    String jobTokenFile = conf.get(JobContext.JOB_TOKEN_FILE);
+    String jobTokenFile = conf.get(TokenCache.JOB_TOKEN_FILENAME);
     LOG.debug("putting jobToken file name into environment fn=" + jobTokenFile);
     env.put("JOB_TOKEN_FILE", jobTokenFile);
     
