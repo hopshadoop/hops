@@ -177,8 +177,6 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
 
   private MRAsyncDiskService asyncDiskService;
   
-  private final String defaultStagingBaseDir;
-  
   /**
    * A client tried to submit a job before the Job Tracker was ready.
    */
@@ -1313,7 +1311,6 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     tasktrackerExpiryInterval = 0;
     myInstrumentation = new JobTrackerMetricsInst(this, new JobConf());
     mrOwner = null;
-    defaultStagingBaseDir = "/Users"; 
   }
 
   
@@ -1565,8 +1562,6 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
 
     //initializes the job status store
     completedJobStatusStore = new CompletedJobStatusStore(conf);
-    Path homeDir = fs.getHomeDirectory();
-    defaultStagingBaseDir = homeDir.getParent().toString();
   }
 
   private static SimpleDateFormat getDateFormat() {
@@ -3668,7 +3663,8 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    */
   public String getStagingAreaDir() throws IOException {
     Path stagingRootDir = new Path(conf.get(JTConfig.JT_STAGING_AREA_ROOT, 
-        defaultStagingBaseDir));
+        "/tmp/hadoop/mapred/staging"));
+    FileSystem fs = stagingRootDir.getFileSystem(conf);
     String user = UserGroupInformation.getCurrentUser().getUserName();
     return fs.makeQualified(new Path(stagingRootDir, 
                                 user+"/.staging")).toString();
@@ -4423,8 +4419,6 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
 
     //initializes the job status store
     completedJobStatusStore = new CompletedJobStatusStore(conf);
-    Path homeDir = fs.getHomeDirectory();
-    defaultStagingBaseDir = homeDir.getParent().toString();
   }
 
   /**

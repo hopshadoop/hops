@@ -40,9 +40,4 @@
   <value>false</value>
   <description></description>
 </property>
-<property>
-  <name>mapreduce.jobtracker.staging.root.dir</name>
-  <value>${hadoop.tmp.dir}/staging</value>
-  <description></description>
-</property>
 </configuration>

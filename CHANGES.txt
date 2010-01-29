@@ -268,6 +268,10 @@ Trunk (unreleased changes)
     MAPREDUCE-1395. Sqoop does not check return value of Job.waitForCompletion().
     (Aaron Kimball via tomwhite)
 
+    MAPREDUCE-1322. Defines default value for staging directory to be user
+    based fixing a failing streaming test.
+    (Devaraj Das and Amareshwari Sriramadasu via yhemanth)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
