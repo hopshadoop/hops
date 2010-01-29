@@ -1182,3 +1182,6 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1406. Fix spelling of JobContext.MAP_COMBINE_MIN_SPILLS.
     (cdouglas)
+
+    MAPREDUCE-1369. JUnit tests should never depend on anything in conf
+    (Anatoli Fomenko via cos)
