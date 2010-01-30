@@ -1198,3 +1198,6 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1369. JUnit tests should never depend on anything in conf
     (Anatoli Fomenko via cos)
+
+    MAPREDUCE-1412. Fix timer granularity issue causing failures in
+    TestTaskTrackerBlacklisting. (cdouglas)

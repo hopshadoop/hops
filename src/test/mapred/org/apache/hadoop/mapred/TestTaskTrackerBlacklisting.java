@@ -20,8 +20,8 @@ package org.apache.hadoop.mapred;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.Map.Entry;
@@ -53,22 +53,19 @@ public class TestTaskTrackerBlacklisting extends TestCase {
 
   private static short responseId;
 
-  private static HashSet<ReasonForBlackListing> nodeUnHealthyReasonSet = 
-    new HashSet<ReasonForBlackListing>();
+  private static final Set<ReasonForBlackListing> nodeUnHealthyReasonSet =
+    EnumSet.of(ReasonForBlackListing.NODE_UNHEALTHY);
 
-  private static HashSet<ReasonForBlackListing> exceedsFailuresReasonSet = 
-    new HashSet<ReasonForBlackListing>();
+  private static final Set<ReasonForBlackListing> exceedsFailuresReasonSet =
+    EnumSet.of(ReasonForBlackListing.EXCEEDING_FAILURES);
 
-  private static HashSet<ReasonForBlackListing> unhealthyAndExceedsFailure = 
-    new HashSet<ReasonForBlackListing>();
+  private static final Set<ReasonForBlackListing>
+    unhealthyAndExceedsFailure = EnumSet.of(
+        ReasonForBlackListing.NODE_UNHEALTHY,
+        ReasonForBlackListing.EXCEEDING_FAILURES);
 
-  static {
-    nodeUnHealthyReasonSet.add(ReasonForBlackListing.NODE_UNHEALTHY);
-    exceedsFailuresReasonSet.add(ReasonForBlackListing.EXCEEDING_FAILURES);
-    unhealthyAndExceedsFailure.add(ReasonForBlackListing.NODE_UNHEALTHY);
-    unhealthyAndExceedsFailure.add(ReasonForBlackListing.EXCEEDING_FAILURES);
-  }
-  private static final long aDay = 24 * 60 * 60 * 1000;
+  // Add extra millisecond where timer granularity is too coarse
+  private static final long aDay = 24 * 60 * 60 * 1000 + 1;
 
   private static class FakeJobTrackerClock extends Clock {
     boolean jumpADay = false;
@@ -186,8 +183,8 @@ public class TestTaskTrackerBlacklisting extends TestCase {
     checkReasonForBlackListing(hosts[0], exceedsFailuresReasonSet);
     clock.jumpADay = true;
     sendHeartBeat(null, false);
-    assertEquals("Tracker 1 still blacklisted after a day", jobTracker
-        .getBlacklistedTrackerCount(), 0);
+    assertEquals("Tracker 1 still blacklisted after a day", 0, jobTracker
+        .getBlacklistedTrackerCount());
     //Cleanup the blacklisted trackers.
     //Tracker is black listed due to failure count, so clock has to be
     //forwarded by a day.
@@ -207,8 +204,8 @@ public class TestTaskTrackerBlacklisting extends TestCase {
     //white list tracker so the further test cases can be
     //using trackers.
     sendHeartBeat(status, false);
-    assertEquals("Trackers still blacklisted after healthy report", jobTracker
-        .getBlacklistedTrackerCount(), 0);
+    assertEquals("Trackers still blacklisted after healthy report", 0,
+        jobTracker.getBlacklistedTrackerCount());
   }
   
   
@@ -265,15 +262,15 @@ public class TestTaskTrackerBlacklisting extends TestCase {
 
   public void testBlackListingWithFailuresAndHealthStatus() throws Exception {
     runBlackListingJob(jobTracker, trackers);
-    assertEquals("Tracker 1 not blacklisted", jobTracker
-        .getBlacklistedTrackerCount(), 1);
+    assertEquals("Tracker 1 not blacklisted", 1,
+        jobTracker.getBlacklistedTrackerCount());
     checkReasonForBlackListing(hosts[0], exceedsFailuresReasonSet);
     TaskTrackerHealthStatus status = getUnhealthyNodeStatus("ERROR");
     
     sendHeartBeat(status, false);
 
-    assertEquals("All trackers not blacklisted", 
-        jobTracker.getBlacklistedTrackerCount(), 3);
+    assertEquals("All trackers not blacklisted", 3,
+        jobTracker.getBlacklistedTrackerCount());
     checkReasonForBlackListing(hosts[0], unhealthyAndExceedsFailure);
     checkReasonForBlackListing(hosts[1], nodeUnHealthyReasonSet);
     checkReasonForBlackListing(hosts[2], nodeUnHealthyReasonSet);
@@ -281,8 +278,8 @@ public class TestTaskTrackerBlacklisting extends TestCase {
     clock.jumpADay = true;
     sendHeartBeat(status, false);
     
-    assertEquals("All trackers not blacklisted", 
-        jobTracker.getBlacklistedTrackerCount(), 3);
+    assertEquals("All trackers not blacklisted", 3,
+        jobTracker.getBlacklistedTrackerCount());
     
     for (String host : hosts) {
       checkReasonForBlackListing(host, nodeUnHealthyReasonSet);
@@ -290,8 +287,8 @@ public class TestTaskTrackerBlacklisting extends TestCase {
     //clear blacklisted trackers due to node health reasons.
     sendHeartBeat(null, false);
     
-    assertEquals("All trackers not white listed", 
-        jobTracker.getBlacklistedTrackerCount(), 0);
+    assertEquals("All trackers not white listed", 0,
+        jobTracker.getBlacklistedTrackerCount());
     //Clear the blacklisted trackers due to failures.
     clock.jumpADay = false;
   }
@@ -302,8 +299,8 @@ public class TestTaskTrackerBlacklisting extends TestCase {
     TaskTrackerHealthStatus status = getUnhealthyNodeStatus(error);
     sendHeartBeat(status, false);
 
-    assertEquals("All trackers not blacklisted", jobTracker
-        .getBlacklistedTrackerCount(), 3);
+    assertEquals("All trackers not blacklisted", 3,
+        jobTracker.getBlacklistedTrackerCount());
 
     checkReasonForBlackListing(hosts[0], nodeUnHealthyReasonSet);
     checkReasonForBlackListing(hosts[1], nodeUnHealthyReasonSet);
@@ -312,8 +309,8 @@ public class TestTaskTrackerBlacklisting extends TestCase {
       //Replace new line as we are adding new line
       //in getFaultReport
       assertEquals("Blacklisting reason string not correct for host " + i,
-          jobTracker.getFaultReport(hosts[i]).replace("\n", ""),
-          error);
+          error,
+          jobTracker.getFaultReport(hosts[i]).replace("\n", ""));
     }
     status.setNodeHealthy(false);
     status.setLastReported(System.currentTimeMillis());
@@ -326,8 +323,8 @@ public class TestTaskTrackerBlacklisting extends TestCase {
       //Replace new line as we are adding new line
       //in getFaultReport
       assertEquals("Blacklisting reason string not correct for host " + i,
-          jobTracker.getFaultReport(hosts[i]).replace("\n", ""),
-          error1);
+          error1,
+          jobTracker.getFaultReport(hosts[i]).replace("\n", ""));
     }
     //clear the blacklisted trackers with node health reasons.
     sendHeartBeat(null, false);
@@ -361,14 +358,14 @@ public class TestTaskTrackerBlacklisting extends TestCase {
         .getNumReservedTaskTrackersForMaps());
     assertEquals("Tracker 1 not unreserved for the job 1", 1, job
         .getNumReservedTaskTrackersForReduces());
-    assertEquals("Tracker 1 not blacklisted", jobTracker
-        .getBlacklistedTrackerCount(), 1);
+    assertEquals("Tracker 1 not blacklisted", 1, jobTracker
+        .getBlacklistedTrackerCount());
     checkReasonForBlackListing(hosts[0], exceedsFailuresReasonSet);
     
     TaskTrackerHealthStatus status = getUnhealthyNodeStatus("ERROR");
     sendHeartBeat(status, false);
-    assertEquals("All trackers not blacklisted", jobTracker
-        .getBlacklistedTrackerCount(), 3);
+    assertEquals("All trackers not blacklisted", 3,
+        jobTracker.getBlacklistedTrackerCount());
     
     checkReasonForBlackListing(hosts[0], unhealthyAndExceedsFailure);
     checkReasonForBlackListing(hosts[1], nodeUnHealthyReasonSet);
@@ -403,8 +400,8 @@ public class TestTaskTrackerBlacklisting extends TestCase {
     TaskTrackerHealthStatus status = getUnhealthyNodeStatus(errorWithNewLines);
     // make all tracker unhealthy
     sendHeartBeat(status, false);
-    assertEquals("All trackers not blacklisted", jobTracker
-        .getBlacklistedTrackerCount(), 3);
+    assertEquals("All trackers not blacklisted", 3, jobTracker
+        .getBlacklistedTrackerCount());
     // Verify the new method .getBlackListedTracker() which is
     // used by the ClusterStatus to set the list of blacklisted
     // tracker.
