@@ -76,7 +76,7 @@ public class Cluster {
 
   private ClientProtocol createClient(Configuration conf) throws IOException {
     ClientProtocol client;
-    String tracker = conf.get("mapred.job.tracker", "local");
+    String tracker = conf.get("mapreduce.jobtracker.address", "local");
     if ("local".equals(tracker)) {
       conf.setInt("mapreduce.job.maps", 1);
       client = new LocalJobRunner(conf);

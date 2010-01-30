@@ -142,6 +142,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1356. Allow user-specified hive table name in sqoop.
     (Aaron Kimball via tomwhite)
 
+    MAPREDUCE-1367. LocalJobRunner should support parallel mapper execution.
+    (Aaron Kimball via tomwhite)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
