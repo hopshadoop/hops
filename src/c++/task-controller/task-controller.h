@@ -72,7 +72,8 @@ enum errorcodes {
   INITIALIZE_USER_FAILED, //20
   UNABLE_TO_EXECUTE_DEBUG_SCRIPT, //21
   INVALID_CONF_DIR, //22
-  UNABLE_TO_BUILD_PATH //23
+  UNABLE_TO_BUILD_PATH, //23
+  INVALID_TASKCONTROLLER_PERMISSIONS //24
 };
 
 #define USER_DIR_PATTERN "%s/taskTracker/%s"
@@ -94,6 +95,8 @@ enum errorcodes {
 #define TT_SYS_DIR_KEY "mapreduce.cluster.local.dir"
 
 #define TT_LOG_DIR_KEY "hadoop.log.dir"
+
+#define TT_GROUP_KEY "mapreduce.tasktracker.group"
 
 #ifndef HADOOP_CONF_DIR
   #define EXEC_PATTERN "/bin/task-controller"

@@ -22,10 +22,10 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.security.PrivilegedExceptionAction;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -34,6 +34,7 @@ import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
+import org.apache.hadoop.security.Groups;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
 
@@ -68,7 +69,22 @@ public class ClusterWithLinuxTaskController extends TestCase {
    * 
    **/
   public static class MyLinuxTaskController extends LinuxTaskController {
-    String taskControllerExePath;
+    String taskControllerExePath = System.getProperty(TASKCONTROLLER_PATH)
+        + "/task-controller";
+    
+    @Override
+    public void setup() throws IOException {
+      // get the current ugi and set the task controller group owner
+      Groups groups = new Groups(new Configuration());
+      String ttGroup = groups.getGroups(
+          UserGroupInformation.getCurrentUser().getUserName()).get(0);
+      getConf().set(TTConfig.TT_GROUP, ttGroup);
+
+      // write configuration file
+      configurationFile = createTaskControllerConf(System
+          .getProperty(TASKCONTROLLER_PATH), getConf());
+      super.setup();
+    }
 
     @Override
     protected String getTaskControllerExecutablePath() {
@@ -105,12 +121,17 @@ public class ClusterWithLinuxTaskController extends TestCase {
   private JobConf clusterConf = null;
   protected Path homeDirectory;
 
+  /** changing this to a larger number needs more work for creating 
+   *  taskcontroller.cfg.
+   *  see {@link #startCluster()} and
+   *  {@link #createTaskControllerConf(String, Configuration)}
+   */ 
   private static final int NUMBER_OF_NODES = 1;
 
   static final String TASKCONTROLLER_PATH = "taskcontroller-path";
   static final String TASKCONTROLLER_UGI = "taskcontroller-ugi";
 
-  private File configurationFile = null;
+  private static File configurationFile = null;
 
   protected UserGroupInformation taskControllerUser;
 
@@ -128,19 +149,9 @@ public class ClusterWithLinuxTaskController extends TestCase {
         new MiniMRCluster(NUMBER_OF_NODES, dfsCluster.getFileSystem().getUri()
             .toString(), 4, null, null, conf);
 
-    // Get the configured taskcontroller-path
-    String path = System.getProperty(TASKCONTROLLER_PATH);
-    configurationFile =
-        createTaskControllerConf(path, mrCluster.getTaskTrackerRunner(0)
-            .getLocalDirs());
-    String execPath = path + "/task-controller";
-    TaskTracker tracker = mrCluster.getTaskTrackerRunner(0).tt;
-    // TypeCasting the parent to our TaskController instance as we
-    // know that that would be instance which should be present in TT.
-    ((MyLinuxTaskController) tracker.getTaskController())
-        .setTaskControllerExe(execPath);
-    String ugi = System.getProperty(TASKCONTROLLER_UGI);
     clusterConf = mrCluster.createJobConf();
+
+    String ugi = System.getProperty(TASKCONTROLLER_UGI);
     String[] splits = ugi.split(",");
     taskControllerUser = UserGroupInformation.createUserForTesting(splits[0], 
         new String[]{splits[1]});
@@ -167,16 +178,21 @@ public class ClusterWithLinuxTaskController extends TestCase {
         taskControllerUser.getGroupNames()[0]);
   }
 
+  static File getTaskControllerConfFile(String path) {
+    File confDirectory = new File(path, "../conf");
+    return new File(confDirectory, "taskcontroller.cfg");
+  }
+  
   /**
    * Create taskcontroller.cfg.
    * 
    * @param path Path to the taskcontroller binary.
-   * @param localDirs
+   * @param conf TaskTracker's configuration
    * @return the created conf file
    * @throws IOException
    */
-  static File createTaskControllerConf(String path, String[] localDirs)
-      throws IOException {
+  static File createTaskControllerConf(String path,
+      Configuration conf) throws IOException {
     File confDirectory = new File(path, "../conf");
     if (!confDirectory.exists()) {
       confDirectory.mkdirs();
@@ -185,17 +201,13 @@ public class ClusterWithLinuxTaskController extends TestCase {
     PrintWriter writer =
         new PrintWriter(new FileOutputStream(configurationFile));
 
-    StringBuffer sb = new StringBuffer();
-    for (int i = 0; i < localDirs.length; i++) {
-      sb.append(localDirs[i]);
-      if ((i + 1) != localDirs.length) {
-        sb.append(",");
-      }
-    }
-    writer.println(String.format(MRConfig.LOCAL_DIR + "=%s", sb.toString()));
+    writer.println(String.format(MRConfig.LOCAL_DIR + "=%s", conf
+        .get(MRConfig.LOCAL_DIR)));
 
     writer
         .println(String.format("hadoop.log.dir=%s", TaskLog.getBaseLogDir()));
+    writer.println(String.format(TTConfig.TT_GROUP + "=%s",
+        conf.get(TTConfig.TT_GROUP)));
 
     writer.flush();
     writer.close();
@@ -215,7 +227,7 @@ public class ClusterWithLinuxTaskController extends TestCase {
     return true;
   }
 
-  private static boolean isTaskExecPathPassed() {
+  static boolean isTaskExecPathPassed() {
     String path = System.getProperty(TASKCONTROLLER_PATH);
     if (path == null || path.isEmpty()
         || path.equals("${" + TASKCONTROLLER_PATH + "}")) {

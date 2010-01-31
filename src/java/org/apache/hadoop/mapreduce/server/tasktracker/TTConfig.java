@@ -86,4 +86,6 @@ public interface TTConfig extends MRConfig {
   public static final String TT_USER_NAME = "mapreduce.tasktracker.user.name";
   public static final String TT_KEYTAB_FILE = 
     "mapreduce.tasktracker.keytab.file";
+  public static final String TT_GROUP = 
+    "mapreduce.tasktracker.group";
 }

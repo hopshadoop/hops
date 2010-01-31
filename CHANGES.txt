@@ -285,6 +285,10 @@ Trunk (unreleased changes)
     based fixing a failing streaming test.
     (Devaraj Das and Amareshwari Sriramadasu via yhemanth)
 
+    MAPREDUCE-899. Modified LinuxTaskController to check that task-controller
+    has right permissions and ownership before performing any actions.
+    (Amareshwari Sriramadasu via yhemanth)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
