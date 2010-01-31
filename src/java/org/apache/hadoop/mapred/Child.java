@@ -32,7 +32,8 @@ import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.security.TokenCache;
-import org.apache.hadoop.mapreduce.security.TokenStorage;
+import org.apache.hadoop.security.TokenStorage;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.mapreduce.security.token.JobTokenSecretManager;
 import org.apache.hadoop.metrics.MetricsContext;
 import org.apache.hadoop.metrics.MetricsUtil;
@@ -72,8 +73,10 @@ class Child {
         firstTaskid.getTaskType() == TaskType.MAP,jvmIdInt);
     
     //load token cache storage
-    String jobTokenFile = System.getenv().get("JOB_TOKEN_FILE");
-    TokenStorage ts = TokenCache.loadTaskTokenStorage(jobTokenFile, defaultConf);
+    String jobTokenFile = 
+      System.getenv().get(UserGroupInformation.HADOOP_TOKEN_FILE_LOCATION);
+    TokenStorage ts = 
+      TokenCache.loadTaskTokenStorage(jobTokenFile, defaultConf);
     LOG.debug("loading token. # keys =" +ts.numberOfSecretKeys() + 
         "; from file=" + jobTokenFile);
     
@@ -155,9 +158,10 @@ class Child {
         JobConf job = new JobConf(task.getJobFile());
         
         // set job shuffle token
-        Token<? extends TokenIdentifier> jt = ts.getJobToken();
+        Token<? extends TokenIdentifier> jt = TokenCache.getJobToken(ts);
         // set the jobTokenFile into task
-        task.setJobTokenSecret(JobTokenSecretManager.createSecretKey(jt.getPassword()));
+        task.setJobTokenSecret(JobTokenSecretManager.
+                               createSecretKey(jt.getPassword()));
         
         // setup the child's Configs.LOCAL_DIR. The child is now sandboxed and
         // can only see files down and under attemtdir only.

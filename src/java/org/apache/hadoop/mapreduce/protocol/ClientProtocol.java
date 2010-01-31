@@ -20,7 +20,6 @@ package org.apache.hadoop.mapreduce.protocol;
 
 import java.io.IOException;
 
-import javax.security.auth.login.LoginException;
 
 import org.apache.hadoop.ipc.VersionedProtocol;
 import org.apache.hadoop.mapreduce.ClusterMetrics;
@@ -34,7 +33,7 @@ import org.apache.hadoop.mapreduce.TaskCompletionEvent;
 import org.apache.hadoop.mapreduce.TaskReport;
 import org.apache.hadoop.mapreduce.TaskTrackerInfo;
 import org.apache.hadoop.mapreduce.TaskType;
-import org.apache.hadoop.mapreduce.security.TokenStorage;
+import org.apache.hadoop.security.TokenStorage;
 import org.apache.hadoop.mapreduce.server.jobtracker.State;
 
 /** 

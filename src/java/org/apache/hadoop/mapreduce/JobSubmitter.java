@@ -485,7 +485,7 @@ class JobSubmitter {
           mapper.readValue(new File(localFileName), Map.class);
 
         for(Map.Entry<String, String> ent: nm.entrySet()) {
-          TokenCache.setSecretKey(new Text(ent.getKey()), ent.getValue().getBytes());
+          TokenCache.addSecretKey(new Text(ent.getKey()), ent.getValue().getBytes());
         }
       } catch (JsonMappingException e) {
         json_error = true;

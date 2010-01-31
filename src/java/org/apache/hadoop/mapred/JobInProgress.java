@@ -66,7 +66,7 @@ import org.apache.hadoop.mapreduce.jobhistory.TaskFailedEvent;
 import org.apache.hadoop.mapreduce.jobhistory.TaskFinishedEvent;
 import org.apache.hadoop.mapreduce.jobhistory.TaskStartedEvent;
 import org.apache.hadoop.mapreduce.security.TokenCache;
-import org.apache.hadoop.mapreduce.security.TokenStorage;
+import org.apache.hadoop.security.TokenStorage;
 import org.apache.hadoop.mapreduce.security.token.JobTokenIdentifier;
 import org.apache.hadoop.mapreduce.server.jobtracker.TaskTracker;
 import org.apache.hadoop.mapreduce.split.JobSplit;
@@ -79,6 +79,7 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.NetworkTopology;
 import org.apache.hadoop.net.Node;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
 
@@ -377,16 +378,22 @@ public class JobInProgress {
     this.startTime = System.currentTimeMillis();
     
     this.localFs = jobtracker.getLocalFileSystem();
-
+    this.tokenStorage = ts;
     // use the user supplied token to add user credentials to the conf
     jobSubmitDir = jobInfo.getJobSubmitDir();
     user = jobInfo.getUser().toString();
+
     UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
-      fs = ugi.doAs(new PrivilegedExceptionAction<FileSystem>() {
-        public FileSystem run() throws IOException {
-          return jobSubmitDir.getFileSystem(default_conf);
+    if (ts != null) {
+      for (Token<? extends TokenIdentifier> token : ts.getAllTokens()) {
+        ugi.addToken(token);
+      }
+    }
+
+    fs = ugi.doAs(new PrivilegedExceptionAction<FileSystem>() {
+      public FileSystem run() throws IOException {
+        return jobSubmitDir.getFileSystem(default_conf);
       }});
-    
     this.localJobFile = 
       default_conf.getLocalPath(JobTracker.SUBDIR + "/" + this.jobId + ".xml");
     
@@ -449,8 +456,6 @@ public class JobInProgress {
         JobContext.SPECULATIVECAP,0.1f);
     this.slowNodeThreshold = conf.getFloat(
         JobContext.SPECULATIVE_SLOWNODE_THRESHOLD,1.0f);
-    this.tokenStorage = ts;
-
   }
 
   /**
@@ -3570,7 +3575,7 @@ public class JobInProgress {
     if(tokenStorage == null)
       tokenStorage = new TokenStorage();
     
-    tokenStorage.setJobToken(token);
+    TokenCache.setJobToken(token, tokenStorage);
     
     // write TokenStorage out
     tokenStorage.write(os);
