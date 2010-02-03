@@ -292,6 +292,9 @@ Trunk (unreleased changes)
     has right permissions and ownership before performing any actions.
     (Amareshwari Sriramadasu via yhemanth)
 
+    MAPREDUCE-1443. DBInputFormat can leak connections.
+    (Aaron Kimball via tomwhite)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

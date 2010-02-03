@@ -149,9 +149,7 @@ public class DBInputFormat<T extends DBWritable>
     dbConf = new DBConfiguration(conf);
 
     try {
-      this.connection = dbConf.getConnection();
-      this.connection.setAutoCommit(false);
-      connection.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
+      getConnection();
 
       DatabaseMetaData dbMeta = connection.getMetaData();
       this.dbProductName = dbMeta.getDatabaseProductName().toUpperCase();
@@ -174,6 +172,17 @@ public class DBInputFormat<T extends DBWritable>
   }
 
   public Connection getConnection() {
+    try {
+      if (null == this.connection) {
+        // The connection was closed; reinstantiate it.
+        this.connection = dbConf.getConnection();
+        this.connection.setAutoCommit(false);
+        this.connection.setTransactionIsolation(
+            Connection.TRANSACTION_SERIALIZABLE);
+      }
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
     return connection;
   }
 
@@ -191,15 +200,18 @@ public class DBInputFormat<T extends DBWritable>
       if (dbProductName.startsWith("ORACLE")) {
         // use Oracle-specific db reader.
         return new OracleDBRecordReader<T>(split, inputClass,
-            conf, connection, getDBConf(), conditions, fieldNames, tableName);
+            conf, getConnection(), getDBConf(), conditions, fieldNames,
+            tableName);
       } else if (dbProductName.startsWith("MYSQL")) {
         // use MySQL-specific db reader.
         return new MySQLDBRecordReader<T>(split, inputClass,
-            conf, connection, getDBConf(), conditions, fieldNames, tableName);
+            conf, getConnection(), getDBConf(), conditions, fieldNames,
+            tableName);
       } else {
         // Generic reader.
         return new DBRecordReader<T>(split, inputClass,
-            conf, connection, getDBConf(), conditions, fieldNames, tableName);
+            conf, getConnection(), getDBConf(), conditions, fieldNames,
+            tableName);
       }
     } catch (SQLException ex) {
       throw new IOException(ex.getMessage());
@@ -251,13 +263,16 @@ public class DBInputFormat<T extends DBWritable>
       connection.commit();
       return splits;
     } catch (SQLException e) {
+      throw new IOException("Got SQLException", e);
+    } finally {
       try {
         if (results != null) { results.close(); }
       } catch (SQLException e1) {}
       try {
         if (statement != null) { statement.close(); }
       } catch (SQLException e1) {}
-      throw new IOException(e.getMessage());
+
+      closeConnection();
     }
   }
 
@@ -324,5 +339,14 @@ public class DBInputFormat<T extends DBWritable>
     dbConf.setInputClass(inputClass);
     dbConf.setInputQuery(inputQuery);
     dbConf.setInputCountQuery(inputCountQuery);
+  }
+
+  protected void closeConnection() {
+    try {
+      if (null != this.connection) {
+        this.connection.close();
+        this.connection = null;
+      }
+    } catch (SQLException sqlE) { } // ignore exception on close.
   }
 }
