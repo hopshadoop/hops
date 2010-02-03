@@ -22,11 +22,14 @@ import java.io.IOException;
 
 import org.apache.hadoop.ipc.VersionedProtocol;
 import org.apache.hadoop.mapred.JvmTask;
+import org.apache.hadoop.mapreduce.security.token.JobTokenSelector;
+import org.apache.hadoop.security.token.TokenInfo;
 
 /** Protocol that task child process uses to contact its parent process.  The
  * parent is a daemon which which polls the central master for a new map or
  * reduce task and runs it as a child process.  All communication between child
  * and parent is via this protocol. */ 
+@TokenInfo(JobTokenSelector.class)
 public interface TaskUmbilicalProtocol extends VersionedProtocol {
 
   /** 

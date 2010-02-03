@@ -46,6 +46,9 @@ Trunk (unreleased changes)
     for loading the tokens in the user's ugi. This is required
     for the copying of files from the hdfs. (ddas)
 
+    MAPREDUCE-1335. Adds SASL Kerberos/Digest authentication in MapReduce.
+    (Kan Zhang via ddas)
+
   IMPROVEMENTS
 
     MAPREDUCE-1198. Alternatively schedule different types of tasks in

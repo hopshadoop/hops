@@ -35,6 +35,13 @@ public class JobTokenIdentifier extends TokenIdentifier {
   final static Text KIND_NAME = new Text("mapreduce.job");
   
   /**
+   * Default constructor
+   */
+  public JobTokenIdentifier() {
+    this.jobid = new Text();
+  }
+
+  /**
    * Create a job token identifier from a jobid
    * @param jobid the jobid to use
    */
@@ -46,6 +53,12 @@ public class JobTokenIdentifier extends TokenIdentifier {
   @Override
   public Text getKind() {
     return KIND_NAME;
+  }
+  
+  /** {@inheritDoc} */
+  @Override
+  public Text getUsername() {
+    return getJobId();
   }
   
   /**
