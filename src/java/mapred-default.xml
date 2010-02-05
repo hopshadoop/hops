@@ -76,22 +76,13 @@
 </property>
 
 <property>
-  <name>mapreduce.map.sort.record.percent</name>
-  <value>0.05</value>
-  <description>The percentage of mapreduce.task.io.sort.mb dedicated to 
-  tracking record boundaries. Let this value be r, 
-  mapreduce.task.io.sort.mb be x. The maximum number
-  of records collected before the collection thread must block is equal
-  to (r * x) / 4</description>
-</property>
-
-<property>
   <name>mapreduce.map.sort.spill.percent</name>
   <value>0.80</value>
-  <description>The soft limit in either the buffer or record collection
-  buffers. Once reached, a thread will begin to spill the contents to disk
-  in the background. Note that this does not imply any chunking of data to
-  the spill. A value less than 0.5 is not recommended.</description>
+  <description>The soft limit in the serialization buffer. Once reached, a
+  thread will begin to spill the contents to disk in the background. Note that
+  collection will not block if this threshold is exceeded while a spill is
+  already in progress, so spills may be larger than this threshold when it is
+  set to less than .5</description>
 </property>
 
 <property>

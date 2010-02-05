@@ -152,6 +152,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1367. LocalJobRunner should support parallel mapper execution.
     (Aaron Kimball via tomwhite)
 
+    MAPREDUCE-64. Eliminate io.sort.record.percent from MapTask configuration.
+    (cdouglas)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band

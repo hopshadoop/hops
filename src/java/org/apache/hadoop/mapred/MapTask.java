@@ -25,6 +25,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.nio.ByteBuffer;
+import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.locks.Condition;
@@ -705,67 +707,72 @@ class MapTask extends Task {
     
   }
 
-  class MapOutputBuffer<K extends Object, V extends Object>
+  private class MapOutputBuffer<K extends Object, V extends Object>
       implements MapOutputCollector<K, V>, IndexedSortable {
-    private final int partitions;
-    private final JobConf job;
-    private final TaskReporter reporter;
-    private final Class<K> keyClass;
-    private final Class<V> valClass;
-    private final RawComparator<K> comparator;
-    private final SerializationFactory serializationFactory;
-    private final Serializer<K> keySerializer;
-    private final Serializer<V> valSerializer;
-    private final CombinerRunner<K,V> combinerRunner;
-    private final CombineOutputCollector<K, V> combineCollector;
-    
+    final int partitions;
+    final JobConf job;
+    final TaskReporter reporter;
+    final Class<K> keyClass;
+    final Class<V> valClass;
+    final RawComparator<K> comparator;
+    final SerializationFactory serializationFactory;
+    final Serializer<K> keySerializer;
+    final Serializer<V> valSerializer;
+    final CombinerRunner<K,V> combinerRunner;
+    final CombineOutputCollector<K, V> combineCollector;
+
     // Compression for map-outputs
-    private CompressionCodec codec = null;
+    final CompressionCodec codec;
 
     // k/v accounting
-    private volatile int kvstart = 0;  // marks beginning of spill
-    private volatile int kvend = 0;    // marks beginning of collectable
-    private int kvindex = 0;           // marks end of collected
-    private final int[] kvoffsets;     // indices into kvindices
-    private final int[] kvindices;     // partition, k/v offsets into kvbuffer
-    private volatile int bufstart = 0; // marks beginning of spill
-    private volatile int bufend = 0;   // marks beginning of collectable
-    private volatile int bufvoid = 0;  // marks the point where we should stop
-                                       // reading at the end of the buffer
-    private int bufindex = 0;          // marks end of collected
-    private int bufmark = 0;           // marks end of record
-    private byte[] kvbuffer;           // main output buffer
-    private static final int PARTITION = 0; // partition offset in acct
-    private static final int KEYSTART = 1;  // key offset in acct
-    private static final int VALSTART = 2;  // val offset in acct
-    private static final int ACCTSIZE = 3;  // total #fields in acct
-    private static final int RECSIZE =
-                       (ACCTSIZE + 1) * 4;  // acct bytes per record
+    final IntBuffer kvmeta; // metadata overlay on backing store
+    int kvstart;            // marks origin of spill metadata
+    int kvend;              // marks end of spill metadata
+    int kvindex;            // marks end of fully serialized records
+
+    int equator;            // marks origin of meta/serialization
+    int bufstart;           // marks beginning of spill
+    int bufend;             // marks beginning of collectable
+    int bufmark;            // marks end of record
+    int bufindex;           // marks end of collected
+    int bufvoid;            // marks the point where we should stop
+                            // reading at the end of the buffer
+
+    byte[] kvbuffer;        // main output buffer
+    private final byte[] b0 = new byte[0];
+
+    private static final int INDEX = 0;            // index offset in acct
+    private static final int VALSTART = 1;         // val offset in acct
+    private static final int KEYSTART = 2;         // key offset in acct
+    private static final int PARTITION = 3;        // partition offset in acct
+    private static final int NMETA = 4;            // num meta ints
+    private static final int METASIZE = NMETA * 4; // size in bytes
 
     // spill accounting
-    private volatile int numSpills = 0;
-    private volatile Throwable sortSpillException = null;
-    private final int softRecordLimit;
-    private final int softBufferLimit;
-    private int recordRemaining;
-    private int bufferRemaining;
-    private final int minSpillsForCombine;
-    private final IndexedSorter sorter;
-    private final ReentrantLock spillLock = new ReentrantLock();
-    private final Condition spillDone = spillLock.newCondition();
-    private final Condition spillReady = spillLock.newCondition();
-    private final BlockingBuffer bb = new BlockingBuffer();
-    private volatile boolean spillThreadRunning = false;
-    private final SpillThread spillThread = new SpillThread();
+    final int maxRec;
+    final int softLimit;
+    boolean spillInProgress;;
+    int bufferRemaining;
+    volatile Throwable sortSpillException = null;
 
-    private final FileSystem localFs;
-    private final FileSystem rfs;
-   
-    private final Counters.Counter mapOutputByteCounter;
-    private final Counters.Counter mapOutputRecordCounter;
-    private final Counters.Counter combineOutputCounter;
-    
-    private ArrayList<SpillRecord> indexCacheList;
+    int numSpills = 0;
+    final int minSpillsForCombine;
+    final IndexedSorter sorter;
+    final ReentrantLock spillLock = new ReentrantLock();
+    final Condition spillDone = spillLock.newCondition();
+    final Condition spillReady = spillLock.newCondition();
+    final BlockingBuffer bb = new BlockingBuffer();
+    volatile boolean spillThreadRunning = false;
+    final SpillThread spillThread = new SpillThread();
+
+    final FileSystem rfs;
+
+    // Counters
+    final Counters.Counter mapOutputByteCounter;
+    final Counters.Counter mapOutputRecordCounter;
+
+    final ArrayList<SpillRecord> indexCacheList =
+      new ArrayList<SpillRecord>();
     private int totalIndexCacheMemory;
     private static final int INDEX_CACHE_MEMORY_LIMIT = 1024 * 1024;
 
@@ -775,44 +782,43 @@ class MapTask extends Task {
                            ) throws IOException, ClassNotFoundException {
       this.job = job;
       this.reporter = reporter;
-      localFs = FileSystem.getLocal(job);
       partitions = job.getNumReduceTasks();
-       
-      rfs = ((LocalFileSystem)localFs).getRaw();
+      rfs = ((LocalFileSystem)FileSystem.getLocal(job)).getRaw();
 
-      indexCacheList = new ArrayList<SpillRecord>();
-      
       //sanity checks
-      final float spillper = job.getFloat(JobContext.MAP_SORT_SPILL_PERCENT,(float)0.8);
-      final float recper = job.getFloat(JobContext.MAP_SORT_RECORD_PERCENT,(float)0.05);
+      final float spillper =
+        job.getFloat(JobContext.MAP_SORT_SPILL_PERCENT, (float)0.8);
       final int sortmb = job.getInt(JobContext.IO_SORT_MB, 100);
-      if (spillper > (float)1.0 || spillper < (float)0.0) {
-        throw new IOException("Invalid \"mapreduce.map.sort.spill.percent\": " + spillper);
-      }
-      if (recper > (float)1.0 || recper < (float)0.01) {
-        throw new IOException("Invalid \"mapreduce.map.sort.record.percent\": " + recper);
+      if (spillper > (float)1.0 || spillper <= (float)0.0) {
+        throw new IOException("Invalid \"" + JobContext.MAP_SORT_SPILL_PERCENT +
+            "\": " + spillper);
       }
       if ((sortmb & 0x7FF) != sortmb) {
-        throw new IOException("Invalid " + JobContext.IO_SORT_MB + ": " + sortmb);
+        throw new IOException(
+            "Invalid \"" + JobContext.IO_SORT_MB + "\": " + sortmb);
       }
       sorter = ReflectionUtils.newInstance(job.getClass("map.sort.class",
             QuickSort.class, IndexedSorter.class), job);
-      LOG.info(JobContext.IO_SORT_MB + " = " + sortmb);
       // buffers and accounting
       int maxMemUsage = sortmb << 20;
-      int recordCapacity = (int)(maxMemUsage * recper);
-      recordCapacity -= recordCapacity % RECSIZE;
-      kvbuffer = new byte[maxMemUsage - recordCapacity];
+      maxMemUsage -= maxMemUsage % METASIZE;
+      kvbuffer = new byte[maxMemUsage];
       bufvoid = kvbuffer.length;
-      recordCapacity /= RECSIZE;
-      kvoffsets = new int[recordCapacity];
-      kvindices = new int[recordCapacity * ACCTSIZE];
-      softBufferLimit = (int)(kvbuffer.length * spillper);
-      softRecordLimit = (int)(kvoffsets.length * spillper);
-      recordRemaining = softRecordLimit;
-      bufferRemaining = softBufferLimit;
-      LOG.info("data buffer = " + softBufferLimit + "/" + kvbuffer.length);
-      LOG.info("record buffer = " + softRecordLimit + "/" + kvoffsets.length);
+      kvmeta = ByteBuffer.wrap(kvbuffer).asIntBuffer();
+      setEquator(0);
+      bufstart = bufend = bufindex = equator;
+      kvstart = kvend = kvindex;
+
+      maxRec = kvmeta.capacity() / NMETA;
+      softLimit = (int)(kvbuffer.length * spillper);
+      bufferRemaining = softLimit;
+      if (LOG.isInfoEnabled()) {
+        LOG.info(JobContext.IO_SORT_MB + ": " + sortmb);
+        LOG.info("soft limit at " + softLimit);
+        LOG.info("bufstart = " + bufstart + "; bufvoid = " + bufvoid);
+        LOG.info("kvstart = " + kvstart + "; length = " + maxRec);
+      }
+
       // k/v serialization
       comparator = job.getOutputKeyComparator();
       keyClass = (Class<K>)job.getMapOutputKeyClass();
@@ -822,27 +828,35 @@ class MapTask extends Task {
       keySerializer.open(bb);
       valSerializer = serializationFactory.getSerializer(valClass);
       valSerializer.open(bb);
-      // counters
+
+      // output counters
       mapOutputByteCounter = reporter.getCounter(TaskCounter.MAP_OUTPUT_BYTES);
-      mapOutputRecordCounter = reporter.getCounter(TaskCounter.MAP_OUTPUT_RECORDS);
-      Counters.Counter combineInputCounter = 
-        reporter.getCounter(TaskCounter.COMBINE_INPUT_RECORDS);
-      combineOutputCounter = reporter.getCounter(TaskCounter.COMBINE_OUTPUT_RECORDS);
+      mapOutputRecordCounter =
+        reporter.getCounter(TaskCounter.MAP_OUTPUT_RECORDS);
+
       // compression
       if (job.getCompressMapOutput()) {
         Class<? extends CompressionCodec> codecClass =
           job.getMapOutputCompressorClass(DefaultCodec.class);
         codec = ReflectionUtils.newInstance(codecClass, job);
+      } else {
+        codec = null;
       }
+
       // combiner
+      final Counters.Counter combineInputCounter =
+        reporter.getCounter(TaskCounter.COMBINE_INPUT_RECORDS);
       combinerRunner = CombinerRunner.create(job, getTaskID(), 
                                              combineInputCounter,
                                              reporter, null);
       if (combinerRunner != null) {
+        final Counters.Counter combineOutputCounter =
+          reporter.getCounter(TaskCounter.COMBINE_OUTPUT_RECORDS);
         combineCollector= new CombineOutputCollector<K,V>(combineOutputCounter);
       } else {
         combineCollector = null;
       }
+      spillInProgress = false;
       minSpillsForCombine = job.getInt(JobContext.MAP_COMBINE_MIN_SPILLS, 3);
       spillThread.setDaemon(true);
       spillThread.setName("SpillThread");
@@ -853,18 +867,22 @@ class MapTask extends Task {
           spillDone.await();
         }
       } catch (InterruptedException e) {
-        throw (IOException)new IOException("Spill thread failed to initialize"
-            ).initCause(sortSpillException);
+        throw new IOException("Spill thread failed to initialize", e);
       } finally {
         spillLock.unlock();
       }
       if (sortSpillException != null) {
-        throw (IOException)new IOException("Spill thread failed to initialize"
-            ).initCause(sortSpillException);
+        throw new IOException("Spill thread failed to initialize",
+            sortSpillException);
       }
     }
 
-    public synchronized void collect(K key, V value, int partition
+    /**
+     * Serialize the key, value to intermediate storage.
+     * When this method returns, kvindex must refer to sufficient unused
+     * storage to store one METADATA.
+     */
+    public synchronized void collect(K key, V value, final int partition
                                      ) throws IOException {
       reporter.progress();
       if (key.getClass() != keyClass) {
@@ -877,50 +895,66 @@ class MapTask extends Task {
                               + valClass.getName() + ", recieved "
                               + value.getClass().getName());
       }
-      final int kvnext = (kvindex + 1) % kvoffsets.length;
-      if (--recordRemaining <= 0) {
-        // Possible for check to remain < zero, if soft limit remains
-        // in force but unsatisfiable because spill is in progress
+      if (partition < 0 || partition >= partitions) {
+        throw new IOException("Illegal partition for " + key + " (" +
+            partition + ")");
+      }
+      checkSpillException();
+      bufferRemaining -= METASIZE;
+      if (bufferRemaining <= 0) {
+        // start spill if the thread is not running and the soft limit has been
+        // reached
         spillLock.lock();
         try {
-          boolean kvfull;
           do {
-            if (sortSpillException != null) {
-              throw (IOException)new IOException("Spill failed"
-                  ).initCause(sortSpillException);
-            }
-            // sufficient acct space
-            kvfull = kvnext == kvstart;
-            final boolean kvsoftlimit = ((kvnext > kvend)
-                ? kvnext - kvend > softRecordLimit
-                : kvend - kvnext <= kvoffsets.length - softRecordLimit);
-            if (kvstart == kvend && kvsoftlimit) {
-              LOG.info("Spilling map output: record full = " + kvfull);
-              startSpill();
-            }
-            if (kvfull) {
-              try {
-                while (kvstart != kvend) {
-                  reporter.progress();
-                  spillDone.await();
-                }
-              } catch (InterruptedException e) {
-                throw (IOException)new IOException(
-                    "Collector interrupted while waiting for the writer"
-                    ).initCause(e);
+            if (!spillInProgress) {
+              final int kvbidx = 4 * kvindex;
+              final int kvbend = 4 * kvend;
+              // serialized, unspilled bytes always lie between kvindex and
+              // bufindex, crossing the equator. Note that any void space
+              // created by a reset must be included in "used" bytes
+              final int bUsed = distanceTo(kvbidx, bufindex);
+              final boolean bufsoftlimit = bUsed >= softLimit;
+              if ((kvbend + METASIZE) % kvbuffer.length !=
+                  equator - (equator % METASIZE)) {
+                // spill finished, reclaim space
+                resetSpill();
+                bufferRemaining = Math.min(
+                    distanceTo(bufindex, kvbidx) - 2 * METASIZE,
+                    softLimit - bUsed) - METASIZE;
+                continue;
+              } else if (bufsoftlimit && kvindex != kvend) {
+                // spill records, if any collected; check latter, as it may
+                // be possible for metadata alignment to hit spill pcnt
+                startSpill();
+                final int avgRec = (int)
+                  (mapOutputByteCounter.getCounter() /
+                  mapOutputRecordCounter.getCounter());
+                // leave at least half the split buffer for serialization data
+                // ensure that kvindex >= bufindex
+                final int distkvi = distanceTo(bufindex, kvbidx);
+                final int newPos = (bufindex +
+                  Math.max(2 * METASIZE - 1,
+                          Math.min(distkvi / 2,
+                                   distkvi / (METASIZE + avgRec) * METASIZE)))
+                  % kvbuffer.length;
+                setEquator(newPos);
+                bufmark = bufindex = newPos;
+                final int serBound = 4 * kvend;
+                // bytes remaining before the lock must be held and limits
+                // checked is the minimum of three arcs: the metadata space, the
+                // serialization space, and the soft limit
+                bufferRemaining = Math.min(
+                    // metadata max
+                    distanceTo(bufend, newPos),
+                    Math.min(
+                      // serialization max
+                      distanceTo(newPos, serBound),
+                      // soft limit
+                      softLimit)) - 2 * METASIZE;
               }
             }
-          } while (kvfull);
-          final int softOff = kvend + softRecordLimit;
-          recordRemaining = Math.min(
-              // out of acct space
-              (kvnext < kvstart
-                 ? kvstart - kvnext
-                 : kvoffsets.length - kvnext + kvstart),
-              // soft limit
-              (kvend < kvnext
-                 ? softOff - kvnext
-                 : kvnext + (softOff - kvoffsets.length)));
+          } while (false);
         } finally {
           spillLock.unlock();
         }
@@ -931,39 +965,110 @@ class MapTask extends Task {
         int keystart = bufindex;
         keySerializer.serialize(key);
         if (bufindex < keystart) {
-          // wrapped the key; reset required
-          bb.reset();
+          // wrapped the key; must make contiguous
+          bb.shiftBufferedKey();
           keystart = 0;
         }
         // serialize value bytes into buffer
         final int valstart = bufindex;
         valSerializer.serialize(value);
+        // It's possible for records to have zero length, i.e. the serializer
+        // will perform no writes. To ensure that the boundary conditions are
+        // checked and that the kvindex invariant is maintained, perform a
+        // zero-length write into the buffer. The logic monitoring this could be
+        // moved into collect, but this is cleaner and inexpensive. For now, it
+        // is acceptable.
+        bb.write(b0, 0, 0);
+
+        // the record must be marked after the preceding write, as the metadata
+        // for this record are not yet written
         int valend = bb.markRecord();
 
-        if (partition < 0 || partition >= partitions) {
-          throw new IOException("Illegal partition for " + key + " (" +
-              partition + ")");
-        }
-
         mapOutputRecordCounter.increment(1);
-        mapOutputByteCounter.increment(valend >= keystart
-            ? valend - keystart
-            : (bufvoid - keystart) + valend);
+        mapOutputByteCounter.increment(
+            distanceTo(keystart, valend, bufvoid));
 
-        // update accounting info
-        int ind = kvindex * ACCTSIZE;
-        kvoffsets[kvindex] = ind;
-        kvindices[ind + PARTITION] = partition;
-        kvindices[ind + KEYSTART] = keystart;
-        kvindices[ind + VALSTART] = valstart;
-        kvindex = kvnext;
+        // write accounting info
+        kvmeta.put(kvindex + INDEX, kvindex);
+        kvmeta.put(kvindex + PARTITION, partition);
+        kvmeta.put(kvindex + KEYSTART, keystart);
+        kvmeta.put(kvindex + VALSTART, valstart);
+        // advance kvindex
+        kvindex = (kvindex - NMETA + kvmeta.capacity()) % kvmeta.capacity();
       } catch (MapBufferTooSmallException e) {
         LOG.info("Record too large for in-memory buffer: " + e.getMessage());
         spillSingleRecord(key, value, partition);
         mapOutputRecordCounter.increment(1);
         return;
       }
+    }
 
+    /**
+     * Set the point from which meta and serialization data expand. The meta
+     * indices are aligned with the buffer, so metadata never spans the ends of
+     * the circular buffer.
+     */
+    private void setEquator(int pos) {
+      equator = pos;
+      // set index prior to first entry, aligned at meta boundary
+      final int aligned = pos - (pos % METASIZE);
+      kvindex =
+        ((aligned - METASIZE + kvbuffer.length) % kvbuffer.length) / 4;
+      if (LOG.isInfoEnabled()) {
+        LOG.info("(EQUATOR) " + pos + " kvi " + kvindex +
+            "(" + (kvindex * 4) + ")");
+      }
+    }
+
+    /**
+     * The spill is complete, so set the buffer and meta indices to be equal to
+     * the new equator to free space for continuing collection. Note that when
+     * kvindex == kvend == kvstart, the buffer is empty.
+     */
+    private void resetSpill() {
+      final int e = equator;
+      bufstart = bufend = e;
+      final int aligned = e - (e % METASIZE);
+      // set start/end to point to first meta record
+      kvstart = kvend =
+        ((aligned - METASIZE + kvbuffer.length) % kvbuffer.length) / 4;
+      if (LOG.isInfoEnabled()) {
+        LOG.info("(RESET) equator " + e + " kv " + kvstart + "(" +
+          (kvstart * 4) + ")" + " kvi " + kvindex + "(" + (kvindex * 4) + ")");
+      }
+    }
+
+    /**
+     * Compute the distance in bytes between two indices in the serialization
+     * buffer.
+     * @see #distanceTo(int,int,int)
+     */
+    final int distanceTo(final int i, final int j) {
+      return distanceTo(i, j, kvbuffer.length);
+    }
+
+    /**
+     * Compute the distance between two indices in the circular buffer given the
+     * max distance.
+     */
+    int distanceTo(final int i, final int j, final int mod) {
+      return i <= j
+        ? j - i
+        : mod - i + j;
+    }
+
+    /**
+     * For the given meta position, return the dereferenced position in the
+     * integer array. Each meta block contains several integers describing
+     * record data in its serialized form, but the INDEX is not necessarily
+     * related to the proximate metadata. The index value at the referenced int
+     * position is the start offset of the associated metadata block. So the
+     * metadata INDEX at metapos may point to the metadata described by the
+     * metadata block at metapos + k, which contains information about that
+     * serialized record.
+     */
+    int offsetFor(int metapos) {
+      return kvmeta.get(metapos * NMETA + INDEX);
     }
 
     /**
@@ -971,32 +1076,34 @@ class MapTask extends Task {
      * Compare by partition, then by key.
      * @see IndexedSortable#compare
      */
-    public int compare(int i, int j) {
-      final int ii = kvoffsets[i % kvoffsets.length];
-      final int ij = kvoffsets[j % kvoffsets.length];
+    public int compare(final int mi, final int mj) {
+      final int kvi = offsetFor(mi % maxRec);
+      final int kvj = offsetFor(mj % maxRec);
+      final int kvip = kvmeta.get(kvi + PARTITION);
+      final int kvjp = kvmeta.get(kvj + PARTITION);
       // sort by partition
-      if (kvindices[ii + PARTITION] != kvindices[ij + PARTITION]) {
-        return kvindices[ii + PARTITION] - kvindices[ij + PARTITION];
+      if (kvip != kvjp) {
+        return kvip - kvjp;
       }
       // sort by key
       return comparator.compare(kvbuffer,
-          kvindices[ii + KEYSTART],
-          kvindices[ii + VALSTART] - kvindices[ii + KEYSTART],
+          kvmeta.get(kvi + KEYSTART),
+          kvmeta.get(kvi + VALSTART) - kvmeta.get(kvi + KEYSTART),
           kvbuffer,
-          kvindices[ij + KEYSTART],
-          kvindices[ij + VALSTART] - kvindices[ij + KEYSTART]);
+          kvmeta.get(kvj + KEYSTART),
+          kvmeta.get(kvj + VALSTART) - kvmeta.get(kvj + KEYSTART));
     }
 
     /**
      * Swap logical indices st i, j MOD offset capacity.
      * @see IndexedSortable#swap
      */
-    public void swap(int i, int j) {
-      i %= kvoffsets.length;
-      j %= kvoffsets.length;
-      int tmp = kvoffsets[i];
-      kvoffsets[i] = kvoffsets[j];
-      kvoffsets[j] = tmp;
+    public void swap(final int mi, final int mj) {
+      final int kvi = (mi % maxRec) * NMETA + INDEX;
+      final int kvj = (mj % maxRec) * NMETA + INDEX;
+      int tmp = kvmeta.get(kvi);
+      kvmeta.put(kvi, kvmeta.get(kvj));
+      kvmeta.put(kvj, tmp);
     }
 
     /**
@@ -1005,11 +1112,7 @@ class MapTask extends Task {
     protected class BlockingBuffer extends DataOutputStream {
 
       public BlockingBuffer() {
-        this(new Buffer());
-      }
-
-      private BlockingBuffer(OutputStream out) {
-        super(out);
+        super(new Buffer());
       }
 
       /**
@@ -1028,23 +1131,24 @@ class MapTask extends Task {
        * If the key is to be passed to a RawComparator, then it must be
        * contiguous in the buffer. This recopies the data in the buffer back
        * into itself, but starting at the beginning of the buffer. Note that
-       * reset() should <b>only</b> be called immediately after detecting
+       * this method should <b>only</b> be called immediately after detecting
        * this condition. To call it at any other time is undefined and would
        * likely result in data loss or corruption.
        * @see #markRecord()
        */
-      protected void reset() throws IOException {
-        // spillLock unnecessary; If spill wraps, then
-        // bufindex < bufstart < bufend so contention is impossible
-        // a stale value for bufstart does not affect correctness, since
-        // we can only get false negatives that force the more
-        // conservative path
+      protected void shiftBufferedKey() throws IOException {
+        // spillLock unnecessary; both kvend and kvindex are current
         int headbytelen = bufvoid - bufmark;
         bufvoid = bufmark;
-        if (bufindex + headbytelen < bufstart) {
+        final int kvbidx = 4 * kvindex;
+        final int kvbend = 4 * kvend;
+        final int avail =
+          Math.min(distanceTo(0, kvbidx), distanceTo(0, kvbend));
+        if (bufindex + headbytelen < avail) {
           System.arraycopy(kvbuffer, 0, kvbuffer, headbytelen, bufindex);
           System.arraycopy(kvbuffer, bufvoid, kvbuffer, 0, headbytelen);
           bufindex += headbytelen;
+          bufferRemaining -= kvbuffer.length - bufvoid;
         } else {
           byte[] keytmp = new byte[bufindex];
           System.arraycopy(kvbuffer, 0, keytmp, 0, bufindex);
@@ -1075,87 +1179,91 @@ class MapTask extends Task {
       @Override
       public void write(byte b[], int off, int len)
           throws IOException {
-        boolean buffull = false;
-        boolean wrap = false;
+        // must always verify the invariant that at least METASIZE bytes are
+        // available beyond kvindex, even when len == 0
         bufferRemaining -= len;
         if (bufferRemaining <= 0) {
-          // writing these bytes could exhaust available buffer space
-          // check if spill or blocking is necessary
+          // writing these bytes could exhaust available buffer space or fill
+          // the buffer to soft limit. check if spill or blocking are necessary
+          boolean blockwrite = false;
           spillLock.lock();
           try {
             do {
-              if (sortSpillException != null) {
-                throw (IOException)new IOException("Spill failed"
-                    ).initCause(sortSpillException);
-              }
+              checkSpillException();
 
-              // sufficient buffer space?
-              if (bufstart <= bufend && bufend <= bufindex) {
-                buffull = bufindex + len > bufvoid;
-                wrap = (bufvoid - bufindex) + bufstart > len;
-              } else {
-                // bufindex <= bufstart <= bufend
-                // bufend <= bufindex <= bufstart
-                wrap = false;
-                buffull = bufindex + len > bufstart;
-              }
+              final int kvbidx = 4 * kvindex;
+              final int kvbend = 4 * kvend;
+              // ser distance to key index
+              final int distkvi = distanceTo(bufindex, kvbidx);
+              // ser distance to spill end index
+              final int distkve = distanceTo(bufindex, kvbend);
 
-              if (kvstart == kvend) {
-                // spill thread not running
-                if (kvend != kvindex) {
-                  // we have records we can spill
-                  final boolean bufsoftlimit = (bufindex > bufend)
-                    ? bufindex - bufend > softBufferLimit
-                    : bufend - bufindex < bufvoid - softBufferLimit;
-                  if (bufsoftlimit || (buffull && !wrap)) {
-                    LOG.info("Spilling map output: buffer full= " + (buffull && !wrap));
-                    startSpill();
+              // if kvindex is closer than kvend, then a spill is neither in
+              // progress nor complete and reset since the lock was held. The
+              // write should block only if there is insufficient space to
+              // complete the current write, write the metadata for this record,
+              // and write the metadata for the next record. If kvend is closer,
+              // then the write should block if there is too little space for
+              // either the metadata or the current write. Note that collect
+              // ensures its metadata requirement with a zero-length write
+              blockwrite = distkvi <= distkve
+                ? distkvi <= len + 2 * METASIZE
+                : distkve <= len || distanceTo(bufend, kvbidx) < 2 * METASIZE;
+
+              if (!spillInProgress) {
+                if (blockwrite) {
+                  if ((kvbend + METASIZE) % kvbuffer.length !=
+                      equator - (equator % METASIZE)) {
+                    // spill finished, reclaim space
+                    // need to use meta exclusively; zero-len rec & 100% spill
+                    // pcnt would fail
+                    resetSpill(); // resetSpill doesn't move bufindex, kvindex
+                    bufferRemaining = Math.min(
+                        distkvi - 2 * METASIZE,
+                        softLimit - distanceTo(kvbidx, bufindex)) - len;
+                    continue;
                   }
-                } else if (buffull && !wrap) {
-                  // We have no buffered records, and this record is too large
-                  // to write into kvbuffer. We must spill it directly from
-                  // collect
-                  final int size = ((bufend <= bufindex)
-                    ? bufindex - bufend
-                    : (bufvoid - bufend) + bufindex) + len;
-                  bufstart = bufend = bufindex = bufmark = 0;
-                  kvstart = kvend = kvindex = 0;
-                  bufvoid = kvbuffer.length;
-                  throw new MapBufferTooSmallException(size + " bytes");
+                  // we have records we can spill; only spill if blocked
+                  if (kvindex != kvend) {
+                    startSpill();
+                    // Blocked on this write, waiting for the spill just
+                    // initiated to finish. Instead of repositioning the marker
+                    // and copying the partial record, we set the record start
+                    // to be the new equator
+                    setEquator(bufmark);
+                  } else {
+                    // We have no buffered records, and this record is too large
+                    // to write into kvbuffer. We must spill it directly from
+                    // collect
+                    final int size = distanceTo(bufstart, bufindex) + len;
+                    setEquator(0);
+                    bufstart = bufend = bufindex = equator;
+                    kvstart = kvend = kvindex;
+                    bufvoid = kvbuffer.length;
+                    throw new MapBufferTooSmallException(size + " bytes");
+                  }
                 }
               }
 
-              if (buffull && !wrap) {
+              if (blockwrite) {
+                // wait for spill
                 try {
-                  while (kvstart != kvend) {
+                  while (spillInProgress) {
                     reporter.progress();
                     spillDone.await();
                   }
                 } catch (InterruptedException e) {
-                    throw (IOException)new IOException(
-                        "Buffer interrupted while waiting for the writer"
-                        ).initCause(e);
+                    throw new IOException(
+                        "Buffer interrupted while waiting for the writer", e);
                 }
               }
-            } while (buffull && !wrap);
-            final int softOff = bufend + softBufferLimit;
-            bufferRemaining = Math.min(
-                // out of buffer space
-                (bufindex < bufstart
-                   ? bufstart - bufindex
-                   : kvbuffer.length - bufindex + bufstart),
-                // soft limit
-                (bufend < bufindex
-                   ? softOff - bufindex
-                   : bufindex + (softOff - kvbuffer.length)));
+            } while (blockwrite);
           } finally {
             spillLock.unlock();
           }
-        } else {
-          buffull = bufindex + len > bufvoid;
         }
         // here, we know that we have sufficient space to write
-        if (buffull) {
+        if (bufindex + len > bufvoid) {
           final int gaplen = bufvoid - bufindex;
           System.arraycopy(b, off, kvbuffer, bufindex, gaplen);
           len -= gaplen;
@@ -1164,7 +1272,6 @@ class MapTask extends Task {
         }
         System.arraycopy(b, off, kvbuffer, bufindex, len);
         bufindex += len;
-        bufferRemaining -= len;
       }
     }
 
@@ -1173,23 +1280,34 @@ class MapTask extends Task {
       LOG.info("Starting flush of map output");
       spillLock.lock();
       try {
-        while (kvstart != kvend) {
+        while (spillInProgress) {
           reporter.progress();
           spillDone.await();
         }
-        if (sortSpillException != null) {
-          throw (IOException)new IOException("Spill failed"
-              ).initCause(sortSpillException);
+        checkSpillException();
+
+        final int kvbend = 4 * kvend;
+        if ((kvbend + METASIZE) % kvbuffer.length !=
+            equator - (equator % METASIZE)) {
+          // spill finished
+          resetSpill();
         }
-        if (kvend != kvindex) {
-          kvend = kvindex;
+        if (kvindex != kvend) {
+          kvend = (kvindex + NMETA) % kvmeta.capacity();
           bufend = bufmark;
+          if (LOG.isInfoEnabled()) {
+            LOG.info("Spilling map output");
+            LOG.info("bufstart = " + bufstart + "; bufend = " + bufmark +
+                     "; bufvoid = " + bufvoid);
+            LOG.info("kvstart = " + kvstart + "(" + (kvstart * 4) +
+                     "); kvend = " + kvend + "(" + (kvend * 4) +
+                     "); length = " + (distanceTo(kvend, kvstart,
+                           kvmeta.capacity()) + 1) + "/" + maxRec);
+          }
           sortAndSpill();
         }
       } catch (InterruptedException e) {
-        throw (IOException)new IOException(
-            "Buffer interrupted while waiting for the writer"
-            ).initCause(e);
+        throw new IOException("Interrupted while waiting for the writer", e);
       } finally {
         spillLock.unlock();
       }
@@ -1204,8 +1322,7 @@ class MapTask extends Task {
         spillThread.interrupt();
         spillThread.join();
       } catch (InterruptedException e) {
-        throw (IOException)new IOException("Spill failed"
-            ).initCause(e);
+        throw new IOException("Spill failed", e);
       }
       // release sort buffer before the merge
       kvbuffer = null;
@@ -1223,26 +1340,22 @@ class MapTask extends Task {
         try {
           while (true) {
             spillDone.signal();
-            while (kvstart == kvend) {
+            while (!spillInProgress) {
               spillReady.await();
             }
             try {
               spillLock.unlock();
               sortAndSpill();
-            } catch (Exception e) {
-              sortSpillException = e;
             } catch (Throwable t) {
               sortSpillException = t;
-              String logMsg = "Task " + getTaskID() + " failed : " 
-                              + StringUtils.stringifyException(t);
-              reportFatalError(getTaskID(), t, logMsg);
             } finally {
               spillLock.lock();
-              if (bufend < bufindex && bufindex < bufstart) {
+              if (bufend < bufstart) {
                 bufvoid = kvbuffer.length;
               }
               kvstart = kvend;
               bufstart = bufend;
+              spillInProgress = false;
             }
           }
         } catch (InterruptedException e) {
@@ -1254,13 +1367,32 @@ class MapTask extends Task {
       }
     }
 
+    private void checkSpillException() throws IOException {
+      final Throwable lspillException = sortSpillException;
+      if (lspillException != null) {
+        if (lspillException instanceof Error) {
+          final String logMsg = "Task " + getTaskID() + " failed : " +
+            StringUtils.stringifyException(lspillException);
+          reportFatalError(getTaskID(), lspillException, logMsg);
+        }
+        throw new IOException("Spill failed", lspillException);
+      }
+    }
+
     private void startSpill() {
-      LOG.info("bufstart = " + bufstart + "; bufend = " + bufmark +
-               "; bufvoid = " + bufvoid);
-      LOG.info("kvstart = " + kvstart + "; kvend = " + kvindex +
-               "; length = " + kvoffsets.length);
-      kvend = kvindex;
+      assert !spillInProgress;
+      kvend = (kvindex + NMETA) % kvmeta.capacity();
       bufend = bufmark;
+      spillInProgress = true;
+      if (LOG.isInfoEnabled()) {
+        LOG.info("Spilling map output");
+        LOG.info("bufstart = " + bufstart + "; bufend = " + bufmark +
+                 "; bufvoid = " + bufvoid);
+        LOG.info("kvstart = " + kvstart + "(" + (kvstart * 4) +
+                 "); kvend = " + kvend + "(" + (kvend * 4) +
+                 "); length = " + (distanceTo(kvend, kvstart,
+                       kvmeta.capacity()) + 1) + "/" + maxRec);
+      }
       spillReady.signal();
     }
 
@@ -1268,7 +1400,7 @@ class MapTask extends Task {
                                        InterruptedException {
       //approximate the length of the output file to be the length of the
       //buffer + header lengths for the partitions
-      long size = (bufend >= bufstart
+      final long size = (bufend >= bufstart
           ? bufend - bufstart
           : (bufvoid - bufend) + bufstart) +
                   partitions * APPROX_HEADER_LENGTH;
@@ -1280,13 +1412,15 @@ class MapTask extends Task {
             mapOutputFile.getSpillFileForWrite(numSpills, size);
         out = rfs.create(filename);
 
-        final int endPosition = (kvend > kvstart)
-          ? kvend
-          : kvoffsets.length + kvend;
-        sorter.sort(MapOutputBuffer.this, kvstart, endPosition, reporter);
-        int spindex = kvstart;
-        IndexRecord rec = new IndexRecord();
-        InMemValBytes value = new InMemValBytes();
+        final int mstart = kvend / NMETA;
+        final int mend = 1 + // kvend is a valid record
+          (kvstart >= kvend
+          ? kvstart
+          : kvmeta.capacity() + kvstart) / NMETA;
+        sorter.sort(MapOutputBuffer.this, mstart, mend, reporter);
+        int spindex = mstart;
+        final IndexRecord rec = new IndexRecord();
+        final InMemValBytes value = new InMemValBytes();
         for (int i = 0; i < partitions; ++i) {
           IFile.Writer<K, V> writer = null;
           try {
@@ -1296,22 +1430,21 @@ class MapTask extends Task {
             if (combinerRunner == null) {
               // spill directly
               DataInputBuffer key = new DataInputBuffer();
-              while (spindex < endPosition &&
-                  kvindices[kvoffsets[spindex % kvoffsets.length]
-                            + PARTITION] == i) {
-                final int kvoff = kvoffsets[spindex % kvoffsets.length];
+              while (spindex < mend &&
+                  kvmeta.get(offsetFor(spindex % maxRec) + PARTITION) == i) {
+                final int kvoff = offsetFor(spindex % maxRec);
+                key.reset(kvbuffer, kvmeta.get(kvoff + KEYSTART),
+                          (kvmeta.get(kvoff + VALSTART) -
+                           kvmeta.get(kvoff + KEYSTART)));
                 getVBytesForOffset(kvoff, value);
-                key.reset(kvbuffer, kvindices[kvoff + KEYSTART],
-                          (kvindices[kvoff + VALSTART] - 
-                           kvindices[kvoff + KEYSTART]));
                 writer.append(key, value);
                 ++spindex;
               }
             } else {
               int spstart = spindex;
-              while (spindex < endPosition &&
-                  kvindices[kvoffsets[spindex % kvoffsets.length]
-                            + PARTITION] == i) {
+              while (spindex < mend &&
+                  kvmeta.get(offsetFor(spindex % maxRec)
+                            + PARTITION) == i) {
                 ++spindex;
               }
               // Note: we would like to avoid the combiner if we've fewer
@@ -1372,7 +1505,7 @@ class MapTask extends Task {
         final Path filename =
             mapOutputFile.getSpillFileForWrite(numSpills, size);
         out = rfs.create(filename);
-        
+
         // we don't run the combiner for a single record
         IndexRecord rec = new IndexRecord();
         for (int i = 0; i < partitions; ++i) {
@@ -1426,14 +1559,17 @@ class MapTask extends Task {
      * deserialized value bytes. Should only be called during a spill.
      */
     private void getVBytesForOffset(int kvoff, InMemValBytes vbytes) {
-      final int nextindex = (kvoff / ACCTSIZE ==
-                            (kvend - 1 + kvoffsets.length) % kvoffsets.length)
+      // get the keystart for the next serialized value to be the end
+      // of this value. If this is the last value in the buffer, use bufend
+      final int nextindex = kvoff == kvend
         ? bufend
-        : kvindices[(kvoff + ACCTSIZE + KEYSTART) % kvindices.length];
-      int vallen = (nextindex >= kvindices[kvoff + VALSTART])
-        ? nextindex - kvindices[kvoff + VALSTART]
-        : (bufvoid - kvindices[kvoff + VALSTART]) + nextindex;
-      vbytes.reset(kvbuffer, kvindices[kvoff + VALSTART], vallen);
+        : kvmeta.get(
+            (kvoff - NMETA + kvmeta.capacity() + KEYSTART) % kvmeta.capacity());
+      // calculate the length of the value
+      int vallen = (nextindex >= kvmeta.get(kvoff + VALSTART))
+        ? nextindex - kvmeta.get(kvoff + VALSTART)
+        : (bufvoid - kvmeta.get(kvoff + VALSTART)) + nextindex;
+      vbytes.reset(kvbuffer, kvmeta.get(kvoff + VALSTART), vallen);
     }
 
     /**
@@ -1443,12 +1579,12 @@ class MapTask extends Task {
       private byte[] buffer;
       private int start;
       private int length;
-            
+
       public void reset(byte[] buffer, int start, int length) {
         this.buffer = buffer;
         this.start = start;
         this.length = length;
-        
+
         if (start + length > bufvoid) {
           this.buffer = new byte[this.length];
           final int taillen = bufvoid - start;
@@ -1456,7 +1592,7 @@ class MapTask extends Task {
           System.arraycopy(buffer, 0, this.buffer, taillen, length-taillen);
           this.start = 0;
         }
-        
+
         super.reset(this.buffer, this.start, this.length);
       }
     }
@@ -1474,13 +1610,13 @@ class MapTask extends Task {
         return ++current < end;
       }
       public DataInputBuffer getKey() throws IOException {
-        final int kvoff = kvoffsets[current % kvoffsets.length];
-        keybuf.reset(kvbuffer, kvindices[kvoff + KEYSTART],
-                     kvindices[kvoff + VALSTART] - kvindices[kvoff + KEYSTART]);
+        final int kvoff = offsetFor(current % maxRec);
+        keybuf.reset(kvbuffer, kvmeta.get(kvoff + KEYSTART),
+            kvmeta.get(kvoff + VALSTART) - kvmeta.get(kvoff + KEYSTART));
         return keybuf;
       }
       public DataInputBuffer getValue() throws IOException {
-        getVBytesForOffset(kvoffsets[current % kvoffsets.length], vbytes);
+        getVBytesForOffset(offsetFor(current % maxRec), vbytes);
         return vbytes;
       }
       public Progress getProgress() {

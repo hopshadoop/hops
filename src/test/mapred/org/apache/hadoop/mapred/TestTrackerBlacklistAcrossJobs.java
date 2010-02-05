@@ -74,7 +74,7 @@ public class TestTrackerBlacklistAcrossJobs extends TestCase {
     job.setMapOutputKeyClass(NullWritable.class);
     job.setMapOutputValueClass(NullWritable.class);
     job.setOutputFormat(NullOutputFormat.class);
-    job.setInputFormat(TestMapCollection.FakeIF.class);
+    job.setInputFormat(TestReduceFetchFromPartialMem.FakeIF.class);
     
     // run the job
     JobClient jc = new JobClient(mrConf);

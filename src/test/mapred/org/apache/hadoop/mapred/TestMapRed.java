@@ -24,7 +24,9 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.util.Collections;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Random;
 
@@ -322,6 +324,12 @@ public class TestMapRed extends Configured implements Tool {
   public void testNullKeys() throws Exception {
     JobConf conf = new JobConf(TestMapRed.class);
     FileSystem fs = FileSystem.getLocal(conf);
+    HashSet<String> values = new HashSet<String>();
+    String m = "AAAAAAAAAAAAAA";
+    for (int i = 1; i < 11; ++i) {
+      values.add(m);
+      m = m.replace((char)('A' + i - 1), (char)('A' + i));
+    }
     Path testdir = new Path(
         System.getProperty("test.build.data","/tmp")).makeQualified(fs);
     fs.delete(testdir, true);
@@ -329,14 +337,10 @@ public class TestMapRed extends Configured implements Tool {
     SequenceFile.Writer w = SequenceFile.createWriter(fs, conf, inFile,
         NullWritable.class, Text.class, SequenceFile.CompressionType.NONE);
     Text t = new Text();
-    t.set("AAAAAAAAAAAAAA"); w.append(NullWritable.get(), t);
-    t.set("BBBBBBBBBBBBBB"); w.append(NullWritable.get(), t);
-    t.set("CCCCCCCCCCCCCC"); w.append(NullWritable.get(), t);
-    t.set("DDDDDDDDDDDDDD"); w.append(NullWritable.get(), t);
-    t.set("EEEEEEEEEEEEEE"); w.append(NullWritable.get(), t);
-    t.set("FFFFFFFFFFFFFF"); w.append(NullWritable.get(), t);
-    t.set("GGGGGGGGGGGGGG"); w.append(NullWritable.get(), t);
-    t.set("HHHHHHHHHHHHHH"); w.append(NullWritable.get(), t);
+    for (String s : values) {
+      t.set(s);
+      w.append(NullWritable.get(), t);
+    }
     w.close();
     FileInputFormat.setInputPaths(conf, inFile);
     FileOutputFormat.setOutputPath(conf, new Path(testdir, "nullout"));
@@ -350,13 +354,15 @@ public class TestMapRed extends Configured implements Tool {
 
     JobClient.runJob(conf);
 
+    // Since null keys all equal, allow any ordering
     SequenceFile.Reader r = new SequenceFile.Reader(fs,
         new Path(testdir, "nullout/part-00000"), conf);
-    String m = "AAAAAAAAAAAAAA";
+    m = "AAAAAAAAAAAAAA";
     for (int i = 1; r.next(NullWritable.get(), t); ++i) {
-      assertTrue(t.toString() + " doesn't match " + m, m.equals(t.toString()));
+      assertTrue("Unexpected value: " + t, values.remove(t.toString()));
       m = m.replace((char)('A' + i - 1), (char)('A' + i));
     }
+    assertTrue("Missing values: " + values.toString(), values.isEmpty());
   }
 
   private void checkCompression(boolean compressMapOutputs,

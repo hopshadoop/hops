@@ -146,8 +146,6 @@ public interface JobContext {
   public static final String TASK_LOG_RETAIN_HOURS = 
     "mapred.task.userlog.retain.hours";
   
-  public static final String MAP_SORT_RECORD_PERCENT = 
-    "mapreduce.map.sort.record.percent";
   public static final String MAP_SORT_SPILL_PERCENT =
     "mapreduce.map.sort.spill.percent";
   public static final String MAP_INPUT_FILE = "mapreduce.map.input.file";

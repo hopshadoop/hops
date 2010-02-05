@@ -18,29 +18,28 @@
 
 package org.apache.hadoop.mapred;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.io.Writer;
-import java.io.BufferedWriter;
 import java.io.IOException;
+import java.util.Formatter;
 import java.util.StringTokenizer;
 
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.Test;
+import static org.junit.Assert.*;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Cluster;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.Mapper;
-import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.TaskCounter;
 
-import org.junit.Test;
-import static org.junit.Assert.assertEquals;
-
-
 /**
- * This is an wordcount application that tests job counters.
- * It generates simple text input files. Then
+ * This is an wordcount application that tests the count of records
+ * got spilled to disk. It generates simple text input files. Then
  * runs the wordcount map/reduce application on (1) 3 i/p files(with 3 maps
  * and 1 reduce) and verifies the counters and (2) 4 i/p files(with 4 maps
  * and 1 reduce) and verifies counters. Wordcount application reads the
@@ -50,30 +49,45 @@ import static org.junit.Assert.assertEquals;
  */
 public class TestJobCounters {
 
-  String TEST_ROOT_DIR = new Path(System.getProperty("test.build.data",
-                          File.separator + "tmp")).toString().replace(' ', '+');
-	
-  private void validateCounters(Counters counter, long spillRecCnt, 
+  private void validateCounters(Counters counter, long spillRecCnt,
                                 long mapInputRecords, long mapOutputRecords) {
       // Check if the numer of Spilled Records is same as expected
       assertEquals(spillRecCnt,
-    		  counter.findCounter(TaskCounter.SPILLED_RECORDS).getCounter());
+          counter.findCounter(TaskCounter.SPILLED_RECORDS).getCounter());
       assertEquals(mapInputRecords,
     		  counter.findCounter(TaskCounter.MAP_INPUT_RECORDS).getCounter());
-      assertEquals(mapOutputRecords, 
+      assertEquals(mapOutputRecords,
     		  counter.findCounter(TaskCounter.MAP_OUTPUT_RECORDS).getCounter());
   }
-  
-  private void createWordsFile(File inpFile) throws Exception {
-    Writer out = new BufferedWriter(new FileWriter(inpFile));
-    try {
-      // 500*4 unique words --- repeated 5 times => 5*2K words
-      int REPLICAS=5, NUMLINES=500, NUMWORDSPERLINE=4;
 
+  private void removeWordsFile(Path inpFile, Configuration conf)
+      throws IOException {
+    final FileSystem fs = inpFile.getFileSystem(conf);
+    if (fs.exists(inpFile) && !fs.delete(inpFile, false)) {
+      throw new IOException("Failed to delete " + inpFile);
+    }
+  }
+
+  private static void createWordsFile(Path inpFile, Configuration conf)
+      throws IOException {
+    final FileSystem fs = inpFile.getFileSystem(conf);
+    if (fs.exists(inpFile)) {
+      return;
+    }
+    FSDataOutputStream out = fs.create(inpFile);
+    try {
+      // 1024*4 unique words --- repeated 5 times => 5*2K words
+      int REPLICAS=5, NUMLINES=1024, NUMWORDSPERLINE=4;
+      final String WORD = "zymurgy"; // 7 bytes + 4 id bytes
+      final Formatter fmt = new Formatter(new StringBuilder());
       for (int i = 0; i < REPLICAS; i++) {
         for (int j = 1; j <= NUMLINES*NUMWORDSPERLINE; j+=NUMWORDSPERLINE) {
-          out.write("word" + j + " word" + (j+1) + " word" + (j+2) 
-                    + " word" + (j+3) + '\n');
+          ((StringBuilder)fmt.out()).setLength(0);
+          for (int k = 0; k < NUMWORDSPERLINE; ++k) {
+            fmt.format("%s%04d ", WORD, j + k);
+          }
+          ((StringBuilder)fmt.out()).append("\n");
+          out.writeBytes(fmt.toString());
         }
       }
     } finally {
@@ -81,282 +95,241 @@ public class TestJobCounters {
     }
   }
 
+  private static Path IN_DIR = null;
+  private static Path OUT_DIR = null;
+  private static Path testdir = null;
 
-  /**
-   * The main driver for word count map/reduce program.
-   * Invoke this method to submit the map/reduce job.
-   * @throws IOException When there is communication problems with the
-   *                     job tracker.
-   */
+  @BeforeClass
+  public static void initPaths() throws IOException {
+    final Configuration conf = new Configuration();
+    final Path TEST_ROOT_DIR =
+      new Path(System.getProperty("test.build.data", "/tmp"));
+    testdir = new Path(TEST_ROOT_DIR, "spilledRecords.countertest");
+    IN_DIR = new Path(testdir, "in");
+    OUT_DIR = new Path(testdir, "out");
+
+    FileSystem fs = FileSystem.getLocal(conf);
+    testdir = new Path(TEST_ROOT_DIR, "spilledRecords.countertest");
+    if (fs.exists(testdir) && !fs.delete(testdir, true)) {
+      throw new IOException("Could not delete " + testdir);
+    }
+    if (!fs.mkdirs(IN_DIR)) {
+      throw new IOException("Mkdirs failed to create " + IN_DIR);
+    }
+    // create 3 input files each with 5*2k words
+    createWordsFile(new Path(IN_DIR, "input5_2k_1"), conf);
+    createWordsFile(new Path(IN_DIR, "input5_2k_2"), conf);
+    createWordsFile(new Path(IN_DIR, "input5_2k_3"), conf);
+
+  }
+
+  @AfterClass
+  public static void cleanup() throws IOException {
+    //clean up the input and output files
+    final Configuration conf = new Configuration();
+    final FileSystem fs = testdir.getFileSystem(conf);
+    if (fs.exists(testdir)) {
+      fs.delete(testdir, true);
+    }
+  }
+
+  public static JobConf createConfiguration() throws IOException {
+    JobConf baseConf = new JobConf(TestJobCounters.class);
+
+    baseConf.setOutputKeyClass(Text.class);
+    baseConf.setOutputValueClass(IntWritable.class);
+
+    baseConf.setMapperClass(WordCount.MapClass.class);
+    baseConf.setCombinerClass(WordCount.Reduce.class);
+    baseConf.setReducerClass(WordCount.Reduce.class);
+
+    baseConf.setNumReduceTasks(1);
+    baseConf.setInt(JobContext.IO_SORT_MB, 1);
+    baseConf.set(JobContext.MAP_SORT_SPILL_PERCENT, "0.50");
+    baseConf.setInt(JobContext.MAP_COMBINE_MIN_SPILLS, 3);
+    return baseConf;
+  }
+
+  public static Job createJob() throws IOException {
+    final Configuration conf = new Configuration();
+    final Job baseJob = Job.getInstance(new Cluster(conf), conf);
+    baseJob.setOutputKeyClass(Text.class);
+    baseJob.setOutputValueClass(IntWritable.class);
+    baseJob.setMapperClass(NewMapTokenizer.class);
+    baseJob.setCombinerClass(NewSummer.class);
+    baseJob.setReducerClass(NewSummer.class);
+    baseJob.setNumReduceTasks(1);
+    baseJob.getConfiguration().setInt(JobContext.IO_SORT_MB, 1);
+    baseJob.getConfiguration().set(JobContext.MAP_SORT_SPILL_PERCENT, "0.50");
+    baseJob.getConfiguration().setInt(JobContext.MAP_COMBINE_MIN_SPILLS, 3);
+    org.apache.hadoop.mapreduce.lib.input.FileInputFormat.setMinInputSplitSize(
+        baseJob, Long.MAX_VALUE);
+    return baseJob;
+  }
+
   @Test
-  public void testOldJobWithMapAndReducers() throws Exception {
-    JobConf conf = new JobConf(TestJobCounters.class);
-    conf.setJobName("wordcount-map-reducers");
-
-    // the keys are words (strings)
-    conf.setOutputKeyClass(Text.class);
-    // the values are counts (ints)
-    conf.setOutputValueClass(IntWritable.class);
-
-    conf.setMapperClass(WordCount.MapClass.class);
-    conf.setCombinerClass(WordCount.Reduce.class);
-    conf.setReducerClass(WordCount.Reduce.class);
-
+  public void testOldCounterA() throws Exception {
+    JobConf conf = createConfiguration();
     conf.setNumMapTasks(3);
-    conf.setNumReduceTasks(1);
-    conf.setInt(JobContext.IO_SORT_MB, 1);
     conf.setInt(JobContext.IO_SORT_FACTOR, 2);
-    conf.set(JobContext.MAP_SORT_RECORD_PERCENT, "0.05");
-    conf.set(JobContext.MAP_SORT_SPILL_PERCENT, "0.80");
+    removeWordsFile(new Path(IN_DIR, "input5_2k_4"), conf);
+    removeWordsFile(new Path(IN_DIR, "input5_2k_5"), conf);
+    FileInputFormat.setInputPaths(conf, IN_DIR);
+    FileOutputFormat.setOutputPath(conf, new Path(OUT_DIR, "outputO0"));
 
-    FileSystem fs = FileSystem.get(conf);
-    Path testDir = new Path(TEST_ROOT_DIR, "countertest");
-    conf.set("test.build.data", testDir.toString());
-    try {
-      if (fs.exists(testDir)) {
-        fs.delete(testDir, true);
-      }
-      if (!fs.mkdirs(testDir)) {
-        throw new IOException("Mkdirs failed to create " + testDir.toString());
-      }
+    RunningJob myJob = JobClient.runJob(conf);
+    Counters c1 = myJob.getCounters();
+    // Each record requires 16 bytes of metadata, 16 bytes per serialized rec
+    // (vint word len + word + IntWritable) = (1 + 11 + 4)
+    // (2^20 buf * .5 spill pcnt) / 32 bytes/record = 2^14 recs per spill
+    // Each file contains 5 replicas of 4096 words, so the first spill will
+    // contain 4 (2^14 rec / 2^12 rec/replica) replicas, the second just one.
 
-      String inDir = testDir +  File.separator + "genins" + File.separator;
-      String outDir = testDir + File.separator;
-      Path wordsIns = new Path(inDir);
-      if (!fs.mkdirs(wordsIns)) {
-        throw new IOException("Mkdirs failed to create " + wordsIns.toString());
-      }
+    // Each map spills twice, emitting 4096 records per spill from the
+    // combiner per spill. The merge adds an additional 8192 records, as
+    // there are too few spills to combine (2 < 3)
+    // Each map spills 2^14 records, so maps spill 49152 records, combined.
 
-      //create 3 input files each with 5*2k words
-      File inpFile = new File(inDir + "input5_2k_1");
-      createWordsFile(inpFile);
-      inpFile = new File(inDir + "input5_2k_2");
-      createWordsFile(inpFile);
-      inpFile = new File(inDir + "input5_2k_3");
-      createWordsFile(inpFile);
+    // The reduce spill count is composed of the read from one segment and
+    // the intermediate merge of the other two. The intermediate merge
+    // adds 8192 records per segment read; again, there are too few spills to
+    // combine, so all 16834 are written to disk (total 32768 spilled records
+    // for the intermediate merge). The merge into the reduce includes only
+    // the unmerged segment, size 8192. Total spilled records in the reduce
+    // is 32768 from the merge + 8192 unmerged segment = 40960 records
 
-      FileInputFormat.setInputPaths(conf, inDir);
-      Path outputPath1 = new Path(outDir, "output5_2k_3");
-      FileOutputFormat.setOutputPath(conf, outputPath1);
+    // Total: map + reduce = 49152 + 40960 = 90112
+    // 3 files, 5120 = 5 * 1024 rec/file = 15360 input records
+    // 4 records/line = 61440 output records
+    validateCounters(c1, 90112, 15360, 61440);
 
-      RunningJob myJob = JobClient.runJob(conf);
-      Counters c1 = myJob.getCounters();
-      // 3maps & in each map, 4 first level spills --- So total 12.
-      // spilled records count:
-      // Each Map: 1st level:2k+2k+2k+2k=8k;2ndlevel=4k+4k=8k;
-      //           3rd level=2k(4k from 1st level & 4k from 2nd level & combineAndSpill)
-      //           So total 8k+8k+2k=18k
-      // For 3 Maps, total = 3*18=54k
-      // Reduce: each of the 3 map o/p's(2k each) will be spilled in shuffleToDisk()
-      //         So 3*2k=6k in 1st level; 2nd level:4k(2k+2k);
-      //         3rd level directly given to reduce(4k+2k --- combineAndSpill => 2k.
-      //         So 0 records spilled to disk in 3rd level)
-      //         So total of 6k+4k=10k
-      // Total job counter will be 54k+10k = 64k
-      
-      //3 maps and 2.5k lines --- So total 7.5k map input records
-      //3 maps and 10k words in each --- So total of 30k map output recs
-      validateCounters(c1, 64000, 7500, 30000);
-
-      //create 4th input file each with 5*2k words and test with 4 maps
-      inpFile = new File(inDir + "input5_2k_4");
-      createWordsFile(inpFile);
-      conf.setNumMapTasks(4);
-      Path outputPath2 = new Path(outDir, "output5_2k_4");
-      FileOutputFormat.setOutputPath(conf, outputPath2);
-
-      myJob = JobClient.runJob(conf);
-      c1 = myJob.getCounters();
-      // 4maps & in each map 4 first level spills --- So total 16.
-      // spilled records count:
-      // Each Map: 1st level:2k+2k+2k+2k=8k;2ndlevel=4k+4k=8k;
-      //           3rd level=2k(4k from 1st level & 4k from 2nd level & combineAndSpill)
-      //           So total 8k+8k+2k=18k
-      // For 3 Maps, total = 4*18=72k
-      // Reduce: each of the 4 map o/p's(2k each) will be spilled in shuffleToDisk()
-      //         So 4*2k=8k in 1st level; 2nd level:4k+4k=8k;
-      //         3rd level directly given to reduce(4k+4k --- combineAndSpill => 2k.
-      //         So 0 records spilled to disk in 3rd level)
-      //         So total of 8k+8k=16k
-      // Total job counter will be 72k+16k = 88k
-      
-      // 4 maps and 2.5k words in each --- So 10k map input records
-      // 4 maps and 10k unique words --- So 40k map output records
-      validateCounters(c1, 88000, 10000, 40000);
-      
-      // check for a map only job
-      conf.setNumReduceTasks(0);
-      Path outputPath3 = new Path(outDir, "output5_2k_5");
-      FileOutputFormat.setOutputPath(conf, outputPath3);
-
-      myJob = JobClient.runJob(conf);
-      c1 = myJob.getCounters();
-      // 4 maps and 2.5k words in each --- So 10k map input records
-      // 4 maps and 10k unique words --- So 40k map output records
-      validateCounters(c1, 0, 10000, 40000);
-    } finally {
-      //clean up the input and output files
-      if (fs.exists(testDir)) {
-        fs.delete(testDir, true);
-      }
-    }
   }
-  
-  public static class NewMapTokenizer 
-  extends Mapper<Object, Text, Text, IntWritable> {
-	private final static IntWritable one = new IntWritable(1);
-	private Text word = new Text();
 
-	public void map(Object key, Text value, Context context) 
-	throws IOException, InterruptedException {
-      StringTokenizer itr = new StringTokenizer(value.toString());
-      while (itr.hasMoreTokens()) {
-        word.set(itr.nextToken());
-        context.write(word, one);
-      }
-    }
-  }
-  
-  public static class NewIdentityReducer  
-  extends Reducer<Text, IntWritable, Text, IntWritable> {
-  private IntWritable result = new IntWritable();
-  
-  public void reduce(Text key, Iterable<IntWritable> values, 
-                     Context context) throws IOException, InterruptedException {
-    int sum = 0;
-    for (IntWritable val : values) {
-      sum += val.get();
-    }
-    result.set(sum);
-    context.write(key, result);
-  }
- }
-  
-  /**
-   * The main driver for word count map/reduce program.
-   * Invoke this method to submit the map/reduce job.
-   * @throws IOException When there is communication problems with the
-   *                     job tracker.
-   */
   @Test
-  public void testNewJobWithMapAndReducers() throws Exception {
-    JobConf conf = new JobConf(TestJobCounters.class);
-    conf.setInt(JobContext.IO_SORT_MB, 1);
+  public void testOldCounterB() throws Exception {
+
+    JobConf conf = createConfiguration();
+    createWordsFile(new Path(IN_DIR, "input5_2k_4"), conf);
+    removeWordsFile(new Path(IN_DIR, "input5_2k_5"), conf);
+    conf.setNumMapTasks(4);
     conf.setInt(JobContext.IO_SORT_FACTOR, 2);
-    conf.set(JobContext.MAP_SORT_RECORD_PERCENT, "0.05");
-    conf.set(JobContext.MAP_SORT_SPILL_PERCENT, "0.80");
+    FileInputFormat.setInputPaths(conf, IN_DIR);
+    FileOutputFormat.setOutputPath(conf, new Path(OUT_DIR, "outputO1"));
 
-    FileSystem fs = FileSystem.get(conf);
-    Path testDir = new Path(TEST_ROOT_DIR, "countertest2");
-    conf.set("test.build.data", testDir.toString());
-    try {
-      if (fs.exists(testDir)) {
-        fs.delete(testDir, true);
+    RunningJob myJob = JobClient.runJob(conf);
+    Counters c1 = myJob.getCounters();
+    // As above, each map spills 2^14 records, so 4 maps spill 2^16 records
+
+    // In the reduce, there are two intermediate merges before the reduce.
+    // 1st merge: read + write = 8192 * 4
+    // 2nd merge: read + write = 8192 * 4
+    // final merge: 0
+    // Total reduce: 65536
+
+    // Total: map + reduce = 2^16 + 2^16 = 131072
+    // 4 files, 5120 = 5 * 1024 rec/file = 15360 input records
+    // 4 records/line = 81920 output records
+    validateCounters(c1, 131072, 20480, 81920);
+  }
+
+  @Test
+  public void testOldCounterC() throws Exception {
+    JobConf conf = createConfiguration();
+    createWordsFile(new Path(IN_DIR, "input5_2k_4"), conf);
+    createWordsFile(new Path(IN_DIR, "input5_2k_5"), conf);
+    conf.setNumMapTasks(4);
+    conf.setInt(JobContext.IO_SORT_FACTOR, 3);
+    FileInputFormat.setInputPaths(conf, IN_DIR);
+    FileOutputFormat.setOutputPath(conf, new Path(OUT_DIR, "outputO2"));
+    RunningJob myJob = JobClient.runJob(conf);
+    Counters c1 = myJob.getCounters();
+    // As above, each map spills 2^14 records, so 5 maps spill 81920
+
+    // 1st merge: read + write = 6 * 8192
+    // final merge: unmerged = 2 * 8192
+    // Total reduce: 45056
+    // 5 files, 5120 = 5 * 1024 rec/file = 15360 input records
+    // 4 records/line = 102400 output records
+    validateCounters(c1, 147456, 25600, 102400);
+  }
+
+  @Test
+  public void testNewCounterA() throws Exception {
+    final Job job = createJob();
+    final Configuration conf = job.getConfiguration();
+    conf.setInt(JobContext.IO_SORT_FACTOR, 2);
+    removeWordsFile(new Path(IN_DIR, "input5_2k_4"), conf);
+    removeWordsFile(new Path(IN_DIR, "input5_2k_5"), conf);
+    org.apache.hadoop.mapreduce.lib.input.FileInputFormat.setInputPaths(
+        job, IN_DIR);
+    org.apache.hadoop.mapreduce.lib.output.FileOutputFormat.setOutputPath(
+        job, new Path(OUT_DIR, "outputN0"));
+    assertTrue(job.waitForCompletion(true));
+    final Counters c1 = Counters.downgrade(job.getCounters());
+    validateCounters(c1, 90112, 15360, 61440);
+  }
+
+  @Test
+  public void testNewCounterB() throws Exception {
+    final Job job = createJob();
+    final Configuration conf = job.getConfiguration();
+    conf.setInt(JobContext.IO_SORT_FACTOR, 2);
+    createWordsFile(new Path(IN_DIR, "input5_2k_4"), conf);
+    removeWordsFile(new Path(IN_DIR, "input5_2k_5"), conf);
+    org.apache.hadoop.mapreduce.lib.input.FileInputFormat.setInputPaths(
+        job, IN_DIR);
+    org.apache.hadoop.mapreduce.lib.output.FileOutputFormat.setOutputPath(
+        job, new Path(OUT_DIR, "outputN1"));
+    assertTrue(job.waitForCompletion(true));
+    final Counters c1 = Counters.downgrade(job.getCounters());
+    validateCounters(c1, 131072, 20480, 81920);
+  }
+
+  @Test
+  public void testNewCounterC() throws Exception {
+    final Job job = createJob();
+    final Configuration conf = job.getConfiguration();
+    conf.setInt(JobContext.IO_SORT_FACTOR, 3);
+    createWordsFile(new Path(IN_DIR, "input5_2k_4"), conf);
+    createWordsFile(new Path(IN_DIR, "input5_2k_5"), conf);
+    org.apache.hadoop.mapreduce.lib.input.FileInputFormat.setInputPaths(
+        job, IN_DIR);
+    org.apache.hadoop.mapreduce.lib.output.FileOutputFormat.setOutputPath(
+        job, new Path(OUT_DIR, "outputN2"));
+    assertTrue(job.waitForCompletion(true));
+    final Counters c1 = Counters.downgrade(job.getCounters());
+    validateCounters(c1, 147456, 25600, 102400);
+  }
+
+  public static class NewMapTokenizer
+      extends org.apache.hadoop.mapreduce.Mapper<Object,Text,Text,IntWritable> {
+    private final static IntWritable one = new IntWritable(1);
+    private Text word = new Text();
+
+    public void map(Object key, Text value, Context context)
+    throws IOException, InterruptedException {
+        StringTokenizer itr = new StringTokenizer(value.toString());
+        while (itr.hasMoreTokens()) {
+          word.set(itr.nextToken());
+          context.write(word, one);
+        }
       }
-      if (!fs.mkdirs(testDir)) {
-        throw new IOException("Mkdirs failed to create " + testDir.toString());
+  }
+
+  public static class NewSummer
+      extends org.apache.hadoop.mapreduce.Reducer<Text,IntWritable,
+                                                  Text,IntWritable> {
+    private IntWritable result = new IntWritable();
+
+    public void reduce(Text key, Iterable<IntWritable> values, Context context)
+        throws IOException, InterruptedException {
+      int sum = 0;
+      for (IntWritable val : values) {
+        sum += val.get();
       }
-
-      String inDir = testDir +  File.separator + "genins" + File.separator;
-      Path wordsIns = new Path(inDir);
-      if (!fs.mkdirs(wordsIns)) {
-        throw new IOException("Mkdirs failed to create " + wordsIns.toString());
-      }
-      String outDir = testDir + File.separator;
-
-      //create 3 input files each with 5*2k words
-      File inpFile = new File(inDir + "input5_2k_1");
-      createWordsFile(inpFile);
-      inpFile = new File(inDir + "input5_2k_2");
-      createWordsFile(inpFile);
-      inpFile = new File(inDir + "input5_2k_3");
-      createWordsFile(inpFile);
-
-      FileInputFormat.setInputPaths(conf, inDir);
-      Path outputPath1 = new Path(outDir, "output5_2k_3");
-      FileOutputFormat.setOutputPath(conf, outputPath1);
-      
-      Job job = new Job(conf);
-      job.setJobName("wordcount-map-reducers");
-
-      // the keys are words (strings)
-      job.setOutputKeyClass(Text.class);
-      // the values are counts (ints)
-      job.setOutputValueClass(IntWritable.class);
-
-      job.setMapperClass(NewMapTokenizer.class);
-      job.setCombinerClass(NewIdentityReducer.class);
-      job.setReducerClass(NewIdentityReducer.class);
-
-      job.setNumReduceTasks(1);
-
-      job.waitForCompletion(false);
-      
-      org.apache.hadoop.mapreduce.Counters c1 = job.getCounters();
-      // 3maps & in each map, 4 first level spills --- So total 12.
-      // spilled records count:
-      // Each Map: 1st level:2k+2k+2k+2k=8k;2ndlevel=4k+4k=8k;
-      //           3rd level=2k(4k from 1st level & 4k from 2nd level & combineAndSpill)
-      //           So total 8k+8k+2k=18k
-      // For 3 Maps, total = 3*18=54k
-      // Reduce: each of the 3 map o/p's(2k each) will be spilled in shuffleToDisk()
-      //         So 3*2k=6k in 1st level; 2nd level:4k(2k+2k);
-      //         3rd level directly given to reduce(4k+2k --- combineAndSpill => 2k.
-      //         So 0 records spilled to disk in 3rd level)
-      //         So total of 6k+4k=10k
-      // Total job counter will be 54k+10k = 64k
-      
-      //3 maps and 2.5k lines --- So total 7.5k map input records
-      //3 maps and 10k words in each --- So total of 30k map output recs
-      validateCounters(Counters.downgrade(c1), 64000, 7500, 30000);
-
-      //create 4th input file each with 5*2k words and test with 4 maps
-      inpFile = new File(inDir + "input5_2k_4");
-      createWordsFile(inpFile);
-      JobConf newJobConf = new JobConf(job.getConfiguration());
-      
-      Path outputPath2 = new Path(outDir, "output5_2k_4");
-      
-      FileOutputFormat.setOutputPath(newJobConf, outputPath2);
-
-      Job newJob = new Job(newJobConf);
-      newJob.waitForCompletion(false);
-      c1 = newJob.getCounters();
-      // 4maps & in each map 4 first level spills --- So total 16.
-      // spilled records count:
-      // Each Map: 1st level:2k+2k+2k+2k=8k;2ndlevel=4k+4k=8k;
-      //           3rd level=2k(4k from 1st level & 4k from 2nd level & combineAndSpill)
-      //           So total 8k+8k+2k=18k
-      // For 3 Maps, total = 4*18=72k
-      // Reduce: each of the 4 map o/p's(2k each) will be spilled in shuffleToDisk()
-      //         So 4*2k=8k in 1st level; 2nd level:4k+4k=8k;
-      //         3rd level directly given to reduce(4k+4k --- combineAndSpill => 2k.
-      //         So 0 records spilled to disk in 3rd level)
-      //         So total of 8k+8k=16k
-      // Total job counter will be 72k+16k = 88k
-      
-      // 4 maps and 2.5k words in each --- So 10k map input records
-      // 4 maps and 10k unique words --- So 40k map output records
-      validateCounters(Counters.downgrade(c1), 88000, 10000, 40000);
-      
-      JobConf newJobConf2 = new JobConf(newJob.getConfiguration());
-      
-      Path outputPath3 = new Path(outDir, "output5_2k_5");
-      
-      FileOutputFormat.setOutputPath(newJobConf2, outputPath3);
-
-      Job newJob2 = new Job(newJobConf2);
-      newJob2.setNumReduceTasks(0);
-      newJob2.waitForCompletion(false);
-      c1 = newJob2.getCounters();
-      // 4 maps and 2.5k words in each --- So 10k map input records
-      // 4 maps and 10k unique words --- So 40k map output records
-      validateCounters(Counters.downgrade(c1), 0, 10000, 40000);
-    } finally {
-      //clean up the input and output files
-      if (fs.exists(testDir)) {
-        fs.delete(testDir, true);
-      }
+      result.set(sum);
+      context.write(key, result);
     }
   }
+
 }

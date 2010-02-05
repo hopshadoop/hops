@@ -29,9 +29,10 @@ import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.WritableComparator;
-import org.apache.hadoop.mapred.TestMapCollection.FakeIF;
 import org.apache.hadoop.mapreduce.TaskCounter;
 
+import java.io.DataInput;
+import java.io.DataOutput;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Formatter;
@@ -237,6 +238,46 @@ public class TestReduceFetchFromPartialMem extends TestCase {
       assertEquals(nMaps - 1, aKey);
       assertEquals(nMaps - 1, bKey);
       assertEquals("Bad record count", nMaps * (4096 + 2), nRec);
+    }
+  }
+
+  public static class FakeSplit implements InputSplit {
+    public void write(DataOutput out) throws IOException { }
+    public void readFields(DataInput in) throws IOException { }
+    public long getLength() { return 0L; }
+    public String[] getLocations() { return new String[0]; }
+  }
+
+  public static class FakeIF
+      implements InputFormat<NullWritable,NullWritable> {
+
+    public FakeIF() { }
+
+    public InputSplit[] getSplits(JobConf conf, int numSplits) {
+      InputSplit[] splits = new InputSplit[numSplits];
+      for (int i = 0; i < splits.length; ++i) {
+        splits[i] = new FakeSplit();
+      }
+      return splits;
+    }
+
+    public RecordReader<NullWritable,NullWritable> getRecordReader(
+        InputSplit ignored, JobConf conf, Reporter reporter) {
+      return new RecordReader<NullWritable,NullWritable>() {
+        private boolean done = false;
+        public boolean next(NullWritable key, NullWritable value)
+            throws IOException {
+          if (done)
+            return false;
+          done = true;
+          return true;
+        }
+        public NullWritable createKey() { return NullWritable.get(); }
+        public NullWritable createValue() { return NullWritable.get(); }
+        public long getPos() throws IOException { return 0L; }
+        public void close() throws IOException { }
+        public float getProgress() throws IOException { return 0.0f; }
+      };
     }
   }
 

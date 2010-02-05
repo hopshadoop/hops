@@ -293,8 +293,6 @@ public class ConfigUtil {
       new String[] {JobContext.TASK_LOG_RETAIN_HOURS});
     Configuration.addDeprecation("mapred.task.profile.params", 
       new String[] {JobContext.TASK_PROFILE_PARAMS});
-    Configuration.addDeprecation("io.sort.record.percent", 
-      new String[] {JobContext.MAP_SORT_RECORD_PERCENT});
     Configuration.addDeprecation("io.sort.spill.percent", 
       new String[] {JobContext.MAP_SORT_SPILL_PERCENT});
     Configuration.addDeprecation("map.input.file", 

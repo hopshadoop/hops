@@ -197,13 +197,31 @@
        <Bug pattern="DLS_DEAD_LOCAL_STORE" />
      </Match>
     <!--
-      This is a spurious warning. Just ignore
+      None of the following variables should be referenced by any thread
+      but the collection thread in MapTask
     -->
      <Match>
        <Class name="org.apache.hadoop.mapred.MapTask$MapOutputBuffer" />
        <Field name="kvindex" />
        <Bug pattern="IS2_INCONSISTENT_SYNC" />
      </Match>
+     <Match>
+       <Class name="org.apache.hadoop.mapred.MapTask$MapOutputBuffer" />
+       <Field name="bufferRemaining" />
+       <Bug pattern="IS2_INCONSISTENT_SYNC" />
+     </Match>
+     <Match>
+       <Class name="org.apache.hadoop.mapred.MapTask$MapOutputBuffer" />
+       <Field name="equator" />
+       <Bug pattern="IS2_INCONSISTENT_SYNC" />
+     </Match>
+
+    <!-- This is spurious. -->
+    <Match>
+      <Class name="org.apache.hadoop.mapred.MapTask$MapOutputBuffer$SpillThread" />
+      <Method name="run" />
+      <Bug pattern="UL_UNRELEASED_LOCK_EXCEPTION_PATH" />
+    </Match>
 
      <Match>
        <Class name="org.apache.hadoop.mapreduce.task.reduce.MergeThread" />
