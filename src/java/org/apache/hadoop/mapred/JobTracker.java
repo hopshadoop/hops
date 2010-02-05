@@ -1343,7 +1343,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     }
     
     supergroup = conf.get(JT_SUPERGROUP, "supergroup");
-    LOG.info("Starting jobtracker with owner as " + mrOwner.getUserName() 
+    LOG.info("Starting jobtracker with owner as " + mrOwner.getShortUserName() 
              + " and supergroup as " + supergroup);
     clock = newClock;
 
@@ -1478,9 +1478,9 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
         }
         try {
           FileStatus systemDirStatus = fs.getFileStatus(systemDir);
-          if (!systemDirStatus.getOwner().equals(mrOwner.getUserName())) {
+          if (!systemDirStatus.getOwner().equals(mrOwner.getShortUserName())) {
             throw new AccessControlException("The systemdir " + systemDir + 
-                " is not owned by " + mrOwner.getUserName());
+                " is not owned by " + mrOwner.getShortUserName());
           }
           if (!systemDirStatus.getPermission().equals(SYSTEM_DIR_PERMISSION)) {
             LOG.warn("Incorrect permissions on " + systemDir + 
@@ -2949,7 +2949,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     //the conversion from String to Text for the UGI's username will
     //not be required when we have the UGI to return us the username as
     //Text.
-    JobInfo jobInfo = new JobInfo(jobId, new Text(ugi.getUserName()), 
+    JobInfo jobInfo = new JobInfo(jobId, new Text(ugi.getShortUserName()), 
         new Path(jobSubmitDir));
     JobInProgress job = 
       new JobInProgress(this, this.conf, restartCount, jobInfo, ts);
@@ -3036,7 +3036,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     String queue = job.getProfile().getQueueName();
     if (!queueManager.hasAccess(queue, job, oper, ugi)) {
       throw new AccessControlException("User " 
-                            + ugi.getUserName() 
+                            + ugi.getShortUserName() 
                             + " cannot perform "
                             + "operation " + oper + " on queue " + queue +
                             ".\n Please run \"hadoop queue -showacls\" " +
@@ -3665,7 +3665,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     Path stagingRootDir = new Path(conf.get(JTConfig.JT_STAGING_AREA_ROOT, 
         "/tmp/hadoop/mapred/staging"));
     FileSystem fs = stagingRootDir.getFileSystem(conf);
-    String user = UserGroupInformation.getCurrentUser().getUserName();
+    String user = UserGroupInformation.getCurrentUser().getShortUserName();
     return fs.makeQualified(new Path(stagingRootDir, 
                                 user+"/.staging")).toString();
   }
@@ -3890,7 +3890,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    */
   private synchronized boolean isSuperUser() throws IOException {
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
-    if (mrOwner.getUserName().equals(ugi.getUserName()) ) {
+    if (mrOwner.getShortUserName().equals(ugi.getShortUserName()) ) {
       return true;
     }
     String[] groups = ugi.getGroupNames();
@@ -3909,7 +3909,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   public synchronized void refreshNodes() throws IOException {
     // check access
     if (!isSuperUser()) {
-      String user = UserGroupInformation.getCurrentUser().getUserName();
+      String user = UserGroupInformation.getCurrentUser().getShortUserName();
       throw new AccessControlException(user + 
                                        " is not authorized to refresh nodes.");
     }
@@ -4141,7 +4141,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   @Override
   public void refreshQueues() throws IOException{
     LOG.info("Refreshing queue information. requested by : " + 
-             UserGroupInformation.getCurrentUser().getUserName());
+             UserGroupInformation.getCurrentUser().getShortUserName());
     this.queueManager.refreshQueues(new Configuration(this.conf),
         taskScheduler.getQueueRefresher());
   }
@@ -4200,7 +4200,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   @Override
   public void refreshUserToGroupsMappings(Configuration conf) throws IOException {
     LOG.info("Refreshing all user-to-groups mappings. Requested by user: " + 
-             UserGroupInformation.getCurrentUser().getUserName());
+             UserGroupInformation.getCurrentUser().getShortUserName());
     
     Groups.getUserToGroupsMappingService(conf).refresh();
   }

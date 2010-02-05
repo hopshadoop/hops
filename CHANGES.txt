@@ -155,6 +155,9 @@ Trunk (unreleased changes)
     MAPREDUCE-64. Eliminate io.sort.record.percent from MapTask configuration.
     (cdouglas)
 
+    MAPREDUCE-1440. Replace the long user name in MapReduce with the local
+    name. (omalley)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band

@@ -254,7 +254,7 @@ public class Cluster {
       jobHistoryDir = new Path(client.getJobHistoryDir());
     }
     return JobHistory.getJobHistoryFile(jobHistoryDir, jobId, 
-        ugi.getUserName()).toString();
+        ugi.getShortUserName()).toString();
   }
 
   /**

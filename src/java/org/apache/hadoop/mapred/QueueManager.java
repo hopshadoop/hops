@@ -281,7 +281,7 @@ class QueueManager {
 
     if (oper.isJobOwnerAllowed()) {
       if (job != null
-        && job.getJobConf().getUser().equals(ugi.getUserName())) {
+        && job.getJobConf().getUser().equals(ugi.getShortUserName())) {
         return true;
       }
     }

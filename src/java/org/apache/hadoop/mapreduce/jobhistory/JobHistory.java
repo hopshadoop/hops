@@ -230,8 +230,7 @@ public class JobHistory {
    */
   public void setupEventWriter(JobID jobId, JobConf jobConf)
   throws IOException {
-    Path logFile = getJobHistoryFile(logDir, jobId, 
-        UserGroupInformation.createRemoteUser(getUserName(jobConf)).getShortUserName());
+    Path logFile = getJobHistoryFile(logDir, jobId, getUserName(jobConf));
   
     if (logDir == null) {
       LOG.info("Log Directory is null, returning");
