@@ -108,13 +108,13 @@ public class JobHistory {
       long jobTrackerStartTime) throws IOException {
 
     // Get and create the log folder
-    String logDirLoc = conf.get(JTConfig.JT_JOBHISTORY_LOCATION ,
+    final String logDirLoc = conf.get(JTConfig.JT_JOBHISTORY_LOCATION ,
         "file:///" +
         new File(System.getProperty("hadoop.log.dir")).getAbsolutePath()
         + File.separator + "history");
 
     LOG.info("History log directory is " + logDirLoc);
-
+    
     logDir = new Path(logDirLoc);
     logDirFs = logDir.getFileSystem(conf);
 

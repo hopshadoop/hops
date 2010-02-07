@@ -3662,12 +3662,21 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    * @see org.apache.hadoop.mapreduce.protocol.ClientProtocol#getStagingAreaDir()
    */
   public String getStagingAreaDir() throws IOException {
-    Path stagingRootDir = new Path(conf.get(JTConfig.JT_STAGING_AREA_ROOT, 
-        "/tmp/hadoop/mapred/staging"));
-    FileSystem fs = stagingRootDir.getFileSystem(conf);
-    String user = UserGroupInformation.getCurrentUser().getShortUserName();
-    return fs.makeQualified(new Path(stagingRootDir, 
-                                user+"/.staging")).toString();
+    try {
+      final String user = UserGroupInformation.getCurrentUser().getShortUserName();
+      return mrOwner.doAs(new PrivilegedExceptionAction<String>() {
+        @Override
+        public String run() throws Exception {
+          Path stagingRootDir = new Path(conf.get(JTConfig.JT_STAGING_AREA_ROOT, 
+          "/tmp/hadoop/mapred/staging"));
+          FileSystem fs = stagingRootDir.getFileSystem(conf);
+          return fs.makeQualified(new Path(stagingRootDir, 
+                                      user+"/.staging")).toString();
+      }
+      });
+    } catch(InterruptedException ie) {
+      throw new IOException(ie);
+    }
   }
   
   /**
@@ -4373,13 +4382,15 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     FileSystem historyFS = null;
 
     jobHistory = new JobHistory();
-    jobHistory.init(this, conf, this.localMachine, this.startTime);
-    jobHistory.initDone(conf, fs);
-    final String historyLogDir = jobHistory.getCompletedJobHistoryLocation().toString();
-    infoServer.setAttribute("historyLogDir", historyLogDir);
+    final JobTracker jtFinal = this;
     try {
       historyFS = mrOwner.doAs(new PrivilegedExceptionAction<FileSystem>() {
         public FileSystem run() throws IOException {
+          jobHistory.init(jtFinal, conf, jtFinal.localMachine, jtFinal.startTime);
+          jobHistory.initDone(conf, fs);
+          final String historyLogDir = 
+            jobHistory.getCompletedJobHistoryLocation().toString();
+          infoServer.setAttribute("historyLogDir", historyLogDir);
           return new Path(historyLogDir).getFileSystem(conf);
         }
       });

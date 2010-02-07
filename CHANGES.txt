@@ -301,6 +301,11 @@ Trunk (unreleased changes)
     MAPREDUCE-1443. DBInputFormat can leak connections.
     (Aaron Kimball via tomwhite)
 
+    MAPREDUCE-1457. Fixes JobTracker to get the FileSystem object within 
+    getStagingAreaDir within a privileged block. Fixes Child.java to use the
+    appropriate UGIs while getting the TaskUmbilicalProtocol proxy and 
+    while executing the task. (Jakob Homan via ddas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
