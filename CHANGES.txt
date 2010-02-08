@@ -49,6 +49,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1335. Adds SASL Kerberos/Digest authentication in MapReduce.
     (Kan Zhang via ddas)
 
+    MAPREDUCE-1464. Makes a compatible change in JobTokenIdentifier to
+    account for HADOOP-6510. (Jitendra Nath Pandey via ddas)
+
   IMPROVEMENTS
 
     MAPREDUCE-1198. Alternatively schedule different types of tasks in
