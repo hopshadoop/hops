@@ -161,6 +161,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1440. Replace the long user name in MapReduce with the local
     name. (omalley)
 
+    MAPREDUCE-1470. Move delegation tokens from HDFS to Common so that 
+    MapReduce can use them too. (omalley)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
