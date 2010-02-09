@@ -33,7 +33,7 @@ done
 # convert relative path to absolute path
 bin=`dirname "$this"`
 bin=`cd "$bin"; pwd`
-script=`basename $bin`
+script=`basename $this`
 this="$bin/$script"
 
 MUMAK_HOME=`dirname $bin`
@@ -96,7 +96,7 @@ JAVA_HEAP_MAX=-Xmx1200m
 # Hadoop Common jar
 # Hadoop Common test jar
 # Depending 3rd party jars
-CLASSPATH=${MUMAK_HOME}/conf:${HADOOP_HOME}/conf:$JAVA_HOME/lib/tools.jar
+CLASSPATH=${MUMAK_HOME}/conf:${HADOOP_CONF_DIR}:$JAVA_HOME/lib/tools.jar
 
 if [ $IN_RELEASE = 0 ]; then
   CLASSPATH=${CLASSPATH}:${HADOOP_HOME}/build/contrib/${project}/classes
@@ -109,6 +109,10 @@ if [ $IN_RELEASE = 0 ]; then
   done
 
   for f in $HADOOP_HOME/build/ivy/lib/${project}/common/*.jar; do
+    CLASSPATH=${CLASSPATH}:$f;
+  done
+
+  for f in $HADOOP_HOME/build/ivy/lib/${project}/test/*.jar; do
     CLASSPATH=${CLASSPATH}:$f;
   done
 else
@@ -165,7 +169,7 @@ fi
 HADOOP_OPTS="$HADOOP_OPTS -Dhadoop.policy.file=$HADOOP_POLICYFILE"
 
 function print_usage(){
-  echo "Usage: $script trace.json topology.json"
+  echo "Usage: $script [--config dir] trace.json topology.json"
 }
 
 if [ $# != 2 ]; then
