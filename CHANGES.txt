@@ -166,6 +166,8 @@ Trunk (unreleased changes)
     MAPREDUCE-1470. Move delegation tokens from HDFS to Common so that 
     MapReduce can use them too. (omalley)
 
+    MAPREDUCE-1425. Reduce memory usage by archive. (mahadev via szetszwo)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
