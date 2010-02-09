@@ -34,11 +34,16 @@ import org.apache.hadoop.mapreduce.QueueInfo;
 import org.apache.hadoop.mapreduce.TaskTrackerInfo;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.filecache.DistributedCache;
+import org.apache.hadoop.mapreduce.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.mapreduce.tools.CLI;
 import org.apache.hadoop.mapreduce.util.ConfigUtil;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.ipc.RemoteException;
+import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
@@ -1028,6 +1033,45 @@ public class JobClient extends CLI {
     } catch (InterruptedException ie) {
       throw new IOException(ie);
     }
+  }
+
+  /**
+   * Get a delegation token for the user from the JobTracker.
+   * @param renewer the user who can renew the token
+   * @return the new token
+   * @throws IOException
+   */
+  public Token<DelegationTokenIdentifier> 
+    getDelegationToken(Text renewer) throws IOException, InterruptedException {
+    return cluster.getDelegationToken(renewer);
+  }
+
+  /**
+   * Renew a delegation token
+   * @param token the token to renew
+   * @return true if the renewal went well
+   * @throws InvalidToken
+   * @throws IOException
+   */
+  public boolean renewDelegationToken(Token<DelegationTokenIdentifier> token)
+  throws InvalidToken, IOException, InterruptedException {
+    try {
+      return cluster.renewDelegationToken(token);
+    } catch (RemoteException re) {
+      throw re.unwrapRemoteException(InvalidToken.class);
+    }
+  }
+
+  /**
+   * Cancel a delegation token from the JobTracker
+   * @param token the token to cancel
+   * @return true if everything went well
+   * @throws IOException
+   */
+  public boolean cancelDelegationToken(Token<DelegationTokenIdentifier> token
+                                       ) throws IOException, 
+                                                InterruptedException {
+    return cluster.cancelDelegationToken(token);
   }
 
   /**

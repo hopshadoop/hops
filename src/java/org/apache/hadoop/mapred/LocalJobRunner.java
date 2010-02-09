@@ -38,6 +38,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.ClusterMetrics;
 import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.QueueInfo;
@@ -49,12 +50,14 @@ import org.apache.hadoop.mapreduce.filecache.TaskDistributedCacheManager;
 import org.apache.hadoop.mapreduce.filecache.TrackerDistributedCacheManager;
 import org.apache.hadoop.mapreduce.protocol.ClientProtocol;
 import org.apache.hadoop.mapreduce.security.TokenCache;
+import org.apache.hadoop.mapreduce.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.security.TokenStorage;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.mapreduce.server.jobtracker.State;
 import org.apache.hadoop.mapreduce.split.SplitMetaInfoReader;
 import org.apache.hadoop.mapreduce.split.JobSplit.TaskSplitMetaInfo;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.Token;
 
 /** Implements MapReduce locally, in-process, for debugging. */ 
 public class LocalJobRunner implements ClientProtocol {
@@ -753,5 +756,24 @@ public class LocalJobRunner implements ClientProtocol {
   public static int getLocalMaxRunningMaps(
       org.apache.hadoop.mapreduce.JobContext job) {
     return job.getConfiguration().getInt(LOCAL_MAX_MAPS, 1);
+  }
+
+  @Override
+  public boolean cancelDelegationToken(Token<DelegationTokenIdentifier> token
+                                       ) throws IOException,
+                                                InterruptedException {
+    return false;
+  }
+
+  @Override
+  public Token<DelegationTokenIdentifier> 
+     getDelegationToken(Text renewer) throws IOException, InterruptedException {
+    return null;
+  }
+
+  @Override
+  public boolean renewDelegationToken(Token<DelegationTokenIdentifier> token
+                                      ) throws IOException,InterruptedException{
+    return false;
   }
 }

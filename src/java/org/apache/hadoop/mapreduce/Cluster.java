@@ -27,16 +27,21 @@ import java.util.List;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.JobTracker;
 import org.apache.hadoop.mapred.LocalJobRunner;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistory;
 import org.apache.hadoop.mapreduce.protocol.ClientProtocol;
+import org.apache.hadoop.mapreduce.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.mapreduce.server.jobtracker.State;
 import org.apache.hadoop.mapreduce.util.ConfigUtil;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 
 /**
  * Provides a way to access information about the map/reduce cluster.
@@ -305,6 +310,55 @@ public class Cluster {
   public long getTaskTrackerExpiryInterval() throws IOException,
       InterruptedException {
     return client.getTaskTrackerExpiryInterval();
+  }
+
+  /**
+   * Get a delegation token for the user from the JobTracker.
+   * @param renewer the user who can renew the token
+   * @return the new token
+   * @throws IOException
+   */
+  public Token<DelegationTokenIdentifier> 
+      getDelegationToken(Text renewer) throws IOException, InterruptedException{
+    Token<DelegationTokenIdentifier> result =
+      client.getDelegationToken(renewer);
+    InetSocketAddress addr = JobTracker.getAddress(conf);
+    StringBuilder service = new StringBuilder();
+    service.append(NetUtils.normalizeHostName(addr.getAddress().
+                                              getHostAddress()));
+    service.append(':');
+    service.append(addr.getPort());
+    result.setService(new Text(service.toString()));
+    return result;
+  }
+
+  /**
+   * Renew a delegation token
+   * @param token the token to renew
+   * @return true if the renewal went well
+   * @throws InvalidToken
+   * @throws IOException
+   */
+  public boolean renewDelegationToken(Token<DelegationTokenIdentifier> token
+                                      ) throws InvalidToken, IOException,
+                                               InterruptedException {
+    try {
+      return client.renewDelegationToken(token);
+    } catch (RemoteException re) {
+      throw re.unwrapRemoteException(InvalidToken.class);
+    }
+  }
+
+  /**
+   * Cancel a delegation token from the JobTracker
+   * @param token the token to cancel
+   * @return true if everything went well
+   * @throws IOException
+   */
+  public boolean cancelDelegationToken(Token<DelegationTokenIdentifier> token
+                                       ) throws IOException,
+                                                InterruptedException {
+    return client.cancelDelegationToken(token);
   }
 
 }

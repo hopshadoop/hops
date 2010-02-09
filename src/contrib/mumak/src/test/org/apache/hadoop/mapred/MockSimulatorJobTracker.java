@@ -26,6 +26,7 @@ import junit.framework.Assert;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.TaskStatus.State;
 import org.apache.hadoop.mapred.TaskStatus.Phase;
 import org.apache.hadoop.mapreduce.ClusterMetrics;
@@ -36,6 +37,7 @@ import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.QueueAclsInfo;
 import org.apache.hadoop.mapreduce.QueueInfo;
 import org.apache.hadoop.security.TokenStorage;
+import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskReport;
 import org.apache.hadoop.mapreduce.TaskTrackerInfo;
@@ -44,6 +46,7 @@ import org.apache.hadoop.mapreduce.protocol.ClientProtocol;
 import org.apache.hadoop.tools.rumen.TaskInfo;
 import org.apache.hadoop.tools.rumen.MapTaskAttemptInfo;
 import org.apache.hadoop.tools.rumen.ReduceTaskAttemptInfo;
+import org.apache.hadoop.mapreduce.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.mapreduce.split.JobSplit.*;
 //
 // Mock jobtracker class that check heartbeat() in parameters and 
@@ -441,4 +444,22 @@ public class MockSimulatorJobTracker implements InterTrackerProtocol,
     throw new UnsupportedOperationException();
   }
 
+  @Override
+  public boolean cancelDelegationToken(Token<DelegationTokenIdentifier> token
+                                       ) throws IOException,
+                                                InterruptedException {
+    return false;
+  }
+
+  @Override
+  public Token<DelegationTokenIdentifier> 
+     getDelegationToken(Text renewer) throws IOException, InterruptedException {
+    return null;
+  }
+
+  @Override
+  public boolean renewDelegationToken(Token<DelegationTokenIdentifier> token
+                                      ) throws IOException,InterruptedException{
+    return false;
+  }
 }

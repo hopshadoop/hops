@@ -21,6 +21,8 @@ package org.apache.hadoop.mapreduce.protocol;
 import java.io.IOException;
 
 
+import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenSelector;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.VersionedProtocol;
 import org.apache.hadoop.mapreduce.ClusterMetrics;
 import org.apache.hadoop.mapreduce.Counters;
@@ -34,9 +36,12 @@ import org.apache.hadoop.mapreduce.TaskCompletionEvent;
 import org.apache.hadoop.mapreduce.TaskReport;
 import org.apache.hadoop.mapreduce.TaskTrackerInfo;
 import org.apache.hadoop.mapreduce.TaskType;
+import org.apache.hadoop.mapreduce.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.security.TokenStorage;
 import org.apache.hadoop.mapreduce.server.jobtracker.State;
 import org.apache.hadoop.security.KerberosInfo;
+import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.security.token.TokenInfo;
 
 /** 
  * Protocol that a JobClient and the central JobTracker use to communicate.  The
@@ -44,6 +49,7 @@ import org.apache.hadoop.security.KerberosInfo;
  * the current system status.
  */ 
 @KerberosInfo(JobContext.JOB_JOBTRACKER_ID)
+@TokenInfo(DelegationTokenSelector.class)
 public interface ClientProtocol extends VersionedProtocol {
   /* 
    *Changing the versionID to 2L since the getTaskCompletionEvents method has
@@ -94,9 +100,10 @@ public interface ClientProtocol extends VersionedProtocol {
    * Version 30: Job submission files are uploaded to a staging area under
    *             user home dir. JobTracker reads the required files from the
    *             staging area using user credentials passed via the rpc.
-   * Version 31: Added TokenStorage to submitJob          
+   * Version 31: Added TokenStorage to submitJob      
+   * Version 32: Added delegation tokens (add, renew, cancel)    
    */
-  public static final long versionID = 31L;
+  public static final long versionID = 32L;
 
   /**
    * Allocate a name for the job.
@@ -286,4 +293,38 @@ public interface ClientProtocol extends VersionedProtocol {
   public QueueInfo[] getChildQueues(String queueName) 
   throws IOException, InterruptedException;
 
+  /**
+   * Get a new delegation token.
+   * @param renewer the user other than the creator (if any) that can renew the 
+   *        token
+   * @return the new delegation token
+   * @throws IOException
+   * @throws InterruptedException
+   */
+  public 
+  Token<DelegationTokenIdentifier> getDelegationToken(Text renewer
+                                                      ) throws IOException,
+                                                          InterruptedException;
+  
+  /**
+   * Renew an existing delegation token
+   * @param token the token to renew
+   * @return true if the token was successfully renewed
+   * @throws IOException
+   * @throws InterruptedException
+   */
+  public boolean renewDelegationToken(Token<DelegationTokenIdentifier> token
+                                      ) throws IOException,
+                                               InterruptedException;
+  
+  /**
+   * Cancel a delegation token.
+   * @param token the token to cancel
+   * @return true if the token was successfully canceled
+   * @throws IOException
+   * @throws InterruptedException
+   */
+  public boolean cancelDelegationToken(Token<DelegationTokenIdentifier> token
+                                       ) throws IOException,
+                                                InterruptedException;
 }

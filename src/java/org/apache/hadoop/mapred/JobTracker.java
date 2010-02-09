@@ -71,6 +71,7 @@ import org.apache.hadoop.mapred.JobStatusChangeEvent.EventType;
 import org.apache.hadoop.mapred.JobTrackerStatistics.TaskTrackerStat;
 import org.apache.hadoop.mapred.TaskTrackerStatus.TaskTrackerHealthStatus;
 import org.apache.hadoop.mapreduce.ClusterMetrics;
+import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.QueueInfo;
 import org.apache.hadoop.mapreduce.TaskTrackerInfo;
 import org.apache.hadoop.mapreduce.TaskType;
@@ -78,6 +79,8 @@ import org.apache.hadoop.mapreduce.jobhistory.JobHistory;
 import org.apache.hadoop.mapreduce.protocol.ClientProtocol;
 import org.apache.hadoop.security.TokenStorage;
 import org.apache.hadoop.mapreduce.security.token.JobTokenSecretManager;
+import org.apache.hadoop.mapreduce.security.token.delegation.DelegationTokenIdentifier;
+import org.apache.hadoop.mapreduce.security.token.delegation.DelegationTokenSecretManager;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.mapreduce.server.jobtracker.TaskTracker;
 import org.apache.hadoop.mapreduce.util.ConfigUtil;
@@ -95,6 +98,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AuthorizationException;
 import org.apache.hadoop.security.authorize.RefreshAuthorizationPolicyProtocol;
 import org.apache.hadoop.security.authorize.ServiceAuthorizationManager;
+import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.HostsFileReader;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.StringUtils;
@@ -114,6 +118,8 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   }
 
   private final long tasktrackerExpiryInterval;
+  private final long DELEGATION_TOKEN_GC_INTERVAL = 3600000; // 1 hour
+  private final DelegationTokenSecretManager secretManager;
   
   // The interval after which one fault of a tracker will be discarded,
   // if there are no faults during this. 
@@ -1311,6 +1317,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     tasktrackerExpiryInterval = 0;
     myInstrumentation = new JobTrackerMetricsInst(this, new JobConf());
     mrOwner = null;
+    secretManager = null;
   }
 
   
@@ -1346,6 +1353,22 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     LOG.info("Starting jobtracker with owner as " + mrOwner.getShortUserName() 
              + " and supergroup as " + supergroup);
     clock = newClock;
+    
+    long secretKeyInterval = 
+      conf.getLong(MRConfig.DELEGATION_KEY_UPDATE_INTERVAL_KEY, 
+                   MRConfig.DELEGATION_KEY_UPDATE_INTERVAL_DEFAULT);
+    long tokenMaxLifetime =
+      conf.getLong(MRConfig.DELEGATION_TOKEN_MAX_LIFETIME_KEY,
+                   MRConfig.DELEGATION_TOKEN_MAX_LIFETIME_DEFAULT);
+    long tokenRenewInterval =
+      conf.getLong(MRConfig.DELEGATION_TOKEN_RENEW_INTERVAL_KEY, 
+                   MRConfig.DELEGATION_TOKEN_RENEW_INTERVAL_DEFAULT);
+    secretManager = 
+      new DelegationTokenSecretManager(secretKeyInterval,
+                                       tokenMaxLifetime,
+                                       tokenRenewInterval,
+                                       DELEGATION_TOKEN_GC_INTERVAL);
+    secretManager.startThreads();
 
     //
     // Grab some static constants
@@ -1406,7 +1429,11 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     }
     
     int handlerCount = conf.getInt(JT_IPC_HANDLER_COUNT, 10);
-    this.interTrackerServer = RPC.getServer(this, addr.getHostName(), addr.getPort(), handlerCount, false, conf);
+    this.interTrackerServer = RPC.getServer(ClientProtocol.class,
+                                            this,
+                                            addr.getHostName(), 
+                                            addr.getPort(), handlerCount, 
+                                            false, conf, secretManager);
     if (LOG.isDebugEnabled()) {
       Properties p = System.getProperties();
       for (Iterator it = p.keySet().iterator(); it.hasNext();) {
@@ -4350,6 +4377,8 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     }
     supergroup = conf.get("mapred.permissions.supergroup", "supergroup");
     
+    secretManager = null;
+    
     this.hostsReader = new HostsFileReader(conf.get("mapred.hosts", ""),
         conf.get("mapred.hosts.exclude", ""));
     // queue manager
@@ -4440,5 +4469,45 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   String getLocalJobFilePath(org.apache.hadoop.mapreduce.JobID jobId){
     return System.getProperty("hadoop.log.dir") + 
            File.separator + jobId + "_conf.xml";
+  }
+
+  /**
+   * Discard a current delegation token.
+   */
+  @Override
+  public boolean cancelDelegationToken(Token<DelegationTokenIdentifier> token
+                                       ) throws IOException,
+                                                InterruptedException {
+    String user = UserGroupInformation.getCurrentUser().getUserName();
+    return secretManager.cancelToken(token, user);
+  }
+
+  /**
+   * Get a new delegation token.
+   */
+  @Override
+  public Token<DelegationTokenIdentifier> 
+     getDelegationToken(Text renewer
+                        )throws IOException, InterruptedException {
+    UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+    Text owner = new Text(ugi.getUserName());
+    Text realUser = null;
+    if (ugi.getRealUser() != null) {
+      realUser = new Text(ugi.getRealUser().getUserName());
+    }
+    DelegationTokenIdentifier ident = 
+      new DelegationTokenIdentifier(owner, renewer, realUser);
+    return new Token<DelegationTokenIdentifier>(ident, secretManager);
+  }
+
+  /**
+   * Renew a delegation token to extend its lifetime.
+   */
+  @Override
+  public boolean renewDelegationToken(Token<DelegationTokenIdentifier> token
+                                      ) throws IOException,
+                                               InterruptedException {
+    String user = UserGroupInformation.getCurrentUser().getUserName();
+    return secretManager.renewToken(token, user);
   }
 }
