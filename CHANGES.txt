@@ -316,6 +316,9 @@ Trunk (unreleased changes)
     appropriate UGIs while getting the TaskUmbilicalProtocol proxy and 
     while executing the task. (Jakob Homan via ddas)
 
+    MAPREDUCE-1399. The archive command shows a null error message (nicholas
+    via mahadev)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

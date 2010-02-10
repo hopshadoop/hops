@@ -93,6 +93,23 @@
     </test>
 
     <test> <!-- TESTED -->
+      <description>Archive: Archive does not show null message</description>
+      <test-commands>
+        <command>-fs NAMENODE -mkdir bar</command>
+        <archive-command>-fs NAMENODE -archiveName foo.har -p . foo .</archive-command>
+      </test-commands>
+      <cleanup-commands>
+        <command>-fs NAMENODE -rmr /\*</command>
+      </cleanup-commands>
+      <comparators>
+        <comparator>
+          <type>SubstringComparator</type>
+          <expected-output>Index: 0, Size: 0</expected-output>
+        </comparator>
+      </comparators>
+    </test>
+
+    <test> <!-- TESTED -->
       <description>Archive: source and destination are same</description>
       <test-commands>
         <command>-fs NAMENODE -mkdir /dir0</command>
@@ -389,8 +406,8 @@
       </cleanup-commands>
       <comparators>
         <comparator>
-          <type>TokenComparator</type>
-          <expected-output>java.lang.NullPointerException</expected-output>
+          <type>SubstringComparator</type>
+          <expected-output>Index: 0, Size: 0</expected-output>
          </comparator>
        </comparators>
     </test>
