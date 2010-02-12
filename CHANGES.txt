@@ -185,6 +185,9 @@ Trunk (unreleased changes)
     only on required set of localized paths.
     (Amareshwari Sriramadasu via yhemanth)
 
+    MAPREDUCE-1467. Add a --verbose flag to Sqoop.
+    (Aaron Kimball via tomwhite)
+
   BUG FIXES
 
     MAPREDUCE-1258. Fix fair scheduler event log not logging job info.
