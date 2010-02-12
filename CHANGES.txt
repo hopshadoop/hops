@@ -244,8 +244,6 @@ Trunk (unreleased changes)
     parameter instead of using FileStatus.class.  (Peter Romianowski via
     szetszwo)
 
-    MAPREDUCE-1251. c++ utils doesn't compile. (Eli Collins via tomwhite)
-
     MAPREDUCE-1148. SQL identifiers are a superset of Java identifiers.
     (Aaron Kimball via tomwhite)
 
@@ -1251,3 +1249,5 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1448. Respect --config option in Mumak script. (Hong Tang via
     cdouglas)
+
+    MAPREDUCE-1251. c++ utils doesn't compile. (Eli Collins via tomwhite)
