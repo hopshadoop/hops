@@ -54,6 +54,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-1433. Add a delegation token for MapReduce. (omalley)
 
+    MAPREDUCE-1341. Sqoop should have an option to create hive tables and
+    skip the table import step. (Leonid Furman via tomwhite)
+
   IMPROVEMENTS
 
     MAPREDUCE-1198. Alternatively schedule different types of tasks in
