@@ -322,6 +322,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1399. The archive command shows a null error message (nicholas
     via mahadev)
 
+    MAPREDUCE-1469. Sqoop should disable speculative execution in export.
+    (Aaron Kimball via tomwhite)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
