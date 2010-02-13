@@ -445,7 +445,7 @@ public class JobConf extends Configuration {
   }
 
   public String[] getLocalDirs() throws IOException {
-    return getStrings(MRConfig.LOCAL_DIR);
+    return getTrimmedStrings(MRConfig.LOCAL_DIR);
   }
 
   /**

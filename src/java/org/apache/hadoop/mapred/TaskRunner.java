@@ -598,7 +598,7 @@ abstract class TaskRunner extends Thread {
    * process space.
    */
   static void setupChildMapredLocalDirs(Task t, JobConf conf) {
-    String[] localDirs = conf.getStrings(MRConfig.LOCAL_DIR);
+    String[] localDirs = conf.getTrimmedStrings(MRConfig.LOCAL_DIR);
     String jobId = t.getJobID().toString();
     String taskId = t.getTaskID().toString();
     boolean isCleanup = t.isTaskCleanupTask();

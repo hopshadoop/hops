@@ -64,7 +64,7 @@ public abstract class TaskController implements Configurable {
 
   public void setConf(Configuration conf) {
     this.conf = conf;
-    mapredLocalDirs = conf.getStrings(MRConfig.LOCAL_DIR);
+    mapredLocalDirs = conf.getTrimmedStrings(MRConfig.LOCAL_DIR);
   }
 
   /**

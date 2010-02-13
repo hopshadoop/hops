@@ -171,6 +171,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-1425. Reduce memory usage by archive. (mahadev via szetszwo)
 
+    MAPREDUCE-1441. Trim whitespace from directory lists pulled from the
+    configuration. (Todd Lipcon via cdouglas)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
