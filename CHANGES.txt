@@ -326,6 +326,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1469. Sqoop should disable speculative execution in export.
     (Aaron Kimball via tomwhite)
 
+    MAPREDUCE-1305. Improve efficiency of distcp -delete. (Peter Romianowski
+    via cdouglas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

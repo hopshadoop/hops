@@ -951,6 +951,7 @@ public class TestCopyFiles extends TestCase {
   /** test -delete */
   public void testDelete() throws Exception {
     final Configuration conf = new Configuration();
+    conf.setInt("fs.trash.interval", 60);
     MiniDFSCluster cluster = null;
     try {
       cluster = new MiniDFSCluster(conf, 2, true, null);
@@ -1001,6 +1002,12 @@ public class TestCopyFiles extends TestCase {
         dstresults = removePrefix(dstresults, dstrootdir);
         System.out.println("second dstresults=" +  dstresults);
         assertEquals(srcresults, dstresults);
+        // verify that files removed in -delete were moved to the trash
+        // regrettably, this test will break if Trash changes incompatibly
+        assertTrue(fs.exists(new Path(fs.getHomeDirectory(),
+                ".Trash/Current" + dstrootdir + "/foo")));
+        assertTrue(fs.exists(new Path(fs.getHomeDirectory(),
+                ".Trash/Current" + dstrootdir + "/foobar")));
 
         //cleanup
         deldir(fs, dstrootdir);
