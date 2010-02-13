@@ -51,7 +51,7 @@ public class Utils {
      */
     public static class OutputLogFilter implements PathFilter {
       public boolean accept(Path path) {
-        return !(path.toString().contains("_logs"));
+        return !"_logs".equals(path.getName());
       }
     }
   }
