@@ -65,9 +65,17 @@ public class DistributedRaidFileSystem extends FilterFileSystem {
   /* Initialize a Raid FileSystem
    */
   public void initialize(URI name, Configuration conf) throws IOException {
-    super.initialize(name, conf);
     this.conf = conf;
 
+    Class<?> clazz = conf.getClass("fs.raid.underlyingfs.impl",
+        DistributedFileSystem.class);
+    if (clazz == null) {
+      throw new IOException("No FileSystem for fs.raid.underlyingfs.impl.");
+    }
+    
+    this.fs = (FileSystem)ReflectionUtils.newInstance(clazz, null); 
+    super.initialize(name, conf);
+    
     String alt = conf.get("hdfs.raid.locations");
     
     // If no alternates are specified, then behave absolutely same as 

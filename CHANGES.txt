@@ -341,6 +341,12 @@ Trunk (unreleased changes)
     MAPREDUCE-1358. Avoid false positives in OutputLogFilter. (Todd Lipcon via
     cdouglas)
 
+    MAPREDUCE-1490. Fix a NullPointerException that could occur during 
+    instantiation and initialization of the DistributedRaidFileSystem. 
+    (Rodrigo Schmidt via dhruba)
+
+    cdouglas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

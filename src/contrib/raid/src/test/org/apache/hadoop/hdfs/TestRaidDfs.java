@@ -22,6 +22,7 @@ import java.io.FileWriter;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.GregorianCalendar;
@@ -177,10 +178,14 @@ public class TestRaidDfs extends TestCase {
 
       // filter all filesystem calls from client
       Configuration clientConf = new Configuration(conf);
-      clientConf.set("fs.hdfs.impl", "org.apache.hadoop.dfs.DistributedRaidFileSystem");
-      DistributedRaidFileSystem raidfs = new DistributedRaidFileSystem(dfs);
-      raidfs.initialize(dfs.getUri(), clientConf);
-
+      clientConf.set("fs.hdfs.impl", "org.apache.hadoop.hdfs.DistributedRaidFileSystem");
+      clientConf.set("fs.raid.underlyingfs.impl", "org.apache.hadoop.hdfs.DistributedFileSystem");
+      URI dfsUri = dfs.getUri();
+      FileSystem.closeAll();
+      FileSystem raidfs = FileSystem.get(dfsUri, clientConf);
+      
+      assertTrue("raidfs not an instance of DistributedRaidFileSystem",raidfs instanceof DistributedRaidFileSystem);
+      
       // corrupt first block of file
       LOG.info("Corrupt first block of file");
       corruptBlock(file1, locations.get(0).getBlock());
