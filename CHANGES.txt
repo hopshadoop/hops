@@ -347,6 +347,10 @@ Trunk (unreleased changes)
 
     cdouglas)
 
+    MAPREDUCE-1476. Fix the M/R framework to not call commit for special
+    tasks like job setup/cleanup and task cleanup.
+    (Amareshwari Sriramadasu via yhemanth)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
