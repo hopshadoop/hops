@@ -345,8 +345,6 @@ Trunk (unreleased changes)
     instantiation and initialization of the DistributedRaidFileSystem. 
     (Rodrigo Schmidt via dhruba)
 
-    cdouglas)
-
     MAPREDUCE-1476. Fix the M/R framework to not call commit for special
     tasks like job setup/cleanup and task cleanup.
     (Amareshwari Sriramadasu via yhemanth)
@@ -357,6 +355,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-1444. Sqoop ConnManager instances can leak Statement objects.
     (Aaron Kimball via tomwhite)
+
+    MAPREDUCE-1491. The parity files created by the RAID are combined
+    using Hadoop Archive Files (HAR).  (Rodrigo Schmidt via dhruba)
  
 Release 0.21.0 - Unreleased
 

@@ -30,6 +30,8 @@ import java.util.Set;
 import java.util.HashSet;
 import java.lang.Thread;
 import java.net.InetSocketAddress;
+import java.net.URI;
+
 import org.xml.sax.SAXException;
 import javax.xml.parsers.ParserConfigurationException;
 
@@ -37,8 +39,10 @@ import org.apache.hadoop.ipc.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.tools.HadoopArchives;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Daemon;
+import org.apache.hadoop.util.ToolRunner;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.FileStatus;
@@ -51,7 +55,6 @@ import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.raid.protocol.PolicyInfo;
 import org.apache.hadoop.raid.protocol.PolicyList;
 import org.apache.hadoop.raid.protocol.RaidProtocol;
-import org.apache.hadoop.raid.protocol.RaidProtocol.ReturnStatus;
 
 /**
  * A {@link RaidNode} that implements 
@@ -70,7 +73,8 @@ public class RaidNode implements RaidProtocol {
   public static final int DEFAULT_PORT = 60000;
   public static final int DEFAULT_STRIPE_LENGTH = 5; // default value of stripe length
   public static final String DEFAULT_RAID_LOCATION = "/raid";
-
+  public static final String HAR_SUFFIX = "_raid.har";
+  
   /** RPC server */
   private Server server;
   /** RPC server address */
@@ -92,6 +96,9 @@ public class RaidNode implements RaidProtocol {
 
   /** Deamon thread to delete obsolete parity files */
   Daemon purgeThread = null;
+  
+  /** Deamon thread to har raid directories */
+  Daemon harThread = null;
 
   /** Do do distributed raiding */
   boolean isRaidLocal = false;
@@ -248,8 +255,13 @@ public class RaidNode implements RaidProtocol {
     // start the thread that deletes obsolete parity files
     this.purgeThread = new Daemon(new PurgeMonitor());
     this.purgeThread.start();
+
+    // start the thread that creates HAR files
+    this.harThread = new Daemon(new HarMonitor());
+    this.harThread.start();
   }
 
+  
   /**
    * Implement RaidProtocol methods
    */
@@ -453,6 +465,66 @@ public class RaidNode implements RaidProtocol {
     return null; // no matching policies
   }
 
+  /**
+   * Returns the Path to the parity file of a given file
+   * 
+   * @param destPathPrefix Destination prefix defined by some policy
+   * @param srcPath Path to the original source file
+   * @param create Boolean value telling whether a new parity file should be created
+   * @return Path object representing the parity file of the source
+   * @throws IOException
+   */
+  static private Path getParityFile(Path destPathPrefix, Path srcPath, boolean create, Configuration conf) throws IOException {
+    Path srcParent = srcPath.getParent();
+
+    FileSystem fsDest = destPathPrefix.getFileSystem(conf);
+
+    Path outDir = destPathPrefix;
+    if (srcParent != null) {
+      if (srcParent.getParent() == null) {
+        outDir = destPathPrefix;
+      } else {
+        outDir = new Path(destPathPrefix, makeRelative(srcParent));
+      }
+    }
+
+    String harDirName = srcParent.getName() + HAR_SUFFIX; 
+    Path HarPath = new Path(outDir,harDirName);
+    Path outPath =  new Path(destPathPrefix, makeRelative(srcPath));
+
+    if (create || !fsDest.exists(HarPath)) {  // case 1: no HAR file
+      return outPath;
+    }
+
+    URI HarPathUri = HarPath.toUri();
+    Path inHarPath = new Path("har://",HarPathUri.getPath()+"/"+outPath.toUri().getPath());
+    FileSystem fsHar = inHarPath.getFileSystem(conf);
+    
+    if (!fsHar.exists(inHarPath)) { // case 2: no file inside HAR
+      return outPath;
+    }
+
+    if (! fsDest.exists(outPath)) { // case 3: only inside HAR
+      return inHarPath;
+    }
+
+    // both inside and outside HAR. Should return most recent
+    FileStatus inHar = fsHar.getFileStatus(inHarPath);
+    FileStatus outHar = fsDest.getFileStatus(outPath);
+
+    if (inHar.getModificationTime() >= outHar.getModificationTime()) {
+      return inHarPath;
+    }
+
+    return outPath;
+  }
+  
+  private Path getParityFile(Path destPathPrefix, Path srcPath, boolean create) throws IOException {
+	  
+	  return getParityFile(destPathPrefix, srcPath, create, conf);
+	  
+  }
+  
  /**
   * Returns a list of pathnames that needs raiding.
   */
@@ -520,7 +592,7 @@ public class RaidNode implements RaidProtocol {
       // does not match the modTime of the source file, then recalculate RAID
       boolean add = false;
       try {
-        Path outpath =  new Path(destPathPrefix, makeRelative(path));
+        Path outpath =  getParityFile(destPathPrefix, path, false);
         FileSystem outFs = outpath.getFileSystem(conf);
         FileStatus ostat = outFs.getFileStatus(outpath);
         if (ostat.getModificationTime() != src.getModificationTime() &&
@@ -538,7 +610,9 @@ public class RaidNode implements RaidProtocol {
 
     } else if (files != null) {
       for (FileStatus one:files) {
-        recurse(srcFs, conf, destPathPrefix, one, accept, modTimePeriod, srcReplication, now);
+        if (!one.getPath().getName().endsWith(HAR_SUFFIX)){
+          recurse(srcFs, conf, destPathPrefix, one, accept, modTimePeriod, srcReplication, now);
+        }
       }
     }
   }
@@ -678,7 +752,7 @@ public class RaidNode implements RaidProtocol {
     long fileSize = stat.getLen();
 
     // create output tmp path
-    Path outpath =  new Path(destPathPrefix, makeRelative(inpath));
+    Path outpath =  getParityFile(destPathPrefix, inpath,true,conf);
     Path tmppath =  new Path(outpath + ".tmp");
     FileSystem outFs = outpath.getFileSystem(conf);
 
@@ -688,6 +762,7 @@ public class RaidNode implements RaidProtocol {
       if (stmp.getModificationTime() == stat.getModificationTime()) {
         LOG.info("Parity file for " + inpath + "(" + locations.length + ") is " + outpath +
                  " already upto-date. Nothing more to do.");
+        return;
       }
     } catch (IOException e) {
       // ignore errors because the raid file might not exist yet.
@@ -891,7 +966,7 @@ public class RaidNode implements RaidProtocol {
     LOG.info("Decompose a total of " + numLength + " blocks.");
 
     // open and seek to the appropriate offset in parity file.
-    Path parityFile =  new Path(destPathPrefix, makeRelative(srcPath));
+    Path parityFile =  getParityFile(destPathPrefix, srcPath, false, conf);
     FileSystem parityFs = parityFile.getFileSystem(conf);
     LOG.info("Parity file for " + srcPath + " is " + parityFile);
     ins[numLength-1] = parityFs.open(parityFile);
@@ -905,10 +980,11 @@ public class RaidNode implements RaidProtocol {
     // We need to generate a unique name for this tmp file later on.
     Path tmpFile = null;
     FSDataOutputStream fout = null;
+    FileSystem destFs = destPathPrefix.getFileSystem(conf);
     int retry = 5;
     try {
       tmpFile = new Path("/tmp/dhruba/" + rand.nextInt());
-      fout = parityFs.create(tmpFile, false);
+      fout = destFs.create(tmpFile, false);
     } catch (IOException e) {
       if (retry-- <= 0) {
         LOG.info("Unable to create temporary file " + tmpFile +
@@ -935,17 +1011,17 @@ public class RaidNode implements RaidProtocol {
 
     // Now, reopen the source file and the recovered block file
     // and copy all relevant data to new file
-    Path recoveredPath =  new Path(destPathPrefix, makeRelative(srcPath));
+    Path recoveredPath =  getParityFile(destPathPrefix, srcPath, true, conf);
     recoveredPath = new Path(recoveredPath + ".recovered");
     LOG.info("Creating recovered file " + recoveredPath);
 
     FSDataInputStream sin = srcFs.open(srcPath);
-    FSDataOutputStream out = parityFs.create(recoveredPath, false, 
+    FSDataOutputStream out = destFs.create(recoveredPath, false, 
                                              conf.getInt("io.file.buffer.size", 64 * 1024),
                                              srcStat.getReplication(), 
                                              srcStat.getBlockSize());
 
-    FSDataInputStream bin = parityFs.open(tmpFile);
+    FSDataInputStream bin = destFs.open(tmpFile);
     long recoveredSize = 0;
 
     // copy all the good blocks (upto the corruption)
@@ -992,12 +1068,12 @@ public class RaidNode implements RaidProtocol {
     bin.close();
 
     // delete the temporary block file that was created.
-    parityFs.delete(tmpFile, false);
+    destFs.delete(tmpFile, false);
     LOG.info("Deleted temporary file " + tmpFile);
 
     // copy the meta information from source path to the newly created
     // recovered path
-    copyMetaInformation(parityFs, srcStat, recoveredPath);
+    copyMetaInformation(destFs, srcStat, recoveredPath);
 
     return recoveredPath;
   }
@@ -1060,8 +1136,8 @@ public class RaidNode implements RaidProtocol {
               FileSystem destFs = FileSystem.get(destp.toUri(), conf);
               destp = destp.makeQualified(destFs);
               destinationPrefix = destp.toUri().getPath(); // strip host:port
-              destp = new Path(destp, makeRelative(info.getSrcPath()));
-
+              destp = getParityFile(destp, info.getSrcPath(), true);
+              
               // if this destination path has already been processed as part
               // of another policy, then nothing more to do
               if (processed.contains(destp)) {
@@ -1108,6 +1184,11 @@ public class RaidNode implements RaidProtocol {
       String destStr = destPath.toUri().getPath();
       LOG.debug("Checking " + destPath + " prefix " + destPrefix);
 
+      // Verify if it is a har file
+      if (destStr.endsWith(HAR_SUFFIX)) {
+        return;
+      }
+      
       // Verify the destPrefix is a prefix of the destPath
       if (!destStr.startsWith(destPrefix)) {
         LOG.error("Destination path " + destStr + " should have " + 
@@ -1116,10 +1197,11 @@ public class RaidNode implements RaidProtocol {
       }
       String src = destStr.replaceFirst(destPrefix, "");
       
-      // if the source path does not exist, then delete the 
-      // destination path as well
+      // if the source path does not exist or the parity file has been HARed, 
+      // then delete the parity file
       Path srcPath = new Path(src);
-      if (!srcFs.exists(srcPath)) {
+      Path dstPath = (new Path(destPrefix.trim())).makeQualified(destFs);
+      if (!srcFs.exists(srcPath) || !destPath.equals(getParityFile(dstPath,srcPath,false))) {
         boolean done = destFs.delete(destPath, false);
         if (done) {
           LOG.info("Purged path " + destPath );
@@ -1141,6 +1223,160 @@ public class RaidNode implements RaidProtocol {
     } 
   }
 
+  
+  private void doHar() throws IOException, InterruptedException {
+    
+    PolicyList.CompareByPath lexi = new PolicyList.CompareByPath();
+
+    long prevExec = 0;
+    while (running) {
+
+      LOG.info("Started HAR thread");
+      // The config may be reloaded by the TriggerMonitor. 
+      // This thread uses whatever config is currently active.
+      while(now() < prevExec + configMgr.getPeriodicity()){
+        Thread.sleep(SLEEP_TIME);
+      }
+
+      prevExec = now();
+      
+      // fetch all categories
+      Collection<PolicyList> all = configMgr.getAllPolicies();
+            
+      // sort all policies by reverse lexicographical order. This is 
+      // needed to make the nearest policy take precedence.
+      PolicyList[] sorted = all.toArray(new PolicyList[all.size()]);
+      Arrays.sort(sorted, lexi);
+
+      for (PolicyList category : sorted) {
+        for (PolicyInfo info: category.getAll()) {
+          String str = info.getProperty("time_before_har");
+          String tmpHarPath = info.getProperty("har_tmp_dir");
+          if (tmpHarPath == null) {
+            tmpHarPath = "/raid_har";
+          }
+          if (str != null) {
+            try {
+              long cutoff = now() - ( Long.parseLong(str) * 24L * 3600000L );
+              // expand destination prefix path
+              String destinationPrefix = getDestinationPath(conf, info);
+              Path destp = new Path(destinationPrefix.trim());
+              FileSystem destFs = FileSystem.get(destp.toUri(), conf);
+              destp = destp.makeQualified(destFs);
+              destinationPrefix = destp.toUri().getPath(); // strip host:port
+              destp = getParityFile(destp, info.getSrcPath(), true);
+
+              FileStatus stat = null;
+              try {
+                stat = destFs.getFileStatus(destp);
+              } catch (FileNotFoundException e) {
+                // do nothing, leave stat = null;
+              }
+              if (stat != null) {
+                LOG.info("Purging obsolete parity files for policy " + 
+                    info.getName() + " " + destp);
+
+                recurseHar(destFs, stat, cutoff, tmpHarPath);
+              }
+
+
+            } catch (Exception e) {
+              LOG.warn("Ignoring Exception while processing policy " + 
+                  info.getName() + " " + 
+                  StringUtils.stringifyException(e));
+            }
+          }
+        }
+      }
+    }
+    return;
+  }
+  
+  private void recurseHar(FileSystem destFs, FileStatus dest, long cutoff, String tmpHarPath)
+    throws IOException {
+
+    if (!dest.isDir()) {
+      return;
+    }
+    
+    Path destPath = dest.getPath(); // pathname, no host:port
+
+    // Verify if it already contains a HAR directory
+    if ( destFs.exists(new Path(destPath, destPath.getName()+HAR_SUFFIX)) ) {
+      return;
+    }
+
+    FileStatus[] files = null;
+    files = destFs.listStatus(destPath);
+    boolean shouldHar = false;
+    if (files != null) {
+      shouldHar = files.length > 0;
+      for (FileStatus one: files) {
+        if (one.isDir()){
+          recurseHar(destFs, one, cutoff, tmpHarPath);
+          shouldHar = false;
+        } else if (one.getModificationTime() > cutoff ) {
+          shouldHar = false;
+        }
+      }
+    }
+    if ( shouldHar ) {
+      singleHar(destFs, dest, tmpHarPath);
+    }
+  } 
+
+  
+  private void singleHar(FileSystem destFs, FileStatus dest, String tmpHarPath) throws IOException {
+    
+    Path root = new Path("/");
+    Path qualifiedPath = dest.getPath().makeQualified(destFs.getUri(),root);
+    String harFile = qualifiedPath.getName() + HAR_SUFFIX;
+    HadoopArchives har = new HadoopArchives(conf);
+    String[] args = new String[6];
+    args[0] = "-archiveName";
+    args[1] = harFile;
+    args[2] = "-p"; 
+    args[3] = root.makeQualified(destFs.getUri(),root).toString();
+    args[4] = qualifiedPath.toUri().getPath().substring(1);
+    args[5] = tmpHarPath.toString();
+    int ret = 0;
+    try {
+      ret = ToolRunner.run(har, args);
+      if (ret == 0 && !destFs.rename(new Path(tmpHarPath+"/"+harFile), 
+                                     new Path(qualifiedPath, harFile))){
+        LOG.info("HAR rename didn't succeed");
+        ret = -2;
+      }
+    } catch (Exception exc) {
+      throw new IOException("Error while creating archive " + ret, exc);
+    }
+    
+    if (ret != 0){
+      throw new IOException("Error while creating archive " + ret);
+    }
+    return;
+  }
+  
+  /**
+   * Periodically generates HAR files
+   */
+  class HarMonitor implements Runnable {
+
+    public void run() {
+      while (running) {
+        try {
+          doHar();
+        } catch (Exception e) {
+          LOG.error(StringUtils.stringifyException(e));
+        } finally {
+          LOG.info("Har parity files thread continuing to run...");
+        }
+      }
+    }
+    
+
+  }  
+  
   /**
    * If the config file has an entry for hdfs.raid.locations, then that overrides
    * destination path specified in the raid policy file
