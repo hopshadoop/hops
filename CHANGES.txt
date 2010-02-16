@@ -354,6 +354,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1398. Fix TaskLauncher to stop waiting for slots on a TIP that
     is killed / failed.
     (Amareshwari Sriramadasu via yhemanth)
+
+    MAPREDUCE-1444. Sqoop ConnManager instances can leak Statement objects.
+    (Aaron Kimball via tomwhite)
  
 Release 0.21.0 - Unreleased
 
