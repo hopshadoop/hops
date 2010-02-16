@@ -351,6 +351,10 @@ Trunk (unreleased changes)
     tasks like job setup/cleanup and task cleanup.
     (Amareshwari Sriramadasu via yhemanth)
 
+    MAPREDUCE-1398. Fix TaskLauncher to stop waiting for slots on a TIP that
+    is killed / failed.
+    (Amareshwari Sriramadasu via yhemanth)
+ 
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
