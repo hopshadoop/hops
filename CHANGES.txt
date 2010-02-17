@@ -358,7 +358,10 @@ Trunk (unreleased changes)
 
     MAPREDUCE-1491. The parity files created by the RAID are combined
     using Hadoop Archive Files (HAR).  (Rodrigo Schmidt via dhruba)
- 
+
+    MAPREDUCE-1378. URL encode link in jobhistory.jsp to avoid errors caused by
+    unescaped characters. (E. Sammer via cdouglas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

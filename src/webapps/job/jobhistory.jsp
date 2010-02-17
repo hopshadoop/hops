@@ -21,6 +21,7 @@
   contentType="text/html; charset=UTF-8"
   import="java.io.*"
   import="java.util.*"
+  import="java.net.URLEncoder"
   import="org.apache.hadoop.mapred.*"
   import="org.apache.hadoop.util.*"
   import="org.apache.hadoop.fs.*"
@@ -262,7 +263,7 @@ window.location.href = url;
     throws IOException {
       out.print("<tr>"); 
       out.print("<td>" + "<a href=\"jobdetailshistory.jsp?jobid=" + jobId + 
-                "&logFile=" + logFile.toString() + "\">" + jobId + "</a></td>"); 
+                "&logFile=" + URLEncoder.encode(logFile.toString(), "UTF-8") + "\">" + jobId + "</a></td>"); 
       out.print("<td>" + user + "</td>"); 
       out.print("</tr>");
     }
