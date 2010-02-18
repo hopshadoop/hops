@@ -23,13 +23,7 @@ import java.io.IOException;
 import java.io.InputStream;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.compress.CodecPool;
-import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.hadoop.io.compress.CompressionCodecFactory;
-import org.apache.hadoop.io.compress.Decompressor;
 import org.codehaus.jackson.JsonParser;
 import org.codehaus.jackson.map.DeserializationConfig;
 import org.codehaus.jackson.map.ObjectMapper;
@@ -44,7 +38,6 @@ class JsonObjectMapperParser<T> implements Closeable {
   private final ObjectMapper mapper;
   private final Class<? extends T> clazz;
   private final JsonParser jsonParser;
-  private final Decompressor decompressor;
 
   /**
    * Constructor.
@@ -60,17 +53,7 @@ class JsonObjectMapperParser<T> implements Closeable {
     mapper.configure(
         DeserializationConfig.Feature.CAN_OVERRIDE_ACCESS_MODIFIERS, true);
     this.clazz = clazz;
-    FileSystem fs = path.getFileSystem(conf);
-    CompressionCodec codec = new CompressionCodecFactory(conf).getCodec(path);
-    InputStream input;
-    if (codec == null) {
-      input = fs.open(path);
-      decompressor = null;
-    } else {
-      FSDataInputStream fsdis = fs.open(path);
-      decompressor = CodecPool.getDecompressor(codec);
-      input = codec.createInputStream(fsdis, decompressor);
-    }
+    InputStream input = new PossiblyDecompressedInputStream(path, conf);
     jsonParser = mapper.getJsonFactory().createJsonParser(input);
   }
 
@@ -86,7 +69,6 @@ class JsonObjectMapperParser<T> implements Closeable {
     mapper.configure(
         DeserializationConfig.Feature.CAN_OVERRIDE_ACCESS_MODIFIERS, true);
     this.clazz = clazz;
-    decompressor = null;
     jsonParser = mapper.getJsonFactory().createJsonParser(input);
   }
 
@@ -107,12 +89,6 @@ class JsonObjectMapperParser<T> implements Closeable {
 
   @Override
   public void close() throws IOException {
-    try {
-      jsonParser.close();
-    } finally {
-      if (decompressor != null) {
-        CodecPool.returnDecompressor(decompressor);
-      }
-    }
+    jsonParser.close();
   }
 }

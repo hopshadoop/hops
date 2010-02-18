@@ -23,6 +23,11 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 
+import org.apache.hadoop.mapreduce.jobhistory.Events;
+import org.apache.hadoop.mapreduce.jobhistory.JhCounter;
+import org.apache.hadoop.mapreduce.jobhistory.JhCounterGroup;
+import org.apache.hadoop.mapreduce.jobhistory.JhCounters;
+
 import org.codehaus.jackson.annotate.JsonAnySetter;
 
 /**
@@ -46,9 +51,6 @@ public class LoggedTask implements DeepCompare {
   Pre21JobHistoryConstants.Values taskStatus;
   List<LoggedTaskAttempt> attempts = new ArrayList<LoggedTaskAttempt>();
   List<LoggedLocation> preferredLocations = Collections.emptyList();
-
-  int numberMaps = -1;
-  int numberReduces = -1;
 
   static private Set<String> alreadySeenAnySetterAttributes =
       new TreeSet<String>();
@@ -157,22 +159,6 @@ public class LoggedTask implements DeepCompare {
     }
   }
 
-  public int getNumberMaps() {
-    return numberMaps;
-  }
-
-  void setNumberMaps(int numberMaps) {
-    this.numberMaps = numberMaps;
-  }
-
-  public int getNumberReduces() {
-    return numberReduces;
-  }
-
-  void setNumberReduces(int numberReduces) {
-    this.numberReduces = numberReduces;
-  }
-
   public Pre21JobHistoryConstants.Values getTaskStatus() {
     return taskStatus;
   }
@@ -187,6 +173,110 @@ public class LoggedTask implements DeepCompare {
 
   void setTaskType(Pre21JobHistoryConstants.Values taskType) {
     this.taskType = taskType;
+  }
+
+  private void incorporateMapCounters(JhCounters counters) {
+    incorporateCounter(new SetField(this) {
+      @Override
+      void set(long val) {
+        task.inputBytes = val;
+      }
+    }, counters, "HDFS_BYTES_READ");
+    incorporateCounter(new SetField(this) {
+      @Override
+      void set(long val) {
+        task.outputBytes = val;
+      }
+    }, counters, "FILE_BYTES_WRITTEN");
+    incorporateCounter(new SetField(this) {
+      @Override
+      void set(long val) {
+        task.inputRecords = val;
+      }
+    }, counters, "MAP_INPUT_RECORDS");
+    incorporateCounter(new SetField(this) {
+      @Override
+      void set(long val) {
+        task.outputRecords = val;
+      }
+    }, counters, "MAP_OUTPUT_RECORDS");
+  }
+
+  private void incorporateReduceCounters(JhCounters counters) {
+    incorporateCounter(new SetField(this) {
+      @Override
+      void set(long val) {
+        task.inputBytes = val;
+      }
+    }, counters, "REDUCE_SHUFFLE_BYTES");
+    incorporateCounter(new SetField(this) {
+      @Override
+      void set(long val) {
+        task.outputBytes = val;
+      }
+    }, counters, "HDFS_BYTES_WRITTEN");
+    incorporateCounter(new SetField(this) {
+      @Override
+      void set(long val) {
+        task.inputRecords = val;
+      }
+    }, counters, "REDUCE_INPUT_RECORDS");
+    incorporateCounter(new SetField(this) {
+      @Override
+      void set(long val) {
+        task.outputRecords = val;
+      }
+    }, counters, "REDUCE_OUTPUT_RECORDS");
+  }
+
+  // incorporate event counters
+  // LoggedTask MUST KNOW ITS TYPE BEFORE THIS CALL
+  public void incorporateCounters(JhCounters counters) {
+    switch (taskType) {
+    case MAP:
+      incorporateMapCounters(counters);
+      return;
+    case REDUCE:
+      incorporateReduceCounters(counters);
+      return;
+      // NOT exhaustive
+    }
+  }
+
+  private static String canonicalizeCounterName(String nonCanonicalName) {
+    String result = nonCanonicalName.toLowerCase();
+
+    result = result.replace(' ', '|');
+    result = result.replace('-', '|');
+    result = result.replace('_', '|');
+    result = result.replace('.', '|');
+
+    return result;
+  }
+
+  private abstract class SetField {
+    LoggedTask task;
+
+    SetField(LoggedTask task) {
+      this.task = task;
+    }
+
+    abstract void set(long value);
+  }
+
+  private static void incorporateCounter(SetField thunk, JhCounters counters,
+      String counterName) {
+    counterName = canonicalizeCounterName(counterName);
+
+    for (JhCounterGroup group : counters.groups) {
+      for (JhCounter counter : group.counts) {
+        if (counterName
+            .equals(canonicalizeCounterName(counter.name.toString()))) {
+          thunk.set(counter.value);
+          return;
+        }
+      }
+    }
   }
 
   private void compare1(long c1, long c2, TreePath loc, String eltname)

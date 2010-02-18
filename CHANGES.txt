@@ -177,6 +177,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1445. Refactor Sqoop tests to support better ConnManager testing.
     (Aaron Kimball via tomwhite)
 
+    MAPREDUCE-1309. Refactor Rumen trace generator to improve code structure
+    and add extensible support for log formats. (Dick King via cdouglas)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
