@@ -39,6 +39,7 @@ import org.apache.hadoop.mapreduce.security.token.delegation.DelegationTokenIden
 import org.apache.hadoop.mapreduce.server.jobtracker.State;
 import org.apache.hadoop.mapreduce.util.ConfigUtil;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
@@ -335,30 +336,35 @@ public class Cluster {
   /**
    * Renew a delegation token
    * @param token the token to renew
-   * @return true if the renewal went well
+   * @return the new expiration time
    * @throws InvalidToken
    * @throws IOException
    */
-  public boolean renewDelegationToken(Token<DelegationTokenIdentifier> token
-                                      ) throws InvalidToken, IOException,
-                                               InterruptedException {
+  public long renewDelegationToken(Token<DelegationTokenIdentifier> token
+                                   ) throws InvalidToken, IOException,
+                                            InterruptedException {
     try {
       return client.renewDelegationToken(token);
     } catch (RemoteException re) {
-      throw re.unwrapRemoteException(InvalidToken.class);
+      throw re.unwrapRemoteException(InvalidToken.class, 
+                                     AccessControlException.class);
     }
   }
 
   /**
    * Cancel a delegation token from the JobTracker
    * @param token the token to cancel
-   * @return true if everything went well
    * @throws IOException
    */
-  public boolean cancelDelegationToken(Token<DelegationTokenIdentifier> token
-                                       ) throws IOException,
-                                                InterruptedException {
-    return client.cancelDelegationToken(token);
+  public void cancelDelegationToken(Token<DelegationTokenIdentifier> token
+                                    ) throws IOException,
+                                             InterruptedException {
+    try {
+      client.cancelDelegationToken(token);
+    } catch (RemoteException re) {
+      throw re.unwrapRemoteException(InvalidToken.class,
+                                     AccessControlException.class);
+    }
   }
 
 }

@@ -42,6 +42,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.RemoteException;
+import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.util.Tool;
@@ -1053,25 +1054,21 @@ public class JobClient extends CLI {
    * @throws InvalidToken
    * @throws IOException
    */
-  public boolean renewDelegationToken(Token<DelegationTokenIdentifier> token)
-  throws InvalidToken, IOException, InterruptedException {
-    try {
-      return cluster.renewDelegationToken(token);
-    } catch (RemoteException re) {
-      throw re.unwrapRemoteException(InvalidToken.class);
-    }
+  public long renewDelegationToken(Token<DelegationTokenIdentifier> token
+                                   ) throws InvalidToken, IOException, 
+                                            InterruptedException {
+    return cluster.renewDelegationToken(token);
   }
 
   /**
    * Cancel a delegation token from the JobTracker
    * @param token the token to cancel
-   * @return true if everything went well
    * @throws IOException
    */
-  public boolean cancelDelegationToken(Token<DelegationTokenIdentifier> token
-                                       ) throws IOException, 
-                                                InterruptedException {
-    return cluster.cancelDelegationToken(token);
+  public void cancelDelegationToken(Token<DelegationTokenIdentifier> token
+                                    ) throws InvalidToken, IOException, 
+                                             InterruptedException {
+    cluster.cancelDelegationToken(token);
   }
 
   /**

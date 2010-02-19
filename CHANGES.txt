@@ -180,6 +180,10 @@ Trunk (unreleased changes)
     MAPREDUCE-1309. Refactor Rumen trace generator to improve code structure
     and add extensible support for log formats. (Dick King via cdouglas)
 
+    MAPREDUCE-1503. Delegation token renewing and cancelling should provide
+    meaningful exceptions when there are failures instead of returning 
+    false. (omalley)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band

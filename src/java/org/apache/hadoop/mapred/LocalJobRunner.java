@@ -759,10 +759,9 @@ public class LocalJobRunner implements ClientProtocol {
   }
 
   @Override
-  public boolean cancelDelegationToken(Token<DelegationTokenIdentifier> token
+  public void cancelDelegationToken(Token<DelegationTokenIdentifier> token
                                        ) throws IOException,
                                                 InterruptedException {
-    return false;
   }
 
   @Override
@@ -772,8 +771,8 @@ public class LocalJobRunner implements ClientProtocol {
   }
 
   @Override
-  public boolean renewDelegationToken(Token<DelegationTokenIdentifier> token
+  public long renewDelegationToken(Token<DelegationTokenIdentifier> token
                                       ) throws IOException,InterruptedException{
-    return false;
+    return 0;
   }
 }

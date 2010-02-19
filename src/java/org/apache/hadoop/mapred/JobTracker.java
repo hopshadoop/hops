@@ -4475,11 +4475,11 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    * Discard a current delegation token.
    */
   @Override
-  public boolean cancelDelegationToken(Token<DelegationTokenIdentifier> token
+  public void cancelDelegationToken(Token<DelegationTokenIdentifier> token
                                        ) throws IOException,
                                                 InterruptedException {
     String user = UserGroupInformation.getCurrentUser().getUserName();
-    return secretManager.cancelToken(token, user);
+    secretManager.cancelToken(token, user);
   }
 
   /**
@@ -4504,7 +4504,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    * Renew a delegation token to extend its lifetime.
    */
   @Override
-  public boolean renewDelegationToken(Token<DelegationTokenIdentifier> token
+  public long renewDelegationToken(Token<DelegationTokenIdentifier> token
                                       ) throws IOException,
                                                InterruptedException {
     String user = UserGroupInformation.getCurrentUser().getUserName();
