@@ -17,12 +17,14 @@
  */
 package org.apache.hadoop.mapred;
 
+import java.io.File;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.util.Properties;
 
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
@@ -32,7 +34,12 @@ public class TestJobStatusPersistency extends ClusterMapReduceTestCase {
   static final Path TEST_DIR = 
     new Path(System.getProperty("test.build.data","/tmp"), 
              "job-status-persistence");
-  
+
+  @Override
+  protected void setUp() throws Exception {
+    // Don't start anything by default
+  }
+
   private JobID runJob() throws Exception {
     OutputStream os = getFileSystem().create(new Path(getInputDir(), "text.txt"));
     Writer wr = new OutputStreamWriter(os);
@@ -65,6 +72,7 @@ public class TestJobStatusPersistency extends ClusterMapReduceTestCase {
   }
 
   public void testNonPersistency() throws Exception {
+    startCluster(true, null);
     JobID jobId = runJob();
     JobClient jc = new JobClient(createJobConf());
     RunningJob rj = jc.getJob(jobId);
@@ -80,8 +88,7 @@ public class TestJobStatusPersistency extends ClusterMapReduceTestCase {
     Properties config = new Properties();
     config.setProperty(JTConfig.JT_PERSIST_JOBSTATUS, "true");
     config.setProperty(JTConfig.JT_PERSIST_JOBSTATUS_HOURS, "1");
-    stopCluster();
-    startCluster(false, config);
+    startCluster(true, config);
     JobID jobId = runJob();
     JobClient jc = new JobClient(createJobConf());
     RunningJob rj0 = jc.getJob(jobId);
@@ -113,7 +120,7 @@ public class TestJobStatusPersistency extends ClusterMapReduceTestCase {
    * Test if the completed job status is persisted to localfs.
    */
   public void testLocalPersistency() throws Exception {
-    FileSystem fs = FileSystem.getLocal(createJobConf());
+    FileSystem fs = FileSystem.getLocal(new JobConf());
     
     fs.delete(TEST_DIR, true);
     
@@ -122,8 +129,7 @@ public class TestJobStatusPersistency extends ClusterMapReduceTestCase {
     config.setProperty(JTConfig.JT_PERSIST_JOBSTATUS_HOURS, "1");
     config.setProperty(JTConfig.JT_PERSIST_JOBSTATUS_DIR, 
                        fs.makeQualified(TEST_DIR).toString());
-    stopCluster();
-    startCluster(false, config);
+    startCluster(true, config);
     JobID jobId = runJob();
     JobClient jc = new JobClient(createJobConf());
     RunningJob rj = jc.getJob(jobId);
@@ -133,5 +139,45 @@ public class TestJobStatusPersistency extends ClusterMapReduceTestCase {
     Path jobInfo = new Path(TEST_DIR, rj.getID() + ".info");
     assertTrue("Missing job info from the local fs", fs.exists(jobInfo));
     fs.delete(TEST_DIR, true);
+  }
+
+  /**
+   * Verify that completed-job store is inactive if the jobinfo path is not
+   * writable.
+   * 
+   * @throws Exception
+   */
+  public void testJobStoreDisablingWithInvalidPath() throws Exception {
+    MiniMRCluster mr = null;
+    Path parent = new Path(TEST_DIR, "parent");
+    try {
+      FileSystem fs = FileSystem.getLocal(new JobConf());
+
+      if (fs.exists(TEST_DIR) && !fs.delete(TEST_DIR, true)) {
+        fail("Cannot delete TEST_DIR!");
+      }
+
+      if (fs.mkdirs(new Path(TEST_DIR, parent))) {
+        if (!(new File(parent.toUri().getPath()).setWritable(false, false))) {
+          fail("Cannot chmod parent!");
+        }
+      } else {
+        fail("Cannot create parent dir!");
+      }
+      JobConf config = new JobConf();
+      config.set(JTConfig.JT_PERSIST_JOBSTATUS, "true");
+      config.set(JTConfig.JT_PERSIST_JOBSTATUS_HOURS, "1");
+      config.set(JTConfig.JT_PERSIST_JOBSTATUS_DIR, new Path(parent,
+          "child").toUri().getPath());
+      mr = new MiniMRCluster(0, "file:///", 4, null, null, config);
+      assertFalse(
+          "CompletedJobStore is unexpectly active!",
+          mr.getJobTrackerRunner().getJobTracker().completedJobStatusStore.isActive());
+    } finally {
+      new File(parent.toUri().getPath()).setWritable(true, false);
+      if (mr != null) {
+        mr.shutdown();
+      }
+    }
   }
 }

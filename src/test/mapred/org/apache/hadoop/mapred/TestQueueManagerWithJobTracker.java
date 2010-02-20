@@ -142,8 +142,18 @@ public class TestQueueManagerWithJobTracker {
         .downgrade(jobID));
     tracker.initJob(jip);
     try {
-      tracker.killJob(jobID);
-      fail("current user is neither u1 nor in the administer group list");
+      final Configuration userConf =
+          new Configuration(miniMRCluster.createJobConf());
+      UserGroupInformation ugi =
+          UserGroupInformation.createUserForTesting("someRandomUser",
+              new String[] { "someRandomGroup" });
+      cluster = ugi.doAs(new PrivilegedExceptionAction<Cluster>() {
+        public Cluster run() throws IOException {
+          return new Cluster(userConf);
+        }
+      });
+      cluster.getJob(jobID).killJob();
+      fail("user 'someRandomeUser' is neither u1 nor in the administer group list");
     } catch (Exception e) {
       final Configuration userConf = new Configuration(miniMRCluster.createJobConf());
       UserGroupInformation ugi = 

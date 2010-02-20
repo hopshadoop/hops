@@ -25,6 +25,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.TIPStatus;
 import org.apache.hadoop.mapreduce.Cluster;
@@ -39,6 +40,7 @@ import org.apache.hadoop.mapreduce.TaskReport;
 import org.apache.hadoop.mapreduce.TaskTrackerInfo;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.jobhistory.HistoryViewer;
+import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
@@ -218,9 +220,9 @@ public class CLI extends Configured implements Tool {
         if (job == null) {
           System.out.println("Could not find job " + jobid);
         } else {
+          Counters counters = job.getCounters();
           System.out.println();
           System.out.println(job);
-          Counters counters = job.getCounters();
           if (counters != null) {
             System.out.println(counters);
           } else {
@@ -306,6 +308,13 @@ public class CLI extends Configured implements Tool {
           System.out.println("Could not fail task " + taskid);
           exitCode = -1;
         }
+      }
+    } catch (RemoteException re) {
+      IOException unwrappedException = re.unwrapRemoteException();
+      if (unwrappedException instanceof AccessControlException) {
+        System.out.println(unwrappedException.getMessage());
+      } else {
+        throw re;
       }
     } finally {
       cluster.close();

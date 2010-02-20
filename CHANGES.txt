@@ -57,6 +57,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1341. Sqoop should have an option to create hive tables and
     skip the table import step. (Leonid Furman via tomwhite)
 
+    MAPREDUCE-1307. Introduces the Job level ACLs feature. 
+    (Vinod Kumar Vavilapalli via ddas)
+
   IMPROVEMENTS
 
     MAPREDUCE-1198. Alternatively schedule different types of tasks in

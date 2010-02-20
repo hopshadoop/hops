@@ -20,12 +20,16 @@ package org.apache.hadoop.mapreduce;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Map.Entry;
 
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableFactories;
 import org.apache.hadoop.io.WritableFactory;
 import org.apache.hadoop.io.WritableUtils;
+import org.apache.hadoop.security.authorize.AccessControlList;
 
 /**************************************************
  * Describes the current status of a job.
@@ -72,6 +76,9 @@ public class JobStatus implements Writable, Cloneable {
   private String user;
   private JobPriority priority;
   private String schedulingInfo="NA";
+
+  private Map<JobACL, AccessControlList> jobACLs =
+      new HashMap<JobACL, AccessControlList>();
 
   private String jobName;
   private String jobFile;
@@ -222,7 +229,11 @@ public class JobStatus implements Writable, Cloneable {
   protected synchronized void setSchedulingInfo(String schedulingInfo) {
     this.schedulingInfo = schedulingInfo;
   }
-  
+
+  protected synchronized void setJobACLs(Map<JobACL, AccessControlList> acls) {
+    this.jobACLs = acls;
+  }
+
   /**
    * @return Percentage of progress in maps 
    */
@@ -281,6 +292,10 @@ public class JobStatus implements Writable, Cloneable {
    return schedulingInfo;
   }
 
+  public synchronized Map<JobACL, AccessControlList> getJobACLs() {
+    return jobACLs;
+  }
+
   /**
    * Return the priority of the job
    * @return job priority
@@ -316,6 +331,13 @@ public class JobStatus implements Writable, Cloneable {
     Text.writeString(out, jobName);
     Text.writeString(out, trackingUrl);
     Text.writeString(out, jobFile);
+
+    // Serialize the job's ACLs
+    out.writeInt(jobACLs.size());
+    for (Entry<JobACL, AccessControlList> entry : jobACLs.entrySet()) {
+      WritableUtils.writeEnum(out, entry.getKey());
+      Text.writeString(out, entry.getValue().toString());
+    }
   }
 
   public synchronized void readFields(DataInput in) throws IOException {
@@ -336,6 +358,14 @@ public class JobStatus implements Writable, Cloneable {
     this.jobName = Text.readString(in);
     this.trackingUrl = Text.readString(in);
     this.jobFile = Text.readString(in);
+
+    // De-serialize the job's ACLs
+    int numACLs = in.readInt();
+    for (int i = 0; i < numACLs; i++) {
+      JobACL aclType = WritableUtils.readEnum(in, JobACL.class);
+      String acl = Text.readString(in);
+      this.jobACLs.put(aclType, new AccessControlList(acl));
+    }
   }
 
   /**

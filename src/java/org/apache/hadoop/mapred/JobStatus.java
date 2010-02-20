@@ -17,6 +17,11 @@
  */
 package org.apache.hadoop.mapred;
 
+import java.util.Map;
+
+import org.apache.hadoop.mapreduce.JobACL;
+import org.apache.hadoop.security.authorize.AccessControlList;
+
 /**************************************************
  * Describes the current status of a job.  This is
  * not intended to be a comprehensive piece of data.
@@ -281,7 +286,11 @@ public class JobStatus extends org.apache.hadoop.mapreduce.JobStatus {
    protected synchronized void setSchedulingInfo(String schedulingInfo) {
      super.setSchedulingInfo(schedulingInfo);
    }
-   
+
+   protected synchronized void setJobACLs(Map<JobACL, AccessControlList> acls) {
+     super.setJobACLs(acls);
+   }
+
   /**
    * Set the priority of the job, defaulting to NORMAL.
    * @param jp new job priority

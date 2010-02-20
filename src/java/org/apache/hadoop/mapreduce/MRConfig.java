@@ -35,6 +35,8 @@ public interface MRConfig {
   public static final String MAPMEMORY_MB = "mapreduce.cluster.mapmemory.mb";
   public static final String REDUCEMEMORY_MB = 
     "mapreduce.cluster.reducememory.mb";
+  public static final String JOB_LEVEL_AUTHORIZATION_ENABLING_FLAG = 
+    "mapreduce.cluster.job-authorization-enabled";
 
   //Delegation token related keys
   public static final String  DELEGATION_KEY_UPDATE_INTERVAL_KEY = 

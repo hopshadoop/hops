@@ -101,9 +101,10 @@ public interface ClientProtocol extends VersionedProtocol {
    *             user home dir. JobTracker reads the required files from the
    *             staging area using user credentials passed via the rpc.
    * Version 31: Added TokenStorage to submitJob      
-   * Version 32: Added delegation tokens (add, renew, cancel)    
+   * Version 32: Added delegation tokens (add, renew, cancel)
+   * Version 33: Added JobACLs to JobStatus as part of MAPREDUCE-1307
    */
-  public static final long versionID = 32L;
+  public static final long versionID = 33L;
 
   /**
    * Allocate a name for the job.
