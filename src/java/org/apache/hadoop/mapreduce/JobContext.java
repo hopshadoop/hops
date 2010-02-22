@@ -229,7 +229,8 @@ public interface JobContext {
     "mapreduce.reduce.merge.memtomem.enabled";
   public static final String JOB_NAMENODES = "mapreduce.job.hdfs-servers";
   public static final String JOB_JOBTRACKER_ID = "mapreduce.job.kerberos.jtprinicipal";
-
+  public static final String JOB_CANCEL_DELEGATION_TOKEN = 
+    "mapreduce.job.complete.cancel.delegation.tokens";
   public static final String JOB_ACL_VIEW_JOB =
       "mapreduce.job.acl-view-job";
   public static final String JOB_ACL_MODIFY_JOB =

@@ -60,6 +60,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1307. Introduces the Job level ACLs feature. 
     (Vinod Kumar Vavilapalli via ddas)
 
+    MAPREDUCE-1430. JobTracker automatically renews delegation tokens for jobs.
+    (Boris Shkolnik via ddas)
+
   IMPROVEMENTS
 
     MAPREDUCE-1198. Alternatively schedule different types of tasks in

@@ -267,7 +267,7 @@ public class TestTokenCache {
     for(Token<? extends TokenIdentifier> t: tns) {
       System.out.println("kind="+t.getKind() + ";servic=" + t.getService() + ";str=" + t.toString());
       
-      if(t.getKind().equals(new Text("HDFS_DELEGATION_TOKEN")) &&
+      if(t.getKind().equals(DelegationTokenIdentifier.HDFS_DELEGATION_KIND) &&
           t.getService().equals(new Text(fs_addr))) {
         found = true;
       }

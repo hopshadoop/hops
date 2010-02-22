@@ -68,6 +68,7 @@ import org.apache.hadoop.mapreduce.jobhistory.TaskFinishedEvent;
 import org.apache.hadoop.mapreduce.jobhistory.TaskStartedEvent;
 import org.apache.hadoop.mapreduce.security.TokenCache;
 import org.apache.hadoop.security.TokenStorage;
+import org.apache.hadoop.mapreduce.security.token.DelegationTokenRenewal;
 import org.apache.hadoop.mapreduce.security.token.JobTokenIdentifier;
 import org.apache.hadoop.mapreduce.server.jobtracker.TaskTracker;
 import org.apache.hadoop.mapreduce.split.JobSplit;
@@ -461,7 +462,10 @@ public class JobInProgress {
     this.speculativeCap = conf.getFloat(
         JobContext.SPECULATIVECAP,0.1f);
     this.slowNodeThreshold = conf.getFloat(
-        JobContext.SPECULATIVE_SLOWNODE_THRESHOLD,1.0f);
+        JobContext.SPECULATIVE_SLOWNODE_THRESHOLD,1.0f); 
+    // register job's tokens for renewal
+    DelegationTokenRenewal.registerDelegationTokensForRenewal(
+        jobInfo.getJobID(), ts, this.conf);
   }
 
   /**
@@ -3264,38 +3268,45 @@ public class JobInProgress {
    * from all tables.  Be sure to remove all of this job's tasks
    * from the various tables.
    */
-  synchronized void garbageCollect() {
-    // Cancel task tracker reservation
-    cancelReservedSlots();
-    
-    // Let the JobTracker know that a job is complete
-    jobtracker.getInstrumentation().decWaitingMaps(getJobID(), pendingMaps());
-    jobtracker.getInstrumentation().decWaitingReduces(getJobID(), pendingReduces());
-    jobtracker.storeCompletedJob(this);
-    jobtracker.finalizeJob(this);
-      
-    try {
-      // Definitely remove the local-disk copy of the job file
-      if (localJobFile != null) {
-        localFs.delete(localJobFile, true);
-        localJobFile = null;
-      }
+   void garbageCollect() {
+     synchronized(this) {
+       // Cancel task tracker reservation
+       cancelReservedSlots();
 
-      Path tempDir = jobtracker.getSystemDirectoryForJob(getJobID());
-      new CleanupQueue().addToQueue(new PathDeletionContext(
-          jobtracker.getFileSystem(), tempDir.toUri().getPath())); 
-    } catch (IOException e) {
-      LOG.warn("Error cleaning up "+profile.getJobID()+": "+e);
-    }
-    
-    cleanUpMetrics();
-    // free up the memory used by the data structures
-    this.nonRunningMapCache = null;
-    this.runningMapCache = null;
-    this.nonRunningReduces = null;
-    this.runningReduces = null;
 
-  }
+       // Let the JobTracker know that a job is complete
+       jobtracker.getInstrumentation().decWaitingMaps(getJobID(), pendingMaps());
+       jobtracker.getInstrumentation().decWaitingReduces(getJobID(), pendingReduces());
+       jobtracker.storeCompletedJob(this);
+       jobtracker.finalizeJob(this);
+
+       try {
+         // Definitely remove the local-disk copy of the job file
+         if (localJobFile != null) {
+           localFs.delete(localJobFile, true);
+           localJobFile = null;
+         }
+
+         Path tempDir = jobtracker.getSystemDirectoryForJob(getJobID());
+         new CleanupQueue().addToQueue(new PathDeletionContext(
+             jobtracker.getFileSystem(), tempDir.toUri().getPath())); 
+       } catch (IOException e) {
+         LOG.warn("Error cleaning up "+profile.getJobID()+": "+e);
+       }
+
+       cleanUpMetrics();
+       // free up the memory used by the data structures
+       this.nonRunningMapCache = null;
+       this.runningMapCache = null;
+       this.nonRunningReduces = null;
+       this.runningReduces = null;
+
+     }
+     // remove jobs delegation tokens
+     if(conf.getBoolean(JobContext.JOB_CANCEL_DELEGATION_TOKEN, true)) {
+       DelegationTokenRenewal.removeDelegationTokenRenewalForJob(jobId);
+     } // else don't remove it.May be used by spawned tasks
+   }
 
   /**
    * Return the TaskInProgress that matches the tipid.
