@@ -810,6 +810,10 @@ public class RaidNode implements RaidProtocol {
       out.close();
       out = null;
 
+      // delete destination if exists
+      if (outFs.exists(outpath)){
+        outFs.delete(outpath, false);
+      }
       // rename tmppath to the real parity filename
       if (!outFs.rename(tmppath, outpath)) {
         String msg = "Unable to rename tmp file " + tmppath + " to " + outpath;

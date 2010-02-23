@@ -334,6 +334,7 @@ public class TestRaidNode extends TestCase {
       long crc2 = createOldFile(fileSys, file2, 3, numBlock, blockSize);
       FileStatus[] listPaths = null;
 
+      long firstmodtime = 0;
       // wait till file is raided
       while (true) {
         Thread.sleep(20000L);                  // waiting
@@ -343,6 +344,37 @@ public class TestRaidNode extends TestCase {
           for (FileStatus s : listPaths) {
             LOG.info("doCheckPolicy found path " + s.getPath());
             if (!s.getPath().toString().endsWith(".tmp")) {
+              count++;
+              firstmodtime = s.getModificationTime();
+            }
+          }
+        }
+        if (count > 0) {
+          break;
+        }
+        LOG.info("doCheckPolicy waiting for files to be raided. Found " + 
+                 (listPaths == null ? "none" : listPaths.length));
+      }
+      assertEquals(listPaths.length, 1);
+
+      LOG.info("doCheckPolicy all files found in Raid the first time.");
+
+      LOG.info("doCheckPolicy: recreating source file");
+      crc2 = createOldFile(fileSys, file2, 3, numBlock, blockSize);
+
+      FileStatus st = fileSys.getFileStatus(file2);
+      assertTrue(st.getModificationTime() > firstmodtime);
+      
+      // wait till file is raided
+      while (true) {
+        Thread.sleep(20000L);                  // waiting
+        listPaths = fileSys.listStatus(destPath);
+        int count = 0;
+        if (listPaths != null && listPaths.length == 1) {
+          for (FileStatus s : listPaths) {
+            LOG.info("doCheckPolicy found path " + s.getPath() + " " + s.getModificationTime());
+            if (!s.getPath().toString().endsWith(".tmp") &&
+                s.getModificationTime() > firstmodtime) {
               count++;
             }
           }
@@ -354,7 +386,9 @@ public class TestRaidNode extends TestCase {
                  (listPaths == null ? "none" : listPaths.length));
       }
       assertEquals(listPaths.length, 1);
-      LOG.info("doCheckPolicy all files found in Raid.");
+
+      LOG.info("doCheckPolicy: file got re-raided as expected.");
+      
     } catch (Exception e) {
       LOG.info("doCheckPolicy Exception " + e +
                                           StringUtils.stringifyException(e));

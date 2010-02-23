@@ -378,6 +378,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1378. URL encode link in jobhistory.jsp to avoid errors caused by
     unescaped characters. (E. Sammer via cdouglas)
 
+    MAPREDUCE-1519. RaidNode fails to create new parity file 
+    if an older version already exists. (Rodrigo Schmidt via dhruba)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
