@@ -190,6 +190,8 @@ Trunk (unreleased changes)
     meaningful exceptions when there are failures instead of returning 
     false. (omalley)
 
+    HADOOP-6579. Upgrade commons-codec library to 1.4. (omalley)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
