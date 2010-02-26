@@ -41,6 +41,7 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.TokenStorage;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
+import org.apache.hadoop.security.UserGroupInformation;
 
 
 /**
@@ -100,9 +101,17 @@ public class TokenCache {
    */
   public static void obtainTokensForNamenodes(Path [] ps, Configuration conf) 
   throws IOException {
+    if (!UserGroupInformation.isSecurityEnabled()) {
+      return;
+    }
+    obtainTokensForNamenodesInternal(ps, conf);
+  }
+    
+  static void obtainTokensForNamenodesInternal(Path [] ps, Configuration conf)
+  throws IOException {
     // get jobtracker principal id (for the renewer)
     Text jtCreds = new Text(conf.get(JobContext.JOB_JOBTRACKER_ID, ""));
-   
+    
     for(Path p: ps) {
       FileSystem fs = FileSystem.get(p.toUri(), conf);
       if(fs instanceof DistributedFileSystem) {
