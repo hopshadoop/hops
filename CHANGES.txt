@@ -383,6 +383,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1519. RaidNode fails to create new parity file 
     if an older version already exists. (Rodrigo Schmidt via dhruba)
 
+    MAPREDUCE-1537. Fixes a compilation problem in a testcase after commit
+    HDFS-984. (Jitendra Nath Pandey via ddas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
