@@ -1107,7 +1107,7 @@ public class JobInProgress {
         this.jobtracker.getTaskTracker(tip.machineWhereTaskRan(taskid));
       TaskTrackerStatus ttStatus = 
         (taskTracker == null) ? null : taskTracker.getStatus();
-      String httpTaskLogLocation = null; 
+      String taskTrackerHttpLocation = null; 
 
       if (null != ttStatus){
         String host;
@@ -1116,8 +1116,8 @@ public class JobInProgress {
         } else {
           host = ttStatus.getHost();
         }
-        httpTaskLogLocation = "http://" + host + ":" + ttStatus.getHttpPort(); 
-           //+ "/tasklog?plaintext=true&taskid=" + status.getTaskID();
+        taskTrackerHttpLocation = "http://" + host + ":"
+            + ttStatus.getHttpPort(); 
       }
 
       TaskCompletionEvent taskEvent = null;
@@ -1130,7 +1130,7 @@ public class JobInProgress {
                                             !tip.isJobCleanupTask() &&
                                             !tip.isJobSetupTask(),
                                             TaskCompletionEvent.Status.SUCCEEDED,
-                                            httpTaskLogLocation 
+                                            taskTrackerHttpLocation 
                                            );
         taskEvent.setTaskRunTime((int)(status.getFinishTime() 
                                        - status.getStartTime()));
@@ -1186,7 +1186,7 @@ public class JobInProgress {
                                             !tip.isJobCleanupTask() &&
                                             !tip.isJobSetupTask(),
                                             taskCompletionStatus, 
-                                            httpTaskLogLocation
+                                            taskTrackerHttpLocation
                                            );
       }          
 

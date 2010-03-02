@@ -24,6 +24,7 @@
   import="java.io.*"
   import="java.util.*"
   import="org.apache.hadoop.mapred.*"
+  import="org.apache.hadoop.mapred.JSPUtil.JobWithViewAccessCheck"
   import="org.apache.hadoop.mapreduce.TaskType"
   import="org.apache.hadoop.util.*"
 %>
@@ -39,7 +40,6 @@
 <%! 
   private void printFailedAttempts(JspWriter out,
                                    JobTracker tracker,
-                                   JobID jobId,
                                    TaskInProgress tip,
                                    TaskStatus.State failState) throws IOException {
     TaskStatus[] statuses = tip.getTaskStatuses();
@@ -51,9 +51,8 @@
         String taskTrackerName = statuses[i].getTaskTracker();
         TaskTrackerStatus taskTracker = tracker.getTaskTrackerStatus(taskTrackerName);
         out.print("<tr><td>" + statuses[i].getTaskID() +
-                  "</td><td><a href=\"taskdetails.jsp?jobid="+ jobId + 
-                  "&tipid=" + tipId + "\">" + tipId +
-                  "</a></td>");
+                  "</td><td><a href=\"taskdetails.jsp?tipid=" + tipId + "\">" +
+                  tipId + "</a></td>");
         if (taskTracker == null) {
           out.print("<td>" + taskTrackerName + "</td>");
         } else {
@@ -103,15 +102,11 @@
              
   private void printFailures(JspWriter out, 
                              JobTracker tracker,
-                             JobID jobId,
+                             JobInProgress job,
                              String kind, 
-                             String cause) throws IOException {
-    JobInProgress job =  tracker.getJob(jobId);
-    if (job == null) {
-      out.print("<b>Job " + jobId + " not found.</b><br>\n");
-      return;
-    }
-    
+                             String cause)
+                   throws IOException, InterruptedException, ServletException {
+
     boolean includeMap = false;
     boolean includeReduce = false;
     if (kind == null) {
@@ -150,13 +145,13 @@
     if (includeMap) {
       TaskInProgress[] tips = job.getTasks(TaskType.MAP);
       for(int i=0; i < tips.length; ++i) {
-        printFailedAttempts(out, tracker, jobId, tips[i], state);
+        printFailedAttempts(out, tracker, tips[i], state);
       }
     }
     if (includeReduce) {
       TaskInProgress[] tips = job.getTasks(TaskType.REDUCE);
       for(int i=0; i < tips.length; ++i) {
-        printFailedAttempts(out, tracker, jobId, tips[i], state);
+        printFailedAttempts(out, tracker, tips[i], state);
       }
     }
     out.print("</table>\n");
@@ -170,6 +165,19 @@
       return;
     }
     JobID jobIdObj = JobID.forName(jobId);
+    
+    JobWithViewAccessCheck myJob = JSPUtil.checkAccessAndGetJob(
+        tracker, jobIdObj, request, response);
+    if (!myJob.isViewJobAllowed()) {
+      return; // user is not authorized to view this job
+    }
+
+    JobInProgress job = myJob.getJob();
+    if (job == null) {
+      out.print("<b>Job " + jobId + " not found.</b><br>\n");
+      return;
+    }
+
     String kind = request.getParameter("kind");
     String cause = request.getParameter("cause");
 %>
@@ -180,8 +188,8 @@
 <h1>Hadoop <a href="jobdetails.jsp?jobid=<%=jobId%>"><%=jobId%></a>
 failures on <a href="jobtracker.jsp"><%=trackerName%></a></h1>
 
-<% 
-    printFailures(out, tracker, jobIdObj, kind, cause); 
+<%
+    printFailures(out, tracker, job, kind, cause); 
 %>
 
 <hr>

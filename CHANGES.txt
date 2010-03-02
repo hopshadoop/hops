@@ -63,6 +63,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1430. JobTracker automatically renews delegation tokens for jobs.
     (Boris Shkolnik via ddas)
 
+    MAPREDUCE-1455. Introduces job-level authorization for mapreduce servlets.
+    (Ravi Gummadi via vinodkv)
+
   IMPROVEMENTS
 
     MAPREDUCE-1198. Alternatively schedule different types of tasks in

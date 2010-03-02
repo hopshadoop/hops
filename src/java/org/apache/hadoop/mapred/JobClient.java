@@ -797,7 +797,7 @@ public class JobClient extends CLI {
   }
 
   static String getTaskLogURL(TaskAttemptID taskId, String baseUrl) {
-    return (baseUrl + "/tasklog?plaintext=true&taskid=" + taskId); 
+    return (baseUrl + "/tasklog?plaintext=true&attemptid=" + taskId); 
   }
   
   static Configuration getConfiguration(String jobTrackerSpec)

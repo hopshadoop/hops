@@ -43,7 +43,9 @@
 </head>
 <body>
 <%
-  JSPUtil.processButtons(request, response, tracker);
+  if (!JSPUtil.processButtons(request, response, tracker)) {
+    return;// user is not authorized
+  }
 %>
 <%
   String schedulingInfoString = schedInfo.getSchedulingInfo();
@@ -90,7 +92,7 @@ Child Queues :
 </div>
 <br/>
 <hr/>
-<%=JSPUtil.generateJobTable("Job List", jobs, 30, 0)%>
+<%=JSPUtil.generateJobTable("Job List", jobs, 30, 0, tracker.conf)%>
 <hr>
 <%
   }

@@ -100,7 +100,9 @@ public class ConfigUtil {
     Configuration.addDeprecation("mapred.job.tracker.persist.jobstatus.dir", 
       new String[] {JTConfig.JT_PERSIST_JOBSTATUS_DIR});
     Configuration.addDeprecation("mapred.permissions.supergroup", 
-      new String[] {JTConfig.JT_SUPERGROUP});
+      new String[] {MRConfig.MR_SUPERGROUP});
+    Configuration.addDeprecation("mapreduce.jobtracker.permissions.supergroup",
+        new String[] {MRConfig.MR_SUPERGROUP});
     Configuration.addDeprecation("mapred.task.cache.levels", 
       new String[] {JTConfig.JT_TASKCACHE_LEVELS});
     Configuration.addDeprecation("mapred.jobtracker.taskalloc.capacitypad", 

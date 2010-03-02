@@ -103,7 +103,10 @@
 </head>
 <body>
 
-<% JSPUtil.processButtons(request, response, tracker); %>
+<% if (!JSPUtil.processButtons(request, response, tracker)) {
+     return;// user is not authorized
+   }
+%>
 
 <h1><%= trackerName %> Hadoop Map/Reduce Administration</h1>
 
@@ -137,14 +140,14 @@
 <hr>
 
 <h2 id="running_jobs">Running Jobs</h2>
-<%=JSPUtil.generateJobTable("Running", runningJobs, 30, 0)%>
+<%=JSPUtil.generateJobTable("Running", runningJobs, 30, 0, tracker.conf)%>
 <hr>
 
 <%
 if (completedJobs.size() > 0) {
   out.print("<h2 id=\"completed_jobs\">Completed Jobs</h2>");
   out.print(JSPUtil.generateJobTable("Completed", completedJobs, 0, 
-    runningJobs.size()));
+    runningJobs.size(), tracker.conf));
   out.print("<hr>");
 }
 %>
@@ -153,7 +156,7 @@ if (completedJobs.size() > 0) {
 if (failedJobs.size() > 0) {
   out.print("<h2 id=\"failed_jobs\">Failed Jobs</h2>");
   out.print(JSPUtil.generateJobTable("Failed", failedJobs, 0, 
-    (runningJobs.size()+completedJobs.size())));
+    (runningJobs.size()+completedJobs.size()), tracker.conf));
   out.print("<hr>");
 }
 %>

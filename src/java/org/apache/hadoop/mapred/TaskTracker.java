@@ -241,6 +241,10 @@ public class TaskTracker
   private int maxMapSlots;
   private int maxReduceSlots;
   private int failures;
+
+  // MROwner's ugi
+  private UserGroupInformation mrOwner;
+  private String supergroup;
   
   // Performance-related config knob to send an out-of-band heartbeat
   // on task completion
@@ -262,6 +266,9 @@ public class TaskTracker
   private long reduceSlotSizeMemoryOnTT = JobConf.DISABLED_MEMORY_LIMIT;
   private long totalMemoryAllottedForTasks = JobConf.DISABLED_MEMORY_LIMIT;
   private ResourceCalculatorPlugin resourceCalculatorPlugin = null;
+
+  // Manages job acls of jobs in TaskTracker
+  private TaskTrackerJobACLsManager jobACLsManager;
 
   /**
    * the minimum interval between jobtracker polls
@@ -562,18 +569,22 @@ public class TaskTracker
    */
   synchronized void initialize() throws IOException, InterruptedException {
     String keytabFilename = fConf.get(TTConfig.TT_KEYTAB_FILE);
-    UserGroupInformation ttUgi;
     UserGroupInformation.setConfiguration(fConf);
     if (keytabFilename != null) {
       String desiredUser = fConf.get(TTConfig.TT_USER_NAME,
                                     System.getProperty("user.name"));
       UserGroupInformation.loginUserFromKeytab(desiredUser, 
                                                keytabFilename);
-      ttUgi = UserGroupInformation.getLoginUser();
+      mrOwner = UserGroupInformation.getLoginUser();
       
     } else {
-      ttUgi = UserGroupInformation.getCurrentUser();
+      mrOwner = UserGroupInformation.getCurrentUser();
     }
+
+    supergroup = fConf.get(MRConfig.MR_SUPERGROUP, "supergroup");
+    LOG.info("Starting tasktracker with owner as " + mrOwner.getShortUserName()
+             + " and supergroup as " + supergroup);
+
     localFs = FileSystem.getLocal(fConf);
     // use configured nameserver & interface to get local hostname
     if (fConf.get(TT_HOST_NAME) != null) {
@@ -671,7 +682,7 @@ public class TaskTracker
         asyncDiskService);
 
     this.jobClient = (InterTrackerProtocol) 
-    ttUgi.doAs(new PrivilegedExceptionAction<Object>() {
+    mrOwner.doAs(new PrivilegedExceptionAction<Object>() {
       public Object run() throws IOException {
         return RPC.waitForProxy(InterTrackerProtocol.class,
             InterTrackerProtocol.versionID, 
@@ -713,6 +724,22 @@ public class TaskTracker
     
     oobHeartbeatOnTaskCompletion = 
       fConf.getBoolean(TT_OUTOFBAND_HEARBEAT, false);
+  }
+
+  UserGroupInformation getMROwner() {
+    return mrOwner;
+  }
+
+  String getSuperGroup() {
+    return supergroup;
+  }
+  
+  /**
+   * Is job level authorization enabled on the TT ?
+   */
+  boolean isJobLevelAuthorizationEnabled() {
+    return fConf.getBoolean(
+        MRConfig.JOB_LEVEL_AUTHORIZATION_ENABLING_FLAG, false);
   }
 
   public static Class<? extends TaskTrackerInstrumentation> getInstrumentationClass(
@@ -1232,10 +1259,13 @@ public class TaskTracker
     server.setAttribute("localDirAllocator", localDirAllocator);
     server.setAttribute("shuffleServerMetrics", shuffleServerMetrics);
     server.addInternalServlet("mapOutput", "/mapOutput", MapOutputServlet.class);
-    server.addInternalServlet("taskLog", "/tasklog", TaskLogServlet.class);
+    server.addServlet("taskLog", "/tasklog", TaskLogServlet.class);
     server.start();
     this.httpPort = server.getPort();
     checkJettyPort(httpPort);
+    
+    // Initialize the jobACLSManager
+    jobACLsManager = new TaskTrackerJobACLsManager(this);
     initialize();
   }
 
@@ -3869,4 +3899,7 @@ public class TaskTracker
       return localJobTokenFileStr;
     }
 
+    TaskTrackerJobACLsManager getJobACLsManager() {
+      return jobACLsManager;
+    }
 }

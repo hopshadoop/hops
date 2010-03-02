@@ -1253,7 +1253,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
                                                 "expireLaunchingTasks");
 
   final CompletedJobStatusStore completedJobStatusStore;
-  private JobACLsManager jobACLsManager;
+  private JobTrackerJobACLsManager jobACLsManager;
   Thread completedJobsStoreThread = null;
   final RecoveryManager recoveryManager;
 
@@ -1351,7 +1351,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
       mrOwner = UserGroupInformation.getCurrentUser();
     }
     
-    supergroup = conf.get(JT_SUPERGROUP, "supergroup");
+    supergroup = conf.get(MR_SUPERGROUP, "supergroup");
     LOG.info("Starting jobtracker with owner as " + mrOwner.getShortUserName() 
              + " and supergroup as " + supergroup);
     clock = newClock;
@@ -1590,7 +1590,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
         NetworkTopology.DEFAULT_HOST_LEVEL);
 
     // Initialize the jobACLSManager
-    jobACLsManager = new JobACLsManager(this);
+    jobACLsManager = new JobTrackerJobACLsManager(this);
     //initializes the job status store
     completedJobStatusStore = new CompletedJobStatusStore(jobACLsManager, conf);
   }
@@ -4035,13 +4035,14 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    * Is the calling user a super user? Or part of the supergroup?
    * @return true, if it is a super user
    */
-  boolean isSuperUserOrSuperGroup(UserGroupInformation callerUGI) {
-    if (mrOwner.getShortUserName().equals(callerUGI.getShortUserName())) {
+  static boolean isSuperUserOrSuperGroup(UserGroupInformation callerUGI,
+      UserGroupInformation superUser, String superGroup) {
+    if (superUser.getShortUserName().equals(callerUGI.getShortUserName())) {
       return true;
     }
     String[] groups = callerUGI.getGroupNames();
     for(int i=0; i < groups.length; ++i) {
-      if (groups[i].equals(supergroup)) {
+      if (groups[i].equals(superGroup)) {
         return true;
       }
     }
@@ -4054,7 +4055,8 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    */
   public synchronized void refreshNodes() throws IOException {
     // check access
-    if (!isSuperUserOrSuperGroup(UserGroupInformation.getCurrentUser())) {
+    if (!isSuperUserOrSuperGroup(UserGroupInformation.getCurrentUser(), mrOwner,
+                                 supergroup)) {
       String user = UserGroupInformation.getCurrentUser().getShortUserName();
       throw new AccessControlException(user + 
                                        " is not authorized to refresh nodes.");
@@ -4064,6 +4066,10 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     refreshHosts();
   }
   
+  UserGroupInformation getMROwner() {
+    return mrOwner;
+  }
+
   String getSuperGroup() {
     return supergroup;
   }
@@ -4489,7 +4495,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     } else {
       mrOwner = UserGroupInformation.getCurrentUser();
     }
-    supergroup = conf.get("mapred.permissions.supergroup", "supergroup");
+    supergroup = conf.get(MRConfig.MR_SUPERGROUP, "supergroup");
     
     secretManager = null;
     
@@ -4572,7 +4578,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
         NetworkTopology.DEFAULT_HOST_LEVEL);
 
     // Initialize the jobACLSManager
-    jobACLsManager = new JobACLsManager(this);
+    jobACLsManager = new JobTrackerJobACLsManager(this);
 
     //initializes the job status store
     completedJobStatusStore = new CompletedJobStatusStore(jobACLsManager, conf);

@@ -42,6 +42,7 @@ import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.mapred.lib.IdentityReducer;
 import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -215,7 +216,7 @@ public class TestNodeRefresh extends TestCase {
     // start a cluster with 1 host and specified superuser and supergroup
     Configuration conf = new Configuration();
     // set the supergroup
-    conf.set(JTConfig.JT_SUPERGROUP, "abc");
+    conf.set(MRConfig.MR_SUPERGROUP, "abc");
     startCluster(2, 1, 0, UserGroupInformation.createRemoteUser("user1"), conf);
 
     conf = mr.createJobConf(new JobConf(conf));

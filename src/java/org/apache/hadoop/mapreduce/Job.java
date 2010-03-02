@@ -1176,7 +1176,7 @@ public class Job extends JobContextImpl implements JobContext {
   }
   
   private String getTaskLogURL(TaskAttemptID taskId, String baseUrl) {
-    return (baseUrl + "/tasklog?plaintext=true&taskid=" + taskId); 
+    return (baseUrl + "/tasklog?plaintext=true&attemptid=" + taskId); 
   }
 
   /** The interval at which monitorAndPrintJob() prints status */

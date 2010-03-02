@@ -20,6 +20,8 @@ package org.apache.hadoop.mapred;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.mapreduce.JobACL;
 import org.apache.hadoop.security.AccessControlException;
@@ -27,20 +29,21 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AccessControlList;
 
 @InterfaceAudience.Private
-public class JobACLsManager {
+public abstract class JobACLsManager {
 
-  private JobTracker jobTracker = null;
+  static final Log LOG = LogFactory.getLog(JobACLsManager.class);
 
-  public JobACLsManager(JobTracker tracker) {
-    jobTracker = tracker;
-  }
+  protected abstract boolean isJobLevelAuthorizationEnabled();
+
+  protected abstract boolean isSuperUserOrSuperGroup(
+      UserGroupInformation callerUGI);
 
   /**
    * Construct the jobACLs from the configuration so that they can be kept in
    * the memory. If authorization is disabled on the JT, nothing is constructed
    * and an empty map is returned.
    * 
-   * @return JobACl to AccessControlList map.
+   * @return JobACL to AccessControlList map.
    */
   Map<JobACL, AccessControlList> constructJobACLs(JobConf conf) {
     
@@ -48,7 +51,7 @@ public class JobACLsManager {
       new HashMap<JobACL, AccessControlList>();
 
     // Don't construct anything if authorization is disabled.
-    if (!jobTracker.isJobLevelAuthorizationEnabled()) {
+    if (!isJobLevelAuthorizationEnabled()) {
       return acls;
     }
 
@@ -66,13 +69,12 @@ public class JobACLsManager {
   }
 
   /**
-   * If authorization is enabled on the JobTracker, checks whether the user (in
-   * the callerUGI) is authorized to perform the operation specify by
-   * 'jobOperation' on the job.
+   * If authorization is enabled, checks whether the user (in the callerUGI) is
+   * authorized to perform the operation specified by 'jobOperation' on the job.
    * <ul>
    * <li>The owner of the job can do any operation on the job</li>
-   * <li>The superuser/supergroup of the JobTracker is always permitted to do
-   * operations on any job.</li>
+   * <li>The superuser/supergroup is always permitted to do operations on any
+   * job.</li>
    * <li>For all other users/groups job-acls are checked</li>
    * </ul>
    * 
@@ -83,40 +85,65 @@ public class JobACLsManager {
   void checkAccess(JobStatus jobStatus, UserGroupInformation callerUGI,
       JobACL jobOperation) throws AccessControlException {
 
-    if (!jobTracker.isJobLevelAuthorizationEnabled()) {
+    JobID jobId = jobStatus.getJobID();
+    String jobOwner = jobStatus.getUsername();
+    AccessControlList acl = jobStatus.getJobACLs().get(jobOperation);
+    checkAccess(jobId, callerUGI, jobOperation, jobOwner, acl);
+  }
+
+  /**
+   * If authorization is enabled, checks whether the user (in the callerUGI) is
+   * authorized to perform the operation specified by 'jobOperation' on the job.
+   * <ul>
+   * <li>The owner of the job can do any operation on the job</li>
+   * <li>The superuser/supergroup is always permitted to do operations on any
+   * job.</li>
+   * <li>For all other users/groups job-acls are checked</li>
+   * </ul>
+   * @param jobId
+   * @param callerUGI
+   * @param jobOperation
+   * @param jobOwner
+   * @param jobACL
+   * @throws AccessControlException
+   */
+  void checkAccess(JobID jobId, UserGroupInformation callerUGI,
+      JobACL jobOperation, String jobOwner, AccessControlList jobACL)
+      throws AccessControlException {
+
+    if (!isJobLevelAuthorizationEnabled()) {
       return;
     }
 
-    JobID jobId = jobStatus.getJobID();
-
     // Check for superusers/supergroups
-    if (jobTracker.isSuperUserOrSuperGroup(callerUGI)) {
-      JobInProgress.LOG.info("superuser/supergroup "
+    if (isSuperUserOrSuperGroup(callerUGI)) {
+      LOG.info("superuser/supergroupMember "
           + callerUGI.getShortUserName() + " trying to perform "
           + jobOperation.toString() + " on " + jobId);
       return;
     }
 
     // Job-owner is always part of all the ACLs
-    if (callerUGI.getShortUserName().equals(jobStatus.getUsername())) {
-      JobInProgress.LOG.info("Jobowner " + callerUGI.getShortUserName()
+    if (callerUGI.getShortUserName().equals(jobOwner)) {
+      LOG.info("Jobowner " + callerUGI.getShortUserName()
           + " trying to perform " + jobOperation.toString() + " on "
           + jobId);
       return;
     }
 
-    AccessControlList acl = jobStatus.getJobACLs().get(jobOperation);
-    if (acl.isUserAllowed(callerUGI)) {
-      JobInProgress.LOG.info("Normal user " + callerUGI.getShortUserName()
+    
+    if (jobACL.isUserAllowed(callerUGI)) {
+      LOG.info("Normal user " + callerUGI.getShortUserName()
           + " trying to perform " + jobOperation.toString() + " on "
           + jobId);
       return;
     }
 
     throw new AccessControlException(callerUGI
-        + " not authorized for performing the operation "
+        + " is not authorized for performing the operation "
         + jobOperation.toString() + " on " + jobId + ". "
-        + jobOperation.toString() + " configured for this job : "
-        + acl.toString());
+        + jobOperation.toString()
+        + " Access control list configured for this job : "
+        + jobACL.toString());
   }
 }

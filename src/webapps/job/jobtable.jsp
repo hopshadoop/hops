@@ -64,7 +64,7 @@ if(jobs == null || jobs.isEmpty()) {
 (In the order maintained by the scheduler)
 <br/><br/><br/>
 <%=
-  JSPUtil.generateJobTable("Job List", jobs, 30, 5)
+  JSPUtil.generateJobTable("Job List", jobs, 30, 5, tracker.conf)
 %>
 </center>
 <%

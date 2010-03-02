@@ -49,6 +49,11 @@ public interface JTConfig extends MRConfig {
     "mapreduce.jobtracker.persist.jobstatus.hours";
   public static final String JT_PERSIST_JOBSTATUS_DIR = 
     "mapreduce.jobtracker.persist.jobstatus.dir";
+
+  /**
+   * @deprecated Use MR_SUPERGROUP instead
+   */
+  @Deprecated
   public static final String JT_SUPERGROUP = 
     "mapreduce.jobtracker.permissions.supergroup";
   public static final String JT_RETIREJOBS = 
