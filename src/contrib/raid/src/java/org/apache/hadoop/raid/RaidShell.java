@@ -74,13 +74,17 @@ public class RaidShell extends Configured implements Tool {
    * @throws IOException
    */
   public RaidShell(Configuration conf) throws IOException {
+    this(conf, RaidNode.getAddress(conf));
+  }
+
+  public RaidShell(Configuration conf, InetSocketAddress address) throws IOException {
     super(conf);
     this.ugi = UserGroupInformation.getCurrentUser();
 
-    this.rpcRaidnode = createRPCRaidnode(RaidNode.getAddress(conf), conf, ugi);
+    this.rpcRaidnode = createRPCRaidnode(address, conf, ugi);
     this.raidnode = createRaidnode(rpcRaidnode);
   }
-
+  
   public static RaidProtocol createRaidnode(Configuration conf) throws IOException {
     return createRaidnode(RaidNode.getAddress(conf), conf);
   }

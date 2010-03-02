@@ -84,6 +84,7 @@ public class TestRaidDfs extends TestCase {
 
     // do not use map-reduce cluster for Raiding
     conf.setBoolean("fs.raidnode.local", true);
+    conf.set("raid.server.address", "localhost:0");
     conf.setInt("hdfs.raid.stripeLength", 3);
     conf.set("hdfs.raid.locations", "/destraid");
 

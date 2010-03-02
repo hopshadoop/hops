@@ -85,6 +85,8 @@ public class TestRaidNode extends TestCase {
     // the RaidNode does the raiding inline (instead of submitting to map/reduce)
     conf.setBoolean("fs.raidnode.local", local);
 
+    conf.set("raid.server.address", "localhost:0");
+    
     // create a dfs and map-reduce cluster
     final int taskTrackers = 4;
     final int jobTrackerPort = 60050;
@@ -209,10 +211,10 @@ public class TestRaidNode extends TestCase {
 
       while (times-- > 0) {
         try {
-          shell = new RaidShell(conf);
+          shell = new RaidShell(conf, cnode.getListenerAddress());
         } catch (Exception e) {
-          LOG.info("doTestPathFilter unable to connect to " + RaidNode.getAddress(conf) +
-                   " retrying....");
+          LOG.info("doTestPathFilter unable to connect to " + 
+              cnode.getListenerAddress() + " retrying....");
           Thread.sleep(1000);
           continue;
         }
@@ -308,21 +310,16 @@ public class TestRaidNode extends TestCase {
       fileSys.delete(dir, true);
       fileSys.delete(destPath, true);
 
-      // create a file that has a replciation factor of 2. The Raid code should not
-      // pick this up.
-      long crc1 = createOldFile(fileSys, file1, 2, numBlock, blockSize);
-      LOG.info("doCheckPolicy created test files.");
-
       // create an instance of the RaidNode
       cnode = RaidNode.createRaidNode(null, conf);
       int times = 10;
 
       while (times-- > 0) {
         try {
-          shell = new RaidShell(conf);
+          shell = new RaidShell(conf, cnode.getListenerAddress());
         } catch (Exception e) {
-          LOG.info("doCheckPolicy unable to connect to " + RaidNode.getAddress(conf) +
-                   " retrying....");
+          LOG.info("doCheckPolicy unable to connect to " + 
+              cnode.getListenerAddress() + " retrying....");
           Thread.sleep(1000);
           continue;
         }
@@ -331,7 +328,7 @@ public class TestRaidNode extends TestCase {
       LOG.info("doCheckPolicy created RaidShell.");
 
       // this file should be picked up RaidNode
-      long crc2 = createOldFile(fileSys, file2, 3, numBlock, blockSize);
+      long crc2 = createOldFile(fileSys, file2, 2, numBlock, blockSize);
       FileStatus[] listPaths = null;
 
       long firstmodtime = 0;
@@ -360,7 +357,7 @@ public class TestRaidNode extends TestCase {
       LOG.info("doCheckPolicy all files found in Raid the first time.");
 
       LOG.info("doCheckPolicy: recreating source file");
-      crc2 = createOldFile(fileSys, file2, 3, numBlock, blockSize);
+      crc2 = createOldFile(fileSys, file2, 2, numBlock, blockSize);
 
       FileStatus st = fileSys.getFileStatus(file2);
       assertTrue(st.getModificationTime() > firstmodtime);

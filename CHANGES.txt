@@ -392,6 +392,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1537. The patch makes the job client call the getDelegationToken
     only when security is enabled. (Jitendra Nath Pandey via ddas)
 
+    MAPREDUCE-1510. RAID should regenerate parity files if they get deleted.
+    (Rodrigo Schmidt via dhruba)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

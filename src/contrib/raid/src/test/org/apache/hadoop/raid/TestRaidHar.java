@@ -81,6 +81,8 @@ public class TestRaidHar extends TestCase {
     // the RaidNode does the raiding inline (instead of submitting to map/reduce)
     conf.setBoolean("fs.raidnode.local", local);
 
+    conf.set("raid.server.address", "localhost:0");
+
     // create a dfs and map-reduce cluster
     final int taskTrackers = 4;
 
@@ -209,10 +211,10 @@ public class TestRaidHar extends TestCase {
 
       while (times-- > 0) {
         try {
-          shell = new RaidShell(conf);
+          shell = new RaidShell(conf, cnode.getListenerAddress());
         } catch (Exception e) {
-          LOG.info("doTestHar unable to connect to " + RaidNode.getAddress(conf) +
-                   " retrying....");
+          LOG.info("doTestHar unable to connect to " + 
+              cnode.getListenerAddress() + " retrying....");
           Thread.sleep(1000);
           continue;
         }

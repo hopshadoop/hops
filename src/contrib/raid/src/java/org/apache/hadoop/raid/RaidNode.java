@@ -224,7 +224,10 @@ public class RaidNode implements RaidProtocol {
     return getAddress(nodeport);
   }
 
-
+  public InetSocketAddress getListenerAddress() {
+    return server.getListenerAddress();
+  }
+  
   private void initialize(Configuration conf) 
     throws IOException, SAXException, InterruptedException, RaidConfigurationException,
            ClassNotFoundException, ParserConfigurationException {
@@ -579,12 +582,6 @@ public class RaidNode implements RaidProtocol {
       // if the source file has fewer than or equal to 2 blocks, then no need to RAID
       long blockSize = src.getBlockSize();
       if (2 * blockSize >= src.getLen()) {
-        return;
-      }
-
-      // If the replication factor of the source file is already below what is
-      // expected by RAID, then ignore it.
-      if (src.getReplication() < srcReplication) {
         return;
       }
 
