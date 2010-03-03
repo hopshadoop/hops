@@ -59,7 +59,7 @@ public class TestDebugScriptWithLinuxTaskController extends
     TaskAttemptID taskId = new TaskAttemptID(
         new TaskID(jobId,TaskType.MAP, 0), 0);
     TestDebugScript.verifyDebugScriptOutput(taskId, splits[0],
-        "-rw-rw----");
+        taskTrackerSpecialGroup, "-rw-rw----");
     TestDebugScript.cleanupDebugScriptDirs();
   }
 }

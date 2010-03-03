@@ -395,6 +395,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1510. RAID should regenerate parity files if they get deleted.
     (Rodrigo Schmidt via dhruba)
 
+    MAPREDUCE-1421. Fix the LinuxTaskController tests failing on trunk after
+    the commit of MAPREDUCE-1385. (Amareshwari Sriramadasu via vinodkv)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

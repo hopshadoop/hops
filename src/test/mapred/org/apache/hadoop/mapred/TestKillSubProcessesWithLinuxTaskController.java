@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.mapred;
 
+import java.security.PrivilegedExceptionAction;
+
 /**
  * Test killing of child processes spawned by the jobs with LinuxTaskController
  * running the jobs as a user different from the user running the cluster. 
@@ -32,11 +34,16 @@ public class TestKillSubProcessesWithLinuxTaskController extends
       return;
     }
     startCluster();
-    JobConf myConf = getClusterConf();
-    JobTracker jt = mrCluster.getJobTrackerRunner().getJobTracker();
+    taskControllerUser.doAs(new PrivilegedExceptionAction<Object>() {
+      public Object run() throws Exception {
+        JobConf myConf = getClusterConf();
+        JobTracker jt = mrCluster.getJobTrackerRunner().getJobTracker();
 
-    TestKillSubProcesses.mr = mrCluster;
-    TestKillSubProcesses sbProc = new TestKillSubProcesses();
-    sbProc.runTests(myConf, jt);
+        TestKillSubProcesses.mr = mrCluster;
+        TestKillSubProcesses sbProc = new TestKillSubProcesses();
+        sbProc.runTests(myConf, jt);
+        return null;
+      }
+    });
   }
 }

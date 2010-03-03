@@ -104,11 +104,8 @@ public class TestLinuxTaskController extends TestCase {
         conf);
     validateTaskControllerSetup(controller, true);
 
-    // get the current ugi and set the task controller group owner in conf
-    Groups groups = new Groups(new Configuration());
-    String ttGroup = groups.getGroups(
-        UserGroupInformation.getCurrentUser().getUserName()).get(0);
-    conf.set(TTConfig.TT_GROUP, ttGroup);
+    conf.set(TTConfig.TT_GROUP,
+        ClusterWithLinuxTaskController.taskTrackerSpecialGroup);
     // write the task-controller's conf file
     ClusterWithLinuxTaskController.createTaskControllerConf(taskControllerPath,
         conf);
