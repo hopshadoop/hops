@@ -19,10 +19,12 @@ package org.apache.hadoop.mapreduce.lib.input;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.ArrayList;
 
 import junit.framework.TestCase;
 
 import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
@@ -33,6 +35,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
@@ -72,6 +75,24 @@ public class TestCombineFileInputFormat extends TestCase{
     public RecordReader<Text,Text> createRecordReader(InputSplit split, 
         TaskAttemptContext context) throws IOException {
       return null;
+    }
+  }
+
+  /** Dummy class to extend CombineFileInputFormat. It allows 
+   * non-existent files to be passed into the CombineFileInputFormat, allows
+   * for easy testing without having to create real files.
+   */
+  private class DummyInputFormat1 extends DummyInputFormat {
+    @Override
+    protected List<FileStatus> listStatus(JobContext job) throws IOException {
+      Path[] files = getInputPaths(job);
+      List<FileStatus> results = new ArrayList<FileStatus>();
+      for (int i = 0; i < files.length; i++) {
+        Path p = files[i];
+        FileSystem fs = p.getFileSystem(job.getConfiguration());
+        results.add(fs.getFileStatus(p));
+      }
+      return results;
     }
   }
 
@@ -410,6 +431,28 @@ public class TestCombineFileInputFormat extends TestCase{
       assertEquals(fileSplit.getNumPaths(), 6);
       assertEquals(fileSplit.getLocations().length, 1);
       assertEquals(fileSplit.getLocations()[0], hosts3[0]); // should be on r3
+
+      // measure performance when there are multiple pools and
+      // many files in each pool.
+      int numPools = 100;
+      int numFiles = 1000;
+      DummyInputFormat1 inFormat1 = new DummyInputFormat1();
+      for (int i = 0; i < numFiles; i++) {
+        FileInputFormat.setInputPaths(job, file1);
+      }
+      inFormat1.setMinSplitSizeRack(1); // everything is at least rack local
+      final Path dirNoMatch1 = new Path(inDir, "/dirxx");
+      final Path dirNoMatch2 = new Path(inDir, "/diryy");
+      for (int i = 0; i < numPools; i++) {
+        inFormat1.createPool(new TestFilter(dirNoMatch1), 
+                            new TestFilter(dirNoMatch2));
+      }
+      long start = System.currentTimeMillis();
+      splits = inFormat1.getSplits(job);
+      long end = System.currentTimeMillis();
+      System.out.println("Elapsed time for " + numPools + " pools " +
+                         " and " + numFiles + " files is " + 
+                         ((end - start)/1000) + " seconds.");
     } finally {
       if (dfs != null) {
         dfs.shutdown();
