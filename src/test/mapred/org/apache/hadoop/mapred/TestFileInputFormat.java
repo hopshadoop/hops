@@ -18,14 +18,22 @@
 package org.apache.hadoop.mapred;
 
 import java.io.DataOutputStream;
+import java.io.IOException;
 
 import junit.framework.TestCase;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.io.Text;
+
+import com.sun.org.apache.commons.logging.Log;
+import com.sun.org.apache.commons.logging.LogFactory;
 
 public class TestFileInputFormat extends TestCase {
 
@@ -86,4 +94,93 @@ public class TestFileInputFormat extends TestCase {
     }
   }
 
+  
+  final Path root = new Path("/TestFileInputFormat");
+  final Path file1 = new Path(root, "file1");
+  final Path dir1 = new Path(root, "dir1");
+  final Path file2 = new Path(dir1, "file2");
+
+  static final int BLOCKSIZE = 1024;
+  static final byte[] databuf = new byte[BLOCKSIZE];
+
+  private static final Log LOG = LogFactory.getLog(TestFileInputFormat.class);
+  
+  private static final String rack1[] = new String[] {
+    "/r1"
+  };
+  private static final String hosts1[] = new String[] {
+    "host1.rack1.com"
+  };
+  
+  /** Dummy class to extend CombineFileInputFormat*/
+  private class DummyFileInputFormat extends FileInputFormat<Text, Text> {
+    @Override
+    public RecordReader<Text, Text> getRecordReader(InputSplit split,
+        JobConf job, Reporter reporter) throws IOException {
+      return null;
+    }
+  }
+
+  public void testMultiLevelInput() throws IOException {
+    String namenode = null;
+    MiniDFSCluster dfs = null;
+    FileSystem fileSys = null;
+    try {
+      JobConf conf = new JobConf();
+      
+      conf.setBoolean("dfs.replication.considerLoad", false);
+      dfs = new MiniDFSCluster(conf, 1, true, rack1, hosts1);
+      dfs.waitActive();
+
+      namenode = (dfs.getFileSystem()).getUri().getHost() + ":" +
+                 (dfs.getFileSystem()).getUri().getPort();
+
+      fileSys = dfs.getFileSystem();
+      if (!fileSys.mkdirs(dir1)) {
+        throw new IOException("Mkdirs failed to create " + root.toString());
+      }
+      writeFile(conf, file1, (short)1, 1);
+      writeFile(conf, file2, (short)1, 1);
+
+      // split it using a CombinedFile input format
+      DummyFileInputFormat inFormat = new DummyFileInputFormat();
+      inFormat.setInputPaths(conf, root);
+
+      // By default, we don't allow multi-level/recursive inputs
+      boolean exceptionThrown = false;
+      try {
+        InputSplit[] splits = inFormat.getSplits(conf, 1);
+      } catch (Exception e) {
+        exceptionThrown = true;
+      }
+      assertTrue("Exception should be thrown by default for scanning a "
+          + "directory with directories inside.", exceptionThrown);
+
+      // Enable multi-level/recursive inputs
+      conf.setBoolean("mapred.input.dir.recursive", true);
+      InputSplit[] splits = inFormat.getSplits(conf, 1);
+      assertEquals(splits.length, 2);
+      
+    } finally {
+      if (dfs != null) {
+        dfs.shutdown();
+      }
+    }
+  }
+
+  static void writeFile(Configuration conf, Path name,
+      short replication, int numBlocks) throws IOException {
+    FileSystem fileSys = FileSystem.get(conf);
+
+    FSDataOutputStream stm = fileSys.create(name, true,
+                                            conf.getInt("io.file.buffer.size", 4096),
+                                            replication, (long)BLOCKSIZE);
+    for (int i = 0; i < numBlocks; i++) {
+      stm.write(databuf);
+    }
+    stm.close();
+    DFSTestUtil.waitReplication(fileSys, name, replication);
+  }
+
+  
 }

@@ -141,6 +141,30 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
         ReflectionUtils.newInstance(filterClass, conf) : null;
   }
 
+  /**
+   * Add files in the input path recursively into the results.
+   * @param result
+   *          The List to store all files.
+   * @param fs
+   *          The FileSystem.
+   * @param path
+   *          The input path.
+   * @param inputFilter
+   *          The input filter that can be used to filter files/dirs. 
+   * @throws IOException
+   */
+  protected void addInputPathRecursively(List<FileStatus> result,
+      FileSystem fs, Path path, PathFilter inputFilter) 
+      throws IOException {
+    for(FileStatus stat: fs.listStatus(path, inputFilter)) {
+      if (stat.isDir()) {
+        addInputPathRecursively(result, fs, stat.getPath(), inputFilter);
+      } else {
+        result.add(stat);
+      }
+    }          
+  }
+  
   /** List input directories.
    * Subclasses may override to, e.g., select only files matching a regular
    * expression. 
@@ -157,6 +181,9 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
 
     // get tokens for all the required FileSystems..
     TokenCache.obtainTokensForNamenodes(dirs, job);
+    
+    // Whether we need to recursive look into the directory structure
+    boolean recursive = job.getBoolean("mapred.input.dir.recursive", false);
     
     List<FileStatus> result = new ArrayList<FileStatus>();
     List<IOException> errors = new ArrayList<IOException>();
@@ -183,7 +210,11 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
           if (globStat.isDir()) {
             for(FileStatus stat: fs.listStatus(globStat.getPath(),
                 inputFilter)) {
-              result.add(stat);
+              if (recursive && stat.isDir()) {
+                addInputPathRecursively(result, fs, stat.getPath(), inputFilter);
+              } else {
+                result.add(stat);
+              }
             }          
           } else {
             result.add(globStat);
