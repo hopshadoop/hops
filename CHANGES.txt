@@ -409,6 +409,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1520. Fix TestMiniMRLocalFS failure caused by regression in
     getting user working dir. (Amareshwari Sriramadasu via cdouglas)
 
+    MAPREDUCE-1512. RAID uses HarFileSystem directly instead of
+    FileSystem.get (Rodrigo Schmidt via dhruba)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
