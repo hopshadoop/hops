@@ -406,6 +406,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1421. Fix the LinuxTaskController tests failing on trunk after
     the commit of MAPREDUCE-1385. (Amareshwari Sriramadasu via vinodkv)
 
+    MAPREDUCE-1520. Fix TestMiniMRLocalFS failure caused by regression in
+    getting user working dir. (Amareshwari Sriramadasu via cdouglas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

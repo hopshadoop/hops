@@ -199,8 +199,6 @@ class Child {
 
         // Initiate Java VM metrics
         JvmMetrics.init(task.getPhase().toString(), job.getSessionId());
-        // use job-specified working directory
-        FileSystem.get(job).setWorkingDirectory(job.getWorkingDirectory());
         LOG.debug("Creating remote user to execute task: " + job.get("user.name"));
         childUGI = UserGroupInformation.createRemoteUser(job.get("user.name"));
         // Add tokens to new user so that it may execute its task correctly.
@@ -214,6 +212,8 @@ class Child {
           @Override
           public Object run() throws Exception {
             try {
+              // use job-specified working directory
+              FileSystem.get(job).setWorkingDirectory(job.getWorkingDirectory());
               taskFinal.run(job, umbilical);             // run the task
             } finally {
               TaskLog.syncLogs(firstTaskid, taskid, isCleanup);
