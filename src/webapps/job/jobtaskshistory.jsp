@@ -22,6 +22,7 @@
   import="javax.servlet.http.*"
   import="java.io.*"
   import="java.util.*"
+  import="org.apache.hadoop.http.HtmlQuoting"
   import="org.apache.hadoop.mapreduce.TaskAttemptID"
   import="org.apache.hadoop.mapreduce.TaskID"
   import="org.apache.hadoop.mapred.*"
@@ -39,10 +40,10 @@
 %>
 
 <%	
-  String jobid = request.getParameter("jobid");
+  String jobid = JobID.forName(request.getParameter("jobid")).toString();
   String logFile = request.getParameter("logFile");
-  String taskStatus = request.getParameter("status"); 
-  String taskType = request.getParameter("taskType"); 
+  String taskStatus = request.getParameter("status");
+  String taskType = request.getParameter("taskType");
   
   FileSystem fs = (FileSystem) application.getAttribute("fileSys");
   JobHistoryParser.JobInfo job = JSPUtil.getJobInfo(request, fs);
@@ -80,7 +81,7 @@
     out.print("<td>" + StringUtils.getFormattedTimeWithDiff(dateFormat, 
           attempt.getFinishTime(),
           attempt.getStartTime() ) + "</td>");
-    out.print("<td>" + attempt.getError() + "</td>");
+    out.print("<td>"+ HtmlQuoting.quoteHtmlChars(attempt.getError()) +"</td>");
     out.print("</tr>"); 
   }
 %>

@@ -23,6 +23,7 @@
   import="java.io.*"
   import="java.util.*"
   import="org.apache.hadoop.fs.*"
+  import="org.apache.hadoop.http.HtmlQuoting"
   import="org.apache.hadoop.mapreduce.TaskAttemptID"
   import="org.apache.hadoop.mapreduce.TaskID"
   import="org.apache.hadoop.mapreduce.Counter"
@@ -38,7 +39,7 @@
 
 <%! static SimpleDateFormat dateFormat = new SimpleDateFormat("d-MMM-yyyy HH:mm:ss") ; %>
 <%
-    String jobid = request.getParameter("jobid");
+    String jobid = JobID.forName(request.getParameter("jobid")).toString();
     String logFile = request.getParameter("logFile");
 
     Path jobFile = new Path(logFile);
@@ -58,8 +59,8 @@
 
 <h2>Hadoop Job <%=jobid %> on <a href="jobhistory.jsp">History Viewer</a></h2>
 
-<b>User: </b> <%=job.getUsername() %><br/> 
-<b>JobName: </b> <%=job.getJobname() %><br/> 
+<b>User: </b> <%=HtmlQuoting.quoteHtmlChars(job.getUsername()) %><br/>
+<b>JobName: </b> <%=HtmlQuoting.quoteHtmlChars(job.getJobname()) %><br/>
 <b>JobConf: </b> <a href="jobconf_history.jsp?jobid=<%=jobid%>&jobLogDir=<%=new Path(logFile).getParent().toString()%>&jobUniqueString=<%=jobUniqueString%>"> 
                  <%=job.getJobConfPath() %></a><br/> 
 <b>Submitted At: </b> <%=StringUtils.getFormattedTimeWithDiff(dateFormat, job.getSubmitTime(), 0 )  %><br/> 
@@ -173,11 +174,12 @@
        if (isFirst) {
          isFirst = false;
 %>
-         <td rowspan="<%=totalGroup.size()%>"><%=totalGroup.getDisplayName()%></td>
+         <td rowspan="<%=totalGroup.size()%>">
+         <%=HtmlQuoting.quoteHtmlChars(totalGroup.getDisplayName())%></td>
 <%
        }
 %>
-       <td><%=counter.getDisplayName()%></td>
+       <td><%=HtmlQuoting.quoteHtmlChars(counter.getDisplayName())%></td>
        <td align="right"><%=mapValue%></td>
        <td align="right"><%=reduceValue%></td>
        <td align="right"><%=totalValue%></td>

@@ -24,6 +24,7 @@
   import="java.io.*"
   import="java.util.*"
   import="java.text.DecimalFormat"
+  import="org.apache.hadoop.http.HtmlQuoting"
   import="org.apache.hadoop.mapred.*"
   import="org.apache.hadoop.mapreduce.*"
   import="org.apache.hadoop.util.*"
@@ -113,7 +114,6 @@
 <div id="quicklinks">
   <a href="#quicklinks" onclick="toggle('quicklinks-list'); return false;">Quick Links</a>
   <ul id="quicklinks-list">
-    <li><a href="#scheduling_info">Scheduling Info</a></li>
     <li><a href="#running_jobs">Running Jobs</a></li>
     <li><a href="#retired_jobs">Retired Jobs</a></li>
     <li><a href="#local_logs">Local Logs</a></li>

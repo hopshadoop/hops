@@ -36,6 +36,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.http.HtmlQuoting;
 import org.apache.hadoop.mapreduce.JobACL;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser.JobInfo;
@@ -270,7 +271,7 @@ class JSPUtil {
 
     boolean isModifiable = label.equals("Running") &&
         privateActionsAllowed(conf);
-    StringBuffer sb = new StringBuffer();
+    StringBuilder sb = new StringBuilder();
     
     sb.append("<table border=\"1\" cellpadding=\"5\" cellspacing=\"0\">\n");
 
@@ -324,9 +325,10 @@ class JSPUtil {
         int desiredReduces = job.desiredReduces();
         int completedMaps = job.finishedMaps();
         int completedReduces = job.finishedReduces();
-        String name = profile.getJobName();
+        String name = HtmlQuoting.quoteHtmlChars(profile.getJobName());
         String jobpri = job.getPriority().toString();
-        String schedulingInfo = job.getStatus().getSchedulingInfo();
+        String schedulingInfo =
+          HtmlQuoting.quoteHtmlChars(job.getStatus().getSchedulingInfo());
 
         if (isModifiable) {
           sb.append("<tr><td><input TYPE=\"checkbox\" " +
@@ -341,7 +343,8 @@ class JSPUtil {
             + "\"><a href=\"jobdetails.jsp?jobid=" + jobid + "&refresh="
             + refresh + "\">" + jobid + "</a></td>" + "<td id=\"priority_"
             + rowId + "\">" + jobpri + "</td>" + "<td id=\"user_" + rowId
-            + "\">" + profile.getUser() + "</td>" + "<td id=\"name_" + rowId
+            + "\">" + HtmlQuoting.quoteHtmlChars(profile.getUser()) +
+              "</td>" + "<td id=\"name_" + rowId
             + "\">" + ("".equals(name) ? "&nbsp;" : name) + "</td>" + "<td>"
             + StringUtils.formatPercent(status.mapProgress(), 2)
             + ServletUtil.percentageGraph(status.mapProgress() * 100, 80)
@@ -369,7 +372,7 @@ class JSPUtil {
   public static String generateRetiredJobTable(JobTracker tracker, int rowId) 
     throws IOException {
 
-    StringBuffer sb = new StringBuffer();
+    StringBuilder sb = new StringBuilder();
     sb.append("<table border=\"1\" cellpadding=\"5\" cellspacing=\"0\">\n");
 
     Iterator<JobStatus> iterator = 
@@ -404,8 +407,8 @@ class JSPUtil {
             
             "<td id=\"priority_" + rowId + "\">" + 
               status.getJobPriority().toString() + "</td>" +
-            "<td id=\"user_" + rowId + "\">" + status.getUsername() + "</td>" +
-            "<td id=\"name_" + rowId + "\">" + status.getJobName() + "</td>" +
+            "<td id=\"user_" + rowId + "\">" + HtmlQuoting.quoteHtmlChars(status.getUsername()) + "</td>" +
+            "<td id=\"name_" + rowId + "\">" + HtmlQuoting.quoteHtmlChars(status.getJobName()) + "</td>" +
             "<td>" + JobStatus.getJobRunState(status.getRunState()) + "</td>" +
             "<td>" + new Date(status.getStartTime()) + "</td>" +
             "<td>" + new Date(status.getFinishTime()) + "</td>" +
@@ -418,7 +421,7 @@ class JSPUtil {
             + ServletUtil.percentageGraph(status.reduceProgress() * 100, 80) + 
             "</td>" +
             
-            "<td>" + status.getSchedulingInfo() + "</td>" +
+            "<td>" + HtmlQuoting.quoteHtmlChars(status.getSchedulingInfo()) + "</td>" +
             
             "</tr>\n");
         rowId++;

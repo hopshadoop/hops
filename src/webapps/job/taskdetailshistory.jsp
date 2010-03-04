@@ -22,6 +22,7 @@
   import="javax.servlet.http.*"
   import="java.io.*"
   import="java.util.*"
+  import="org.apache.hadoop.http.HtmlQuoting"
   import="org.apache.hadoop.mapred.*"
   import="org.apache.hadoop.fs.*"
   import="org.apache.hadoop.util.*"
@@ -38,7 +39,7 @@
 %>
 
 <%	
-  String jobid = request.getParameter("jobid");
+  String jobid = JobID.forName(request.getParameter("jobid")).toString();
   String logFile = request.getParameter("logFile");
   String taskid = request.getParameter("taskid"); 
   FileSystem fs = (FileSystem) application.getAttribute("fileSys");
@@ -105,7 +106,8 @@
               taskAttempt.getFinishTime(),
               taskAttempt.getStartTime()) + "</td>"); 
     out.print("<td>" + taskAttempt.getHostname() + "</td>");
-    out.print("<td>" + taskAttempt.getError() + "</td>");
+    out.print("<td>" + HtmlQuoting.quoteHtmlChars(taskAttempt.getError()) +
+              "</td>");
 
     // Print task log urls
     out.print("<td>");	

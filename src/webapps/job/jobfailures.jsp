@@ -23,6 +23,7 @@
   import="javax.servlet.http.*"
   import="java.io.*"
   import="java.util.*"
+  import="org.apache.hadoop.http.HtmlQuoting"
   import="org.apache.hadoop.mapred.*"
   import="org.apache.hadoop.mapred.JSPUtil.JobWithViewAccessCheck"
   import="org.apache.hadoop.mapreduce.TaskType"
@@ -68,7 +69,7 @@
           out.print("&nbsp;");
         } else {
           for(int j = 0 ; j < failures.length ; j++){
-            out.print(failures[j]);
+            out.print(HtmlQuoting.quoteHtmlChars(failures[j]));
             if (j < (failures.length - 1)) {
               out.print("\n-------\n");
             }
@@ -120,7 +121,8 @@
       includeMap = true;
       includeReduce = true;
     } else {
-      out.print("<b>Kind " + kind + " not supported.</b><br>\n");
+      out.print("<b>Kind " + kind +
+          " not supported.</b><br>\n");
       return;
     }
     

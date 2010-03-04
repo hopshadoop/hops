@@ -22,6 +22,7 @@
   import="javax.servlet.http.*"
   import="java.io.*"
   import="java.util.*"
+  import="org.apache.hadoop.http.HtmlQuoting"
   import="org.apache.hadoop.mapred.*"
   import="org.apache.hadoop.fs.*"
   import="org.apache.hadoop.util.*"
@@ -36,7 +37,7 @@
 %>
 <html><body>
 <%
-  String jobid = request.getParameter("jobid");
+  String jobid = JobID.forName(request.getParameter("jobid")).toString();
   String logFile = request.getParameter("logFile");
   String numTasks = request.getParameter("numTasks");
   int showTasks = 10 ; 
@@ -47,8 +48,8 @@
   JobHistoryParser.JobInfo job = JSPUtil.getJobInfo(request, fs);
 %>
 <h2>Hadoop Job <a href="jobdetailshistory.jsp?jobid=<%=jobid%>&&logFile=<%=logFile%>"><%=jobid %> </a></h2>
-<b>User : </b> <%=job.getUsername() %><br/> 
-<b>JobName : </b> <%=job.getJobname() %><br/> 
+<b>User : </b> <%=HtmlQuoting.quoteHtmlChars(job.getUsername()) %><br/>
+<b>JobName : </b> <%=HtmlQuoting.quoteHtmlChars(job.getJobname()) %><br/>
 <b>JobConf : </b> <%=job.getJobConfPath() %><br/> 
 <b>Submitted At : </b> <%=StringUtils.getFormattedTimeWithDiff(dateFormat, job.getSubmitTime(), 0 ) %><br/> 
 <b>Launched At : </b> <%=StringUtils.getFormattedTimeWithDiff(dateFormat, job.getLaunchTime(), job.getSubmitTime()) %><br/>

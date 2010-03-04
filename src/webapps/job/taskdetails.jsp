@@ -24,6 +24,7 @@
   import="java.io.*"
   import="java.lang.String"
   import="java.util.*"
+  import="org.apache.hadoop.http.HtmlQuoting"
   import="org.apache.hadoop.mapred.*"
   import="org.apache.hadoop.mapred.JSPUtil.JobWithViewAccessCheck"
   import="org.apache.hadoop.util.*"
@@ -271,7 +272,7 @@
           out.print("&nbsp;");
         } else {
           for(int j = 0 ; j < failures.length ; j++){
-            out.print(failures[j]);
+            out.print(HtmlQuoting.quoteHtmlChars(failures[j]));
             if (j < (failures.length - 1)) {
               out.print("\n-------\n");
             }

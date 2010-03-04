@@ -21,6 +21,7 @@
   import="javax.servlet.http.*"
   import="java.util.Vector"
   import="java.util.Collection"
+  import="org.apache.hadoop.http.HtmlQuoting"
   import="org.apache.hadoop.mapred.*"
   import="org.apache.hadoop.util.StringUtils"
   import="org.apache.hadoop.util.ServletUtil"
@@ -30,8 +31,7 @@
   JobTracker tracker = (JobTracker) application.getAttribute("job.tracker");
   String trackerName = StringUtils.simpleHostname(tracker
       .getJobTrackerMachine());
-  String queueName = StringUtils.escapeHTML(request
-      .getParameter("queueName"));
+  String queueName = request.getParameter("queueName");
   TaskScheduler scheduler = tracker.getTaskScheduler();
   JobQueueInfo schedInfo = tracker.getQueueInfo(queueName);
 %>
@@ -54,7 +54,8 @@
   <a href="jobtracker.jsp"><%=trackerName%></a>
 </h1>
 <div>
-Scheduling Information : <%=schedulingInfoString.replaceAll("\n", "<br/>")%>
+Scheduling Information :
+<%=HtmlQuoting.quoteHtmlChars(schedulingInfoString).replaceAll("\n", "<br/>")%>
 </div>
 <hr/>
 <%

@@ -198,6 +198,8 @@ Trunk (unreleased changes)
     MAPREDUCE-1423. Improve performance of CombineFileInputFormat when multiple
     pools are configured. (Dhruba Borthakur via zshao)
 
+    MAPREDUCE-1454. Quote user supplied strings in Tracker servlets. (cdouglas)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
