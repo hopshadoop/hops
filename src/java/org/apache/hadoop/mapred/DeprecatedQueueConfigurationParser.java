@@ -95,10 +95,11 @@ class DeprecatedQueueConfigurationParser extends QueueConfigurationParser {
       return false;
     } else {
       LOG.warn(
-        "Configuring \"mapred.queue.names\" in mapred-site.xml or " +
-          "hadoop-site.xml is deprecated. Configure " +
-          "queue hierarchy  in " +
-          QUEUE_CONF_FILE_NAME);
+          "Configuring \"" + MAPRED_QUEUE_NAMES_KEY
+          + "\" in mapred-site.xml or "
+          + "hadoop-site.xml is deprecated and will overshadow "
+          + QUEUE_CONF_FILE_NAME + ". Remove this property and configure "
+          + "queue hierarchy in " + QUEUE_CONF_FILE_NAME);
       // store queues so we can check if ACLs are also configured
       // in the deprecated files.
       queues = conf.getStrings(MAPRED_QUEUE_NAMES_KEY);

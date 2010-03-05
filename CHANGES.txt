@@ -203,6 +203,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1408. Add customizable job submission policies to Gridmix. (Rahul
     Singh via cdouglas)
 
+    MAPREDUCE-1527. Better warning logged when mapred.queue.names is
+    overshadowed by mapred-queues.xml. (Hong Tang via acmurthy) 
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
