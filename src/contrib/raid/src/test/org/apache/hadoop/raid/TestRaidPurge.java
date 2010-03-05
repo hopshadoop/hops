@@ -171,8 +171,8 @@ public class TestRaidPurge extends TestCase {
     try {
       for (long blockSize : blockSizes) {
         for (long stripeLength : stripeLengths) {
-             doTestPurge(iter, targetReplication, metaReplication,
-                         stripeLength, blockSize, numBlock);
+          doTestPurge(iter, targetReplication, metaReplication,
+              stripeLength, blockSize, numBlock);
            iter++;
         }
       }
@@ -197,12 +197,10 @@ public class TestRaidPurge extends TestCase {
     Path file1 = new Path(dir + "/file" + iter);
     RaidNode cnode = null;
     try {
-      Path userDir = new Path("/destraid/user/dhruba");
-      Path recover1 = new Path("/destraid/" + file1 + ".recovered");
       Path destPath = new Path("/destraid/user/dhruba/raidtest");
       fileSys.delete(dir, true);
       fileSys.delete(destPath, true);
-      long crc1 = TestRaidNode.createOldFile(fileSys, file1, 1, numBlock, blockSize);
+      TestRaidNode.createOldFile(fileSys, file1, 1, numBlock, blockSize);
       LOG.info("doTestPurge created test files for iteration " + iter);
 
       // create an instance of the RaidNode
@@ -254,53 +252,12 @@ public class TestRaidPurge extends TestCase {
                  fileSys.delete(file1, true));
       LOG.info("deleted file " + file1);
 
-      // wait till parity file is automatically deleted
-      while (true) {
-        listPaths = fileSys.listStatus(destPath);
-        int count = 0;
-        if (listPaths != null && listPaths.length == 1) {
-          for (FileStatus s : listPaths) {
-            LOG.info("doTestPurge found path " + s.getPath());
-            if (!s.getPath().toString().endsWith(".tmp")) {
-              count++;
-            }
-          }
-        }
-	if (count == 0) {
-          break;
-        }
-        LOG.info("doTestPurge waiting for parity files to be removed. Found " + 
-                 (listPaths == null ? "none" : listPaths.length));
+      // wait till parity file and directory are automatically deleted
+      while (fileSys.exists(destPath)) {
+        LOG.info("doTestPurge waiting for parity files to be removed.");
         Thread.sleep(1000);                  // keep waiting
       }
 
-      // verify that if we delete the directory itself, then the correspoding
-      // directory in the parity space is deleted too.
-      assertTrue("The directory " + userDir + " should have one entry", 
-                 fileSys.listStatus(userDir).length == 1);
-      assertTrue("Unable to delete original directory " + dir,
-                 fileSys.delete(dir, true));
-      LOG.info("deleted dir " + dir);
-
-      // wait till parity directory is automatically deleted
-      while (true) {
-        listPaths = fileSys.listStatus(userDir);
-        int count = 0;
-        if (listPaths != null) {
-          for (FileStatus s : listPaths) {
-            LOG.info("doTestPurge found path " + s.getPath());
-            count++;
-          }
-        }
-	if (count == 0) {
-          break;
-        }
-        LOG.info("doTestPurge waiting for parity dir to be removed. Found " + 
-                 (listPaths == null ? "none" : listPaths.length));
-        Thread.sleep(1000);                  // keep waiting
-      }
-     
-      
     } catch (Exception e) {
       LOG.info("doTestPurge Exception " + e +
                                           StringUtils.stringifyException(e));

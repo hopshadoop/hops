@@ -422,6 +422,9 @@ Trunk (unreleased changes)
     cleaning up, essentially to avoid following links.
     (Ravi Gummadi via yhemanth)
 
+    MAPREDUCE-1518. RaidNode does not run the deletion check on the
+    directory that stores the parity files.  (Rodrigo Schmidt via dhruba)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

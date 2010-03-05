@@ -1226,6 +1226,28 @@ public class RaidNode implements RaidProtocol {
                   destPrefix + " as its prefix.");
         return;
       }
+      
+      if (dest.isDir()) {
+        FileStatus[] files = null;
+        files = destFs.listStatus(destPath);
+        if (files != null) {
+          for (FileStatus one:files) {
+            recursePurge(srcFs, destFs, destPrefix, one);
+          }
+        }
+        files = destFs.listStatus(destPath);
+        if (files == null || files.length == 0){
+          boolean done = destFs.delete(destPath,false);
+          if (done) {
+            LOG.info("Purged directory " + destPath );
+          }
+          else {
+            LOG.info("Unable to purge directory " + destPath);
+          }
+        }
+        return; // the code below does the file checking
+      }
+      
       String src = destStr.replaceFirst(destPrefix, "");
       
       // if the source path does not exist or the parity file has been HARed, 
@@ -1236,20 +1258,9 @@ public class RaidNode implements RaidProtocol {
           !destPath.equals(getParityFile(dstPath,srcPath).getPath())) {
         boolean done = destFs.delete(destPath, false);
         if (done) {
-          LOG.info("Purged path " + destPath );
+          LOG.info("Purged file " + destPath );
         } else {
-          LOG.info("Unable to purge path " + destPath );
-        }
-        return;
-      }
-      if (!dest.isDir()) {
-        return;
-      }
-      FileStatus[] files = null;
-      files = destFs.listStatus(destPath);
-      if (files != null) {
-        for (FileStatus one:files) {
-          recursePurge(srcFs, destFs, destPrefix, one);
+          LOG.info("Unable to purge file " + destPath );
         }
       }
     } 
