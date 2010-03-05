@@ -23,65 +23,94 @@ import java.io.IOException;
 
 import junit.framework.TestCase;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.mapreduce.JobContext;
 
+/**
+ * Verifies if TaskRunner.SetupWorkDir() is cleaning up files/dirs pointed
+ * to by symlinks under work dir.
+ */
 public class TestSetupWorkDir extends TestCase {
-  private static final Log LOG =
-    LogFactory.getLog(TestSetupWorkDir.class);
 
   /**
-   * Create a file in the given dir and set permissions r_xr_xr_x sothat no one
-   * can delete it directly(without doing chmod).
-   * Creates dir/subDir and dir/subDir/file
+   * Creates 1 subdirectory and 1 file under dir2. Creates 1 subdir, 1 file,
+   * 1 symlink to a dir and a symlink to a file under dir1.
+   * Creates dir1/subDir, dir1/file, dir2/subDir, dir2/file,
+   * dir1/symlinkSubDir->dir2/subDir, dir1/symlinkFile->dir2/file.
    */
-  static void createFileAndSetPermissions(JobConf jobConf, Path dir)
+  static void createSubDirsAndSymLinks(JobConf jobConf, Path dir1, Path dir2)
        throws IOException {
-    Path subDir = new Path(dir, "subDir");
     FileSystem fs = FileSystem.getLocal(jobConf);
+    createSubDirAndFile(fs, dir1);
+    createSubDirAndFile(fs, dir2);
+    // now create symlinks under dir1 that point to file/dir under dir2
+    FileUtil.symLink(dir2+"/subDir", dir1+"/symlinkSubDir");
+    FileUtil.symLink(dir2+"/file", dir1+"/symlinkFile");
+  }
+
+  static void createSubDirAndFile(FileSystem fs, Path dir) throws IOException {
+    Path subDir = new Path(dir, "subDir");
     fs.mkdirs(subDir);
-    Path p = new Path(subDir, "file");
+    Path p = new Path(dir, "file");
     DataOutputStream out = fs.create(p);
     out.writeBytes("dummy input");
-    out.close();
-    // no write permission for subDir and subDir/file
-    try {
-      int ret = 0;
-      if((ret = FileUtil.chmod(subDir.toUri().getPath(), "a=rx", true)) != 0) {
-        LOG.warn("chmod failed for " + subDir + ";retVal=" + ret);
-      }
-    } catch(InterruptedException e) {
-      LOG.warn("Interrupted while doing chmod for " + subDir);
+    out.close();    
+  }
+
+  void createEmptyDir(FileSystem fs, Path dir) throws IOException {
+    if (fs.exists(dir)) {
+      fs.delete(dir, true);
+    }
+    if (!fs.mkdirs(dir)) {
+      throw new IOException("Unable to create directory " + dir);
     }
   }
 
   /**
-   * Validates if setupWorkDir is properly cleaning up contents of workDir.
+   * Validates if TaskRunner.setupWorkDir() is properly cleaning up the
+   * contents of workDir and creating tmp dir under it (even though workDir
+   * contains symlinks to files/directories).
    */
   public void testSetupWorkDir() throws IOException {
     Path rootDir = new Path(System.getProperty("test.build.data",  "/tmp"),
                             "testSetupWorkDir");
     Path myWorkDir = new Path(rootDir, "./work");
+    Path myTargetDir = new Path(rootDir, "./tmp");
     JobConf jConf = new JobConf();
     FileSystem fs = FileSystem.getLocal(jConf);
-    if (fs.exists(myWorkDir)) {
-      fs.delete(myWorkDir, true);
-    }
-    if (!fs.mkdirs(myWorkDir)) {
-      throw new IOException("Unable to create workDir " + myWorkDir);
-    }
+    createEmptyDir(fs, myWorkDir);
+    createEmptyDir(fs, myTargetDir);
 
-    // create {myWorkDir}/subDir/file and set 555 perms for subDir and file
-    createFileAndSetPermissions(jConf, myWorkDir);
+    // create subDirs and symlinks under work dir
+    createSubDirsAndSymLinks(jConf, myWorkDir, myTargetDir);
 
-    TaskRunner.deleteDirContents(jConf, new File(myWorkDir.toUri().getPath()));
-    
-    assertTrue("Contents of " + myWorkDir + " are not cleaned up properly.",
-        fs.listStatus(myWorkDir).length == 0);
-    
+    assertTrue("Did not create symlinks/files/dirs properly. Check "
+        + myWorkDir + " and " + myTargetDir,
+        (fs.listStatus(myWorkDir).length == 4) &&
+        (fs.listStatus(myTargetDir).length == 2));
+
+    // let us disable creation of symlinks in setupWorkDir()
+    jConf.set(JobContext.CACHE_SYMLINK, "no");
+
+    // Deletion of myWorkDir should not affect contents of myTargetDir.
+    // myTargetDir is like $user/jobcache/distcache
+    TaskRunner.setupWorkDir(jConf, new File(myWorkDir.toUri().getPath()));
+
+    // Contents of myWorkDir should be cleaned up and a tmp dir should be
+    // created under myWorkDir
+    assertTrue(myWorkDir + " is not cleaned up properly.",
+        fs.exists(myWorkDir) && (fs.listStatus(myWorkDir).length == 1));
+
+    // Make sure that the dir under myWorkDir is tmp
+    assertTrue(fs.listStatus(myWorkDir)[0].getPath().toUri().getPath()
+               .toString().equals(myWorkDir.toString() + "/tmp"));
+
+    // Make sure that myTargetDir is not changed/deleted
+    assertTrue("Dir " + myTargetDir + " seem to be modified.",
+        fs.exists(myTargetDir) && (fs.listStatus(myTargetDir).length == 2));
+
     // cleanup
     fs.delete(rootDir, true);
   }

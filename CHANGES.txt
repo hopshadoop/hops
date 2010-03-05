@@ -412,6 +412,10 @@ Trunk (unreleased changes)
     MAPREDUCE-1512. RAID uses HarFileSystem directly instead of
     FileSystem.get (Rodrigo Schmidt via dhruba)
 
+    MAPREDUCE-1435. Fix symlink handling in task work directory when
+    cleaning up, essentially to avoid following links.
+    (Ravi Gummadi via yhemanth)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
