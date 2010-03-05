@@ -54,6 +54,8 @@ import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.log4j.Level;
 
 public class TestGridmixSubmission {
+  static GridmixJobSubmissionPolicy policy = GridmixJobSubmissionPolicy.REPLAY;
+
   {
     ((Log4JLogger)LogFactory.getLog("org.apache.hadoop.mapred.gridmix")
         ).getLogger().setLevel(Level.DEBUG);
@@ -96,8 +98,8 @@ public class TestGridmixSubmission {
     private final int expected;
     private final BlockingQueue<Job> retiredJobs;
 
-    public TestMonitor(int expected) {
-      super();
+    public TestMonitor(int expected, Statistics stats) {
+      super(stats);
       this.expected = expected;
       retiredJobs = new LinkedBlockingQueue<Job>();
     }
@@ -276,16 +278,18 @@ public class TestGridmixSubmission {
 
   static class DebugGridmix extends Gridmix {
 
-    private DebugJobFactory factory;
+    private JobFactory factory;
     private TestMonitor monitor;
 
     public void checkMonitor() throws Exception {
-      monitor.verify(factory.getSubmitted());
+      monitor.verify(((DebugJobFactory.Debuggable)factory).getSubmitted());
     }
 
     @Override
-    protected JobMonitor createJobMonitor() {
-      monitor = new TestMonitor(NJOBS + 1); // include data generation job
+    protected JobMonitor createJobMonitor(Statistics stats) {
+      Configuration conf = new Configuration();
+      conf.set(GridmixJobSubmissionPolicy.JOB_SUBMISSION_POLICY, policy.name());
+      monitor = new TestMonitor(NJOBS + 1, stats);
       return monitor;
     }
 
@@ -293,16 +297,42 @@ public class TestGridmixSubmission {
     protected JobFactory createJobFactory(JobSubmitter submitter,
         String traceIn, Path scratchDir, Configuration conf,
         CountDownLatch startFlag) throws IOException {
-      factory =
-        new DebugJobFactory(submitter, scratchDir, NJOBS, conf, startFlag);
+      factory = DebugJobFactory.getFactory(
+        submitter, scratchDir, NJOBS, conf, startFlag);
       return factory;
     }
   }
 
   @Test
-  public void testSubmit() throws Exception {
+  public void testReplaySubmit() throws Exception {
+    policy = GridmixJobSubmissionPolicy.REPLAY;
+    System.out.println(" Replay started at " + System.currentTimeMillis());
+    doSubmission();
+    System.out.println(" Replay ended at " + System.currentTimeMillis());
+  }
+
+  @Test
+  public void testStressSubmit() throws Exception {
+    policy = GridmixJobSubmissionPolicy.STRESS;
+    System.out.println(" Stress started at " + System.currentTimeMillis());
+    doSubmission();
+    System.out.println(" Stress ended at " + System.currentTimeMillis());
+  }
+
+  @Test
+  public void testSerialSubmit() throws Exception {
+    policy = GridmixJobSubmissionPolicy.SERIAL;
+    System.out.println("Serial started at " + System.currentTimeMillis());
+    doSubmission();
+    System.out.println("Serial ended at " + System.currentTimeMillis());
+  }
+
+  public void doSubmission() throws Exception {
     final Path in = new Path("foo").makeQualified(dfs);
     final Path out = new Path("/gridmix").makeQualified(dfs);
+    final Path root = new Path("/user");
+    Configuration conf = null;
+    try{
     final String[] argv = {
       "-D" + FilePool.GRIDMIX_MIN_FILE + "=0",
       "-D" + Gridmix.GRIDMIX_OUT_DIR + "=" + out,
@@ -311,11 +341,19 @@ public class TestGridmixSubmission {
       "-" // ignored by DebugGridmix
     };
     DebugGridmix client = new DebugGridmix();
-    final Configuration conf = mrCluster.createJobConf();
+    conf = mrCluster.createJobConf();
+    conf.set(GridmixJobSubmissionPolicy.JOB_SUBMISSION_POLICY,policy.name());
     //conf.setInt(Gridmix.GRIDMIX_KEY_LEN, 2);
     int res = ToolRunner.run(conf, client, argv);
     assertEquals("Client exited with nonzero status", 0, res);
     client.checkMonitor();
+    } catch (Exception e) {
+      e.printStackTrace();
+    } finally {
+      in.getFileSystem(conf).delete(in, true);
+      out.getFileSystem(conf).delete(out, true);
+      root.getFileSystem(conf).delete(root, true);
+    }
   }
 
 }

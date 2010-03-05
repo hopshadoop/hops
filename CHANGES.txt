@@ -200,6 +200,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-1454. Quote user supplied strings in Tracker servlets. (cdouglas)
 
+    MAPREDUCE-1408. Add customizable job submission policies to Gridmix. (Rahul
+    Singh via cdouglas)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band

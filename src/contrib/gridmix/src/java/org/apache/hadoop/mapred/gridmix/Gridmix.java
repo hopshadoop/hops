@@ -32,7 +32,7 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
-
+import org.apache.hadoop.tools.rumen.ZombieJobProducer;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -82,6 +82,7 @@ public class Gridmix extends Configured implements Tool {
   private JobFactory factory;
   private JobSubmitter submitter;
   private JobMonitor monitor;
+  private Statistics statistics;
 
   // Shutdown hook
   private final Shutdown sdh = new Shutdown();
@@ -129,20 +130,38 @@ public class Gridmix extends Configured implements Tool {
    */
   private void startThreads(Configuration conf, String traceIn, Path ioPath,
       Path scratchDir, CountDownLatch startFlag) throws IOException {
-    monitor = createJobMonitor();
-    submitter = createJobSubmitter(monitor,
-        conf.getInt(GRIDMIX_SUB_THR,
-          Runtime.getRuntime().availableProcessors() + 1),
-        conf.getInt(GRIDMIX_QUE_DEP, 5),
-        new FilePool(conf, ioPath));
-    factory = createJobFactory(submitter, traceIn, scratchDir, conf, startFlag);
-    monitor.start();
-    submitter.start();
-    factory.start();
-  }
+    try {
+      GridmixJobSubmissionPolicy policy = GridmixJobSubmissionPolicy.getPolicy(
+        conf, GridmixJobSubmissionPolicy.STRESS);
+      LOG.info(" Submission policy is " + policy.name());
+      statistics = new Statistics(conf, policy.getPollingInterval(), startFlag);
+      monitor = createJobMonitor(statistics);
+      int noOfSubmitterThreads = policy.name().equals(
+        GridmixJobSubmissionPolicy.SERIAL.name()) ? 1 :
+        Runtime.getRuntime().availableProcessors() + 1;
 
-  protected JobMonitor createJobMonitor() throws IOException {
-    return new JobMonitor();
+      submitter = createJobSubmitter(
+        monitor, conf.getInt(
+          GRIDMIX_SUB_THR, noOfSubmitterThreads),
+        conf.getInt(GRIDMIX_QUE_DEP, 5), new FilePool(conf, ioPath));
+      factory = createJobFactory(
+        submitter, traceIn, scratchDir, conf, startFlag);
+      if (policy.name().equals(GridmixJobSubmissionPolicy.SERIAL.name())) {
+        statistics.addJobStatsListeners(factory);
+      } else {
+        statistics.addClusterStatsObservers(factory);
+      }
+
+      monitor.start();
+      submitter.start();
+    }catch(Exception e) {
+      LOG.error(" Exception at start " ,e);
+      throw new IOException(e);
+    }
+   }
+
+  protected JobMonitor createJobMonitor(Statistics stats) throws IOException {
+    return new JobMonitor(stats);
   }
 
   protected JobSubmitter createJobSubmitter(JobMonitor monitor, int threads,
@@ -153,9 +172,11 @@ public class Gridmix extends Configured implements Tool {
   protected JobFactory createJobFactory(JobSubmitter submitter, String traceIn,
       Path scratchDir, Configuration conf, CountDownLatch startFlag)
       throws IOException {
-    return new JobFactory(submitter, createInputStream(traceIn), scratchDir,
-        conf, startFlag);
-  }
+     return GridmixJobSubmissionPolicy.getPolicy(
+       conf, GridmixJobSubmissionPolicy.STRESS).createJobFactory(
+       submitter, new ZombieJobProducer(
+         createInputStream(
+           traceIn), null), scratchDir, conf, startFlag);  }
 
   public int run(String[] argv) throws IOException, InterruptedException {
     if (argv.length < 2) {
@@ -196,6 +217,8 @@ public class Gridmix extends Configured implements Tool {
         }
         // scan input dir contents
         submitter.refreshFilePool();
+        factory.start();
+        statistics.start();
       } catch (Throwable e) {
         LOG.error("Startup failed", e);
         if (factory != null) factory.abort(); // abort pipeline
@@ -203,7 +226,6 @@ public class Gridmix extends Configured implements Tool {
         // signal for factory to start; sets start time
         startFlag.countDown();
       }
-
       if (factory != null) {
         // wait for input exhaustion
         factory.join(Long.MAX_VALUE);
@@ -218,6 +240,10 @@ public class Gridmix extends Configured implements Tool {
         // wait for running tasks to complete
         monitor.shutdown();
         monitor.join(Long.MAX_VALUE);
+
+        statistics.shutdown();
+        statistics.join(Long.MAX_VALUE);
+
       }
     } finally {
       IOUtils.cleanup(LOG, trace);
@@ -256,6 +282,7 @@ public class Gridmix extends Configured implements Tool {
         killComponent(factory, FAC_SLEEP);   // read no more tasks
         killComponent(submitter, SUB_SLEEP); // submit no more tasks
         killComponent(monitor, MON_SLEEP);   // process remaining jobs here
+        killComponent(statistics,MON_SLEEP);
       } finally {
         if (monitor == null) {
           return;

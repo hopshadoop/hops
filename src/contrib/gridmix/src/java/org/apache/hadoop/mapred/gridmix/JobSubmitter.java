@@ -82,6 +82,11 @@ class JobSubmitter implements Gridmix.Component<GridmixJob> {
           job.buildSplits(inputDir);
         } catch (IOException e) {
           LOG.warn("Failed to submit " + job.getJob().getJobName(), e);
+          monitor.submissionFailed(job.getJob());
+          return;
+        } catch (Exception e) {
+          LOG.warn("Failed to submit " + job.getJob().getJobName(), e);
+          monitor.submissionFailed(job.getJob());
           return;
         }
         // Sleep until deadline
@@ -101,14 +106,22 @@ class JobSubmitter implements Gridmix.Component<GridmixJob> {
             throw new InterruptedException("Failed to submit " +
                 job.getJob().getJobName());
           }
+          monitor.submissionFailed(job.getJob());
         } catch (ClassNotFoundException e) {
           LOG.warn("Failed to submit " + job.getJob().getJobName(), e);
+          monitor.submissionFailed(job.getJob());
         }
       } catch (InterruptedException e) {
         // abort execution, remove splits if nesc
         // TODO release ThdLoc
         GridmixJob.pullDescription(job.id());
         Thread.currentThread().interrupt();
+        monitor.submissionFailed(job.getJob());
+        return;
+      } catch(Exception e) {
+        //Due to some exception job wasnt submitted.
+        LOG.info(" Job " + job.getJob() + " submission failed " , e);
+        monitor.submissionFailed(job.getJob());
         return;
       } finally {
         sem.release();
