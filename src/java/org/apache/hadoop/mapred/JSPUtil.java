@@ -34,32 +34,26 @@ import javax.servlet.jsp.JspWriter;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.http.HtmlQuoting;
 import org.apache.hadoop.mapreduce.JobACL;
+import org.apache.hadoop.mapreduce.jobhistory.JobHistory;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser.JobInfo;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authorize.AccessControlList;
 import org.apache.hadoop.util.ServletUtil;
 import org.apache.hadoop.util.StringUtils;
 
 class JSPUtil {
   static final String PRIVATE_ACTIONS_KEY = "webinterface.private.actions";
-  
-  // This conf is not from jobtracker, not from tasktracker. So may not
-  // contain PRIVATE_ACTIONS_KEY set to true even if we set in conf object used
-  // by jobtracker. So use this conf with caution.
-  public static final Configuration conf = new Configuration();
 
   //LRU based cache
   private static final Map<String, JobInfo> jobHistoryCache = 
-    new LinkedHashMap<String, JobInfo>(); 
-
-  private static final int CACHE_SIZE = 
-    conf.getInt(JTConfig.JT_JOBHISTORY_CACHE_SIZE, 5);
+    new LinkedHashMap<String, JobInfo>();
 
   private static final Log LOG = LogFactory.getLog(JSPUtil.class);
 
@@ -399,8 +393,7 @@ class JSPUtil {
         sb.append("<tr>");
         sb.append(
             "<td id=\"job_" + rowId + "\">" + 
-              "<a href=\"jobdetailshistory.jsp?jobid=" + 
-              status.getJobId() + "&logFile=" + 
+              "<a href=\"jobdetailshistory.jsp?logFile=" + 
               URLEncoder.encode(status.getHistoryFile().toString(), 
                 "UTF-8") + "\">" + 
               status.getJobId() + "</a></td>" +
@@ -443,8 +436,7 @@ class JSPUtil {
       StringBuilder sb = new StringBuilder();
       sb.append("<retired_job rowid=\"" + rowId + "\" jobid=\"" + status.getJobId() + "\">");
       sb.append("<jobid>" + status.getJobId() + "</jobid>");
-      sb.append("<history_url>jobdetailshistory.jsp?jobid=" + status.getJobId()
-          + "&amp;logFile="
+      sb.append("<history_url>jobdetailshistory.jsp?logFile="
           + URLEncoder.encode(status.getHistoryFile().toString(), "UTF-8")
           + "</history_url>");
       sb.append("<priority>" + status.getJobPriority().toString()
@@ -472,12 +464,30 @@ class JSPUtil {
     return conf.getBoolean(PRIVATE_ACTIONS_KEY, false);
   }
 
-  static JobInfo getJobInfo(HttpServletRequest request, FileSystem fs) 
-      throws IOException {
-    String jobid = request.getParameter("jobid");
-    String logFile = request.getParameter("logFile");
+  static Path getJobConfFilePath(Path logFile) {
+    Path logDir = logFile.getParent();
+    org.apache.hadoop.mapreduce.JobID jobId =
+      JobHistory.getJobIDFromHistoryFilePath(logFile);
+    return JobHistory.getConfFile(logDir, jobId);
+  }
+
+  /**
+   * Read a job-history log file and construct the corresponding {@link JobInfo}
+   * . Also cache the {@link JobInfo} for quick serving further requests.
+   * 
+   * @param logFile
+   * @param fs
+   * @param jobTracker
+   * @return JobInfo
+   * @throws IOException
+   */
+  static JobInfo getJobInfo(Path logFile, FileSystem fs,
+      JobTracker jobTracker) throws IOException {
+    String jobid =
+        JobHistory.getJobIDFromHistoryFilePath(logFile).toString();
+    JobInfo jobInfo = null;
     synchronized(jobHistoryCache) {
-      JobInfo jobInfo = jobHistoryCache.remove(jobid);
+      jobInfo = jobHistoryCache.remove(jobid);
       if (jobInfo == null) {
         JobHistoryParser parser = new JobHistoryParser(fs, logFile);
         jobInfo = parser.parse();
@@ -485,6 +495,8 @@ class JSPUtil {
             jobHistoryCache.size());
       }
       jobHistoryCache.put(jobid, jobInfo);
+      int CACHE_SIZE =
+          jobTracker.conf.getInt(JTConfig.JT_JOBHISTORY_CACHE_SIZE, 5);
       if (jobHistoryCache.size() > CACHE_SIZE) {
         Iterator<Map.Entry<String, JobInfo>> it = 
           jobHistoryCache.entrySet().iterator();
@@ -492,7 +504,88 @@ class JSPUtil {
         it.remove();
         LOG.info("Job History file removed form cache "+removeJobId);
       }
-      return jobInfo;
+    }
+
+    jobTracker.getJobACLsManager().checkAccess(JobID.forName(jobid),
+        UserGroupInformation.getCurrentUser(), JobACL.VIEW_JOB,
+        jobInfo.getUsername(), jobInfo.getJobACLs().get(JobACL.VIEW_JOB));
+    return jobInfo;
+  }
+
+  /**
+   * Check the access for users to view job-history pages.
+   * 
+   * @param request
+   * @param response
+   * @param jobTracker
+   * @param fs
+   * @param logFile
+   * @return the job if authorization is disabled or if the authorization checks
+   *         pass. Otherwise return null.
+   * @throws IOException
+   * @throws InterruptedException
+   * @throws ServletException
+   */
+  static JobInfo checkAccessAndGetJobInfo(HttpServletRequest request,
+      HttpServletResponse response, final JobTracker jobTracker,
+      final FileSystem fs, final Path logFile) throws IOException,
+      InterruptedException, ServletException {
+    String jobid =
+        JobHistory.getJobIDFromHistoryFilePath(logFile).toString();
+    String user = request.getRemoteUser();
+    JobInfo job = null;
+    if (user != null) {
+      try {
+        final UserGroupInformation ugi =
+            UserGroupInformation.createRemoteUser(user);
+        job =
+            ugi.doAs(new PrivilegedExceptionAction<JobHistoryParser.JobInfo>() {
+              public JobInfo run() throws IOException {
+                // checks job view permission
+                JobInfo jobInfo = JSPUtil.getJobInfo(logFile, fs, jobTracker);
+                return jobInfo;
+              }
+            });
+      } catch (AccessControlException e) {
+        String errMsg =
+            String.format(
+                "User %s failed to view %s!<br><br>%s"
+                    + "<hr>"
+                    + "<a href=\"jobhistory.jsp\">Go back to JobHistory</a><br>"
+                    + "<a href=\"jobtracker.jsp\">Go back to JobTracker</a>",
+                user, jobid, e.getMessage());
+        JSPUtil.setErrorAndForward(errMsg, request, response);
+        return null;
+      }
+    } else {
+      // no authorization needed
+      job = JSPUtil.getJobInfo(logFile, fs, jobTracker);
+    }
+    return job;
+  }
+
+  /**
+   * Nicely print the Job-ACLs
+   * @param tracker
+   * @param jobAcls
+   * @param out
+   * @throws IOException
+   */
+  static void printJobACLs(JobTracker tracker,
+      Map<JobACL, AccessControlList> jobAcls, JspWriter out)
+      throws IOException {
+    if (tracker.isJobLevelAuthorizationEnabled()) {
+      // Display job-view-acls and job-modify-acls configured for this job
+      out.print("<b>Job-ACLs:</b><br>");
+      for (JobACL aclName : JobACL.values()) {
+        String aclConfigName = aclName.getAclName();
+        AccessControlList aclConfigured = jobAcls.get(aclName);
+        if (aclConfigured != null) {
+          String aclStr = aclConfigured.toString();
+          out.print("&nbsp;&nbsp;&nbsp;&nbsp;" + aclConfigName + ": "
+              + HtmlQuoting.quoteHtmlChars(aclStr) + "<br>");
+        }
+      }
     }
   }
 }

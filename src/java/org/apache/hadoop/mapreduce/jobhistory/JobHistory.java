@@ -212,6 +212,34 @@ public class JobHistory {
   }
 
   /**
+   * Get the JobID from the history file's name. See it's companion method
+   * {@link #getJobHistoryFile(Path, JobID, String)} for how history file's name
+   * is constructed from a given JobID and userName.
+   * 
+   * @param jobHistoryFilePath
+   * @return jobID
+   */
+  public static JobID getJobIDFromHistoryFilePath(Path jobHistoryFilePath) {
+    String[] jobDetails = jobHistoryFilePath.getName().split("_");
+    String jobId =
+        jobDetails[0] + "_" + jobDetails[1] + "_" + jobDetails[2];
+    return JobID.forName(jobId);
+  }
+
+  /**
+   * Get the user name of the job-submitter from the history file's name. See
+   * it's companion method {@link #getJobHistoryFile(Path, JobID, String)} for
+   * how history file's name is constructed from a given JobID and username.
+   * 
+   * @param jobHistoryFilePath
+   * @return the user-name
+   */
+  public static String getUserFromHistoryFilePath(Path jobHistoryFilePath) {
+    String[] jobDetails = jobHistoryFilePath.getName().split("_");
+    return jobDetails[3];
+  }
+
+  /**
    * Given the job id, return the history file path from the cache
    */
   public String getHistoryFilePath(JobID jobId) {
@@ -253,7 +281,7 @@ public class JobHistory {
   
     /* Storing the job conf on the log dir */
   
-    Path logDirConfPath = getConfFile(jobId);
+    Path logDirConfPath = getConfFile(logDir, jobId);
     LOG.info("LogDirConfPath is " + logDirConfPath);
   
     FSDataOutputStream jobFileOut = null;
@@ -326,7 +354,14 @@ public class JobHistory {
         TimeUnit.HOURS, new LinkedBlockingQueue<Runnable>());
   }
 
-  Path getConfFile(JobID jobId) {
+  /**
+   * Get the job conf file for the given jobId
+   * 
+   * @param logDir
+   * @param jobId
+   * @return the jobconf.xml path
+   */
+  public static Path getConfFile(Path logDir, JobID jobId) {
     Path jobFilePath = null;
     if (logDir != null) {
       jobFilePath = new Path(logDir + File.separator +

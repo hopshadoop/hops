@@ -46,9 +46,9 @@ public abstract class JobACLsManager {
    * @return JobACL to AccessControlList map.
    */
   Map<JobACL, AccessControlList> constructJobACLs(JobConf conf) {
-    
+
     Map<JobACL, AccessControlList> acls =
-      new HashMap<JobACL, AccessControlList>();
+        new HashMap<JobACL, AccessControlList>();
 
     // Don't construct anything if authorization is disabled.
     if (!isJobLevelAuthorizationEnabled()) {

@@ -708,8 +708,9 @@ public class JobInProgress {
     if (jobname == null) { jobname = ""; }
     setUpLocalizedJobConf(conf, jobId);
     jobHistory.setupEventWriter(jobId, conf);
-    JobSubmittedEvent jse = new JobSubmittedEvent(jobId, jobname, username,
-        this.startTime, jobFile.toString());
+    JobSubmittedEvent jse =
+        new JobSubmittedEvent(jobId, jobname, username, this.startTime,
+            jobFile.toString(), status.getJobACLs());
     jobHistory.logEvent(jse, jobId);
     
   }

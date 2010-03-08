@@ -18,12 +18,15 @@
 package org.apache.hadoop.mapred;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 import junit.framework.TestCase;
 
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.Counters;
+import org.apache.hadoop.mapreduce.JobACL;
 import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.jobhistory.JobFinishedEvent;
@@ -31,6 +34,7 @@ import org.apache.hadoop.mapreduce.jobhistory.JobHistory;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser;
 import org.apache.hadoop.mapreduce.jobhistory.JobSubmittedEvent;
 import org.apache.hadoop.mapreduce.jobhistory.TaskFinishedEvent;
+import org.apache.hadoop.security.authorize.AccessControlList;
 
 /**
  * Unit test to test if the JobHistory writer/parser is able to handle
@@ -70,8 +74,17 @@ public class TestJobHistoryParsing  extends TestCase {
     jh.init(jt, conf, "localhost", 1234);
     JobID jobId = JobID.forName("job_200809171136_0001");
     jh.setupEventWriter(jobId, conf);
+    Map<JobACL, AccessControlList> jobACLs =
+        new HashMap<JobACL, AccessControlList>();
+    AccessControlList viewJobACL =
+        new AccessControlList("user1,user2 group1,group2");
+    AccessControlList modifyJobACL =
+        new AccessControlList("user3,user4 group3, group4");
+    jobACLs.put(JobACL.VIEW_JOB, viewJobACL);
+    jobACLs.put(JobACL.MODIFY_JOB, modifyJobACL);
     JobSubmittedEvent jse =
-      new JobSubmittedEvent(jobId, weirdJob, username, 12345, weirdPath);
+        new JobSubmittedEvent(jobId, weirdJob, username, 12345, weirdPath,
+            jobACLs);
     jh.logEvent(jse, jobId);
 
     JobFinishedEvent jfe =
@@ -109,6 +122,12 @@ public class TestJobHistoryParsing  extends TestCase {
     assertTrue (jobInfo.getUsername().equals(username));
     assertTrue(jobInfo.getJobname().equals(weirdJob));
     assertTrue(jobInfo.getJobConfPath().equals(weirdPath));
+    Map<JobACL, AccessControlList> parsedACLs = jobInfo.getJobACLs();
+    assertEquals(2, parsedACLs.size());
+    assertTrue(parsedACLs.get(JobACL.VIEW_JOB).toString().equals(
+        viewJobACL.toString()));
+    assertTrue(parsedACLs.get(JobACL.MODIFY_JOB).toString().equals(
+        modifyJobACL.toString()));
 
     if (mr != null) {
       mr.shutdown();

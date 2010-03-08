@@ -74,7 +74,11 @@
           {"name": "jobName", "type": "string"},
           {"name": "userName", "type": "string"},
           {"name": "submitTime", "type": "long"},
-          {"name": "jobConfPath", "type": "string"}
+          {"name": "jobConfPath", "type": "string"},
+          {"name": "acls", "type": {"type": "map",
+                                    "values": "string"
+                                    }
+          }
       ]
      },
 

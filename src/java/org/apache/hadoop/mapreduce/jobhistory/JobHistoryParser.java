@@ -26,6 +26,7 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.Counters;
+import org.apache.hadoop.mapreduce.JobACL;
 import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapred.JobPriority;
 import org.apache.hadoop.mapred.JobStatus;
@@ -33,6 +34,7 @@ import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskID;
 import org.apache.hadoop.mapred.TaskStatus;
 import org.apache.hadoop.mapreduce.TaskType;
+import org.apache.hadoop.security.authorize.AccessControlList;
 
 /**
  * Default Parser for the JobHistory files. Typical usage is
@@ -307,6 +309,7 @@ public class JobHistoryParser {
     info.username = event.getUserName();
     info.submitTime = event.getSubmitTime();
     info.jobConfPath = event.getJobConfPath();
+    info.jobACLs = event.getJobAcls();
   }
 
   /**
@@ -331,6 +334,7 @@ public class JobHistoryParser {
     Counters mapCounters;
     Counters reduceCounters;
     JobPriority priority;
+    Map<JobACL, AccessControlList> jobACLs;
     
     Map<TaskID, TaskInfo> tasksMap;
     
@@ -343,6 +347,7 @@ public class JobHistoryParser {
       finishedMaps = finishedReduces = 0;
       username = jobname = jobConfPath = "";
       tasksMap = new HashMap<TaskID, TaskInfo>();
+      jobACLs = new HashMap<JobACL, AccessControlList>();
     }
     
     /** Print all the job information */
@@ -402,6 +407,7 @@ public class JobHistoryParser {
     public Map<TaskID, TaskInfo> getAllTasks() { return tasksMap; }
     /** Get the priority of this job */
     public String getPriority() { return priority.toString(); }
+    public Map<JobACL, AccessControlList> getJobACLs() { return jobACLs; }
   }
   
   /**

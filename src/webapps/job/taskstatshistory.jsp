@@ -32,25 +32,33 @@
   import="org.apache.hadoop.mapreduce.TaskAttemptID" 
   import="org.apache.hadoop.mapreduce.Counter" 
   import="org.apache.hadoop.mapreduce.Counters" 
-  import="org.apache.hadoop.mapreduce.CounterGroup" 
+  import="org.apache.hadoop.mapreduce.CounterGroup"
 %>
 <%! private static SimpleDateFormat dateFormat = new SimpleDateFormat("d/MM HH:mm:ss") ;
     private static final long serialVersionUID = 1L;
 %>
 
 <%
-  String jobid = request.getParameter("jobid");
   String attemptid = request.getParameter("attemptid");
-  String taskid = request.getParameter("taskid");
+  if(attemptid == null) {
+    out.println("No attemptid found! Pass a 'attemptid' parameter in the request.");
+    return;
+  }
+  TaskID tipid = TaskAttemptID.forName(attemptid).getTaskID();
   String logFile = request.getParameter("logFile");
 
   Format decimal = new DecimalFormat();
 
   FileSystem fs = (FileSystem) application.getAttribute("fileSys");
-  JobHistoryParser.JobInfo job = JSPUtil.getJobInfo(request, fs);
+  JobTracker jobTracker = (JobTracker) application.getAttribute("job.tracker");
+  JobHistoryParser.JobInfo job = JSPUtil.checkAccessAndGetJobInfo(request,
+      response, jobTracker, fs, new Path(logFile));
+  if (job == null) {
+    return;
+  }
 
   Map<TaskID, JobHistoryParser.TaskInfo> tasks = job.getAllTasks();
-  JobHistoryParser.TaskInfo task = tasks.get(TaskID.forName(taskid));
+  JobHistoryParser.TaskInfo task = tasks.get(tipid);
 
   Map<TaskAttemptID, JobHistoryParser.TaskAttemptInfo> attempts = task.getAllTaskAttempts();
   JobHistoryParser.TaskAttemptInfo attempt = attempts.get(TaskAttemptID.forName(attemptid));
@@ -106,7 +114,7 @@
 %>
 
 <hr>
-<a href="jobdetailshistory.jsp?jobid=<%=jobid%>&logFile=<%=logFile%>">Go back to the job</a><br>
+<a href="jobdetailshistory.jsp?logFile=<%=logFile%>">Go back to the job</a><br>
 <a href="jobtracker.jsp">Go back to JobTracker</a><br>
 <%
 out.println(ServletUtil.htmlFooter());

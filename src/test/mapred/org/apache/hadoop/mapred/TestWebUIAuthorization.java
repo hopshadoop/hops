@@ -26,11 +26,18 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.http.TestHttpServer.DummyFilterInitializer;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.SleepJob;
+import org.apache.hadoop.mapreduce.TaskAttemptID;
+import org.apache.hadoop.mapreduce.TaskID;
+import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser;
+import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser.JobInfo;
+import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser.TaskAttemptInfo;
+import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser.TaskInfo;
 import org.apache.hadoop.security.Groups;
 import org.apache.hadoop.security.ShellBasedUnixGroupsMapping;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -109,21 +116,28 @@ public class TestWebUIAuthorization extends ClusterMapReduceTestCase {
    *     cannot view the job
    * (5) other unauthorized users cannot view the job
    */
-  private void validateViewJob(String url, String method) throws IOException {
-    assertEquals(HttpURLConnection.HTTP_OK,
-        getHttpStatusCode(url, jobSubmitter, method));
-    assertEquals(HttpURLConnection.HTTP_OK,
-        getHttpStatusCode(url, superGroupMember, method));
-    assertEquals(HttpURLConnection.HTTP_OK,
-        getHttpStatusCode(url, mrOwner, method));
-    assertEquals(HttpURLConnection.HTTP_OK,
-        getHttpStatusCode(url, viewColleague, method));
-    assertEquals(HttpURLConnection.HTTP_OK,
-        getHttpStatusCode(url, viewAndModifyColleague, method));
-    assertEquals(HttpURLConnection.HTTP_UNAUTHORIZED,
-        getHttpStatusCode(url, modifyColleague, method));
-    assertEquals(HttpURLConnection.HTTP_UNAUTHORIZED,
-        getHttpStatusCode(url, unauthorizedUser, method));
+  private void validateViewJob(String url, String method)
+      throws IOException {
+    assertEquals("Incorrect return code for " + jobSubmitter,
+        HttpURLConnection.HTTP_OK, getHttpStatusCode(url, jobSubmitter,
+            method));
+    assertEquals("Incorrect return code for " + superGroupMember,
+        HttpURLConnection.HTTP_OK, getHttpStatusCode(url, superGroupMember,
+            method));
+    assertEquals("Incorrect return code for " + mrOwner,
+        HttpURLConnection.HTTP_OK, getHttpStatusCode(url, mrOwner, method));
+    assertEquals("Incorrect return code for " + viewColleague,
+        HttpURLConnection.HTTP_OK, getHttpStatusCode(url, viewColleague,
+            method));
+    assertEquals("Incorrect return code for " + viewAndModifyColleague,
+        HttpURLConnection.HTTP_OK, getHttpStatusCode(url,
+            viewAndModifyColleague, method));
+    assertEquals("Incorrect return code for " + modifyColleague,
+        HttpURLConnection.HTTP_UNAUTHORIZED, getHttpStatusCode(url,
+            modifyColleague, method));
+    assertEquals("Incorrect return code for " + unauthorizedUser,
+        HttpURLConnection.HTTP_UNAUTHORIZED, getHttpStatusCode(url,
+            unauthorizedUser, method));
   }
 
   /**
@@ -214,6 +228,125 @@ public class TestWebUIAuthorization extends ClusterMapReduceTestCase {
             jobid.toString(), jobSubmitter, "GET"));
       }
     }
+  }
+
+  public void testAuthorizationForJobHistoryPages() throws Exception {
+    JobConf conf = new JobConf();
+    conf.set(CommonConfigurationKeys.HADOOP_SECURITY_GROUP_MAPPING,
+        MyGroupsProvider.class.getName());
+    Groups.getUserToGroupsMappingService(conf);
+    Properties props = new Properties();
+    props.setProperty("hadoop.http.filter.initializers",
+        DummyFilterInitializer.class.getName());
+    props.setProperty(MRConfig.JOB_LEVEL_AUTHORIZATION_ENABLING_FLAG,
+        String.valueOf(true));
+    props.setProperty("dfs.permissions.enabled", "false");
+
+    props.setProperty("mapreduce.job.committer.setup.cleanup.needed",
+        "false");
+    props.setProperty(MRConfig.MR_SUPERGROUP, "superGroup");
+
+    MyGroupsProvider.mapping.put(jobSubmitter, Arrays.asList("group1"));
+    MyGroupsProvider.mapping.put(viewColleague, Arrays.asList("group2"));
+    MyGroupsProvider.mapping.put(modifyColleague, Arrays.asList("group1"));
+    MyGroupsProvider.mapping.put(unauthorizedUser, Arrays.asList("evilSociety"));
+    MyGroupsProvider.mapping.put(superGroupMember, Arrays.asList("superGroup"));
+    MyGroupsProvider.mapping.put(viewAndModifyColleague, Arrays.asList("group3"));
+    mrOwner = UserGroupInformation.getCurrentUser().getShortUserName();
+    MyGroupsProvider.mapping.put(mrOwner, Arrays.asList(
+        new String[] { "group4", "group5" }));
+
+    startCluster(true, props);
+    MiniMRCluster cluster = getMRCluster();
+    int infoPort = cluster.getJobTrackerRunner().getJobTrackerInfoPort();
+
+    conf = new JobConf(cluster.createJobConf());
+    conf.set(JobContext.JOB_ACL_VIEW_JOB, viewColleague + " group3");
+
+    // Let us add group1 and group3 to modify-job-acl. So modifyColleague and
+    // viewAndModifyColleague will be able to modify the job
+    conf.set(JobContext.JOB_ACL_MODIFY_JOB, " group1,group3");
+
+    final SleepJob sleepJob = new SleepJob();
+    sleepJob.setConf(conf);
+    UserGroupInformation jobSubmitterUGI =
+        UserGroupInformation.createRemoteUser(jobSubmitter);
+    Job job = jobSubmitterUGI.doAs(new PrivilegedExceptionAction<Job>() {
+      public Job run() throws Exception {
+        // Very large sleep job.
+        Job job = sleepJob.createJob(1, 0, 1000, 1, 0, 0);
+        job.waitForCompletion(true);
+        return job;
+      }
+    });
+
+    org.apache.hadoop.mapreduce.JobID jobid = job.getID();
+
+    String historyFileName = job.getStatus().getHistoryFile();
+    String jtURL = "http://localhost:" + infoPort;
+
+    // Job will automatically be retired. Now test jsps..
+
+    // validate access of jobdetails_history.jsp
+    String jobDetailsJSP =
+        jtURL + "/jobdetailshistory.jsp?logFile=" + historyFileName;
+    validateViewJob(jobDetailsJSP, "GET");
+
+    // validate accesses of jobtaskshistory.jsp
+    String jobTasksJSP =
+        jtURL + "/jobtaskshistory.jsp?logFile=" + historyFileName;
+    String[] taskTypes =
+        new String[] { "JOb_SETUP", "MAP", "REDUCE", "JOB_CLEANUP" };
+    String[] states =
+        new String[] { "all", "SUCCEEDED", "FAILED", "KILLED" };
+    for (String taskType : taskTypes) {
+      for (String state : states) {
+        validateViewJob(jobTasksJSP + "&taskType=" + taskType + "&status="
+            + state, "GET");
+      }
+    }
+
+    JobHistoryParser parser =
+        new JobHistoryParser(new Path(historyFileName).getFileSystem(conf),
+            historyFileName);
+    JobInfo jobInfo = parser.parse();
+    Map<TaskID, TaskInfo> tipsMap = jobInfo.getAllTasks();
+    for (TaskID tip : tipsMap.keySet()) {
+      // validate access of taskdetailshistory.jsp
+      validateViewJob(jtURL + "/taskdetailshistory.jsp?logFile="
+          + historyFileName + "&tipid=" + tip.toString(), "GET");
+
+      Map<TaskAttemptID, TaskAttemptInfo> attemptsMap =
+          tipsMap.get(tip).getAllTaskAttempts();
+      for (TaskAttemptID attempt : attemptsMap.keySet()) {
+
+        // validate access to taskstatshistory.jsp
+        validateViewJob(jtURL + "/taskstatshistory.jsp?attemptid="
+            + attempt.toString() + "&logFile=" + historyFileName, "GET");
+
+        // validate access to tasklogs - STDOUT and STDERR. SYSLOGs are not
+        // generated for the 1 map sleep job in the test case.
+        validateViewJob(TaskLogServlet.getTaskLogUrl("localhost",
+            Integer.toString(attemptsMap.get(attempt).getHttpPort()),
+            attempt.toString())
+            + "&filter=" + TaskLog.LogName.STDOUT, "GET");
+
+        validateViewJob(TaskLogServlet.getTaskLogUrl("localhost",
+            Integer.toString(attemptsMap.get(attempt).getHttpPort()),
+            attempt.toString())
+            + "&filter=" + TaskLog.LogName.STDERR, "GET");        
+      }
+    }
+
+    // validate access to analysejobhistory.jsp
+    String analyseJobHistoryJSP =
+        jtURL + "/analysejobhistory.jsp?logFile=" + historyFileName;
+    validateViewJob(analyseJobHistoryJSP, "GET");
+
+    // validate access of jobconf_history.jsp
+    String jobConfJSP =
+        jtURL + "/jobconf_history.jsp?logFile=" + historyFileName;
+    validateViewJob(jobConfJSP, "GET");
   }
 
   /**

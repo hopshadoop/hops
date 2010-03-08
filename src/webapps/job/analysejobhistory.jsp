@@ -37,7 +37,6 @@
 %>
 <html><body>
 <%
-  String jobid = JobID.forName(request.getParameter("jobid")).toString();
   String logFile = request.getParameter("logFile");
   String numTasks = request.getParameter("numTasks");
   int showTasks = 10 ; 
@@ -45,9 +44,14 @@
     showTasks = Integer.parseInt(numTasks);  
   }
   FileSystem fs = (FileSystem) application.getAttribute("fileSys");
-  JobHistoryParser.JobInfo job = JSPUtil.getJobInfo(request, fs);
+  JobTracker jobTracker = (JobTracker) application.getAttribute("job.tracker");
+  JobHistoryParser.JobInfo job = JSPUtil.checkAccessAndGetJobInfo(request,
+      response, jobTracker, fs, new Path(logFile));
+  if (job == null) {
+    return;
+  }
 %>
-<h2>Hadoop Job <a href="jobdetailshistory.jsp?jobid=<%=jobid%>&&logFile=<%=logFile%>"><%=jobid %> </a></h2>
+<h2>Hadoop Job <a href="jobdetailshistory.jsp?logFile=<%=logFile%>"><%=job.getJobId() %> </a></h2>
 <b>User : </b> <%=HtmlQuoting.quoteHtmlChars(job.getUsername()) %><br/>
 <b>JobName : </b> <%=HtmlQuoting.quoteHtmlChars(job.getJobname()) %><br/>
 <b>JobConf : </b> <%=job.getJobConfPath() %><br/> 
@@ -125,7 +129,7 @@
 %>
 
 <h3>Time taken by best performing Map task 
-<a href="taskdetailshistory.jsp?jobid=<%=jobid%>&logFile=<%=logFile%>&taskid=<%=minMap.getAttemptId().getTaskID()%>">
+<a href="taskdetailshistory.jsp?logFile=<%=logFile%>&tipid=<%=minMap.getAttemptId().getTaskID()%>">
 <%=minMap.getAttemptId().getTaskID() %></a> : <%=StringUtils.formatTimeDiff(minMap.getFinishTime(), minMap.getStartTime() ) %></h3>
 <h3>Average time taken by Map tasks: 
 <%=StringUtils.formatTimeDiff(avg.getAvgMapTime(), 0) %></h3>
@@ -136,7 +140,7 @@
   for (int i=0;i<showTasks && i<mapTasks.length; i++) {
 %>
     <tr>
-    <td><a href="taskdetailshistory.jsp?jobid=<%=jobid%>&logFile=<%=logFile%>&taskid=<%=mapTasks[i].getAttemptId().getTaskID()%>">
+    <td><a href="taskdetailshistory.jsp?logFile=<%=logFile%>&tipid=<%=mapTasks[i].getAttemptId().getTaskID()%>">
         <%=mapTasks[i].getAttemptId().getTaskID() %></a></td>
     <td><%=StringUtils.formatTimeDiff(mapTasks[i].getFinishTime(), mapTasks[i].getStartTime()) %></td>
     </tr>
@@ -150,8 +154,8 @@
 %>
 
 <h3>The last Map task 
-<a href="taskdetailshistory.jsp?jobid=<%=jobid%>&logFile=<%=logFile%>
-&taskid=<%=lastMap.getAttemptId().getTaskID()%>"><%=lastMap.getAttemptId().getTaskID() %></a> 
+<a href="taskdetailshistory.jsp?logFile=<%=logFile%>
+&tipid=<%=lastMap.getAttemptId().getTaskID()%>"><%=lastMap.getAttemptId().getTaskID() %></a> 
 finished at (relative to the Job launch time): 
 <%=StringUtils.getFormattedTimeWithDiff(dateFormat, 
                               lastMap.getFinishTime(), 
@@ -164,8 +168,8 @@ finished at (relative to the Job launch time):
   JobHistoryParser.TaskAttemptInfo minShuffle = reduceTasks[reduceTasks.length-1] ;
 %>
 <h3>Time taken by best performing shuffle
-<a href="taskdetailshistory.jsp?jobid=<%=jobid%>&logFile=<%=logFile%>
-&taskid=<%=minShuffle.getAttemptId().getTaskID()%>"><%=minShuffle.getAttemptId().getTaskID()%></a> : 
+<a href="taskdetailshistory.jsp?logFile=<%=logFile%>
+&tipid=<%=minShuffle.getAttemptId().getTaskID()%>"><%=minShuffle.getAttemptId().getTaskID()%></a> : 
 <%=StringUtils.formatTimeDiff(minShuffle.getShuffleFinishTime(),
                               minShuffle.getStartTime() ) %></h3>
 <h3>Average time taken by Shuffle: 
@@ -177,8 +181,8 @@ finished at (relative to the Job launch time):
   for (int i=0;i<showTasks && i<reduceTasks.length; i++) {
 %>
     <tr>
-    <td><a href="taskdetailshistory.jsp?jobid=<%=jobid%>&logFile=
-<%=logFile%>&taskid=<%=reduceTasks[i].getAttemptId().getTaskID()%>">
+    <td><a href="taskdetailshistory.jsp?logFile=
+<%=logFile%>&tipid=<%=reduceTasks[i].getAttemptId().getTaskID()%>">
 <%=reduceTasks[i].getAttemptId().getTaskID() %></a></td>
     <td><%=
            StringUtils.formatTimeDiff(
@@ -196,8 +200,8 @@ finished at (relative to the Job launch time):
 %>
 
 <h3>The last Shuffle  
-<a href="taskdetailshistory.jsp?jobid=<%=jobid%>&logFile=<%=logFile%>
-&taskid=<%=lastShuffle.getAttemptId().getTaskID()%>"><%=lastShuffle.getAttemptId().getTaskID()%>
+<a href="taskdetailshistory.jsp?logFile=<%=logFile%>
+&tipid=<%=lastShuffle.getAttemptId().getTaskID()%>"><%=lastShuffle.getAttemptId().getTaskID()%>
 </a> finished at (relative to the Job launch time): 
 <%=StringUtils.getFormattedTimeWithDiff(dateFormat,
                               lastShuffle.getShuffleFinishTime(),
@@ -209,7 +213,7 @@ finished at (relative to the Job launch time):
 %>
 <hr/>
 <h3>Time taken by best performing Reduce task : 
-<a href="taskdetailshistory.jsp?jobid=<%=jobid%>&logFile=<%=logFile%>&taskid=<%=minReduce.getAttemptId().getTaskID()%>">
+<a href="taskdetailshistory.jsp?logFile=<%=logFile%>&tipid=<%=minReduce.getAttemptId().getTaskID()%>">
 <%=minReduce.getAttemptId().getTaskID() %></a> : 
 <%=StringUtils.formatTimeDiff(minReduce.getFinishTime(),
     minReduce.getShuffleFinishTime() ) %></h3>
@@ -223,7 +227,7 @@ finished at (relative to the Job launch time):
   for (int i=0;i<showTasks && i<reduceTasks.length; i++) {
 %>
     <tr>
-    <td><a href="taskdetailshistory.jsp?jobid=<%=jobid%>&logFile=<%=logFile%>&taskid=<%=reduceTasks[i].getAttemptId().getTaskID()%>">
+    <td><a href="taskdetailshistory.jsp?logFile=<%=logFile%>&tipid=<%=reduceTasks[i].getAttemptId().getTaskID()%>">
         <%=reduceTasks[i].getAttemptId().getTaskID() %></a></td>
     <td><%=StringUtils.formatTimeDiff(
              reduceTasks[i].getFinishTime(),
@@ -239,8 +243,8 @@ finished at (relative to the Job launch time):
 %>
 
 <h3>The last Reduce task 
-<a href="taskdetailshistory.jsp?jobid=<%=jobid%>&logFile=<%=logFile%>
-&taskid=<%=lastReduce.getAttemptId().getTaskID()%>"><%=lastReduce.getAttemptId().getTaskID()%>
+<a href="taskdetailshistory.jsp?logFile=<%=logFile%>
+&tipid=<%=lastReduce.getAttemptId().getTaskID()%>"><%=lastReduce.getAttemptId().getTaskID()%>
 </a> finished at (relative to the Job launch time): 
 <%=StringUtils.getFormattedTimeWithDiff(dateFormat,
                               lastReduce.getFinishTime(),

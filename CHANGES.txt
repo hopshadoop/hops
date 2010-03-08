@@ -10,6 +10,8 @@ Trunk (unreleased changes)
     MAPREDUCE-1385. Use the new UserGroupInformation from HADOOP-6299.
     (ddas via omalley)
 
+    MAPREDUCE-1493. Authorization for job-history pages. (vinodkv)
+
   NEW FEATURES
 
     MAPREDUCE-1383. Automates fetching of delegation tokens in File*Formats

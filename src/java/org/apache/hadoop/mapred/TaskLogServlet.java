@@ -232,7 +232,7 @@ public class TaskLogServlet extends HttpServlet {
                      TaskLog.LogName.STDOUT, isCleanup);
         printTaskLog(response, out, attemptId, start, end, plainText, 
                      TaskLog.LogName.STDERR, isCleanup);
-        printTaskLog(response, out, attemptId, start, end, plainText, 
+        printTaskLog(response, out, attemptId, start, end, plainText,
                      TaskLog.LogName.SYSLOG, isCleanup);
         if (haveTaskLog(attemptId, TaskLog.LogName.DEBUGOUT)) {
           printTaskLog(response, out, attemptId, start, end, plainText, 

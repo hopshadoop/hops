@@ -25,6 +25,7 @@ import java.util.Map;
 
 import org.apache.hadoop.mapred.JobPriority;
 import org.apache.hadoop.mapreduce.Counters;
+import org.apache.hadoop.mapreduce.JobACL;
 import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.jobhistory.HistoryEvent;
 import org.apache.hadoop.mapreduce.jobhistory.JobFinishedEvent;
@@ -34,6 +35,7 @@ import org.apache.hadoop.mapreduce.jobhistory.JobPriorityChangeEvent;
 import org.apache.hadoop.mapreduce.jobhistory.JobStatusChangedEvent;
 import org.apache.hadoop.mapreduce.jobhistory.JobSubmittedEvent;
 import org.apache.hadoop.mapreduce.jobhistory.JobUnsuccessfulCompletionEvent;
+import org.apache.hadoop.security.authorize.AccessControlList;
 
 public class Job20LineHistoryEventEmitter extends HistoryEventEmitter {
 
@@ -78,8 +80,10 @@ public class Job20LineHistoryEventEmitter extends HistoryEventEmitter {
 
         that.originalSubmitTime = Long.parseLong(submitTime);
 
+        Map<JobACL, AccessControlList> jobACLs =
+          new HashMap<JobACL, AccessControlList>();
         return new JobSubmittedEvent(jobID, jobName, user == null ? "nulluser"
-            : user, that.originalSubmitTime, jobConf);
+            : user, that.originalSubmitTime, jobConf, jobACLs);
       }
 
       return null;

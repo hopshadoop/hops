@@ -233,11 +233,9 @@ window.location.href = url;
     Set<String> displayedJobs = new HashSet<String>();
     for (int i = start - 1; i < start + length - 1; ++i) {
       Path jobFile = jobFiles[i];
-      
-      String[] jobDetails = jobFile.getName().split("_");
 
-      String jobId = jobDetails[0] + "_" +jobDetails[1] + "_" + jobDetails[2] ;
-      String userName = jobDetails[3];
+      String jobId = JobHistory.getJobIDFromHistoryFilePath(jobFile).toString();
+      String userName = JobHistory.getUserFromHistoryFilePath(jobFile);
 
       // Check if the job is already displayed. There can be multiple job 
       // history files for jobs that have restarted
@@ -266,8 +264,8 @@ window.location.href = url;
                           String user, Path logFile, JspWriter out)
     throws IOException {
       out.print("<tr>"); 
-      out.print("<td>" + "<a href=\"jobdetailshistory.jsp?jobid=" + jobId + 
-                "&logFile=" + URLEncoder.encode(logFile.toString(), "UTF-8") +
+      out.print("<td>" + "<a href=\"jobdetailshistory.jsp?logFile=" +
+       URLEncoder.encode(logFile.toString(), "UTF-8") +
                 "\">" + HtmlQuoting.quoteHtmlChars(jobId) + "</a></td>");
       out.print("<td>" + HtmlQuoting.quoteHtmlChars(user) + "</td>");
       out.print("</tr>");
