@@ -43,7 +43,7 @@ public class TestJobExecutionAsDifferentUser extends
     startCluster();
 
     
-    taskControllerUser.doAs(new PrivilegedExceptionAction<Object>() {
+    jobOwner.doAs(new PrivilegedExceptionAction<Object>() {
       public Object run() throws Exception {
         Path inDir = new Path("input");
         Path outDir = new Path("output");
@@ -83,7 +83,7 @@ public class TestJobExecutionAsDifferentUser extends
       return;
     }
     startCluster();
-    taskControllerUser.doAs(new PrivilegedExceptionAction<Object>() {
+    jobOwner.doAs(new PrivilegedExceptionAction<Object>() {
       public Object run() throws Exception {
 
         TestMiniMRChildTask childTask = new TestMiniMRChildTask();
@@ -118,7 +118,7 @@ public class TestJobExecutionAsDifferentUser extends
 
     // Run a job that should timeout and trigger a SIGQUIT.
     startCluster();
-    taskControllerUser.doAs(new PrivilegedExceptionAction<Object>() {
+    jobOwner.doAs(new PrivilegedExceptionAction<Object>() {
       public Object run() throws Exception {
         JobConf conf = getClusterConf();
         conf.setInt(JobContext.TASK_TIMEOUT, 10000);

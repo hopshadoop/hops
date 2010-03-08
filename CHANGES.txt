@@ -1353,3 +1353,6 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1522. FileInputFormat may use the default FileSystem for the
     input path. (Tsz Wo (Nicholas), SZE via cdouglas)
+
+    MAPREDUCE-890. After HADOOP-4491, the user who started mapred system is 
+    not able to run job. (Ravi Gummadi via vinodkv)

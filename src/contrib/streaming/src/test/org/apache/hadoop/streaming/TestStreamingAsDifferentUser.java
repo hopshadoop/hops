@@ -56,7 +56,7 @@ public class TestStreamingAsDifferentUser extends
     }
     startCluster();
     final JobConf myConf = getClusterConf();
-    taskControllerUser.doAs(new PrivilegedExceptionAction<Void>() {
+    jobOwner.doAs(new PrivilegedExceptionAction<Void>() {
       public Void run() throws IOException{
 
         FileSystem inFs = inputPath.getFileSystem(myConf);
@@ -117,7 +117,7 @@ public class TestStreamingAsDifferentUser extends
     final String taskTrackerUser 
       = UserGroupInformation.getCurrentUser().getShortUserName();
     
-    taskControllerUser.doAs(new PrivilegedExceptionAction<Void>() {
+    jobOwner.doAs(new PrivilegedExceptionAction<Void>() {
       public Void run() throws Exception{
 
         FileSystem inFs = inputPath.getFileSystem(myConf);
@@ -155,13 +155,13 @@ public class TestStreamingAsDifferentUser extends
 
         // validate private cache files' permissions
         checkPermissionsOnPrivateDistCache(localDirs,
-            taskControllerUser.getShortUserName(), taskTrackerSpecialGroup);
+            jobOwner.getShortUserName(), taskTrackerSpecialGroup);
         
         // check the file is present even after the job is over.
         // work directory symlink cleanup should not have removed the target 
         // files.
         checkPresenceOfPrivateDistCacheFiles(localDirs, 
-            taskControllerUser.getShortUserName(), new String[] {"test.sh"});
+            jobOwner.getShortUserName(), new String[] {"test.sh"});
 
         // validate private cache files' permissions
         checkPermissionsOnPublicDistCache(FileSystem.getLocal(myConf),

@@ -28,6 +28,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.ClusterWithLinuxTaskController.MyLinuxTaskController;
 import org.apache.hadoop.mapreduce.server.tasktracker.Localizer;
 import org.apache.hadoop.mapreduce.MRConfig;
+import org.apache.hadoop.security.UserGroupInformation;
 
 /**
  * Test to verify localization of a job and localization of a task on a
@@ -41,6 +42,7 @@ public class TestLocalizationWithLinuxTaskController extends
       LogFactory.getLog(TestLocalizationWithLinuxTaskController.class);
 
   private File configFile;
+  private static String taskTrackerUserName;
 
   @Override
   protected boolean canRun() {
@@ -78,6 +80,8 @@ public class TestLocalizationWithLinuxTaskController extends
     uploadJobConf(jobConf);
     task.setConf(jobConf);
     task.setUser(user);
+    taskTrackerUserName = UserGroupInformation.getLoginUser()
+                          .getShortUserName();
   }
 
   @Override
@@ -112,16 +116,25 @@ public class TestLocalizationWithLinuxTaskController extends
       assertTrue("taskTracker sub-dir in the local-dir " + localDir
           + "is not created!", taskTrackerSubDir.exists());
 
+      // user-dir, jobcache and distcache will have
+      //     2770 permissions if jobOwner is same as tt_user
+      //     2570 permissions for any other user
+      String expectedDirPerms = taskTrackerUserName.equals(task.getUser())
+                                ? "drwxrws---"
+                                : "dr-xrws---";
+
       File userDir = new File(taskTrackerSubDir, task.getUser());
       assertTrue("user-dir in taskTrackerSubdir " + taskTrackerSubDir
           + "is not created!", userDir.exists());
-      checkFilePermissions(userDir.getAbsolutePath(), "dr-xrws---", task
+
+      checkFilePermissions(userDir.getAbsolutePath(), expectedDirPerms, task
           .getUser(), ClusterWithLinuxTaskController.taskTrackerSpecialGroup);
 
       File jobCache = new File(userDir, TaskTracker.JOBCACHE);
       assertTrue("jobcache in the userDir " + userDir + " isn't created!",
           jobCache.exists());
-      checkFilePermissions(jobCache.getAbsolutePath(), "dr-xrws---", task
+
+      checkFilePermissions(jobCache.getAbsolutePath(), expectedDirPerms, task
           .getUser(), ClusterWithLinuxTaskController.taskTrackerSpecialGroup);
 
       // Verify the distributed cache dir.
@@ -131,7 +144,7 @@ public class TestLocalizationWithLinuxTaskController extends
       assertTrue("distributed cache dir " + distributedCacheDir
           + " doesn't exists!", distributedCacheDir.exists());
       checkFilePermissions(distributedCacheDir.getAbsolutePath(),
-          "dr-xrws---", task.getUser(),
+          expectedDirPerms, task.getUser(),
           ClusterWithLinuxTaskController.taskTrackerSpecialGroup);
     }
   }
@@ -139,12 +152,25 @@ public class TestLocalizationWithLinuxTaskController extends
   @Override
   protected void checkJobLocalization()
       throws IOException {
+    // job-dir, jars-dir and subdirectories in them will have
+    //     2770 permissions if jobOwner is same as tt_user
+    //     2570 permissions for any other user
+    // Files under these dirs will have
+    //      770 permissions if jobOwner is same as tt_user
+    //      570 permissions for any other user
+    String expectedDirPerms = taskTrackerUserName.equals(task.getUser())
+                              ? "drwxrws---"
+                              : "dr-xrws---";
+    String expectedFilePerms = taskTrackerUserName.equals(task.getUser())
+                               ? "-rwxrwx---"
+                               : "-r-xrwx---";
+
     for (String localDir : trackerFConf.getStrings(MRConfig.LOCAL_DIR)) {
       File jobDir =
           new File(localDir, TaskTracker.getLocalJobDir(task.getUser(), jobId
               .toString()));
       // check the private permissions on the job directory
-      checkFilePermissions(jobDir.getAbsolutePath(), "dr-xrws---", task
+      checkFilePermissions(jobDir.getAbsolutePath(), expectedDirPerms, task
           .getUser(), ClusterWithLinuxTaskController.taskTrackerSpecialGroup);
     }
 
@@ -156,12 +182,12 @@ public class TestLocalizationWithLinuxTaskController extends
     dirs.add(jarsDir);
     dirs.add(new Path(jarsDir, "lib"));
     for (Path dir : dirs) {
-      checkFilePermissions(dir.toUri().getPath(), "dr-xrws---",
+      checkFilePermissions(dir.toUri().getPath(), expectedDirPerms,
           task.getUser(),
           ClusterWithLinuxTaskController.taskTrackerSpecialGroup);
     }
 
-    // job-work dir needs user writable permissions
+    // job-work dir needs user writable permissions i.e. 2770 for any user
     Path jobWorkDir =
         lDirAlloc.getLocalPathToRead(TaskTracker.getJobWorkDir(task.getUser(),
             jobId.toString()), trackerFConf);
@@ -177,7 +203,7 @@ public class TestLocalizationWithLinuxTaskController extends
     files.add(new Path(jarsDir, "lib" + Path.SEPARATOR + "lib1.jar"));
     files.add(new Path(jarsDir, "lib" + Path.SEPARATOR + "lib2.jar"));
     for (Path file : files) {
-      checkFilePermissions(file.toUri().getPath(), "-r-xrwx---", task
+      checkFilePermissions(file.toUri().getPath(), expectedFilePerms, task
           .getUser(), ClusterWithLinuxTaskController.taskTrackerSpecialGroup);
     }
   }

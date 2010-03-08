@@ -136,7 +136,7 @@ public class ClusterWithLinuxTaskController extends TestCase {
 
   private static File configurationFile = null;
 
-  protected UserGroupInformation taskControllerUser;
+  protected UserGroupInformation jobOwner;
   
   protected static String taskTrackerSpecialGroup = null;
   /**
@@ -183,7 +183,7 @@ public class ClusterWithLinuxTaskController extends TestCase {
 
     String ugi = System.getProperty(TASKCONTROLLER_UGI);
     String[] splits = ugi.split(",");
-    taskControllerUser = UserGroupInformation.createUserForTesting(splits[0], 
+    jobOwner = UserGroupInformation.createUserForTesting(splits[0], 
         new String[]{splits[1]});
     createHomeAndStagingDirectory(clusterConf);
   }
@@ -191,7 +191,7 @@ public class ClusterWithLinuxTaskController extends TestCase {
   private void createHomeAndStagingDirectory(JobConf conf)
       throws IOException {
     FileSystem fs = dfsCluster.getFileSystem();
-    String path = "/user/" + taskControllerUser.getUserName();
+    String path = "/user/" + jobOwner.getUserName();
     homeDirectory = new Path(path);
     LOG.info("Creating Home directory : " + homeDirectory);
     fs.mkdirs(homeDirectory);
@@ -204,8 +204,8 @@ public class ClusterWithLinuxTaskController extends TestCase {
 
   private void changePermission(FileSystem fs)
       throws IOException {
-    fs.setOwner(homeDirectory, taskControllerUser.getUserName(),
-        taskControllerUser.getGroupNames()[0]);
+    fs.setOwner(homeDirectory, jobOwner.getUserName(),
+        jobOwner.getGroupNames()[0]);
   }
 
   static File getTaskControllerConfFile(String path) {
@@ -334,11 +334,11 @@ public class ClusterWithLinuxTaskController extends TestCase {
       LOG.info("Ownership of the file is " + status.getPath() + " is " + owner
           + "," + group);
       assertTrue("Output part-file's owner is not correct. Expected : "
-          + taskControllerUser.getUserName() + " Found : " + owner, owner
-          .equals(taskControllerUser.getUserName()));
+          + jobOwner.getUserName() + " Found : " + owner, owner
+          .equals(jobOwner.getUserName()));
       assertTrue("Output part-file's group is not correct. Expected : "
-          + taskControllerUser.getGroupNames()[0] + " Found : " + group, group
-          .equals(taskControllerUser.getGroupNames()[0]));
+          + jobOwner.getGroupNames()[0] + " Found : " + group, group
+          .equals(jobOwner.getGroupNames()[0]));
     }
   }
   
