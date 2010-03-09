@@ -155,7 +155,8 @@ public class TestStreamingAsDifferentUser extends
 
         // validate private cache files' permissions
         checkPermissionsOnPrivateDistCache(localDirs,
-            jobOwner.getShortUserName(), taskTrackerSpecialGroup);
+            jobOwner.getShortUserName(), taskTrackerUser,
+            taskTrackerSpecialGroup);
         
         // check the file is present even after the job is over.
         // work directory symlink cleanup should not have removed the target 

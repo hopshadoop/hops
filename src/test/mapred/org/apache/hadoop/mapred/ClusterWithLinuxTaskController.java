@@ -346,13 +346,23 @@ public class ClusterWithLinuxTaskController extends TestCase {
    * Validates permissions of private distcache dir and its contents fully
    */
   public static void checkPermissionsOnPrivateDistCache(String[] localDirs,
-      String user, String groupOwner) throws IOException {
+      String user, String taskTrackerUser, String groupOwner)
+      throws IOException {
+    // user-dir, jobcache and distcache will have
+    //     2770 permissions if jobOwner is same as tt_user
+    //     2570 permissions for any other user
+    String expectedDirPerms  = taskTrackerUser.equals(user)
+                               ? "drwxrws---"
+                               : "dr-xrws---";
+    String expectedFilePerms = taskTrackerUser.equals(user)
+                               ? "-rwxrwx---"
+                               : "-r-xrwx---";
     for (String localDir : localDirs) {
       File distCacheDir = new File(localDir,
           TaskTracker.getPrivateDistributedCacheDir(user));
       if (distCacheDir.exists()) {
-        checkPermissionsOnDir(distCacheDir, user, groupOwner, "dr-xrws---",
-            "-r-xrwx---");
+        checkPermissionsOnDir(distCacheDir, user, groupOwner, expectedDirPerms,
+            expectedFilePerms);
       }
     }
   }

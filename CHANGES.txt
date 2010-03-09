@@ -427,6 +427,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1518. RaidNode does not run the deletion check on the
     directory that stores the parity files.  (Rodrigo Schmidt via dhruba)
 
+    MAPREDUCE-1573. TestStreamingAsDifferentUser fails if run as tt_user.
+    (Ravi Gummadi via vinodkv)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
