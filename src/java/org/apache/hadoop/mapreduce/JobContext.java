@@ -113,6 +113,8 @@ public interface JobContext {
     "mapreduce.job.cache.archives.visibilities";
   public static final String CACHE_SYMLINK = 
     "mapreduce.job.cache.symlink.create";
+  public static final String USER_LOG_RETAIN_HOURS = 
+    "mapreduce.job.userlog.retain.hours";
   
   public static final String IO_SORT_FACTOR = 
     "mapreduce.task.io.sort.factor"; 
@@ -143,8 +145,6 @@ public interface JobContext {
   public static final String TASK_OUTPUT_DIR = "mapreduce.task.output.dir";
   public static final String TASK_USERLOG_LIMIT = 
     "mapreduce.task.userlog.limit.kb";
-  public static final String TASK_LOG_RETAIN_HOURS = 
-    "mapred.task.userlog.retain.hours";
   
   public static final String MAP_SORT_SPILL_PERCENT =
     "mapreduce.map.sort.spill.percent";

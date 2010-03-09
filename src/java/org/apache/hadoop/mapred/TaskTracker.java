@@ -257,7 +257,7 @@ public class TaskTracker
   int workerThreads;
   CleanupQueue directoryCleanupThread;
   volatile JvmManager jvmManager;
-  
+  UserLogCleaner taskLogCleanupThread;
   private TaskMemoryManagerThread taskMemoryManager;
   private boolean taskMemoryManagerEnabled = true;
   private long totalVirtualMemoryOnTT = JobConf.DISABLED_MEMORY_LIMIT;
@@ -709,6 +709,9 @@ public class TaskTracker
 
     setIndexCache(new IndexCache(this.fConf));
 
+    //clear old user logs
+    taskLogCleanupThread.clearOldUserLogs(this.fConf);
+
     mapLauncher = new TaskLauncher(TaskType.MAP, maxMapSlots);
     reduceLauncher = new TaskLauncher(TaskType.REDUCE, maxReduceSlots);
     mapLauncher.start();
@@ -943,8 +946,7 @@ public class TaskTracker
                               new LocalDirAllocator(MRConfig.LOCAL_DIR);
 
   // intialize the job directory
-  @SuppressWarnings("unchecked")
-  private void localizeJob(TaskInProgress tip
+  RunningJob localizeJob(TaskInProgress tip
                            ) throws IOException, InterruptedException {
     Task t = tip.getTask();
     JobID jobId = t.getJobID();
@@ -957,6 +959,8 @@ public class TaskTracker
       if (!rjob.localized) {
        
         JobConf localJobConf = localizeJobFiles(t, rjob);
+        // initialize job log directory
+        initializeJobLogDir(jobId);
 
         // Now initialize the job via task-controller so as to set
         // ownership/permissions of jars, job-work-dir. Note that initializeJob
@@ -974,7 +978,7 @@ public class TaskTracker
         rjob.localized = true;
       }
     }
-    launchTaskForJob(tip, new JobConf(rjob.jobConf)); 
+    return rjob;
   }
 
   private FileSystem getFS(final Path filePath, JobID jobId, 
@@ -1054,6 +1058,14 @@ public class TaskTracker
     localizeJobJarFile(userName, jobId, localFs, localJobConf);
     
     return localJobConf;
+  }
+
+  // create job userlog dir
+  void initializeJobLogDir(JobID jobId) {
+    // remove it from tasklog cleanup thread first,
+    // it might be added there because of tasktracker reinit or restart
+    taskLogCleanupThread.unmarkJobFromLogDeletion(jobId);
+    localizer.initializeJobLogDir(jobId);
   }
 
   /**
@@ -1263,7 +1275,8 @@ public class TaskTracker
     server.start();
     this.httpPort = server.getPort();
     checkJettyPort(httpPort);
-    
+    // create task log cleanup thread
+    setTaskLogCleanupThread(new UserLogCleaner(fConf));
     // Initialize the jobACLSManager
     jobACLsManager = new TaskTrackerJobACLsManager(this);
     initialize();
@@ -1282,6 +1295,9 @@ public class TaskTracker
     taskCleanupThread.setDaemon(true);
     taskCleanupThread.start();
     directoryCleanupThread = new CleanupQueue();
+    // start tasklog cleanup thread
+    taskLogCleanupThread.setDaemon(true);
+    taskLogCleanupThread.start();
   }
 
   // only used by tests
@@ -1291,6 +1307,14 @@ public class TaskTracker
   
   CleanupQueue getCleanupThread() {
     return directoryCleanupThread;
+  }
+
+  UserLogCleaner getTaskLogCleanupThread() {
+    return this.taskLogCleanupThread;
+  }
+
+  void setTaskLogCleanupThread(UserLogCleaner t) {
+    this.taskLogCleanupThread = t;
   }
 
   void setIndexCache(IndexCache cache) {
@@ -1808,7 +1832,7 @@ public class TaskTracker
    * @param action The action with the job
    * @throws IOException
    */
-  private synchronized void purgeJob(KillJobAction action) throws IOException {
+  synchronized void purgeJob(KillJobAction action) throws IOException {
     JobID jobId = action.getJobID();
     LOG.info("Received 'KillJobAction' for job: " + jobId);
     RunningJob rjob = null;
@@ -1833,6 +1857,11 @@ public class TaskTracker
         if (!rjob.keepJobFiles) {
           removeJobFiles(rjob.jobConf.getUser(), rjob.getJobID().toString());
         }
+        // add job to taskLogCleanupThread
+        long now = System.currentTimeMillis();
+        taskLogCleanupThread.markJobLogsForDeletion(now, rjob.jobConf,
+            rjob.jobid);
+
         // Remove this job 
         rjob.tasks.clear();
       }
@@ -2186,7 +2215,8 @@ public class TaskTracker
    */
   void startNewTask(TaskInProgress tip) {
     try {
-      localizeJob(tip);
+      RunningJob rjob = localizeJob(tip);
+      launchTaskForJob(tip, new JobConf(rjob.jobConf)); 
     } catch (Throwable e) {
       String msg = ("Error initializing " + tip.getTask().getTaskID() + 
                     ":\n" + StringUtils.stringifyException(e));
@@ -3261,6 +3291,10 @@ public class TaskTracker
       
     FetchStatus getFetchStatus() {
       return f;
+    }
+
+    JobConf getJobConf() {
+      return jobConf;
     }
   }
 

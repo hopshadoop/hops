@@ -430,6 +430,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1573. TestStreamingAsDifferentUser fails if run as tt_user.
     (Ravi Gummadi via vinodkv)
 
+    MAPREDUCE-927. Cleanup of task-logs should happen in TaskTracker instead
+    of the Child. (Amareshwari Sriramadasu via vinodkv)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

@@ -73,7 +73,8 @@ enum errorcodes {
   UNABLE_TO_EXECUTE_DEBUG_SCRIPT, //21
   INVALID_CONF_DIR, //22
   UNABLE_TO_BUILD_PATH, //23
-  INVALID_TASKCONTROLLER_PERMISSIONS //24
+  INVALID_TASKCONTROLLER_PERMISSIONS, //24
+  PREPARE_JOB_LOGS_FAILED, //25
 };
 
 #define USER_DIR_PATTERN "%s/taskTracker/%s"
@@ -86,7 +87,9 @@ enum errorcodes {
 
 #define JOB_DIR_TO_ATTEMPT_DIR_PATTERN "%s/%s"
 
-#define ATTEMPT_LOG_DIR_PATTERN "%s/userlogs/%s"
+#define JOB_LOG_DIR_PATTERN "%s/userlogs/%s"
+
+#define ATTEMPT_LOG_DIR_PATTERN JOB_LOG_DIR_PATTERN"/%s"
 
 #define TASK_SCRIPT_PATTERN "%s/%s/taskjvm.sh"
 

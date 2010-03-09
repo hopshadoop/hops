@@ -22,7 +22,6 @@ import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.DataOutputStream;
 import java.io.File;
-import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -34,11 +33,13 @@ import java.util.List;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.util.ProcessTree;
 import org.apache.hadoop.util.Shell;
 import org.apache.log4j.Appender;
@@ -50,6 +51,7 @@ import org.apache.log4j.Logger;
  * This class uses the system property <code>hadoop.log.dir</code>.
  * 
  */
+@InterfaceAudience.Private
 public class TaskLog {
   private static final Log LOG =
     LogFactory.getLog(TaskLog.class);
@@ -71,7 +73,7 @@ public class TaskLog {
   }
 
   public static File getTaskLogFile(TaskAttemptID taskid, LogName filter) {
-    return new File(getBaseDir(taskid.toString()), filter.toString());
+    return new File(getAttemptDir(taskid.toString()), filter.toString());
   }
   public static File getRealTaskLogFileLocation(TaskAttemptID taskid, 
       LogName filter) {
@@ -82,7 +84,7 @@ public class TaskLog {
       LOG.error("getTaskLogFileDetail threw an exception " + ie);
       return null;
     }
-    return new File(getBaseDir(l.location), filter.toString());
+    return new File(getAttemptDir(l.location), filter.toString());
   }
   private static class LogFileDetail {
     final static String LOCATION = "LOG_DIR:";
@@ -118,7 +120,7 @@ public class TaskLog {
     //to be associated with each task attempt since jvm reuse is disabled
     //when profiling/debugging is enabled
     if (filter.equals(LogName.DEBUGOUT) || filter.equals(LogName.PROFILE)) {
-      l.length = new File(getBaseDir(l.location), filter.toString()).length();
+      l.length = new File(getAttemptDir(l.location), filter.toString()).length();
       l.start = 0;
       fis.close();
       return l;
@@ -140,7 +142,7 @@ public class TaskLog {
   }
   
   private static File getTmpIndexFile(String taskid) {
-    return new File(getBaseDir(taskid), "log.tmp");
+    return new File(getAttemptDir(taskid), "log.tmp");
   }
   public static File getIndexFile(String taskid) {
     return getIndexFile(taskid, false);
@@ -148,9 +150,9 @@ public class TaskLog {
   
   public static File getIndexFile(String taskid, boolean isCleanup) {
     if (isCleanup) {
-      return new File(getBaseDir(taskid), "log.index.cleanup");
+      return new File(getAttemptDir(taskid), "log.index.cleanup");
     } else {
-      return new File(getBaseDir(taskid), "log.index");
+      return new File(getAttemptDir(taskid), "log.index");
     }
   }
 
@@ -158,8 +160,9 @@ public class TaskLog {
     return System.getProperty("hadoop.log.dir");
   }
 
-  static File getBaseDir(String taskid) {
-    return new File(LOG_DIR, taskid);
+  static File getAttemptDir(String taskid) {
+    return new File(getJobDir(TaskAttemptID.forName(taskid).getJobID()),
+        taskid);
   }
   private static long prevOutLength;
   private static long prevErrLength;
@@ -271,38 +274,6 @@ public class TaskLog {
     }
   }
 
-  private static class TaskLogsPurgeFilter implements FileFilter {
-    long purgeTimeStamp;
-  
-    TaskLogsPurgeFilter(long purgeTimeStamp) {
-      this.purgeTimeStamp = purgeTimeStamp;
-    }
-
-    public boolean accept(File file) {
-      LOG.debug("PurgeFilter - file: " + file + ", mtime: " + file.lastModified() + ", purge: " + purgeTimeStamp);
-      return file.lastModified() < purgeTimeStamp;
-    }
-  }
-  /**
-   * Purge old user logs.
-   * 
-   * @throws IOException
-   */
-  public static synchronized void cleanup(int logsRetainHours
-                                          ) throws IOException {
-    // Purge logs of tasks on this tasktracker if their  
-    // mtime has exceeded "mapred.task.log.retain" hours
-    long purgeTimeStamp = System.currentTimeMillis() - 
-                            (logsRetainHours*60L*60*1000);
-    File[] oldTaskLogs = LOG_DIR.listFiles
-                           (new TaskLogsPurgeFilter(purgeTimeStamp));
-    if (oldTaskLogs != null) {
-      for (int i=0; i < oldTaskLogs.length; ++i) {
-        FileUtil.fullyDelete(oldTaskLogs[i]);
-      }
-    }
-  }
-
   static class Reader extends InputStream {
     private long bytesRemaining;
     private FileInputStream file;
@@ -341,7 +312,7 @@ public class TaskLog {
       start += fileDetail.start;
       end += fileDetail.start;
       bytesRemaining = end - start;
-      file = new FileInputStream(new File(getBaseDir(fileDetail.location), 
+      file = new FileInputStream(new File(getAttemptDir(fileDetail.location), 
           kind.toString()));
       // skip upto start
       long pos = 0;
@@ -648,4 +619,14 @@ public class TaskLog {
     return LOG_DIR;
   }
   
+  /**
+   * Get the user log directory for the job jobid.
+   * 
+   * @param jobid
+   * @return user log directory for the job
+   */
+  public static File getJobDir(JobID jobid) {
+    return new File(getUserLogDir(), jobid.toString());
+  }
+
 } // TaskLog

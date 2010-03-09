@@ -292,7 +292,7 @@ public class ConfigUtil {
     Configuration.addDeprecation("mapred.userlog.limit.kb", 
       new String[] {JobContext.TASK_USERLOG_LIMIT});
     Configuration.addDeprecation("mapred.userlog.retain.hours", 
-      new String[] {JobContext.TASK_LOG_RETAIN_HOURS});
+      new String[] {JobContext.USER_LOG_RETAIN_HOURS});
     Configuration.addDeprecation("mapred.task.profile.params", 
       new String[] {JobContext.TASK_PROFILE_PARAMS});
     Configuration.addDeprecation("io.sort.spill.percent", 

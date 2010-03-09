@@ -67,7 +67,7 @@ public class MRAsyncDiskService {
    * @param localFileSystem The localFileSystem used for deletions.
    * @param volumes The roots of the file system volumes.
    */
-  public MRAsyncDiskService(FileSystem localFileSystem, String[] volumes)
+  public MRAsyncDiskService(FileSystem localFileSystem, String... volumes)
       throws IOException {
     
     this.volumes = new String[volumes.length];

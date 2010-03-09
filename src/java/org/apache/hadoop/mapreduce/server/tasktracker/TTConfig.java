@@ -88,4 +88,6 @@ public interface TTConfig extends MRConfig {
     "mapreduce.tasktracker.keytab.file";
   public static final String TT_GROUP = 
     "mapreduce.tasktracker.group";
+  public static final String TT_USERLOGCLEANUP_SLEEPTIME = 
+    "mapreduce.tasktracker.userlogcleanup.sleeptime";
 }
