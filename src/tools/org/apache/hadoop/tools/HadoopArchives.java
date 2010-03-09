@@ -75,6 +75,7 @@ import org.apache.hadoop.util.ToolRunner;
  * Hadoop archives look at {@link HarFileSystem}.
  */
 public class HadoopArchives implements Tool {
+  public static final int VERSION = 1;
   private static final Log LOG = LogFactory.getLog(HadoopArchives.class);
   
   private static final String NAME = "har"; 
@@ -680,7 +681,7 @@ public class HadoopArchives implements Tool {
         }
         indexStream = fs.create(index);
         outStream = fs.create(masterIndex);
-        String version = HarFileSystem.VERSION + " \n";
+        String version = VERSION + " \n";
         outStream.write(version.getBytes());
         
       } catch(IOException e) {

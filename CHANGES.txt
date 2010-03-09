@@ -433,6 +433,9 @@ Trunk (unreleased changes)
     MAPREDUCE-927. Cleanup of task-logs should happen in TaskTracker instead
     of the Child. (Amareshwari Sriramadasu via vinodkv)
 
+    MAPREDUCE-1578. Decouple HadoopArchives vesrion from HarFileSystem version.
+    (Rodrigo Schmidt via szetszwo)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
