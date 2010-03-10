@@ -161,7 +161,7 @@ class JvmManager {
    */
   static void deleteWorkDir(TaskTracker tracker, Task task) throws IOException {
     tracker.getCleanupThread().addToQueue(
-        TaskTracker.buildTaskControllerPathDeletionContexts(
+        TaskTracker.buildTaskControllerTaskPathDeletionContexts(
           tracker.getLocalFileSystem(),
           tracker.getLocalFiles(tracker.getJobConf(), ""),
           task, true /* workDir */,

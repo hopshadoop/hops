@@ -70,6 +70,8 @@ import org.apache.hadoop.mapred.TaskController.DebugScriptContext;
 import org.apache.hadoop.mapred.TaskController.JobInitializationContext;
 import org.apache.hadoop.mapred.CleanupQueue.PathDeletionContext;
 import org.apache.hadoop.mapred.TaskController.TaskControllerPathDeletionContext;
+import org.apache.hadoop.mapred.TaskController.TaskControllerTaskPathDeletionContext;
+import org.apache.hadoop.mapred.TaskController.TaskControllerJobPathDeletionContext;
 import org.apache.hadoop.mapred.TaskTrackerStatus.TaskTrackerHealthStatus;
 import org.apache.hadoop.mapred.pipes.Submitter;
 import org.apache.hadoop.mapreduce.MRConfig;
@@ -1788,7 +1790,33 @@ public class TaskTracker
   }
 
   /**
-   * Builds list of TaskControllerPathDeletionContext objects for a task
+   * Builds list of {@link TaskControllerJobPathDeletionContext} objects for a 
+   * job each pointing to the job's jobLocalDir.
+   * @param fs    : FileSystem in which the dirs to be deleted
+   * @param paths : mapred-local-dirs
+   * @param id    : {@link JobID} of the job for which the local-dir needs to 
+   *                be cleaned up.
+   * @param user  : Job owner's username
+   * @param taskController : the task-controller to be used for deletion of
+   *                         jobLocalDir
+   */
+  static PathDeletionContext[] buildTaskControllerJobPathDeletionContexts(
+      FileSystem fs, Path[] paths, JobID id, String user,
+      TaskController taskController)
+      throws IOException {
+    int i = 0;
+    PathDeletionContext[] contexts =
+                          new TaskControllerPathDeletionContext[paths.length];
+
+    for (Path p : paths) {
+      contexts[i++] = new TaskControllerJobPathDeletionContext(fs, p, id, user,
+                                                               taskController);
+    }
+    return contexts;
+  } 
+  
+  /**
+   * Builds list of TaskControllerTaskPathDeletionContext objects for a task
    * @param fs    : FileSystem in which the dirs to be deleted
    * @param paths : mapred-local-dirs
    * @param task  : the task whose taskDir or taskWorkDir is going to be deleted
@@ -1796,7 +1824,7 @@ public class TaskTracker
    * @param taskController : the task-controller to be used for deletion of
    *                         taskDir or taskWorkDir
    */
-  static PathDeletionContext[] buildTaskControllerPathDeletionContexts(
+  static PathDeletionContext[] buildTaskControllerTaskPathDeletionContexts(
       FileSystem fs, Path[] paths, Task task, boolean isWorkDir,
       TaskController taskController)
       throws IOException {
@@ -1805,7 +1833,7 @@ public class TaskTracker
                           new TaskControllerPathDeletionContext[paths.length];
 
     for (Path p : paths) {
-      contexts[i++] = new TaskControllerPathDeletionContext(fs, p, task,
+      contexts[i++] = new TaskControllerTaskPathDeletionContext(fs, p, task,
                           isWorkDir, taskController);
     }
     return contexts;
@@ -1855,7 +1883,7 @@ public class TaskTracker
         // Delete the job directory for this  
         // task if the job is done/failed
         if (!rjob.keepJobFiles) {
-          removeJobFiles(rjob.jobConf.getUser(), rjob.getJobID().toString());
+          removeJobFiles(rjob.jobConf.getUser(), rjob.getJobID());
         }
         // add job to taskLogCleanupThread
         long now = System.currentTimeMillis();
@@ -1879,10 +1907,11 @@ public class TaskTracker
    * @param rjob
    * @throws IOException
    */
-  void removeJobFiles(String user, String jobId)
+  void removeJobFiles(String user, JobID jobId)
       throws IOException {
-    PathDeletionContext[] contexts = buildPathDeletionContexts(localFs,
-        getLocalFiles(fConf, getLocalJobDir(user, jobId)));
+    PathDeletionContext[] contexts = 
+      buildTaskControllerJobPathDeletionContexts(localFs, 
+          getLocalFiles(fConf, ""), jobId, user, taskController);
     directoryCleanupThread.addToQueue(contexts);
   }
 
@@ -3006,7 +3035,7 @@ public class TaskTracker
         if (localJobConf.getNumTasksToExecutePerJvm() == 1) {
           // No jvm reuse, remove everything
           PathDeletionContext[] contexts =
-            buildTaskControllerPathDeletionContexts(localFs,
+            buildTaskControllerTaskPathDeletionContexts(localFs,
                 getLocalFiles(fConf, ""), task, false/* not workDir */,
                 taskController);
           directoryCleanupThread.addToQueue(contexts);
@@ -3026,7 +3055,7 @@ public class TaskTracker
       } else {
         if (localJobConf.getNumTasksToExecutePerJvm() == 1) {
           PathDeletionContext[] contexts =
-            buildTaskControllerPathDeletionContexts(localFs,
+            buildTaskControllerTaskPathDeletionContexts(localFs,
               getLocalFiles(fConf, ""), task, true /* workDir */,
               taskController);
           directoryCleanupThread.addToQueue(contexts);

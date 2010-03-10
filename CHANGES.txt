@@ -436,6 +436,10 @@ Trunk (unreleased changes)
     MAPREDUCE-1578. Decouple HadoopArchives vesrion from HarFileSystem version.
     (Rodrigo Schmidt via szetszwo)
 
+    MAPREDUCE-1422. Fix cleanup of localized job directory to work if files
+    with non-deletable permissions are created within it.
+    (Amar Kamat via yhemanth)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

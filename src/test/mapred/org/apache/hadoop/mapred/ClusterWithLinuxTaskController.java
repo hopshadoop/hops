@@ -109,7 +109,7 @@ public class ClusterWithLinuxTaskController extends TestCase {
     void dumpTaskStack(TaskControllerContext context) {
       attemptedSigQuits++;
       try {
-        signalTask(context, TaskCommands.SIGQUIT_TASK_JVM);
+        signalTask(context, TaskControllerCommands.SIGQUIT_TASK_JVM);
       } catch (Exception e) {
         LOG.warn("Execution sending SIGQUIT: " + StringUtils.stringifyException(e));
         failedSigQuits++;
