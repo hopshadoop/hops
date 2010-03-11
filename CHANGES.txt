@@ -231,6 +231,8 @@ Trunk (unreleased changes)
     MAPREDUCE-1501. FileInputFormat supports multi-level, recursive 
     directory listing.  (Zheng Shao via dhruba)
 
+    MAPREDUCE-1556. upgrade to Avro 1.3.0. (cutting via tomwhite)
+
   BUG FIXES
 
     MAPREDUCE-1258. Fix fair scheduler event log not logging job info.

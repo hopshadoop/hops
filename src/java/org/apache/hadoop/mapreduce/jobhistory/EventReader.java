@@ -83,7 +83,7 @@ public class EventReader implements Closeable {
     Event wrapper;
     try {
       wrapper = (Event)reader.read(null, decoder);
-    } catch (AvroRuntimeException e) {            // at EOF
+    } catch (EOFException e) {            // at EOF
       return null;
     }
     HistoryEvent result;

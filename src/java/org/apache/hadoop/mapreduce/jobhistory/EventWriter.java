@@ -44,16 +44,17 @@ class EventWriter {
   static final String VERSION = "Avro-Json";
 
   private FSDataOutputStream out;
-  private DatumWriter<Object> writer = new SpecificDatumWriter(Event.class);
+  private DatumWriter<Event> writer =
+    new SpecificDatumWriter<Event>(Event.class);
   private Encoder encoder;
   
   EventWriter(FSDataOutputStream out) throws IOException {
     this.out = out;
     out.writeBytes(VERSION);
     out.writeBytes("\n");
-    out.writeBytes(Event._SCHEMA.toString());
+    out.writeBytes(Event.SCHEMA$.toString());
     out.writeBytes("\n");
-    this.encoder = new JsonEncoder(Event._SCHEMA, out);
+    this.encoder = new JsonEncoder(Event.SCHEMA$, out);
   }
   
   synchronized void write(HistoryEvent event) throws IOException { 
@@ -75,10 +76,10 @@ class EventWriter {
   }
 
   private static final Schema GROUPS =
-    Schema.createArray(JhCounterGroup._SCHEMA);
+    Schema.createArray(JhCounterGroup.SCHEMA$);
 
   private static final Schema COUNTERS =
-    Schema.createArray(JhCounter._SCHEMA);
+    Schema.createArray(JhCounter.SCHEMA$);
 
   static JhCounters toAvro(Counters counters) {
     return toAvro(counters, "COUNTERS");
