@@ -24,6 +24,7 @@ import junit.framework.Assert;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
+import org.apache.hadoop.conf.Configuration;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -66,8 +67,6 @@ public class TestSimulatorTaskTracker {
   
   final static String taskAttemptIdPrefix = "attempt_200907150128_0007_";
   final String taskTrackerName = "test_task_tracker";
-  final int maxMapSlots = 3;
-  final int maxReduceSlots = 3;
   
   @Before
   public void setUp() {
@@ -77,9 +76,13 @@ public class TestSimulatorTaskTracker {
     } catch (Exception e) {
       Assert.fail("Couldn't set up the mock job tracker: " + e);
     }
-    taskTracker = new SimulatorTaskTracker(jobTracker, taskTrackerName,
-                                           "test_host", 
-                                           maxMapSlots, maxReduceSlots);
+    Configuration ttConf = new Configuration();
+    ttConf.set("mumak.tasktracker.tracker.name", taskTrackerName);
+    ttConf.set("mumak.tasktracker.host.name", "test_host");
+    ttConf.setInt("mapred.tasktracker.map.tasks.maximum", 3);
+    ttConf.setInt("mapred.tasktracker.reduce.tasks.maximum", 3);
+    ttConf.setInt("mumak.tasktracker.heartbeat.fuzz", -1);    
+    taskTracker = new SimulatorTaskTracker(jobTracker, ttConf);
     eventQueue = new CheckedEventQueue(simulationStartTime); 
   }
   

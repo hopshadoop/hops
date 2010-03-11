@@ -440,6 +440,9 @@ Trunk (unreleased changes)
     with non-deletable permissions are created within it.
     (Amar Kamat via yhemanth)
 
+    MAPREDUCE-1306. Randomize the arrival of heartbeat responses in Mumak.
+    (Tamas Sarlos via cdouglas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

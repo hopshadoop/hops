@@ -41,7 +41,12 @@ public class SimulatorJobStoryProducer implements JobStoryProducer {
 
   public SimulatorJobStoryProducer(Path path, ZombieCluster cluster,
       long firstJobStartTime, Configuration conf) throws IOException {
-    producer = new ZombieJobProducer(path, cluster, conf);
+    this(path, cluster, firstJobStartTime, conf, System.nanoTime());
+  }
+
+  public SimulatorJobStoryProducer(Path path, ZombieCluster cluster,
+      long firstJobStartTime, Configuration conf, long seed) throws IOException {
+    producer = new ZombieJobProducer(path, cluster, conf, seed);
     this.firstJobStartTime = firstJobStartTime;
   }
 

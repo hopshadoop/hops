@@ -22,10 +22,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Set;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Iterator;
+import java.util.Random;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -35,6 +36,7 @@ import org.apache.hadoop.tools.rumen.TaskAttemptInfo;
 import org.apache.hadoop.tools.rumen.ReduceTaskAttemptInfo;
 // Explicitly use the new api, older o.a.h.mapred.TaskAttemptID is deprecated
 import org.apache.hadoop.mapreduce.TaskAttemptID;
+import org.apache.hadoop.conf.Configuration;
 
 /**
  * This class simulates a {@link TaskTracker}. Its main purpose is to call heartbeat()
@@ -49,6 +51,17 @@ import org.apache.hadoop.mapreduce.TaskAttemptID;
  * handle*Action() methods.
  */
 public class SimulatorTaskTracker implements SimulatorEventListener {
+  /** Default host name. */
+  public static String DEFAULT_HOST_NAME = "unknown";
+  /** Default task tracker name. */
+  public static String DEFAULT_TRACKER_NAME = 
+      "tracker_unknown:localhost/127.0.0.1:10000";
+  /** Default number of map slots per task tracker. */
+  public static final int DEFAULT_MAP_SLOTS = 2;
+  /** Default number of reduce slots per task tracker. */
+  public static final int DEFAULT_REDUCE_SLOTS = 2;
+  /** Default range of heartbeat response perturbations + 1 in milliseconds. */
+  public static final int DEFAULT_HEARTBEAT_FUZZ = 11;
   /** The name of the task tracker. */
   protected final String taskTrackerName;
   /** The name of the host the task tracker is running on. */
@@ -68,9 +81,11 @@ public class SimulatorTaskTracker implements SimulatorEventListener {
    * not yet reported tasks. We manage it in a mark & sweep garbage collector 
    * manner. We insert tasks on launch, mark them on completion, and remove
    * completed tasks at heartbeat() reports.
+   * We use LinkedHashMap instead of HashMap so that the order of iteration
+   * is deterministic.
    */
   protected Map<TaskAttemptID, SimulatorTaskInProgress> tasks = 
-      new HashMap<TaskAttemptID, SimulatorTaskInProgress>();
+      new LinkedHashMap<TaskAttemptID, SimulatorTaskInProgress>();
   /** 
    * Number of map slots allocated to tasks in RUNNING state on this task 
    * tracker. Must be in sync with the tasks map above. 
@@ -92,34 +107,68 @@ public class SimulatorTaskTracker implements SimulatorEventListener {
 
   /**
    * Task attempt ids for which TaskAttemptCompletionEvent was created but the 
-   * task attempt got killed. 
+   * task attempt got killed.
+   * We use LinkedHashSet to get deterministic iterators, should ever use one.
    */
   private Set<TaskAttemptID> orphanTaskCompletions = 
-    new HashSet<TaskAttemptID>();
+    new LinkedHashSet<TaskAttemptID>();
 
   /** The log object to send our messages to; only used for debugging. */
   private static final Log LOG = LogFactory.getLog(SimulatorTaskTracker.class);
+  
+  /** 
+   * Number of milliseconds to perturb the requested heartbeat intervals with
+   * to simulate network latency, etc.
+   * If <= 1 then there is no pertrubation. This option is also useful for 
+   * testing.
+   * If > 1 then hearbeats are perturbed with a uniformly random integer in 
+   * (-heartbeatIntervalFuzz,+heartbeatIntervalFuzz), not including 
+   * the bounds.
+   */
+  private int heartbeatIntervalFuzz = -1;
+  /** Used for randomly perturbing the heartbeat timings. */
+  private Random random;
   
   /**
    * Constructs a task tracker. 
    *
    * @param jobTracker the SimulatorJobTracker we talk to
-   * @param taskTrackerName the task tracker name to report, otherwise unused
-   * @param hostName the host name to report, otherwise unused
-   * @param maxMapTasks the number of map slots
-   * @param maxReduceTasks the number of reduce slots
+   * @param conf Configuration object. Parameters read are:
+   * <dl>
+   * <dt> mumak.tasktracker.tracker.name <dd> 
+   *      the task tracker name to report, otherwise unused
+   * <dt> mumak.tasktracker.host.name <dd> 
+   *      the host name to report, otherwise unused
+   * <dt> mapred.tasktracker.map.tasks.maximum <dd> 
+   *      the number of map slots
+   * <dt> mapred.tasktracker.reduce.tasks.maximum <dd> 
+   *      the number of reduce slots
+   * <dt> mumak.tasktracker.heartbeat.fuzz <dd>
+   *      Perturbation for the heartbeats. 
+   *      None if <= 1 else perturbations are uniformly randomly generated 
+   *      in (-heartbeat.fuzz,+heartbeat.fuzz), not including the bounds.
+   * </dl>
    */
-  public SimulatorTaskTracker(InterTrackerProtocol jobTracker, 
-                              String taskTrackerName, String hostName, 
-                              int maxMapTasks, int maxReduceTasks) {
+  public SimulatorTaskTracker(InterTrackerProtocol jobTracker,
+                              Configuration conf) {
+    this.taskTrackerName = conf.get(
+        "mumak.tasktracker.tracker.name", DEFAULT_TRACKER_NAME);
+
     LOG.debug("SimulatorTaskTracker constructor, taskTrackerName=" +
               taskTrackerName);
 
     this.jobTracker = jobTracker;    
-    this.taskTrackerName = taskTrackerName;
-    this.hostName = hostName;
-    this.maxMapSlots = maxMapTasks;
-    this.maxReduceSlots = maxReduceTasks;
+    this.hostName = conf.get(
+        "mumak.tasktracker.host.name", DEFAULT_HOST_NAME);
+    this.maxMapSlots = conf.getInt(
+        "mapred.tasktracker.map.tasks.maximum", DEFAULT_MAP_SLOTS);
+    this.maxReduceSlots = conf.getInt(
+        "mapred.tasktracker.reduce.tasks.maximum", DEFAULT_REDUCE_SLOTS);
+    this.heartbeatIntervalFuzz = conf.getInt(
+        "mumak.tasktracker.heartbeat.fuzz", DEFAULT_HEARTBEAT_FUZZ);
+    long seed = conf.getLong("mumak.tasktracker.random.seed", 
+        System.nanoTime());
+    this.random = new Random(seed);
   }
   
   /**
@@ -637,7 +686,18 @@ public class SimulatorTaskTracker implements SimulatorEventListener {
     List<SimulatorEvent> events = handleHeartbeatResponse(response, now);
     
     // Next heartbeat
-    events.add(new HeartbeatEvent(this, now + response.getHeartbeatInterval()));
+    int heartbeatInterval = response.getHeartbeatInterval();
+    if (heartbeatIntervalFuzz > 1) {
+      // Add some randomness to heartbeat timings to simulate network latency, 
+      // time spent servicing this heartbeat request, etc.
+      // randomFuzz is in (-heartbeatIntervalFuzz,+heartbeatIntervalFuzz)
+      int randomFuzz = random.nextInt(2*heartbeatIntervalFuzz-1) - 
+                       heartbeatIntervalFuzz;
+      heartbeatInterval += randomFuzz;
+      // make sure we never schedule a heartbeat in the past
+      heartbeatInterval = Math.max(1, heartbeatInterval); 
+    }
+    events.add(new HeartbeatEvent(this, now + heartbeatInterval));
 
     return events;
   }

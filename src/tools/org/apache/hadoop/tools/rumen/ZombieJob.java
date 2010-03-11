@@ -57,6 +57,7 @@ public class ZombieJob implements JobStory {
   private JobConf jobConf;
 
   private long seed;
+  private long numRandomSeeds = 0;
   private boolean hasRandomSeed = false;
 
   private Map<LoggedDiscreteCDF, CDFRandomGenerator> interpolatorMap =
@@ -194,7 +195,8 @@ public class ZombieJob implements JobStory {
         if (cluster == null) {
           splitsList.add(new FileSplit(emptyPath, 0, 0, new String[0]));
         } else {
-          MachineNode[] mNodes = cluster.getRandomMachines(avgHostPerSplit);
+          MachineNode[] mNodes = cluster.getRandomMachines(avgHostPerSplit,
+                                                           random);
           String[] hosts = new String[mNodes.length];
           for (int j = 0; j < hosts.length; ++j) {
             hosts[j] = mNodes[j].getName();
@@ -794,7 +796,13 @@ public class ZombieJob implements JobStory {
 
     return makeUpRuntimeCore(loggedDiscreteCDF);
   }
-
+  
+  private synchronized long getNextRandomSeed() {
+    numRandomSeeds++;
+    return RandomSeedGenerator.getSeed("forZombieJob" + job.getJobID(),
+                                       numRandomSeeds);
+  }
+   
   private long makeUpRuntimeCore(LoggedDiscreteCDF loggedDiscreteCDF) {
     CDFRandomGenerator interpolator;
 
@@ -809,7 +817,7 @@ public class ZombieJob implements JobStory {
 
       interpolator =
           hasRandomSeed ? new CDFPiecewiseLinearRandomGenerator(
-              loggedDiscreteCDF, ++seed)
+              loggedDiscreteCDF, getNextRandomSeed())
               : new CDFPiecewiseLinearRandomGenerator(loggedDiscreteCDF);
 
       /*
