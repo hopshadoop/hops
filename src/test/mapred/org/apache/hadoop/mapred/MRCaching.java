@@ -21,6 +21,7 @@ package org.apache.hadoop.mapred;
 import java.io.*;
 import java.util.*;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
@@ -34,8 +35,11 @@ import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.util.*;
 import org.apache.hadoop.mapred.MapReduceBase;
 import org.apache.hadoop.mapreduce.filecache.DistributedCache;
+import org.apache.hadoop.mapreduce.JobContext;
 
 import java.net.URI;
+
+import junit.framework.Assert;
 
 public class MRCaching {
   static String testStr = "This is a test file " + "used for testing caching "
@@ -271,8 +275,16 @@ public class MRCaching {
       uris[5] = fs.getUri().resolve(cacheDir + "/test.tar#" + "testtar");
     }
     DistributedCache.addCacheFile(uris[0], conf);
+
+    // Save expected file sizes
+    long[] fileSizes = new long[1];
+    fileSizes[0] = fs.getFileStatus(new Path(uris[0].getPath())).getLen();
+
+    long[] archiveSizes = new long[5]; // track last 5
     for (int i = 1; i < 6; i++) {
       DistributedCache.addCacheArchive(uris[i], conf);
+      archiveSizes[i-1] = // starting with second archive
+        fs.getFileStatus(new Path(uris[i].getPath())).getLen();
     }
     RunningJob job = JobClient.runJob(conf);
     int count = 0;
@@ -295,7 +307,32 @@ public class MRCaching {
     if (count != 6)
       return new TestResult(job, false);
 
+    // Check to ensure the filesizes of files in DC were correctly saved.
+    // Note, the underlying job clones the original conf before determine
+    // various stats (timestamps etc.), so we have to getConfiguration here.
+    validateCacheFileSizes(job.getConfiguration(), fileSizes,
+                           JobContext.CACHE_FILES_SIZES);
+    validateCacheFileSizes(job.getConfiguration(), archiveSizes,
+                           JobContext.CACHE_ARCHIVES_SIZES);
+
     return new TestResult(job, true);
 
+  }
+
+  private static void validateCacheFileSizes(Configuration job,
+                                             long[] expectedSizes,
+                                             String configKey)
+  throws IOException {
+    String configValues = job.get(configKey, "");
+    System.out.println(configKey + " -> " + configValues);
+    String[] realSizes = StringUtils.getStrings(configValues);
+    Assert.assertEquals("Number of files for "+ configKey,
+                        expectedSizes.length, realSizes.length);
+
+    for (int i=0; i < expectedSizes.length; ++i) {
+      long actual = Long.valueOf(realSizes[i]);
+      long expected = expectedSizes[i];
+      Assert.assertEquals("File "+ i +" for "+ configKey, expected, actual);
+    }
   }
 }

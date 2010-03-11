@@ -99,7 +99,11 @@ public interface JobContext {
   public static final String CLASSPATH_FILES = "mapreduce.job.classpath.files";
   public static final String CACHE_FILES = "mapreduce.job.cache.files";
   public static final String CACHE_ARCHIVES = "mapreduce.job.cache.archives";
-  public static final String CACHE_LOCALFILES = 
+  public static final String CACHE_FILES_SIZES =
+    "mapreduce.job.cache.files.filesizes";    // internal use only
+  public static final String CACHE_ARCHIVES_SIZES =
+    "mapreduce.job.cache.archives.filesizes"; // ditto
+  public static final String CACHE_LOCALFILES =
     "mapreduce.job.cache.local.files";
   public static final String CACHE_LOCALARCHIVES = 
     "mapreduce.job.cache.local.archives";

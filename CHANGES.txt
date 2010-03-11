@@ -206,7 +206,10 @@ Trunk (unreleased changes)
     Singh via cdouglas)
 
     MAPREDUCE-1527. Better warning logged when mapred.queue.names is
-    overshadowed by mapred-queues.xml. (Hong Tang via acmurthy) 
+    overshadowed by mapred-queues.xml. (Hong Tang via acmurthy)
+
+    MAPREDUCE-1403. Save the size and number of distributed cache artifacts in
+    the configuration. (Arun Murthy via cdouglas)
 
   OPTIMIZATIONS
 

@@ -19,6 +19,7 @@
 package org.apache.hadoop.mapred;
 
 import java.io.IOException;
+import org.apache.hadoop.conf.Configuration;
 
 
 /** 
@@ -34,6 +35,14 @@ import java.io.IOException;
  */
 @Deprecated
 public interface RunningJob {
+
+  /**
+   * Get the underlying job configuration
+   *
+   * @return the configuration of the job.
+   */
+  public Configuration getConfiguration();
+
   /**
    * Get the job identifier.
    * 

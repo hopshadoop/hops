@@ -163,6 +163,10 @@ public class JobClient extends CLI {
       this.job = job;
     }
 
+    public Configuration getConfiguration() {
+      return job.getConfiguration();
+    }
+
     /**
      * An identifier for the job
      */

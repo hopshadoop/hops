@@ -30,7 +30,6 @@ import java.util.TreeMap;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.TaskController;
 import org.apache.hadoop.mapred.TaskController.DistributedCacheFileContext;
 import org.apache.hadoop.mapreduce.JobContext;
@@ -341,21 +340,34 @@ public class TrackerDistributedCacheManager {
   }
   
   /**
-   * Returns mtime of a given cache file on hdfs.
+   * Returns {@link FileStatus} of a given cache file on hdfs.
    * 
    * @param conf configuration
    * @param cache cache file 
+   * @return {@link FileStatus} of a given cache file on hdfs
+   * @throws IOException
+   */
+  static FileStatus getFileStatus(Configuration conf, URI cache)
+    throws IOException {
+    FileSystem fileSystem = FileSystem.get(cache, conf);
+    Path filePath = new Path(cache.getPath());
+
+    return fileSystem.getFileStatus(filePath);
+  }
+
+  /**
+   * Returns mtime of a given cache file on hdfs.
+   *
+   * @param conf configuration
+   * @param cache cache file
    * @return mtime of a given cache file on hdfs
    * @throws IOException
    */
   static long getTimestamp(Configuration conf, URI cache)
     throws IOException {
-    FileSystem fileSystem = FileSystem.get(cache, conf);
-    Path filePath = new Path(cache.getPath());
-
-    return fileSystem.getFileStatus(filePath).getModificationTime();
+    return getFileStatus(conf, cache).getModificationTime();
   }
-  
+
   /**
    * Returns a boolean to denote whether a cache file is visible to all(public)
    * or not
@@ -687,26 +699,37 @@ public class TrackerDistributedCacheManager {
   public static void determineTimestamps(Configuration job) throws IOException {
     URI[] tarchives = DistributedCache.getCacheArchives(job);
     if (tarchives != null) {
-      StringBuffer archiveTimestamps = 
-        new StringBuffer(String.valueOf(
-            getTimestamp(job, tarchives[0])));
+      FileStatus status = getFileStatus(job, tarchives[0]);
+      StringBuilder archiveFileSizes =
+        new StringBuilder(String.valueOf(status.getLen()));
+      StringBuilder archiveTimestamps =
+        new StringBuilder(String.valueOf(status.getModificationTime()));
       for (int i = 1; i < tarchives.length; i++) {
+        status = getFileStatus(job, tarchives[i]);
+        archiveFileSizes.append(",");
+        archiveFileSizes.append(String.valueOf(status.getLen()));
         archiveTimestamps.append(",");
-        archiveTimestamps.append(String.valueOf(
-            getTimestamp(job, tarchives[i])));
+        archiveTimestamps.append(String.valueOf(status.getModificationTime()));
       }
+      job.set(JobContext.CACHE_ARCHIVES_SIZES, archiveFileSizes.toString());
       setArchiveTimestamps(job, archiveTimestamps.toString());
     }
   
     URI[] tfiles = DistributedCache.getCacheFiles(job);
     if (tfiles != null) {
-      StringBuffer fileTimestamps = new StringBuffer(String.valueOf(
-          getTimestamp(job, tfiles[0])));
+      FileStatus status = getFileStatus(job, tfiles[0]);
+      StringBuilder fileSizes =
+        new StringBuilder(String.valueOf(status.getLen()));
+      StringBuilder fileTimestamps = new StringBuilder(String.valueOf(
+        status.getModificationTime()));
       for (int i = 1; i < tfiles.length; i++) {
+        status = getFileStatus(job, tfiles[i]);
+        fileSizes.append(",");
+        fileSizes.append(String.valueOf(status.getLen()));
         fileTimestamps.append(",");
-        fileTimestamps.append(String.valueOf(
-            getTimestamp(job, tfiles[i])));
+        fileTimestamps.append(String.valueOf(status.getModificationTime()));
       }
+      job.set(JobContext.CACHE_FILES_SIZES, fileSizes.toString());
       setFileTimestamps(job, fileTimestamps.toString());
     }
   }
@@ -751,8 +774,8 @@ public class TrackerDistributedCacheManager {
   throws IOException {
     URI[] tarchives = DistributedCache.getCacheArchives(job);
     if (tarchives != null) {
-      StringBuffer archiveVisibilities = 
-        new StringBuffer(String.valueOf(isPublic(job, tarchives[0])));
+      StringBuilder archiveVisibilities =
+        new StringBuilder(String.valueOf(isPublic(job, tarchives[0])));
       for (int i = 1; i < tarchives.length; i++) {
         archiveVisibilities.append(",");
         archiveVisibilities.append(String.valueOf(isPublic(job, tarchives[i])));
@@ -761,8 +784,8 @@ public class TrackerDistributedCacheManager {
     }
     URI[] tfiles = DistributedCache.getCacheFiles(job);
     if (tfiles != null) {
-      StringBuffer fileVisibilities = 
-        new StringBuffer(String.valueOf(isPublic(job, tfiles[0])));
+      StringBuilder fileVisibilities =
+        new StringBuilder(String.valueOf(isPublic(job, tfiles[0])));
       for (int i = 1; i < tfiles.length; i++) {
         fileVisibilities.append(",");
         fileVisibilities.append(String.valueOf(isPublic(job, tfiles[i])));
