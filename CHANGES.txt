@@ -448,6 +448,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1306. Randomize the arrival of heartbeat responses in Mumak.
     (Tamas Sarlos via cdouglas)
 
+    MAPREDUCE-1579. archive: check and possibly replace the space charater
+    in source paths.  (szetszwo)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
@@ -1379,6 +1382,3 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-890. After HADOOP-4491, the user who started mapred system is 
     not able to run job. (Ravi Gummadi via vinodkv)
-
-    MAPREDUCE-1579. archive: check and possibly replace the space charater
-    in source paths.  (szetszwo)
