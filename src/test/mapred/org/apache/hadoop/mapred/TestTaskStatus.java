@@ -17,10 +17,13 @@
  */
 package org.apache.hadoop.mapred;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.junit.Test;
 import static org.junit.Assert.*;
 
 public class TestTaskStatus {
+  private static final Log LOG = LogFactory.getLog(TestTaskStatus.class);
 
   @Test
   public void testMapTaskStatusStartAndFinishTimes() {
@@ -70,5 +73,135 @@ public class TestTaskStatus {
     status.setFinishTime(currentTime);
     assertEquals("Finish time of the task status not set correctly.",
         currentTime, status.getFinishTime());
+    
+    // test with null task-diagnostics
+    TaskStatus ts = ((TaskStatus)status.clone());
+    ts.setDiagnosticInfo(null);
+    ts.setDiagnosticInfo("");
+    ts.setStateString(null);
+    ts.setStateString("");
+    ((TaskStatus)status.clone()).statusUpdate(ts);
+    
+    // test with null state-string
+    ((TaskStatus)status.clone()).statusUpdate(0, null, null);
+    ((TaskStatus)status.clone()).statusUpdate(0, "", null);
+    ((TaskStatus)status.clone()).statusUpdate(null, 0, "", null, 1);
+  }
+  
+  /**
+   * Test the {@link TaskStatus} against large sized task-diagnostic-info and 
+   * state-string. Does the following
+   *  - create Map/Reduce TaskStatus such that the task-diagnostic-info and 
+   *    state-string are small strings and check their contents
+   *  - append them with small string and check their contents
+   *  - append them with large string and check their size
+   *  - update the status using statusUpdate() calls and check the size/contents
+   *  - create Map/Reduce TaskStatus with large string and check their size
+   */
+  @Test
+  public void testTaskDiagnosticsAndStateString() {
+    // check the default case
+    String test = "hi";
+    final int maxSize = 16;
+    TaskStatus status = new TaskStatus(null, 0, 0, null, test, test, null, null, 
+                                       null) {
+      @Override
+      protected int getMaxStringSize() {
+        return maxSize;
+      }
+
+      @Override
+      public void addFetchFailedMap(TaskAttemptID mapTaskId) {
+      }
+
+      @Override
+      public boolean getIsMap() {
+        return false;
+      }
+    };
+    assertEquals("Small diagnostic info test failed", 
+                 status.getDiagnosticInfo(), test);
+    assertEquals("Small state string test failed", status.getStateString(), 
+                 test);
+    
+    // now append some small string and check
+    String newDInfo = test.concat(test);
+    status.setDiagnosticInfo(test);
+    status.setStateString(newDInfo);
+    assertEquals("Small diagnostic info append failed", 
+                 newDInfo, status.getDiagnosticInfo());
+    assertEquals("Small state-string append failed", 
+                 newDInfo, status.getStateString());
+    
+    // update the status with small state strings
+    TaskStatus newStatus = (TaskStatus)status.clone();
+    String newSInfo = "hi1";
+    newStatus.setStateString(newSInfo);
+    status.statusUpdate(newStatus);
+    newDInfo = newDInfo.concat(newStatus.getDiagnosticInfo());
+    
+    assertEquals("Status-update on diagnostic-info failed", 
+                 newDInfo, status.getDiagnosticInfo());
+    assertEquals("Status-update on state-string failed", 
+                 newSInfo, status.getStateString());
+    
+    newSInfo = "hi2";
+    status.statusUpdate(0, newSInfo, null);
+    assertEquals("Status-update on state-string failed", 
+                 newSInfo, status.getStateString());
+    
+    newSInfo = "hi3";
+    status.statusUpdate(null, 0, newSInfo, null, 0);
+    assertEquals("Status-update on state-string failed", 
+                 newSInfo, status.getStateString());
+    
+    
+    // now append each with large string
+    String large = "hihihihihihihihihihi"; // 20 chars
+    status.setDiagnosticInfo(large);
+    status.setStateString(large);
+    assertEquals("Large diagnostic info append test failed", 
+                 maxSize, status.getDiagnosticInfo().length());
+    assertEquals("Large state-string append test failed",
+                 maxSize, status.getStateString().length());
+    
+    // update a large status with large strings
+    newStatus.setDiagnosticInfo(large + "0");
+    newStatus.setStateString(large + "1");
+    status.statusUpdate(newStatus);
+    assertEquals("Status-update on diagnostic info failed",
+                 maxSize, status.getDiagnosticInfo().length());
+    assertEquals("Status-update on state-string failed", 
+                 maxSize, status.getStateString().length());
+    
+    status.statusUpdate(0, large + "2", null);
+    assertEquals("Status-update on state-string failed", 
+                 maxSize, status.getStateString().length());
+    
+    status.statusUpdate(null, 0, large + "3", null, 0);
+    assertEquals("Status-update on state-string failed", 
+                 maxSize, status.getStateString().length());
+    
+    // test passing large string in constructor
+    status = new TaskStatus(null, 0, 0, null, large, large, null, null, 
+        null) {
+      @Override
+      protected int getMaxStringSize() {
+        return maxSize;
+      }
+
+      @Override
+      public void addFetchFailedMap(TaskAttemptID mapTaskId) {
+      }
+
+      @Override
+      public boolean getIsMap() {
+        return false;
+      }
+    };
+    assertEquals("Large diagnostic info test failed", 
+                maxSize, status.getDiagnosticInfo().length());
+    assertEquals("Large state-string test failed", 
+                 maxSize, status.getStateString().length());
   }
 }

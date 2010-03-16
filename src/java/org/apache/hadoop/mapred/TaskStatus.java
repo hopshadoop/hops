@@ -60,7 +60,20 @@ public abstract class TaskStatus implements Writable, Cloneable {
   private Counters counters;
   private boolean includeCounters;
   private SortedRanges.Range nextRecordRange = new SortedRanges.Range();
+  
+  // max task-status string size
+  static final int MAX_STRING_SIZE = 1024;
 
+  /**
+   * Testcases can override {@link #getMaxStringSize()} to control the max-size 
+   * of strings in {@link TaskStatus}. Note that the {@link TaskStatus} is never
+   * exposed to clients or users (i.e Map or Reduce) and hence users cannot 
+   * override this api to pass large strings in {@link TaskStatus}.
+   */
+  protected int getMaxStringSize() {
+    return MAX_STRING_SIZE;
+  }
+  
   public TaskStatus() {
     taskid = new TaskAttemptID();
     numSlots = 0;
@@ -74,8 +87,8 @@ public abstract class TaskStatus implements Writable, Cloneable {
     this.progress = progress;
     this.numSlots = numSlots;
     this.runState = runState;
-    this.diagnosticInfo = diagnosticInfo;
-    this.stateString = stateString;
+    setDiagnosticInfo(diagnosticInfo);
+    setStateString(stateString);
     this.taskTracker = taskTracker;
     this.phase = phase;
     this.counters = counters;
@@ -97,12 +110,39 @@ public abstract class TaskStatus implements Writable, Cloneable {
   public void setTaskTracker(String tracker) { this.taskTracker = tracker;}
   public void setRunState(State runState) { this.runState = runState; }
   public String getDiagnosticInfo() { return diagnosticInfo; }
-  public void setDiagnosticInfo(String info) { 
+  public void setDiagnosticInfo(String info) {
+    // if the diag-info has already reached its max then log and return
+    if (diagnosticInfo != null 
+        && diagnosticInfo.length() == getMaxStringSize()) {
+      LOG.info("task-diagnostic-info for task " + taskid + " : " + info);
+      return;
+    }
     diagnosticInfo = 
       ((diagnosticInfo == null) ? info : diagnosticInfo.concat(info)); 
+    // trim the string to MAX_STRING_SIZE if needed
+    if (diagnosticInfo != null 
+        && diagnosticInfo.length() > getMaxStringSize()) {
+      LOG.info("task-diagnostic-info for task " + taskid + " : " 
+               + diagnosticInfo);
+      diagnosticInfo = diagnosticInfo.substring(0, getMaxStringSize());
+    }
   }
   public String getStateString() { return stateString; }
-  public void setStateString(String stateString) { this.stateString = stateString; }
+  /**
+   * Set the state of the {@link TaskStatus}.
+   */
+  public void setStateString(String stateString) {
+    if (stateString != null) {
+      if (stateString.length() <= getMaxStringSize()) {
+        this.stateString = stateString;
+      } else {
+        // log it
+        LOG.info("state-string for task " + taskid + " : " + stateString);
+        // trim the state string
+        this.stateString = stateString.substring(0, getMaxStringSize());
+      }
+    }
+  }
   
   /**
    * Get the next record range which is going to be processed by Task.
@@ -341,7 +381,7 @@ public abstract class TaskStatus implements Writable, Cloneable {
   synchronized void statusUpdate(TaskStatus status) {
     setProgress (status.getProgress());
     this.runState = status.getRunState();
-    this.stateString = status.getStateString();
+    setStateString(status.getStateString());
     this.nextRecordRange = status.getNextRecordRange();
 
     setDiagnosticInfo(status.getDiagnosticInfo());
@@ -430,8 +470,8 @@ public abstract class TaskStatus implements Writable, Cloneable {
     setProgress(in.readFloat());
     this.numSlots = in.readInt();
     this.runState = WritableUtils.readEnum(in, State.class);
-    this.diagnosticInfo = Text.readString(in);
-    this.stateString = Text.readString(in);
+    setDiagnosticInfo(Text.readString(in));
+    setStateString(Text.readString(in));
     this.phase = WritableUtils.readEnum(in, Phase.class); 
     this.startTime = in.readLong(); 
     this.finishTime = in.readLong(); 
