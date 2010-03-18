@@ -43,6 +43,20 @@ import org.apache.commons.logging.LogFactory;
 public class RandomSeedGenerator {
   private static Log LOG = LogFactory.getLog(RandomSeedGenerator.class);
   
+  /** MD5 algorithm instance, one for each thread. */
+  private static final ThreadLocal<MessageDigest> md5Holder =
+      new ThreadLocal<MessageDigest>() {
+        @Override protected MessageDigest initialValue() {
+          MessageDigest md5 = null; 
+          try {
+            md5 = MessageDigest.getInstance("MD5");
+          } catch (NoSuchAlgorithmException nsae) {
+            throw new RuntimeException("Can't create MD5 digests", nsae);
+          }
+          return md5;
+        }
+      };
+      
   /**
    * Generates a new random seed.
    *
@@ -52,12 +66,8 @@ public class RandomSeedGenerator {
    *         (vastly) different random seeds.
    */   
   public static long getSeed(String streamId, long masterSeed) {
-    MessageDigest md5 = null; 
-    try {
-      md5 = MessageDigest.getInstance("MD5");
-    } catch (NoSuchAlgorithmException nsae) {
-      throw new RuntimeException("Can't create MD5 digests", nsae);
-    }
+    MessageDigest md5 = md5Holder.get();
+    md5.reset();
     //'/' : make sure that we don't get the same str from ('11',0) and ('1',10)
     // We could have fed the bytes of masterSeed one by one to md5.update()
     // instead

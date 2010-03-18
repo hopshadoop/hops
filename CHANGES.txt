@@ -214,6 +214,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1482. Truncate state string and diagnostic information in
     TaskStatus. (Amar Kamat via szetszwo)
 
+    MAPREDUCE-1593.  [Rumen] Improvements to random seed generation (tamas via
+    mahadev)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
