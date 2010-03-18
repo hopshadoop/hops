@@ -232,7 +232,7 @@ public class DBRecordReader<T extends DBWritable> extends
 
       pos ++;
     } catch (SQLException e) {
-      throw new IOException(e.getMessage());
+      throw new IOException("SQLException in nextKeyValue", e);
     }
     return true;
   }

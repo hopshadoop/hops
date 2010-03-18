@@ -68,6 +68,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1455. Introduces job-level authorization for mapreduce servlets.
     (Ravi Gummadi via vinodkv)
 
+    MAPREDUCE-1446. Sqoop should support CLOB and BLOB datatypes.
+    (Aaron Kimball via tomwhite)
+
   IMPROVEMENTS
 
     MAPREDUCE-1198. Alternatively schedule different types of tasks in
