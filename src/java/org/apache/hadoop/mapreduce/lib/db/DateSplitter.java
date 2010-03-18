@@ -131,11 +131,11 @@ public class DateSplitter extends IntegerSplitter {
     try {
       switch (sqlDataType) {
       case Types.DATE:
-        return rs.getDate(1).getTime();
+        return rs.getDate(colNum).getTime();
       case Types.TIME:
-        return rs.getTime(1).getTime();
+        return rs.getTime(colNum).getTime();
       case Types.TIMESTAMP:
-        return rs.getTimestamp(1).getTime();
+        return rs.getTimestamp(colNum).getTime();
       default:
         throw new SQLException("Not a date-type field");
       }

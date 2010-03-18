@@ -454,6 +454,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1579. archive: check and possibly replace the space charater
     in source paths.  (szetszwo)
 
+    MAPREDUCE-1536. DataDrivenDBInputFormat does not split date columns correctly.
+    (Aaron Kimball via enis)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
