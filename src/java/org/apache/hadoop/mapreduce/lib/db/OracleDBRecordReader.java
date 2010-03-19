@@ -99,9 +99,10 @@ public class OracleDBRecordReader<T extends DBWritable> extends DBRecordReader<T
    * @param conn      Connection object
    * @throws          SQLException instance
    */
-  private void setSessionTimeZone(Connection conn) throws SQLException {
-    // need to use reflection to call the method setSessionTimeZone on the OracleConnection class
-    // because oracle specific java libraries are not accessible in this context
+  public static void setSessionTimeZone(Connection conn) throws SQLException {
+    // need to use reflection to call the method setSessionTimeZone on
+    // the OracleConnection class because oracle specific java libraries are
+    // not accessible in this context.
     Method method;
     try {
       method = conn.getClass().getMethod(

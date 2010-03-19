@@ -52,8 +52,8 @@ public class DateSplitter extends IntegerSplitter {
     minVal = resultSetColToLong(results, 1, sqlDataType);
     maxVal = resultSetColToLong(results, 2, sqlDataType);
 
-    String lowClausePrefix = colName + " >= '";
-    String highClausePrefix = colName + " < '";
+    String lowClausePrefix = colName + " >= ";
+    String highClausePrefix = colName + " < ";
 
     int numSplits = conf.getInt("mapred.map.tasks", 1);
     if (numSplits < 1) {
@@ -99,13 +99,13 @@ public class DateSplitter extends IntegerSplitter {
         }
         // This is the last one; use a closed interval.
         splits.add(new DataDrivenDBInputFormat.DataDrivenDBInputSplit(
-            lowClausePrefix + startDate.toString() + "'",
-            colName + " <= '" + endDate.toString() + "'"));
+            lowClausePrefix + dateToString(startDate),
+            colName + " <= " + dateToString(endDate)));
       } else {
         // Normal open-interval case.
         splits.add(new DataDrivenDBInputFormat.DataDrivenDBInputSplit(
-            lowClausePrefix + startDate.toString() + "'",
-            highClausePrefix + endDate.toString() + "'"));
+            lowClausePrefix + dateToString(startDate),
+            highClausePrefix + dateToString(endDate)));
       }
 
       start = end;
@@ -158,5 +158,16 @@ public class DateSplitter extends IntegerSplitter {
     default: // Shouldn't ever hit this case.
       return null;
     }
+  }
+
+  /**
+   * Given a Date 'd', format it as a string for use in a SQL date
+   * comparison operation.
+   * @param d the date to format.
+   * @return the string representing this date in SQL with any appropriate
+   * quotation characters, etc.
+   */
+  protected String dateToString(Date d) {
+    return "'" + d.toString() + "'";
   }
 }

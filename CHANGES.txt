@@ -220,6 +220,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1593.  [Rumen] Improvements to random seed generation (tamas via
     mahadev)
 
+    MAPREDUCE-1460. Oracle support in DataDrivenDBInputFormat.
+    (Aaron Kimball via tomwhite)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band

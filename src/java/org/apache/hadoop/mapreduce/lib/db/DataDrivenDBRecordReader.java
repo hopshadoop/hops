@@ -54,15 +54,18 @@ public class DataDrivenDBRecordReader<T extends DBWritable> extends DBRecordRead
 
   private static final Log LOG = LogFactory.getLog(DataDrivenDBRecordReader.class);
 
+  private String dbProductName; // database manufacturer string.
+
   /**
    * @param split The InputSplit to read data for
    * @throws SQLException 
    */
   public DataDrivenDBRecordReader(DBInputFormat.DBInputSplit split,
       Class<T> inputClass, Configuration conf, Connection conn, DBConfiguration dbConfig,
-      String cond, String [] fields, String table)
+      String cond, String [] fields, String table, String dbProduct)
       throws SQLException {
     super(split, inputClass, conf, conn, dbConfig, cond, fields, table);
+    this.dbProductName = dbProduct;
   }
 
   /** Returns the query for selecting the records,
@@ -96,7 +99,11 @@ public class DataDrivenDBRecordReader<T extends DBWritable> extends DBRecordRead
       }
 
       query.append(" FROM ").append(tableName);
-      query.append(" AS ").append(tableName); //in hsqldb this is necessary
+      if (!dbProductName.startsWith("ORACLE")) {
+        // Seems to be necessary for hsqldb? Oracle explicitly does *not*
+        // use this clause.
+        query.append(" AS ").append(tableName);
+      }
       query.append(" WHERE ");
       if (conditions != null && conditions.length() > 0) {
         // Put the user's conditions first.
@@ -118,6 +125,8 @@ public class DataDrivenDBRecordReader<T extends DBWritable> extends DBRecordRead
       query.append(inputQuery.replace(DataDrivenDBInputFormat.SUBSTITUTE_TOKEN,
           conditionClauses.toString()));
     }
+
+    LOG.debug("Using query: " + query.toString());
 
     return query.toString();
   }

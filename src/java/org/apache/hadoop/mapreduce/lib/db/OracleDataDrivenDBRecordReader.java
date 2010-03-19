@@ -26,22 +26,20 @@ import java.sql.SQLException;
 import org.apache.hadoop.conf.Configuration;
 
 /**
- * A RecordReader that reads records from a MySQL table via DataDrivenDBRecordReader
+ * A RecordReader that reads records from a Oracle table via DataDrivenDBRecordReader
  */
-public class MySQLDataDrivenDBRecordReader<T extends DBWritable>
+public class OracleDataDrivenDBRecordReader<T extends DBWritable>
     extends DataDrivenDBRecordReader<T> {
 
-  public MySQLDataDrivenDBRecordReader(DBInputFormat.DBInputSplit split,
-      Class<T> inputClass, Configuration conf, Connection conn, DBConfiguration dbConfig,
-      String cond, String [] fields, String table) throws SQLException {
-    super(split, inputClass, conf, conn, dbConfig, cond, fields, table, "MYSQL");
-  }
+  public OracleDataDrivenDBRecordReader(DBInputFormat.DBInputSplit split,
+      Class<T> inputClass, Configuration conf, Connection conn,
+      DBConfiguration dbConfig, String cond, String [] fields,
+      String table) throws SQLException {
 
-  // Execute statements for mysql in unbuffered mode.
-  protected ResultSet executeQuery(String query) throws SQLException {
-    statement = getConnection().prepareStatement(query,
-      ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
-    statement.setFetchSize(Integer.MIN_VALUE); // MySQL: read row-at-a-time.
-    return statement.executeQuery();
+    super(split, inputClass, conf, conn, dbConfig, cond, fields, table,
+        "ORACLE");
+
+    // Must initialize the tz used by the connection for Oracle.
+    OracleDBRecordReader.setSessionTimeZone(conn);
   }
 }

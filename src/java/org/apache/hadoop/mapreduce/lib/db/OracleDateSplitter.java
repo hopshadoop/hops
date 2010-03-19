@@ -16,22 +16,22 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.sqoop.mapred;
+package org.apache.hadoop.mapreduce.lib.db;
 
-import junit.framework.Test;
-import junit.framework.TestSuite;
+import java.util.Date;
 
 /**
- * All tests for Sqoop old mapred-api (org.apache.hadoop.sqoop.mapred)
+ * Implement DBSplitter over date/time values returned by an Oracle db.
+ * Make use of logic from DateSplitter, since this just needs to use
+ * some Oracle-specific functions on the formatting end when generating
+ * InputSplits.
  */
-public final class MapredTests {
+public class OracleDateSplitter extends DateSplitter {
 
-  private MapredTests() { }
-
-  public static Test suite() {
-    TestSuite suite = new TestSuite("Tests for org.apache.hadoop.sqoop.mapred");
-    suite.addTestSuite(TestAutoProgressMapRunner.class);
-    return suite;
+  @SuppressWarnings("unchecked")
+  @Override
+  protected String dateToString(Date d) {
+    // Oracle Data objects are always actually Timestamps
+    return "TO_TIMESTAMP('" + d.toString() + "', 'YYYY-MM-DD HH24:MI:SS.FF')";
   }
 }
-
