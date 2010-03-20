@@ -469,6 +469,8 @@ Trunk (unreleased changes)
     MAPREDUCE-890. After HADOOP-4491, the user who started mapred system is 
     not able to run job. (Ravi Gummadi via vinodkv)
 
+    MAPREDUCE-1615. Fix compilation of TestSubmitJob. (cdouglas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

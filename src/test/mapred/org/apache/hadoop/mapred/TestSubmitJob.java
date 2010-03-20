@@ -33,6 +33,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.Text;
@@ -263,7 +264,8 @@ public class TestSubmitJob extends TestCase {
         Path path = new Path(new URI(jt.getSystemDir()).getPath());
         LOG.info("Try listing the mapred-system-dir as the user (" 
                  + user2.getUserName() + ")");
-        client.getListing(path.toString());
+        client.getListing(
+            path.toString(), HdfsFileStatus.EMPTY_NAME);
       } catch (IOException ioe) {
         failed = true;
       }
@@ -276,7 +278,8 @@ public class TestSubmitJob extends TestCase {
       try {
         LOG.info("Try accessing the job folder for job " + id + " as the user (" 
                  + user2.getUserName() + ")");
-        client.getListing(jobSubmitDirpath.toString());
+        client.getListing(
+            jobSubmitDirpath.toString(), HdfsFileStatus.EMPTY_NAME);
       } catch (IOException ioe) {
         failed = true;
       }
