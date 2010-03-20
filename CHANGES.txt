@@ -471,6 +471,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-1615. Fix compilation of TestSubmitJob. (cdouglas)
 
+    MAPREDUCE-1508. Protect against NPE in TestMultipleLevelCaching. (Aaron
+    Kimball via cdouglas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

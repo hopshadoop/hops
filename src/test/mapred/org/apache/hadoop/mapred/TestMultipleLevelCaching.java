@@ -119,8 +119,11 @@ public class TestMultipleLevelCaching extends TestCase {
     		  testName, mr, fileSys, inDir, outputPath, 1, 1, 0, 0);
       mr.shutdown();
     } finally {
-      fileSys.delete(inDir, true);
-      fileSys.delete(outputPath, true);
+      if (null != fileSys) {
+        // inDir, outputPath only exist if fileSys is valid.
+        fileSys.delete(inDir, true);
+        fileSys.delete(outputPath, true);
+      }
       if (dfs != null) { 
         dfs.shutdown(); 
       }
