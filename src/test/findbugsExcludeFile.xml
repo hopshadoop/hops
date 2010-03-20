@@ -196,6 +196,15 @@
        <Method name="getSplits" />
        <Bug pattern="DLS_DEAD_LOCAL_STORE" />
      </Match>
+     <!--
+       org.apache.hadoop.mapred.IndexCache is thread-safe. It does not need
+       synchronous access. 
+      -->
+     <Match>
+       <Class name="org.apache.hadoop.mapred.TaskTracker" />
+       <Field name="indexCache" />
+       <Bug pattern="IS2_INCONSISTENT_SYNC" />
+     </Match>
     <!--
       None of the following variables should be referenced by any thread
       but the collection thread in MapTask

@@ -477,6 +477,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1508. Protect against NPE in TestMultipleLevelCaching. (Aaron
     Kimball via cdouglas)
 
+    MAPREDUCE-1497. Suppress spurious findbugs warning about IndexCache
+    synchronization. (Amareshwari Sriramadasu via cdouglas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
