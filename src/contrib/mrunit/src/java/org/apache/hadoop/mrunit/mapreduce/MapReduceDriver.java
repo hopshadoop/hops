@@ -28,6 +28,7 @@ import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.Mapper;
@@ -202,7 +203,7 @@ public class MapReduceDriver<K1, V1, K2, V2, K3, V3>
       LOG.debug("Mapping input " + input.toString() + ")");
 
       mapOutputs.addAll(new MapDriver<K1, V1, K2, V2>(myMapper).withInput(
-              input).withCounters(getCounters()).run());
+              input).withCounters(getCounters()).withConfiguration(configuration).run());
     }
 
     List<Pair<K2, List<V2>>> reduceInputs = shuffle(mapOutputs);
@@ -217,7 +218,7 @@ public class MapReduceDriver<K1, V1, K2, V2, K3, V3>
           + sb.toString() + ")");
 
       reduceOutputs.addAll(new ReduceDriver<K2, V2, K3, V3>(myReducer)
-              .withCounters(getCounters())
+              .withCounters(getCounters()).withConfiguration(configuration)
               .withInputKey(inputKey).withInputValues(inputValues).run());
     }
 
@@ -227,5 +228,16 @@ public class MapReduceDriver<K1, V1, K2, V2, K3, V3>
   @Override
   public String toString() {
     return "MapReduceDriver (0.20+) (" + myMapper + ", " + myReducer + ")";
+  }
+  
+  /** 
+   * @param configuration The configuration object that will given to the 
+   *        mapper and reducer associated with the driver
+   * @return this driver object for fluent coding
+   */
+  public MapReduceDriver<K1, V1, K2, V2, K3, V3> withConfiguration(
+      Configuration configuration) {
+    setConfiguration(configuration);
+    return this;
   }
 }

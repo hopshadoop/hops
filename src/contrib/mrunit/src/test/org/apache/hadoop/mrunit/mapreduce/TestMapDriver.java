@@ -24,8 +24,11 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import junit.framework.Assert;
 import junit.framework.TestCase;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mrunit.types.Pair;
@@ -181,6 +184,32 @@ public class TestMapDriver extends TestCase {
       // expected.
     }
   }
+  
+  @Test
+  public void testConfiguration() {
+	  Configuration conf = new Configuration();
+	  conf.set("TestKey", "TestValue");
+	  MapDriver<NullWritable, NullWritable, NullWritable, NullWritable> confDriver 
+	      = new MapDriver<NullWritable, NullWritable, NullWritable, NullWritable>();
+	  ConfigurationMapper<NullWritable, NullWritable, NullWritable, NullWritable> mapper 
+	      = new ConfigurationMapper<NullWritable, NullWritable, NullWritable, NullWritable>();
+	  confDriver.withMapper(mapper).withConfiguration(conf).
+	      withInput(NullWritable.get(),NullWritable.get()).
+	      withOutput(NullWritable.get(),NullWritable.get()).runTest();
+	  assertEquals(mapper.setupConfiguration.get("TestKey"), "TestValue");
+  }
 
+  /**
+   * Test mapper which stores the configuration object it was passed during its setup method
+   */
+  public static class ConfigurationMapper<KEYIN, VALUEIN, KEYOUT, VALUEOUT> extends Mapper<KEYIN, VALUEIN, KEYOUT, VALUEOUT> {
+	public Configuration setupConfiguration;
+	
+	@Override
+	protected void setup(Context context) throws IOException,
+			InterruptedException {
+		setupConfiguration = context.getConfiguration();
+	}
+  }
 }
 

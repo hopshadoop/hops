@@ -42,10 +42,22 @@ public class MockReduceContext <KEYIN, VALUEIN, KEYOUT, VALUEOUT>
 
   private MockOutputCollector<KEYOUT, VALUEOUT> output;
 
-  public MockReduceContext(final List<Pair<KEYIN, List<VALUEIN>>> in, 
+  /**
+   * Create a new instance with the passed configuration, reducer key/values input 
+   * pairs and counters
+   * 
+   * @param configuration Configuration for the mapper
+   * @param in input key/value pairs for the mapper
+   * @param counters pre-initialized counter values
+   * 
+   * @throws IOException
+   * @throws InterruptedException
+   */
+  public MockReduceContext(Configuration configuration, 
+                           final List<Pair<KEYIN, List<VALUEIN>>> in, 
                            final Counters counters) 
   throws IOException, InterruptedException {
-    super(new Configuration(),
+    super(configuration,
           new TaskAttemptID("mrunit-jt", 0, TaskType.REDUCE, 0, 0),
           new MockRawKeyValueIterator(), null, null, null,
           new MockOutputCommitter(), new MockReporter(counters), null,
@@ -53,7 +65,20 @@ public class MockReduceContext <KEYIN, VALUEIN, KEYOUT, VALUEOUT>
     this.inputIter = in.iterator();
     this.output = new MockOutputCollector<KEYOUT, VALUEOUT>();
   }
-
+  
+  /**
+   * Create a new instance with the passed reducer key/values input pairs and
+   * counters. A new {@link Configuration} object will be created and used
+   * to configure the reducer
+   * 
+   * @param in input key/values pairs for the reducer
+   * @param counters pre-initialized counter values
+   */
+  public MockReduceContext(final List<Pair<KEYIN, List<VALUEIN>>> in, 
+          final Counters counters) 
+  throws IOException, InterruptedException {
+    this(new Configuration(), in, counters);
+  }
 
   /**
    * A private iterable/iterator implementation that wraps around the 

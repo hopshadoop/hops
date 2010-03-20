@@ -25,6 +25,7 @@ import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.map.WrappedMapper;
@@ -193,7 +194,7 @@ public class MapDriver<K1, V1, K2, V2> extends MapDriverBase<K1, V1, K2, V2> {
 
     try {
       MockMapContext<K1, V1, K2, V2> context =
-        new MockMapContext<K1, V1, K2, V2>(inputs, getCounters());
+        new MockMapContext<K1, V1, K2, V2>(configuration, inputs, getCounters());
 
       myMapper.run(new WrappedMapper<K1, V1, K2, V2>().getMapContext(context));
       return context.getOutputs();
@@ -205,6 +206,16 @@ public class MapDriver<K1, V1, K2, V2> extends MapDriverBase<K1, V1, K2, V2> {
   @Override
   public String toString() {
     return "MapDriver (0.20+) (" + myMapper + ")";
+  }
+  
+  /** 
+   * @param configuration The configuration object that will given to the mapper
+   *        associated with the driver
+   * @return this object for fluent coding
+   */
+  public MapDriver<K1, V1, K2, V2> withConfiguration(Configuration configuration) {
+    setConfiguration(configuration);
+	  return this;
   }
 }
 

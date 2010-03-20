@@ -23,14 +23,20 @@ import static org.apache.hadoop.mrunit.testutil.ExtendedAssert.assertListEquals;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import junit.framework.TestCase;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.Mapper.Context;
 import org.apache.hadoop.mapreduce.lib.reduce.LongSumReducer;
+import org.apache.hadoop.mrunit.mapreduce.TestMapDriver.ConfigurationMapper;
 import org.apache.hadoop.mrunit.types.Pair;
 import org.junit.Before;
 import org.junit.Test;
@@ -260,6 +266,33 @@ public class TestReduceDriver extends TestCase {
         .withInputValue(new LongWritable(1))
         .withOutput(new Text("foo"), new LongWritable(4))
         .runTest();
+  }
+  
+  @Test
+  public void testConfiguration() {
+	  Configuration conf = new Configuration();
+	  conf.set("TestKey", "TestValue");
+	  ReduceDriver<NullWritable, NullWritable, NullWritable, NullWritable> confDriver 
+	      = new ReduceDriver<NullWritable, NullWritable, NullWritable, NullWritable>();
+	  ConfigurationReducer<NullWritable, NullWritable, NullWritable, NullWritable> reducer 
+	      = new ConfigurationReducer<NullWritable, NullWritable, NullWritable, NullWritable>();
+	  confDriver.withReducer(reducer).withConfiguration(conf).
+	      withInput(NullWritable.get(),Arrays.asList(NullWritable.get())).
+	      withOutput(NullWritable.get(),NullWritable.get()).runTest();
+	  assertEquals(reducer.setupConfiguration.get("TestKey"), "TestValue");
+  }
+
+  /**
+   * Test reducer which stores the configuration object it was passed during its setup method
+   */
+  public static class ConfigurationReducer<KEYIN, VALUEIN, KEYOUT, VALUEOUT> extends Reducer<KEYIN, VALUEIN, KEYOUT, VALUEOUT> {
+	public Configuration setupConfiguration;
+	
+	@Override
+	protected void setup(Context context) throws IOException,
+			InterruptedException {
+		setupConfiguration = context.getConfiguration();
+	}
   }
 }
 

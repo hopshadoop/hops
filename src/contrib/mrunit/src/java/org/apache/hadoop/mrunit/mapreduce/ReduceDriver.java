@@ -25,6 +25,7 @@ import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.reduce.WrappedReducer;
@@ -198,7 +199,7 @@ public class ReduceDriver<K1, V1, K2, V2> extends ReduceDriverBase<K1, V1, K2, V
 
     try {
       MockReduceContext<K1, V1, K2, V2> context = 
-        new MockReduceContext<K1, V1, K2, V2>(inputs, getCounters());
+        new MockReduceContext<K1, V1, K2, V2>(configuration, inputs, getCounters());
       myReducer.run(new WrappedReducer<K1, V1, K2, V2>().getReducerContext(context));
       return context.getOutputs();
     } catch (InterruptedException ie) {
@@ -209,6 +210,17 @@ public class ReduceDriver<K1, V1, K2, V2> extends ReduceDriverBase<K1, V1, K2, V
   @Override
   public String toString() {
     return "ReduceDriver (0.20+) (" + myReducer + ")";
+  }
+  
+  /** 
+   * @param configuration The configuration object that will given to the 
+   *        reducer associated with the driver
+   * @return this object for fluent coding
+   */
+  public ReduceDriver<K1, V1, K2, V2> withConfiguration(
+      Configuration configuration) {
+    setConfiguration(configuration);
+    return this;
   }
 }
 

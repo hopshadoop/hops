@@ -21,15 +21,20 @@ import static org.apache.hadoop.mrunit.testutil.ExtendedAssert.assertListEquals;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import junit.framework.TestCase;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.reduce.LongSumReducer;
+import org.apache.hadoop.mrunit.mapreduce.TestMapDriver.ConfigurationMapper;
+import org.apache.hadoop.mrunit.mapreduce.TestReduceDriver.ConfigurationReducer;
 import org.apache.hadoop.mrunit.types.Pair;
 import org.junit.Before;
 import org.junit.Test;
@@ -229,6 +234,26 @@ public class TestMapReduceDriver extends TestCase {
     expected.add(new Pair<Text, List<Text>>(new Text("b"), sublist2));
 
     assertListEquals(expected, outputs);
+  }
+  
+  @Test
+  public void testConfiguration() {
+	  Configuration conf = new Configuration();
+	  conf.set("TestKey", "TestValue");
+	  
+	  MapReduceDriver<NullWritable, NullWritable, NullWritable, NullWritable, NullWritable, NullWritable> confDriver 
+	      = new MapReduceDriver<NullWritable, NullWritable, NullWritable, NullWritable, NullWritable, NullWritable>();
+	  
+	  ConfigurationMapper<NullWritable, NullWritable, NullWritable, NullWritable> mapper 
+	      = new ConfigurationMapper<NullWritable, NullWritable, NullWritable, NullWritable>();
+	  ConfigurationReducer<NullWritable, NullWritable, NullWritable, NullWritable> reducer 
+      = new ConfigurationReducer<NullWritable, NullWritable, NullWritable, NullWritable>();
+	  
+	  confDriver.withMapper(mapper).withReducer(reducer).withConfiguration(conf).
+	      withInput(NullWritable.get(),NullWritable.get()).
+	      withOutput(NullWritable.get(),NullWritable.get()).runTest();
+	  assertEquals(mapper.setupConfiguration.get("TestKey"), "TestValue");
+	  assertEquals(reducer.setupConfiguration.get("TestKey"), "TestValue");	  
   }
 
 }

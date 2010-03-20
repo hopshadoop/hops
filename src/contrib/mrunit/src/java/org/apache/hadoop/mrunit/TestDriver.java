@@ -24,6 +24,7 @@ import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mrunit.types.Pair;
 
@@ -32,9 +33,12 @@ public abstract class TestDriver<K1, V1, K2, V2> {
   public static final Log LOG = LogFactory.getLog(TestDriver.class);
 
   protected List<Pair<K2, V2>> expectedOutputs;
+  
+  protected Configuration configuration;
 
   public TestDriver() {
     expectedOutputs = new ArrayList<Pair<K2, V2>>();
+    configuration = new Configuration();
   }
 
   /**
@@ -242,4 +246,19 @@ public abstract class TestDriver<K1, V1, K2, V2> {
     sb.append(")");
   }
 
+  /** 
+   * @return The configuration object that will given to the mapper and/or 
+   *         reducer associated with the driver (new API only)
+   */
+  public Configuration getConfiguration() {
+    return configuration;
+  }
+  
+  /**
+   * @param configuration The configuration object that will given to the 
+   *        mapper and/or reducer associated with the driver (new API only)
+   */
+  public void setConfiguration(Configuration configuration) {
+    this.configuration = configuration;
+  }
 }

@@ -223,6 +223,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1460. Oracle support in DataDrivenDBInputFormat.
     (Aaron Kimball via tomwhite)
 
+    MAPREDUCE-1569. Pass configuration through mocked contexts in MRUnit.
+    (Chris White via cdouglas)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
