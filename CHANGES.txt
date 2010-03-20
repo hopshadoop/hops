@@ -480,6 +480,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1497. Suppress spurious findbugs warning about IndexCache
     synchronization. (Amareshwari Sriramadasu via cdouglas)
 
+    MAPREDUCE-1420. Fix TestTTResourceReporting failure. (Scott Chen via
+    cdouglas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

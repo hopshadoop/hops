@@ -120,11 +120,11 @@ public class TestTTResourceReporting extends TestCase {
       float reportedCpuUsage = status.getResourceStatus().getCpuUsage();
 
       message =
-          "expected memory values : "
+          "expected values : "
               + "(totalVirtualMemoryOnTT, totalPhysicalMemoryOnTT, "
               + "availableVirtualMemoryOnTT, availablePhysicalMemoryOnTT, "
               + "mapSlotMemSize, reduceSlotMemorySize, cumulativeCpuTime, "
-              + "cpuFrequency, numProcessors) = ("
+              + "cpuFrequency, numProcessors, cpuUsage) = ("
               + totalVirtualMemoryOnTT + ", "
               + totalPhysicalMemoryOnTT + ","
               + availableVirtualMemoryOnTT + ", "
@@ -137,12 +137,12 @@ public class TestTTResourceReporting extends TestCase {
               + cpuUsage
               +")";
       message +=
-          "\nreported memory values : "
+          "\nreported values : "
               + "(totalVirtualMemoryOnTT, totalPhysicalMemoryOnTT, "
               + "availableVirtualMemoryOnTT, availablePhysicalMemoryOnTT, "
               + "reportedMapSlotMemorySize, reportedReduceSlotMemorySize, "
               + "reportedCumulativeCpuTime, reportedCpuFrequency, "
-              + "reportedNumProcessors) = ("
+              + "reportedNumProcessors, cpuUsage) = ("
               + reportedTotalVirtualMemoryOnTT + ", "
               + reportedTotalPhysicalMemoryOnTT + ","
               + reportedAvailableVirtualMemoryOnTT + ", "
@@ -161,7 +161,6 @@ public class TestTTResourceReporting extends TestCase {
           || totalPhysicalMemoryOnTT != reportedTotalPhysicalMemoryOnTT
           || mapSlotMemorySize != reportedMapSlotMemorySize
           || reduceSlotMemorySize != reportedReduceSlotMemorySize
-          || cpuFrequency != reportedCpuFrequency
           || numProcessors != reportedNumProcessors) {
         hasPassed = false;
       }
@@ -170,6 +169,7 @@ public class TestTTResourceReporting extends TestCase {
       if (availableVirtualMemoryOnTT != reportedAvailableVirtualMemoryOnTT
           || availablePhysicalMemoryOnTT != reportedAvailablePhysicalMemoryOnTT
           || cumulativeCpuTime != reportedCumulativeCpuTime
+          || cpuFrequency != reportedCpuFrequency
           || cpuUsage != reportedCpuUsage) {
         hasDynamicValuePassed = false;
       }
@@ -260,10 +260,9 @@ public class TestTTResourceReporting extends TestCase {
 
     JobConf conf = new JobConf();
     LinuxResourceCalculatorPlugin plugin = new LinuxResourceCalculatorPlugin();
-    // In this case, we only check these four fields because they are static
+    // In this case, we only check these three fields because they are static
     conf.setLong("totalVmemOnTT", plugin.getVirtualMemorySize());
     conf.setLong("totalPmemOnTT", plugin.getPhysicalMemorySize());
-    conf.setLong("cpuFrequency", plugin.getCpuFrequency());
     conf.setLong("numProcessors", plugin.getNumProcessors());
 
     try {
