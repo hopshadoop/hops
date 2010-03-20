@@ -1397,3 +1397,6 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1522. FileInputFormat may use the default FileSystem for the
     input path. (Tsz Wo (Nicholas), SZE via cdouglas)
+
+    MAPREDUCE-1407. Update javadoc in mapreduce.{Mapper,Reducer} to match
+    actual usage. (Benoit Sigoure via cdouglas)
