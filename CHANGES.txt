@@ -486,6 +486,8 @@ Trunk (unreleased changes)
     MAPREDUCE-1480. Correctly initialize child RecordReaders in
     CombineFileInputFormat. (Aaron Kimball via cdouglas)
 
+    MAPREDUCE-1348. Fix block forensics packaging. (Tom White via cdouglas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
