@@ -483,6 +483,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1420. Fix TestTTResourceReporting failure. (Scott Chen via
     cdouglas)
 
+    MAPREDUCE-1480. Correctly initialize child RecordReaders in
+    CombineFileInputFormat. (Aaron Kimball via cdouglas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
