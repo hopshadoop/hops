@@ -226,6 +226,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1569. Pass configuration through mocked contexts in MRUnit.
     (Chris White via cdouglas)
 
+    MAPREDUCE-1590. Move HarFileSystem from Hadoop Common to Mapreduce tools.
+    (mahadev)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
