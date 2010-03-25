@@ -933,6 +933,9 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-1097. Add support for Vertica 3.5 to its contrib module. (Omer
     Trajman via cdouglas)
 
+    MAPREDUCE-1627. HadoopArchives should not uses a method in DistCp.
+    (szetszwo)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 
