@@ -346,21 +346,6 @@ public class HarFileSystem extends FilterFileSystem {
   }
   
   /**
-   * fake the rawblocks since map reduce uses the block offsets to 
-   * fo some computations regarding the blocks
-   * @param rawBlocks the raw blocks returned by the filesystem
-   * @return faked blocks with changed offsets.
-   */
-  private BlockLocation[] fakeBlockLocations(BlockLocation[] rawBlocks, 
-		  long startIndex) {
-	for (BlockLocation block : rawBlocks) {
-		long rawOffset = block.getOffset();
-		block.setOffset(rawOffset - startIndex);
-	}
-	return rawBlocks;
-  }
-  
-  /**
    * the hash of the path p inside iniside
    * the filesystem
    * @param p the path in the harfilesystem

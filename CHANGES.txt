@@ -229,6 +229,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1590. Move HarFileSystem from Hadoop Common to Mapreduce tools.
     (mahadev)
 
+    MAPREDUCE-1629. Get rid of fakeBlockLocations() on HarFileSystem, since
+    it's not used (mahadev)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
