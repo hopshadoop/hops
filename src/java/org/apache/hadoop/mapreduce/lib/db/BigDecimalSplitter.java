@@ -29,6 +29,7 @@ import org.apache.commons.logging.LogFactory;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.InputSplit;
+import org.apache.hadoop.mapreduce.JobContext;
 
 /**
  * Implement DBSplitter over BigDecimal values.
@@ -45,7 +46,7 @@ public class BigDecimalSplitter implements DBSplitter {
     String lowClausePrefix = colName + " >= ";
     String highClausePrefix = colName + " < ";
 
-    BigDecimal numSplits = new BigDecimal(conf.getInt("mapred.map.tasks", 1));
+    BigDecimal numSplits = new BigDecimal(conf.getInt(JobContext.NUM_MAPS, 1));
 
     if (minVal == null && maxVal == null) {
       // Range is null to null. Return a null split accordingly.

@@ -32,6 +32,7 @@ import org.apache.commons.logging.LogFactory;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.InputSplit;
+import org.apache.hadoop.mapreduce.JobContext;
 
 /**
  * Implement DBSplitter over date/time values.
@@ -55,7 +56,7 @@ public class DateSplitter extends IntegerSplitter {
     String lowClausePrefix = colName + " >= ";
     String highClausePrefix = colName + " < ";
 
-    int numSplits = conf.getInt("mapred.map.tasks", 1);
+    int numSplits = conf.getInt(JobContext.NUM_MAPS, 1);
     if (numSplits < 1) {
       numSplits = 1;
     }

@@ -160,6 +160,16 @@ public class DataDrivenDBInputFormat<T extends DBWritable>
   /** {@inheritDoc} */
   public List<InputSplit> getSplits(JobContext job) throws IOException {
 
+    int targetNumTasks = job.getConfiguration().getInt(JobContext.NUM_MAPS, 1);
+    if (1 == targetNumTasks) {
+      // There's no need to run a bounding vals query; just return a split
+      // that separates nothing. This can be considerably more optimal for a
+      // large table with no index.
+      List<InputSplit> singletonSplit = new ArrayList<InputSplit>();
+      singletonSplit.add(new DataDrivenDBInputSplit("1=1", "1=1"));
+      return singletonSplit;
+    }
+
     ResultSet results = null;
     Statement statement = null;
     Connection connection = getConnection();

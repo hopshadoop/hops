@@ -63,9 +63,35 @@ to call at top-level: ant deploy-contrib compile-core-test
   <!-- ================================================================== -->
   <!-- Run unit tests                                                     -->
   <!-- Override with our own version so we can set hadoop.alt.classpath   -->
-  <!-- and Hadoop logger properties                                       -->
+  <!-- and Hadoop logger properties.                                      -->
+  <!-- We also want to select specific sub-batteries of tests to run      -->
+  <!-- tests of third-party databases, etc.                               -->
+  <!--                                                                    -->
+  <!-- By default, we'll run the "normal" tests: Test*.java               -->
+  <!-- To run third-party tests, run with -Dthirdparty=true               -->
   <!-- ================================================================== -->
-  <target name="test" depends="compile-test, compile" if="test.available">
+  <target name="test" depends="compile-test, compile, test-prep, run-tests"
+      if="test.available">
+  </target>
+
+  <!-- set variables that configure the test proper -->
+  <target name="test-prep" depends="test-prep-normal, test-prep-thirdparty"/>
+
+  <target name="test-prep-normal" unless="thirdparty">
+    <!-- Set this to run all the "standard" tests -->
+    <property name="test.pattern" value="Test*" />
+  </target>
+
+  <target name="test-prep-thirdparty" if="thirdparty">
+    <!-- Run tests that *end* with the name Test, instead of starting with it;
+         this runs non-standard tests e.g. third-party database tests. -->
+    <property name="test.pattern" value="*Test" />
+  </target>
+
+
+  <!-- actually run the selected unit tests -->
+  <target name="run-tests" depends="compile-test, compile, test-prep"
+      if="test.available">
     <echo message="contrib: ${name}"/>
     <delete dir="${hadoop.log.dir}"/>
     <mkdir dir="${hadoop.log.dir}"/>
@@ -142,7 +168,7 @@ to call at top-level: ant deploy-contrib compile-core-test
       <formatter type="${test.junit.output.format}" />
       <batchtest todir="${build.test}" unless="testcase">
         <fileset dir="${src.test}"
-                 includes="**/Test*.java" excludes="**/${test.exclude}.java" />
+                 includes="**/${test.pattern}.java" excludes="**/${test.exclude}.java" />
       </batchtest>
       <batchtest todir="${build.test}" if="testcase">
         <fileset dir="${src.test}" includes="**/${testcase}.java"/>
