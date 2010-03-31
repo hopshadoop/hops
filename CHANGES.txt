@@ -497,6 +497,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-1348. Fix block forensics packaging. (Tom White via cdouglas)
 
+    MAPREDUCE-1628. HarFileSystem shows incorrect replication numbers and
+    permissions (tsz via mahadev)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

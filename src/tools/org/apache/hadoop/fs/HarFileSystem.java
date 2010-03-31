@@ -26,6 +26,8 @@ import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -386,7 +388,7 @@ public class HarFileSystem extends FilterFileSystem {
    *          the archive index filestatus
    */
   private void fileStatusesInIndex(HarStatus parent, List<FileStatus> statuses,
-      List<String> children, FileStatus archiveIndexStat) throws IOException {
+      List<String> children) throws IOException {
     // read the index file
     FSDataInputStream aIn = null;
     try {
@@ -401,7 +403,9 @@ public class HarFileSystem extends FilterFileSystem {
       Path harPath = new Path(parentString);
       int harlen = harPath.depth();
       Text line = new Text();
-      while (read < archiveIndexStat.getLen()) {
+      final Map<String, FileStatus> cache = new TreeMap<String, FileStatus>();
+      for(final long len = fs.getFileStatus(archiveIndex).getLen();
+          read < len; ) {
         int tmp = aLin.readLine(line);
         read += tmp;
         String lineFeed = line.toString();
@@ -411,15 +415,7 @@ public class HarFileSystem extends FilterFileSystem {
           if (thisPath.depth() == harlen + 1) {
             // bingo!
             HarStatus hstatus = new HarStatus(lineFeed);
-            FileStatus childStatus = new FileStatus(hstatus.isDir() ? 0
-                : hstatus.getLength(), hstatus.isDir(), (int) archiveIndexStat
-                .getReplication(), archiveIndexStat.getBlockSize(),
-                archiveIndexStat.getModificationTime(), archiveIndexStat
-                    .getAccessTime(), new FsPermission(archiveIndexStat
-                    .getPermission()), archiveIndexStat.getOwner(),
-                archiveIndexStat.getGroup(), makeRelative(this.uri.toString(),
-                    new Path(hstatus.name)));
-            statuses.add(childStatus);
+            statuses.add(toFileStatus(hstatus, cache));
           }
           line.clear();
         }
@@ -497,7 +493,41 @@ public class HarFileSystem extends FilterFileSystem {
     }
     return retStr;
   }
-  
+
+  /**
+   * Combine the status stored in the index and the underlying status. 
+   * @param h status stored in the index
+   * @param cache caching the underlying file statuses
+   * @return the combined file status
+   * @throws IOException
+   */
+  private FileStatus toFileStatus(HarStatus h,
+      Map<String, FileStatus> cache) throws IOException {
+    FileStatus underlying = null;
+    if (cache != null) {
+      underlying = cache.get(h.partName);
+    }
+    if (underlying == null) {
+      final Path p = h.isDir? archivePath: new Path(archivePath, h.partName);
+      underlying = fs.getFileStatus(p);
+      if (cache != null) {
+        cache.put(h.partName, underlying);
+      }
+    }
+
+    return new FileStatus(
+        h.isDir()? 0L: h.getLength(),
+        h.isDir(),
+        underlying.getReplication(),
+        underlying.getBlockSize(),
+        underlying.getModificationTime(),
+        underlying.getAccessTime(),
+        new FsPermission(underlying.getPermission()),
+        underlying.getOwner(),
+        underlying.getGroup(),
+        makeRelative(this.uri.toString(), new Path(h.name)));
+  }
+
   // a single line parser for hadoop archives status 
   // stored in a single line in the index files 
   // the format is of the form 
@@ -561,7 +591,6 @@ public class HarFileSystem extends FilterFileSystem {
    */
   @Override
   public FileStatus getFileStatus(Path f) throws IOException {
-    FileStatus archiveStatus = fs.getFileStatus(archiveIndex);
     // get the fs DataInputStream for the underlying file
     // look up the index.
     Path p = makeQualified(f);
@@ -575,13 +604,7 @@ public class HarFileSystem extends FilterFileSystem {
     }
     HarStatus hstatus = null;
     hstatus = new HarStatus(readStr);
-    return new FileStatus(hstatus.isDir()?0:hstatus.getLength(), hstatus.isDir(),
-        (int)archiveStatus.getReplication(), archiveStatus.getBlockSize(),
-        archiveStatus.getModificationTime(), archiveStatus.getAccessTime(),
-        new FsPermission(
-        archiveStatus.getPermission()), archiveStatus.getOwner(), 
-        archiveStatus.getGroup(), 
-            makeRelative(this.uri.toString(), new Path(hstatus.name)));
+    return toFileStatus(hstatus, null);
   }
 
   /**
@@ -678,7 +701,6 @@ public class HarFileSystem extends FilterFileSystem {
     // we will create fake filestatuses to return
     // to the client
     List<FileStatus> statuses = new ArrayList<FileStatus>();
-    FileStatus archiveStatus = fs.getFileStatus(archiveIndex);
     Path tmpPath = makeQualified(f);
     Path harPath = getPathInHar(tmpPath);
     String readStr = fileStatusInIndex(harPath);
@@ -686,16 +708,11 @@ public class HarFileSystem extends FilterFileSystem {
       throw new FileNotFoundException("File " + f + " not found in " + archivePath);
     }
     HarStatus hstatus = new HarStatus(readStr);
-    if (!hstatus.isDir()) 
-        statuses.add(new FileStatus(hstatus.getLength(), 
-            hstatus.isDir(),
-            archiveStatus.getReplication(), archiveStatus.getBlockSize(),
-            archiveStatus.getModificationTime(), archiveStatus.getAccessTime(),
-            new FsPermission(archiveStatus.getPermission()),
-            archiveStatus.getOwner(), archiveStatus.getGroup(), 
-            makeRelative(this.uri.toString(), new Path(hstatus.name))));
-    else 
-      fileStatusesInIndex(hstatus, statuses, hstatus.children, archiveStatus);
+    if (hstatus.isDir()) {
+      fileStatusesInIndex(hstatus, statuses, hstatus.children);
+    } else {
+      statuses.add(toFileStatus(hstatus, null));
+    }
     
     return statuses.toArray(new FileStatus[statuses.size()]);
   }
