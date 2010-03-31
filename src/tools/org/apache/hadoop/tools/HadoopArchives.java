@@ -867,6 +867,11 @@ public class HadoopArchives implements Tool {
           }
         }
       }
+      if (globPaths.isEmpty()) {
+        throw new IOException("The resolved paths is empty."
+            + "  Please check whether the srcPaths exist, where srcPaths = "
+            + srcPaths);
+      }
 
       //process space replacement configuration
       if (conf.getBoolean(SPACE_REPLACE_LABEL, SPACE_REPLACE_DEFAULT)) {
