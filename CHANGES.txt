@@ -235,6 +235,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1489. DataDrivenDBInputFormat should not query the database
     when generating only one split. (Aaron Kimball via tomwhite)
 
+    MAPREDUCE-1514.  Add documentation on replication, permissions, new options,
+    limitations and internals of har.  (mahadev via szetszwo)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
