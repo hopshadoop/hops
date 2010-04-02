@@ -241,6 +241,8 @@ Trunk (unreleased changes)
     MAPREDUCE-1428.  Make block size and the size of archive created files
     configurable.  (mahadev via szetszwo)
 
+    MAPREDUCE-1656. JobStory should provide queue info. (hong via mahadev)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band

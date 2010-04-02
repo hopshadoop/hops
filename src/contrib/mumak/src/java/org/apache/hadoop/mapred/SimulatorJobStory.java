@@ -102,4 +102,9 @@ public class SimulatorJobStory implements JobStory {
   public Pre21JobHistoryConstants.Values getOutcome() {
     return job.getOutcome();
   }
+  
+  @Override
+  public String getQueueName() {
+    return job.getQueueName();
+  }
 }

@@ -167,4 +167,9 @@ public class FakeJobs implements JobStory {
   public Pre21JobHistoryConstants.Values getOutcome() {
     return Pre21JobHistoryConstants.Values.SUCCESS;
   }
+  
+  @Override
+  public String getQueueName() {
+    return JobConf.DEFAULT_QUEUE_NAME;
+  }
 }
