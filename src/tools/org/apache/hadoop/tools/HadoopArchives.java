@@ -86,7 +86,10 @@ public class HadoopArchives implements Tool {
   static final String TOTAL_SIZE_LABEL = NAME + ".total.size";
   static final String DST_HAR_LABEL = NAME + ".archive.name";
   static final String SRC_PARENT_LABEL = NAME + ".parent.path";
-
+  /** the size of the blocks that will be created when archiving **/
+  static final String HAR_BLOCKSIZE_LABEL = NAME + ".block.size";
+  /**the size of the part files that will be created when archiving **/
+  static final String HAR_PARTSIZE_LABEL = NAME + ".partfile.size";
   static final String SPACE_REPLACE_LABEL = NAME + ".space.replace.enable";
   static final boolean SPACE_REPLACE_DEFAULT = false;
   static final String SPACE_REPLACEMENT_LABEL = NAME + ".space.replacement";
@@ -104,9 +107,10 @@ public class HadoopArchives implements Tool {
     + " by the space replacement option."
     + "  The resulted har contains only the replaced paths.";
 
-  // size of each part file
-  // its fixed for now.
-  static final long partSize = 2 * 1024 * 1024 * 1024l;
+  /** size of each part file size **/
+  long partSize = 2 * 1024 * 1024 * 1024l;
+  /** size of blocks in hadoop archives **/
+  long blockSize = 512 * 1024 * 1024l;
 
   private static final String usage = "archive"
   + " -archiveName NAME -p <parent path> <src>* <dest>" +
@@ -487,6 +491,10 @@ public class HadoopArchives implements Tool {
     int numFiles = 0;
     long totalSize = 0;
     FileSystem fs = parentPath.getFileSystem(conf);
+    this.blockSize = conf.getLong(HAR_BLOCKSIZE_LABEL, blockSize);
+    this.partSize = conf.getLong(HAR_PARTSIZE_LABEL, partSize);
+    conf.setLong(HAR_BLOCKSIZE_LABEL, blockSize);
+    conf.setLong(HAR_PARTSIZE_LABEL, partSize);
     conf.set(DST_HAR_LABEL, archiveName);
     conf.set(SRC_PARENT_LABEL, parentPath.makeQualified(fs).toString());
     Path outputPath = new Path(dest, archiveName);
@@ -599,7 +607,8 @@ public class HadoopArchives implements Tool {
     FileSystem destFs = null;
     byte[] buffer;
     int buf_size = 128 * 1024;
-    
+    long blockSize = 512 * 1024 * 1024l;
+
     // configure the mapper and create 
     // the part file.
     // use map reduce framework to write into
@@ -616,6 +625,7 @@ public class HadoopArchives implements Tool {
       // create a file name using the partition
       // we need to write to this directory
       tmpOutputDir = FileOutputFormat.getWorkOutputPath(conf);
+      blockSize = conf.getLong(HAR_BLOCKSIZE_LABEL, blockSize);
       // get the output path and write to the tmp 
       // directory 
       partname = "part-" + partId;
@@ -631,10 +641,11 @@ public class HadoopArchives implements Tool {
         //this was a stale copy
         if (destFs.exists(tmpOutput)) {
           destFs.delete(tmpOutput, false);
-        }
-        partStream = destFs.create(tmpOutput);
+        } 
+        partStream = destFs.create(tmpOutput, false, conf.getInt("io.file.buffer.size", 4096), 
+            destFs.getDefaultReplication(), blockSize);
       } catch(IOException ie) {
-        throw new RuntimeException("Unable to open output file " + tmpOutput);
+        throw new RuntimeException("Unable to open output file " + tmpOutput, ie);
       }
       buffer = new byte[buf_size];
     }

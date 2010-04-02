@@ -112,36 +112,9 @@ public class TestHarFileSystem extends TestCase {
       }
     }
   }
-  
-  // test archives with a -p option
-  public void testRelativeArchives() throws Exception {
-    fs.delete(archivePath,true);
-    Configuration conf = mapred.createJobConf();
-    HadoopArchives har = new HadoopArchives(conf);
-    String[] args = new String[6];
-    args[0] = "-archiveName";
-    args[1] = "foo.har";
-    args[2] = "-p";
-    args[3] =  fs.getHomeDirectory().toString();
-    args[4] = "test";
-    args[5] = archivePath.toString();
-    int ret = ToolRunner.run(har, args);
-    assertTrue("failed test", ret == 0);
-    Path finalPath = new Path(archivePath, "foo.har");
-    Path fsPath = new Path(inputPath.toUri().getPath());
-    Path filePath = new Path(finalPath, "test");
-    //make it a har path 
-    Path harPath = new Path("har://" + filePath.toUri().getPath());
-    assertTrue(fs.exists(new Path(finalPath, "_index")));
-    assertTrue(fs.exists(new Path(finalPath, "_masterindex")));
-    assertTrue(!fs.exists(new Path(finalPath, "_logs")));
-    args = new String[2];
-    args[0] = "-ls";
-    args[1] = harPath.toString();
-    FsShell shell = new FsShell(conf);
-    ret = ToolRunner.run(shell, args);
-    // fileb and filec
-    assertTrue(ret == 0);
+
+  /* check bytes in the har output files */
+  private void  checkBytes(Path harPath, Configuration conf) throws IOException {
     Path harFilea = new Path(harPath, "a");
     Path harFileb = new Path(harPath, "b");
     Path harFilec = new Path(harPath, "c");
@@ -160,7 +133,95 @@ public class TestHarFileSystem extends TestCase {
     fin.close();
     assertTrue("strings are equal ", (b[0] == "c".getBytes()[0]));
   }
+
+  /**
+   * check if the block size of the part files is what we had specified
+   */
+  private void checkBlockSize(FileSystem fs, Path finalPath, long blockSize) throws IOException {
+    FileStatus[] statuses = fs.globStatus(new Path(finalPath, "part-*"));
+    for (FileStatus status: statuses) {
+      assertTrue(status.getBlockSize() == blockSize);
+    }
+  }
   
+  // test archives with a -p option
+  public void testRelativeArchives() throws Exception {
+    fs.delete(archivePath, true);
+    Configuration conf = mapred.createJobConf();
+    HadoopArchives har = new HadoopArchives(conf);
+
+    {
+      String[] args = new String[6];
+      args[0] = "-archiveName";
+      args[1] = "foo1.har";
+      args[2] = "-p";
+      args[3] = fs.getHomeDirectory().toString();
+      args[4] = "test";
+      args[5] = archivePath.toString();
+      int ret = ToolRunner.run(har, args);
+      assertTrue("failed test", ret == 0);
+      Path finalPath = new Path(archivePath, "foo1.har");
+      Path fsPath = new Path(inputPath.toUri().getPath());
+      Path filePath = new Path(finalPath, "test");
+      // make it a har path
+      Path harPath = new Path("har://" + filePath.toUri().getPath());
+      assertTrue(fs.exists(new Path(finalPath, "_index")));
+      assertTrue(fs.exists(new Path(finalPath, "_masterindex")));
+      /*check for existence of only 1 part file, since part file size == 2GB */
+      assertTrue(fs.exists(new Path(finalPath, "part-0")));
+      assertTrue(!fs.exists(new Path(finalPath, "part-1")));
+      assertTrue(!fs.exists(new Path(finalPath, "part-2")));
+      assertTrue(!fs.exists(new Path(finalPath, "_logs")));
+      FileStatus[] statuses = fs.listStatus(finalPath);
+      args = new String[2];
+      args[0] = "-ls";
+      args[1] = harPath.toString();
+      FsShell shell = new FsShell(conf);
+      ret = ToolRunner.run(shell, args);
+      // fileb and filec
+      assertTrue(ret == 0);
+      checkBytes(harPath, conf);
+      /* check block size for path files */
+      checkBlockSize(fs, finalPath, 512 * 1024 * 1024l);
+    }
+    
+    /** now try with different block size and part file size **/
+    {
+      String[] args = new String[8];
+      args[0] = "-Dhar.block.size=512";
+      args[1] = "-Dhar.partfile.size=1";
+      args[2] = "-archiveName";
+      args[3] = "foo.har";
+      args[4] = "-p";
+      args[5] = fs.getHomeDirectory().toString();
+      args[6] = "test";
+      args[7] = archivePath.toString();
+      int ret = ToolRunner.run(har, args);
+      assertTrue("failed test", ret == 0);
+      Path finalPath = new Path(archivePath, "foo.har");
+      Path fsPath = new Path(inputPath.toUri().getPath());
+      Path filePath = new Path(finalPath, "test");
+      // make it a har path
+      Path harPath = new Path("har://" + filePath.toUri().getPath());
+      assertTrue(fs.exists(new Path(finalPath, "_index")));
+      assertTrue(fs.exists(new Path(finalPath, "_masterindex")));
+      /*check for existence of 3 part files, since part file size == 1 */
+      assertTrue(fs.exists(new Path(finalPath, "part-0")));
+      assertTrue(fs.exists(new Path(finalPath, "part-1")));
+      assertTrue(fs.exists(new Path(finalPath, "part-2")));
+      assertTrue(!fs.exists(new Path(finalPath, "_logs")));
+      FileStatus[] statuses = fs.listStatus(finalPath);
+      args = new String[2];
+      args[0] = "-ls";
+      args[1] = harPath.toString();
+      FsShell shell = new FsShell(conf);
+      ret = ToolRunner.run(shell, args);
+      // fileb and filec
+      assertTrue(ret == 0);
+      checkBytes(harPath, conf);
+      checkBlockSize(fs, finalPath, 512);
+    }
+  }
  
   public void testArchivesWithMapred() throws Exception {
     fs.delete(archivePath, true);

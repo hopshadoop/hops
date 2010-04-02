@@ -238,6 +238,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1514.  Add documentation on replication, permissions, new options,
     limitations and internals of har.  (mahadev via szetszwo)
 
+    MAPREDUCE-1428.  Make block size and the size of archive created files
+    configurable.  (mahadev via szetszwo)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
