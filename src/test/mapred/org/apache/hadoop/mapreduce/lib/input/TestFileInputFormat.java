@@ -24,7 +24,11 @@ import java.util.Arrays;
 import org.junit.Test;
 import static org.junit.Assert.*;
 
+import static org.mockito.Mockito.*;
+import static org.apache.hadoop.test.MockitoMaker.*;
+
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.Job;
@@ -65,4 +69,15 @@ public class TestFileInputFormat {
     }
   }
 
+  @Test
+  public void testNumInputFiles() throws Exception {
+    Configuration conf = spy(new Configuration());
+    Job job = make(stub(Job.class).returning(conf).from.getConfiguration());
+    FileStatus stat = make(stub(FileStatus.class).returning(0L).from.getLen());
+    TextInputFormat ispy = spy(new TextInputFormat());
+    doReturn(Arrays.asList(stat)).when(ispy).listStatus(job);
+
+    ispy.getSplits(job);
+    verify(conf).setLong(FileInputFormat.NUM_INPUT_FILES, 1);
+  }
 }

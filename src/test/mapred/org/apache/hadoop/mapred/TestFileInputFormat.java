@@ -32,68 +32,99 @@ import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.io.Text;
 
-import com.sun.org.apache.commons.logging.Log;
-import com.sun.org.apache.commons.logging.LogFactory;
-
 public class TestFileInputFormat extends TestCase {
 
-  public void testLocality() throws Exception {
-    JobConf conf = new JobConf();
-    MiniDFSCluster dfs = null;
-    try {
-      dfs = new MiniDFSCluster(conf, 4, true,
-                               new String[]{"/rack0", "/rack0", 
-                                             "/rack1", "/rack1"},
-                               new String[]{"host0", "host1", 
-                                            "host2", "host3"});
-      FileSystem fs = dfs.getFileSystem();
-      System.out.println("FileSystem " + fs.getUri());
-      Path path = new Path("/foo/bar");
-      // create a multi-block file on hdfs
-      DataOutputStream out = fs.create(path, true, 4096, 
-                                       (short) 2, 512, null);
-      for(int i=0; i < 1000; ++i) {
-        out.writeChars("Hello\n");
-      }
-      out.close();
-      System.out.println("Wrote file");
+  Configuration conf = new Configuration();
+  MiniDFSCluster dfs = null;
 
-      // split it using a file input format
-      TextInputFormat.addInputPath(conf, path);
-      TextInputFormat inFormat = new TextInputFormat();
-      inFormat.configure(conf);
-      InputSplit[] splits = inFormat.getSplits(conf, 1);
-      FileStatus fileStatus = fs.getFileStatus(path);
-      BlockLocation[] locations = 
-        fs.getFileBlockLocations(fileStatus, 0, fileStatus.getLen());
-      System.out.println("Made splits");
-
-      // make sure that each split is a block and the locations match
-      for(int i=0; i < splits.length; ++i) {
-        FileSplit fileSplit = (FileSplit) splits[i];
-        System.out.println("File split: " + fileSplit);
-        for (String h: fileSplit.getLocations()) {
-          System.out.println("Location: " + h);
-        }
-        System.out.println("Block: " + locations[i]);
-        assertEquals(locations[i].getOffset(), fileSplit.getStart());
-        assertEquals(locations[i].getLength(), fileSplit.getLength());
-        String[] blockLocs = locations[i].getHosts();
-        String[] splitLocs = fileSplit.getLocations();
-        assertEquals(2, blockLocs.length);
-        assertEquals(2, splitLocs.length);
-        assertTrue((blockLocs[0].equals(splitLocs[0]) && 
-                    blockLocs[1].equals(splitLocs[1])) ||
-                   (blockLocs[1].equals(splitLocs[0]) &&
-                    blockLocs[0].equals(splitLocs[1])));
-      }
-    } finally {
-      if (dfs != null) {
-        dfs.shutdown();
-      }
-    }
+  private MiniDFSCluster newDFSCluster(JobConf conf) throws Exception {
+    return new MiniDFSCluster(conf, 4, true,
+                         new String[]{"/rack0", "/rack0",
+                                      "/rack1", "/rack1"},
+                         new String[]{"host0", "host1",
+                                      "host2", "host3"});
   }
 
+  public void testLocality() throws Exception {
+    JobConf job = new JobConf(conf);
+    dfs = newDFSCluster(job);
+    FileSystem fs = dfs.getFileSystem();
+    System.out.println("FileSystem " + fs.getUri());
+
+    Path inputDir = new Path("/foo/");
+    String fileName = "part-0000";
+    createInputs(fs, inputDir, fileName);
+
+    // split it using a file input format
+    TextInputFormat.addInputPath(job, inputDir);
+    TextInputFormat inFormat = new TextInputFormat();
+    inFormat.configure(job);
+    InputSplit[] splits = inFormat.getSplits(job, 1);
+    FileStatus fileStatus = fs.getFileStatus(new Path(inputDir, fileName));
+    BlockLocation[] locations =
+      fs.getFileBlockLocations(fileStatus, 0, fileStatus.getLen());
+    System.out.println("Made splits");
+
+    // make sure that each split is a block and the locations match
+    for(int i=0; i < splits.length; ++i) {
+      FileSplit fileSplit = (FileSplit) splits[i];
+      System.out.println("File split: " + fileSplit);
+      for (String h: fileSplit.getLocations()) {
+        System.out.println("Location: " + h);
+      }
+      System.out.println("Block: " + locations[i]);
+      assertEquals(locations[i].getOffset(), fileSplit.getStart());
+      assertEquals(locations[i].getLength(), fileSplit.getLength());
+      String[] blockLocs = locations[i].getHosts();
+      String[] splitLocs = fileSplit.getLocations();
+      assertEquals(2, blockLocs.length);
+      assertEquals(2, splitLocs.length);
+      assertTrue((blockLocs[0].equals(splitLocs[0]) &&
+                  blockLocs[1].equals(splitLocs[1])) ||
+                 (blockLocs[1].equals(splitLocs[0]) &&
+                  blockLocs[0].equals(splitLocs[1])));
+    }
+
+    assertEquals("Expected value of " + FileInputFormat.NUM_INPUT_FILES,
+                 1, job.getLong(FileInputFormat.NUM_INPUT_FILES, 0));
+  }
+
+  private void createInputs(FileSystem fs, Path inDir, String fileName)
+  throws IOException {
+    // create a multi-block file on hdfs
+    DataOutputStream out = fs.create(new Path(inDir, fileName), true, 4096,
+                                     (short) 2, 512, null);
+    for(int i=0; i < 1000; ++i) {
+      out.writeChars("Hello\n");
+    }
+    out.close();
+    System.out.println("Wrote file");
+  }
+
+  public void testNumInputs() throws Exception {
+    JobConf job = new JobConf(conf);
+    dfs = newDFSCluster(job);
+    FileSystem fs = dfs.getFileSystem();
+    System.out.println("FileSystem " + fs.getUri());
+
+    Path inputDir = new Path("/foo/");
+    final int numFiles = 10;
+    String fileNameBase = "part-0000";
+    for (int i=0; i < numFiles; ++i) {
+      createInputs(fs, inputDir, fileNameBase + String.valueOf(i));
+    }
+    createInputs(fs, inputDir, "_meta");
+    createInputs(fs, inputDir, "_temp");
+
+    // split it using a file input format
+    TextInputFormat.addInputPath(job, inputDir);
+    TextInputFormat inFormat = new TextInputFormat();
+    inFormat.configure(job);
+    InputSplit[] splits = inFormat.getSplits(job, 1);
+
+    assertEquals("Expected value of " + FileInputFormat.NUM_INPUT_FILES,
+                 numFiles, job.getLong(FileInputFormat.NUM_INPUT_FILES, 0));
+  }
   
   final Path root = new Path("/TestFileInputFormat");
   final Path file1 = new Path(root, "file1");
@@ -103,8 +134,6 @@ public class TestFileInputFormat extends TestCase {
   static final int BLOCKSIZE = 1024;
   static final byte[] databuf = new byte[BLOCKSIZE];
 
-  private static final Log LOG = LogFactory.getLog(TestFileInputFormat.class);
-  
   private static final String rack1[] = new String[] {
     "/r1"
   };
@@ -112,7 +141,6 @@ public class TestFileInputFormat extends TestCase {
     "host1.rack1.com"
   };
   
-  /** Dummy class to extend CombineFileInputFormat*/
   private class DummyFileInputFormat extends FileInputFormat<Text, Text> {
     @Override
     public RecordReader<Text, Text> getRecordReader(InputSplit split,
@@ -122,50 +150,40 @@ public class TestFileInputFormat extends TestCase {
   }
 
   public void testMultiLevelInput() throws IOException {
-    String namenode = null;
-    MiniDFSCluster dfs = null;
-    FileSystem fileSys = null;
-    try {
-      JobConf conf = new JobConf();
-      
-      conf.setBoolean("dfs.replication.considerLoad", false);
-      dfs = new MiniDFSCluster(conf, 1, true, rack1, hosts1);
-      dfs.waitActive();
+    JobConf job = new JobConf(conf);
 
-      namenode = (dfs.getFileSystem()).getUri().getHost() + ":" +
-                 (dfs.getFileSystem()).getUri().getPort();
+    job.setBoolean("dfs.replication.considerLoad", false);
+    dfs = new MiniDFSCluster(job, 1, true, rack1, hosts1);
+    dfs.waitActive();
 
-      fileSys = dfs.getFileSystem();
-      if (!fileSys.mkdirs(dir1)) {
-        throw new IOException("Mkdirs failed to create " + root.toString());
-      }
-      writeFile(conf, file1, (short)1, 1);
-      writeFile(conf, file2, (short)1, 1);
+    String namenode = (dfs.getFileSystem()).getUri().getHost() + ":" +
+                      (dfs.getFileSystem()).getUri().getPort();
 
-      // split it using a CombinedFile input format
-      DummyFileInputFormat inFormat = new DummyFileInputFormat();
-      inFormat.setInputPaths(conf, root);
-
-      // By default, we don't allow multi-level/recursive inputs
-      boolean exceptionThrown = false;
-      try {
-        InputSplit[] splits = inFormat.getSplits(conf, 1);
-      } catch (Exception e) {
-        exceptionThrown = true;
-      }
-      assertTrue("Exception should be thrown by default for scanning a "
-          + "directory with directories inside.", exceptionThrown);
-
-      // Enable multi-level/recursive inputs
-      conf.setBoolean("mapred.input.dir.recursive", true);
-      InputSplit[] splits = inFormat.getSplits(conf, 1);
-      assertEquals(splits.length, 2);
-      
-    } finally {
-      if (dfs != null) {
-        dfs.shutdown();
-      }
+    FileSystem fileSys = dfs.getFileSystem();
+    if (!fileSys.mkdirs(dir1)) {
+      throw new IOException("Mkdirs failed to create " + root.toString());
     }
+    writeFile(job, file1, (short)1, 1);
+    writeFile(job, file2, (short)1, 1);
+
+    // split it using a CombinedFile input format
+    DummyFileInputFormat inFormat = new DummyFileInputFormat();
+    inFormat.setInputPaths(job, root);
+
+    // By default, we don't allow multi-level/recursive inputs
+    boolean exceptionThrown = false;
+    try {
+      InputSplit[] splits = inFormat.getSplits(job, 1);
+    } catch (Exception e) {
+      exceptionThrown = true;
+    }
+    assertTrue("Exception should be thrown by default for scanning a "
+        + "directory with directories inside.", exceptionThrown);
+
+    // Enable multi-level/recursive inputs
+    job.setBoolean("mapred.input.dir.recursive", true);
+    InputSplit[] splits = inFormat.getSplits(job, 1);
+    assertEquals(splits.length, 2);
   }
 
   static void writeFile(Configuration conf, Path name,
@@ -182,5 +200,11 @@ public class TestFileInputFormat extends TestCase {
     DFSTestUtil.waitReplication(fileSys, name, replication);
   }
 
-  
+  @Override
+  public void tearDown() throws Exception {
+    if (dfs != null) {
+      dfs.shutdown();
+      dfs = null;
+    }
+  }
 }

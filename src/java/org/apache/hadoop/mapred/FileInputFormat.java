@@ -61,6 +61,9 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
   public static final Log LOG =
     LogFactory.getLog(FileInputFormat.class);
 
+  public static final String NUM_INPUT_FILES =
+    org.apache.hadoop.mapreduce.lib.input.FileInputFormat.NUM_INPUT_FILES;
+
   private static final double SPLIT_SLOP = 1.1;   // 10% slop
 
   private long minSplitSize = 1;
@@ -246,6 +249,8 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
     throws IOException {
     FileStatus[] files = listStatus(job);
     
+    // Save the number of input files for metrics/loadgen
+    job.setLong(NUM_INPUT_FILES, files.length);
     long totalSize = 0;                           // compute total size
     for (FileStatus file: files) {                // check we have valid files
       if (file.isDir()) {
