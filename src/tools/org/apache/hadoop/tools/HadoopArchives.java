@@ -22,6 +22,9 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -74,7 +77,7 @@ import org.apache.hadoop.util.ToolRunner;
  * Hadoop archives look at {@link HarFileSystem}.
  */
 public class HadoopArchives implements Tool {
-  public static final int VERSION = 1;
+  public static final int VERSION = 2;
   private static final Log LOG = LogFactory.getLog(HadoopArchives.class);
   
   private static final String NAME = "har"; 
@@ -90,22 +93,6 @@ public class HadoopArchives implements Tool {
   static final String HAR_BLOCKSIZE_LABEL = NAME + ".block.size";
   /**the size of the part files that will be created when archiving **/
   static final String HAR_PARTSIZE_LABEL = NAME + ".partfile.size";
-  static final String SPACE_REPLACE_LABEL = NAME + ".space.replace.enable";
-  static final boolean SPACE_REPLACE_DEFAULT = false;
-  static final String SPACE_REPLACEMENT_LABEL = NAME + ".space.replacement";
-  static final String SPACE_REPLACEMENT_DEFAULT = "_";
-  static final String SPACE_REPLACEMENT_DESCRIPTION
-    = HadoopArchives.class.getSimpleName() + " (version=" + VERSION
-    + ") does not support source paths with the space character."
-    + "\n\nThere is a space replacement option, which can be enabled by"
-    + "\n  -D" + SPACE_REPLACE_LABEL + "=true"
-    + "\nThe space replacement string can be specified by"
-    + "\n  -D" + SPACE_REPLACEMENT_LABEL + "=<REPLACEMENT_STRING>"
-    + "\nThe default <REPLACEMENT_STRING> is \""
-    + SPACE_REPLACEMENT_DEFAULT
-    + "\".\n*** Note that the original paths will not be changed"
-    + " by the space replacement option."
-    + "  The resulted har contains only the replaced paths.";
 
   /** size of each part file size **/
   long partSize = 2 * 1024 * 1024 * 1024l;
@@ -118,11 +105,6 @@ public class HadoopArchives implements Tool {
   
  
   private JobConf conf;
-  private String spaceReplacement = null;
-
-  private boolean isSpaceReplaceEnabled() {
-    return spaceReplacement != null;
-  }
 
   public void setConf(Configuration conf) {
     if (conf instanceof JobConf) {
@@ -315,13 +297,12 @@ public class HadoopArchives implements Tool {
    * @param fullPath the full path
    * @param root the prefix root to be truncated
    * @return the relative path
-   * @throws IOException 
    */
-  private String relPathToRoot(Path fullPath, Path root) throws IOException {
+  private Path relPathToRoot(Path fullPath, Path root) {
     // just take some effort to do it 
     // rather than just using substring 
     // so that we do not break sometime later
-    final String justRoot = Path.SEPARATOR;
+    final Path justRoot = new Path(Path.SEPARATOR);
     if (fullPath.depth() == root.depth()) {
       return justRoot;
     }
@@ -332,7 +313,7 @@ public class HadoopArchives implements Tool {
         retPath = new Path(parent.getName(), retPath);
         parent = parent.getParent();
       }
-      return new Path(justRoot, retPath.toString()).toString();
+      return new Path(justRoot, retPath);
     }
     return null;
   }
@@ -403,35 +384,20 @@ public class HadoopArchives implements Tool {
     }
     Set<Map.Entry<String, HashSet<String>>> keyVals = allpaths.entrySet();
     for (Map.Entry<String, HashSet<String>> entry : keyVals) {
-      final String relPath = relPathToRoot(new Path(entry.getKey()), parentPath);
+      final Path relPath = relPathToRoot(new Path(entry.getKey()), parentPath);
       if (relPath != null) {
         final String[] children = new String[entry.getValue().size()];
         int i = 0;
         for(String child: entry.getValue()) {
           children[i++] = child;
         }
-        append(srcWriter, 0L, relPath, children);
+        append(srcWriter, 0L, relPath.toString(), children);
       }
-    }
-  }
-
-  //check whether the path contains the space character.
-  private void checkSpace(String p) throws IOException {
-    //check only if space replacement is disabled.
-    if (!isSpaceReplaceEnabled() && p.indexOf(' ') >= 0) {
-      throw new IOException("Source \"" + p + "\" contains the space character.  "
-          + SPACE_REPLACEMENT_DESCRIPTION);
     }
   }
 
   private void append(SequenceFile.Writer srcWriter, long len,
       String path, String[] children) throws IOException {
-    checkSpace(path);
-    if (children != null) {
-      for(String child: children) {
-        checkSpace(child);
-      }
-    }
     srcWriter.append(new LongWritable(len), new HarEntry(path, children));
   }
     
@@ -544,7 +510,7 @@ public class HadoopArchives implements Tool {
         for (FileStatusDir statDir: allFiles) {
           FileStatus stat = statDir.getFileStatus();
           long len = stat.isDir()? 0:stat.getLen();
-          final String path = relPathToRoot(stat.getPath(), parentPath);
+          final Path path = relPathToRoot(stat.getPath(), parentPath);
           final String[] children;
           if (stat.isDir()) {
             //get the children 
@@ -557,7 +523,7 @@ public class HadoopArchives implements Tool {
           else {
             children = null;
           }
-          append(srcWriter, len, path, children);
+          append(srcWriter, len, path.toString(), children);
           srcWriter.sync();
           numFiles++;
           totalSize += len;
@@ -596,8 +562,6 @@ public class HadoopArchives implements Tool {
   static class HArchivesMapper 
   implements Mapper<LongWritable, HarEntry, IntWritable, Text> {
     private JobConf conf = null;
-    private String spaceReplacement;
-
     int partId = -1 ; 
     Path tmpOutputDir = null;
     Path tmpOutput = null;
@@ -615,8 +579,6 @@ public class HadoopArchives implements Tool {
     // tmp files. 
     public void configure(JobConf conf) {
       this.conf = conf;
-      this.spaceReplacement = conf.get(SPACE_REPLACEMENT_LABEL,
-          SPACE_REPLACEMENT_DEFAULT);
 
       // this is tightly tied to map reduce
       // since it does not expose an api 
@@ -676,8 +638,9 @@ public class HadoopArchives implements Tool {
       return new Path(parent, new Path(p.toString().substring(1)));
     }
 
-    private String replaceSpaces(String s) {
-      return s.replace(" ", spaceReplacement);
+    private static String encodeName(String s) 
+      throws UnsupportedEncodingException {
+      return URLEncoder.encode(s,"UTF-8");
     }
 
     // read files from the split input 
@@ -690,15 +653,15 @@ public class HadoopArchives implements Tool {
         Reporter reporter) throws IOException {
       Path relPath = new Path(value.path);
       int hash = HarFileSystem.getHarHash(relPath);
-      String towrite = replaceSpaces(relPath.toString());
+      String towrite = encodeName(relPath.toString());
       Path srcPath = realPath(relPath, rootPath);
       long startPos = partStream.getPos();
       if (value.isDir()) { 
-        towrite += " dir none " + 0 + " " + 0 + " ";
+        towrite += " dir none 0 0 ";
         StringBuffer sbuff = new StringBuffer();
         sbuff.append(towrite);
         for (String child: value.children) {
-          sbuff.append(replaceSpaces(child) + " ");
+          sbuff.append(encodeName(child) + " ");
         }
         towrite = sbuff.toString();
         //reading directories is also progress
@@ -882,22 +845,6 @@ public class HadoopArchives implements Tool {
         throw new IOException("The resolved paths is empty."
             + "  Please check whether the srcPaths exist, where srcPaths = "
             + srcPaths);
-      }
-
-      //process space replacement configuration
-      if (conf.getBoolean(SPACE_REPLACE_LABEL, SPACE_REPLACE_DEFAULT)) {
-        spaceReplacement = conf.get(SPACE_REPLACEMENT_LABEL,
-            SPACE_REPLACEMENT_DEFAULT);
-        if (spaceReplacement.indexOf(' ') >= 0) {
-          throw new IllegalArgumentException("spaceReplacement = \""
-              + spaceReplacement + "\" cannot contain the space character.");
-        }
-        if (spaceReplacement.indexOf(Path.SEPARATOR) >= 0) {
-          throw new IllegalArgumentException("spaceReplacement = \""
-              + spaceReplacement + "\" cannot contain the path separator \""
-              + Path.SEPARATOR + "\".");
-        }
-        LOG.info(SPACE_REPLACEMENT_LABEL + " = " + spaceReplacement);
       }
 
       archive(parentPath, globPaths, archiveName, destPath);

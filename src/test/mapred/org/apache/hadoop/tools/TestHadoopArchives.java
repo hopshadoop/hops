@@ -112,8 +112,9 @@ public class TestHadoopArchives extends TestCase {
     createFile(sub1, "x", fs);
     createFile(sub1, "y", fs);
     createFile(sub1, "z", fs);
-    final Path sub2 = new Path(inputPath, "sub 2");
+    final Path sub2 = new Path(inputPath, "sub 1 with suffix");
     fs.mkdirs(sub2);
+    createFile(sub2, "z", fs);
     final Configuration conf = mapred.createJobConf();
     final FsShell shell = new FsShell(conf);
 
@@ -125,23 +126,9 @@ public class TestHadoopArchives extends TestCase {
     final String prefix = "har://hdfs-" + uri.getHost() +":" + uri.getPort()
         + archivePath.toUri().getPath() + Path.SEPARATOR;
 
-    {//space replacement is not enabled
-      final String[] args = {
-          "-archiveName",
-          "fail.har",
-          "-p",
-          inputPathStr,
-          "*",
-          archivePath.toString()
-      };
-      final HadoopArchives har = new HadoopArchives(mapred.createJobConf());
-      assertEquals(-1, ToolRunner.run(har, args));
-    }
-
     {//Enable space replacement
       final String harName = "foo.har";
       final String[] args = {
-          "-D" + HadoopArchives.SPACE_REPLACE_LABEL + "=true",
           "-archiveName",
           harName,
           "-p",
@@ -154,87 +141,11 @@ public class TestHadoopArchives extends TestCase {
 
       //compare results
       final List<String> harPaths = lsr(shell, prefix + harName);
-      final List<String> replaced = replace(originalPaths, HadoopArchives.SPACE_REPLACEMENT_DEFAULT);
-      assertEquals(replaced, harPaths);
+      assertEquals(originalPaths, harPaths);
     }
 
-    {//Replace space with space
-      final String[] args = {
-          "-D" + HadoopArchives.SPACE_REPLACE_LABEL + "=true",
-          "-D" + HadoopArchives.SPACE_REPLACEMENT_LABEL + "=p q",
-          "-Dhar.space.replace.enable=true",
-          "-archiveName",
-          "fail.har",
-          "-p",
-          inputPathStr,
-          "*",
-          archivePath.toString()
-      };
-      final HadoopArchives har = new HadoopArchives(mapred.createJobConf());
-      try {
-        ToolRunner.run(har, args);
-        fail();
-      } catch(IllegalArgumentException iae) {
-        System.out.println("GOOD");
-        iae.printStackTrace();
-      }
-    }
-
-    {//Replace space with Path.SEPARATOR
-      final String[] args = {
-          "-D" + HadoopArchives.SPACE_REPLACE_LABEL + "=true",
-          "-D" + HadoopArchives.SPACE_REPLACEMENT_LABEL + "=" + Path.SEPARATOR,
-          "-Dhar.space.replace.enable=true",
-          "-archiveName",
-          "fail.har",
-          "-p",
-          inputPathStr,
-          "*",
-          archivePath.toString()
-      };
-      final HadoopArchives har = new HadoopArchives(mapred.createJobConf());
-      try {
-        ToolRunner.run(har, args);
-        fail();
-      } catch(IllegalArgumentException iae) {
-        System.out.println("GOOD");
-        iae.printStackTrace();
-      }
-    }
-
-    {//Replace space with a valid replacement
-      final String harName = "bar.har";
-      final String replacement = "+-";
-      final String[] args = {
-          "-D" + HadoopArchives.SPACE_REPLACE_LABEL + "=true",
-          "-D" + HadoopArchives.SPACE_REPLACEMENT_LABEL + "=" + replacement,
-          "-Dhar.space.replace.enable=true",
-          "-archiveName",
-          harName,
-          "-p",
-          inputPathStr,
-          "*",
-          archivePath.toString()
-      };
-      final HadoopArchives har = new HadoopArchives(mapred.createJobConf());
-      assertEquals(0, ToolRunner.run(har, args));
-
-      //compare results
-      final List<String> harPaths = lsr(shell, prefix + harName);
-      final List<String> replaced = replace(originalPaths, replacement);
-      assertEquals(replaced, harPaths);
-    }
   }
 
-  private static List<String> replace(List<String> paths, String replacement) {
-    final List<String> replaced = new ArrayList<String>();
-    for(int i = 0; i < paths.size(); i++) {
-      replaced.add(paths.get(i).replace(" ", replacement));
-    }
-    Collections.sort(replaced);
-    return replaced;   
-  }
-      
   private static List<String> lsr(final FsShell shell, String dir
       ) throws Exception {
     System.out.println("lsr root=" + dir);

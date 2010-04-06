@@ -511,6 +511,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1602. Fix the error message for the case that src does not
     exist.  (szetszwo)
 
+    MAPREDUCE-1585. Create Hadoop Archives version 2 with filenames
+    URL-encoded (rodrigo via mahadev)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
