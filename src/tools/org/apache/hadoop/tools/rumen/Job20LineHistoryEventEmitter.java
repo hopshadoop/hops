@@ -226,15 +226,10 @@ public class Job20LineHistoryEventEmitter extends HistoryEventEmitter {
       if (status != null && status.equalsIgnoreCase("success")
           && finishTime != null && finishedMaps != null
           && finishedReduces != null) {
-        try {
-          return new JobFinishedEvent(jobID, Long.parseLong(finishTime),
-              Integer.parseInt(finishedMaps),
-              Integer.parseInt(finishedReduces), Integer.parseInt(failedMaps),
-              Integer.parseInt(failedReduces), null, null,
-              parseCounters(counters));
-        } catch (ParseException e) {
-          return null;
-        }
+        return new JobFinishedEvent(jobID, Long.parseLong(finishTime), Integer
+            .parseInt(finishedMaps), Integer.parseInt(finishedReduces), Integer
+            .parseInt(failedMaps), Integer.parseInt(failedReduces), null, null,
+            maybeParseCounters(counters));
       }
 
       return null;

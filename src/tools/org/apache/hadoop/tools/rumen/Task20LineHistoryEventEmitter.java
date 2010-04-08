@@ -119,13 +119,7 @@ public class Task20LineHistoryEventEmitter extends HistoryEventEmitter {
 
       if (finishTime != null && error == null
           && (status != null && status.equalsIgnoreCase("success"))) {
-        Counters eventCounters = null;
-
-        try {
-          eventCounters = parseCounters(counters);
-        } catch (ParseException e) {
-          // no code
-        }
+        Counters eventCounters = maybeParseCounters(counters);
 
         Task20LineHistoryEventEmitter that =
             (Task20LineHistoryEventEmitter) thatg;

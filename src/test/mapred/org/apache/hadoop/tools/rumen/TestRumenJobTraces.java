@@ -137,7 +137,7 @@ public class TestRumenJobTraces {
         new Path(rootInputPath, "dispatch-sample-v20-jt-log.gz");
 
     System.out.println("topology result file = " + topologyPath);
-    System.out.println("trace result file = " + tracePath);
+    System.out.println("testRumenViaDispatch() trace result file = " + tracePath);
 
     String demuxerClassName = ConcatenatedInputFilesDemuxer.class.getName();
 
@@ -159,6 +159,44 @@ public class TestRumenJobTraces {
             topologyGoldFile, LoggedNetworkTopology.class, "topology");
     TestRumenJobTraces.<LoggedJob> jsonFileMatchesGold(conf, tracePath,
         traceGoldFile, LoggedJob.class, "trace");
+  }
+
+  @Test
+  public void testBracketedCounters() throws Exception {
+    final Configuration conf = new Configuration();
+    final FileSystem lfs = FileSystem.getLocal(conf);
+
+    final Path rootInputDir =
+        new Path(System.getProperty("test.tools.input.dir", "")).makeQualified(
+            lfs.getUri(), lfs.getWorkingDirectory());
+    final Path rootTempDir =
+        new Path(System.getProperty("test.build.data", "/tmp")).makeQualified(
+            lfs.getUri(), lfs.getWorkingDirectory());
+
+    final Path rootInputPath = new Path(rootInputDir, "rumen/small-trace-test");
+    final Path tempDir = new Path(rootTempDir, "TestBracketedCounters");
+    lfs.delete(tempDir, true);
+
+    final Path topologyPath = new Path(tempDir, "dispatch-topology.json");
+    final Path tracePath = new Path(tempDir, "dispatch-trace.json");
+
+    final Path inputPath = new Path(rootInputPath, "counters-format-test-logs");
+
+    System.out.println("topology result file = " + topologyPath);
+    System.out.println("testBracketedCounters() trace result file = " + tracePath);
+
+    final Path goldPath =
+        new Path(rootInputPath, "counters-test-trace.json.gz");
+
+    String[] args =
+        { tracePath.toString(), topologyPath.toString(), inputPath.toString() };
+
+    Tool analyzer = new TraceBuilder();
+    int result = ToolRunner.run(analyzer, args);
+    assertEquals("Non-zero exit", 0, result);
+
+    TestRumenJobTraces.<LoggedJob> jsonFileMatchesGold(conf, tracePath,
+        goldPath, LoggedJob.class, "trace");
   }
 
   @Test

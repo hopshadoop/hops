@@ -103,11 +103,11 @@ public class TraceBuilder extends Configured implements Tool {
 
           List<String> dirNames = new ArrayList<String>();
 
-          for (int j = 0; j < statuses.length; ++j) {
-            String name = statuses[j].getPath().getName();
+          for (FileStatus s : statuses) {
+            if (s.isDir()) continue;
+            String name = s.getPath().getName();
 
-            if (!(name.length() >= 4 && ".crc".equals(name.substring(name
-                .length() - 4)))) {
+            if (!(name.endsWith(".crc") || name.startsWith("."))) {
               dirNames.add(name);
             }
           }
@@ -126,12 +126,14 @@ public class TraceBuilder extends Configured implements Tool {
     }
   }
 
-  public static void main(String[] args) throws Exception {
+  public static void main(String[] args) {
     TraceBuilder builder = new TraceBuilder();
     int result = RUN_METHOD_FAILED_EXIT_CODE;
 
     try {
-      result = ToolRunner.run(builder, args);
+      result = ToolRunner.run(builder, args); 
+    } catch (Throwable t) {
+      t.printStackTrace(System.err);
     } finally {
       try {
         builder.finish();
@@ -199,61 +201,65 @@ public class TraceBuilder extends Configured implements Tool {
       for (Path p : options.inputs) {
         InputDemuxer inputDemuxer = options.inputDemuxerClass.newInstance();
 
-        inputDemuxer.bindTo(p, getConf());
+        try {
+          inputDemuxer.bindTo(p, getConf());
+        } catch (IOException e) {
+          LOG.warn("Unable to bind Path " + p + " .  Skipping...", e);
 
-        if (inputDemuxer != null) {
-          Pair<String, InputStream> filePair = null;
+          continue;
+        }
 
-          try {
-            while ((filePair = inputDemuxer.getNext()) != null) {
-              RewindableInputStream ris =
-                  new RewindableInputStream(filePair.second());
+        Pair<String, InputStream> filePair = null;
 
-              JobHistoryParser parser = null;
+        try {
+          while ((filePair = inputDemuxer.getNext()) != null) {
+            RewindableInputStream ris =
+                new RewindableInputStream(filePair.second());
 
-              try {
-                String jobID = extractJobID(filePair.first());
-                if (jobID == null) {
-                  LOG.warn("File skipped: Invalid file name: "
-                      + filePair.first());
-                  continue;
+            JobHistoryParser parser = null;
+
+            try {
+              String jobID = extractJobID(filePair.first());
+              if (jobID == null) {
+                LOG.warn("File skipped: Invalid file name: "
+                    + filePair.first());
+                continue;
+              }
+              if ((jobBuilder == null)
+                  || (!jobBuilder.getJobID().equals(jobID))) {
+                if (jobBuilder != null) {
+                  traceWriter.output(jobBuilder.build());
                 }
-                if ((jobBuilder == null)
-                    || (!jobBuilder.getJobID().equals(jobID))) {
-                  if (jobBuilder != null) {
-                    traceWriter.output(jobBuilder.build());
-                  }
-                  jobBuilder = new JobBuilder(jobID);
-                }
+                jobBuilder = new JobBuilder(jobID);
+              }
 
-                if (isJobConfXml(filePair.first(), ris)) {
-                  processJobConf(jobConfParser.parse(ris.rewind()), jobBuilder);
-                } else {
-                  parser = JobHistoryParserFactory.getParser(ris);
-                  if (parser == null) {
-                    LOG.warn("File skipped: Cannot find suitable parser: "
-                        + filePair.first());
-                  } else {
-                    processJobHistory(parser, jobBuilder);
-                  }
-                }
-              } finally {
+              if (isJobConfXml(filePair.first(), ris)) {
+                processJobConf(jobConfParser.parse(ris.rewind()), jobBuilder);
+              } else {
+                parser = JobHistoryParserFactory.getParser(ris);
                 if (parser == null) {
-                  ris.close();
+                  LOG.warn("File skipped: Cannot find suitable parser: "
+                      + filePair.first());
                 } else {
-                  parser.close();
-                  parser = null;
+                  processJobHistory(parser, jobBuilder);
                 }
               }
+            } finally {
+              if (parser == null) {
+                ris.close();
+              } else {
+                parser.close();
+                parser = null;
+              }
             }
-          } catch (Throwable t) {
-            if (filePair != null) {
-              LOG.warn("TraceBuilder got an error while processing file "
-                  + filePair.first(), t);
-            }
-          } finally {
-            inputDemuxer.close();
           }
+        } catch (Throwable t) {
+          if (filePair != null) {
+            LOG.warn("TraceBuilder got an error while processing the [possibly virtual] file "
+                + filePair.first() + " within Path " + p , t);
+          }
+        } finally {
+          inputDemuxer.close();
         }
       }
       if (jobBuilder != null) {

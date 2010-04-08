@@ -101,21 +101,16 @@ public abstract class TaskAttempt20LineEventEmitter extends HistoryEventEmitter 
 
       if (finishTime != null && status != null
           && status.equalsIgnoreCase("success")) {
+        String hostName = line.get("HOSTNAME");
+        String counters = line.get("COUNTERS");
+        String state = line.get("STATE_STRING");
 
-        try {
-          String hostName = line.get("HOSTNAME");
-          String counters = line.get("COUNTERS");
-          String state = line.get("STATE_STRING");
+        TaskAttempt20LineEventEmitter that =
+            (TaskAttempt20LineEventEmitter) thatg;
 
-          TaskAttempt20LineEventEmitter that =
-              (TaskAttempt20LineEventEmitter) thatg;
-
-          return new TaskAttemptFinishedEvent(taskAttemptID,
-              that.originalTaskType, status, Long.parseLong(finishTime),
-              hostName, state, parseCounters(counters));
-        } catch (ParseException e) {
-          return null;
-        }
+        return new TaskAttemptFinishedEvent(taskAttemptID,
+            that.originalTaskType, status, Long.parseLong(finishTime),
+            hostName, state, maybeParseCounters(counters));
       }
 
       return null;

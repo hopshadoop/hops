@@ -63,6 +63,15 @@ abstract class HistoryEventEmitter {
     return new Pair<Queue<HistoryEvent>, PostEmitAction>(results, removeEmitter);
   }
 
+  protected static Counters maybeParseCounters(String counters) {
+    try {
+      return parseCounters(counters);
+    } catch (ParseException e) {
+      LOG.warn("The counter string, \"" + counters + "\" is badly formatted.");
+      return null;
+    }
+  }
+
   protected static Counters parseCounters(String counters)
       throws ParseException {
     if (counters == null) {
@@ -73,6 +82,8 @@ abstract class HistoryEventEmitter {
     counters = counters.replace("\\.", "\\\\.");
     counters = counters.replace("\\\\(", "\\(");
     counters = counters.replace("\\\\)", "\\)");
+    counters = counters.replace("\\\\[", "\\[");
+    counters = counters.replace("\\\\]", "\\]");
 
     org.apache.hadoop.mapred.Counters depForm =
         org.apache.hadoop.mapred.Counters.fromEscapedCompactString(counters);

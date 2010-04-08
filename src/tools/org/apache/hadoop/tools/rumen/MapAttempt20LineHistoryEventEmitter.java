@@ -60,23 +60,18 @@ public class MapAttempt20LineHistoryEventEmitter extends
 
       if (finishTime != null && status != null
           && status.equalsIgnoreCase("success")) {
+        String hostName = line.get("HOSTNAME");
+        String counters = line.get("COUNTERS");
+        String state = line.get("STATE_STRING");
 
-        try {
-          String hostName = line.get("HOSTNAME");
-          String counters = line.get("COUNTERS");
-          String state = line.get("STATE_STRING");
+        MapAttempt20LineHistoryEventEmitter that =
+            (MapAttempt20LineHistoryEventEmitter) thatg;
 
-          MapAttempt20LineHistoryEventEmitter that =
-              (MapAttempt20LineHistoryEventEmitter) thatg;
-
-          if (finishTime != null && "success".equalsIgnoreCase(status)) {
-            return new MapAttemptFinishedEvent(taskAttemptID,
-                that.originalTaskType, status, Long.parseLong(finishTime), Long
-                    .parseLong(finishTime), hostName, state,
-                parseCounters(counters));
-          }
-        } catch (ParseException e) {
-          // no code
+        if (finishTime != null && "success".equalsIgnoreCase(status)) {
+          return new MapAttemptFinishedEvent(taskAttemptID,
+              that.originalTaskType, status, Long.parseLong(finishTime), Long
+                  .parseLong(finishTime), hostName, state,
+              maybeParseCounters(counters));
         }
       }
 
