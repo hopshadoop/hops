@@ -12,6 +12,8 @@ Trunk (unreleased changes)
 
     MAPREDUCE-1493. Authorization for job-history pages. (vinodkv)
 
+    MAPREDUCE-1644. Remove Sqoop contrib module. (Aaron Kimball via cdouglas)
+
   NEW FEATURES
 
     MAPREDUCE-1383. Automates fetching of delegation tokens in File*Formats

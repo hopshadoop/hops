@@ -1294,7 +1294,6 @@
         <exclude name="src/test/mapred/org/apache/hadoop/mapred/test.tgz"/>
         <exclude name="src/test/tools/data/rumen/**/*"/>
         <exclude name="src/test/mapred/org/apache/hadoop/mapred/*.txt"/>
-        <exclude name="src/contrib/sqoop/testdata/hive/scripts/*.q"/>
         <exclude name="src/contrib/mumak/src/test/data/*.json"/>
         <exclude name="src/contrib/index/sample/*.txt"/>
         <exclude name="src/test/mapred/org/apache/hadoop/cli/data60bytes"/>
