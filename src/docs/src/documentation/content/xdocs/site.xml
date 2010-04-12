@@ -259,6 +259,9 @@ See http://forrest.apache.org/docs/linking.html for more info.
             <streaming href="streaming/">
               <package-summary href="package-summary.html" />
             </streaming>
+            <typedbytes href="typedbytes/">
+              <package-summary href="package-summary.html" />
+            </typedbytes>
             <util href="util/">
               <genericoptionsparser href="GenericOptionsParser.html" />
               <progress href="Progress.html" />

@@ -112,6 +112,7 @@ For an example, see <a href="streaming.html#Making+Archives+Available+to+Tasks">
 <tr><td> -numReduceTasks</td><td> Optional </td><td> Specify the number of reducers</td></tr>
 <tr><td> -mapdebug </td><td> Optional </td><td> Script to call when map task fails </td></tr>
 <tr><td> -reducedebug </td><td> Optional </td><td> Script to call when reduce task fails </td></tr>
+<tr><td> -io </td><td> Optional </td><td> Format to use for input to and output from client processes. </td></tr>
 </table>
 
 <section>
@@ -182,8 +183,25 @@ Since the TextInputFormat returns keys of LongWritable class, which are actually
 </source>
 </section>
 
+<section>
+<title>Specifying the Communication Format</title>
+<p>
+By default Hadoop Streaming uses tab-separated lines of text as input/output format for passing data to and from client processes, but it is also possible to use other formats. Specifying the communication format can be done as follows:
+</p>
+<source>
+   -io [identifier]
+</source>
+<p>
+where <code>[identifier]</code> can be <code>text</code>, <code>rawbytes</code> or <code>typedbytes</code>. These identifiers correspond to the following formats:
+</p>
+<ul>
+<li><code>text</code>: The default tab-separated lines of text.</li>
+<li><code>rawbytes</code>: Keys and values are passed as a 4 byte length followed by the raw bytes.</li>
+<li><code>typedbytes</code>: The "typed bytes" format as described in the <a href="ext:api/org/apache/hadoop/typedbytes/package-summary">API documentation</a> for the package <code>org.apache.hadoop.typedbytes</code>.</li>
+</ul>
 </section>
 
+</section>
 
 <!-- GENERIC COMMAND OPTIONS-->
 <section>
@@ -294,8 +312,20 @@ the nth field separator in a line of the reduce outputs as the separator between
 inputs. By default the separator is the tab character.</p>
 </section>
 
+<section>
+<title>Specifying Communication Formats in Detail</title>
+<p>
+The above-mentioned <code>-io [identifier]</code> option is pretty coarse-grained since it triggers usage of the format corresponding to the given identifier for everything. A more fine-grained way of specifying the communication formats is by using the following generic options:
+</p>
+<source>
+    -D stream.map.input=[identifier]
+    -D stream.map.output=[identifier]
+    -D stream.reduce.input=[identifier]
+    -D stream.reduce.output=[identifier]
+</source>
 </section>
 
+</section>
 
 <section>
 <title>Working with Large Files and Archives</title>

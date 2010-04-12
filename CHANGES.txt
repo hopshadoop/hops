@@ -525,6 +525,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1635. ResourceEstimator does not work after MAPREDUCE-842.
     (Amareshwari Sriramadasu via vinodkv)
 
+    MAPREDUCE-889. binary communication formats added to Streaming by
+    HADOOP-1722 should be documented. (Klaas Bosteels via tomwhite)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
