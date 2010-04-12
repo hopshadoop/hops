@@ -522,6 +522,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1523. Sometimes rumen trace generator fails to extract the job
     finish time. (dick king via mahadev)
 
+    MAPREDUCE-1635. ResourceEstimator does not work after MAPREDUCE-842.
+    (Amareshwari Sriramadasu via vinodkv)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
