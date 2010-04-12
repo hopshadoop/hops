@@ -31,6 +31,15 @@
       <fileset dir="." includes="*/build.xml"/>
     </subant>
   </target>
+
+  <!-- ====================================================== -->
+  <!-- Compile contrib test code.                             -->
+  <!-- ====================================================== -->
+  <target name="compile-test">
+    <subant target="compile-test">
+      <fileset dir="." includes="*/build.xml"/>
+    </subant>
+  </target>
   
   <!-- ====================================================== -->
   <!-- Package contrib jars.                                  -->

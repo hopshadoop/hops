@@ -528,6 +528,9 @@ Trunk (unreleased changes)
     MAPREDUCE-889. binary communication formats added to Streaming by
     HADOOP-1722 should be documented. (Klaas Bosteels via tomwhite)
 
+    MAPREDUCE-1031. ant tar target doens't seem to compile tests in contrib
+    projects. (Aaron Kimball via tomwhite)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

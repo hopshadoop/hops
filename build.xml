@@ -1001,6 +1001,13 @@
       </fileset>
     </copy>
 
+    <subant target="compile-test">
+      <!--Pass down the version in case its needed again and the target
+      distribution directory so contribs know where to install to.-->
+      <property name="version" value="${version}"/>
+      <property name="dist.dir" value="${dist.dir}"/>
+      <fileset file="${contrib.dir}/build.xml"/>
+    </subant>  	
     <subant target="package">
       <!--Pass down the version in case its needed again and the target
       distribution directory so contribs know where to install to.-->
