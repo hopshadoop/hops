@@ -534,6 +534,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1031. ant tar target doens't seem to compile tests in contrib
     projects. (Aaron Kimball via tomwhite)
 
+    MAPREDUCE-1692. Removed unused testcase TestStreamedMerge.
+    (Sreekanth Ramakrishnan and Amareshwari Sriramadasu via yhemanth)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
