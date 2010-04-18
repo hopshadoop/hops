@@ -537,6 +537,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1692. Removed unused testcase TestStreamedMerge.
     (Sreekanth Ramakrishnan and Amareshwari Sriramadasu via yhemanth)
 
+    MAPREDUCE-1062. Fix ReliabilityTest to work with retired jobs. (Sreekanth
+    Ramakrishnan via cdouglas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
