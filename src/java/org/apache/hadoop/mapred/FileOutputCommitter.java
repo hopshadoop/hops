@@ -26,8 +26,6 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.mapreduce.JobStatus;
-import org.apache.hadoop.util.StringUtils;
 
 /** An {@link OutputCommitter} that commits files specified 
  * in job output directory i.e. ${mapreduce.output.fileoutputformat.outputdir}. 
@@ -176,14 +174,10 @@ public class FileOutputCommitter extends OutputCommitter {
 
   public void abortTask(TaskAttemptContext context) throws IOException {
     Path taskOutputPath =  getTempTaskOutputPath(context);
-    try {
-      if (taskOutputPath != null) {
-        FileSystem fs = taskOutputPath.getFileSystem(context.getJobConf());
-        context.getProgressible().progress();
-        fs.delete(taskOutputPath, true);
-      }
-    } catch (IOException ie) {
-      LOG.warn("Error discarding output" + StringUtils.stringifyException(ie));
+    if (taskOutputPath != null) {
+      FileSystem fs = taskOutputPath.getFileSystem(context.getJobConf());
+      context.getProgressible().progress();
+      fs.delete(taskOutputPath, true);
     }
   }
 
@@ -204,38 +198,29 @@ public class FileOutputCommitter extends OutputCommitter {
 
   public boolean needsTaskCommit(TaskAttemptContext context) 
   throws IOException {
-    try {
-      Path taskOutputPath = getTempTaskOutputPath(context);
-      if (taskOutputPath != null) {
-        context.getProgressible().progress();
-        // Get the file-system for the task output directory
-        FileSystem fs = taskOutputPath.getFileSystem(context.getJobConf());
-        // since task output path is created on demand, 
-        // if it exists, task needs a commit
-        if (fs.exists(taskOutputPath)) {
-          return true;
-        }
+    Path taskOutputPath = getTempTaskOutputPath(context);
+    if (taskOutputPath != null) {
+      context.getProgressible().progress();
+      // Get the file-system for the task output directory
+      FileSystem fs = taskOutputPath.getFileSystem(context.getJobConf());
+      // since task output path is created on demand, 
+      // if it exists, task needs a commit
+      if (fs.exists(taskOutputPath)) {
+        return true;
       }
-    } catch (IOException  ioe) {
-      throw ioe;
     }
     return false;
   }
 
-  Path getTempTaskOutputPath(TaskAttemptContext taskContext) {
+  Path getTempTaskOutputPath(TaskAttemptContext taskContext) throws IOException {
     JobConf conf = taskContext.getJobConf();
     Path outputPath = FileOutputFormat.getOutputPath(conf);
     if (outputPath != null) {
       Path p = new Path(outputPath,
                      (FileOutputCommitter.TEMP_DIR_NAME + Path.SEPARATOR +
                       "_" + taskContext.getTaskAttemptID().toString()));
-      try {
-        FileSystem fs = p.getFileSystem(conf);
-        return p.makeQualified(fs);
-      } catch (IOException ie) {
-        LOG.warn(StringUtils .stringifyException(ie));
-        return p;
-      }
+      FileSystem fs = p.getFileSystem(conf);
+      return p.makeQualified(fs);
     }
     return null;
   }

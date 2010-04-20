@@ -540,6 +540,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1062. Fix ReliabilityTest to work with retired jobs. (Sreekanth
     Ramakrishnan via cdouglas)
 
+    MAPREDUCE-1409. IOExceptions thrown from FIleOutputCommitter::abortTask
+    should cause the task to fail. (Amareshwari Sriramadasu via cdouglas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
