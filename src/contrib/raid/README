@@ -144,6 +144,19 @@ on any machine irrespective of whether that machine is running any other hadoop 
 You can start the RaidNode by running the following on the selected machine:
 nohup $HADOOP_HOME/bin/hadoop org.apache.hadoop.raid.RaidNode >> /xxx/logs/hadoop-root-raidnode-hadoop.xxx.com.log &
 
+Optionally, we provide two scripts to start and stop the RaidNode. Copy the scripts
+start-raidnode.sh and stop-raidnode.sh to the directory $HADOOP_HOME/bin in the machine
+you would like to deploy the daemon. You can start or stop the RaidNode by directly 
+callying the scripts from that machine. If you want to deploy the RaidNode remotely,
+copy start-raidnode-remote.sh and stop-raidnode-remote.sh to $HADOOP_HOME/bin at 
+the machine from which you want to trigger the remote deployment and create a text
+file $HADOOP_HOME/conf/raidnode at the same machine containing the name of the server
+where the RaidNode should run. These scripts run ssh to the specified machine and 
+invoke start/stop-raidnode.sh there. As an example, you might want to change
+start-mapred.sh in the JobTracker machine so that it automatically calls 
+start-raidnode-remote.sh (and do the equivalent thing for stop-mapred.sh and 
+stop-raidnode-remote.sh).
+
 Run fsckraid periodically (being developed as part of another JIRA). This valudates parity
 blocsk of a file.
 
