@@ -43,7 +43,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.raid.protocol.PolicyInfo;
 import org.apache.hadoop.raid.protocol.PolicyList;
 import org.apache.hadoop.raid.protocol.RaidProtocol;
-import org.apache.hadoop.raid.protocol.RaidProtocol.ReturnStatus;
 
 /**
  * A {@link RaidShell} that allows browsing configured raid policies.
@@ -198,7 +197,7 @@ public class RaidShell extends Configured implements Tool {
       if ("-showConfig".equals(cmd)) {
         exitCode = showConfig(cmd, argv, i);
       } else if ("-recover".equals(cmd)) {
-        exitCode = recover(cmd, argv, i);
+        exitCode = recoverAndPrint(cmd, argv, i);
       } else {
         exitCode = -1;
         System.err.println(cmd.substring(1) + ": Unknown command");
@@ -256,19 +255,30 @@ public class RaidShell extends Configured implements Tool {
   /**
    * Recovers the specified path from the parity file
    */
-  public int recover(String cmd, String argv[], int startindex)
+  public Path[] recover(String cmd, String argv[], int startindex)
     throws IOException {
-    int exitCode = 0;
-    String[] paths = new String[argv.length - startindex];
+    Path[] paths = new Path[(argv.length - startindex) / 2];
+    int j = 0;
     for (int i = startindex; i < argv.length; i = i + 2) {
       String path = argv[i];
       long corruptOffset = Long.parseLong(argv[i+1]);
       LOG.info("RaidShell recoverFile for " + path + " corruptOffset " + corruptOffset);
-      raidnode.recoverFile(path, corruptOffset);
+      paths[j] = new Path(raidnode.recoverFile(path, corruptOffset));
+      LOG.info("Raidshell created recovery file " + paths[j]);
+      j++;
     }
-    return 0;
+    return paths;
   }
 
+  public int recoverAndPrint(String cmd, String argv[], int startindex)
+    throws IOException {
+    int exitCode = 0;
+    for (Path p : recover(cmd,argv,startindex)) {
+      System.out.println(p);
+    }
+    return exitCode;
+  }
+  
   /**
    * main() has some simple utility methods
    */

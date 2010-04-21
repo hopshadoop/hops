@@ -39,21 +39,6 @@ public interface RaidProtocol extends VersionedProtocol {
   public static final long versionID = 1L;
 
   /**
-   * A set of codes returned by RPC calls.
-   */
-  public enum ReturnStatus {
-    SUCCESS ((int)0x01),
-    FAILURE ((int)0x02),
-    RETRY   ((int)0x03);
-    private int code;
-
-    private ReturnStatus(int code) {
-      this.code = code;
-    }
-    int getReturnStatus() {return code;}
-  }
-
-  /**
    * Get a listing of all configured policies
    * @throws IOException
    * return all categories of configured policies
@@ -68,6 +53,6 @@ public interface RaidProtocol extends VersionedProtocol {
    * @param inputPath The absolute pathname of the file to be recovered.
    * @param corruptOffset The offset that has the corruption
    */
-  public ReturnStatus recoverFile(String inputPath, long corruptOffset) throws IOException;
+  public String recoverFile(String inputPath, long corruptOffset) throws IOException;
 
 }

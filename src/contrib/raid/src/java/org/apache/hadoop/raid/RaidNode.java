@@ -277,7 +277,7 @@ public class RaidNode implements RaidProtocol {
   }
 
   /** {@inheritDoc} */
-  public ReturnStatus recoverFile(String inStr, long corruptOffset) throws IOException {
+  public String recoverFile(String inStr, long corruptOffset) throws IOException {
 
     LOG.info("Recover File for " + inStr + " for corrupt offset " + corruptOffset);
     Path inputPath = new Path(inStr);
@@ -294,9 +294,12 @@ public class RaidNode implements RaidProtocol {
       FileSystem fs = FileSystem.get(destPath.toUri(), conf);
       destPath = destPath.makeQualified(fs);
 
-      unRaid(conf, srcPath, destPath, stripeLength, corruptOffset);
+      Path unraided = unRaid(conf, srcPath, destPath, stripeLength, corruptOffset);
+      if (unraided != null) {
+        return unraided.toString();
+      }
     }
-    return ReturnStatus.SUCCESS;
+    return null;
   }
 
   /**
@@ -767,10 +770,10 @@ public class RaidNode implements RaidProtocol {
                                   int metaRepl, int stripeLength) throws IOException {
 
     // two buffers for generating parity
+    Random rand = new Random();
     int bufSize = 5 * 1024 * 1024; // 5 MB
     byte[] bufs = new byte[bufSize];
     byte[] xor = new byte[bufSize];
-    byte zero = 0;
 
     Path inpath = stat.getPath();
     long blockSize = stat.getBlockSize();
@@ -780,7 +783,9 @@ public class RaidNode implements RaidProtocol {
     Path outpath =  getOriginalParityFile(destPathPrefix, inpath);
     FileSystem outFs = outpath.getFileSystem(conf);
    
-    Path tmppath =  new Path(outpath + ".tmp");
+    Path tmppath =  new Path(conf.get("fs.raid.tmpdir", "/tmp/raid") + 
+                             outpath.toUri().getPath() + "." + 
+                             rand.nextLong() + ".tmp");
 
     // if the parity file is already upto-date, then nothing to do
     try {
@@ -841,6 +846,7 @@ public class RaidNode implements RaidProtocol {
         outFs.delete(outpath, false);
       }
       // rename tmppath to the real parity filename
+      outFs.mkdirs(outpath.getParent());
       if (!outFs.rename(tmppath, outpath)) {
         String msg = "Unable to rename tmp file " + tmppath + " to " + outpath;
         LOG.warn(msg);
@@ -954,10 +960,8 @@ public class RaidNode implements RaidProtocol {
     Random rand = new Random();
     FileSystem srcFs = srcPath.getFileSystem(conf);
     FileStatus srcStat = srcFs.getFileStatus(srcPath);
-    BlockLocation[] locations = srcFs.getFileBlockLocations(srcStat, 0, srcStat.getLen());
     long blockSize = srcStat.getBlockSize();
     long fileSize = srcStat.getLen();
-    int totalBlocks = locations.length;
 
     // find the stripe number where the corrupted offset lies
     long snum = corruptOffset / (stripeLength * blockSize);
@@ -1014,7 +1018,8 @@ public class RaidNode implements RaidProtocol {
     FileSystem destFs = destPathPrefix.getFileSystem(conf);
     int retry = 5;
     try {
-      tmpFile = new Path("/tmp/dhruba/" + rand.nextInt());
+      tmpFile = new Path(conf.get("fs.raid.tmpdir", "/tmp/raid") + "/" + 
+          rand.nextInt());
       fout = destFs.create(tmpFile, false);
     } catch (IOException e) {
       if (retry-- <= 0) {
@@ -1042,8 +1047,12 @@ public class RaidNode implements RaidProtocol {
 
     // Now, reopen the source file and the recovered block file
     // and copy all relevant data to new file
-    Path recoveredPath = getOriginalParityFile(destPathPrefix, srcPath);
-    recoveredPath = new Path(recoveredPath + ".recovered");
+    final Path recoveryDestination = 
+      new Path(conf.get("fs.raid.tmpdir", "/tmp/raid"));
+    final Path recoveredPrefix = 
+      destFs.makeQualified(new Path(recoveryDestination, makeRelative(srcPath)));
+    final Path recoveredPath = 
+      new Path(recoveredPrefix + "." + rand.nextLong() + ".recovered");
     LOG.info("Creating recovered file " + recoveredPath);
 
     FSDataInputStream sin = srcFs.open(srcPath);
@@ -1296,7 +1305,7 @@ public class RaidNode implements RaidProtocol {
           String str = info.getProperty("time_before_har");
           String tmpHarPath = info.getProperty("har_tmp_dir");
           if (tmpHarPath == null) {
-            tmpHarPath = "/raid_har";
+            tmpHarPath = "/tmp/raid_har";
           }
           if (str != null) {
             try {
@@ -1371,13 +1380,16 @@ public class RaidNode implements RaidProtocol {
   
   private void singleHar(FileSystem destFs, FileStatus dest, String tmpHarPath) throws IOException {
     
+    Random rand = new Random();
     Path root = new Path("/");
     Path qualifiedPath = dest.getPath().makeQualified(destFs);
-    String harFile = qualifiedPath.getName() + HAR_SUFFIX;
+    String harFileDst = qualifiedPath.getName() + HAR_SUFFIX;
+    String harFileSrc = qualifiedPath.getName() + "-" + 
+                                rand.nextLong() + "-" + HAR_SUFFIX;
     HadoopArchives har = new HadoopArchives(conf);
     String[] args = new String[6];
     args[0] = "-archiveName";
-    args[1] = harFile;
+    args[1] = harFileSrc;
     args[2] = "-p"; 
     args[3] = root.makeQualified(destFs).toString();
     args[4] = qualifiedPath.toUri().getPath().substring(1);
@@ -1385,10 +1397,10 @@ public class RaidNode implements RaidProtocol {
     int ret = 0;
     try {
       ret = ToolRunner.run(har, args);
-      if (ret == 0 && !destFs.rename(new Path(tmpHarPath+"/"+harFile), 
-                                     new Path(qualifiedPath, harFile))){
-        LOG.info("HAR rename didn't succeed from " + tmpHarPath+"/"+harFile +
-            " to " + qualifiedPath+"/"+harFile);
+      if (ret == 0 && !destFs.rename(new Path(tmpHarPath+"/"+harFileSrc), 
+                                     new Path(qualifiedPath, harFileDst))) {
+        LOG.info("HAR rename didn't succeed from " + tmpHarPath+"/"+harFileSrc +
+            " to " + qualifiedPath + "/" + harFileDst);
         ret = -2;
       }
     } catch (Exception exc) {
@@ -1416,6 +1428,7 @@ public class RaidNode implements RaidProtocol {
           LOG.info("Har parity files thread continuing to run...");
         }
       }
+      LOG.info("Leaving Har thread.");
     }
     
 

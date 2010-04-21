@@ -21,20 +21,15 @@ package org.apache.hadoop.raid.protocol;
 import java.io.IOException;
 import java.io.DataInput;
 import java.io.DataOutput;
-import java.util.Date;
-import java.util.List;
 import java.util.Properties;
 import java.util.Enumeration;
 import java.lang.Math;
-import java.lang.Class;
 import java.text.SimpleDateFormat;
-import java.util.StringTokenizer;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableFactories;
@@ -42,7 +37,6 @@ import org.apache.hadoop.io.WritableFactory;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.raid.protocol.RaidProtocol.ReturnStatus;
 
 /**
  * Maintains information about one policy

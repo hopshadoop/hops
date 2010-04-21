@@ -254,6 +254,10 @@ Trunk (unreleased changes)
     MAPREDUCE-1673. Scripts to start and stop RaidNode.
     (Rodrigo Schmidt via dhruba)
 
+    MAPREDUCE-1659. RaidNode writes temp files on configured tmp directory and
+    add random numbers to their names to avoid conflicts
+    (Rodrigo Schmidt via dhruba)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
