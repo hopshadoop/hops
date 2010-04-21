@@ -258,6 +258,9 @@ Trunk (unreleased changes)
     add random numbers to their names to avoid conflicts
     (Rodrigo Schmidt via dhruba)
 
+    MAPREDUCE-1221. Allow admins to control physical memory limits per-task
+    and per-node. (Scott Chen via acmurthy) 
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band

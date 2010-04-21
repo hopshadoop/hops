@@ -156,6 +156,8 @@ public interface JobContext {
   public static final String MAP_INPUT_PATH = "mapreduce.map.input.length";
   public static final String MAP_INPUT_START = "mapreduce.map.input.start";
   public static final String MAP_MEMORY_MB = "mapreduce.map.memory.mb";
+  public static final String MAP_MEMORY_PHYSICAL_MB =
+    "mapreduce.map.memory.physical.mb";
   public static final String MAP_ENV = "mapreduce.map.env";
   public static final String MAP_JAVA_OPTS = "mapreduce.map.java.opts";
   public static final String MAP_ULIMIT = "mapreduce.map.ulimit"; 
@@ -193,6 +195,8 @@ public interface JobContext {
     "mapreduce.reduce.markreset.buffer.percent";
   public static final String REDUCE_MARKRESET_BUFFER_SIZE = 
     "mapreduce.reduce.markreset.buffer.size";
+  public static final String REDUCE_MEMORY_PHYSICAL_MB = 
+    "mapreduce.reduce.memory.physical.mb";
   public static final String REDUCE_MEMORY_MB = 
     "mapreduce.reduce.memory.mb";
   public static final String REDUCE_MEMORY_TOTAL_BYTES = 

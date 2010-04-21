@@ -267,6 +267,7 @@ public class TaskTracker
   private long mapSlotMemorySizeOnTT = JobConf.DISABLED_MEMORY_LIMIT;
   private long reduceSlotSizeMemoryOnTT = JobConf.DISABLED_MEMORY_LIMIT;
   private long totalMemoryAllottedForTasks = JobConf.DISABLED_MEMORY_LIMIT;
+  private long reservedPhysicalMemoryOnTT = JobConf.DISABLED_MEMORY_LIMIT;
   private ResourceCalculatorPlugin resourceCalculatorPlugin = null;
 
   // Manages job acls of jobs in TaskTracker
@@ -1722,6 +1723,15 @@ public class TaskTracker
   }
 
   /**
+   * @return The amount of physical memory that will not be used for running
+   *         tasks in bytes. Returns JobConf.DISABLED_MEMORY_LIMIT if it is not
+   *         configured.
+   */
+  long getReservedPhysicalMemoryOnTT() {
+    return reservedPhysicalMemoryOnTT;
+  }
+
+  /**
    * Check if the jobtracker directed a 'reset' of the tasktracker.
    * 
    * @param actions the directives of the jobtracker for the tasktracker.
@@ -2231,11 +2241,25 @@ public class TaskTracker
   
   void addToMemoryManager(TaskAttemptID attemptId, boolean isMap, 
                           JobConf conf) {
-    if (isTaskMemoryManagerEnabled()) {
-      taskMemoryManager.addTask(attemptId, isMap ? conf
-          .getMemoryForMapTask() * 1024 * 1024L : conf
-          .getMemoryForReduceTask() * 1024 * 1024L);
+    if (!isTaskMemoryManagerEnabled()) {
+      return; // Skip this if TaskMemoryManager is not enabled.
     }
+    // Obtain physical memory limits from the job configuration
+    long physicalMemoryLimit =
+      conf.getLong(isMap ? JobContext.MAP_MEMORY_PHYSICAL_MB :
+                   JobContext.REDUCE_MEMORY_PHYSICAL_MB,
+                   JobConf.DISABLED_MEMORY_LIMIT);
+    if (physicalMemoryLimit > 0) {
+      physicalMemoryLimit *= 1024L * 1024L;
+    }
+
+    // Obtain virtual memory limits from the job configuration
+    long virtualMemoryLimit = isMap ?
+      conf.getMemoryForMapTask() * 1024 * 1024 :
+      conf.getMemoryForReduceTask() * 1024 * 1024;
+
+    taskMemoryManager.addTask(attemptId, virtualMemoryLimit,
+                              physicalMemoryLimit);
   }
 
   void removeFromMemoryManager(TaskAttemptID attemptId) {
@@ -3821,6 +3845,14 @@ public class TaskTracker
           + " Thrashing might happen.");
     }
 
+    reservedPhysicalMemoryOnTT =
+      fConf.getLong(TTConfig.TT_RESERVED_PHYSCIALMEMORY_MB,
+                    JobConf.DISABLED_MEMORY_LIMIT);
+    reservedPhysicalMemoryOnTT =
+      reservedPhysicalMemoryOnTT == JobConf.DISABLED_MEMORY_LIMIT ?
+      JobConf.DISABLED_MEMORY_LIMIT :
+      reservedPhysicalMemoryOnTT * 1024 * 1024; // normalize to bytes
+
     // start the taskMemoryManager thread only if enabled
     setTaskMemoryManagerEnabledFlag();
     if (isTaskMemoryManagerEnabled()) {
@@ -3838,10 +3870,12 @@ public class TaskTracker
       return;
     }
 
-    if (totalMemoryAllottedForTasks == JobConf.DISABLED_MEMORY_LIMIT) {
+    if (reservedPhysicalMemoryOnTT == JobConf.DISABLED_MEMORY_LIMIT
+        && totalMemoryAllottedForTasks == JobConf.DISABLED_MEMORY_LIMIT) {
       taskMemoryManagerEnabled = false;
-      LOG.warn("TaskTracker's totalMemoryAllottedForTasks is -1."
-          + " TaskMemoryManager is disabled.");
+      LOG.warn("TaskTracker's totalMemoryAllottedForTasks is -1 and " +
+               "reserved physical memory is not configured. " +
+               "TaskMemoryManager is disabled.");
       return;
     }
 
