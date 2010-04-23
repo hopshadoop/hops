@@ -339,7 +339,7 @@ public class CapacityTestUtils {
     }
 
     @Override
-    public Task obtainNewMapTask(
+    public synchronized Task obtainNewMapTask(
       final TaskTrackerStatus tts, int clusterSize,
       int ignored) throws IOException {
       boolean areAllMapsRunning = (mapTaskCtr == numMapTasks);
@@ -385,7 +385,7 @@ public class CapacityTestUtils {
     }
 
     @Override
-    public Task obtainNewReduceTask(
+    public synchronized Task obtainNewReduceTask(
       final TaskTrackerStatus tts,
       int clusterSize, int ignored) throws IOException {
       boolean areAllReducesRunning = (redTaskCtr == numReduceTasks);

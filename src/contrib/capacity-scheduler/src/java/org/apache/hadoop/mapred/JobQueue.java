@@ -161,18 +161,17 @@ class JobQueue extends AbstractQueue {
       j.getProfile().getUser(),
       i.intValue() + numReduceSlotsForThisJob);
     if (LOG.isDebugEnabled()) {
-      LOG.debug(
-        String.format(
-          "updateQSI: job %s: run(m)=%d, "
+      synchronized (j) {
+        LOG.debug(String.format("updateQSI: job %s: run(m)=%d, "
             + "occupied(m)=%d, run(r)=%d, occupied(r)=%d, finished(m)=%d,"
             + " finished(r)=%d, failed(m)=%d, failed(r)=%d, "
-            + "spec(m)=%d, spec(r)=%d, total(m)=%d, total(r)=%d", j
-            .getJobID().toString(), numMapsRunningForThisJob,
-          numMapSlotsForThisJob, numReducesRunningForThisJob,
-          numReduceSlotsForThisJob, j
-            .finishedMaps(), j.finishedReduces(), j.failedMapTasks,
-          j.failedReduceTasks, j.speculativeMapTasks, j.speculativeReduceTasks,
-          j.numMapTasks, j.numReduceTasks));
+            + "spec(m)=%d, spec(r)=%d, total(m)=%d, total(r)=%d", j.getJobID()
+            .toString(), numMapsRunningForThisJob, numMapSlotsForThisJob,
+            numReducesRunningForThisJob, numReduceSlotsForThisJob, j
+                .finishedMaps(), j.finishedReduces(), j.failedMapTasks,
+            j.failedReduceTasks, j.speculativeMapTasks,
+            j.speculativeReduceTasks, j.numMapTasks, j.numReduceTasks));
+      }
     }
 
     /*
@@ -355,8 +354,6 @@ class JobQueue extends AbstractQueue {
   }
 
   public void jobUpdated(JobChangeEvent event) {
-    JobInProgress job = event.getJobInProgress();
-
     // Check if this is the status change
     if (event instanceof JobStatusChangeEvent) {
       jobStateChanged((JobStatusChangeEvent) event);

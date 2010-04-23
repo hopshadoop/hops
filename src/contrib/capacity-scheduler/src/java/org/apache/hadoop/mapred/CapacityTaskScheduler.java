@@ -578,16 +578,20 @@ class CapacityTaskScheduler extends TaskScheduler {
     @Override
     Task obtainNewTask(TaskTrackerStatus taskTracker, JobInProgress job)
     throws IOException {
-      ClusterStatus clusterStatus =
-        scheduler.taskTrackerManager.getClusterStatus();
-      int numTaskTrackers = clusterStatus.getTaskTrackers();
-      return job.obtainNewMapTask(taskTracker, numTaskTrackers,
-          scheduler.taskTrackerManager.getNumberOfUniqueHosts());
+      synchronized (scheduler) {
+        ClusterStatus clusterStatus = scheduler.taskTrackerManager
+            .getClusterStatus();
+        int numTaskTrackers = clusterStatus.getTaskTrackers();
+        return job.obtainNewMapTask(taskTracker, numTaskTrackers,
+            scheduler.taskTrackerManager.getNumberOfUniqueHosts());
+      }
     }
 
     @Override
     int getClusterCapacity() {
-      return scheduler.taskTrackerManager.getClusterStatus().getMaxMapTasks();
+      synchronized (scheduler) {
+        return scheduler.taskTrackerManager.getClusterStatus().getMaxMapTasks();
+      }
     }
 
     @Override
@@ -621,17 +625,21 @@ class CapacityTaskScheduler extends TaskScheduler {
     @Override
     Task obtainNewTask(TaskTrackerStatus taskTracker, JobInProgress job)
     throws IOException {
-      ClusterStatus clusterStatus =
-        scheduler.taskTrackerManager.getClusterStatus();
-      int numTaskTrackers = clusterStatus.getTaskTrackers();
-      return job.obtainNewReduceTask(taskTracker, numTaskTrackers,
-          scheduler.taskTrackerManager.getNumberOfUniqueHosts());
+      synchronized (scheduler) {
+        ClusterStatus clusterStatus = scheduler.taskTrackerManager
+            .getClusterStatus();
+        int numTaskTrackers = clusterStatus.getTaskTrackers();
+        return job.obtainNewReduceTask(taskTracker, numTaskTrackers,
+            scheduler.taskTrackerManager.getNumberOfUniqueHosts());
+      }
     }
 
     @Override
     int getClusterCapacity() {
-      return scheduler.taskTrackerManager.getClusterStatus()
-          .getMaxReduceTasks();
+      synchronized (scheduler) {
+        return scheduler.taskTrackerManager.getClusterStatus()
+            .getMaxReduceTasks();
+      }
     }
 
     @Override
@@ -863,7 +871,7 @@ class CapacityTaskScheduler extends TaskScheduler {
   }
 
   /** mostly for testing purposes */
-  void setInitializationPoller(JobInitializationPoller p) {
+  synchronized void setInitializationPoller(JobInitializationPoller p) {
     this.initializationPoller = p;
   }
   
@@ -888,7 +896,7 @@ class CapacityTaskScheduler extends TaskScheduler {
    * provided for the test classes
    * lets you update the QSI objects and sorted collections
    */ 
-  void updateContextInfoForTests() {
+  synchronized void updateContextInfoForTests() {
     ClusterStatus c = taskTrackerManager.getClusterStatus();
     int mapClusterCapacity = c.getMaxMapTasks();
     int reduceClusterCapacity = c.getMaxReduceTasks();
@@ -1011,7 +1019,7 @@ class CapacityTaskScheduler extends TaskScheduler {
     return jobCollection;
   }
   
-  JobInitializationPoller getInitializationPoller() {
+  synchronized JobInitializationPoller getInitializationPoller() {
     return initializationPoller;
   }
 

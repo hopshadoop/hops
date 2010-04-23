@@ -91,6 +91,18 @@ public class TestRefreshOfQueues {
   }
 
   /**
+   * Helper method that ensures TaskScheduler is locked before calling
+   * {@link QueueManager#refreshQueues(Configuration, 
+   *    org.apache.hadoop.mapred.TaskScheduler.QueueRefresher)}.
+   */
+  private static void refreshQueues(QueueManager qm, Configuration conf,
+      TaskScheduler ts) throws IOException {
+    synchronized (ts) {
+      qm.refreshQueues(conf, ts.getQueueRefresher());
+    }
+  }
+
+  /**
    * @throws Throwable
    */
   @Test
@@ -160,8 +172,7 @@ public class TestRefreshOfQueues {
         queueConfigFile.getAbsolutePath(), new JobQueueInfo[] { queues[0] });
 
     // Now do scheduler refresh.
-    taskTrackerManager.getQueueManager().refreshQueues(null,
-        scheduler.getQueueRefresher());
+    refreshQueues(taskTrackerManager.getQueueManager(), null, scheduler);
 
     allQueues = getAllQueues(scheduler);
 
@@ -251,9 +262,7 @@ public class TestRefreshOfQueues {
     QueueManagerTestUtils.writeQueueConfigurationFile(
       queueConfigFile.getAbsolutePath(), new JobQueueInfo[]{queues[0]});
 
-    taskTrackerManager.getQueueManager().refreshQueues(
-      null,
-      scheduler.getQueueRefresher());
+    refreshQueues(taskTrackerManager.getQueueManager(), null, scheduler);
 
     job1 =
       taskTrackerManager.submitJobAndInit(
@@ -350,8 +359,7 @@ public class TestRefreshOfQueues {
         queueConfigFile.getAbsolutePath(), new JobQueueInfo[] { queues[0] });
 
     try {
-      taskTrackerManager.getQueueManager().refreshQueues(null,
-          scheduler.getQueueRefresher());
+      refreshQueues(taskTrackerManager.getQueueManager(), null, scheduler);
     } catch (IOException ioe) {
       assertTrue(ioe.getMessage().contains(
           String.format(QueueHierarchyBuilder.TOTAL_CAPACITY_OVERFLOWN_MSG,
@@ -422,9 +430,7 @@ public class TestRefreshOfQueues {
     QueueManagerTestUtils.writeQueueConfigurationFile(
       queueConfigFile.getAbsolutePath(), new JobQueueInfo[]{queues[0]});
 
-    taskTrackerManager.getQueueManager().refreshQueues(
-      null,
-      scheduler.getQueueRefresher());
+    refreshQueues(taskTrackerManager.getQueueManager(), null, scheduler);
 
     job1 =
       taskTrackerManager.submitJobAndInit(

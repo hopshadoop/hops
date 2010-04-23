@@ -29,8 +29,6 @@ import org.apache.hadoop.mapreduce.TaskType;
  *
  */
 abstract class TaskDataView {
-  TaskType type;
-
   abstract int getRunningTasks(JobInProgress job);
 
   abstract int getPendingTasks(JobInProgress job);
@@ -80,10 +78,7 @@ abstract class TaskDataView {
    * The data view for map tasks
    */
   static class MapTaskDataView extends TaskDataView {
-    TaskType type;
-
     MapTaskDataView() {
-      type = TaskType.MAP;
     }
 
     @Override
@@ -118,10 +113,7 @@ abstract class TaskDataView {
    *  The data view for reduce tasks
    */
   static class ReduceTaskDataView extends TaskDataView {
-    TaskType type;
-
     ReduceTaskDataView() {
-      type = TaskType.REDUCE;
     }
 
     @Override

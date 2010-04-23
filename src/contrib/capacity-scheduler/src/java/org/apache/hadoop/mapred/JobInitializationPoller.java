@@ -191,6 +191,7 @@ public class JobInitializationPoller extends Thread {
       if (jobs == null) {
         LOG.error("Invalid queue passed to the thread : " + queue
             + " For job :: " + job.getJobID());
+        return;
       }
       synchronized (jobs) {
         JobSchedulingInfo schedInfo = new JobSchedulingInfo(job);
@@ -212,14 +213,12 @@ public class JobInitializationPoller extends Thread {
    * jobs allowed to be initialize per user in the queue.
    * 
    */
-  private class QueueInfo {
-    String queue;
+  private static class QueueInfo {
     int maxUsersAllowedToInitialize;
     int maxJobsPerUserToInitialize;
 
-    public QueueInfo(String queue, int maxUsersAllowedToInitialize,
+    public QueueInfo(int maxUsersAllowedToInitialize,
         int maxJobsPerUserToInitialize) {
-      this.queue = queue;
       this.maxJobsPerUserToInitialize = maxJobsPerUserToInitialize;
       this.maxUsersAllowedToInitialize = maxUsersAllowedToInitialize;
     }
@@ -290,8 +289,7 @@ public class JobInitializationPoller extends Thread {
       int maxJobsPerUserToInitialize =
           schedulerConf.getMaxJobsPerUserToInitialize(queue);
       QueueInfo qi =
-          new QueueInfo(queue, maxUsersToInitialize,
-              maxJobsPerUserToInitialize);
+          new QueueInfo(maxUsersToInitialize, maxJobsPerUserToInitialize);
       jobQueues.put(queue, qi);
     }
     sleepInterval = schedulerConf.getSleepInterval();

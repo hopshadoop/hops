@@ -742,6 +742,7 @@
    <subant target="jar">
       <property name="version" value="${version}"/>
       <property name="dist.dir" value="${dist.dir}"/>
+      <fileset file="${contrib.dir}/capacity-scheduler/build.xml"/>
       <fileset file="${contrib.dir}/streaming/build.xml"/>
       <fileset file="${contrib.dir}/gridmix/build.xml"/>
       <fileset file="${contrib.dir}/mumak/build.xml"/>
@@ -773,12 +774,14 @@
       <sourcePath path="${mapred.src.dir}"/>
       <sourcePath path="${examples.dir}" />
       <sourcePath path="${tools.src}" />
+      <sourcePath path="${basedir}/src/contrib/capacity-scheduler/src/java" />
       <sourcePath path="${basedir}/src/contrib/streaming/src/java" />
       <sourcePath path="${basedir}/src/contrib/gridmix/src/java" />
       <sourcePath path="${basedir}/src/contrib/mumak/src/java" />
       <class location="${basedir}/build/${final.name}.jar" />
       <class location="${basedir}/build/${examples.final.name}.jar" />
       <class location="${basedir}/build/${tools.final.name}.jar" />
+      <class location="${basedir}/build/contrib/capacity-scheduler/hadoop-${version}-capacity-scheduler.jar" />
       <class location="${basedir}/build/contrib/streaming/hadoop-${version}-streaming.jar" />
       <class location="${basedir}/build/contrib/gridmix/hadoop-${version}-gridmix.jar" />
       <class location="${basedir}/build/contrib/mumak/hadoop-${version}-mumak.jar" />
@@ -836,6 +839,7 @@
         <packageset dir="${mapred.src.dir}"/>
     	<packageset dir="${examples.dir}"/>
 
+    	<packageset dir="src/contrib/capacity-scheduler/src/java"/>
     	<packageset dir="src/contrib/streaming/src/java"/>
     	<packageset dir="src/contrib/data_join/src/java"/>
     	<packageset dir="src/contrib/index/src/java"/>

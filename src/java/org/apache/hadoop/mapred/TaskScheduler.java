@@ -99,6 +99,9 @@ abstract class TaskScheduler implements Configurable {
    * {@link QueueManager} whenever it gets a request from an administrator to
    * refresh its own queue-configuration. This method has a documented contract
    * between the {@link QueueManager} and the {@link TaskScheduler}.
+   * 
+   * Before calling QueueRefresher, the caller must hold the lock to the
+   * corresponding {@link TaskScheduler} (generally in the {@link JobTracker}).
    */
   abstract class QueueRefresher {
 

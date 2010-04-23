@@ -553,6 +553,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1409. IOExceptions thrown from FIleOutputCommitter::abortTask
     should cause the task to fail. (Amareshwari Sriramadasu via cdouglas)
 
+    MAPREDUCE-1695. Include capacity scheduler in findbugs and javadoc-dev
+    targets and also fix existing warnings. (Hong Tang via yhemanth)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

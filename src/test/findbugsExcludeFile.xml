@@ -360,4 +360,24 @@
       <Method name="getHexDigit"/>
       <Bug pattern="ICAST_QUESTIONABLE_UNSIGNED_RIGHT_SHIFT" />
      </Match>
+
+     <!-- 
+	   False positive of FindBugs complaining that initializationPoller and
+	   started were accessed through
+	   CapacitySchedulerQueueRefresher.refreshQueues without explicitly holding
+	   the lock of CapacityTaskScheduler. The lock is in fact acquired by
+	   JobTracker prior to calling QueueManager.refereshQueues - this is
+	   necessary to ensure the order of locking (TaskScheduler ->
+	   QueueManager).
+     --> 
+    <Match>
+       <Class name="org.apache.hadoop.mapred.CapacityTaskScheduler" />
+       <Field name="initializationPoller" />
+       <Bug pattern="IS2_INCONSISTENT_SYNC" />
+    </Match>
+    <Match>
+       <Class name="org.apache.hadoop.mapred.CapacityTaskScheduler" />
+       <Field name="started" />
+       <Bug pattern="IS2_INCONSISTENT_SYNC" />
+    </Match>
  </FindBugsFilter>

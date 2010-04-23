@@ -4298,10 +4298,12 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   public void refreshQueues() throws IOException{
     LOG.info("Refreshing queue information. requested by : " + 
              UserGroupInformation.getCurrentUser().getShortUserName());
-    this.queueManager.refreshQueues(new Configuration(this.conf),
-        taskScheduler.getQueueRefresher());
+    synchronized (taskScheduler) {
+      queueManager.refreshQueues(new Configuration(this.conf), taskScheduler
+          .getQueueRefresher());
+    }
   }
-
+  
   private void initializeTaskMemoryRelatedConfig() {
     memSizeForMapSlotOnJT =
         JobConf.normalizeMemoryConfigValue(conf.getLong(

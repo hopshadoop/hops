@@ -101,12 +101,12 @@ public class QueueSchedulingContext {
   QueueSchedulingContext(
     String queueName, float capacityPercent, float maxCapacityPercent,
     int ulMin) {
-    this.setQueueName(new String(queueName));
+    this.setQueueName(queueName);
     this.setCapacityPercent(capacityPercent);
     this.setMaxCapacityPercent(maxCapacityPercent);
     this.setUlMin(ulMin);
-    this.setMapTSC(new TaskSchedulingContext(TaskType.MAP));
-    this.setReduceTSC(new TaskSchedulingContext(TaskType.REDUCE));
+    this.setMapTSC(new TaskSchedulingContext());
+    this.setReduceTSC(new TaskSchedulingContext());
   }
 
   /**

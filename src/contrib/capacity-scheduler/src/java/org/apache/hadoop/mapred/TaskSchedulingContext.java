@@ -19,6 +19,7 @@ package org.apache.hadoop.mapred;
 
 import org.apache.hadoop.mapreduce.TaskType;
 
+import java.util.Iterator;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Set;
@@ -40,8 +41,6 @@ import java.util.Set;
  * ********************************************************************
  */
 public class TaskSchedulingContext {
-
-  private TaskType type;
   /**
    * the actual capacity, which depends on how many slots are available
    * in the cluster at any given time.
@@ -66,10 +65,6 @@ public class TaskSchedulingContext {
     "%s running map tasks using %d map slots. %d additional slots reserved." +
       " %s running reduce tasks using %d reduce slots." +
       " %d additional slots reserved.";
-
-  public TaskSchedulingContext(TaskType type) {
-    this.type = type;
-  }
 
   /**
    * reset the variables associated with tasks
@@ -188,11 +183,12 @@ public class TaskSchedulingContext {
   }
 
   private void updateNoOfSlotsOccupiedByUser(Map<String, Integer> nou) {
-    Set<String> keys = nou.keySet();
-    for (String key : keys) {
-      if (this.numSlotsOccupiedByUser.containsKey(key)) {
-        int currentVal = this.numSlotsOccupiedByUser.get(key);
-        this.numSlotsOccupiedByUser.put(key, currentVal + nou.get(key));
+    for (Iterator<Map.Entry<String, Integer>> it = nou.entrySet().iterator(); it.hasNext(); ) {
+      Map.Entry<String, Integer> entry = it.next();
+      String key = entry.getKey();
+      Integer currentVal = numSlotsOccupiedByUser.get(key);
+      if (currentVal != null) {
+        this.numSlotsOccupiedByUser.put(key, currentVal + entry.getValue());
       }
     }
   }
