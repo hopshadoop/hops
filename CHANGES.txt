@@ -568,6 +568,8 @@ Trunk (unreleased changes)
     MAPREDUCE-1494. Ensure TestJobDirCleanup verifies the correct paths.
     (Amareshwari Sriramadasu via cdouglas)
 
+    MAPREDUCE-1622. Include missing slf4j dependencies. (cdouglas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

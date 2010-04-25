@@ -66,9 +66,9 @@
                conf="common->master"/>
 
    <dependency org="org.slf4j" name="slf4j-api" rev="${slf4j-api.version}" 
-               conf="test->master"/>
+               conf="common->master"/>
    <dependency org="org.slf4j" name="slf4j-log4j12" 
-               rev="${slf4j-log4j12.version}" conf="test->master"/>
+               rev="${slf4j-log4j12.version}" conf="common->master"/>
    <dependency org="org.apache.hadoop" name="hadoop-core-test" 
                rev="${hadoop-core.version}" conf="test->default"/>
    <dependency org="org.apache.hadoop" name="hadoop-hdfs-test" 
