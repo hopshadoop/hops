@@ -367,7 +367,7 @@ public class TestSeveral extends TestCase {
     assertFalse("Missing event notification on failing a running job", 
         myListener.contains(jobId));
 
-    TestJobDirCleanup.verifyJobDirCleanup(mrCluster, numTT);
+    TestJobDirCleanup.verifyJobDirCleanup(mrCluster, numTT, job.getID());
   }
 
   /**
@@ -426,7 +426,7 @@ public class TestSeveral extends TestCase {
     assertFalse("Missing event notification on killing a running job", 
         myListener.contains(job.getID()));
 
-    TestJobDirCleanup.verifyJobDirCleanup(mrCluster, numTT);
+    TestJobDirCleanup.verifyJobDirCleanup(mrCluster, numTT, job.getID());
   }
 
 }

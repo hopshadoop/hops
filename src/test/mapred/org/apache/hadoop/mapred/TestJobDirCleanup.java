@@ -22,14 +22,14 @@ import java.io.IOException;
 
 import junit.framework.TestCase;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.SleepJob;
-import org.apache.hadoop.util.ToolRunner;
+import org.apache.hadoop.security.UserGroupInformation;
 
 public class TestJobDirCleanup extends TestCase {
   //The testcase brings up a cluster with many trackers, and
@@ -37,13 +37,15 @@ public class TestJobDirCleanup extends TestCase {
   //to see whether the job directories are cleaned up at the
   //end of the job (indirectly testing whether all tasktrackers
   //got a KillJobAction).
-  private static final Log LOG =
-    LogFactory.getLog(TestEmptyJob.class.getName());
-  private void runSleepJob(JobConf conf) throws Exception {
-    String[] args = { "-m", "1", "-r", "10", "-mt", "1000", "-rt", "10000" };
-    ToolRunner.run(conf, new SleepJob(), args);
+  private JobID runSleepJob(JobConf conf) throws Exception {
+    SleepJob sleep = new SleepJob();
+    sleep.setConf(conf);
+    Job job = sleep.createJob(1, 10, 1000, 1, 10000, 1);
+    job.waitForCompletion(true);
+    return job.getID();
   }
-  public void testJobDirCleanup() throws IOException {
+
+  public void testJobDirCleanup() throws Exception {
     String namenode = null;
     MiniDFSCluster dfs = null;
     MiniMRCluster mr = null;
@@ -61,12 +63,13 @@ public class TestJobDirCleanup extends TestCase {
       // make cleanup inline sothat validation of existence of these directories
       // can be done
       mr.setInlineCleanupThreads();
-      final String jobTrackerName = "localhost:" + mr.getJobTrackerPort();
+
+      // run the sleep job
       JobConf jobConf = mr.createJobConf();
-      runSleepJob(jobConf);
-      verifyJobDirCleanup(mr, taskTrackers);
-    } catch (Exception ee){
-      assertTrue(false);
+      JobID jobid = runSleepJob(jobConf);
+      
+      // verify the job directories are cleaned up.
+      verifyJobDirCleanup(mr, taskTrackers, jobid);
     } finally {
       if (fileSys != null) { fileSys.close(); }
       if (dfs != null) { dfs.shutdown(); }
@@ -74,15 +77,35 @@ public class TestJobDirCleanup extends TestCase {
     }
   }
 
-  static void verifyJobDirCleanup(MiniMRCluster mr, int numTT)
-  throws IOException {
+  static void verifyJobDirCleanup(MiniMRCluster mr, int numTT, JobID jobid)
+      throws IOException {
+    // wait till killJobAction is sent to all trackers.
+    // this loops waits atmost for 10 seconds
+    boolean sent = true;
+    for (int i = 0; i < 100; i++) {
+      sent = true;
+      for (int j = 0; j < numTT; j++) {
+        if (mr.getTaskTrackerRunner(j).getTaskTracker().getRunningJob(
+            org.apache.hadoop.mapred.JobID.downgrade(jobid)) != null) {
+          sent = false;
+          break;
+        }
+      }
+      if (!sent) {
+        UtilsForTests.waitFor(100);
+      } else {
+        break;
+      }
+    }
+    
+    assertTrue("KillJobAction not sent for all trackers", sent);
+    String user = UserGroupInformation.getCurrentUser().getShortUserName();
+    String jobDirStr = TaskTracker.getLocalJobDir(user, jobid.toString());
     for(int i=0; i < numTT; ++i) {
-      String jobDirStr = mr.getTaskTrackerLocalDir(i)+
-      "/taskTracker/jobcache";
-      File jobDir = new File(jobDirStr);
-      String[] contents = jobDir.list();
-      assertTrue("Contents of " + jobDir + " not cleanup.",
-                 (contents == null || contents.length == 0));
+      for (String localDir : mr.getTaskTrackerLocalDirs(i)) {
+        File jobDir = new File(localDir, jobDirStr);
+        assertFalse(jobDir + " is not cleaned up.", jobDir.exists());
+      }
     }
   }
 }
