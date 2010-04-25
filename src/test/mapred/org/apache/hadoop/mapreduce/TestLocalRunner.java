@@ -142,6 +142,31 @@ public class TestLocalRunner extends TestCase {
     }
   }
 
+  private static class GCMapper
+      extends Mapper<LongWritable, Text, LongWritable, Text> {
+    public void map(LongWritable key, Text val, Context c)
+        throws IOException, InterruptedException {
+
+      // Create a whole bunch of objects.
+      List<Integer> lst = new ArrayList<Integer>();
+      for (int i = 0; i < 20000; i++) {
+        lst.add(new Integer(i));
+      }
+
+      // Actually use this list, to ensure that it isn't just optimized away.
+      int sum = 0;
+      for (int x : lst) {
+        sum += x;
+      }
+
+      // throw away the list and run a GC.
+      lst = null;
+      System.gc();
+
+      c.write(new LongWritable(sum), val);
+    }
+  }
+
   /**
    * Create a single input file in the input directory.
    * @param dirPath the directory in which the file resides
@@ -243,6 +268,51 @@ public class TestLocalRunner extends TestCase {
     r.close();
 
   }
+
+  /**
+   * Test that the GC counter actually increments when we know that we've
+   * spent some time in the GC during the mapper.
+   */
+  @Test
+  public void testGcCounter() throws Exception {
+    Path inputPath = getInputPath();
+    Path outputPath = getOutputPath();
+
+    Configuration conf = new Configuration();
+    FileSystem fs = FileSystem.getLocal(conf);
+
+    // Clear input/output dirs.
+    if (fs.exists(outputPath)) {
+      fs.delete(outputPath, true);
+    }
+
+    if (fs.exists(inputPath)) {
+      fs.delete(inputPath, true);
+    }
+
+    // Create one input file
+    createInputFile(inputPath, 0, 20);
+
+    // Now configure and run the job.
+    Job job = new Job();
+    job.setMapperClass(GCMapper.class);
+    job.setNumReduceTasks(0);
+    job.getConfiguration().set("io.sort.mb", "25");
+    FileInputFormat.addInputPath(job, inputPath);
+    FileOutputFormat.setOutputPath(job, outputPath);
+
+    boolean ret = job.waitForCompletion(true);
+    assertTrue("job failed", ret);
+
+    // This job should have done *some* gc work.
+    // It had to clean up 400,000 objects.
+    // We strongly suspect this will result in a few milliseconds effort.
+    Counter gcCounter = job.getCounters().findCounter(
+        TaskCounter.GC_TIME_MILLIS);
+    assertNotNull(gcCounter);
+    assertTrue("No time spent in gc", gcCounter.getValue() > 0);
+  }
+
 
   /**
    * Run a test with several mappers in parallel, operating at different

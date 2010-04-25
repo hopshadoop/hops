@@ -21,12 +21,16 @@ package org.apache.hadoop.mapred;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.lang.management.GarbageCollectorMXBean;
+import java.lang.management.ManagementFactory;
 import java.text.NumberFormat;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.concurrent.atomic.AtomicBoolean;
+
 
 import javax.crypto.SecretKey;
 
@@ -46,6 +50,7 @@ import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.io.serializer.Deserializer;
 import org.apache.hadoop.io.serializer.SerializationFactory;
 import org.apache.hadoop.mapred.IFile.Writer;
+import org.apache.hadoop.mapreduce.Counter;
 import org.apache.hadoop.mapreduce.OutputCommitter;
 import org.apache.hadoop.mapreduce.TaskCounter;
 import org.apache.hadoop.mapreduce.JobStatus;
@@ -140,6 +145,7 @@ abstract public class Task implements Writable, Configurable {
   private int numSlotsRequired;
   protected TaskUmbilicalProtocol umbilical;
   protected SecretKey tokenSecret;
+  protected GcTimeUpdater gcUpdater;
 
   ////////////////////////////////////////////
   // Constructors
@@ -154,6 +160,7 @@ abstract public class Task implements Writable, Configurable {
       counters.findCounter(TaskCounter.FAILED_SHUFFLE);
     mergedMapOutputsCounter = 
       counters.findCounter(TaskCounter.MERGED_MAP_OUTPUTS);
+    gcUpdater = new GcTimeUpdater();
   }
 
   public Task(String jobFile, TaskAttemptID taskId, int partition, 
@@ -175,6 +182,7 @@ abstract public class Task implements Writable, Configurable {
     failedShuffleCounter = counters.findCounter(TaskCounter.FAILED_SHUFFLE);
     mergedMapOutputsCounter = 
       counters.findCounter(TaskCounter.MERGED_MAP_OUTPUTS);
+    gcUpdater = new GcTimeUpdater();
   }
 
   ////////////////////////////////////////////
@@ -499,6 +507,7 @@ abstract public class Task implements Writable, Configurable {
     private InputSplit split = null;
     private Progress taskProgress;
     private Thread pingThread = null;
+
     /**
      * flag that indicates whether progress update needs to be sent to parent.
      * If true, it has been set. If false, it has been reset. 
@@ -511,6 +520,7 @@ abstract public class Task implements Writable, Configurable {
       this.umbilical = umbilical;
       this.taskProgress = taskProgress;
     }
+
     // getters and setters for flag
     void setProgressFlag() {
       progressFlag.set(true);
@@ -680,6 +690,48 @@ abstract public class Task implements Writable, Configurable {
   }
 
   /**
+   * An updater that tracks the amount of time this task has spent in GC.
+   */
+  class GcTimeUpdater {
+    private long lastGcMillis = 0;
+    private List<GarbageCollectorMXBean> gcBeans = null;
+
+    public GcTimeUpdater() {
+      this.gcBeans = ManagementFactory.getGarbageCollectorMXBeans();
+      getElapsedGc(); // Initialize 'lastGcMillis' with the current time spent.
+    }
+
+    /**
+     * @return the number of milliseconds that the gc has used for CPU
+     * since the last time this method was called.
+     */
+    protected long getElapsedGc() {
+      long thisGcMillis = 0;
+      for (GarbageCollectorMXBean gcBean : gcBeans) {
+        thisGcMillis += gcBean.getCollectionTime();
+      }
+
+      long delta = thisGcMillis - lastGcMillis;
+      this.lastGcMillis = thisGcMillis;
+      return delta;
+    }
+
+    /**
+     * Increment the gc-elapsed-time counter.
+     */
+    public void incrementGcCounter() {
+      if (null == counters) {
+        return; // nothing to do.
+      }
+
+      Counter gcCounter = counters.findCounter(TaskCounter.GC_TIME_MILLIS);
+      if (null != gcCounter) {
+        gcCounter.increment(getElapsedGc());
+      }
+    }
+  }
+
+  /**
    * An updater that tracks the last number reported for a given file
    * system and only creates the counters when they are needed.
    */
@@ -734,6 +786,8 @@ abstract public class Task implements Writable, Configurable {
       }
       updater.updateCounters();      
     }
+
+    gcUpdater.incrementGcCounter();
   }
 
   public void done(TaskUmbilicalProtocol umbilical,
@@ -767,6 +821,9 @@ abstract public class Task implements Writable, Configurable {
     }
     taskDone.set(true);
     reporter.stopCommunicationThread();
+    // Make sure we send at least one set of counter increments. It's
+    // ok to call updateCounters() in this thread after comm thread stopped.
+    updateCounters();
     sendLastUpdate(umbilical);
     //signal the tasktracker that we are done
     sendDone(umbilical);

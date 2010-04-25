@@ -264,6 +264,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1065. Update mapred tutorial to use the new API. (Aaron Kimball
     via cdouglas)
 
+    MAPREDUCE-1304. Add a task counter tracking time spent in GC. (Aaron
+    Kimball via cdouglas)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
