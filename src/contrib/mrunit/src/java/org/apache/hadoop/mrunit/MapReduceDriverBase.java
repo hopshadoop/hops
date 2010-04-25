@@ -21,14 +21,16 @@ package org.apache.hadoop.mrunit;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.TreeMap;
+import java.util.Map.Entry;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.io.RawComparator;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mrunit.types.Pair;
 
 /**
@@ -41,15 +43,33 @@ import org.apache.hadoop.mrunit.types.Pair;
  * This is designed to handle a single (k, v)* -> (k, v)* case from the
  * Mapper/Reducer pair, representing a single unit test.
  */
-public abstract class MapReduceDriverBase<K1, V1, K2, V2, K3, V3>
+public abstract class MapReduceDriverBase<K1, V1, K2 extends Comparable, V2, K3, V3>
     extends TestDriver<K1, V1, K3, V3> {
 
   public static final Log LOG = LogFactory.getLog(MapReduceDriverBase.class);
 
   protected List<Pair<K1, V1>> inputList;
+  
+  /** Key group comparator */
+  protected Comparator<K2> keyGroupComparator;
+  
+  /** Key value order comparator */
+  protected Comparator<K2> keyValueOrderComparator;
 
   public MapReduceDriverBase() {
     inputList = new ArrayList<Pair<K1, V1>>();
+    
+    // create a simple comparator for key grouping and ordering
+    Comparator<K2> simpleComparator = new Comparator<K2>() {
+      @Override
+      public int compare(K2 o1, K2 o2) {
+        return o1.compareTo(o2);
+      }
+    };
+    
+    // assign simple key grouping and ordering comparator
+    keyGroupComparator = simpleComparator;
+    keyValueOrderComparator = null;
   }
 
   /**
@@ -158,38 +178,82 @@ public abstract class MapReduceDriverBase<K1, V1, K2, V2, K3, V3>
    * @return the sorted list of (key, list(val))'s to present to the reducer
    */
   public List<Pair<K2, List<V2>>> shuffle(List<Pair<K2, V2>> mapOutputs) {
-    HashMap<K2, List<V2>> reducerInputs = new HashMap<K2, List<V2>>();
-
-    // step 1: condense all values with the same key into a list.
+    // step 1 - use the key group comparator to organise map outputs
+    final TreeMap<K2, List<Pair<K2,V2>>> groupedByKey = 
+        new TreeMap<K2, List<Pair<K2,V2>>>(keyGroupComparator);
+    
+    List<Pair<K2,V2>> groupedKeyList;
     for (Pair<K2, V2> mapOutput : mapOutputs) {
-      List<V2> valuesForKey = reducerInputs.get(mapOutput.getFirst());
-
-      if (null == valuesForKey) {
-        // this is the first (k, v) pair for this key. Add it to the list.
-        valuesForKey = new ArrayList<V2>();
-        valuesForKey.add(mapOutput.getSecond());
-        reducerInputs.put(mapOutput.getFirst(), valuesForKey);
-      } else {
-        // add this value to the existing list for this key
-        valuesForKey.add(mapOutput.getSecond());
+      groupedKeyList = groupedByKey.get(mapOutput.getFirst());
+      
+      if (groupedKeyList == null) {
+        groupedKeyList = new ArrayList<Pair<K2,V2>>();
+        groupedByKey.put(mapOutput.getFirst(), groupedKeyList);
       }
+      
+      groupedKeyList.add(mapOutput);
     }
-
-    // build a list out of these (k, list(v)) pairs
-    List<Pair<K2, List<V2>>> finalInputs = new ArrayList<Pair<K2, List<V2>>>();
-    Set<Map.Entry<K2, List<V2>>> entries = reducerInputs.entrySet();
-    for (Map.Entry<K2, List<V2>> entry : entries) {
-      K2 key = entry.getKey();
-      List<V2> vals = entry.getValue();
-      finalInputs.add(new Pair<K2, List<V2>>(key, vals));
+    
+    // step 2 - sort each key group using the key order comparator (if set)
+    Comparator<Pair<K2,V2>> pairKeyComparator = new Comparator<Pair<K2, V2>>() {
+      @Override
+      public int compare(Pair<K2, V2> o1, Pair<K2, V2> o2) {
+        return keyValueOrderComparator.compare(o1.getFirst(), o2.getFirst());
+      }
+    };
+    
+    // create shuffle stage output list
+    List<Pair<K2, List<V2>>> outputKeyValuesList = 
+        new ArrayList<Pair<K2,List<V2>>>();
+    
+    // populate output list
+    for (Entry<K2, List<Pair<K2, V2>>> groupedByKeyEntry : 
+          groupedByKey.entrySet()) {
+      if (keyValueOrderComparator != null) {
+        // sort the key/value pairs using the key order comparator (if set)
+        Collections.sort(groupedByKeyEntry.getValue(), pairKeyComparator);
+      }
+      
+      // create list to hold values for the grouped key
+      List<V2> valuesList = new ArrayList<V2>();
+      for (Pair<K2, V2> pair : groupedByKeyEntry.getValue()) {
+        valuesList.add(pair.getSecond());
+      }
+      
+      // add key and values to output list
+      outputKeyValuesList.add(
+          new Pair<K2,List<V2>>(groupedByKeyEntry.getKey(), valuesList));
     }
-
-    // and then sort the output list by key
-    if (finalInputs.size() > 0) {
-      Collections.sort(finalInputs,
-              finalInputs.get(0).new FirstElemComparator());
-    }
-
-    return finalInputs;
+    
+    // return output list
+    return outputKeyValuesList;
+  }
+  
+  /**
+   * Set the key grouping comparator, similar to calling the following API 
+   * calls but passing a real instance rather than just the class:
+   * <UL>
+   * <LI>pre 0.20.1 API: {@link JobConf#setOutputValueGroupingComparator(Class)}
+   * <LI>0.20.1+ API: {@link Job#setGroupingComparatorClass(Class)}
+   * </UL>
+   * @param groupingComparator
+   */
+  public void setKeyGroupingComparator(
+        RawComparator<K2> groupingComparator) {
+    keyGroupComparator = groupingComparator;
+  }
+  
+  /**
+   * Set the key value order comparator, similar to calling the following API 
+   * calls but passing a real instance rather than just the class:
+   * <UL>
+   * <LI>pre 0.20.1 API: {@link JobConf#setOutputKeyComparatorClass(Class)}
+   * <LI>0.20.1+ API: {@link Job#setSortComparatorClass(Class)}
+   * </UL>
+   * @param orderComparator
+   */
+  public void setKeyOrderComparator(
+        RawComparator<K2> orderComparator) {
+    keyValueOrderComparator = orderComparator;
   }
 }

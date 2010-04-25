@@ -21,6 +21,7 @@ package org.apache.hadoop.mrunit;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +29,7 @@ import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.io.RawComparator;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.Counters;
 import org.apache.hadoop.mapred.Mapper;
@@ -48,7 +50,7 @@ import org.apache.hadoop.mrunit.types.Pair;
  * If a combiner is specified, then it will be run exactly once after
  * the Mapper and before the Reducer.
  */
-public class MapReduceDriver<K1, V1, K2, V2, K3, V3>
+public class MapReduceDriver<K1, V1, K2 extends Comparable, V2, K3, V3>
     extends MapReduceDriverBase<K1, V1, K2, V2, K3, V3> {
 
   public static final Log LOG = LogFactory.getLog(MapReduceDriver.class);
@@ -287,5 +289,31 @@ public class MapReduceDriver<K1, V1, K2, V2, K3, V3>
   @Override
   public String toString() {
     return "MapReduceDriver (" + myMapper + ", " + myReducer + ")";
+  }
+  
+  /**
+   * Identical to {@link #setKeyGroupingComparator(RawComparator)}, but with a 
+   * fluent programming style 
+   * @param groupingComparator Comparator to use in the shuffle stage for key 
+   * grouping 
+   * @return this
+   */
+  public MapReduceDriver<K1, V1, K2, V2, K3, V3> withKeyGroupingComparator(
+      RawComparator<K2> groupingComparator) {
+    setKeyGroupingComparator(groupingComparator);
+    return this;
+  }
+  
+  /**
+   * Identical to {@link #setKeyOrderComparator(RawComparator)}, but with a 
+   * fluent programming style 
+   * @param orderComparator Comparator to use in the shuffle stage for key 
+   * value ordering 
+   * @return this
+   */
+  public MapReduceDriver<K1, V1, K2, V2, K3, V3> withKeyOrderComparator(
+      RawComparator<K2> orderComparator) {
+    setKeyOrderComparator(orderComparator);
+    return this;
   }
 }

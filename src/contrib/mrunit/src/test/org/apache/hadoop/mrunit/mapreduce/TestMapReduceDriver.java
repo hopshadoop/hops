@@ -22,6 +22,7 @@ import static org.apache.hadoop.mrunit.testutil.ExtendedAssert.assertListEquals;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 
 import junit.framework.TestCase;
@@ -29,9 +30,14 @@ import junit.framework.TestCase;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.RawComparator;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapred.OutputCollector;
+import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.Reducer.Context;
 import org.apache.hadoop.mapreduce.lib.reduce.LongSumReducer;
 import org.apache.hadoop.mrunit.mapreduce.TestMapDriver.ConfigurationMapper;
 import org.apache.hadoop.mrunit.mapreduce.TestReduceDriver.ConfigurationReducer;
@@ -256,5 +262,65 @@ public class TestMapReduceDriver extends TestCase {
 	  assertEquals(reducer.setupConfiguration.get("TestKey"), "TestValue");	  
   }
 
+  // Test the key grouping and value ordering comparators
+  @Test
+  public void testComparators() {
+    // group comparator - group by first character
+    RawComparator groupComparator = new RawComparator() {
+      @Override
+      public int compare(Object o1, Object o2) {
+        return o1.toString().substring(0, 1).compareTo(
+            o2.toString().substring(0, 1));
+      }
+
+      @Override
+      public int compare(byte[] arg0, int arg1, int arg2, byte[] arg3,
+          int arg4, int arg5) {
+        throw new RuntimeException("Not implemented");
+      }  
+    };
+    
+    // value order comparator - order by second character
+    RawComparator orderComparator = new RawComparator() {
+      @Override
+      public int compare(Object o1, Object o2) {
+        return o1.toString().substring(1, 2).compareTo(
+            o2.toString().substring(1, 2));
+      }
+      
+      @Override
+      public int compare(byte[] arg0, int arg1, int arg2, byte[] arg3,
+          int arg4, int arg5) {
+        throw new RuntimeException("Not implemented");
+      }
+    };
+    
+    // reducer to track the order of the input values using bit shifting
+    driver.withReducer(new Reducer<Text, LongWritable, Text, LongWritable>() {
+      protected void reduce(Text key, Iterable<LongWritable> values, Context context)
+          throws IOException, InterruptedException {
+        long outputValue = 0;
+        int count = 0;
+        for (LongWritable value : values) {
+          outputValue |= (value.get() << (count++*8));
+        }
+        
+        context.write(key, new LongWritable(outputValue));
+      }
+    });
+    
+    driver.withKeyGroupingComparator(groupComparator);
+    driver.withKeyOrderComparator(orderComparator);
+    
+    driver.addInput(new Text("a1"), new LongWritable(1));
+    driver.addInput(new Text("b1"), new LongWritable(1));
+    driver.addInput(new Text("a3"), new LongWritable(3));
+    driver.addInput(new Text("a2"), new LongWritable(2));
+    
+    driver.addOutput(new Text("a1"), new LongWritable(0x1 | (0x2 << 8) | (0x3 << 16)));
+    driver.addOutput(new Text("b1"), new LongWritable(0x1));
+    
+    driver.runTest();
+  }
 }
 
