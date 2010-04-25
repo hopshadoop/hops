@@ -261,6 +261,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1221. Allow admins to control physical memory limits per-task
     and per-node. (Scott Chen via acmurthy) 
 
+    MAPREDUCE-1065. Update mapred tutorial to use the new API. (Aaron Kimball
+    via cdouglas)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band

@@ -251,6 +251,106 @@ See http://forrest.apache.org/docs/linking.html for more info.
                 <package-summary href="package-summary.html" />
               </pipes>
             </mapred>
+            <mapreduce href="mapreduce/">
+              <counter href="Counter.html">
+                <increment href="#increment(long)"/>
+              </counter>
+              <counters href="Counters.html" />
+              <inputformat href="InputFormat.html">
+                <getsplits href="#getSplits(org.apache.hadoop.mapreduce.JobContext)"/>
+              </inputformat>
+              <inputsplit href="InputSplit.html" />
+              <job href="Job.html">
+                <setcombinerclass href="#setCombinerClass(java.lang.Class)"/>
+                <setgroupingcomparatorclass href="#setGroupingComparatorClass(java.lang.Class)"/>
+                <setmapperclass href="#setMapperClass(java.lang.Class)"/>
+                <setmapspeculativeexecution href="#setMapSpeculativeExecution(boolean)"/>
+                <setmaxmapattempts href="#setMaxMapAttempts(int)"/>
+                <setmaxreduceattempts href="#setMaxReduceAttempts(int)"/>
+                <setnummaptasks href="#setNumMapTasks(int)"/>
+                <setnumreducetasks href="#setNumReduceTasks(int)"/>
+                <setprofileenabled href="#setProfileEnabled(boolean)"/>
+                <setprofileparams href="#setProfileParams(java.lang.String)"/>
+                <setprofiletaskrange href="#setProfileTaskRange(boolean,%20java.lang.String)"/>
+                <setreducerclass href="#setReducerClass(java.lang.Class)"/>
+                <setreducespeculativeexecution href="#setReduceSpeculativeExecution(boolean)"/>
+                <submit href="#submit()"/>
+                <waitforcompletion href="#waitForCompletion(boolean)"/>
+              </job>
+              <lib href="lib/">
+                <package-summary href="package-summary.html" />
+                <input href="input/">
+                  <fileinputformat href="FileInputFormat.html">
+                     <setinputpaths
+                     href="#setInputPaths(org.apache.hadoop.mapreduce.Job,%20org.apache.hadoop.fs.Path...)"/>
+                     <addinputpath
+                     href="#addInputPath(org.apache.hadoop.mapreduce.Job,%20org.apache.hadoop.fs.Path)"/>
+                     <setinputpathstring
+                     href="#setInputPaths(org.apache.hadoop.mapreduce.Job,%20java.lang.String)"/>
+                     <addinputpathstring
+                     href="#addInputPaths(org.apache.hadoop.mapreduce.Job,%20java.lang.String)"/>
+                  </fileinputformat>
+                  <filesplit href="FileSplit.html" />
+                  <textinputformat href="TextInputFormat.html" />
+                </input>
+                <output href="output/">
+                  <fileoutputcommitter href="FileOutputCommitter.html"/>
+                  <fileoutputformat href="FileOutputFormat.html">
+                    <getoutputpath href="#getOutputPath(org.apache.hadoop.mapreduce.JobContext)" />
+                    <getworkoutputpath
+                    href="#getWorkOutputPath(org.apache.hadoop.mapreduce.TaskInputOutputContext)"/>
+                    <setoutputpath href="#setOutputPath(org.apache.hadoop.mapreduce.Job,%20org.apache.hadoop.fs.Path)" />
+                    <setcompressoutput href="#setCompressOutput(org.apache.hadoop.mapreduce.Job,%20boolean)" />
+                    <setoutputcompressorclass
+                    href="#setOutputCompressorClass(org.apache.hadoop.mapreduce.Job,%20java.lang.Class)" />
+                  </fileoutputformat>
+                  <lazyoutputformat href="LazyOutputFormat.html">
+                    <setoutputformatclass
+                    href="#setOutputFormatClass(org.apache.hadoop.mapreduce.Job,%20java.lang.Class)"/>
+                  </lazyoutputformat>
+                  <sequencefileoutputformat href="SequenceFileOutputFormat.html">
+                    <setoutputcompressiontype
+                    href="#setOutputCompressionType(org.apache.hadoop.mapreduce.Job,%20org.apache.hadoop.io.SequenceFile.CompressionType)"/>
+                  </sequencefileoutputformat>
+                  <textoutputformat href="TextOutputFormat.html" />
+                </output>
+                <partition href="partition/">
+                  <hashpartitioner href="HashPartitioner.html" />
+                </partition>
+              </lib>
+              <mapcontext href="MapContext.html"/>
+              <mapper href="Mapper.html">
+                <cleanup href="#cleanup(org.apache.hadoop.mapreduce.Mapper.Context)"/>
+                <map href="#map(KEYIN,%20VALUEIN,%20org.apache.hadoop.mapreduce.Mapper.Context)"/>
+                <run href="#run(org.apache.hadoop.mapreduce.Mapper.Context)"/>
+                <setup href="#setup(org.apache.hadoop.mapreduce.Mapper.Context)"/>
+              </mapper>
+              <outputcollector href="OutputCollector.html">
+                <collect href="#collect(K, V)" />
+              </outputcollector>
+              <outputcommitter href="OutputCommitter.html" />
+              <outputformat href="OutputFormat.html" />
+              <partitioner href="Partitioner.html" />
+              <recordreader href="RecordReader.html" />
+              <recordwriter href="RecordWriter.html" />
+              <reducecontext href="ReduceContext.html"/>
+              <reducer href="Reducer.html">
+                <cleanup href="#cleanup(org.apache.hadoop.mapreduce.Reducer.Context)"/>
+                <reduce
+                href="#reduce(KEYIN,%20java.lang.Iterable,%20org.apache.hadoop.mapreduce.Reducer.Context)"/>
+                <run href="#run(org.apache.hadoop.mapreduce.Reducer.Context)"/>
+                <setup href="#setup(org.apache.hadoop.mapreduce.Reducer.Context)"/>
+              </reducer>
+              <task href="task/">
+                <jobcontextimpl href="JobContextImpl.html">
+                  <getjar href="#getJar()"/>
+                </jobcontextimpl>
+              </task>
+              <taskinputoutputcontext href="TaskInputOutputContext.html">
+                <write href="#write(KEYOUT,%20VALUEOUT)"/>
+                <getcounter href="#getCounter(java.lang.Enum)"/>
+              </taskinputoutputcontext>
+            </mapreduce>
             <net href="net/">
               <dnstoswitchmapping href="DNSToSwitchMapping.html">
               <resolve href="#resolve(java.util.List)" />

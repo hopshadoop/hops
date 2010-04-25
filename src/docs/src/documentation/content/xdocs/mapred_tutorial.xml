@@ -67,7 +67,8 @@
       
       <p>Typically the compute nodes and the storage nodes are the same, that is, 
       the MapReduce framework and the 
-      <a href="http://hadoop.apache.org/hdfs/docs/current/index.html">Hadoop Distributed File System</a> (HDFS) 
+      <a href="http://hadoop.apache.org/hdfs/docs/current/index.html">Hadoop
+        Distributed File System</a> (HDFS) 
       are running on the same set of nodes. This configuration
       allows the framework to effectively schedule tasks on the nodes where data 
       is already present, resulting in very high aggregate bandwidth across the 
@@ -117,11 +118,14 @@
       the job, conceivably of different types.</p> 
       
       <p>The <code>key</code> and <code>value</code> classes have to be 
-      serializable by the framework and hence need to implement the 
-      <a href="ext:api/org/apache/hadoop/io/writable">Writable</a> 
-      interface. Additionally, the <code>key</code> classes have to implement the
+        serializable by the framework. Several serialization systems exists; the
+        default serialization mechanism requires keys and values to implement
+        the
+      <a href="ext:api/org/apache/hadoop/io/writable">Writable</a> interface.
+      Additionally, the <code>key</code> classes must facilitate sorting by the
+      framework; a straightforward means to do so is for them to implement the
       <a href="ext:api/org/apache/hadoop/io/writablecomparable">
-      WritableComparable</a> interface to facilitate sorting by the framework.
+        WritableComparable</a> interface.
       </p>
 
       <p>Input and Output types of a MapReduce job:</p>
@@ -132,7 +136,7 @@
         -&gt; 
         <code>&lt;k2, v2&gt;</code> 
         -&gt; 
-        <strong>combine</strong> 
+        <strong>combine*</strong> 
         -&gt; 
         <code>&lt;k2, v2&gt;</code> 
         -&gt; 
@@ -140,6 +144,8 @@
         -&gt; 
         <code>&lt;k3, v3&gt;</code> (output)
       </p>
+      <p>Note that the combine phase may run zero or more times in this
+        process.</p>
     </section>
     
     <section>
@@ -164,383 +170,150 @@
             <th></th>
             <th>WordCount.java</th>
           </tr>
-          <tr>
-            <td>1.</td>
-            <td>
-                <code>package org.myorg;</code>
-            </td>
-          </tr>
-          <tr>
-            <td>2.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>3.</td>
-            <td>
-              <code>import java.io.IOException;</code>
-            </td>
-          </tr>
-          <tr>
-            <td>4.</td>
-            <td>
-              <code>import java.util.*;</code>
-            </td>
-          </tr>
-          <tr>
-            <td>5.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>6.</td>
-            <td>
-              <code>import org.apache.hadoop.fs.Path;</code>
-            </td>
-          </tr>
-          <tr>
-            <td>7.</td>
-            <td>
-              <code>import org.apache.hadoop.conf.*;</code>
-            </td>
-          </tr>
-          <tr>
-            <td>8.</td>
-            <td>
-              <code>import org.apache.hadoop.io.*;</code>
-            </td>
-          </tr>
-          <tr>
-            <td>9.</td>
-            <td>
-            <code>import org.apache.hadoop.mapred.*;</code>
-            </td>
-          </tr>
-          <tr>
-            <td>10.</td>
-            <td>
-              <code>import org.apache.hadoop.util.*;</code>
-            </td>
-          </tr>
-          <tr>
-            <td>11.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>12.</td>
-            <td>
-              <code>public class WordCount {</code>
-            </td>
-          </tr>
-          <tr>
-            <td>13.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>14.</td>
-            <td>
-              &nbsp;&nbsp;
-              <code>
-                public static class Map extends MapReduceBase 
-                implements Mapper&lt;LongWritable, Text, Text, IntWritable&gt; {
-              </code>
-            </td>
-          </tr>
-          <tr>
-            <td>15.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>
-                private final static IntWritable one = new IntWritable(1);
-              </code>
-            </td>
-          </tr>
-          <tr>
-            <td>16.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>private Text word = new Text();</code>
-            </td>
-          </tr>
-          <tr>
-            <td>17.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>18.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>
-                public void map(LongWritable key, Text value, 
-                OutputCollector&lt;Text, IntWritable&gt; output, 
-                Reporter reporter) throws IOException {
-              </code>
-            </td>
-          </tr>
-          <tr>
-            <td>19.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>String line = value.toString();</code>
-            </td>
-          </tr>
-          <tr>
-            <td>20.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>StringTokenizer tokenizer = new StringTokenizer(line);</code>
-            </td>
-          </tr>
-          <tr>
-            <td>21.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>while (tokenizer.hasMoreTokens()) {</code>
-            </td>
-          </tr>
-          <tr>
-            <td>22.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>word.set(tokenizer.nextToken());</code>
-            </td>
-          </tr>
-          <tr>
-            <td>23.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>output.collect(word, one);</code>
-            </td>
-          </tr>
-          <tr>
-            <td>24.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>}</code>
-            </td>
-          </tr>
-          <tr>
-            <td>25.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>}</code>
-            </td>
-          </tr>
-          <tr>
-            <td>26.</td>
-            <td>
-              &nbsp;&nbsp;
-              <code>}</code>
-            </td>
-          </tr>
-          <tr>
-            <td>27.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>28.</td>
-            <td>
-              &nbsp;&nbsp;
-              <code>
-                public static class Reduce extends MapReduceBase implements 
-                Reducer&lt;Text, IntWritable, Text, IntWritable&gt; {
-              </code>
-            </td>
-          </tr>
-          <tr>
-            <td>29.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>
-                public void reduce(Text key, Iterator&lt;IntWritable&gt; values,
-                OutputCollector&lt;Text, IntWritable&gt; output, 
-                Reporter reporter) throws IOException {
-              </code>
-            </td>
-          </tr>
-          <tr>
-            <td>30.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>int sum = 0;</code>
-            </td>
-          </tr>
-          <tr>
-            <td>31.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>while (values.hasNext()) {</code>
-            </td>
-          </tr>
-          <tr>
-            <td>32.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>sum += values.next().get();</code>
-            </td>
-          </tr>
-          <tr>
-            <td>33.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>}</code>
-            </td>
-          </tr>
-          <tr>
-            <td>34.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>output.collect(key, new IntWritable(sum));</code>
-            </td>
-          </tr>
-          <tr>
-            <td>35.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>}</code>
-            </td>
-          </tr>
-          <tr>
-            <td>36.</td>
-            <td>
-              &nbsp;&nbsp;
-              <code>}</code>
-            </td>
-          </tr>
-          <tr>
-            <td>37.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>38.</td>
-            <td>
-              &nbsp;&nbsp;
-              <code>
-                public static void main(String[] args) throws Exception {
-              </code>
-            </td>
-          </tr>
-          <tr>
-            <td>39.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>
-                JobConf conf = new JobConf(WordCount.class);
-              </code>
-            </td>
-          </tr>
-          <tr>
-            <td>40.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>conf.setJobName("wordcount");</code>
-            </td>
-          </tr>
-          <tr>
-            <td>41.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>42.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>conf.setOutputKeyClass(Text.class);</code>
-            </td>
-          </tr>
-          <tr>
-            <td>43.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>conf.setOutputValueClass(IntWritable.class);</code>
-            </td>
-          </tr>
-          <tr>
-            <td>44.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>45.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>conf.setMapperClass(Map.class);</code>
-            </td>
-          </tr>
-          <tr>
-            <td>46.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>conf.setCombinerClass(Reduce.class);</code>
-            </td>
-          </tr>
-          <tr>
-            <td>47.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>conf.setReducerClass(Reduce.class);</code>
-            </td>
-          </tr>
-          <tr>
-            <td>48.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>49.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>conf.setInputFormat(TextInputFormat.class);</code>
-            </td>
-          </tr>
-          <tr>
-            <td>50.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>conf.setOutputFormat(TextOutputFormat.class);</code>
-            </td>
-          </tr>
-          <tr>
-            <td>51.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>52.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>FileInputFormat.setInputPaths(conf, new Path(args[0]));</code>
-            </td>
-          </tr>
-          <tr>
-            <td>53.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>FileOutputFormat.setOutputPath(conf, new Path(args[1]));</code>
-            </td>
-          </tr>
-          <tr>
-            <td>54.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>55.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>JobClient.runJob(conf);</code>
-            </td>
-          </tr>
-          <tr>
-            <td>57.</td>
-            <td>
-              &nbsp;&nbsp;
-              <code>}</code>
-            </td>
-          </tr>
-          <tr>
-            <td>58.</td>
-            <td>
-              <code>}</code>
-            </td>
-          </tr>
-          <tr>
-            <td>59.</td>
-            <td></td>
-          </tr>
+<tr><td>1.</td><td><code>package&nbsp;org.myorg;
+</code></td></tr>
+<tr><td>2.</td><td><code>
+</code></td></tr>
+<tr><td>3.</td><td><code>import&nbsp;java.io.IOException;
+</code></td></tr>
+<tr><td>4.</td><td><code>import&nbsp;java.util.*;
+</code></td></tr>
+<tr><td>5.</td><td><code>
+</code></td></tr>
+<tr><td>6.</td><td><code>import&nbsp;org.apache.hadoop.fs.Path;
+</code></td></tr>
+<tr><td>7.</td><td><code>import&nbsp;org.apache.hadoop.conf.*;
+</code></td></tr>
+<tr><td>8.</td><td><code>import&nbsp;org.apache.hadoop.io.*;
+</code></td></tr>
+<tr><td>9.</td><td><code>import&nbsp;org.apache.hadoop.mapreduce.*;
+</code></td></tr>
+<tr><td>10.</td><td><code>import&nbsp;org.apache.hadoop.mapreduce.lib.input.*;
+</code></td></tr>
+<tr><td>11.</td><td><code>import&nbsp;org.apache.hadoop.mapreduce.lib.output.*;
+</code></td></tr>
+<tr><td>12.</td><td><code>import&nbsp;org.apache.hadoop.util.*;
+</code></td></tr>
+<tr><td>13.</td><td><code>
+</code></td></tr>
+<tr><td>14.</td><td><code>public&nbsp;class&nbsp;WordCount&nbsp;extends&nbsp;Configured&nbsp;implements&nbsp;Tool&nbsp;{
+</code></td></tr>
+<tr><td>15.</td><td><code>
+</code></td></tr>
+<tr><td>16.</td><td><code>&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;class&nbsp;Map
+</code></td></tr>
+<tr><td>17.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;extends&nbsp;Mapper&lt;LongWritable,&nbsp;Text,&nbsp;Text,&nbsp;IntWritable&gt;&nbsp;{
+</code></td></tr>
+<tr><td>18.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;final&nbsp;static&nbsp;IntWritable&nbsp;one&nbsp;=&nbsp;new&nbsp;IntWritable(1);
+</code></td></tr>
+<tr><td>19.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;Text&nbsp;word&nbsp;=&nbsp;new&nbsp;Text();
+</code></td></tr>
+<tr><td>20.</td><td><code>
+</code></td></tr>
+<tr><td>21.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;map(LongWritable&nbsp;key,&nbsp;Text&nbsp;value,&nbsp;Context&nbsp;context)
+</code></td></tr>
+<tr><td>22.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;throws&nbsp;IOException,&nbsp;InterruptedException&nbsp;{
+</code></td></tr>
+<tr><td>23.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;line&nbsp;=&nbsp;value.toString();
+</code></td></tr>
+<tr><td>24.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;StringTokenizer&nbsp;tokenizer&nbsp;=&nbsp;new&nbsp;StringTokenizer(line);
+</code></td></tr>
+<tr><td>25.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;while&nbsp;(tokenizer.hasMoreTokens())&nbsp;{
+</code></td></tr>
+<tr><td>26.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;word.set(tokenizer.nextToken());
+</code></td></tr>
+<tr><td>27.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;context.write(word,&nbsp;one);
+</code></td></tr>
+<tr><td>28.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+</code></td></tr>
+<tr><td>29.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+</code></td></tr>
+<tr><td>30.</td><td><code>&nbsp;&nbsp;&nbsp;}
+</code></td></tr>
+<tr><td>31.</td><td><code>
+</code></td></tr>
+<tr><td>32.</td><td><code>&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;class&nbsp;Reduce
+</code></td></tr>
+<tr><td>33.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;extends&nbsp;Reducer&lt;Text,&nbsp;IntWritable,&nbsp;Text,&nbsp;IntWritable&gt;&nbsp;{
+</code></td></tr>
+<tr><td>34.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;reduce(Text&nbsp;key,&nbsp;Iterable&lt;IntWritable&gt;&nbsp;values,
+</code></td></tr>
+<tr><td>35.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Context&nbsp;context)&nbsp;throws&nbsp;IOException,&nbsp;InterruptedException&nbsp;{
+</code></td></tr>
+<tr><td>36.</td><td><code>
+</code></td></tr>
+<tr><td>37.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;int&nbsp;sum&nbsp;=&nbsp;0;
+</code></td></tr>
+<tr><td>38.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;(IntWritable&nbsp;val&nbsp;:&nbsp;values)&nbsp;{
+</code></td></tr>
+<tr><td>39.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sum&nbsp;+=&nbsp;val.get();
+</code></td></tr>
+<tr><td>40.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+</code></td></tr>
+<tr><td>41.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;context.write(key,&nbsp;new&nbsp;IntWritable(sum));
+</code></td></tr>
+<tr><td>42.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+</code></td></tr>
+<tr><td>43.</td><td><code>&nbsp;&nbsp;&nbsp;}
+</code></td></tr>
+<tr><td>44.</td><td><code>
+</code></td></tr>
+<tr><td>45.</td><td><code>&nbsp;&nbsp;&nbsp;public&nbsp;int&nbsp;run(String&nbsp;[]&nbsp;args)&nbsp;throws&nbsp;Exception&nbsp;{
+</code></td></tr>
+<tr><td>46.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Job&nbsp;job&nbsp;=&nbsp;new&nbsp;Job(getConf());
+</code></td></tr>
+<tr><td>47.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;job.setJarByClass(WordCount.class);
+</code></td></tr>
+<tr><td>48.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;job.setJobName(&quot;wordcount&quot;);
+</code></td></tr>
+<tr><td>49.</td><td><code>
+</code></td></tr>
+<tr><td>50.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;job.setOutputKeyClass(Text.class);
+</code></td></tr>
+<tr><td>51.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;job.setOutputValueClass(IntWritable.class);
+</code></td></tr>
+<tr><td>52.</td><td><code>
+</code></td></tr>
+<tr><td>53.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;job.setMapperClass(Map.class);
+</code></td></tr>
+<tr><td>54.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;job.setCombinerClass(Reduce.class);
+</code></td></tr>
+<tr><td>55.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;job.setReducerClass(Reduce.class);
+</code></td></tr>
+<tr><td>56.</td><td><code>
+</code></td></tr>
+<tr><td>57.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;job.setInputFormatClass(TextInputFormat.class);
+</code></td></tr>
+<tr><td>58.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;job.setOutputFormatClass(TextOutputFormat.class);
+</code></td></tr>
+<tr><td>59.</td><td><code>
+</code></td></tr>
+<tr><td>60.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FileInputFormat.setInputPaths(job,&nbsp;new&nbsp;Path(args[0]));
+</code></td></tr>
+<tr><td>61.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FileOutputFormat.setOutputPath(job,&nbsp;new&nbsp;Path(args[1]));
+</code></td></tr>
+<tr><td>62.</td><td><code>
+</code></td></tr>
+<tr><td>63.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;boolean&nbsp;success&nbsp;=&nbsp;job.waitForCompletion(true);
+</code></td></tr>
+<tr><td>64.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;success&nbsp;?&nbsp;0&nbsp;:&nbsp;1;
+</code></td></tr>
+<tr><td>65.</td><td><code>&nbsp;&nbsp;&nbsp;}
+</code></td></tr>
+<tr><td>66.</td><td><code>
+</code></td></tr>
+<tr><td>67.</td><td><code>&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;main(String[]&nbsp;args)&nbsp;throws&nbsp;Exception&nbsp;{
+</code></td></tr>
+<tr><td>68.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;int&nbsp;ret&nbsp;=&nbsp;ToolRunner.run(new&nbsp;WordCount(),&nbsp;args);
+</code></td></tr>
+<tr><td>69.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.exit(ret);
+</code></td></tr>
+<tr><td>70.</td><td><code>&nbsp;&nbsp;&nbsp;}
+</code></td></tr>
+<tr><td>71.</td><td><code>}
+</code></td></tr>
+<tr><td>72.</td><td><code>
+</code></td></tr>
         </table>
       </section>
         
@@ -553,47 +326,48 @@
         <p>
           <code>$ mkdir wordcount_classes</code><br/>
           <code>
-            $ javac -classpath ${HADOOP_HOME}/hadoop-${HADOOP_VERSION}-core.jar 
+            $ javac -classpath
+            ${HADOOP_HOME}/hadoop-core-${HADOOP_VERSION}.jar:${HADOOP_HOME}/hadoop-mapred-${HADOOP_VERSION}.jar:${HADOOP_HOME}/hadoop-hdfs-${HADOOP_VERSION}.jar
               -d wordcount_classes WordCount.java
           </code><br/>
-          <code>$ jar -cvf /usr/joe/wordcount.jar -C wordcount_classes/ .</code> 
+          <code>$ jar -cvf /user/joe/wordcount.jar -C wordcount_classes/ .</code> 
         </p>
         
         <p>Assuming that:</p>
         <ul>
           <li>
-            <code>/usr/joe/wordcount/input</code>  - input directory in HDFS
+            <code>/user/joe/wordcount/input</code>  - input directory in HDFS
           </li>
           <li>
-            <code>/usr/joe/wordcount/output</code> - output directory in HDFS
+            <code>/user/joe/wordcount/output</code> - output directory in HDFS
           </li>
         </ul>
         
         <p>Sample text-files as input:</p>
         <p>
-          <code>$ bin/hadoop dfs -ls /usr/joe/wordcount/input/</code><br/>
-          <code>/usr/joe/wordcount/input/file01</code><br/>
-          <code>/usr/joe/wordcount/input/file02</code><br/>
+          <code>$ bin/hadoop fs -ls /user/joe/wordcount/input/</code><br/>
+          <code>/user/joe/wordcount/input/file01</code><br/>
+          <code>/user/joe/wordcount/input/file02</code><br/>
           <br/>
-          <code>$ bin/hadoop dfs -cat /usr/joe/wordcount/input/file01</code><br/>
+          <code>$ bin/hadoop fs -cat /user/joe/wordcount/input/file01</code><br/>
           <code>Hello World Bye World</code><br/>
           <br/>
-          <code>$ bin/hadoop dfs -cat /usr/joe/wordcount/input/file02</code><br/>
+          <code>$ bin/hadoop fs -cat /user/joe/wordcount/input/file02</code><br/>
           <code>Hello Hadoop Goodbye Hadoop</code>
         </p>
 
         <p>Run the application:</p>
         <p>
           <code>
-            $ bin/hadoop jar /usr/joe/wordcount.jar org.myorg.WordCount 
-              /usr/joe/wordcount/input /usr/joe/wordcount/output 
+            $ bin/hadoop jar /user/joe/wordcount.jar org.myorg.WordCount 
+              /user/joe/wordcount/input /user/joe/wordcount/output 
           </code>
         </p>
 
         <p>Output:</p>
         <p>
           <code>
-            $ bin/hadoop dfs -cat /usr/joe/wordcount/output/part-00000
+            $ bin/hadoop fs -cat /user/joe/wordcount/output/part-r-00000
           </code>
           <br/>
           <code>Bye    1</code><br/>
@@ -602,19 +376,27 @@
           <code>Hello    2</code><br/>
           <code>World    2</code><br/>
         </p>
+
+      </section>
+      <section>
+        <title>Bundling a data payload with your application</title>
         
-        <p> Applications can specify a comma separated list of paths which
+        <p> Applications can specify a comma-separated list of paths which
         would be present in the current working directory of the task 
         using the option <code>-files</code>. The <code>-libjars</code>
         option allows applications to add jars to the classpaths of the maps
         and reduces. The option <code>-archives</code> allows them to pass 
         comma separated list of archives as arguments. These archives are 
         unarchived and a link with name of the archive is created in 
-        the current working directory of tasks. More
-        details about the command line options are available at 
+        the current working directory of tasks. The mechanism that
+        provides this functionality is called the <em>distributed cache</em>.
+        More details about the command line options surrounding job launching
+        and control of the distributed cache are available at 
         <a href="commands_manual.html"> Hadoop Commands Guide.</a></p>
         
-        <p>Running <code>wordcount</code> example with 
+        <p>Hadoop ships with some example code in a jar precompiled for you;
+        one of these is (another) wordcount program. Here's an example
+        invocation of the <code>wordcount</code> example with 
         <code>-libjars</code>, <code>-files</code> and <code>-archives</code>:
         <br/>
         <code> hadoop jar hadoop-examples.jar wordcount -files cachefile.txt 
@@ -634,18 +416,26 @@
         Here, the files dir1/dict.txt and dir2/dict.txt can be accessed by 
         tasks using the symbolic names dict1 and dict2 respectively.
         And the archive mytar.tgz will be placed and unarchived into a 
-        directory by the name tgzdir
+        directory by the name tgzdir.
         </p> 
+
+        <p>The distributed cache is also described in greater detail further
+        down in this tutorial.</p>
       </section>
       
       <section>
         <title>Walk-through</title>
         
-        <p>The <code>WordCount</code> application is quite straight-forward.</p>
+        <p>This section describes the operation of the <code>WordCount</code>
+        application shown earlier in this tutorial.</p> 
         
-        <p>The <code>Mapper</code> implementation (lines 14-26), via the 
-        <code>map</code> method (lines 18-25), processes one line at a time,
-        as provided by the specified <code>TextInputFormat</code> (line 49). 
+      <p>The <a href="ext:api/org/apache/hadoop/mapreduce/mapper"
+          ><code>Mapper</code></a>
+        implementation (lines 16-30), via the 
+        <code>map</code> method (lines 21-29), processes one line at a time,
+        as provided by the specified <a
+          href="ext:api/org/apache/hadoop/mapreduce/lib/input/textinputformat"
+          ><code>TextInputFormat</code></a> (line 57). 
         It then splits the line into tokens separated by whitespaces, via the 
         <code>StringTokenizer</code>, and emits a key-value pair of 
         <code>&lt; &lt;word&gt;, 1&gt;</code>.</p>
@@ -671,10 +461,12 @@
         tutorial.</p>
         
         <p><code>WordCount</code> also specifies a <code>combiner</code> (line 
-        46). Hence, the output of each map is passed through the local combiner 
-        (which is same as the <code>Reducer</code> as per the job 
-        configuration) for local aggregation, after being sorted on the 
-        <em>key</em>s.</p>
+        54). Hence, the output of each map is passed through the local combiner 
+        (which is same as the <a
+          href="ext:api/org/apache/hadoop/mapreduce/reducer"
+          ><code>Reducer</code></a>
+        as per the job configuration) for local aggregation, after being
+        sorted on the <em>key</em>s.</p>
 
         <p>
           The output of the first map:<br/>
@@ -690,9 +482,12 @@
           <code>&lt; Hello, 1&gt;</code><br/>
         </p>
 
-        <p>The <code>Reducer</code> implementation (lines 28-36), via the
-        <code>reduce</code> method (lines 29-35) just sums up the values,
-        which are the occurence counts for each key (i.e. words in this example).
+        <p>The <a href="ext:api/org/apache/hadoop/mapreduce/reducer"
+            ><code>Reducer</code></a>
+        implementation (lines 32-43), via the
+        <code>reduce</code> method (lines 34-42) just sums up the values,
+        which are the occurence counts for each key (i.e. words in this
+        example).
         </p>
         
         <p>
@@ -706,12 +501,19 @@
         
         <p>The <code>run</code> method specifies various facets of the job, such 
         as the input/output paths (passed via the command line), key/value 
-        types, input/output formats etc., in the <code>JobConf</code>.
-        It then calls the <code>JobClient.runJob</code> (line  55) to submit the
-        and monitor its progress.</p>
+        types, input/output formats etc., in the <a
+        href="ext:api/org/apache/hadoop/mapreduce/job"><code>Job</code></a>.
+        It then calls the <a
+          href="ext:api/org/apache/hadoop/mapreduce/job/waitforcompletion"
+          ><code>Job.waitForCompletion()</code></a> (line 63)
+        to submit the job to Hadoop and monitor its progress.</p>
 
-        <p>We'll learn more about <code>JobConf</code>, <code>JobClient</code>,
-        <code>Tool</code> and other interfaces and classes a bit later in the 
+        <p>We'll learn more about <a
+        href="ext:api/org/apache/hadoop/mapreduce/job"><code>Job</code></a>,
+      <a href="ext:api/org/apache/hadoop/mapreduce/mapper"
+        ><code>Mapper</code></a>,
+        <a href="ext:api/org/apache/hadoop/util/tool"><code>Tool</code></a>
+        and other interfaces and classes a bit later in the 
         tutorial.</p>
       </section>
     </section>
@@ -719,22 +521,35 @@
     <section>
       <title>MapReduce - User Interfaces</title>
       
-      <p>This section provides a reasonable amount of detail on every user-facing 
-      aspect of the MapReduce framwork. This should help users implement, 
-      configure and tune their jobs in a fine-grained manner. However, please 
-      note that the javadoc for each class/interface remains the most 
-      comprehensive documentation available; this is only meant to be a tutorial.
+      <p>This section provides a reasonable amount of detail on every
+        user-facing aspect of the MapReduce framwork. This should help users
+        implement, configure and tune their jobs in a fine-grained manner.
+        However, please note that the javadoc for each class/interface remains
+        the most comprehensive documentation available; this is only meant to
+        be a tutorial.
       </p>
       
-      <p>Let us first take the <code>Mapper</code> and <code>Reducer</code> 
-      interfaces. Applications typically implement them to provide the 
+      <p>Let us first take the
+        <a href="ext:api/org/apache/hadoop/mapreduce/mapper"
+          ><code>Mapper</code></a> and
+        <a href="ext:api/org/apache/hadoop/mapreduce/reducer"
+          ><code>Reducer</code></a>
+      classes. Applications typically extend them to provide the 
       <code>map</code> and <code>reduce</code> methods.</p>
       
-      <p>We will then discuss other core interfaces including 
-      <code>JobConf</code>, <code>JobClient</code>, <code>Partitioner</code>, 
-      <code>OutputCollector</code>, <code>Reporter</code>, 
-      <code>InputFormat</code>, <code>OutputFormat</code>,
-      <code>OutputCommitter</code> and others.</p>
+      <p>We will then discuss other core classes including 
+      <a href="ext:api/org/apache/hadoop/mapreduce/job"><code>Job</code></a>,
+      <a href="ext:api/org/apache/hadoop/mapreduce/partitioner"
+        ><code>Partitioner</code></a>,
+      <a href="ext:api/org/apache/hadoop/mapreduce/mapcontext"
+        ><code>Context</code></a>,
+      <a href="ext:api/org/apache/hadoop/mapreduce/inputformat"
+        ><code>InputFormat</code></a>,
+      <a href="ext:api/org/apache/hadoop/mapreduce/outputformat"
+        ><code>OutputFormat</code></a>,
+      <a href="ext:api/org/apache/hadoop/mapreduce/outputcommitter"
+        ><code>OutputCommitter</code></a>
+      and others.</p>
       
       <p>Finally, we will wrap up by discussing some useful features of the
       framework such as the <code>DistributedCache</code>, 
@@ -743,16 +558,17 @@
       <section>
         <title>Payload</title>
         
-        <p>Applications typically implement the <code>Mapper</code> and 
-        <code>Reducer</code> interfaces to provide the <code>map</code> and 
+        <p>Applications typically extend the <code>Mapper</code> and
+        <code>Reducer</code> classes to provide the <code>map</code> and 
         <code>reduce</code> methods. These form the core of the job.</p>
         
         <section>
           <title>Mapper</title>
 
-          <p><a href="ext:api/org/apache/hadoop/mapred/mapper">
-          Mapper</a> maps input key/value pairs to a set of intermediate 
-          key/value pairs.</p>
+          <p><a href="ext:api/org/apache/hadoop/mapreduce/mapper"
+              ><code>Mapper</code></a>
+          maps input key/value pairs to a set of
+          intermediate key/value pairs.</p>
  
           <p>Maps are the individual tasks that transform input records into 
           intermediate records. The transformed intermediate records do not need
@@ -760,29 +576,78 @@
           map to zero or many output pairs.</p> 
  
           <p>The Hadoop MapReduce framework spawns one map task for each 
-          <code>InputSplit</code> generated by the <code>InputFormat</code> for 
-          the job.</p>
+            <a href="ext:api/org/apache/hadoop/mapreduce/inputsplit"
+              ><code>InputSplit</code></a>
+          generated by the
+          <a href="ext:api/org/apache/hadoop/mapreduce/inputformat"
+            ><code>InputFormat</code></a>
+          for the job. An <code>InputSplit</code> is a logical representation of
+          a unit of input work for a map task; e.g., a filename and a byte
+          range within that file to process. The <code>InputFormat</code> is
+          responsible for enumerating the <code>InputSplits</code>, and
+          producing a
+          <a href="ext:api/org/apache/hadoop/mapreduce/recordreader"
+            ><code>RecordReader</code></a>
+          which will turn those
+          logical work units into actual physical input records.</p>
           
-          <p>Overall, <code>Mapper</code> implementations are passed the 
-          <code>JobConf</code> for the job via the 
-          <a href="ext:api/org/apache/hadoop/mapred/jobconfigurable/configure">
-          JobConfigurable.configure(JobConf)</a> method and override it to 
-          initialize themselves. The framework then calls 
-          <a href="ext:api/org/apache/hadoop/mapred/mapper/map">
-          map(WritableComparable, Writable, OutputCollector, Reporter)</a> for 
-          each key/value pair in the <code>InputSplit</code> for that task.        
-          Applications can then override the
-          <a href="ext:api/org/apache/hadoop/io/closeable/close">
-          Closeable.close()</a> method to perform any required cleanup.</p>
- 
+          <p>Overall, <code>Mapper</code> implementations are specified in the
+          <a href="ext:api/org/apache/hadoop/mapreduce/job"><code>Job</code></a>,
+          a client-side class that describes the job's
+          configuration and interfaces with the cluster on behalf of the
+          client program. The <code>Mapper</code> itself then is instantiated
+          in the running job, and is passed a <a
+            href="ext:api/org/apache/hadoop/mapreduce/mapcontext"
+            ><code>MapContext</code></a> object
+          which it can use to configure itself. The <code>Mapper</code>
+          contains a <code>run()</code> method which calls its
+          <code>setup()</code>
+          method once, its <code>map()</code> method for each input record,
+          and finally its <code>cleanup()</code> method. All of these methods
+          (including <code>run()</code> itself) can be overridden with
+          your own code. If you do not override any methods (leaving even
+          map as-is), it will act as the <em>identity function</em>, emitting
+          each input record as a separate output.</p>
+
+          <p>The <code>Context</code> object allows the mapper to interact
+          with the rest of the Hadoop system. It includes configuration
+          data for the job, as well as interfaces which allow it to emit
+          output. The <code>getConfiguration()</code> method returns a
+          <a href="ext:api/org/apache/hadoop/conf/configuration">
+          <code>Configuration</code></a> which contains configuration data
+          for your program. You can set arbitrary (key, value) pairs of
+          configuration data in your <code>Job</code>, e.g. with
+          <code>Job.getConfiguration().set("myKey", "myVal")</code>,
+          and then retrieve this data in your mapper with
+          <code>Context.getConfiguration().get("myKey")</code>. This sort of
+          functionality is typically done in the Mapper's
+          <a href="ext:api/org/apache/hadoop/mapreduce/mapper/setup"
+            ><code>setup()</code></a>
+          method.</p>
+
+          <p>The
+            <a href="ext:api/org/apache/hadoop/mapreduce/mapper/run"
+              ><code>Mapper.run()</code></a>
+          method then calls 
+          <code>map(KeyInType, ValInType, Context)</code> for 
+          each key/value pair in the <code>InputSplit</code> for that task.
+          Note that in the WordCount program's map() method, we then emit
+          our output data via the <code>Context</code> argument, using its
+          <code>write()</code> method.
+          </p>
+
+          <p>Applications can then override the Mapper's
+            <a href="ext:api/org/apache/hadoop/mapreduce/mapper/cleanup"
+              ><code>cleanup()</code></a>
+          method to perform any required teardown operations.</p>
 
           <p>Output pairs do not need to be of the same types as input pairs. A 
           given input pair may map to zero or many output pairs.  Output pairs 
-          are collected with calls to 
-          <a href="ext:api/org/apache/hadoop/mapred/outputcollector/collect">
-          OutputCollector.collect(WritableComparable,Writable)</a>.</p>
+          are collected with calls to
+          <a href="ext:api/org/apache/hadoop/mapreduce/taskinputoutputcontext/write"
+            ><code>Context.write(KeyOutType, ValOutType)</code></a>.</p>
 
-          <p>Applications can use the <code>Reporter</code> to report 
+          <p>Applications can also use the <code>Context</code> to report 
           progress, set application-level status messages and update 
           <code>Counters</code>, or just indicate that they are alive.</p>
  
@@ -790,18 +655,26 @@
           subsequently grouped by the framework, and passed to the
           <code>Reducer</code>(s) to  determine the final output. Users can 
           control the grouping by specifying a <code>Comparator</code> via 
-          <a href="ext:api/org/apache/hadoop/mapred/jobconf/setoutputkeycomparatorclass">
-          JobConf.setOutputKeyComparatorClass(Class)</a>.</p>
+          <a
+            href="ext:api/org/apache/hadoop/mapreduce/job/setgroupingcomparatorclass"
+            ><code>Job.setGroupingComparatorClass(Class)</code></a>.
+          If a grouping comparator is not specified, then all values with the
+          same key will be presented by an unordered <code>Iterable</code> to
+          a call to the <code>Reducer.reduce()</code> method.</p>
 
-          <p>The <code>Mapper</code> outputs are sorted and then 
+          <p>The <code>Mapper</code> outputs are sorted and
           partitioned per <code>Reducer</code>. The total number of partitions is 
           the same as the number of reduce tasks for the job. Users can control 
           which keys (and hence records) go to which <code>Reducer</code> by 
-          implementing a custom <code>Partitioner</code>.</p>
+          implementing a custom
+          <a href="ext:api/org/apache/hadoop/mapreduce/partitioner"
+            ><code>Partitioner</code></a>.</p>
  
           <p>Users can optionally specify a <code>combiner</code>, via 
-          <a href="ext:api/org/apache/hadoop/mapred/jobconf/setcombinerclass">
-          JobConf.setCombinerClass(Class)</a>, to perform local aggregation of 
+          <a
+            href="ext:api/org/apache/hadoop/mapreduce/job/setcombinerclass"
+            ><code>Job.setCombinerClass(Class)</code></a>,
+          to perform local aggregation of 
           the intermediate outputs, which helps to cut down the amount of data 
           transferred from the <code>Mapper</code> to the <code>Reducer</code>.
           </p>
@@ -811,7 +684,7 @@
           Applications can control if, and how, the 
           intermediate outputs are to be compressed and the 
           <a href="ext:api/org/apache/hadoop/io/compress/compressioncodec">
-          CompressionCodec</a> to be used via the <code>JobConf</code>.
+          CompressionCodec</a> to be used via the <code>Job</code>.
           </p>
           
           <section>
@@ -826,35 +699,63 @@
             maps take at least a minute to execute.</p>
  
             <p>Thus, if you expect 10TB of input data and have a blocksize of 
-            <code>128MB</code>, you'll end up with 82,000 maps, unless 
-            <a href="ext:api/org/apache/hadoop/mapred/jobconf/setnummaptasks">
-            setNumMapTasks(int)</a> (which only provides a hint to the framework) 
-            is used to set it even higher.</p>
+              <code>128MB</code>, you'll end up with 82,000 maps, unless the
+              <code>mapreduce.job.maps</code> parameter
+            (which only provides a hint to the
+            framework) is used to set it even higher. Ultimately, the number
+            of tasks is controlled by the number of splits returned by the
+            <a
+              href="ext:api/org/apache/hadoop/mapreduce/inputformat/getsplits"
+              ><code>InputFormat.getSplits()</code></a> method (which you can
+            override).
+            </p>
           </section>
         </section>
         
         <section>
           <title>Reducer</title>
           
-          <p><a href="ext:api/org/apache/hadoop/mapred/reducer">
-          Reducer</a> reduces a set of intermediate values which share a key to
-          a smaller set of values.</p>
+          <p><a href="ext:api/org/apache/hadoop/mapreduce/reducer"
+              ><code>Reducer</code></a>
+          reduces a set of intermediate values which
+          share a key to a (usually smaller) set of values.</p>
           
-          <p>The number of reduces for the job is set by the user 
-          via <a href="ext:api/org/apache/hadoop/mapred/jobconf/setnumreducetasks">
-          JobConf.setNumReduceTasks(int)</a>.</p>
+          <p>The number of reduces for the job is set by the user via <a
+              href="ext:api/org/apache/hadoop/mapreduce/job/setnumreducetasks"
+              ><code>Job.setNumReduceTasks(int)</code></a>.</p>
           
-          <p>Overall, <code>Reducer</code> implementations are passed the 
-          <code>JobConf</code> for the job via the 
-          <a href="ext:api/org/apache/hadoop/mapred/jobconfigurable/configure">
-          JobConfigurable.configure(JobConf)</a> method and can override it to 
-          initialize themselves. The framework then calls   
-          <a href="ext:api/org/apache/hadoop/mapred/reducer/reduce">
-          reduce(WritableComparable, Iterator, OutputCollector, Reporter)</a>
-          method for each <code>&lt;key, (list of values)&gt;</code> 
-          pair in the grouped inputs. Applications can then override the           
-          <a href="ext:api/org/apache/hadoop/io/closeable/close">
-          Closeable.close()</a> method to perform any required cleanup.</p>
+          <p>The API of <code>Reducer</code> is very similar to that of
+          <code>Mapper</code>; there's a <a
+            href="ext:api/org/apache/hadoop/mapreduce/reducer/run"
+            ><code>run()</code></a> method that receives
+          a <a href="ext:api/org/apache/hadoop/mapreduce/reducecontext"
+            ><code>Context</code></a> containing the job's configuration as
+          well as interfacing methods that return data from the reducer itself
+          back to the framework. The <code>run()</code> method calls <a
+            href="ext:api/org/apache/hadoop/mapreduce/reducer/setup"
+            ><code>setup()</code></a> once,
+          <a href="ext:api/org/apache/hadoop/mapreduce/reducer/reduce"
+            ><code>reduce()</code></a> once for each key associated with the
+          reduce task, and <a
+            href="ext:api/org/apache/hadoop/mapreduce/reducer/cleanup"
+            ><code>cleanup()</code></a>
+          once at the end. Each of these methods
+          can access the job's configuration data by using
+          <code>Context.getConfiguration()</code>.</p>
+
+          <p>As in <code>Mapper</code>, any or all of these methods can be
+          overridden with custom implementations. If none of these methods are
+          overridden, the default reducer operation is the identity function;
+          values are passed through without further processing.</p>
+
+          <p>The heart of <code>Reducer</code> is its <code>reduce()</code>
+          method. This is called once per key; the second argument is an
+          <code>Iterable</code> which returns all the values associated with
+          that key. In the WordCount example, this is all of the 1's or other
+          partial counts associated with a given word. The Reducer should
+          emit its final output (key, value) pairs with the
+          <code>Context.write()</code> method. It may emit 0, 1, or more
+          (key, value) pairs for each input.</p>
 
           <p><code>Reducer</code> has 3 primary phases: shuffle, sort and reduce.
           </p>
@@ -882,12 +783,12 @@
               <p>If equivalence rules for grouping the intermediate keys are 
               required to be different from those for grouping keys before 
               reduction, then one may specify a <code>Comparator</code> via 
-              <a href="ext:api/org/apache/hadoop/mapred/jobconf/setoutputvaluegroupingcomparator">
-              JobConf.setOutputValueGroupingComparator(Class)</a>. Since 
-              <a href="ext:api/org/apache/hadoop/mapred/jobconf/setoutputkeycomparatorclass">
-              JobConf.setOutputKeyComparatorClass(Class)</a> can be used to 
-              control how intermediate keys are grouped, these can be used in 
-              conjunction to simulate <em>secondary sort on values</em>.</p>
+              <a
+                href="ext:api/org/apache/hadoop/mapreduce/job/setgroupingcomparatorclass"
+                >Job.setGroupingComparatorClass(Class)</a>. Since this
+              can be used to control how intermediate keys are grouped, these
+              can be used in conjunction to simulate <em>secondary sort on
+              values</em>.</p>
             </section>
           </section>
    
@@ -895,20 +796,22 @@
             <title>Reduce</title>
    
             <p>In this phase the 
-            <a href="ext:api/org/apache/hadoop/mapred/reducer/reduce">
-            reduce(WritableComparable, Iterator, OutputCollector, Reporter)</a>
-            method is called for each <code>&lt;key, (list of values)&gt;</code> 
-            pair in the grouped inputs.</p>
-            
+              <a href="ext:api/org/apache/hadoop/mapreduce/reducer/reduce"
+                ><code>reduce(MapOutKeyType,
+            Iterable&lt;MapOutValType&gt;, Context)</code></a>
+            method is called for each <code>&lt;key, (list of
+            values)&gt;</code> pair in the grouped inputs.</p>
+
             <p>The output of the reduce task is typically written to the 
             <a href="ext:api/org/apache/hadoop/fs/filesystem">
             FileSystem</a> via 
-            <a href="ext:api/org/apache/hadoop/mapred/outputcollector/collect">
-            OutputCollector.collect(WritableComparable, Writable)</a>.</p>
+            <code>Context.write(ReduceOutKeyType, ReduceOutValType)</code>.</p>
    
-            <p>Applications can use the <code>Reporter</code> to report 
+            <p>Applications can use the <code>Context</code> to report 
             progress, set application-level status messages and update 
-            <code>Counters</code>, or just indicate that they are alive.</p>
+            <a href="ext:api/org/apache/hadoop/mapreduce/counters"
+              ><code>Counters</code></a>,
+            or just indicate that they are alive.</p>
  
            <p>The output of the <code>Reducer</code> is <em>not sorted</em>.</p>
           </section>
@@ -926,12 +829,13 @@
             reduces and launch a second wave of reduces doing a much better job 
             of load balancing.</p>
  
-            <p>Increasing the number of reduces increases the framework overhead, 
-            but increases load balancing and lowers the cost of failures.</p>
+            <p>Increasing the number of reduces increases the framework
+            overhead, but increases load balancing and lowers the cost of
+            failures.</p>
  
             <p>The scaling factors above are slightly less than whole numbers to 
-            reserve a few reduce slots in the framework for speculative-tasks and
-            failed tasks.</p>
+            reserve a few reduce slots in the framework for speculative-tasks
+            and failed tasks.</p>
           </section>
           
           <section>
@@ -942,7 +846,7 @@
  
             <p>In this case the outputs of the map-tasks go directly to the
             <code>FileSystem</code>, into the output path set by 
-            <a href="ext:api/org/apache/hadoop/mapred/fileoutputformat/setoutputpath">
+            <a href="ext:api/org/apache/hadoop/mapreduce/lib/output/fileoutputformat/setoutputpath">
             setOutputPath(Path)</a>. The framework does not sort the 
             map-outputs before writing them out to the <code>FileSystem</code>.
             </p>
@@ -951,14 +855,15 @@
           <section>
             <title>Mark-Reset</title>
 
-            <p>While applications iterate through the values for a given key, it is
-            possible to mark the current position and later reset the iterator to
-            this position and continue the iteration process. The corresponding
-            methods are <code>mark()</code> and <code>reset()</code>. 
+            <p>While applications iterate through the values for a given key, it
+              is possible to mark the current position and later reset the
+              iterator to this position and continue the iteration process.
+              The corresponding methods are <code>mark()</code> and
+              <code>reset()</code>. 
             </p>
 
             <p><code>mark()</code> and <code>reset()</code> can be called any
-            number of times during the iteration cycle.  The <code>reset()</code>
+            number of times during the iteration cycle. The <code>reset()</code>
             method will reset the iterator to the last record before a call to
             the previous <code>mark()</code>.
             </p>
@@ -1005,7 +910,7 @@
             <tr><td>
             <code>
                 &nbsp;&nbsp;
-                values.mark();
+                mitr.mark();
             </code>
             </td></tr>
 
@@ -1014,14 +919,14 @@
             <tr><td>
             <code>
                 &nbsp;&nbsp;
-                while (values.hasNext()) {
+                while (mitr.hasNext()) {
             </code>
             </td></tr>
 
             <tr><td>
             <code>
                   &nbsp;&nbsp;&nbsp;&nbsp;
-                  i = values.next();
+                  i = mitr.next();
             </code>
             </td></tr>
 
@@ -1051,7 +956,7 @@
             <tr><td>
             <code>
                 &nbsp;&nbsp;
-                values.reset();
+                mitr.reset();
             </code>
             </td></tr>
 
@@ -1067,7 +972,7 @@
             <tr><td>
             <code>
                 &nbsp;&nbsp;
-                // call to values.next() in this example, we will iterate over all
+                // call to mitr.next() in this example, we will iterate over all
             </code>
             </td></tr>
 
@@ -1081,14 +986,14 @@
             <tr><td>
             <code>
                 &nbsp;&nbsp;
-                while (values.hasNext()) {
+                while (mitr.hasNext()) {
             </code>
             </td></tr>
 
             <tr><td>
             <code>
                   &nbsp;&nbsp;&nbsp;&nbsp;
-                  i = values.next();
+                  i = mitr.next();
             </code>
             </td></tr>
 
@@ -1123,8 +1028,8 @@
         <section>
           <title>Partitioner</title>
           
-          <p><a href="ext:api/org/apache/hadoop/mapred/partitioner">
-          Partitioner</a> partitions the key space.</p>
+          <p><a href="ext:api/org/apache/hadoop/mapreduce/partitioner"><code>
+          Partitioner</code></a> partitions the key space.</p>
 
           <p>Partitioner controls the partitioning of the keys of the 
           intermediate map-outputs. The key (or a subset of the key) is used to 
@@ -1133,103 +1038,111 @@
           job. Hence this controls which of the <code>m</code> reduce tasks the 
           intermediate key (and hence the record) is sent to for reduction.</p>
           
-          <p><a href="ext:api/org/apache/hadoop/mapred/lib/hashpartitioner">
-          HashPartitioner</a> is the default <code>Partitioner</code>.</p>
+          <p><a
+          href="ext:api/org/apache/hadoop/mapreduce/lib/partition/hashpartitioner"
+          ><code>HashPartitioner</code></a> is the default
+          <code>Partitioner</code>.</p>
         </section>
         
         <section>
-          <title>Reporter</title>
+          <title>Reporting Progress</title>
         
-          <p><a href="ext:api/org/apache/hadoop/mapred/reporter">
-          Reporter</a> is a facility for MapReduce applications to report 
-          progress, set application-level status messages and update 
-          <code>Counters</code>.</p>
+          <p>Via the mapper or reducer's Context, MapReduce applications can
+          report progress, set application-level status messages and update 
+          <a href="ext:api/org/apache/hadoop/mapreduce/counters"
+            ><code>Counters</code></a>.</p>
  
-          <p><code>Mapper</code> and <code>Reducer</code> implementations can use 
-          the <code>Reporter</code> to report progress or just indicate 
+          <p><code>Mapper</code> and <code>Reducer</code> implementations can
+          use the <code>Context</code> to report progress or just indicate 
           that they are alive. In scenarios where the application takes a
           significant amount of time to process individual key/value pairs, 
           this is crucial since the framework might assume that the task has 
           timed-out and kill that task. Another way to avoid this is to 
-          set the configuration parameter <code>mapreduce.task.timeout</code> to a
-          high-enough value (or even set it to <em>zero</em> for no time-outs).
+          set the configuration parameter <code>mapreduce.task.timeout</code>
+          to a high-enough value (or even set it to <em>zero</em> for no
+          time-outs).
           </p>
 
           <p>Applications can also update <code>Counters</code> using the 
-          <code>Reporter</code>.</p>
-        </section>
-      
-        <section>
-          <title>OutputCollector</title>
-        
-          <p><a href="ext:api/org/apache/hadoop/mapred/outputcollector">
-          OutputCollector</a> is a generalization of the facility provided by
-          the MapReduce framework to collect data output by the 
-          <code>Mapper</code> or the <code>Reducer</code> (either the 
-          intermediate outputs or the output of the job).</p>
+          <code>Context</code>.</p>
         </section>
       
         <p>Hadoop MapReduce comes bundled with a 
-        <a href="ext:api/org/apache/hadoop/mapred/lib/package-summary">
-        library</a> of generally useful mappers, reducers, and partitioners.</p>
+        library of generally useful mappers, reducers, and partitioners
+        in the <a
+        href="ext:api/org/apache/hadoop/mapreduce/lib/package-summary"
+        ><code>org.apache.hadoop.mapreduce.lib</code></a> package.</p>
       </section>
       
       <section>
         <title>Job Configuration</title>
         
-        <p><a href="ext:api/org/apache/hadoop/mapred/jobconf">
-        JobConf</a> represents a MapReduce job configuration.</p>
+        <p>The <code>Job</code> represents a MapReduce job configuration.
+        The actual state for this object is written to an underlying instance of
+        <a href="ext:api/org/apache/hadoop/conf/configuration"
+        >Configuration</a>.</p>
  
-        <p><code>JobConf</code> is the primary interface for a user to describe
+        <p><a href="ext:api/org/apache/hadoop/mapreduce/job"
+        ><code>Job</code></a> is the primary interface for a user to describe
         a MapReduce job to the Hadoop framework for execution. The framework 
-        tries to faithfully execute the job as described by <code>JobConf</code>, 
+        tries to faithfully execute the job as described by <code>Job</code>, 
         however:</p> 
         <ul>
-          <li>f
+          <li>
             Some configuration parameters may have been marked as 
             <a href="ext:api/org/apache/hadoop/conf/configuration/final_parameters">
             final</a> by administrators and hence cannot be altered.
           </li>
           <li>
             While some job parameters are straight-forward to set (e.g. 
-            <a href="ext:api/org/apache/hadoop/mapred/jobconf/setnumreducetasks">
-            setNumReduceTasks(int)</a>), other parameters interact subtly with 
-            the rest of the framework and/or job configuration and are 
-            more complex to set (e.g. 
-            <a href="ext:api/org/apache/hadoop/mapred/jobconf/setnummaptasks">
-            setNumMapTasks(int)</a>).
+            <code>setNumReduceTasks(int)</code>), other parameters interact
+            subtly with  the rest of the framework and/or job configuration
+            and are more complex to set (e.g. <code>mapreduce.job.maps</code>).
           </li>
         </ul>
  
-        <p><code>JobConf</code> is typically used to specify the 
+        <p>The <code>Job</code> is typically used to specify the 
         <code>Mapper</code>, combiner (if any), <code>Partitioner</code>, 
         <code>Reducer</code>, <code>InputFormat</code>, 
         <code>OutputFormat</code> and <code>OutputCommitter</code> 
-        implementations. <code>JobConf</code> also 
+        implementations. <code>Job</code> also 
         indicates the set of input files 
-        (<a href="ext:api/org/apache/hadoop/mapred/fileinputformat/setinputpaths">setInputPaths(JobConf, Path...)</a>
-        /<a href="ext:api/org/apache/hadoop/mapred/fileinputformat/addinputpath">addInputPath(JobConf, Path)</a>)
-        and (<a href="ext:api/org/apache/hadoop/mapred/fileinputformat/setinputpathstring">setInputPaths(JobConf, String)</a>
-        /<a href="ext:api/org/apache/hadoop/mapred/fileinputformat/addinputpathstring">addInputPaths(JobConf, String)</a>)
+        (<a href="ext:api/org/apache/hadoop/mapreduce/lib/input/fileinputformat/setinputpaths">setInputPaths(Job, Path...)</a>
+        /<a href="ext:api/org/apache/hadoop/mapreduce/lib/input/fileinputformat/addinputpath">addInputPath(Job, Path)</a>)
+        and (<a
+        href="ext:api/org/apache/hadoop/mapreduce/lib/input/fileinputformat/setinputpathstring">setInputPaths(Job, String)</a>
+        /<a
+        href="ext:api/org/apache/hadoop/mapreduce/lib/input/fileinputformat/addinputpathstring">addInputPaths(Job, String)</a>)
         and where the output files should be written
-        (<a href="ext:api/org/apache/hadoop/mapred/fileoutputformat/setoutputpath">setOutputPath(Path)</a>).</p>
+        (<a href="ext:api/org/apache/hadoop/mapreduce/lib/output/fileoutputformat/setoutputpath">setOutputPath(Path)</a>).</p>
 
-        <p>Optionally, <code>JobConf</code> is used to specify other advanced 
+        <p>Optionally, <code>Job</code> is used to specify other advanced 
         facets of the job such as the <code>Comparator</code> to be used, files 
         to be put in the <code>DistributedCache</code>, whether intermediate 
         and/or job outputs are to be compressed (and how), debugging via 
-        user-provided scripts
-        (<a href="ext:api/org/apache/hadoop/mapred/jobconf/setmapdebugscript">setMapDebugScript(String)</a>/<a href="ext:api/org/apache/hadoop/mapred/jobconf/setreducedebugscript">setReduceDebugScript(String)</a>) 
-        , whether job tasks can be executed in a <em>speculative</em> manner 
-        (<a href="ext:api/org/apache/hadoop/mapred/jobconf/setmapspeculativeexecution">setMapSpeculativeExecution(boolean)</a>)/(<a href="ext:api/org/apache/hadoop/mapred/jobconf/setreducespeculativeexecution">setReduceSpeculativeExecution(boolean)</a>)
+        user-provided scripts,
+        whether job tasks can be executed in a <em>speculative</em> manner 
+        (<a
+          href="ext:api/org/apache/hadoop/mapreduce/job/setmapspeculativeexecution"
+          >setMapSpeculativeExecution(boolean)</a>)/(<a
+          href="ext:api/org/apache/hadoop/mapreduce/job/setreducespeculativeexecution"
+          >setReduceSpeculativeExecution(boolean)</a>)
         , maximum number of attempts per task
-        (<a href="ext:api/org/apache/hadoop/mapred/jobconf/setmaxmapattempts">setMaxMapAttempts(int)</a>/<a href="ext:api/org/apache/hadoop/mapred/jobconf/setmaxreduceattempts">setMaxReduceAttempts(int)</a>) 
+        (<a
+          href="ext:api/org/apache/hadoop/mapreduce/job/setmaxmapattempts"
+          >setMaxMapAttempts(int)</a>/<a
+          href="ext:api/org/apache/hadoop/mapreduce/job/setmaxreduceattempts"
+          >setMaxReduceAttempts(int)</a>) 
         , percentage of tasks failure which can be tolerated by the job
-        (<a href="ext:api/org/apache/hadoop/mapred/jobconf/setmaxmaptaskfailurespercent">setMaxMapTaskFailuresPercent(int)</a>/<a href="ext:api/org/apache/hadoop/mapred/jobconf/setmaxreducetaskfailurespercent">setMaxReduceTaskFailuresPercent(int)</a>) 
-        etc.</p>
+        (Job.getConfiguration().setInt(Job.MAP_FAILURES_MAX_PERCENT,
+        int)/Job.getConfiguration().setInt(Job.REDUCE_FAILURES_MAX_PERCENT,
+        int)), etc.</p>
         
-        <p>Of course, users can use 
-        <a href="ext:api/org/apache/hadoop/conf/configuration/set">set(String, String)</a>/<a href="ext:api/org/apache/hadoop/conf/configuration/get">get(String, String)</a>
+        <p>Of course, users can use <code>Job.getConfiguration()</code> to get
+        access to the underlying configuration state, and can then use
+        <a href="ext:api/org/apache/hadoop/conf/configuration/set">set(String,
+          String)</a>/<a href="ext:api/org/apache/hadoop/conf/configuration/get"
+          >get(String, String)</a>
         to set/get arbitrary parameters needed by applications. However, use the 
         <code>DistributedCache</code> for large amounts of (read-only) data.</p>
       </section>
@@ -1244,7 +1157,7 @@
         <p>The child-task inherits the environment of the parent 
         <code>TaskTracker</code>. The user can specify additional options to the
         child-jvm via the <code>mapred.{map|reduce}.child.java.opts</code> 
-        configuration parameter in the <code>JobConf</code> such as non-standard 
+        configuration parameter in the job configuration such as non-standard 
          paths for the run-time linker to search shared libraries via 
         <code>-Djava.library.path=&lt;&gt;</code> etc. If the 
         <code>mapred.{map|reduce}.child.java.opts</code> parameters contains the 
@@ -1295,7 +1208,7 @@
         that the value set here is a per process limit.
         The value for <code>mapred.{map|reduce}.child.ulimit</code> should be 
         specified in kilo bytes (KB). And also the value must be greater than
-        or equal to the -Xmx passed to JavaVM, else the VM might not start. 
+        or equal to the -Xmx passed to JavaVM, or else the VM might not start. 
         </p>
         
         <p>Note: <code>mapred.{map|reduce}.child.java.opts</code> are used only 
@@ -1366,7 +1279,7 @@
           <ul>
             <li>If the spill threshold is exceeded while a spill is in
             progress, collection will continue until the spill is finished. For
-            example, if <code>io.sort.buffer.spill.percent</code> is set to
+            example, if <code>mapreduce.map.sort.spill.percent</code> is set to
             0.33, and the remainder of the buffer is filled while the spill
             runs, the next spill will include all the collected records, or
             0.66 of the buffer, and will not generate additional spills. In
@@ -1481,9 +1394,7 @@
         : The job-specific shared directory. The tasks can use this space as 
         scratch space and share files among them. This directory is exposed
         to the users through the configuration property  
-        <code>mapreduce.job.local.dir</code>. The directory can accessed through 
-        api <a href="ext:api/org/apache/hadoop/mapred/jobconf/getjoblocaldir">
-        JobConf.getJobLocalDir()</a>. It is available as System property also.
+        <code>mapreduce.job.local.dir</code>. It is available as System property also.
         So, users (streaming etc.) can call 
         <code>System.getProperty("mapreduce.job.local.dir")</code> to access the 
         directory.</li>
@@ -1495,9 +1406,9 @@
         This directory is extracted from <code>job.jar</code> and its contents are
         automatically added to the classpath for each task.
         The job.jar location is accessible to the application through the api
-        <a href="ext:api/org/apache/hadoop/mapred/jobconf/getjar"> 
-        JobConf.getJar() </a>. To access the unjarred directory,
-        JobConf.getJar().getParent() can be called.</li>
+        <a href="ext:api/org/apache/hadoop/mapreduce/task/jobcontextimpl/getjar"> 
+        Job.getJar() </a>. To access the unjarred directory,
+        Job.getJar().getParent() can be called.</li>
         <li><code>${mapreduce.cluster.local.dir}/taskTracker/jobcache/$jobid/job.xml</code>
         : The job.xml file, the generic job configuration, localized for 
         the job. </li>
@@ -1546,8 +1457,7 @@
         (i.e. 1 task per JVM). If it is -1, there is no limit to the number
         of tasks a JVM can run (of the same job). One can also specify some
         value greater than 1 using the api 
-        <a href="ext:api/org/apache/hadoop/mapred/jobconf/setnumtaskstoexecuteperjvm">
-        JobConf.setNumTasksToExecutePerJvm(int)</a></p>
+        <code>Job.getConfiguration().setInt(Job.JVM_NUM_TASKS_TO_RUN, int)</code>.</p>
         </section>
 
         <section>
@@ -1616,11 +1526,11 @@
       <section>
         <title>Job Submission and Monitoring</title>
         
-        <p><a href="ext:api/org/apache/hadoop/mapred/jobclient">
-        JobClient</a> is the primary interface by which user-job interacts
+        <p>The <code>Job</code>
+        is the primary interface by which user-job interacts
         with the <code>JobTracker</code>.</p>
  
-        <p><code>JobClient</code> provides facilities to submit jobs, track their 
+        <p><code>Job</code> provides facilities to submit jobs, track their 
         progress, access component-tasks' reports and logs, get the MapReduce 
         cluster's status information and so on.</p>
  
@@ -1657,8 +1567,8 @@
         to filter log files from the output directory listing. </p>
         
         <p>Normally the user creates the application, describes various facets 
-        of the job via <code>JobConf</code>, and then uses the 
-        <code>JobClient</code> to submit the job and monitor its progress.</p>
+        of the job via <code>Job</code>, and then uses the 
+        <code>waitForCompletion()</code> method to submit the job and monitor its progress.</p>
 
         <section>
           <title>Job Control</title>
@@ -1673,22 +1583,20 @@
           complete (success/failure) lies squarely on the clients. In such 
           cases, the various job-control options are:</p>
           <ul>
-            <li>
-              <a href="ext:api/org/apache/hadoop/mapred/jobclient/runjob">
-              runJob(JobConf)</a> : Submits the job and returns only after the 
+            <li><a
+            href="ext:api/org/apache/hadoop/mapreduce/job/waitforcompletion"><code>Job.waitForCompletion()</code></a> :
+              Submits the job and returns only after the 
               job has completed.
             </li>
             <li>
-              <a href="ext:api/org/apache/hadoop/mapred/jobclient/submitjob">
-              submitJob(JobConf)</a> : Only submits the job, then poll the 
-              returned handle to the 
-              <a href="ext:api/org/apache/hadoop/mapred/runningjob">
-              RunningJob</a> to query status and make scheduling decisions.
+              <a href="ext:api/org/apache/hadoop/mapreduce/job/submit"><code>Job.submit()</code></a> : Only submits the job;, then poll the
+              other methods of <code>Job</code> such as <code>isComplete()</code>,
+              <code>isSuccessful()</code>, etc.
+              to query status and make scheduling decisions.
             </li>
             <li>
-              <a href="ext:api/org/apache/hadoop/mapred/jobconf/setjobendnotificationuri">
-              JobConf.setJobEndNotificationURI(String)</a> : Sets up a 
-              notification upon job-completion, thus avoiding polling.
+              <code>Job.getConfiguration().set(Job.END_NOTIFICATION_URL, String)</code>
+              : Sets up a notification upon job-completion, thus avoiding polling.
             </li>
           </ul>
         </section>
@@ -1697,7 +1605,7 @@
       <section>
         <title>Job Input</title>
         
-        <p><a href="ext:api/org/apache/hadoop/mapred/inputformat">
+        <p><a href="ext:api/org/apache/hadoop/mapreduce/inputformat">
         InputFormat</a> describes the input-specification for a MapReduce job.
         </p> 
  
@@ -1719,7 +1627,7 @@
  
         <p>The default behavior of file-based <code>InputFormat</code>
         implementations, typically sub-classes of 
-        <a href="ext:api/org/apache/hadoop/mapred/fileinputformat">
+        <a href="ext:api/org/apache/hadoop/mapreduce/lib/input/fileinputformat">
         FileInputFormat</a>, is to split the input into <em>logical</em> 
         <code>InputSplit</code> instances based on the total size, in bytes, of 
         the input files. However, the <code>FileSystem</code> blocksize of the 
@@ -1733,7 +1641,7 @@
         record-oriented view of the logical <code>InputSplit</code> to the 
         individual task.</p>
 
-        <p><a href="ext:api/org/apache/hadoop/mapred/textinputformat">
+        <p><a href="ext:api/org/apache/hadoop/mapreduce/lib/input/textinputformat">
         TextInputFormat</a> is the default <code>InputFormat</code>.</p>
         
         <p>If <code>TextInputFormat</code> is the <code>InputFormat</code> for a 
@@ -1746,7 +1654,7 @@
         <section>
           <title>InputSplit</title>
           
-          <p><a href="ext:api/org/apache/hadoop/mapred/inputsplit">
+          <p><a href="ext:api/org/apache/hadoop/mapreduce/inputsplit">
           InputSplit</a> represents the data to be processed by an individual 
           <code>Mapper</code>.</p>
 
@@ -1754,7 +1662,7 @@
           the input, and it is the responsibility of <code>RecordReader</code>
           to process and present a record-oriented view.</p>
           
-          <p><a href="ext:api/org/apache/hadoop/mapred/filesplit">
+          <p><a href="ext:api/org/apache/hadoop/mapreduce/lib/input/filesplit">
           FileSplit</a> is the default <code>InputSplit</code>. It sets 
           <code>mapreduce.map.input.file</code> to the path of the input file for the
           logical split.</p>
@@ -1763,7 +1671,7 @@
         <section>
           <title>RecordReader</title>
           
-          <p><a href="ext:api/org/apache/hadoop/mapred/recordreader">
+          <p><a href="ext:api/org/apache/hadoop/mapreduce/recordreader">
           RecordReader</a> reads <code>&lt;key, value&gt;</code> pairs from an 
           <code>InputSplit</code>.</p>
 
@@ -1779,7 +1687,7 @@
       <section>
         <title>Job Output</title>
         
-        <p><a href="ext:api/org/apache/hadoop/mapred/outputformat">
+        <p><a href="ext:api/org/apache/hadoop/mapreduce/outputformat">
         OutputFormat</a> describes the output-specification for a MapReduce 
         job.</p>
 
@@ -1803,7 +1711,7 @@
         <section>
         <title>Lazy Output Creation</title>
         <p>It is possible to delay creation of output until the first write attempt 
-           by using <a href="ext:api/org/apache/hadoop/mapred/lib/lazyoutputformat">
+           by using <a href="ext:api/org/apache/hadoop/mapreduce/lib/output/lazyoutputformat">
            LazyOutputFormat</a>. This is particularly useful in preventing the 
            creation of zero byte files when there is no call to output.collect 
            (or Context.write). This is achieved by calling the static method 
@@ -1813,8 +1721,8 @@
         </p>
 
         <p>
-        <code> import org.apache.hadoop.mapred.lib.LazyOutputFormat;</code> <br/>
-        <code> LazyOutputFormat.setOutputFormatClass(conf, TextOutputFormat.class);</code>
+        <code>import org.apache.hadoop.mapreduce.lib.output.LazyOutputFormat;</code> <br/>
+        <code>LazyOutputFormat.setOutputFormatClass(job, TextOutputFormat.class);</code>
         </p>
          
         </section>
@@ -1822,7 +1730,7 @@
         <section>
         <title>OutputCommitter</title>
         
-        <p><a href="ext:api/org/apache/hadoop/mapred/outputcommitter">
+        <p><a href="ext:api/org/apache/hadoop/mapreduce/outputcommitter">
         OutputCommitter</a> describes the commit of task output for a 
         MapReduce job.</p>
 
@@ -1863,7 +1771,10 @@
             will be launched with same attempt-id to do the cleanup.
           </li>
         </ol>
-        <p><code>FileOutputCommitter</code> is the default 
+        <p><a
+        href="ext:api/org/apache/hadoop/mapreduce/lib/output/fileoutputcommitter"
+        ><code>FileOutputCommitter</code></a>
+        is the default 
         <code>OutputCommitter</code>. Job setup/cleanup tasks occupy 
         map or reduce slots, whichever is free on the TaskTracker. And
         JobCleanup task, TaskCleanup tasks and JobSetup task have the highest
@@ -1887,20 +1798,22 @@
           <p>To avoid these issues the MapReduce framework, when the 
           <code>OutputCommitter</code> is <code>FileOutputCommitter</code>, 
           maintains a special 
-          <code>${mapreduce.output.fileoutputformat.outputdir}/_temporary/_${taskid}</code> sub-directory
+          <code>${mapreduce.output.fileoutputformat.outputdir}/_temporary/_${taskid}</code>
+          sub-directory
           accessible via <code>${mapreduce.task.output.dir}</code>
           for each task-attempt on the <code>FileSystem</code> where the output
           of the task-attempt is stored. On successful completion of the 
           task-attempt, the files in the 
-          <code>${mapreduce.output.fileoutputformat.outputdir}/_temporary/_${taskid}</code> (only) 
-          are <em>promoted</em> to <code>${mapreduce.output.fileoutputformat.outputdir}</code>. Of course, 
+          <code>${mapreduce.output.fileoutputformat.outputdir}/_temporary/_${taskid}</code>
+          (only) are <em>promoted</em> to
+          <code>${mapreduce.output.fileoutputformat.outputdir}</code>. Of course, 
           the framework discards the sub-directory of unsuccessful task-attempts. 
           This process is completely transparent to the application.</p>
  
           <p>The application-writer can take advantage of this feature by 
           creating any side-files required in <code>${mapreduce.task.output.dir}</code>
           during execution of a task via 
-          <a href="ext:api/org/apache/hadoop/mapred/fileoutputformat/getworkoutputpath">
+          <a href="ext:api/org/apache/hadoop/mapreduce/lib/output/fileoutputformat/getworkoutputpath">
           FileOutputFormat.getWorkOutputPath()</a>, and the framework will promote them 
           similarly for succesful task-attempts, thus eliminating the need to 
           pick unique paths per task-attempt.</p>
@@ -1910,7 +1823,7 @@
           <code>${mapreduce.output.fileoutputformat.outputdir}/_temporary/_{$taskid}</code>, and this value is 
           set by the MapReduce framework. So, just create any side-files in the 
           path  returned by
-          <a href="ext:api/org/apache/hadoop/mapred/fileoutputformat/getworkoutputpath">
+          <a href="ext:api/org/apache/hadoop/mapreduce/lib/output/fileoutputformat/getworkoutputpath">
           FileOutputFormat.getWorkOutputPath() </a>from MapReduce 
           task to take advantage of this feature.</p>
           
@@ -1922,7 +1835,7 @@
         <section>
           <title>RecordWriter</title>
           
-          <p><a href="ext:api/org/apache/hadoop/mapred/recordwriter">
+          <p><a href="ext:api/org/apache/hadoop/mapreduce/recordwriter">
           RecordWriter</a> writes the output <code>&lt;key, value&gt;</code> 
           pairs to an output file.</p>
 
@@ -1950,30 +1863,32 @@
           support multiple queues.</p>
           
           <p>A job defines the queue it needs to be submitted to through the
-          <code>mapreduce.job.queuename</code> property, or through the
-          <a href="ext:api/org/apache/hadoop/mapred/jobconf/setqueuename">setQueueName(String)</a>
-          API. Setting the queue name is optional. If a job is submitted 
+          <code>mapreduce.job.queuename</code> property.
+          Setting the queue name is optional. If a job is submitted 
           without an associated queue name, it is submitted to the 'default' 
           queue.</p> 
         </section>
         <section>
           <title>Counters</title>
           
-          <p><code>Counters</code> represent global counters, defined either by 
-          the MapReduce framework or applications. Each <code>Counter</code> can 
+          <p><a href="ext:api/org/apache/hadoop/mapreduce/counters"
+          ><code>Counters</code></a> represent global counters, defined either by 
+          the MapReduce framework or applications. Each <a
+            href="ext:api/org/apache/hadoop/mapreduce/counter"
+            ><code>Counter</code></a> can 
           be of any <code>Enum</code> type. Counters of a particular 
           <code>Enum</code> are bunched into groups of type 
           <code>Counters.Group</code>.</p>
           
           <p>Applications can define arbitrary <code>Counters</code> (of type 
-          <code>Enum</code>) and update them via 
-          <a href="ext:api/org/apache/hadoop/mapred/reporter/incrcounterEnum">
-          Reporter.incrCounter(Enum, long)</a> or 
-          <a href="ext:api/org/apache/hadoop/mapred/reporter/incrcounterString">
-          Reporter.incrCounter(String, String, long)</a>
-          in the <code>map</code> and/or 
-          <code>reduce</code> methods. These counters are then globally 
-          aggregated by the framework.</p>
+          <code>Enum</code>); get a <code>Counter</code> object from the task's
+          Context with the <a
+            href="ext:api/org/apache/hadoop/mapreduce/taskinputoutputcontext/getcounter"
+            ><code>getCounter()</code></a> method, and then call
+          the <a
+            href="ext:api/org/apache/hadoop/mapreduce/counter/increment"
+            ><code>Counter.increment(long)</code></a> method to increment its
+          value locally. These counters are then globally aggregated by the framework.</p>
         </section>       
         
         <section>
@@ -1988,7 +1903,7 @@
           needed by applications.</p>
  
           <p>Applications specify the files to be cached via urls (hdfs://)
-          in the <code>JobConf</code>. The <code>DistributedCache</code> 
+          in the <code>Job</code>. The <code>DistributedCache</code> 
           assumes that the files specified via hdfs:// urls are already present 
           on the <code>FileSystem</code>.</p>
 
@@ -2082,21 +1997,21 @@
               or {@link org.apache.hadoop.mapreduce.Reducer}:</code><br/>
       
               <code>public static class MapClass extends Mapper&lt;K, V, K, V&gt; {</code><br/>
-                <code>private Path[] localArchives;</code><br/>
-                <code>private Path[] localFiles;</code><br/>
-                <code>public void setup(Context context) {</code><br/>
-                 <code>// Get the cached archives/files</code><br/>
-                 <code>localArchives = context.getLocalCacheArchives();</code><br/>
-                 <code>localFiles = context.getLocalCacheFiles();</code><br/>
-              <code>}</code><br/>
+                <code>&nbsp;&nbsp;private Path[] localArchives;</code><br/>
+                <code>&nbsp;&nbsp;private Path[] localFiles;</code><br/>
+                <code>&nbsp;&nbsp;public void setup(Context context) {</code><br/>
+                 <code>&nbsp;&nbsp;&nbsp;&nbsp;// Get the cached archives/files</code><br/>
+                 <code>&nbsp;&nbsp;&nbsp;&nbsp;localArchives = context.getLocalCacheArchives();</code><br/>
+                 <code>&nbsp;&nbsp;&nbsp;&nbsp;localFiles = context.getLocalCacheFiles();</code><br/>
+              <code>&nbsp;&nbsp;}</code><br/>
         
-              <code>public void map(K key, V value, 
+              <code>&nbsp;&nbsp;public void map(K key, V value, 
                   Context context) throws IOException {</code><br/>
-                <code>// Use data from the cached archives/files here</code><br/>
-                <code>// ...</code><br/>
-                <code>// ...</code><br/>
-                <code>context.write(k, v);</code><br/>
-              <code>}</code><br/>
+                <code>&nbsp;&nbsp;&nbsp;&nbsp;// Use data from the cached archives/files here</code><br/>
+                <code>&nbsp;&nbsp;&nbsp;&nbsp;// ...</code><br/>
+                <code>&nbsp;&nbsp;&nbsp;&nbsp;// ...</code><br/>
+                <code>&nbsp;&nbsp;&nbsp;&nbsp;context.write(k, v);</code><br/>
+              <code>&nbsp;&nbsp;}</code><br/>
             <code>}</code></p>
           
         </section>
@@ -2170,8 +2085,8 @@
           information for some of the tasks in the job by setting the
           configuration property <code>mapreduce.task.profile</code>. The
           value can be set using the api 
-          <a href="ext:api/org/apache/hadoop/mapred/jobconf/setprofileenabled">
-          JobConf.setProfileEnabled(boolean)</a>. If the value is set 
+          <a href="ext:api/org/apache/hadoop/mapreduce/job/setprofileenabled">
+          Job.setProfileEnabled(boolean)</a>. If the value is set 
           <code>true</code>, the task profiling is enabled. The profiler
           information is stored in the user log directory. By default, 
           profiling is not enabled for the job.  </p>
@@ -2180,16 +2095,16 @@
           the configuration property 
           <code>mapreduce.task.profile.{maps|reduces}</code> to set the ranges
           of MapReduce tasks to profile. The value can be set using the api 
-          <a href="ext:api/org/apache/hadoop/mapred/jobconf/setprofiletaskrange">
-          JobConf.setProfileTaskRange(boolean,String)</a>.
+          <a href="ext:api/org/apache/hadoop/mapreduce/job/setprofiletaskrange">
+          Job.setProfileTaskRange(boolean,String)</a>.
           By default, the specified range is <code>0-2</code>.</p>
           
           <p>User can also specify the profiler configuration arguments by 
           setting the configuration property 
           <code>mapreduce.task.profile.params</code>. The value can be specified 
           using the api
-          <a href="ext:api/org/apache/hadoop/mapred/jobconf/setprofileparams">
-          JobConf.setProfileParams(String)</a>. If the string contains a 
+          <a href="ext:api/org/apache/hadoop/mapreduce/job/setprofileparams">
+          Job.setProfileParams(String)</a>. If the string contains a 
           <code>%s</code>, it will be replaced with the name of the profiling
           output file when the task runs. These parameters are passed to the
           task child JVM on the command line. The default value for 
@@ -2224,10 +2139,9 @@
           properties <code>mapreduce.map.debug.script</code> and 
           <code>mapreduce.reduce.debug.script</code>, for debugging map and 
           reduce tasks respectively. These properties can also be set by using APIs 
-          <a href="ext:api/org/apache/hadoop/mapred/jobconf/setmapdebugscript">
-          JobConf.setMapDebugScript(String) </a> and
-          <a href="ext:api/org/apache/hadoop/mapred/jobconf/setreducedebugscript">
-          JobConf.setReduceDebugScript(String) </a>. In streaming mode, a debug 
+          <code>Job.getConfiguration().set(Job.MAP_DEBUG_SCRIPT, String)</code>
+          and <code>Job.getConfiguration().set(Job.REDUCE_DEBUG_SCRIPT,
+          String)</code>. In streaming mode, a debug 
           script can be submitted with the command-line options 
           <code>-mapdebug</code> and <code>-reducedebug</code>, for debugging 
           map and reduce tasks respectively.</p>
@@ -2280,32 +2194,30 @@
             <title>Intermediate Outputs</title>
             
             <p>Applications can control compression of intermediate map-outputs
-            via the 
-            <a href="ext:api/org/apache/hadoop/mapred/jobconf/setcompressmapoutput">
-            JobConf.setCompressMapOutput(boolean)</a> api and the 
-            <code>CompressionCodec</code> to be used via the
-            <a href="ext:api/org/apache/hadoop/mapred/jobconf/setmapoutputcompressorclass">
-            JobConf.setMapOutputCompressorClass(Class)</a> api.</p>
+            via the <code>Job.getConfiguration().setBoolean(Job.MAP_OUTPUT_COMPRESS, bool)</code>
+            api and the <code>CompressionCodec</code> to be used via the
+            <code>Job.getConfiguration().setClass(Job.MAP_OUTPUT_COMPRESS_CODEC, Class,
+            CompressionCodec.class)</code> api.</p>
           </section>
           
           <section>
             <title>Job Outputs</title>
             
             <p>Applications can control compression of job-outputs via the
-            <a href="ext:api/org/apache/hadoop/mapred/fileoutputformat/setcompressoutput">
-            FileOutputFormat.setCompressOutput(JobConf, boolean)</a> api and the 
+            <a href="ext:api/org/apache/hadoop/mapreduce/lib/output/fileoutputformat/setcompressoutput">
+            FileOutputFormat.setCompressOutput(Job, boolean)</a> api and the 
             <code>CompressionCodec</code> to be used can be specified via the
-            <a href="ext:api/org/apache/hadoop/mapred/fileoutputformat/setoutputcompressorclass">
-            FileOutputFormat.setOutputCompressorClass(JobConf, Class)</a> api.</p>
+            <a href="ext:api/org/apache/hadoop/mapreduce/lib/output//fileoutputformat/setoutputcompressorclass">
+            FileOutputFormat.setOutputCompressorClass(Job, Class)</a> api.</p>
             
             <p>If the job outputs are to be stored in the 
-            <a href="ext:api/org/apache/hadoop/mapred/sequencefileoutputformat">
+            <a href="ext:api/org/apache/hadoop/mapreduce/lib/output/sequencefileoutputformat">
             SequenceFileOutputFormat</a>, the required
             <code>SequenceFile.CompressionType</code> (i.e. <code>RECORD</code> / 
             <code>BLOCK</code> - defaults to <code>RECORD</code>) can be 
             specified via the 
-            <a href="ext:api/org/apache/hadoop/mapred/sequencefileoutputformat/setoutputcompressiontype">
-            SequenceFileOutputFormat.setOutputCompressionType(JobConf, 
+            <a href="ext:api/org/apache/hadoop/mapreduce/lib/output//sequencefileoutputformat/setoutputcompressiontype">
+            SequenceFileOutputFormat.setOutputCompressionType(Job, 
             SequenceFile.CompressionType)</a> api.</p>
           </section>
         </section>
@@ -2370,16 +2282,16 @@
           bad records. A task will be re-executed till the
           acceptable skipped value is met or all task attempts are exhausted.
           To increase the number of task attempts, use
-          <a href="ext:api/org/apache/hadoop/mapred/jobconf/setmaxmapattempts">
-          JobConf.setMaxMapAttempts(int)</a> and 
-          <a href="ext:api/org/apache/hadoop/mapred/jobconf/setmaxreduceattempts">
-          JobConf.setMaxReduceAttempts(int)</a>.
+          <a href="ext:api/org/apache/hadoop/mapreduce/job/setmaxmapattempts">
+          Job.setMaxMapAttempts(int)</a> and 
+          <a href="ext:api/org/apache/hadoop/mapreduce/job/setmaxreduceattempts">
+          Job.setMaxReduceAttempts(int)</a>.
           </p>
           
           <p>Skipped records are written to HDFS in the sequence file 
           format, for later analysis. The location can be changed through 
           <a href="ext:api/org/apache/hadoop/mapred/skipbadrecords/setskipoutputpath">
-          SkipBadRecords.setSkipOutputPath(JobConf, Path)</a>.
+          SkipBadRecords.setSkipOutputPath(conf, Path)</a>.
           </p> 
 
         </section>
@@ -2405,837 +2317,284 @@
         <table>
           <tr>
             <th></th>
-            <th>WordCount.java</th>
-          </tr>
-          <tr>
-            <td>1.</td>
-            <td>
-              <code>package org.myorg;</code>
-            </td>
-          </tr>
-          <tr>
-            <td>2.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>3.</td>
-            <td>
-              <code>import java.io.*;</code>
-            </td>
-          </tr>
-          <tr>
-            <td>4.</td>
-            <td>
-              <code>import java.util.*;</code>
-            </td>
-          </tr>
-          <tr>
-            <td>5.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>6.</td>
-            <td>
-              <code>import org.apache.hadoop.fs.Path;</code>
-            </td>
-          </tr>
-          <tr>
-            <td>7.</td>
-            <td>
-              <code>import org.apache.hadoop.filecache.DistributedCache;</code>
-            </td>
-          </tr>
-          <tr>
-            <td>8.</td>
-            <td>
-              <code>import org.apache.hadoop.conf.*;</code>
-            </td>
-          </tr>
-          <tr>
-            <td>9.</td>
-            <td>
-              <code>import org.apache.hadoop.io.*;</code>
-            </td>
-          </tr>
-          <tr>
-            <td>10.</td>
-            <td>
-              <code>import org.apache.hadoop.mapred.*;</code>
-            </td>
-          </tr>
-          <tr>
-            <td>11.</td>
-            <td>
-              <code>import org.apache.hadoop.util.*;</code>
-            </td>
-          </tr>
-          <tr>
-            <td>12.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>13.</td>
-            <td>
-              <code>public class WordCount extends Configured implements Tool {</code>
-            </td>
-          </tr>
-          <tr>
-            <td>14.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>15.</td>
-            <td>
-              &nbsp;&nbsp;
-              <code>
-                public static class Map extends MapReduceBase 
-                implements Mapper&lt;LongWritable, Text, Text, IntWritable&gt; {
-              </code>
-            </td>
-          </tr>
-          <tr>
-            <td>16.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>17.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>
-                static enum Counters { INPUT_WORDS }
-              </code>
-            </td>
-          </tr>
-          <tr>
-            <td>18.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>19.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>
-                private final static IntWritable one = new IntWritable(1);
-              </code>
-            </td>
-          </tr>
-          <tr>
-            <td>20.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>private Text word = new Text();</code>
-            </td>
-          </tr>
-          <tr>
-            <td>21.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>22.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>private boolean caseSensitive = true;</code>
-            </td>
-          </tr>
-          <tr>
-            <td>23.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>private Set&lt;String&gt; patternsToSkip = new HashSet&lt;String&gt;();</code>
-            </td>
-          </tr>
-          <tr>
-            <td>24.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>25.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>private long numRecords = 0;</code>
-            </td>
-          </tr>
-          <tr>
-            <td>26.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>private String inputFile;</code>
-            </td>
-          </tr>
-          <tr>
-            <td>27.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>28.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>public void configure(JobConf job) {</code>
-            </td>
-          </tr>
-          <tr>
-            <td>29.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>
-                caseSensitive = job.getBoolean("wordcount.case.sensitive", true);
-              </code>
-            </td>
-          </tr>
-          <tr>
-            <td>30.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>inputFile = job.get("mapreduce.map.input.file");</code>
-            </td>
-          </tr>
-          <tr>
-            <td>31.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>32.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>if (job.getBoolean("wordcount.skip.patterns", false)) {</code>
-            </td>
-          </tr>
-          <tr>
-            <td>33.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>Path[] patternsFiles = new Path[0];</code>
-            </td>
-          </tr>
-          <tr>
-            <td>34.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>try {</code>
-            </td>
-          </tr>
-          <tr>
-            <td>35.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>
-                patternsFiles = DistributedCache.getLocalCacheFiles(job);
-              </code>
-            </td>
-          </tr>
-          <tr>
-            <td>36.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>} catch (IOException ioe) {</code>
-            </td>
-          </tr>
-          <tr>
-            <td>37.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>
-                System.err.println("Caught exception while getting cached files: " 
-                + StringUtils.stringifyException(ioe));
-              </code>
-            </td>
-          </tr>
-          <tr>
-            <td>38.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>}</code>
-            </td>
-          </tr>
-          <tr>
-            <td>39.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>for (Path patternsFile : patternsFiles) {</code>
-            </td>
-          </tr>
-          <tr>
-            <td>40.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>parseSkipFile(patternsFile);</code>
-            </td>
-          </tr>
-          <tr>
-            <td>41.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>}</code>
-            </td>
-          </tr>
-          <tr>
-            <td>42.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>}</code>
-            </td>
-          </tr>
-          <tr>
-            <td>43.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>}</code>
-            </td>
-          </tr>
-          <tr>
-            <td>44.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>45.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>private void parseSkipFile(Path patternsFile) {</code>
-            </td>
-          </tr>
-          <tr>
-            <td>46.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>try {</code>
-            </td>
-          </tr>
-          <tr>
-            <td>47.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>
-                BufferedReader fis = 
-                  new BufferedReader(new FileReader(patternsFile.toString()));
-              </code>
-            </td>
-          </tr>
-          <tr>
-            <td>48.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>String pattern = null;</code>
-            </td>
-          </tr>
-          <tr>
-            <td>49.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>while ((pattern = fis.readLine()) != null) {</code>
-            </td>
-          </tr>
-          <tr>
-            <td>50.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>patternsToSkip.add(pattern);</code>
-            </td>
-          </tr>
-          <tr>
-            <td>51.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>}</code>
-            </td>
-          </tr>
-          <tr>
-            <td>52.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>} catch (IOException ioe) {</code>
-            </td>
-          </tr>
-          <tr>
-            <td>53.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>
-                System.err.println("Caught exception while parsing the cached file '" +
-                                   patternsFile + "' : " + 
-                                   StringUtils.stringifyException(ioe));
-                
-              </code>
-            </td>
-          </tr>
-          <tr>
-            <td>54.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>}</code>
-            </td>
-          </tr>
-          <tr>
-            <td>55.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>}</code>
-            </td>
-          </tr>
-          <tr>
-            <td>56.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>57.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>
-                public void map(LongWritable key, Text value, 
-                OutputCollector&lt;Text, IntWritable&gt; output, 
-                Reporter reporter) throws IOException {
-              </code>
-            </td>
-          </tr>
-          <tr>
-            <td>58.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>
-                String line = 
-                  (caseSensitive) ? value.toString() : 
-                                    value.toString().toLowerCase();
-              </code>
-            </td>
-          </tr>
-          <tr>
-            <td>59.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>60.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>for (String pattern : patternsToSkip) {</code>
-            </td>
-          </tr>
-          <tr>
-            <td>61.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>line = line.replaceAll(pattern, "");</code>
-            </td>
-          </tr>
-          <tr>
-            <td>62.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>}</code>
-            </td>
-          </tr>
-          <tr>
-            <td>63.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>64.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>StringTokenizer tokenizer = new StringTokenizer(line);</code>
-            </td>
-          </tr>
-          <tr>
-            <td>65.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>while (tokenizer.hasMoreTokens()) {</code>
-            </td>
-          </tr>
-          <tr>
-            <td>66.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>word.set(tokenizer.nextToken());</code>
-            </td>
-          </tr>
-          <tr>
-            <td>67.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>output.collect(word, one);</code>
-            </td>
-          </tr>
-          <tr>
-            <td>68.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>reporter.incrCounter(Counters.INPUT_WORDS, 1);</code>
-            </td>
-          </tr>
-          <tr>
-            <td>69.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>}</code>
-            </td>
-          </tr>
-          <tr>
-            <td>70.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>71.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>if ((++numRecords % 100) == 0) {</code>
-            </td>
-          </tr>
-          <tr>
-            <td>72.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>
-                reporter.setStatus("Finished processing " + numRecords + 
-                                   " records " + "from the input file: " + 
-                                   inputFile);
-              </code>
-            </td>
-          </tr>
-          <tr>
-            <td>73.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>}</code>
-            </td>
-          </tr>
-          <tr>
-            <td>74.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>}</code>
-            </td>
-          </tr>
-          <tr>
-            <td>75.</td>
-            <td>
-              &nbsp;&nbsp;
-              <code>}</code>
-            </td>
-          </tr>
-          <tr>
-            <td>76.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>77.</td>
-            <td>
-              &nbsp;&nbsp;
-              <code>
-                public static class Reduce extends MapReduceBase implements 
-                Reducer&lt;Text, IntWritable, Text, IntWritable&gt; {
-              </code>
-            </td>
-          </tr>
-          <tr>
-            <td>78.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>
-                public void reduce(Text key, Iterator&lt;IntWritable&gt; values,
-                OutputCollector&lt;Text, IntWritable&gt; output, 
-                Reporter reporter) throws IOException {
-              </code>
-            </td>
-          </tr>
-          <tr>
-            <td>79.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>int sum = 0;</code>
-            </td>
-          </tr>
-          <tr>
-            <td>80.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>while (values.hasNext()) {</code>
-            </td>
-          </tr>
-          <tr>
-            <td>81.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>sum += values.next().get();</code>
-            </td>
-          </tr>
-          <tr>
-            <td>82.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>}</code>
-            </td>
-          </tr>
-          <tr>
-            <td>83.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>output.collect(key, new IntWritable(sum));</code>
-            </td>
-          </tr>
-          <tr>
-            <td>84.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>}</code>
-            </td>
-          </tr>
-          <tr>
-            <td>85.</td>
-            <td>
-              &nbsp;&nbsp;
-              <code>}</code>
-            </td>
-          </tr>
-          <tr>
-            <td>86.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>87.</td>
-            <td>
-              &nbsp;&nbsp;
-              <code>public int run(String[] args) throws Exception {</code>
-            </td>
-          </tr>
-          <tr>
-            <td>88.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>
-                JobConf conf = new JobConf(getConf(), WordCount.class);
-              </code>
-            </td>
-          </tr>
-          <tr>
-            <td>89.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>conf.setJobName("wordcount");</code>
-            </td>
-          </tr>
-          <tr>
-            <td>90.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>91.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>conf.setOutputKeyClass(Text.class);</code>
-            </td>
-          </tr>
-          <tr>
-            <td>92.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>conf.setOutputValueClass(IntWritable.class);</code>
-            </td>
-          </tr>
-          <tr>
-            <td>93.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>94.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>conf.setMapperClass(Map.class);</code>
-            </td>
-          </tr>
-          <tr>
-            <td>95.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>conf.setCombinerClass(Reduce.class);</code>
-            </td>
-          </tr>
-          <tr>
-            <td>96.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>conf.setReducerClass(Reduce.class);</code>
-            </td>
-          </tr>
-          <tr>
-            <td>97.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>98.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>conf.setInputFormat(TextInputFormat.class);</code>
-            </td>
-          </tr>
-          <tr>
-            <td>99.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>conf.setOutputFormat(TextOutputFormat.class);</code>
-            </td>
-          </tr>
-          <tr>
-            <td>100.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>101.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>
-                List&lt;String&gt; other_args = new ArrayList&lt;String&gt;();
-              </code>
-            </td>
-          </tr>
-          <tr>
-            <td>102.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>for (int i=0; i &lt; args.length; ++i) {</code>
-            </td>
-          </tr>
-          <tr>
-            <td>103.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>if ("-skip".equals(args[i])) {</code>
-            </td>
-          </tr>
-          <tr>
-            <td>104.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>
-                DistributedCache.addCacheFile(new Path(args[++i]).toUri(), conf);
-              </code>
-            </td>
-          </tr>
-          <tr>
-            <td>105.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>
-                conf.setBoolean("wordcount.skip.patterns", true);
-              </code>
-            </td>
-          </tr>
-          <tr>
-            <td>106.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>} else {</code>
-            </td>
-          </tr>
-          <tr>
-            <td>107.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>other_args.add(args[i]);</code>
-            </td>
-          </tr>
-          <tr>
-            <td>108.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <code>}</code>
-            </td>
-          </tr>
-          <tr>
-            <td>109.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>}</code>
-            </td>
-          </tr>
-          <tr>
-            <td>110.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>111.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>FileInputFormat.setInputPaths(conf, new Path(other_args.get(0)));</code>
-            </td>
-          </tr>
-          <tr>
-            <td>112.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>FileOutputFormat.setOutputPath(conf, new Path(other_args.get(1)));</code>
-            </td>
-          </tr>
-          <tr>
-            <td>113.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>114.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>JobClient.runJob(conf);</code>
-            </td>
-          </tr>
-          <tr>
-            <td>115.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>return 0;</code>
-            </td>
-          </tr>
-          <tr>
-            <td>116.</td>
-            <td>
-              &nbsp;&nbsp;
-              <code>}</code>
-            </td>
-          </tr>
-          <tr>
-            <td>117.</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>118.</td>
-            <td>
-              &nbsp;&nbsp;
-              <code>
-                public static void main(String[] args) throws Exception {
-              </code>
-            </td>
-          </tr>
-          <tr>
-            <td>119.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>
-                int res = ToolRunner.run(new Configuration(), new WordCount(), 
-                                         args);
-              </code>
-            </td>
-          </tr>
-          <tr>
-            <td>120.</td>
-            <td>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <code>System.exit(res);</code>
-            </td>
-          </tr>
-          <tr>
-            <td>121.</td>
-            <td>
-              &nbsp;&nbsp;
-              <code>}</code>
-            </td>
-          </tr>
-          <tr>
-            <td>122.</td>
-            <td>
-              <code>}</code>
-            </td>
-          </tr>
-          <tr>
-            <td>123.</td>
-            <td></td>
-          </tr>
+            <th>WordCount2.java</th>
+          </tr>
+<tr><td>1.</td><td><code>package&nbsp;org.myorg;
+</code></td></tr>
+<tr><td>2.</td><td><code>
+</code></td></tr>
+<tr><td>3.</td><td><code>import&nbsp;java.io.*;
+</code></td></tr>
+<tr><td>4.</td><td><code>import&nbsp;java.util.*;
+</code></td></tr>
+<tr><td>5.</td><td><code>
+</code></td></tr>
+<tr><td>6.</td><td><code>import&nbsp;org.apache.hadoop.fs.Path;
+</code></td></tr>
+<tr><td>7.</td><td><code>import&nbsp;org.apache.hadoop.filecache.DistributedCache;
+</code></td></tr>
+<tr><td>8.</td><td><code>import&nbsp;org.apache.hadoop.conf.*;
+</code></td></tr>
+<tr><td>9.</td><td><code>import&nbsp;org.apache.hadoop.io.*;
+</code></td></tr>
+<tr><td>10.</td><td><code>import&nbsp;org.apache.hadoop.mapreduce.*;
+</code></td></tr>
+<tr><td>11.</td><td><code>import&nbsp;org.apache.hadoop.mapreduce.lib.input.*;
+</code></td></tr>
+<tr><td>12.</td><td><code>import&nbsp;org.apache.hadoop.mapreduce.lib.output.*;
+</code></td></tr>
+<tr><td>13.</td><td><code>import&nbsp;org.apache.hadoop.util.*;
+</code></td></tr>
+<tr><td>14.</td><td><code>
+</code></td></tr>
+<tr><td>15.</td><td><code>public&nbsp;class&nbsp;WordCount2&nbsp;extends&nbsp;Configured&nbsp;implements&nbsp;Tool&nbsp;{
+</code></td></tr>
+<tr><td>16.</td><td><code>
+</code></td></tr>
+<tr><td>17.</td><td><code>&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;class&nbsp;Map
+</code></td></tr>
+<tr><td>18.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;extends&nbsp;Mapper&lt;LongWritable,&nbsp;Text,&nbsp;Text,&nbsp;IntWritable&gt;&nbsp;{
+</code></td></tr>
+<tr><td>19.</td><td><code>
+</code></td></tr>
+<tr><td>20.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;static&nbsp;enum&nbsp;Counters&nbsp;{&nbsp;INPUT_WORDS&nbsp;}
+</code></td></tr>
+<tr><td>21.</td><td><code>
+</code></td></tr>
+<tr><td>22.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;final&nbsp;static&nbsp;IntWritable&nbsp;one&nbsp;=&nbsp;new&nbsp;IntWritable(1);
+</code></td></tr>
+<tr><td>23.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;Text&nbsp;word&nbsp;=&nbsp;new&nbsp;Text();
+</code></td></tr>
+<tr><td>24.</td><td><code>
+</code></td></tr>
+<tr><td>25.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;boolean&nbsp;caseSensitive&nbsp;=&nbsp;true;
+</code></td></tr>
+<tr><td>26.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;Set&lt;String&gt;&nbsp;patternsToSkip&nbsp;=&nbsp;new&nbsp;HashSet&lt;String&gt;();
+</code></td></tr>
+<tr><td>27.</td><td><code>
+</code></td></tr>
+<tr><td>28.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;long&nbsp;numRecords&nbsp;=&nbsp;0;
+</code></td></tr>
+<tr><td>29.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;String&nbsp;inputFile;
+</code></td></tr>
+<tr><td>30.</td><td><code>
+</code></td></tr>
+<tr><td>31.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setup(Context&nbsp;context)&nbsp;{
+</code></td></tr>
+<tr><td>32.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Configuration&nbsp;conf&nbsp;=&nbsp;context.getConfiguration();
+</code></td></tr>
+<tr><td>33.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;caseSensitive&nbsp;=&nbsp;conf.getBoolean(&quot;wordcount.case.sensitive&quot;,&nbsp;true);
+</code></td></tr>
+<tr><td>34.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;inputFile&nbsp;=&nbsp;conf.get(&quot;mapreduce.map.input.file&quot;);
+</code></td></tr>
+<tr><td>35.</td><td><code>
+</code></td></tr>
+<tr><td>36.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(conf.getBoolean(&quot;wordcount.skip.patterns&quot;,&nbsp;false))&nbsp;{
+</code></td></tr>
+<tr><td>37.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Path[]&nbsp;patternsFiles&nbsp;=&nbsp;new&nbsp;Path[0];
+</code></td></tr>
+<tr><td>38.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{
+</code></td></tr>
+<tr><td>39.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;patternsFiles&nbsp;=&nbsp;DistributedCache.getLocalCacheFiles(conf);
+</code></td></tr>
+<tr><td>40.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(IOException&nbsp;ioe)&nbsp;{
+</code></td></tr>
+<tr><td>41.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.err.println(&quot;Caught&nbsp;exception&nbsp;while&nbsp;getting&nbsp;cached&nbsp;files:&nbsp;&quot;
+</code></td></tr>
+<tr><td>42.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+&nbsp;StringUtils.stringifyException(ioe));
+</code></td></tr>
+<tr><td>43.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+</code></td></tr>
+<tr><td>44.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;(Path&nbsp;patternsFile&nbsp;:&nbsp;patternsFiles)&nbsp;{
+</code></td></tr>
+<tr><td>45.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;parseSkipFile(patternsFile);
+</code></td></tr>
+<tr><td>46.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+</code></td></tr>
+<tr><td>47.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+</code></td></tr>
+<tr><td>48.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+</code></td></tr>
+<tr><td>49.</td><td><code>
+</code></td></tr>
+<tr><td>50.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;void&nbsp;parseSkipFile(Path&nbsp;patternsFile)&nbsp;{
+</code></td></tr>
+<tr><td>51.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{
+</code></td></tr>
+<tr><td>52.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;BufferedReader&nbsp;fis&nbsp;=&nbsp;new&nbsp;BufferedReader(new&nbsp;FileReader(
+</code></td></tr>
+<tr><td>53.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;patternsFile.toString()));
+</code></td></tr>
+<tr><td>54.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;pattern&nbsp;=&nbsp;null;
+</code></td></tr>
+<tr><td>55.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;while&nbsp;((pattern&nbsp;=&nbsp;fis.readLine())&nbsp;!=&nbsp;null)&nbsp;{
+</code></td></tr>
+<tr><td>56.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;patternsToSkip.add(pattern);
+</code></td></tr>
+<tr><td>57.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+</code></td></tr>
+<tr><td>58.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(IOException&nbsp;ioe)&nbsp;{
+</code></td></tr>
+<tr><td>59.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.err.println(&quot;Caught&nbsp;exception&nbsp;while&nbsp;parsing&nbsp;the&nbsp;cached&nbsp;file&nbsp;'&quot;
+</code></td></tr>
+<tr><td>60.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+&nbsp;patternsFile&nbsp;+&nbsp;&quot;'&nbsp;:&nbsp;&quot;&nbsp;+&nbsp;StringUtils.stringifyException(ioe));
+</code></td></tr>
+<tr><td>61.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+</code></td></tr>
+<tr><td>62.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+</code></td></tr>
+<tr><td>63.</td><td><code>
+</code></td></tr>
+<tr><td>64.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;map(LongWritable&nbsp;key,&nbsp;Text&nbsp;value,&nbsp;Context&nbsp;context)
+</code></td></tr>
+<tr><td>65.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;throws&nbsp;IOException,&nbsp;InterruptedException&nbsp;{
+</code></td></tr>
+<tr><td>66.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;line&nbsp;=&nbsp;(caseSensitive)&nbsp;?
+</code></td></tr>
+<tr><td>67.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;value.toString()&nbsp;:&nbsp;value.toString().toLowerCase();
+</code></td></tr>
+<tr><td>68.</td><td><code>
+</code></td></tr>
+<tr><td>69.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;(String&nbsp;pattern&nbsp;:&nbsp;patternsToSkip)&nbsp;{
+</code></td></tr>
+<tr><td>70.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;line&nbsp;=&nbsp;line.replaceAll(pattern,&nbsp;&quot;&quot;);
+</code></td></tr>
+<tr><td>71.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+</code></td></tr>
+<tr><td>72.</td><td><code>
+</code></td></tr>
+<tr><td>73.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;StringTokenizer&nbsp;tokenizer&nbsp;=&nbsp;new&nbsp;StringTokenizer(line);
+</code></td></tr>
+<tr><td>74.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;while&nbsp;(tokenizer.hasMoreTokens())&nbsp;{
+</code></td></tr>
+<tr><td>75.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;word.set(tokenizer.nextToken());
+</code></td></tr>
+<tr><td>76.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;context.write(word,&nbsp;one);
+</code></td></tr>
+<tr><td>77.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;context.getCounter(Counters.INPUT_WORDS).increment(1);
+</code></td></tr>
+<tr><td>78.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+</code></td></tr>
+<tr><td>79.</td><td><code>
+</code></td></tr>
+<tr><td>80.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;((++numRecords&nbsp;%&nbsp;100)&nbsp;==&nbsp;0)&nbsp;{
+</code></td></tr>
+<tr><td>81.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;context.setStatus(&quot;Finished&nbsp;processing&nbsp;&quot;&nbsp;+&nbsp;numRecords
+</code></td></tr>
+<tr><td>82.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+&nbsp;&quot;&nbsp;records&nbsp;&quot;&nbsp;+&nbsp;&quot;from&nbsp;the&nbsp;input&nbsp;file:&nbsp;&quot;&nbsp;+&nbsp;inputFile);
+</code></td></tr>
+<tr><td>83.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+</code></td></tr>
+<tr><td>84.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+</code></td></tr>
+<tr><td>85.</td><td><code>&nbsp;&nbsp;&nbsp;}
+</code></td></tr>
+<tr><td>86.</td><td><code>
+</code></td></tr>
+<tr><td>87.</td><td><code>&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;class&nbsp;Reduce
+</code></td></tr>
+<tr><td>88.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;extends&nbsp;Reducer&lt;Text,&nbsp;IntWritable,&nbsp;Text,&nbsp;IntWritable&gt;&nbsp;{
+</code></td></tr>
+<tr><td>89.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;reduce(Text&nbsp;key,&nbsp;Iterable&lt;IntWritable&gt;&nbsp;values,
+</code></td></tr>
+<tr><td>90.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Context&nbsp;context)&nbsp;throws&nbsp;IOException,&nbsp;InterruptedException&nbsp;{
+</code></td></tr>
+<tr><td>91.</td><td><code>
+</code></td></tr>
+<tr><td>92.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;int&nbsp;sum&nbsp;=&nbsp;0;
+</code></td></tr>
+<tr><td>93.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;(IntWritable&nbsp;val&nbsp;:&nbsp;values)&nbsp;{
+</code></td></tr>
+<tr><td>94.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sum&nbsp;+=&nbsp;val.get();
+</code></td></tr>
+<tr><td>95.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+</code></td></tr>
+<tr><td>96.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;context.write(key,&nbsp;new&nbsp;IntWritable(sum));
+</code></td></tr>
+<tr><td>97.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+</code></td></tr>
+<tr><td>98.</td><td><code>&nbsp;&nbsp;&nbsp;}
+</code></td></tr>
+<tr><td>99.</td><td><code>
+</code></td></tr>
+<tr><td>100.</td><td><code>&nbsp;&nbsp;&nbsp;public&nbsp;int&nbsp;run(String[]&nbsp;args)&nbsp;throws&nbsp;Exception&nbsp;{
+</code></td></tr>
+<tr><td>101.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Job&nbsp;job&nbsp;=&nbsp;new&nbsp;Job(getConf());
+</code></td></tr>
+<tr><td>102.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;job.setJarByClass(WordCount2.class);
+</code></td></tr>
+<tr><td>103.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;job.setJobName(&quot;wordcount2.0&quot;);
+</code></td></tr>
+<tr><td>104.</td><td><code>
+</code></td></tr>
+<tr><td>105.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;job.setOutputKeyClass(Text.class);
+</code></td></tr>
+<tr><td>106.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;job.setOutputValueClass(IntWritable.class);
+</code></td></tr>
+<tr><td>107.</td><td><code>
+</code></td></tr>
+<tr><td>108.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;job.setMapperClass(Map.class);
+</code></td></tr>
+<tr><td>109.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;job.setCombinerClass(Reduce.class);
+</code></td></tr>
+<tr><td>110.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;job.setReducerClass(Reduce.class);
+</code></td></tr>
+<tr><td>111.</td><td><code>
+</code></td></tr>
+<tr><td>112.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;Note&nbsp;that&nbsp;these&nbsp;are&nbsp;the&nbsp;default.
+</code></td></tr>
+<tr><td>113.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;job.setInputFormatClass(TextInputFormat.class);
+</code></td></tr>
+<tr><td>114.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;job.setOutputFormatClass(TextOutputFormat.class);
+</code></td></tr>
+<tr><td>115.</td><td><code>
+</code></td></tr>
+<tr><td>116.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;List&lt;String&gt;&nbsp;other_args&nbsp;=&nbsp;new&nbsp;ArrayList&lt;String&gt;();
+</code></td></tr>
+<tr><td>117.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;(int&nbsp;i=0;&nbsp;i&nbsp;&lt;&nbsp;args.length;&nbsp;++i)&nbsp;{
+</code></td></tr>
+<tr><td>118.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(&quot;-skip&quot;.equals(args[i]))&nbsp;{
+</code></td></tr>
+<tr><td>119.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DistributedCache.addCacheFile(new&nbsp;Path(args[++i]).toUri(),
+</code></td></tr>
+<tr><td>120.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;job.getConfiguration());
+</code></td></tr>
+<tr><td>121.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;job.getConfiguration().setBoolean(&quot;wordcount.skip.patterns&quot;,&nbsp;true);
+</code></td></tr>
+<tr><td>122.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;else&nbsp;{
+</code></td></tr>
+<tr><td>123.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;other_args.add(args[i]);
+</code></td></tr>
+<tr><td>124.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+</code></td></tr>
+<tr><td>125.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+</code></td></tr>
+<tr><td>126.</td><td><code>
+</code></td></tr>
+<tr><td>127.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FileInputFormat.setInputPaths(job,&nbsp;new&nbsp;Path(other_args.get(0)));
+</code></td></tr>
+<tr><td>128.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FileOutputFormat.setOutputPath(job,&nbsp;new&nbsp;Path(other_args.get(1)));
+</code></td></tr>
+<tr><td>129.</td><td><code>
+</code></td></tr>
+<tr><td>130.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;boolean&nbsp;success&nbsp;=&nbsp;job.waitForCompletion(true);
+</code></td></tr>
+<tr><td>131.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;success&nbsp;?&nbsp;0&nbsp;:&nbsp;1;
+</code></td></tr>
+<tr><td>132.</td><td><code>&nbsp;&nbsp;&nbsp;}
+</code></td></tr>
+<tr><td>133.</td><td><code>
+</code></td></tr>
+<tr><td>134.</td><td><code>&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;main(String[]&nbsp;args)&nbsp;throws&nbsp;Exception&nbsp;{
+</code></td></tr>
+<tr><td>135.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;int&nbsp;res&nbsp;=&nbsp;ToolRunner.run(new&nbsp;Configuration(),&nbsp;new&nbsp;WordCount2(),&nbsp;args);
+</code></td></tr>
+<tr><td>136.</td><td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.exit(res);
+</code></td></tr>
+<tr><td>137.</td><td><code>&nbsp;&nbsp;&nbsp;}
+</code></td></tr>
+<tr><td>138.</td><td><code>}
+</code></td></tr>
         </table>
       </section>
         
@@ -3244,29 +2603,29 @@
         
         <p>Sample text-files as input:</p>
         <p>
-          <code>$ bin/hadoop dfs -ls /usr/joe/wordcount/input/</code><br/>
-          <code>/usr/joe/wordcount/input/file01</code><br/>
-          <code>/usr/joe/wordcount/input/file02</code><br/>
+          <code>$ bin/hadoop fs -ls /user/joe/wordcount/input/</code><br/>
+          <code>/user/joe/wordcount/input/file01</code><br/>
+          <code>/user/joe/wordcount/input/file02</code><br/>
           <br/>
-          <code>$ bin/hadoop dfs -cat /usr/joe/wordcount/input/file01</code><br/>
+          <code>$ bin/hadoop fs -cat /user/joe/wordcount/input/file01</code><br/>
           <code>Hello World, Bye World!</code><br/>
           <br/>
-          <code>$ bin/hadoop dfs -cat /usr/joe/wordcount/input/file02</code><br/>
+          <code>$ bin/hadoop fs -cat /user/joe/wordcount/input/file02</code><br/>
           <code>Hello Hadoop, Goodbye to hadoop.</code>
         </p>
         
         <p>Run the application:</p>
         <p>
           <code>
-            $ bin/hadoop jar /usr/joe/wordcount.jar org.myorg.WordCount 
-              /usr/joe/wordcount/input /usr/joe/wordcount/output 
+            $ bin/hadoop jar /user/joe/wordcount.jar org.myorg.WordCount2
+              /user/joe/wordcount/input /user/joe/wordcount/output 
           </code>
         </p>
 
         <p>Output:</p>
         <p>
           <code>
-            $ bin/hadoop dfs -cat /usr/joe/wordcount/output/part-00000
+            $ bin/hadoop fs -cat /user/joe/wordcount/output/part-r-00000
           </code>
           <br/>
           <code>Bye    1</code><br/>
@@ -3286,7 +2645,7 @@
         ignored, via the <code>DistributedCache</code>.</p>
         
         <p>
-          <code>$ hadoop dfs -cat /user/joe/wordcount/patterns.txt</code><br/>
+          <code>$ hadoop fs -cat /user/joe/wordcount/patterns.txt</code><br/>
           <code>\.</code><br/>
           <code>\,</code><br/>
           <code>\!</code><br/>
@@ -3296,16 +2655,16 @@
         <p>Run it again, this time with more options:</p>
         <p>
           <code>
-            $ bin/hadoop jar /usr/joe/wordcount.jar org.myorg.WordCount 
-              -Dwordcount.case.sensitive=true /usr/joe/wordcount/input 
-              /usr/joe/wordcount/output -skip /user/joe/wordcount/patterns.txt
+            $ bin/hadoop jar /user/joe/wordcount.jar org.myorg.WordCount2
+              -Dwordcount.case.sensitive=true /user/joe/wordcount/input 
+              /user/joe/wordcount/output -skip /user/joe/wordcount/patterns.txt
           </code>
         </p>
         
         <p>As expected, the output:</p>
         <p>
           <code>
-            $ bin/hadoop dfs -cat /usr/joe/wordcount/output/part-00000
+            $ bin/hadoop fs -cat /user/joe/wordcount/output/part-r-00000
           </code>
           <br/>
           <code>Bye    1</code><br/>
@@ -3319,16 +2678,16 @@
         <p>Run it once more, this time switch-off case-sensitivity:</p>
         <p>
           <code>
-            $ bin/hadoop jar /usr/joe/wordcount.jar org.myorg.WordCount 
-              -Dwordcount.case.sensitive=false /usr/joe/wordcount/input 
-              /usr/joe/wordcount/output -skip /user/joe/wordcount/patterns.txt
+            $ bin/hadoop jar /user/joe/wordcount.jar org.myorg.WordCount2
+              -Dwordcount.case.sensitive=false /user/joe/wordcount/input 
+              /user/joe/wordcount/output -skip /user/joe/wordcount/patterns.txt
           </code>
         </p>
         
         <p>Sure enough, the output:</p>
         <p>
           <code>
-            $ bin/hadoop dfs -cat /usr/joe/wordcount/output/part-00000
+            $ bin/hadoop fs -cat /user/joe/wordcount/output/part-r-00000
           </code>
           <br/>
           <code>bye    1</code><br/>
@@ -3348,24 +2707,24 @@
         <ul>
           <li>
             Demonstrates how applications can access configuration parameters
-            in the <code>configure</code> method of the <code>Mapper</code> (and
-            <code>Reducer</code>) implementations (lines 28-43).
+            in the <code>setup</code> method of the <code>Mapper</code> (and
+            <code>Reducer</code>) implementations (lines 31-48).
           </li>
           <li>
             Demonstrates how the <code>DistributedCache</code> can be used to 
             distribute read-only data needed by the jobs. Here it allows the user 
-            to specify word-patterns to skip while counting (line 104).
+            to specify word-patterns to skip while counting (line 119).
           </li>
           <li>
             Demonstrates the utility of the <code>Tool</code> interface and the
             <code>GenericOptionsParser</code> to handle generic Hadoop 
-            command-line options (lines 87-116, 119).
+            command-line options (line 135).
           </li>
           <li>
-            Demonstrates how applications can use <code>Counters</code> (line 68)
+            Demonstrates how applications can use <code>Counters</code> (line 77)
             and how they can set application-specific status information via 
-            the <code>Reporter</code> instance passed to the <code>map</code> (and
-            <code>reduce</code>) method (line 72).
+            the <code>Context</code> instance passed to the <code>map</code> (and
+            <code>reduce</code>) method (line 81).
           </li>
         </ul>
         
