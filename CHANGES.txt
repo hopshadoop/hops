@@ -295,6 +295,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-1556. upgrade to Avro 1.3.0. (cutting via tomwhite)
 
+    MAPREDUCE-1613. Install/deploy source jars to Maven repo 
+    (Patrick Angeles via ddas)
+
   BUG FIXES
 
     MAPREDUCE-1258. Fix fair scheduler event log not logging job info.

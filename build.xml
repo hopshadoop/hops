@@ -209,6 +209,11 @@
   <property name="hadoop-mapred-examples.jar" location="${build.dir}/${examples.final.name}.jar" />
   <property name="hadoop-mapred-tools.jar" location="${build.dir}/${tools.final.name}.jar" />
 
+  <property name="hadoop-mapred-sources.jar" location="${build.dir}/${final.name}-sources.jar" />
+  <property name="hadoop-mapred-test-sources.jar" location="${build.dir}/${test.final.name}-sources.jar" />
+  <property name="hadoop-mapred-examples-sources.jar" location="${build.dir}/${examples.final.name}-sources.jar" />
+  <property name="hadoop-mapred-tools-sources.jar" location="${build.dir}/${tools.final.name}-sources.jar" />
+
   <!-- jdiff.home property set -->
   <property name="jdiff.home" value="${build.ivy.lib.dir}/${ant.project.name}/jdiff"/>
   <property name="jdiff.jar" value="${jdiff.home}/jdiff-${jdiff.version}.jar"/>
@@ -457,6 +462,11 @@
       <zipfileset dir="${build.webapps}" prefix="webapps"/>
       <fileset file="${jar.extra.properties.list}" />
     </jar>
+
+    <jar jarfile="${hadoop-mapred-sources.jar}">
+      <fileset dir="${mapred.src.dir}" includes="org/apache/hadoop/**/*.java" />
+      <fileset dir="${build.src}" includes="org/apache/hadoop/**/*.java" />
+    </jar>
   </target>
 
   <!-- ================================================================== -->
@@ -472,12 +482,20 @@
                    value="org/apache/hadoop/examples/ExampleDriver"/>
       </manifest>
     </jar>
+
+    <jar jarfile="${hadoop-mapred-examples-sources.jar}">
+      <fileset dir="${examples.dir}" includes="org/apache/hadoop/**/*.java" />
+    </jar>
   </target>
 
   <target name="tools" depends="jar, compile-tools" 
           description="Make the Hadoop tools jar.">
     <jar jarfile="${build.dir}/${tools.final.name}.jar"
          basedir="${build.tools}">
+    </jar>
+
+    <jar jarfile="${hadoop-mapred-tools-sources.jar}">
+      <fileset dir="${tools.src}" includes="org/apache/hadoop/**/*.java" />
     </jar>
   </target>
 
@@ -577,6 +595,13 @@
             <attribute name="Implementation-Vendor" value="Apache"/>
           </section>
          </manifest>
+    </jar>
+
+    <jar jarfile="${hadoop-mapred-test-sources.jar}">
+      <fileset dir="${test.src.dir}/mapred" includes="org/apache/hadoop/**/*.java" />
+      <fileset dir="${test.src.dir}/unit" includes="org/apache/hadoop/**/*.java" />
+      <fileset dir="${test.src.dir}/mapred/testjar" includes="*.java" />
+      <fileset dir="${test.src.dir}/mapred/testshell" includes="*.java" />
     </jar>
   </target>
 
@@ -1199,12 +1224,15 @@
 
      <artifact:install file="${hadoop-mapred.jar}">
         <pom refid="hadoop.mapred"/>
+	<attach file="${hadoop-mapred-sources.jar}" classifier="sources" />
      </artifact:install>
      <artifact:install file="${hadoop-mapred-examples.jar}">
         <pom refid="hadoop.mapred.examples"/>
+	<attach file="${hadoop-mapred-examples-sources.jar}" classifier="sources" />
      </artifact:install>
      <artifact:install file="${hadoop-mapred-tools.jar}">
         <pom refid="hadoop.mapred.tools"/>
+	<attach file="${hadoop-mapred-tools-sources.jar}" classifier="sources" />
      </artifact:install>
   </target>
 
@@ -1215,15 +1243,19 @@
      <artifact:pom file="${hadoop-mapred-tools.pom}" id="hadoop.mapred.tools"/>
      <artifact:install file="${hadoop-mapred.jar}">
         <pom refid="hadoop.mapred"/>
+	<attach file="${hadoop-mapred-sources.jar}" classifier="sources" />
      </artifact:install>
      <artifact:install file="${hadoop-mapred-test.jar}">
         <pom refid="hadoop.mapred.test"/>
+	<attach file="${hadoop-mapred-test-sources.jar}" classifier="sources" />
      </artifact:install>
      <artifact:install file="${hadoop-mapred-examples.jar}">
         <pom refid="hadoop.mapred.examples"/>
+	<attach file="${hadoop-mapred-examples-sources.jar}" classifier="sources" />
      </artifact:install>
      <artifact:install file="${hadoop-mapred-tools.jar}">
         <pom refid="hadoop.mapred.tools"/>
+	<attach file="${hadoop-mapred-tools-sources.jar}" classifier="sources" />
      </artifact:install>
   </target>
 
@@ -1237,18 +1269,22 @@
      <artifact:deploy file="${hadoop-mapred.jar}">
          <remoteRepository id="apache.snapshots.https" url="${asfrepo}"/>
          <pom refid="hadoop.mapred"/>
+	 <attach file="${hadoop-mapred-sources.jar}" classifier="sources" />
      </artifact:deploy>
      <artifact:deploy file="${hadoop-mapred-test.jar}">
          <remoteRepository id="apache.snapshots.https" url="${asfrepo}"/>
          <pom refid="hadoop.mapred.test"/>
+	 <attach file="${hadoop-mapred-test-sources.jar}" classifier="sources" />
      </artifact:deploy>
      <artifact:deploy file="${hadoop-mapred-examples.jar}">
          <remoteRepository id="apache.snapshots.https" url="${asfrepo}"/>
          <pom refid="hadoop.mapred.examples"/>
+	 <attach file="${hadoop-mapred-examples-sources.jar}" classifier="sources" />
      </artifact:deploy>
      <artifact:deploy file="${hadoop-mapred-tools.jar}">
          <remoteRepository id="apache.snapshots.https" url="${asfrepo}"/>
          <pom refid="hadoop.mapred.tools"/>
+	 <attach file="${hadoop-mapred-tools-sources.jar}" classifier="sources" />
      </artifact:deploy>
   </target>
   
