@@ -270,6 +270,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1570. Add grouping comparators to MRUnit. (Chris White via
     cdouglas)
 
+    MAPREDUCE-1650. Exclude Private elements from generated MapReduce
+    Javadoc. (tomwhite)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band

@@ -145,6 +145,8 @@
 
   <property name="jdiff.build.dir" value="${build.docs}/jdiff"/>
   <property name="jdiff.xml.dir" value="${lib.dir}/jdiff"/>
+  <property name="jdiff.stability" value="-unstable"/>
+  <property name="jdiff.compatibility" value=""/>
   <property name="jdiff.stable" value="0.21.0"/>
   <property name="jdiff.stable.javadoc" 
             value="http://hadoop.apache.org/core/docs/r${jdiff.stable}/api/"/>
@@ -868,7 +870,7 @@
     </javadoc>
   </target>	
 
-  <target name="javadoc-uptodate" depends="compile, ivy-retrieve-javadoc">
+  <target name="javadoc-uptodate" depends="compile, ivy-retrieve-common, ivy-retrieve-javadoc">
     <uptodate property="javadoc.is.uptodate">
       <srcfiles dir="${src.dir}">
         <include name="**/*.java" />
@@ -920,15 +922,19 @@
        <group title="contrib: Streaming" packages="org.apache.hadoop.streaming*"/>
        <group title="contrib: DataJoin" packages="org.apache.hadoop.contrib.utils.join*"/>
        <group title="contrib: Index" packages="org.apache.hadoop.contrib.index*"/>
+       <doclet name="org.apache.hadoop.classification.tools.ExcludePrivateAnnotationsStandardDoclet"
+         path="${common.ivy.lib.dir}/hadoop-core-${version}.jar"/>
     </javadoc>
   </target>	
 
   <target name="api-xml" depends="ivy-retrieve-jdiff,javadoc,write-null">
     <javadoc maxmemory="${javadoc.maxmemory}">
-       <doclet name="jdiff.JDiff"
-               path="${jdiff.jar}:${xerces.jar}">
+       <doclet name="org.apache.hadoop.classification.tools.ExcludePrivateAnnotationsJDiffDoclet"
+         path="${common.ivy.lib.dir}/hadoop-core-${version}.jar:${jdiff.jar}:${xerces.jar}">
          <param name="-apidir" value="${jdiff.xml.dir}"/>
          <param name="-apiname" value="hadoop-mapred ${version}"/>
+         <param name="${jdiff.stability}"/>
+         <param name="${jdiff.compatibility}"/>
        </doclet>
        <packageset dir="src/java"/>
        <packageset dir="src/tools"/>
@@ -948,12 +954,11 @@
 
   <target name="api-report" depends="ivy-retrieve-jdiff,api-xml">
     <mkdir dir="${jdiff.build.dir}"/>
-    <javadoc sourcepath="src/java,src/tools"
-             destdir="${jdiff.build.dir}"
+    <javadoc destdir="${jdiff.build.dir}"
 	     sourceFiles="${jdiff.home}/Null.java"
 	     maxmemory="${javadoc.maxmemory}">
-       <doclet name="jdiff.JDiff"
-               path="${jdiff.jar}:${xerces.jar}">
+       <doclet name="org.apache.hadoop.classification.tools.ExcludePrivateAnnotationsJDiffDoclet"
+         path="${common.ivy.lib.dir}/hadoop-core-${version}.jar:${jdiff.jar}:${xerces.jar}">
          <param name="-oldapi" value="hadoop-mapred ${jdiff.stable}"/>
          <param name="-newapi" value="hadoop-mapred ${version}"/>
          <param name="-oldapidir" value="${jdiff.xml.dir}"/>
@@ -961,7 +966,11 @@
          <param name="-javadocold" value="${jdiff.stable.javadoc}"/>
          <param name="-javadocnew" value="../../api/"/>
          <param name="-stats"/>
+         <param name="${jdiff.stability}"/>
+         <param name="${jdiff.compatibility}"/>
        </doclet>
+       <packageset dir="src/java"/>
+       <packageset dir="src/tools"/>
        <classpath >
          <path refid="classpath" />
          <path refid="jdiff-classpath"/>
