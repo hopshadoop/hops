@@ -965,7 +965,8 @@
     job-level ACL.
 
     Irrespective of this ACL configuration, job-owner, superuser and members
-    of supergroup configured on JobTracker via mapred.permissions.supergroup,
+    of supergroup configured on JobTracker via 
+    "mapreduce.cluster.permissions.supergroup",
     can do all the modification operations.
 
     By default, nobody else besides job-owner, superuser/supergroup can

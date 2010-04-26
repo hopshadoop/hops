@@ -579,6 +579,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1219. Remove job level metrics from jobtracker metrics to ease 
     undue load on jobtracker. (Sreekanth Ramakrishnan via sharad)
 
+    MAPREDUCE-1604. Add Forrest documentation for Job ACLs.
+    (Amareshwari Sriramadasu via yhemanth)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

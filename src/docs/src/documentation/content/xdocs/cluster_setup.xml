@@ -272,6 +272,17 @@
 		        TaskTrackers.
 		      </td>
   		    </tr>
+        <tr>
+          <td>mapreduce.cluster.job-authorization-enabled</td>
+          <td>Boolean, specifying whether job ACLs are supported for 
+              authorizing view and modification of a job</td>
+          <td>
+            If <em>true</em>, job ACLs would be checked while viewing or
+            modifying a job. More details are available at 
+            <a href ="mapred_tutorial.html#Job+Authorization">Job Authorization</a>. 
+          </td>
+        </tr>
+  		    
 		  </table>      
 
           <p>Typically all the above parameters are marked as 
