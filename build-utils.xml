@@ -22,12 +22,16 @@ Contains utilities that are common for the main and contrib builds.
 -->
 <project name="build-utils">
 
+  <!-- Load properties from build properties file, if available -->
+  <dirname property="build-utils.basedir" file="${ant.file.build-utils}"/>
+  <property file="${build-utils.basedir}/build.properties"/>
+
   <target name="java5.check" unless="java5.home">
-    <fail message="'java5.home' is not defined.  Forrest requires Java 5.  Please pass -Djava5.home=&lt;base of Java 5 distribution&gt; to Ant on the command-line." />
+    <fail message="'java5.home' is not defined.  Forrest requires Java 5.  Please pass -Djava5.home=&lt;base of Java 5 distribution&gt; to Ant on the command-line, or set java5.home in build properties file." />
   </target>
 	
   <target name="forrest.check" unless="forrest.home" depends="java5.check">
-    <fail message="'forrest.home' is not defined. Please pass -Dforrest.home=&lt;base of Apache Forrest installation&gt; to Ant on the command-line." />
+    <fail message="'forrest.home' is not defined. Please pass -Dforrest.home=&lt;base of Apache Forrest installation&gt; to Ant on the command-line, or set forest.home in build properties file." />
   </target>
   
 </project>

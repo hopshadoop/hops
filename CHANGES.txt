@@ -570,6 +570,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-1622. Include missing slf4j dependencies. (cdouglas)
 
+    MAPREDUCE-1515. Accept java5.home from build.properties, not only from the
+    command line when building forrest docs. (Al Thompson via cdouglas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
