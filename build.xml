@@ -866,12 +866,11 @@
         <packageset dir="${mapred.src.dir}"/>
     	<packageset dir="${examples.dir}"/>
 
-    	<packageset dir="src/contrib/capacity-scheduler/src/java"/>
-    	<packageset dir="src/contrib/streaming/src/java"/>
-    	<packageset dir="src/contrib/data_join/src/java"/>
-    	<packageset dir="src/contrib/index/src/java"/>
-    	<packageset dir="src/contrib/gridmix/src/java"/>
-    	<packageset dir="src/contrib/mumak/src/java"/>
+       <packageset dir="src/contrib/data_join/src/java"/>
+       <packageset dir="src/contrib/gridmix/src/java"/>
+       <packageset dir="src/contrib/index/src/java"/>
+       <packageset dir="src/contrib/mumak/src/java"/>
+       <packageset dir="src/contrib/streaming/src/java"/>
 
         <link href="${javadoc.link.java}"/>
 
@@ -886,12 +885,14 @@
           <pathelement location="${build.tools}"/>
         </classpath>
 
-    	<group title="Examples" packages="org.apache.hadoop.examples*"/>
+       <group title="Packages" packages="org.apache.*"/>
+       <group title="Libraries" packages="org.apache.hadoop.mapred.lib*:org.apache.hadoop.mapreduce.lib*"/>
+       <group title="Examples" packages="org.apache.hadoop.examples*"/>
 
-       <group title="contrib: Streaming" packages="org.apache.hadoop.streaming*"/>
        <group title="contrib: DataJoin" packages="org.apache.hadoop.contrib.utils.join*"/>
+       <group title="contrib: Gridmix" packages="org.apache.hadoop.mapred.gridmix*"/>
        <group title="contrib: Index" packages="org.apache.hadoop.contrib.index*"/>
-
+       <group title="contrib: Streaming" packages="org.apache.hadoop.streaming*:org.apache.hadoop.typedbytes*"/>
     </javadoc>
   </target>	
 
@@ -923,11 +924,13 @@
         <packageset dir="${mapred.src.dir}"/>
     	<packageset dir="${examples.dir}"/>
 
-    	<packageset dir="src/contrib/streaming/src/java"/>
-    	<packageset dir="src/contrib/data_join/src/java"/>
-    	<packageset dir="src/contrib/index/src/java"/>
-    	<packageset dir="src/contrib/gridmix/src/java"/>
-    	<packageset dir="src/contrib/mumak/src/java"/>
+       <!-- Don't include contrib modules that use the same packages as core
+       MapReduce. This includes capacity-scheduler, dynamic-scheduler,
+       fairscheduler, mumak. See also the javadoc-dev target. -->
+       <packageset dir="src/contrib/data_join/src/java"/>
+       <packageset dir="src/contrib/gridmix/src/java"/>
+       <packageset dir="src/contrib/index/src/java"/>
+       <packageset dir="src/contrib/streaming/src/java"/>
 	
         <link href="${javadoc.link.java}"/>
 
@@ -942,11 +945,14 @@
           <pathelement location="${build.tools}"/>
         </classpath>
 
-    	<group title="Examples" packages="org.apache.hadoop.examples*"/>
+       <group title="Packages" packages="org.apache.*"/>
+       <group title="Libraries" packages="org.apache.hadoop.mapred.lib*:org.apache.hadoop.mapreduce.lib*"/>
+       <group title="Examples" packages="org.apache.hadoop.examples*"/>
 
-       <group title="contrib: Streaming" packages="org.apache.hadoop.streaming*"/>
        <group title="contrib: DataJoin" packages="org.apache.hadoop.contrib.utils.join*"/>
+       <group title="contrib: Gridmix" packages="org.apache.hadoop.mapred.gridmix*"/>
        <group title="contrib: Index" packages="org.apache.hadoop.contrib.index*"/>
+       <group title="contrib: Streaming" packages="org.apache.hadoop.streaming*:org.apache.hadoop.typedbytes*"/>
        <doclet name="org.apache.hadoop.classification.tools.ExcludePrivateAnnotationsStandardDoclet"
          path="${common.ivy.lib.dir}/hadoop-core-${version}.jar"/>
     </javadoc>

@@ -273,6 +273,8 @@ Trunk (unreleased changes)
     MAPREDUCE-1650. Exclude Private elements from generated MapReduce
     Javadoc. (tomwhite)
 
+    MAPREDUCE-1625. Improve grouping of packages in Javadoc. (tomwhite)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
