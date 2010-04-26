@@ -576,6 +576,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1618. Add missing javadoc to JobStatus::*JobAcls. (Amareshwari
     Sriramadasu via cdouglas)
 
+    MAPREDUCE-1219. Remove job level metrics from jobtracker metrics to ease 
+    undue load on jobtracker. (Sreekanth Ramakrishnan via sharad)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

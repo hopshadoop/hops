@@ -80,12 +80,6 @@ public class SimulatorJobInProgress extends JobInProgress {
 
     this.mapFailuresPercent = conf.getMaxMapTaskFailuresPercent();
     this.reduceFailuresPercent = conf.getMaxReduceTaskFailuresPercent();
-    MetricsContext metricsContext = MetricsUtil.getContext("mapred");
-    this.jobMetrics = MetricsUtil.createRecord(metricsContext, "job");
-    this.jobMetrics.setTag("user", conf.getUser());
-    this.jobMetrics.setTag("sessionId", conf.getSessionId());
-    this.jobMetrics.setTag("jobName", conf.getJobName());
-    this.jobMetrics.setTag("jobId", jobid.toString());
 
     this.maxLevel = jobtracker.getNumTaskCacheLevels();
     this.anyCacheLevel = this.maxLevel + 1;
