@@ -230,6 +230,11 @@ public class JobStatus implements Writable, Cloneable {
     this.schedulingInfo = schedulingInfo;
   }
 
+  /**
+   * Set the job acls.
+   * 
+   * @param acls {@link Map} from {@link JobACL} to {@link AccessControlList}
+   */
   protected synchronized void setJobACLs(Map<JobACL, AccessControlList> acls) {
     this.jobACLs = acls;
   }
@@ -292,6 +297,11 @@ public class JobStatus implements Writable, Cloneable {
    return schedulingInfo;
   }
 
+  /**
+   * Get the job acls.
+   * 
+   * @return a {@link Map} from {@link JobACL} to {@link AccessControlList}
+   */
   public synchronized Map<JobACL, AccessControlList> getJobACLs() {
     return jobACLs;
   }

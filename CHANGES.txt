@@ -573,6 +573,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1515. Accept java5.home from build.properties, not only from the
     command line when building forrest docs. (Al Thompson via cdouglas)
 
+    MAPREDUCE-1618. Add missing javadoc to JobStatus::*JobAcls. (Amareshwari
+    Sriramadasu via cdouglas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
