@@ -1172,35 +1172,44 @@ public class RaidNode implements RaidProtocol {
             try {
               // expand destination prefix path
               String destinationPrefix = getDestinationPath(conf, info);
-              Path destp = new Path(destinationPrefix.trim());
-              FileSystem destFs = FileSystem.get(destp.toUri(), conf);
-              destp = destp.makeQualified(destFs);
-              destinationPrefix = destp.toUri().getPath(); // strip host:port
-              destp = getOriginalParityFile(destp, info.getSrcPath());
+              Path destPref = new Path(destinationPrefix.trim());
+              FileSystem destFs = FileSystem.get(destPref.toUri(), conf);
+              destPref = destFs.makeQualified(destPref);
+
+              //get srcPaths
+              Path[] srcPaths = info.getSrcPathExpanded();
               
-              // if this destination path has already been processed as part
-              // of another policy, then nothing more to do
-              if (processed.contains(destp)) {
-                LOG.info("Obsolete parity files for policy " + 
-                        info.getName() + " has already been procesed.");
-                continue;
-              }
+              if ( srcPaths != null ){
+                for (Path srcPath: srcPaths) {
+                  // expand destination prefix
+                  Path destPath = getOriginalParityFile(destPref, srcPath);
 
-              FileSystem srcFs = info.getSrcPath().getFileSystem(conf);
-              FileStatus stat = null;
-              try {
-                stat = destFs.getFileStatus(destp);
-              } catch (FileNotFoundException e) {
-                // do nothing, leave stat = null;
-              }
-              if (stat != null) {
-                LOG.info("Purging obsolete parity files for policy " + 
-                          info.getName() + " " + destp);
-                recursePurge(srcFs, destFs, destinationPrefix, stat);
-              }
+                  // if this destination path has already been processed as part
+                  // of another policy, then nothing more to do
+                  if (processed.contains(destPath)) {
+                    LOG.info("Obsolete parity files for policy " + 
+                            info.getName() + " has already been procesed.");
+                    continue;
+                  }
 
-              // this destination path has already been processed
-              processed.add(destp);
+                  FileSystem srcFs = info.getSrcPath().getFileSystem(conf);
+                  FileStatus stat = null;
+                  try {
+                    stat = destFs.getFileStatus(destPath);
+                  } catch (FileNotFoundException e) {
+                    // do nothing, leave stat = null;
+                  }
+                  if (stat != null) {
+                    LOG.info("Purging obsolete parity files for policy " + 
+                              info.getName() + " " + destPath);
+                    recursePurge(srcFs, destFs, destPref.toUri().getPath(), stat);
+                  }
+
+                  // this destination path has already been processed
+                  processed.add(destPath);
+
+                }
+              }
 
             } catch (Exception e) {
               LOG.warn("Ignoring Exception while processing policy " + 
@@ -1283,13 +1292,13 @@ public class RaidNode implements RaidProtocol {
     long prevExec = 0;
     while (running) {
 
-      LOG.info("Started HAR thread");
       // The config may be reloaded by the TriggerMonitor. 
       // This thread uses whatever config is currently active.
       while(now() < prevExec + configMgr.getPeriodicity()){
         Thread.sleep(SLEEP_TIME);
       }
 
+      LOG.info("Started archive scan");
       prevExec = now();
       
       // fetch all categories
@@ -1310,28 +1319,33 @@ public class RaidNode implements RaidProtocol {
           if (str != null) {
             try {
               long cutoff = now() - ( Long.parseLong(str) * 24L * 3600000L );
-              // expand destination prefix path
+
               String destinationPrefix = getDestinationPath(conf, info);
-              Path destp = new Path(destinationPrefix.trim());
-              FileSystem destFs = FileSystem.get(destp.toUri(), conf);
-              destp = destp.makeQualified(destFs);
-              destinationPrefix = destp.toUri().getPath(); // strip host:port
-              destp = getOriginalParityFile(destp, info.getSrcPath());
+              Path destPref = new Path(destinationPrefix.trim());
+              FileSystem destFs = destPref.getFileSystem(conf); 
+              destPref = destFs.makeQualified(destPref);
 
-              FileStatus stat = null;
-              try {
-                stat = destFs.getFileStatus(destp);
-              } catch (FileNotFoundException e) {
-                // do nothing, leave stat = null;
+              //get srcPaths
+              Path[] srcPaths = info.getSrcPathExpanded();
+              
+              if ( srcPaths != null ){
+                for (Path srcPath: srcPaths) {
+                  // expand destination prefix
+                  Path destPath = getOriginalParityFile(destPref, srcPath);
+
+                  FileStatus stat = null;
+                  try {
+                    stat = destFs.getFileStatus(destPath);
+                  } catch (FileNotFoundException e) {
+                    // do nothing, leave stat = null;
+                  }
+                  if (stat != null) {
+                    LOG.info("Haring parity files for policy " + 
+                        info.getName() + " " + destPath);
+                    recurseHar(destFs, stat, cutoff, tmpHarPath);
+                  }
+                }
               }
-              if (stat != null) {
-                LOG.info("Haring parity files for policy " + 
-                    info.getName() + " " + destp);
-
-                recurseHar(destFs, stat, cutoff, tmpHarPath);
-              }
-
-
             } catch (Exception e) {
               LOG.warn("Ignoring Exception while processing policy " + 
                   info.getName() + " " + 

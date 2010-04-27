@@ -590,6 +590,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1604. Add Forrest documentation for Job ACLs.
     (Amareshwari Sriramadasu via yhemanth)
 
+    MAPREDUCE-1705. Archiving and Purging of HDFS parity files should 
+    handle globbed policies accurately. (Rodrigo Schmidt via dhruba)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

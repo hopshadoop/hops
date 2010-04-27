@@ -101,12 +101,12 @@ public class TestRaidHar extends TestCase {
   /**
    * create raid.xml file for RaidNode
    */
-  private void mySetup(long targetReplication,
-                long metaReplication, long stripeLength) throws Exception {
+  private void mySetup(String srcPath, long targetReplication,
+                long metaReplication, long stripeLength ) throws Exception {
     FileWriter fileWriter = new FileWriter(CONFIG_FILE);
     fileWriter.write("<?xml version=\"1.0\"?>\n");
     String str = "<configuration> " +
-                   "<srcPath prefix=\"/user/test/raidtest\"> " +
+                   "<srcPath prefix=\"" + srcPath + "\"> " +
                      "<policy name = \"RaidTest1\"> " +
                         "<destPath> /destraid</destPath> " +
                         "<property> " +
@@ -162,6 +162,7 @@ public class TestRaidHar extends TestCase {
   public void testRaidHar() throws Exception {
     LOG.info("Test testRaidHar  started.");
 
+    String srcPaths    []  = { "/user/test/raidtest", "/user/test/raid*" };
     long blockSizes    []  = {1024L};
     long stripeLengths []  = {5};
     long targetReplication = 1;
@@ -171,11 +172,13 @@ public class TestRaidHar extends TestCase {
 
     createClusters(true);
     try {
-      for (long blockSize : blockSizes) {
-        for (long stripeLength : stripeLengths) {
-           doTestHar(iter, targetReplication, metaReplication,
-                       stripeLength, blockSize, numBlock);
-           iter++;
+      for (String srcPath : srcPaths) {
+        for (long blockSize : blockSizes) {
+          for (long stripeLength : stripeLengths) {
+            doTestHar(iter, srcPath, targetReplication, metaReplication,
+                         stripeLength, blockSize, numBlock);
+            iter++;
+          }
         }
       }
     } finally {
@@ -188,12 +191,12 @@ public class TestRaidHar extends TestCase {
    * Create parity file, delete original file and then validate that
    * parity file is automatically deleted.
    */
-  private void doTestHar(int iter, long targetReplication,
+  private void doTestHar(int iter, String srcPath, long targetReplication,
                           long metaReplication, long stripeLength,
                           long blockSize, int numBlock) throws Exception {
     LOG.info("doTestHar started---------------------------:" +  " iter " + iter +
              " blockSize=" + blockSize + " stripeLength=" + stripeLength);
-    mySetup(targetReplication, metaReplication, stripeLength);
+    mySetup(srcPath, targetReplication, metaReplication, stripeLength);
     RaidShell shell = null;
     Path dir = new Path("/user/test/raidtest/");
     Path file1 = new Path(dir + "/file" + iter);

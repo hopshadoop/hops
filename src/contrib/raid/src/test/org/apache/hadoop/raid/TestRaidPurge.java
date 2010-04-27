@@ -106,12 +106,12 @@ public class TestRaidPurge extends TestCase {
   /**
    * create raid.xml file for RaidNode
    */
-  private void mySetup(long targetReplication,
+  private void mySetup(String srcPath, long targetReplication,
                 long metaReplication, long stripeLength) throws Exception {
     FileWriter fileWriter = new FileWriter(CONFIG_FILE);
     fileWriter.write("<?xml version=\"1.0\"?>\n");
     String str = "<configuration> " +
-                   "<srcPath prefix=\"/user/dhruba/raidtest\"> " +
+                   "<srcPath prefix=\"" + srcPath + "\"> " +
                      "<policy name = \"RaidTest1\"> " +
                         "<destPath> /destraid</destPath> " +
                         "<property> " +
@@ -160,6 +160,7 @@ public class TestRaidPurge extends TestCase {
   public void testPurge() throws Exception {
     LOG.info("Test testPurge  started.");
 
+    String srcPaths    []  = { "/user/dhruba/raidtest", "/user/dhruba/raid*" };
     long blockSizes    []  = {1024L};
     long stripeLengths []  = {5};
     long targetReplication = 1;
@@ -169,11 +170,13 @@ public class TestRaidPurge extends TestCase {
 
     createClusters(true);
     try {
-      for (long blockSize : blockSizes) {
-        for (long stripeLength : stripeLengths) {
-          doTestPurge(iter, targetReplication, metaReplication,
-              stripeLength, blockSize, numBlock);
-           iter++;
+      for (String srcPath : srcPaths ) {
+        for (long blockSize : blockSizes) {
+          for (long stripeLength : stripeLengths) {
+            doTestPurge(iter, srcPath, targetReplication, metaReplication,
+                stripeLength, blockSize, numBlock);
+            iter++;
+          }
         }
       }
     } finally {
@@ -186,12 +189,12 @@ public class TestRaidPurge extends TestCase {
    * Create parity file, delete original file and then validate that
    * parity file is automatically deleted.
    */
-  private void doTestPurge(int iter, long targetReplication,
+  private void doTestPurge(int iter, String srcPath, long targetReplication,
                           long metaReplication, long stripeLength,
                           long blockSize, int numBlock) throws Exception {
     LOG.info("doTestPurge started---------------------------:" +  " iter " + iter +
              " blockSize=" + blockSize + " stripeLength=" + stripeLength);
-    mySetup(targetReplication, metaReplication, stripeLength);
+    mySetup(srcPath, targetReplication, metaReplication, stripeLength);
     RaidShell shell = null;
     Path dir = new Path("/user/dhruba/raidtest/");
     Path file1 = new Path(dir + "/file" + iter);
