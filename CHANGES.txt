@@ -599,6 +599,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1397. NullPointerException observed during task failures.
     (Amareshwari Sriramadasu via vinodkv)
 
+    MAPREDUCE-1728. Oracle timezone strings do not match Java.
+    (Aaron Kimball via tomwhite)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

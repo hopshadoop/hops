@@ -40,6 +40,6 @@ public class OracleDataDrivenDBRecordReader<T extends DBWritable>
         "ORACLE");
 
     // Must initialize the tz used by the connection for Oracle.
-    OracleDBRecordReader.setSessionTimeZone(conn);
+    OracleDBRecordReader.setSessionTimeZone(conf, conn);
   }
 }

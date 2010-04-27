@@ -20,10 +20,7 @@ package org.apache.hadoop.mapreduce.lib.db;
 
 import java.io.IOException;
 import java.sql.Connection;
-import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.TimeZone;
 import java.lang.reflect.Method;
 
 import org.apache.hadoop.conf.Configuration;
@@ -35,13 +32,16 @@ import org.apache.commons.logging.LogFactory;
  */
 public class OracleDBRecordReader<T extends DBWritable> extends DBRecordReader<T> {
 
+  /** Configuration key to set to a timezone string. */
+  public static final String SESSION_TIMEZONE_KEY = "oracle.sessionTimeZone";
+
   private static final Log LOG = LogFactory.getLog(OracleDBRecordReader.class);
 
   public OracleDBRecordReader(DBInputFormat.DBInputSplit split, 
       Class<T> inputClass, Configuration conf, Connection conn, DBConfiguration dbConfig,
       String cond, String [] fields, String table) throws SQLException {
     super(split, inputClass, conf, conn, dbConfig, cond, fields, table);
-    setSessionTimeZone(conn);
+    setSessionTimeZone(conf, conn);
   }
 
   /** Returns the query for selecting the records from an Oracle DB. */
@@ -96,10 +96,12 @@ public class OracleDBRecordReader<T extends DBWritable> extends DBRecordReader<T
 
   /**
    * Set session time zone
-   * @param conn      Connection object
-   * @throws          SQLException instance
+   * @param conf The current configuration.
+   * We read the 'oracle.sessionTimeZone' property from here.
+   * @param conn The connection to alter the timezone properties of.
    */
-  public static void setSessionTimeZone(Connection conn) throws SQLException {
+  public static void setSessionTimeZone(Configuration conf,
+      Connection conn) throws SQLException {
     // need to use reflection to call the method setSessionTimeZone on
     // the OracleConnection class because oracle specific java libraries are
     // not accessible in this context.
@@ -114,18 +116,21 @@ public class OracleDBRecordReader<T extends DBWritable> extends DBRecordReader<T
     }
 
     // Need to set the time zone in order for Java
-    // to correctly access the column "TIMESTAMP WITH LOCAL TIME ZONE"
-    String clientTimeZone = TimeZone.getDefault().getID();
+    // to correctly access the column "TIMESTAMP WITH LOCAL TIME ZONE".
+    // We can't easily get the correct Oracle-specific timezone string
+    // from Java; just let the user set the timezone in a property.
+    String clientTimeZone = conf.get(SESSION_TIMEZONE_KEY, "GMT");
     try {
       method.setAccessible(true);
       method.invoke(conn, clientTimeZone);
-      LOG.info("Time zone has been set");
+      LOG.info("Time zone has been set to " + clientTimeZone);
     } catch (Exception ex) {
       LOG.warn("Time zone " + clientTimeZone +
-               " could not be set on oracle database.");
-      LOG.info("Setting default time zone: UTC");
+               " could not be set on Oracle database.");
+      LOG.warn("Setting default time zone: GMT");
       try {
-        method.invoke(conn, "UTC");
+        // "GMT" timezone is guaranteed to exist.
+        method.invoke(conn, "GMT");
       } catch (Exception ex2) {
         LOG.error("Could not set time zone for oracle connection", ex2);
         // rethrow SQLException
