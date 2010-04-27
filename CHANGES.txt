@@ -596,6 +596,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1612. job conf file is not accessible from job history web page.
     (Ravi Gummadi and Sreekanth Ramakrishnan via vinodkv)
 
+    MAPREDUCE-1397. NullPointerException observed during task failures.
+    (Amareshwari Sriramadasu via vinodkv)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

@@ -258,7 +258,7 @@ public class TaskTracker
   private MapEventsFetcherThread mapEventsFetcher;
   int workerThreads;
   CleanupQueue directoryCleanupThread;
-  volatile JvmManager jvmManager;
+  private volatile JvmManager jvmManager;
   UserLogCleaner taskLogCleanupThread;
   private TaskMemoryManagerThread taskMemoryManager;
   private boolean taskMemoryManagerEnabled = true;
@@ -2064,7 +2064,12 @@ public class TaskTracker
   public JvmManager getJvmManagerInstance() {
     return jvmManager;
   }
-  
+
+  // called from unit test  
+  void setJvmManagerInstance(JvmManager jvmManager) {
+    this.jvmManager = jvmManager;
+  }
+
   private void addToTaskQueue(LaunchTaskAction action) {
     if (action.getTask().isMapTask()) {
       mapLauncher.addToTaskQueue(action);
@@ -3719,6 +3724,16 @@ public class TaskTracker
   
   int getMaxCurrentReduceTasks() {
     return maxReduceSlots;
+  }
+
+  //called from unit test
+  synchronized void setMaxMapSlots(int mapSlots) {
+    maxMapSlots = mapSlots;
+  }
+
+  //called from unit test
+  synchronized void setMaxReduceSlots(int reduceSlots) {
+    maxReduceSlots = reduceSlots;
   }
 
   /**
