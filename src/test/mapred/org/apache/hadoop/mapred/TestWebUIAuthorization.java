@@ -241,7 +241,8 @@ public class TestWebUIAuthorization extends ClusterMapReduceTestCase {
     props.setProperty(MRConfig.JOB_LEVEL_AUTHORIZATION_ENABLING_FLAG,
         String.valueOf(true));
     props.setProperty("dfs.permissions.enabled", "false");
-
+    props.setProperty("mapred.job.tracker.history.completed.location",
+        "historyDoneFolderOnHDFS");
     props.setProperty("mapreduce.job.committer.setup.cleanup.needed",
         "false");
     props.setProperty(MRConfig.MR_SUPERGROUP, "superGroup");
