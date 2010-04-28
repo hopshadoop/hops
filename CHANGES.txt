@@ -602,6 +602,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1728. Oracle timezone strings do not match Java.
     (Aaron Kimball via tomwhite)
 
+    MAPREDUCE-1609. TaskTracker.localizeJob should not set permissions on 
+    job log directory recursively. (Amareshwari Sriramadasu via vinodkv)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

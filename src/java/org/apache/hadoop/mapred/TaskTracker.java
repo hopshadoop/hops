@@ -286,6 +286,14 @@ public class TaskTracker
 
   private MRAsyncDiskService asyncDiskService;
   
+  MRAsyncDiskService getAsyncDiskService() {
+    return asyncDiskService;
+  }
+
+  void setAsyncDiskService(MRAsyncDiskService asyncDiskService) {
+    this.asyncDiskService = asyncDiskService;
+  }
+
   /**
   * Handle to the specific instance of the {@link TaskController} class
   */
@@ -603,8 +611,8 @@ public class TaskTracker
     // Check local disk, start async disk service, and clean up all 
     // local directories.
     checkLocalDirs(this.fConf.getLocalDirs());
-    asyncDiskService = new MRAsyncDiskService(fConf);
-    asyncDiskService.cleanupAllVolumes();
+    setAsyncDiskService(new MRAsyncDiskService(fConf));
+    getAsyncDiskService().cleanupAllVolumes();
 
     // Clear out state tables
     this.tasks.clear();
