@@ -33,6 +33,8 @@ public abstract class JobACLsManager {
 
   static final Log LOG = LogFactory.getLog(JobACLsManager.class);
 
+  public static final String UNAUTHORIZED_JOB_ACCESS_ERROR =
+      " is not authorized for performing the operation ";
   protected abstract boolean isJobLevelAuthorizationEnabled();
 
   protected abstract boolean isSuperUserOrSuperGroup(
@@ -140,7 +142,7 @@ public abstract class JobACLsManager {
     }
 
     throw new AccessControlException(callerUGI
-        + " is not authorized for performing the operation "
+        + UNAUTHORIZED_JOB_ACCESS_ERROR
         + jobOperation.toString() + " on " + jobId + ". "
         + jobOperation.toString()
         + " Access control list configured for this job : "

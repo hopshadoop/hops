@@ -26,6 +26,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.mapred.JobACLsManager;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.MiniMRCluster;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
@@ -221,7 +222,8 @@ public class TestJobACLs {
           myJob.getCounters();
           fail("AccessControlException expected..");
         } catch (IOException ioe) {
-          assertTrue(ioe.getMessage().contains("AccessControlException"));
+          assertTrue(ioe.getMessage().contains(
+              JobACLsManager.UNAUTHORIZED_JOB_ACCESS_ERROR + JobACL.VIEW_JOB));
         } catch (InterruptedException e) {
           fail("Exception .. interrupted.." + e);
         }
@@ -231,7 +233,8 @@ public class TestJobACLs {
           myJob.getTaskReports(TaskType.JOB_SETUP);
           fail("AccessControlException expected..");
         } catch (IOException ioe) {
-          assertTrue(ioe.getMessage().contains("AccessControlException"));
+          assertTrue(ioe.getMessage().contains(
+              JobACLsManager.UNAUTHORIZED_JOB_ACCESS_ERROR + JobACL.VIEW_JOB));
         } catch (InterruptedException e) {
           fail("Exception .. interrupted.." + e);
         }
@@ -334,7 +337,8 @@ public class TestJobACLs {
           myJob.killJob();
           fail("AccessControlException expected..");
         } catch (IOException ioe) {
-          assertTrue(ioe.getMessage().contains("AccessControlException"));
+          assertTrue(ioe.getMessage().contains(
+            JobACLsManager.UNAUTHORIZED_JOB_ACCESS_ERROR + JobACL.MODIFY_JOB));
         } catch (InterruptedException e) {
           fail("Exception .. interrupted.." + e);
         }
@@ -344,7 +348,8 @@ public class TestJobACLs {
           myJob.setPriority(JobPriority.HIGH);
           fail("AccessControlException expected..");
         } catch (IOException ioe) {
-          assertTrue(ioe.getMessage().contains("AccessControlException"));
+          assertTrue(ioe.getMessage().contains(
+            JobACLsManager.UNAUTHORIZED_JOB_ACCESS_ERROR + JobACL.MODIFY_JOB));
         } catch (InterruptedException e) {
           fail("Exception .. interrupted.." + e);
         }
@@ -407,7 +412,8 @@ public class TestJobACLs {
           myJob.getCounters();
           fail("AccessControlException expected..");
         } catch (IOException ioe) {
-          assertTrue(ioe.getMessage().contains("AccessControlException"));
+          assertTrue(ioe.getMessage().contains(
+              JobACLsManager.UNAUTHORIZED_JOB_ACCESS_ERROR + JobACL.VIEW_JOB));
         } catch (InterruptedException e) {
           fail("Exception .. interrupted.." + e);
         }

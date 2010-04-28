@@ -608,6 +608,8 @@ Trunk (unreleased changes)
     MAPREDUCE-1657. After task logs directory is deleted, tasklog servlet 
     displays wrong error message about job ACLs. (Ravi Gummadi via vinodkv)
 
+    MAPREDUCE-1727. TestJobACLs fails after HADOOP-6686. (Ravi Gummadi via vinodkv)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
