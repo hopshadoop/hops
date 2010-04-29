@@ -278,6 +278,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1417. Forrest documentation should be updated to reflect 
     the changes in MAPREDUCE-744. (Ravi Gummadi via vinodkv)
 
+    MAPREDUCE-1568. TrackerDistributedCacheManager should clean up cache
+    in a background thread. (Scott Chen via zshao)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band

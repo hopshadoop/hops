@@ -691,6 +691,7 @@ public class TaskTracker
     this.distributedCacheManager = 
         new TrackerDistributedCacheManager(this.fConf, taskController,
         asyncDiskService);
+    this.distributedCacheManager.startCleanupThread();
 
     this.jobClient = (InterTrackerProtocol) 
     mrOwner.doAs(new PrivilegedExceptionAction<Object>() {
@@ -1218,6 +1219,7 @@ public class TaskTracker
     this.mapLauncher.interrupt();
     this.reduceLauncher.interrupt();
     
+    this.distributedCacheManager.stopCleanupThread();
     jvmManager.stop();
     
     // shutdown RPC connections

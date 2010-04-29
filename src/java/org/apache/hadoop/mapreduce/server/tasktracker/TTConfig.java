@@ -94,4 +94,6 @@ public interface TTConfig extends MRConfig {
     "mapreduce.tasktracker.group";
   public static final String TT_USERLOGCLEANUP_SLEEPTIME = 
     "mapreduce.tasktracker.userlogcleanup.sleeptime";
+  public static final String TT_DISTRIBUTED_CACHE_CHECK_PERIOD =
+    "mapreduce.tasktracker.distributedcache.checkperiod";
 }

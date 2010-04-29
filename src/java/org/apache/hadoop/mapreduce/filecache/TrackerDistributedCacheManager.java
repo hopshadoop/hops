@@ -20,8 +20,10 @@ package org.apache.hadoop.mapreduce.filecache;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
@@ -60,14 +62,6 @@ public class TrackerDistributedCacheManager {
   private TreeMap<String, CacheStatus> cachedArchives = 
     new TreeMap<String, CacheStatus>();
 
-  // For holding the properties of each cache directory
-  static class CacheDir {
-    long size;
-    long subdirs;
-  }
-  private TreeMap<Path, CacheDir> baseDirProperties =
-    new TreeMap<Path, CacheDir>();
-
   // default total cache size (10GB)
   private static final long DEFAULT_CACHE_SIZE = 10737418240L;
   private static final long DEFAULT_CACHE_SUBDIR_LIMIT = 10000;
@@ -88,7 +82,10 @@ public class TrackerDistributedCacheManager {
   private Random random = new Random();
 
   private MRAsyncDiskService asyncDiskService;
-  
+
+  BaseDirManager baseDirManager = new BaseDirManager();
+  CleanupThread cleanupThread;
+
   public TrackerDistributedCacheManager(Configuration conf,
       TaskController taskController) throws IOException {
     this.localFs = FileSystem.getLocal(conf);
@@ -101,6 +98,7 @@ public class TrackerDistributedCacheManager {
       // setting the cache number of subdirectories limit to a default of 10000
     this.allowedCacheSubdirs = conf.getLong(
           TTConfig.TT_LOCAL_CACHE_SUBDIRS_LIMIT, DEFAULT_CACHE_SUBDIR_LIMIT);
+    this.cleanupThread = new CleanupThread(conf);
   }
 
   /**
@@ -186,26 +184,6 @@ public class TrackerDistributedCacheManager {
         createSymlink(conf, cache, lcacheStatus, isArchive, currentWorkDir,
             honorSymLinkConf);
       }
-
-      // try deleting stuff if you can
-      long size = 0;
-      long numberSubdirs = 0;
-      synchronized (lcacheStatus) {
-        synchronized (baseDirProperties) {
-          CacheDir cacheDir = baseDirProperties.get(lcacheStatus.getBaseDir());
-          if (cacheDir != null) {
-            size = cacheDir.size;
-            numberSubdirs = cacheDir.subdirs;
-          } else {
-            LOG.warn("Cannot find size and number of subdirectories of" +
-                     " baseDir: " + lcacheStatus.getBaseDir());
-          }
-        }
-      }
-      if (allowedCacheSize < size || allowedCacheSubdirs < numberSubdirs) {
-        // try some cache deletions
-        deleteCache(conf);
-      }
       initSuccessful = true;
       return localizedPath;
     } finally {
@@ -253,39 +231,6 @@ public class TrackerDistributedCacheManager {
         throw new IOException("Cannot find localized cache: " + cache);
       }
       return lcacheStatus.refcount;
-    }
-  }
-
-  // To delete the caches which have a refcount of zero
-
-  private void deleteCache(Configuration conf) throws IOException {
-    Set<CacheStatus> deleteSet = new HashSet<CacheStatus>();
-    // try deleting cache Status with refcount of zero
-    synchronized (cachedArchives) {
-      for (Iterator<String> it = cachedArchives.keySet().iterator(); 
-          it.hasNext();) {
-        String cacheId = it.next();
-        CacheStatus lcacheStatus = cachedArchives.get(cacheId);
-        
-        // if reference count is zero 
-        // mark the cache for deletion
-        if (lcacheStatus.refcount == 0) {
-          // delete this cache entry from the global list 
-          // and mark the localized file for deletion
-          deleteSet.add(lcacheStatus);
-          it.remove();
-        }
-      }
-    }
-    
-    // do the deletion, after releasing the global lock
-    for (CacheStatus lcacheStatus : deleteSet) {
-      synchronized (lcacheStatus) {
-        deleteLocalPath(asyncDiskService,
-            FileSystem.getLocal(conf), lcacheStatus.getLocalizedUniqueDir());
-        // Update the maps baseDirSize and baseDirNumberSubDir
-        deleteCacheInfoUpdate(lcacheStatus);
-      }
     }
   }
 
@@ -505,7 +450,7 @@ public class TrackerDistributedCacheManager {
     cacheStatus.size = cacheSize;
     // Increase the size and sub directory count of the cache
     // from baseDirSize and baseDirNumberSubDir.
-    addCacheInfoUpdate(cacheStatus);
+    baseDirManager.addCacheUpdate(cacheStatus);
 
     // set proper permissions for the localized directory
     setPermissions(conf, cacheStatus, isPublic);
@@ -606,30 +551,31 @@ public class TrackerDistributedCacheManager {
   }
 
   static class CacheStatus {
-    // the local load path of this cache
-    Path localizedLoadPath;
+    //
+    // This field should be accessed under global cachedArchives lock.
+    //
+    int refcount;           // number of instances using this cache.
 
-    //the base dir where the cache lies
-    Path localizedBaseDir;
+    //
+    // The following three fields should be accessed under
+    // individual cacheStatus lock.
+    //
+    long size;              //the size of this cache.
+    long mtime;             // the cache-file modification time
+    boolean inited = false; // is it initialized ?
 
-    //the size of this cache
-    long size;
-
-    // number of instances using this cache
-    int refcount;
-
-    // the cache-file modification time
-    long mtime;
-
-    // is it initialized ?
-    boolean inited = false;
-
+    //
+    // The following four fields are Immutable.
+    //
     // The sub directory (tasktracker/archive or tasktracker/user/archive),
     // under which the file will be localized
-    Path subDir;
-    
+    final Path subDir;
     // unique string used in the construction of local load path
-    String uniqueString;
+    final String uniqueString;
+    // the local load path of this cache
+    final Path localizedLoadPath;
+    //the base dir where the cache lies
+    final Path localizedBaseDir;
 
     public CacheStatus(Path baseDir, Path localLoadPath, Path subDir,
         String uniqueString) {
@@ -925,48 +871,154 @@ public class TrackerDistributedCacheManager {
   }
   
   /**
-   * Decrement the size and sub directory count of the cache from baseDirSize
-   * and baseDirNumberSubDir. Have to lock lcacheStatus before calling this.
-   * @param cacheStatus cache status of the cache is deleted
+   * A thread to check and cleanup the unused files periodically
    */
-  private void deleteCacheInfoUpdate(CacheStatus cacheStatus) {
-    if (!cacheStatus.inited) {
-      // if it is not created yet, do nothing.
-      return;
+  private class CleanupThread extends Thread {
+    // How often do we check if we need to clean up cache files?
+    private long cleanUpCheckPeriod = 60000L; // 1 minute
+    public CleanupThread(Configuration conf) {
+      cleanUpCheckPeriod =
+        conf.getLong(TTConfig.TT_DISTRIBUTED_CACHE_CHECK_PERIOD,
+                            cleanUpCheckPeriod);
     }
-    // decrement the size of the cache from baseDirSize
-    synchronized (baseDirProperties) {
-      CacheDir cacheDir = baseDirProperties.get(cacheStatus.getBaseDir());
-      if (cacheDir != null) {
-        cacheDir.size -= cacheStatus.size;
-        cacheDir.subdirs--;
-      } else {
-        LOG.warn("Cannot find size and number of subdirectories of" +
-                 " baseDir: " + cacheStatus.getBaseDir());
+    private volatile boolean running = true;
+    public void stopRunning() {
+      running = false;
+    }
+    @Override
+    public void run() {
+      while (running) {
+        try {
+          Thread.sleep(cleanUpCheckPeriod);
+          baseDirManager.checkAndCleanup();
+        } catch (Exception e) {
+          LOG.error("Exception in DistributedCache CleanupThread.", e);
+          // This thread should keep running and never crash.
+        }
       }
     }
   }
-  
+
   /**
-   * Update the maps baseDirSize and baseDirNumberSubDir when adding cache.
-   * Increase the size and sub directory count of the cache from baseDirSize
-   * and baseDirNumberSubDir. Have to lock lcacheStatus before calling this.
-   * @param cacheStatus cache status of the cache is added
+   * This class holds properties of each base directories and is responsible
+   * for clean up unused cache files in base directories.
    */
-  private void addCacheInfoUpdate(CacheStatus cacheStatus) {
-    long cacheSize = cacheStatus.size;
-    // decrement the size of the cache from baseDirSize
-    synchronized (baseDirProperties) {
-      CacheDir cacheDir = baseDirProperties.get(cacheStatus.getBaseDir());
-      if (cacheDir != null) {
-        cacheDir.size += cacheSize;
-        cacheDir.subdirs++;
-      } else {
-        cacheDir = new CacheDir();
-        cacheDir.size = cacheSize;
-        cacheDir.subdirs = 1;
-        baseDirProperties.put(cacheStatus.getBaseDir(), cacheDir);
+  private class BaseDirManager {
+    private class CacheDir {
+      long size;
+      long subdirs;
+    }
+    private TreeMap<Path, CacheDir> properties =
+      new TreeMap<Path, CacheDir>();
+
+    private long getDirSize(Path p) {
+      return properties.get(p).size;
+    }
+    private long getDirSubdirs(Path p) {
+      return properties.get(p).subdirs;
+    }
+
+    /**
+     * Check each base directory to see if the size or number of subdirectories
+     * are exceed the limit. If the limit is exceeded, start deleting caches
+     * with zero reference count. This method synchronizes cachedArchives.
+     */
+    public void checkAndCleanup() throws IOException {
+      Collection<CacheStatus> toBeDeletedCache = new LinkedList<CacheStatus>();
+      Set<Path> toBeCleanedBaseDir = new HashSet<Path>();
+      synchronized (properties) {
+        for (Path baseDir : properties.keySet()) {
+          if (allowedCacheSize < getDirSize(baseDir) ||
+              allowedCacheSubdirs < getDirSubdirs(baseDir)) {
+            toBeCleanedBaseDir.add(baseDir);
+          }
+        }
+      }
+      synchronized (cachedArchives) {
+        for (Iterator<String> it = cachedArchives.keySet().iterator();
+        it.hasNext();) {
+          String cacheId = it.next();
+          CacheStatus cacheStatus = cachedArchives.get(cacheId);
+          if (toBeCleanedBaseDir.contains(cacheStatus.getBaseDir())) {
+            // if reference count is zero mark the cache for deletion
+            if (cacheStatus.refcount == 0) {
+              // delete this cache entry from the global list 
+              // and mark the localized file for deletion
+              toBeDeletedCache.add(cacheStatus);
+              it.remove();
+            }
+          }
+        }
+      }
+      // do the deletion, after releasing the global lock
+      for (CacheStatus cacheStatus : toBeDeletedCache) {
+        synchronized (cacheStatus) {
+          deleteLocalPath(asyncDiskService, FileSystem.getLocal(trackerConf),
+                          cacheStatus.getLocalizedUniqueDir());
+          // Update the maps baseDirSize and baseDirNumberSubDir
+          deleteCacheUpdate(cacheStatus);
+        }
       }
     }
+    /**
+     * Decrement the size and sub directory count of the cache from baseDirSize
+     * and baseDirNumberSubDir. Have to synchronize cacheStatus before calling
+     * this method
+     * @param cacheStatus cache status of the cache is deleted
+     */
+    public void deleteCacheUpdate(CacheStatus cacheStatus) {
+      if (!cacheStatus.inited) {
+        // if it is not created yet, do nothing.
+        return;
+      }
+      synchronized (properties) {
+        CacheDir cacheDir = properties.get(cacheStatus.getBaseDir());
+        if (cacheDir != null) {
+          cacheDir.size -= cacheStatus.size;
+          cacheDir.subdirs--;
+        } else {
+          LOG.warn("Cannot find size and number of subdirectories of" +
+              " baseDir: " + cacheStatus.getBaseDir());
+        }
+      }
+    }
+
+    /**
+     * Update the maps baseDirSize and baseDirNumberSubDir when adding cache.
+     * Increase the size and sub directory count of the cache from baseDirSize
+     * and baseDirNumberSubDir. Have to synchronize cacheStatus before calling
+     * this method.
+     * @param cacheStatus cache status of the cache is added
+     */
+    public void addCacheUpdate(CacheStatus cacheStatus) {
+      long cacheSize = cacheStatus.size;
+      synchronized (properties) {
+        CacheDir cacheDir = properties.get(cacheStatus.getBaseDir());
+        if (cacheDir != null) {
+          cacheDir.size += cacheSize;
+          cacheDir.subdirs++;
+        } else {
+          cacheDir = new CacheDir();
+          cacheDir.size = cacheSize;
+          cacheDir.subdirs = 1;
+          properties.put(cacheStatus.getBaseDir(), cacheDir);
+        }
+      }
+    }
+  }
+
+  /**
+   * Start the background thread
+   */
+  public void startCleanupThread() {
+    this.cleanupThread.start();
+  }
+
+  /**
+   * Stop the background thread
+   */
+  public void stopCleanupThread() {
+    cleanupThread.stopRunning();
+    cleanupThread.interrupt();
   }
 }
