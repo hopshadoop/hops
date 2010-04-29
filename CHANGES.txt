@@ -275,6 +275,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-1625. Improve grouping of packages in Javadoc. (tomwhite)
 
+    MAPREDUCE-1417. Forrest documentation should be updated to reflect 
+    the changes in MAPREDUCE-744. (Ravi Gummadi via vinodkv)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
