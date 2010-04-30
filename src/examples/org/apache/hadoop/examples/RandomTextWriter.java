@@ -193,7 +193,7 @@ public class RandomTextWriter extends Configured implements Tool {
       numMaps = 1;
       conf.setLong(BYTES_PER_MAP, totalBytesToWrite);
     }
-    conf.setInt(JobContext.NUM_MAPS, numMaps);
+    conf.setInt(MRJobConfig.NUM_MAPS, numMaps);
     
     Job job = new Job(conf);
     

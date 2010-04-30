@@ -177,7 +177,7 @@ public class DistributedPentomino extends Configured implements Tool {
     int depth = conf.getInt(Pentomino.DEPTH, PENT_DEPTH);
     Class<? extends Pentomino> pentClass = conf.getClass(Pentomino.CLASS, 
       OneSidedPentomino.class, Pentomino.class);
-    int numMaps = conf.getInt(JobContext.NUM_MAPS, DEFAULT_MAPS);
+    int numMaps = conf.getInt(MRJobConfig.NUM_MAPS, DEFAULT_MAPS);
     Path output = new Path(args[0]);
     Path input = new Path(output + "_input");
     FileSystem fileSys = FileSystem.get(conf);

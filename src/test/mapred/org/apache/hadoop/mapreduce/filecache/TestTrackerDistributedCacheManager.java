@@ -37,8 +37,8 @@ import org.apache.hadoop.mapred.TaskController;
 import org.apache.hadoop.mapred.TaskTracker;
 import org.apache.hadoop.mapreduce.Cluster;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.MRConfig;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.filecache.DistributedCache;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -146,7 +146,7 @@ public class TestTrackerDistributedCacheManager extends TestCase {
     // Configures a task/job with both a regular file and a "classpath" file.
     Configuration subConf = new Configuration(conf);
     String userName = getJobOwnerName();
-    subConf.set(JobContext.USER_NAME, userName);
+    subConf.set(MRJobConfig.USER_NAME, userName);
     DistributedCache.addCacheFile(firstCacheFile.toUri(), subConf);
     DistributedCache.addFileToClassPath(secondCacheFile, subConf);
     TrackerDistributedCacheManager.determineTimestamps(subConf);
@@ -450,7 +450,7 @@ public class TestTrackerDistributedCacheManager extends TestCase {
     FileSystem localfs = FileSystem.getLocal(conf2);
     long now = System.currentTimeMillis();
     String userName = getJobOwnerName();
-    conf2.set(JobContext.USER_NAME, userName);
+    conf2.set(MRJobConfig.USER_NAME, userName);
 
     // We first test the size limit
     Path localCache = manager.getLocalCache(firstCacheFile.toUri(), conf2, 
@@ -524,7 +524,7 @@ public class TestTrackerDistributedCacheManager extends TestCase {
       new TrackerDistributedCacheManager(conf, taskController);
     conf.set("fs.fakefile.impl", conf.get("fs.file.impl"));
     String userName = getJobOwnerName();
-    conf.set(JobContext.USER_NAME, userName);
+    conf.set(MRJobConfig.USER_NAME, userName);
     Path fileToCache = new Path("fakefile:///"
         + firstCacheFile.toUri().getPath());
     Path result = manager.getLocalCache(fileToCache.toUri(), conf,
@@ -610,7 +610,7 @@ public class TestTrackerDistributedCacheManager extends TestCase {
     // ****** Imitate JobClient code
     // Configures a task/job with both a regular file and a "classpath" file.
     Configuration subConf = new Configuration(myConf);
-    subConf.set(JobContext.USER_NAME, userName);
+    subConf.set(MRJobConfig.USER_NAME, userName);
     DistributedCache.addCacheFile(firstCacheFile.toUri(), subConf);
     TrackerDistributedCacheManager.determineTimestamps(subConf);
     TrackerDistributedCacheManager.determineCacheVisibilities(subConf);
@@ -656,7 +656,7 @@ public class TestTrackerDistributedCacheManager extends TestCase {
     
     // submit another job
     Configuration subConf2 = new Configuration(myConf);
-    subConf2.set(JobContext.USER_NAME, userName);
+    subConf2.set(MRJobConfig.USER_NAME, userName);
     DistributedCache.addCacheFile(firstCacheFile.toUri(), subConf2);
     TrackerDistributedCacheManager.determineTimestamps(subConf2);
     TrackerDistributedCacheManager.determineCacheVisibilities(subConf2);
@@ -692,7 +692,7 @@ public class TestTrackerDistributedCacheManager extends TestCase {
       return;
     }
     String userName = getJobOwnerName();
-    conf.set(JobContext.USER_NAME, userName);
+    conf.set(MRJobConfig.USER_NAME, userName);
     TrackerDistributedCacheManager manager = 
         new TrackerDistributedCacheManager(conf, taskController);
     FileSystem localfs = FileSystem.getLocal(conf);

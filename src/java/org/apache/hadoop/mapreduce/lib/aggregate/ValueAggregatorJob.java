@@ -26,7 +26,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.InputFormat;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
@@ -157,7 +157,7 @@ public class ValueAggregatorJob {
     }
     String userJarFile = conf.get(ValueAggregatorJobBase.USER_JAR);
     if (userJarFile != null) {
-      conf.set(JobContext.JAR, userJarFile);
+      conf.set(MRJobConfig.JAR, userJarFile);
     }
 
     Job theJob = new Job(conf);

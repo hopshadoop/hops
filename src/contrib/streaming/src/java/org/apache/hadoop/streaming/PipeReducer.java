@@ -28,7 +28,7 @@ import org.apache.hadoop.mapred.Reducer;
 import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.mapred.OutputCollector;
 import org.apache.hadoop.mapred.SkipBadRecords;
-import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.streaming.io.InputWriter;
 import org.apache.hadoop.streaming.io.OutputReader;
 import org.apache.hadoop.util.StringUtils;
@@ -70,7 +70,7 @@ public class PipeReducer extends PipeMapRed implements Reducer {
     //processed records could be different(equal or less) than the no of 
     //records input.
     SkipBadRecords.setAutoIncrReducerProcCount(job, false);
-    skipping = job.getBoolean(JobContext.SKIP_RECORDS, false);
+    skipping = job.getBoolean(MRJobConfig.SKIP_RECORDS, false);
 
     try {
       reduceOutFieldSeparator = job_.get("stream.reduce.output.field.separator", "\t").getBytes("UTF-8");

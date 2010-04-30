@@ -34,7 +34,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapred.TaskController;
 import org.apache.hadoop.mapred.TaskController.DistributedCacheFileContext;
-import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.security.TokenCache;
 import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
 import org.apache.hadoop.mapreduce.util.MRAsyncDiskService;
@@ -477,7 +477,7 @@ public class TrackerDistributedCacheManager {
     } else {
       // invoke taskcontroller to set permissions
       DistributedCacheFileContext context = new DistributedCacheFileContext(
-          conf.get(JobContext.USER_NAME), new File(cacheStatus.localizedBaseDir
+          conf.get(MRJobConfig.USER_NAME), new File(cacheStatus.localizedBaseDir
               .toString()), cacheStatus.localizedBaseDir,
           cacheStatus.uniqueString);
       taskController.initializeDistributedCacheFile(context);
@@ -656,7 +656,7 @@ public class TrackerDistributedCacheManager {
         archiveTimestamps.append(",");
         archiveTimestamps.append(String.valueOf(status.getModificationTime()));
       }
-      job.set(JobContext.CACHE_ARCHIVES_SIZES, archiveFileSizes.toString());
+      job.set(MRJobConfig.CACHE_ARCHIVES_SIZES, archiveFileSizes.toString());
       setArchiveTimestamps(job, archiveTimestamps.toString());
     }
   
@@ -674,7 +674,7 @@ public class TrackerDistributedCacheManager {
         fileTimestamps.append(",");
         fileTimestamps.append(String.valueOf(status.getModificationTime()));
       }
-      job.set(JobContext.CACHE_FILES_SIZES, fileSizes.toString());
+      job.set(MRJobConfig.CACHE_FILES_SIZES, fileSizes.toString());
       setFileTimestamps(job, fileTimestamps.toString());
     }
   }
@@ -747,7 +747,7 @@ public class TrackerDistributedCacheManager {
    * @throws IOException
    */
   static String[] getFileVisibilities(Configuration conf) {
-    return conf.getStrings(JobContext.CACHE_FILE_VISIBILITIES);
+    return conf.getStrings(MRJobConfig.CACHE_FILE_VISIBILITIES);
   }
 
   /**
@@ -757,7 +757,7 @@ public class TrackerDistributedCacheManager {
    * @return a string array of booleans 
    */
   static String[] getArchiveVisibilities(Configuration conf) {
-    return conf.getStrings(JobContext.CACHE_ARCHIVES_VISIBILITIES);
+    return conf.getStrings(MRJobConfig.CACHE_ARCHIVES_VISIBILITIES);
   }
 
   /**
@@ -814,7 +814,7 @@ public class TrackerDistributedCacheManager {
    * The order should be the same as the order in which the archives are added.
    */
   static void setArchiveVisibilities(Configuration conf, String booleans) {
-    conf.set(JobContext.CACHE_ARCHIVES_VISIBILITIES, booleans);
+    conf.set(MRJobConfig.CACHE_ARCHIVES_VISIBILITIES, booleans);
   }
 
   /**
@@ -825,7 +825,7 @@ public class TrackerDistributedCacheManager {
    * The order should be the same as the order in which the files are added.
    */
   static void setFileVisibilities(Configuration conf, String booleans) {
-    conf.set(JobContext.CACHE_FILE_VISIBILITIES, booleans);
+    conf.set(MRJobConfig.CACHE_FILE_VISIBILITIES, booleans);
   }
 
   /**
@@ -836,7 +836,7 @@ public class TrackerDistributedCacheManager {
    * The order should be the same as the order in which the archives are added.
    */
   static void setArchiveTimestamps(Configuration conf, String timestamps) {
-    conf.set(JobContext.CACHE_ARCHIVES_TIMESTAMPS, timestamps);
+    conf.set(MRJobConfig.CACHE_ARCHIVES_TIMESTAMPS, timestamps);
   }
 
   /**
@@ -847,7 +847,7 @@ public class TrackerDistributedCacheManager {
    * The order should be the same as the order in which the files are added.
    */
   static void setFileTimestamps(Configuration conf, String timestamps) {
-    conf.set(JobContext.CACHE_FILE_TIMESTAMPS, timestamps);
+    conf.set(MRJobConfig.CACHE_FILE_TIMESTAMPS, timestamps);
   }
   
   /**
@@ -857,7 +857,7 @@ public class TrackerDistributedCacheManager {
    * @param str a comma separated list of local archives
    */
   static void setLocalArchives(Configuration conf, String str) {
-    conf.set(JobContext.CACHE_LOCALARCHIVES, str);
+    conf.set(MRJobConfig.CACHE_LOCALARCHIVES, str);
   }
 
   /**
@@ -867,7 +867,7 @@ public class TrackerDistributedCacheManager {
    * @param str a comma separated list of local files
    */
   static void setLocalFiles(Configuration conf, String str) {
-    conf.set(JobContext.CACHE_LOCALFILES, str);
+    conf.set(MRJobConfig.CACHE_LOCALFILES, str);
   }
   
   /**

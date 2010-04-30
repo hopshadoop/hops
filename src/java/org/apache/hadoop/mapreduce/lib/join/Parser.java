@@ -38,6 +38,7 @@ import org.apache.hadoop.mapreduce.InputFormat;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
@@ -327,7 +328,7 @@ public abstract static class Node extends ComposableInputFormat {
         TaskAttemptContext context = 
           new TaskAttemptContextImpl(conf, 
                                      TaskAttemptID.forName(
-                                         conf.get(JobContext.TASK_ATTEMPT_ID)));
+                                         conf.get(MRJobConfig.TASK_ATTEMPT_ID)));
         return rrCstrMap.get(ident).newInstance(id,
             inf.createRecordReader(split, context), cmpcl);
       } catch (IllegalAccessException e) {

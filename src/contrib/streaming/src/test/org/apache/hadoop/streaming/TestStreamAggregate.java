@@ -23,7 +23,7 @@ import static org.junit.Assert.*;
 import java.io.*;
 
 import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 
 /**
  * This class tests hadoopStreaming in MapReduce local mode.
@@ -65,7 +65,7 @@ public class TestStreamAggregate
       "-reducer", "aggregate",
       //"-verbose",
       //"-jobconf", "stream.debug=set"
-      "-jobconf", JobContext.PRESERVE_FAILED_TASK_FILES + "=true",
+      "-jobconf", MRJobConfig.PRESERVE_FAILED_TASK_FILES + "=true",
       "-jobconf", "stream.tmpdir="+System.getProperty("test.build.data","/tmp")
     };
   }

@@ -64,6 +64,7 @@ import org.apache.hadoop.mapreduce.split.JobSplit.TaskSplitIndex;
 import org.apache.hadoop.mapreduce.split.JobSplit.TaskSplitMetaInfo;
 import org.apache.hadoop.mapreduce.task.MapContextImpl;
 import org.apache.hadoop.mapreduce.MRConfig;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.TaskCounter;
 import org.apache.hadoop.util.IndexedSortable;
@@ -522,7 +523,7 @@ class MapTask extends Task {
     private final Counters.Counter mapOutputRecordCounter;
     
     @SuppressWarnings("unchecked")
-    NewDirectOutputCollector(org.apache.hadoop.mapreduce.JobContext jobContext,
+    NewDirectOutputCollector(MRJobConfig jobContext,
         JobConf job, TaskUmbilicalProtocol umbilical, TaskReporter reporter) 
     throws IOException, ClassNotFoundException, InterruptedException {
       this.reporter = reporter;

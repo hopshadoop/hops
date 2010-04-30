@@ -41,7 +41,7 @@ import org.apache.hadoop.mapred.Counters;
 import org.apache.hadoop.mapred.IFileInputStream;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.Reporter;
-import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.security.SecureShuffleUtils;
 import org.apache.hadoop.mapreduce.task.reduce.MapOutput.Type;
@@ -124,10 +124,10 @@ class Fetcher<K,V> extends Thread {
     }
 
     this.connectionTimeout = 
-      job.getInt(JobContext.SHUFFLE_CONNECT_TIMEOUT,
+      job.getInt(MRJobConfig.SHUFFLE_CONNECT_TIMEOUT,
                  DEFAULT_STALLED_COPY_TIMEOUT);
     this.readTimeout = 
-      job.getInt(JobContext.SHUFFLE_READ_TIMEOUT, DEFAULT_READ_TIMEOUT);
+      job.getInt(MRJobConfig.SHUFFLE_READ_TIMEOUT, DEFAULT_READ_TIMEOUT);
     
     setName("fetcher#" + id);
     setDaemon(true);

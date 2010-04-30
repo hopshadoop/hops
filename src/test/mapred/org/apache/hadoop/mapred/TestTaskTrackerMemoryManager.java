@@ -32,13 +32,13 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
 import org.apache.hadoop.mapreduce.util.LinuxResourceCalculatorPlugin;
 import org.apache.hadoop.mapreduce.util.ProcfsBasedProcessTree;
 import org.apache.hadoop.mapreduce.SleepJob;
 import org.apache.hadoop.mapreduce.util.TestProcfsBasedProcessTree;
-import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.ToolRunner;
 
@@ -185,8 +185,8 @@ public class TestTaskTrackerMemoryManager extends TestCase {
     conf.setMemoryForMapTask(PER_TASK_LIMIT);
     conf.setMemoryForReduceTask(PER_TASK_LIMIT);
     // Set task physical memory limits
-    conf.setLong(JobContext.MAP_MEMORY_PHYSICAL_MB, PER_TASK_LIMIT);
-    conf.setLong(JobContext.REDUCE_MEMORY_PHYSICAL_MB, PER_TASK_LIMIT);
+    conf.setLong(MRJobConfig.MAP_MEMORY_PHYSICAL_MB, PER_TASK_LIMIT);
+    conf.setLong(MRJobConfig.REDUCE_MEMORY_PHYSICAL_MB, PER_TASK_LIMIT);
     runAndCheckSuccessfulJob(conf);
   }
 
@@ -287,8 +287,8 @@ public class TestTaskTrackerMemoryManager extends TestCase {
     // Set up job.
     JobConf conf = new JobConf(miniMRCluster.createJobConf());
     if (doPhysicalMemory) {
-      conf.setLong(JobContext.MAP_MEMORY_PHYSICAL_MB, PER_TASK_LIMIT);
-      conf.setLong(JobContext.REDUCE_MEMORY_PHYSICAL_MB, PER_TASK_LIMIT);
+      conf.setLong(MRJobConfig.MAP_MEMORY_PHYSICAL_MB, PER_TASK_LIMIT);
+      conf.setLong(MRJobConfig.REDUCE_MEMORY_PHYSICAL_MB, PER_TASK_LIMIT);
     } else {
       conf.setMemoryForMapTask(PER_TASK_LIMIT);
       conf.setMemoryForReduceTask(PER_TASK_LIMIT);
@@ -554,8 +554,8 @@ public class TestTaskTrackerMemoryManager extends TestCase {
     // Set up job.
     JobConf conf = new JobConf(miniMRCluster.createJobConf());
     // Set per task physical memory limits to be a higher value
-    conf.setLong(JobContext.MAP_MEMORY_PHYSICAL_MB, 2 * 1024L);
-    conf.setLong(JobContext.REDUCE_MEMORY_PHYSICAL_MB, 2 * 1024L);
+    conf.setLong(MRJobConfig.MAP_MEMORY_PHYSICAL_MB, 2 * 1024L);
+    conf.setLong(MRJobConfig.REDUCE_MEMORY_PHYSICAL_MB, 2 * 1024L);
     JobClient jClient = new JobClient(conf);
     SleepJob sleepJob = new SleepJob();
     sleepJob.setConf(conf);

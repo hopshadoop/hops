@@ -28,7 +28,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.HadoopTestCase;
 import org.apache.hadoop.mapred.Utils;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.MapReduceTestUtil;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.map.InverseMapper;
@@ -43,7 +43,7 @@ public class TestMRKeyFieldBasedComparator extends HadoopTestCase {
   public TestMRKeyFieldBasedComparator() throws IOException {
     super(HadoopTestCase.LOCAL_MR, HadoopTestCase.LOCAL_FS, 1, 1);
     conf = createJobConf();
-    conf.set(JobContext.MAP_OUTPUT_KEY_FIELD_SEPERATOR, " ");
+    conf.set(MRJobConfig.MAP_OUTPUT_KEY_FIELD_SEPERATOR, " ");
   }
   
   private void testComparator(String keySpec, int expect) 
@@ -54,7 +54,7 @@ public class TestMRKeyFieldBasedComparator extends HadoopTestCase {
     
     conf.set("mapreduce.partition.keycomparator.options", keySpec);
     conf.set("mapreduce.partition.keypartitioner.options", "-k1.1,1.1");
-    conf.set(JobContext.MAP_OUTPUT_KEY_FIELD_SEPERATOR, " ");
+    conf.set(MRJobConfig.MAP_OUTPUT_KEY_FIELD_SEPERATOR, " ");
 
     Job job = MapReduceTestUtil.createJob(conf, inDir, outDir, 1, 2,
                 line1 +"\n" + line2 + "\n"); 

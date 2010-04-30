@@ -41,8 +41,8 @@ import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.mapred.lib.IdentityReducer;
-import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.MRConfig;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -423,7 +423,7 @@ public class TestNodeRefresh extends TestCase {
 
     // run a failing job to blacklist the tracker
     JobConf jConf = mr.createJobConf();
-    jConf.set(JobContext.MAX_TASK_FAILURES_PER_TRACKER, "1");
+    jConf.set(MRJobConfig.MAX_TASK_FAILURES_PER_TRACKER, "1");
     jConf.setJobName("test-job-fail-once");
     jConf.setMapperClass(FailOnceMapper.class);
     jConf.setReducerClass(IdentityReducer.class);

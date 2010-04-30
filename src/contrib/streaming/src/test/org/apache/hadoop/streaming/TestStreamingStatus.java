@@ -30,7 +30,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.MiniMRCluster;
 import org.apache.hadoop.mapred.TaskReport;
-import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 
 
@@ -53,9 +53,9 @@ public class TestStreamingStatus {
       "-input", INPUT_FILE,
       "-output", OUTPUT_DIR,
       "-mapper", map,
-      "-jobconf", JobContext.NUM_MAPS + "=1",
-      "-jobconf", JobContext.NUM_REDUCES + "=0",      
-      "-jobconf", JobContext.PRESERVE_FAILED_TASK_FILES + "=true",
+      "-jobconf", MRJobConfig.NUM_MAPS + "=1",
+      "-jobconf", MRJobConfig.NUM_REDUCES + "=0",      
+      "-jobconf", MRJobConfig.PRESERVE_FAILED_TASK_FILES + "=true",
       "-jobconf", "stream.tmpdir="+System.getProperty("test.build.data","/tmp"),
       "-jobconf", JTConfig.JT_IPC_ADDRESS + "=localhost:"+jobtrackerPort,
       "-jobconf", "fs.default.name=file:///"

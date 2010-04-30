@@ -21,7 +21,7 @@ package org.apache.hadoop.mapred;
 import java.util.Properties;
 
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
 import org.apache.hadoop.mapreduce.SleepJob;
@@ -107,7 +107,7 @@ public class TestCapacitySchedulerWithJobTracker extends
 
     JobConf conf = getJobConf();
     conf.setSpeculativeExecution(false);
-    conf.set(JobContext.SETUP_CLEANUP_NEEDED, "false");
+    conf.set(MRJobConfig.SETUP_CLEANUP_NEEDED, "false");
     conf.setNumTasksToExecutePerJvm(-1);
     conf.setQueueName(queues[0]);
     SleepJob sleepJob1 = new SleepJob();

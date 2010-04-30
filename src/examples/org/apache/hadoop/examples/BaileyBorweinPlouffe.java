@@ -41,6 +41,7 @@ import org.apache.hadoop.mapreduce.InputFormat;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.Reducer;
@@ -328,11 +329,11 @@ public class BaileyBorweinPlouffe extends Configured implements Tool {
     job.setInputFormatClass(BbpInputFormat.class);
 
     // disable task timeout
-    jobconf.setLong(JobContext.TASK_TIMEOUT, 0);
+    jobconf.setLong(MRJobConfig.TASK_TIMEOUT, 0);
 
     // do not use speculative execution
-    jobconf.setBoolean(JobContext.MAP_SPECULATIVE, false);
-    jobconf.setBoolean(JobContext.REDUCE_SPECULATIVE, false);
+    jobconf.setBoolean(MRJobConfig.MAP_SPECULATIVE, false);
+    jobconf.setBoolean(MRJobConfig.REDUCE_SPECULATIVE, false);
     return job;
   }
 

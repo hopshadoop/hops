@@ -281,6 +281,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1568. TrackerDistributedCacheManager should clean up cache
     in a background thread. (Scott Chen via zshao)
 
+    MAPREDUCE-1749. Move configuration strings out of JobContext so that it
+    can be made public stable. (omalley)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band

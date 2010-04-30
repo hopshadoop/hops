@@ -34,6 +34,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Cluster;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.Partitioner;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
@@ -153,7 +154,7 @@ public class TeraSort extends Configured implements Tool {
      */
     private static Text[] readPartitions(FileSystem fs, Path p,
         Configuration conf) throws IOException {
-      int reduces = conf.getInt(JobContext.NUM_REDUCES, 1);
+      int reduces = conf.getInt(MRJobConfig.NUM_REDUCES, 1);
       Text[] result = new Text[reduces - 1];
       DataInputStream reader = fs.open(p);
       for(int i=0; i < reduces - 1; ++i) {
@@ -242,7 +243,7 @@ public class TeraSort extends Configured implements Tool {
     public void setConf(Configuration conf) {
       this.conf = conf;
       prefixesPerReduce = (int) Math.ceil((1 << (8 * PREFIX_LENGTH)) / 
-        (float) conf.getInt(JobContext.NUM_REDUCES, 1));
+        (float) conf.getInt(MRJobConfig.NUM_REDUCES, 1));
     }
     
     public Configuration getConf() {

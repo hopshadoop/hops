@@ -75,7 +75,7 @@ import org.apache.hadoop.mapred.TaskController.TaskControllerJobPathDeletionCont
 import org.apache.hadoop.mapred.TaskTrackerStatus.TaskTrackerHealthStatus;
 import org.apache.hadoop.mapred.pipes.Submitter;
 import org.apache.hadoop.mapreduce.MRConfig;
-import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.filecache.TrackerDistributedCacheManager;
 import org.apache.hadoop.mapreduce.security.SecureShuffleUtils;
@@ -233,7 +233,7 @@ public class TaskTracker
   static final String JOBFILE = "job.xml";
   static final String JOB_TOKEN_FILE="jobToken"; //localized file
 
-  static final String JOB_LOCAL_DIR = JobContext.JOB_LOCAL_DIR;
+  static final String JOB_LOCAL_DIR = MRJobConfig.JOB_LOCAL_DIR;
 
   private JobConf fConf;
   private FileSystem localFs;
@@ -2261,8 +2261,8 @@ public class TaskTracker
     }
     // Obtain physical memory limits from the job configuration
     long physicalMemoryLimit =
-      conf.getLong(isMap ? JobContext.MAP_MEMORY_PHYSICAL_MB :
-                   JobContext.REDUCE_MEMORY_PHYSICAL_MB,
+      conf.getLong(isMap ? MRJobConfig.MAP_MEMORY_PHYSICAL_MB :
+                   MRJobConfig.REDUCE_MEMORY_PHYSICAL_MB,
                    JobConf.DISABLED_MEMORY_LIMIT);
     if (physicalMemoryLimit > 0) {
       physicalMemoryLimit *= 1024L * 1024L;
@@ -2482,7 +2482,7 @@ public class TaskTracker
     public synchronized void setJobConf(JobConf lconf){
       this.localJobConf = lconf;
       keepFailedTaskFiles = localJobConf.getKeepFailedTaskFiles();
-      taskTimeout = localJobConf.getLong(JobContext.TASK_TIMEOUT, 
+      taskTimeout = localJobConf.getLong(MRJobConfig.TASK_TIMEOUT, 
                                          10 * 60 * 1000);
     }
         
@@ -2805,7 +2805,7 @@ public class TaskTracker
         getTaskController().runDebugScript(context);
         // add all lines of debug out to diagnostics
         try {
-          int num = localJobConf.getInt(JobContext.TASK_DEBUGOUT_LINES,
+          int num = localJobConf.getInt(MRJobConfig.TASK_DEBUGOUT_LINES,
               -1);
           addDiagnostics(FileUtil.makeShellPath(stdout),num,
               "DEBUG OUT");

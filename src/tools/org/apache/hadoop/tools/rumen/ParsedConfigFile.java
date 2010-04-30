@@ -29,7 +29,7 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.apache.hadoop.mapreduce.MRConfig;
-import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.w3c.dom.Document;
 import org.w3c.dom.NodeList;
 import org.w3c.dom.Node;
@@ -159,11 +159,11 @@ class ParsedConfigFile {
           }
         }
 
-        if (JobContext.QUEUE_NAME.equals(attr) && value != null) {
+        if (MRJobConfig.QUEUE_NAME.equals(attr) && value != null) {
           queue = value;
         }
 
-        if (JobContext.JOB_NAME.equals(attr) && value != null) {
+        if (MRJobConfig.JOB_NAME.equals(attr) && value != null) {
           jobName = value;
         }
 
@@ -173,9 +173,9 @@ class ParsedConfigFile {
             maybeGetIntValue(MRConfig.REDUCEMEMORY_MB, attr, value,
                 clusterReduceMB);
         jobMapMB =
-            maybeGetIntValue(JobContext.MAP_MEMORY_MB, attr, value, jobMapMB);
+            maybeGetIntValue(MRJobConfig.MAP_MEMORY_MB, attr, value, jobMapMB);
         jobReduceMB =
-            maybeGetIntValue(JobContext.REDUCE_MEMORY_MB, attr, value,
+            maybeGetIntValue(MRJobConfig.REDUCE_MEMORY_MB, attr, value,
                 jobReduceMB);
       }
 

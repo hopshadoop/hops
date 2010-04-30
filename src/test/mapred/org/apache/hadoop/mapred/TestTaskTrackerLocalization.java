@@ -34,9 +34,9 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.security.TokenCache;
 import org.apache.hadoop.mapreduce.security.token.JobTokenIdentifier;
@@ -133,9 +133,9 @@ public class TestTaskTrackerLocalization extends TestCase {
     // Set job view ACLs in conf sothat validation of contents of jobACLsFile
     // can be done against this value. Have both users and groups
     String jobViewACLs = "user1,user2, group1,group2";
-    jobConf.set(JobContext.JOB_ACL_VIEW_JOB, jobViewACLs);
+    jobConf.set(MRJobConfig.JOB_ACL_VIEW_JOB, jobViewACLs);
 
-    jobConf.setInt(JobContext.USER_LOG_RETAIN_HOURS, 0);
+    jobConf.setInt(MRJobConfig.USER_LOG_RETAIN_HOURS, 0);
     jobConf.setUser(getJobOwner().getShortUserName());
 
     Job job = new Job(jobConf);
@@ -657,10 +657,10 @@ public class TestTaskTrackerLocalization extends TestCase {
     // Validate the contents of jobACLsFile(both user name and job-view-acls)
     Configuration jobACLsConf =
         TaskLogServlet.getConfFromJobACLsFile(task.getTaskID().toString());
-    assertTrue(jobACLsConf.get(JobContext.USER_NAME).equals(
+    assertTrue(jobACLsConf.get(MRJobConfig.USER_NAME).equals(
         localizedJobConf.getUser()));
-    assertTrue(jobACLsConf.get(JobContext.JOB_ACL_VIEW_JOB).
-        equals(localizedJobConf.get(JobContext.JOB_ACL_VIEW_JOB)));
+    assertTrue(jobACLsConf.get(MRJobConfig.JOB_ACL_VIEW_JOB).
+        equals(localizedJobConf.get(MRJobConfig.JOB_ACL_VIEW_JOB)));
   }
 
   /**

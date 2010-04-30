@@ -28,7 +28,7 @@ import org.apache.commons.logging.LogFactory;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.InputSplit;
-import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 
 /**
  * Implement DBSplitter over floating-point values.
@@ -61,7 +61,7 @@ public class FloatSplitter implements DBSplitter {
 
     // Use this as a hint. May need an extra task if the size doesn't
     // divide cleanly.
-    int numSplits = conf.getInt(JobContext.NUM_MAPS, 1);
+    int numSplits = conf.getInt(MRJobConfig.NUM_MAPS, 1);
     double splitSize = (maxVal - minVal) / (double) numSplits;
 
     if (splitSize < MIN_INCREMENT) {

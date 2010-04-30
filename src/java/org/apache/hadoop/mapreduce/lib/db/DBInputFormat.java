@@ -36,6 +36,7 @@ import org.apache.hadoop.mapreduce.InputFormat;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.util.ReflectionUtils;
@@ -238,7 +239,7 @@ public class DBInputFormat<T extends DBWritable>
       results.next();
 
       long count = results.getLong(1);
-      int chunks = job.getConfiguration().getInt(JobContext.NUM_MAPS, 1);
+      int chunks = job.getConfiguration().getInt(MRJobConfig.NUM_MAPS, 1);
       long chunkSize = (count / chunks);
 
       results.close();

@@ -32,7 +32,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
 import org.apache.hadoop.mapreduce.util.MRAsyncDiskService;
 
@@ -149,7 +149,7 @@ class UserLogCleaner extends Thread {
 
   private int getUserlogRetainMillis(Configuration conf) {
     return (conf == null ? UserLogCleaner.DEFAULT_USER_LOG_RETAIN_HOURS
-        : conf.getInt(JobContext.USER_LOG_RETAIN_HOURS,
+        : conf.getInt(MRJobConfig.USER_LOG_RETAIN_HOURS,
             UserLogCleaner.DEFAULT_USER_LOG_RETAIN_HOURS)) * 1000 * 60 * 60;
   }
 

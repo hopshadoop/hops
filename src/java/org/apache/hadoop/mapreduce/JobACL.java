@@ -29,14 +29,14 @@ public enum JobACL {
    * ACL for 'viewing' job. Dictates who can 'view' some or all of the job
    * related details.
    */
-  VIEW_JOB(JobContext.JOB_ACL_VIEW_JOB),
+  VIEW_JOB(MRJobConfig.JOB_ACL_VIEW_JOB),
 
   /**
    * ACL for 'modifying' job. Dictates who can 'modify' the job for e.g., by
    * killing the job, killing/failing a task of the job or setting priority of
    * the job.
    */
-  MODIFY_JOB(JobContext.JOB_ACL_MODIFY_JOB);
+  MODIFY_JOB(MRJobConfig.JOB_ACL_MODIFY_JOB);
 
   String aclName;
 

@@ -24,7 +24,7 @@ import org.apache.hadoop.contrib.index.example.LineDocInputFormat;
 import org.apache.hadoop.contrib.index.example.LineDocLocalAnalysis;
 import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hadoop.mapreduce.MRConfig;
-import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 
@@ -64,7 +64,7 @@ public class IndexUpdateConfiguration {
    * @return the IO sort space in MB
    */
   public int getIOSortMB() {
-    return conf.getInt(JobContext.IO_SORT_MB, 100);
+    return conf.getInt(MRJobConfig.IO_SORT_MB, 100);
   }
 
   /**
@@ -72,7 +72,7 @@ public class IndexUpdateConfiguration {
    * @param mb  the IO sort space in MB
    */
   public void setIOSortMB(int mb) {
-    conf.setInt(JobContext.IO_SORT_MB, mb);
+    conf.setInt(MRJobConfig.IO_SORT_MB, mb);
   }
 
   /**

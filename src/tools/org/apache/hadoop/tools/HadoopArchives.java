@@ -64,8 +64,8 @@ import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.mapred.SequenceFileRecordReader;
 import org.apache.hadoop.mapred.lib.NullOutputFormat;
 import org.apache.hadoop.mapreduce.Cluster;
-import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobSubmissionFiles;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
@@ -546,7 +546,7 @@ public class HadoopArchives implements Tool {
     conf.setReducerClass(HArchivesReducer.class);
     conf.setMapOutputKeyClass(IntWritable.class);
     conf.setMapOutputValueClass(Text.class);
-    conf.set(JobContext.HISTORY_LOCATION, "none");
+    conf.set(MRJobConfig.HISTORY_LOCATION, "none");
     FileInputFormat.addInputPath(conf, jobDirectory);
     //make sure no speculative execution is done
     conf.setSpeculativeExecution(false);
@@ -583,7 +583,7 @@ public class HadoopArchives implements Tool {
       // this is tightly tied to map reduce
       // since it does not expose an api 
       // to get the partition
-      partId = conf.getInt(JobContext.TASK_PARTITION, -1);
+      partId = conf.getInt(MRJobConfig.TASK_PARTITION, -1);
       // create a file name using the partition
       // we need to write to this directory
       tmpOutputDir = FileOutputFormat.getWorkOutputPath(conf);

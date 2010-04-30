@@ -44,7 +44,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.MiniMRCluster;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.SleepJob;
 import org.apache.hadoop.security.TokenStorage;
 import org.apache.hadoop.security.token.Token;
@@ -207,9 +207,9 @@ public class TestTokenCache {
     
     // provide namenodes names for the job to get the delegation tokens for
     String nnUri = dfsCluster.getURI().toString();
-    jConf.set(JobContext.JOB_NAMENODES, nnUri + "," + nnUri);
+    jConf.set(MRJobConfig.JOB_NAMENODES, nnUri + "," + nnUri);
     // job tracker principla id..
-    jConf.set(JobContext.JOB_JOBTRACKER_ID, "jt_id");
+    jConf.set(MRJobConfig.JOB_JOBTRACKER_ID, "jt_id");
     
     // using argument to pass the file name
     String[] args = {

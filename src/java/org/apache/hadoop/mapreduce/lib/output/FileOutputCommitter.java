@@ -29,6 +29,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobStatus;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.OutputCommitter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
@@ -92,7 +93,7 @@ public class FileOutputCommitter extends OutputCommitter {
   }
   
   // Create a _success file in the job's output dir
-  private void markOutputDirSuccessful(JobContext context) throws IOException {
+  private void markOutputDirSuccessful(MRJobConfig context) throws IOException {
     if (outputPath != null) {
       // create a file in the output folder to mark the job completion
       Path filePath = new Path(outputPath, SUCCEEDED_FILE_NAME);

@@ -50,6 +50,7 @@ import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobCounter;
 import org.apache.hadoop.mapreduce.JobACL;
 import org.apache.hadoop.mapreduce.JobSubmissionFiles;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.jobhistory.JobFinishedEvent;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistory;
@@ -344,13 +345,13 @@ public class JobInProgress {
     (numMapTasks + numReduceTasks + 10);
     
     this.slowTaskThreshold = Math.max(0.0f,
-        conf.getFloat(JobContext.SPECULATIVE_SLOWTASK_THRESHOLD,1.0f));
+        conf.getFloat(MRJobConfig.SPECULATIVE_SLOWTASK_THRESHOLD,1.0f));
     this.speculativeCap = conf.getFloat(
-        JobContext.SPECULATIVECAP,0.1f);
+        MRJobConfig.SPECULATIVECAP,0.1f);
     this.slowNodeThreshold = conf.getFloat(
-        JobContext.SPECULATIVE_SLOWNODE_THRESHOLD,1.0f);
+        MRJobConfig.SPECULATIVE_SLOWNODE_THRESHOLD,1.0f);
     this.jobSetupCleanupNeeded = conf.getBoolean(
-        JobContext.SETUP_CLEANUP_NEEDED, true);
+        MRJobConfig.SETUP_CLEANUP_NEEDED, true);
     if (tracker != null) { // Some mock tests have null tracker
       this.jobHistory = tracker.getJobHistory();
     }
@@ -450,11 +451,11 @@ public class JobInProgress {
     this.nonRunningReduces = new LinkedList<TaskInProgress>();    
     this.runningReduces = new LinkedHashSet<TaskInProgress>();
     this.slowTaskThreshold = Math.max(0.0f,
-        conf.getFloat(JobContext.SPECULATIVE_SLOWTASK_THRESHOLD,1.0f));
+        conf.getFloat(MRJobConfig.SPECULATIVE_SLOWTASK_THRESHOLD,1.0f));
     this.speculativeCap = conf.getFloat(
-        JobContext.SPECULATIVECAP,0.1f);
+        MRJobConfig.SPECULATIVECAP,0.1f);
     this.slowNodeThreshold = conf.getFloat(
-        JobContext.SPECULATIVE_SLOWNODE_THRESHOLD,1.0f); 
+        MRJobConfig.SPECULATIVE_SLOWNODE_THRESHOLD,1.0f); 
     // register job's tokens for renewal
     DelegationTokenRenewal.registerDelegationTokensForRenewal(
         jobInfo.getJobID(), ts, this.conf);
@@ -616,7 +617,7 @@ public class JobInProgress {
     // we should start scheduling reduces
     completedMapsForReduceSlowstart = 
       (int)Math.ceil(
-          (conf.getFloat(JobContext.COMPLETED_MAPS_FOR_REDUCE_SLOWSTART, 
+          (conf.getFloat(MRJobConfig.COMPLETED_MAPS_FOR_REDUCE_SLOWSTART, 
                          DEFAULT_COMPLETED_MAPS_PERCENT_FOR_REDUCE_SLOWSTART) * 
            numMapTasks));
     
@@ -3266,7 +3267,7 @@ public class JobInProgress {
 
      }
      // remove jobs delegation tokens
-     if(conf.getBoolean(JobContext.JOB_CANCEL_DELEGATION_TOKEN, true)) {
+     if(conf.getBoolean(MRJobConfig.JOB_CANCEL_DELEGATION_TOKEN, true)) {
        DelegationTokenRenewal.removeDelegationTokenRenewalForJob(jobId);
      } // else don't remove it.May be used by spawned tasks
    }

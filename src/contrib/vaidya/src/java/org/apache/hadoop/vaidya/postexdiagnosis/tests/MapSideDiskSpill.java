@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.vaidya.postexdiagnosis.tests;
 
-import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.vaidya.statistics.job.JobStatistics;
 import org.apache.hadoop.vaidya.statistics.job.JobStatisticsInterface.JobKeys;
 import org.apache.hadoop.vaidya.statistics.job.JobStatisticsInterface.KeyDataType;
@@ -99,11 +99,11 @@ public class MapSideDiskSpill extends DiagnosticTest {
   public String getPrescription() {
     return 
     "* Use combiner to lower the map output size.\n" +
-      "* Increase map side sort buffer size (" + JobContext.IO_SORT_MB + 
-      ":" + this._job.getJobConf().getInt(JobContext.IO_SORT_MB, 0) + ").\n" +
+      "* Increase map side sort buffer size (" + MRJobConfig.IO_SORT_MB + 
+      ":" + this._job.getJobConf().getInt(MRJobConfig.IO_SORT_MB, 0) + ").\n" +
       ") if number of Map Output Records are large. \n" +
-      "* Increase (" + JobContext.MAP_SORT_SPILL_PERCENT + ":" + 
-      this._job.getJobConf().getInt(JobContext.MAP_SORT_SPILL_PERCENT, 0) + 
+      "* Increase (" + MRJobConfig.MAP_SORT_SPILL_PERCENT + ":" + 
+      this._job.getJobConf().getInt(MRJobConfig.MAP_SORT_SPILL_PERCENT, 0) + 
       "), default 0.80 i.e. 80% of sort buffer size. \n";
   }
 

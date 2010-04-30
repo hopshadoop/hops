@@ -26,7 +26,7 @@ import junit.framework.TestCase;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 
 /**
  * Verifies if TaskRunner.SetupWorkDir() is cleaning up files/dirs pointed
@@ -92,7 +92,7 @@ public class TestSetupWorkDir extends TestCase {
         (fs.listStatus(myTargetDir).length == 2));
 
     // let us disable creation of symlinks in setupWorkDir()
-    jConf.set(JobContext.CACHE_SYMLINK, "no");
+    jConf.set(MRJobConfig.CACHE_SYMLINK, "no");
 
     // Deletion of myWorkDir should not affect contents of myTargetDir.
     // myTargetDir is like $user/jobcache/distcache

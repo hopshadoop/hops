@@ -24,8 +24,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.mapred.UtilsForTests.FakeClock;
-import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.MRConfig;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.server.tasktracker.Localizer;
 import org.apache.hadoop.mapreduce.util.MRAsyncDiskService;
 
@@ -75,7 +75,7 @@ public class TestUserLogCleanup {
 
   private void jobFinished(JobID jobid, int logRetainHours) {
     Configuration jobconf = new Configuration();
-    jobconf.setInt(JobContext.USER_LOG_RETAIN_HOURS, logRetainHours);
+    jobconf.setInt(MRJobConfig.USER_LOG_RETAIN_HOURS, logRetainHours);
     taskLogCleanupThread.markJobLogsForDeletion(myClock.getTime(), jobconf,
         jobid);
   }
@@ -147,7 +147,7 @@ public class TestUserLogCleanup {
     // job directories will be added with 3 hours as retain hours. They will be
     // deleted at time 4.
     Configuration conf = new Configuration();
-    conf.setInt(JobContext.USER_LOG_RETAIN_HOURS, 3);
+    conf.setInt(MRJobConfig.USER_LOG_RETAIN_HOURS, 3);
     taskLogCleanupThread.clearOldUserLogs(conf);
     assertFalse(foo.exists());
     assertFalse(bar.exists());
@@ -229,7 +229,7 @@ public class TestUserLogCleanup {
     // clear userlog directory
     // job directories will be added with 3 hours as retain hours. 
     Configuration conf = new Configuration();
-    conf.setInt(JobContext.USER_LOG_RETAIN_HOURS, 3);
+    conf.setInt(MRJobConfig.USER_LOG_RETAIN_HOURS, 3);
     taskLogCleanupThread = new UserLogCleaner(conf);
     myClock = new FakeClock(); // clock is reset.
     taskLogCleanupThread.setClock(myClock);

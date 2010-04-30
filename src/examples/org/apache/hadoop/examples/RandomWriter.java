@@ -106,7 +106,7 @@ public class RandomWriter extends Configured implements Tool {
       List<InputSplit> result = new ArrayList<InputSplit>();
       Path outDir = FileOutputFormat.getOutputPath(job);
       int numSplits = 
-            job.getConfiguration().getInt(JobContext.NUM_MAPS, 1);
+            job.getConfiguration().getInt(MRJobConfig.NUM_MAPS, 1);
       for(int i=0; i < numSplits; ++i) {
         result.add(new FileSplit(new Path(outDir, "dummy-split-" + i), 0, 1, 
                                   (String[])null));
@@ -259,7 +259,7 @@ public class RandomWriter extends Configured implements Tool {
       numMaps = 1;
       conf.setLong(BYTES_PER_MAP, totalBytesToWrite);
     }
-    conf.setInt(JobContext.NUM_MAPS, numMaps);
+    conf.setInt(MRJobConfig.NUM_MAPS, numMaps);
 
     Job job = new Job(conf);
     

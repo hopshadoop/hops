@@ -30,6 +30,7 @@ import org.apache.hadoop.mapred.UtilsForTests;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobStatus;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
@@ -73,7 +74,7 @@ public class TestFileOutputCommitter extends TestCase {
     Job job = new Job();
     FileOutputFormat.setOutputPath(job, outDir);
     Configuration conf = job.getConfiguration();
-    conf.set(JobContext.TASK_ATTEMPT_ID, attempt);
+    conf.set(MRJobConfig.TASK_ATTEMPT_ID, attempt);
     JobContext jContext = new JobContextImpl(conf, taskID.getJobID());
     TaskAttemptContext tContext = new TaskAttemptContextImpl(conf, taskID);
     FileOutputCommitter committer = new FileOutputCommitter(outDir, tContext);
@@ -110,7 +111,7 @@ public class TestFileOutputCommitter extends TestCase {
     Job job = new Job();
     FileOutputFormat.setOutputPath(job, outDir);
     Configuration conf = job.getConfiguration();
-    conf.set(JobContext.TASK_ATTEMPT_ID, attempt);
+    conf.set(MRJobConfig.TASK_ATTEMPT_ID, attempt);
     JobContext jContext = new JobContextImpl(conf, taskID.getJobID());
     TaskAttemptContext tContext = new TaskAttemptContextImpl(conf, taskID);
     FileOutputCommitter committer = new FileOutputCommitter(outDir, tContext);
@@ -160,7 +161,7 @@ public class TestFileOutputCommitter extends TestCase {
     Configuration conf = job.getConfiguration();
     conf.set(FileSystem.FS_DEFAULT_NAME_KEY, "faildel:///");
     conf.setClass("fs.faildel.impl", FakeFileSystem.class, FileSystem.class);
-    conf.set(JobContext.TASK_ATTEMPT_ID, attempt);
+    conf.set(MRJobConfig.TASK_ATTEMPT_ID, attempt);
     FileOutputFormat.setOutputPath(job, outDir);
     JobContext jContext = new JobContextImpl(conf, taskID.getJobID());
     TaskAttemptContext tContext = new TaskAttemptContextImpl(conf, taskID);

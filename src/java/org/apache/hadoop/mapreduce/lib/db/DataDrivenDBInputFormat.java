@@ -41,6 +41,7 @@ import org.apache.hadoop.mapreduce.InputFormat;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.util.ReflectionUtils;
@@ -160,7 +161,7 @@ public class DataDrivenDBInputFormat<T extends DBWritable>
   /** {@inheritDoc} */
   public List<InputSplit> getSplits(JobContext job) throws IOException {
 
-    int targetNumTasks = job.getConfiguration().getInt(JobContext.NUM_MAPS, 1);
+    int targetNumTasks = job.getConfiguration().getInt(MRJobConfig.NUM_MAPS, 1);
     if (1 == targetNumTasks) {
       // There's no need to run a bounding vals query; just return a split
       // that separates nothing. This can be considerably more optimal for a

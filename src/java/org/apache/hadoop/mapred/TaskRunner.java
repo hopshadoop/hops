@@ -35,8 +35,8 @@ import java.util.Vector;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.MRConfig;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.filecache.DistributedCache;
 import org.apache.hadoop.mapreduce.filecache.TaskDistributedCacheManager;
 import org.apache.hadoop.mapreduce.filecache.TrackerDistributedCacheManager;
@@ -312,13 +312,13 @@ abstract class TaskRunner extends Thread {
     Configuration aclConf = new Configuration(false);
 
     // set the job view acls in aclConf
-    String jobViewACLs = conf.get(JobContext.JOB_ACL_VIEW_JOB);
+    String jobViewACLs = conf.get(MRJobConfig.JOB_ACL_VIEW_JOB);
     if (jobViewACLs != null) {
-      aclConf.set(JobContext.JOB_ACL_VIEW_JOB, jobViewACLs);
+      aclConf.set(MRJobConfig.JOB_ACL_VIEW_JOB, jobViewACLs);
     }
     // set jobOwner as mapreduce.job.user.name in aclConf
     String jobOwner = conf.getUser();
-    aclConf.set(JobContext.USER_NAME, jobOwner);
+    aclConf.set(MRJobConfig.USER_NAME, jobOwner);
     FileOutputStream out = new FileOutputStream(aclFile);
     try {
       aclConf.writeXml(out);
@@ -492,7 +492,7 @@ abstract class TaskRunner extends Thread {
       throws IOException {
 
     // add java.io.tmpdir given by mapreduce.task.tmp.dir
-    String tmp = conf.get(JobContext.TASK_TEMP_DIR, "./tmp");
+    String tmp = conf.get(MRJobConfig.TASK_TEMP_DIR, "./tmp");
     Path tmpDir = new Path(tmp);
 
     // if temp directory path is not absolute, prepend it with workDir.

@@ -300,8 +300,8 @@ public class TestMapCollection {
     conf.setInt(Job.COMPLETION_POLL_INTERVAL_KEY, 100);
     Job job = Job.getInstance(new Cluster(conf), conf);
     conf = job.getConfiguration();
-    conf.setInt(JobContext.IO_SORT_MB, ioSortMB);
-    conf.set(JobContext.MAP_SORT_SPILL_PERCENT, Float.toString(spillPer));
+    conf.setInt(MRJobConfig.IO_SORT_MB, ioSortMB);
+    conf.set(MRJobConfig.MAP_SORT_SPILL_PERCENT, Float.toString(spillPer));
     conf.setClass("test.mapcollection.class", FixedRecordFactory.class,
         RecordFactory.class);
     FixedRecordFactory.setLengths(conf, keylen, vallen);
@@ -311,7 +311,7 @@ public class TestMapCollection {
 
   private static void runTest(String name, Job job) throws Exception {
     job.setNumReduceTasks(1);
-    job.getConfiguration().setInt(JobContext.IO_SORT_FACTOR, 1000);
+    job.getConfiguration().setInt(MRJobConfig.IO_SORT_FACTOR, 1000);
     job.getConfiguration().set("fs.default.name", "file:///");
     job.getConfiguration().setInt("test.mapcollection.num.maps", 1);
     job.setInputFormatClass(FakeIF.class);
@@ -411,9 +411,9 @@ public class TestMapCollection {
     conf.setInt(Job.COMPLETION_POLL_INTERVAL_KEY, 100);
     Job job = Job.getInstance(new Cluster(conf), conf);
     conf = job.getConfiguration();
-    conf.setInt(JobContext.IO_SORT_MB, 1);
+    conf.setInt(MRJobConfig.IO_SORT_MB, 1);
     // 2^20 * spill = 14336 bytes available post-spill, at most 896 meta
-    conf.set(JobContext.MAP_SORT_SPILL_PERCENT, Float.toString(.986328125f));
+    conf.set(MRJobConfig.MAP_SORT_SPILL_PERCENT, Float.toString(.986328125f));
     conf.setClass("test.mapcollection.class", StepFactory.class,
         RecordFactory.class);
     StepFactory.setLengths(conf, 4000, 0, 96, 0, 252);
@@ -429,8 +429,8 @@ public class TestMapCollection {
     conf.setInt(Job.COMPLETION_POLL_INTERVAL_KEY, 100);
     Job job = Job.getInstance(new Cluster(conf), conf);
     conf = job.getConfiguration();
-    conf.setInt(JobContext.IO_SORT_MB, 1);
-    conf.set(JobContext.MAP_SORT_SPILL_PERCENT, Float.toString(.986328125f));
+    conf.setInt(MRJobConfig.IO_SORT_MB, 1);
+    conf.set(MRJobConfig.MAP_SORT_SPILL_PERCENT, Float.toString(.986328125f));
     conf.setClass("test.mapcollection.class", StepFactory.class,
         RecordFactory.class);
     StepFactory.setLengths(conf, 4000, 261120, 96, 1024, 251);
@@ -498,14 +498,14 @@ public class TestMapCollection {
     conf.setInt(Job.COMPLETION_POLL_INTERVAL_KEY, 100);
     Job job = Job.getInstance(new Cluster(conf), conf);
     conf = job.getConfiguration();
-    conf.setInt(JobContext.IO_SORT_MB, 1);
+    conf.setInt(MRJobConfig.IO_SORT_MB, 1);
     conf.setClass("test.mapcollection.class", RandomFactory.class,
         RecordFactory.class);
     final Random r = new Random();
     final long seed = r.nextLong();
     LOG.info("SEED: " + seed);
     r.setSeed(seed);
-    conf.set(JobContext.MAP_SORT_SPILL_PERCENT,
+    conf.set(MRJobConfig.MAP_SORT_SPILL_PERCENT,
         Float.toString(Math.max(0.1f, r.nextFloat())));
     RandomFactory.setLengths(conf, r, 1 << 14);
     conf.setInt("test.spillmap.records", r.nextInt(500));
@@ -519,15 +519,15 @@ public class TestMapCollection {
     conf.setInt(Job.COMPLETION_POLL_INTERVAL_KEY, 100);
     Job job = Job.getInstance(new Cluster(conf), conf);
     conf = job.getConfiguration();
-    conf.setInt(JobContext.IO_SORT_MB, 1);
-    conf.setBoolean(JobContext.MAP_OUTPUT_COMPRESS, true);
+    conf.setInt(MRJobConfig.IO_SORT_MB, 1);
+    conf.setBoolean(MRJobConfig.MAP_OUTPUT_COMPRESS, true);
     conf.setClass("test.mapcollection.class", RandomFactory.class,
         RecordFactory.class);
     final Random r = new Random();
     final long seed = r.nextLong();
     LOG.info("SEED: " + seed);
     r.setSeed(seed);
-    conf.set(JobContext.MAP_SORT_SPILL_PERCENT,
+    conf.set(MRJobConfig.MAP_SORT_SPILL_PERCENT,
         Float.toString(Math.max(0.1f, r.nextFloat())));
     RandomFactory.setLengths(conf, r, 1 << 14);
     conf.setInt("test.spillmap.records", r.nextInt(500));

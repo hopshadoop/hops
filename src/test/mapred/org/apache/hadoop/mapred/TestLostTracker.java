@@ -24,7 +24,7 @@ import junit.framework.TestCase;
 import org.apache.hadoop.mapred.FakeObjectUtilities.FakeJobInProgress;
 import org.apache.hadoop.mapred.FakeObjectUtilities.FakeJobTracker;
 import org.apache.hadoop.mapred.UtilsForTests.FakeClock;
-import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 
 /**
@@ -103,8 +103,8 @@ public class TestLostTracker extends TestCase {
     JobConf conf = new JobConf();
     conf.setNumMapTasks(1);
     conf.setNumReduceTasks(1);
-    conf.set(JobContext.MAX_TASK_FAILURES_PER_TRACKER, "1");
-    conf.set(JobContext.SETUP_CLEANUP_NEEDED, "false");
+    conf.set(MRJobConfig.MAX_TASK_FAILURES_PER_TRACKER, "1");
+    conf.set(MRJobConfig.SETUP_CLEANUP_NEEDED, "false");
     FakeJobInProgress job = new FakeJobInProgress(conf, jobTracker);
     job.initTasks();
     job.setClusterSize(4);
@@ -170,8 +170,8 @@ public class TestLostTracker extends TestCase {
     JobConf conf = new JobConf();
     conf.setNumMapTasks(1);
     conf.setNumReduceTasks(0);
-    conf.set(JobContext.MAX_TASK_FAILURES_PER_TRACKER, "1");
-    conf.set(JobContext.SETUP_CLEANUP_NEEDED, "false");
+    conf.set(MRJobConfig.MAX_TASK_FAILURES_PER_TRACKER, "1");
+    conf.set(MRJobConfig.SETUP_CLEANUP_NEEDED, "false");
     FakeJobInProgress job = new FakeJobInProgress(conf, jobTracker);
     job.initTasks();
     job.setClusterSize(4);

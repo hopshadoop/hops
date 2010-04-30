@@ -30,9 +30,9 @@ import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.http.TestHttpServer.DummyFilterInitializer;
-import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.MRConfig;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.SleepJob;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskID;
@@ -264,11 +264,11 @@ public class TestWebUIAuthorization extends ClusterMapReduceTestCase {
     int infoPort = cluster.getJobTrackerRunner().getJobTrackerInfoPort();
 
     conf = new JobConf(cluster.createJobConf());
-    conf.set(JobContext.JOB_ACL_VIEW_JOB, viewColleague + " group3");
+    conf.set(MRJobConfig.JOB_ACL_VIEW_JOB, viewColleague + " group3");
 
     // Let us add group1 and group3 to modify-job-acl. So modifyColleague and
     // viewAndModifyColleague will be able to modify the job
-    conf.set(JobContext.JOB_ACL_MODIFY_JOB, " group1,group3");
+    conf.set(MRJobConfig.JOB_ACL_MODIFY_JOB, " group1,group3");
 
     final SleepJob sleepJob = new SleepJob();
     sleepJob.setConf(conf);
@@ -398,11 +398,11 @@ public class TestWebUIAuthorization extends ClusterMapReduceTestCase {
       JobConf clusterConf, String jtURL) throws Exception {
 
     JobConf conf = new JobConf(cluster.createJobConf());
-    conf.set(JobContext.JOB_ACL_VIEW_JOB, viewColleague + " group3");
+    conf.set(MRJobConfig.JOB_ACL_VIEW_JOB, viewColleague + " group3");
 
     // Let us add group1 and group3 to modify-job-acl. So modifyColleague and
     // viewAndModifyColleague will be able to modify the job
-    conf.set(JobContext.JOB_ACL_MODIFY_JOB, " group1,group3");
+    conf.set(MRJobConfig.JOB_ACL_MODIFY_JOB, " group1,group3");
 
     String jobTrackerJSP =  jtURL + "/jobtracker.jsp?a=b";
     Job job = startSleepJobAsUser(jobSubmitter, conf);
@@ -485,7 +485,7 @@ public class TestWebUIAuthorization extends ClusterMapReduceTestCase {
     // jobTrackerJSP killJob url
     String url = jobTrackerJSP + "&killJobs=true";
     // view-job-acl doesn't matter for killJob from jobtracker jsp page
-    conf.set(JobContext.JOB_ACL_VIEW_JOB, "");
+    conf.set(MRJobConfig.JOB_ACL_VIEW_JOB, "");
     
     // Let us start jobs as 4 different users(none of these 4 users is
     // mrOwner and none of these users is a member of superGroup). So only
@@ -494,7 +494,7 @@ public class TestWebUIAuthorization extends ClusterMapReduceTestCase {
 
     // start 1st job.
     // Out of these 4 users, only jobSubmitter can do killJob on 1st job
-    conf.set(JobContext.JOB_ACL_MODIFY_JOB, "");
+    conf.set(MRJobConfig.JOB_ACL_MODIFY_JOB, "");
     Job job1 = startSleepJobAsUser(jobSubmitter, conf);
     org.apache.hadoop.mapreduce.JobID jobid = job1.getID();
     getTIPId(cluster, jobid);// wait till the map task is started
@@ -514,7 +514,7 @@ public class TestWebUIAuthorization extends ClusterMapReduceTestCase {
     // start 4rd job.
     // Out of these 4 users, viewColleague and viewAndModifyColleague
     // can do killJob on 4th job
-    conf.set(JobContext.JOB_ACL_MODIFY_JOB, viewColleague);
+    conf.set(MRJobConfig.JOB_ACL_MODIFY_JOB, viewColleague);
     Job job4 = startSleepJobAsUser(viewAndModifyColleague, conf);
     jobid = job4.getID();
     getTIPId(cluster, jobid);// wait till the map task is started
@@ -581,11 +581,11 @@ public class TestWebUIAuthorization extends ClusterMapReduceTestCase {
 
     JobConf clusterConf = cluster.createJobConf();
     conf = new JobConf(clusterConf);
-    conf.set(JobContext.JOB_ACL_VIEW_JOB, viewColleague + " group3");
+    conf.set(MRJobConfig.JOB_ACL_VIEW_JOB, viewColleague + " group3");
 
     // Let us add group1 and group3 to modify-job-acl. So modifyColleague and
     // viewAndModifyColleague will be able to modify the job
-    conf.set(JobContext.JOB_ACL_MODIFY_JOB, " group1,group3");
+    conf.set(MRJobConfig.JOB_ACL_MODIFY_JOB, " group1,group3");
     
     Job job = startSleepJobAsUser(jobSubmitter, conf);
 

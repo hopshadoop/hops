@@ -127,7 +127,7 @@ public class GridMixRunner {
       try {
         Configuration conf = StreamJob.createJob(args);
         conf.setBoolean(FileOutputFormat.COMPRESS, outputCompressed);
-        conf.setBoolean(JobContext.MAP_OUTPUT_COMPRESS, mapoutputCompressed);
+        conf.setBoolean(MRJobConfig.MAP_OUTPUT_COMPRESS, mapoutputCompressed);
         Job job = new Job(conf, "GridmixStreamingSorter." + size);
         ControlledJob cjob = new ControlledJob(job, null);
         gridmix.addJob(cjob);
@@ -150,7 +150,7 @@ public class GridMixRunner {
       try {
         Configuration conf = new Configuration();
         conf.setBoolean(FileOutputFormat.COMPRESS, outputCompressed);
-        conf.setBoolean(JobContext.MAP_OUTPUT_COMPRESS, mapoutputCompressed);
+        conf.setBoolean(MRJobConfig.MAP_OUTPUT_COMPRESS, mapoutputCompressed);
         Job job = new Job(conf);
         job.setJarByClass(Sort.class);
         job.setJobName("GridmixJavaSorter." + size);

@@ -69,7 +69,7 @@ public class SleepJob extends Configured implements Tool {
     public List<InputSplit> getSplits(JobContext jobContext) {
       List<InputSplit> ret = new ArrayList<InputSplit>();
       int numSplits = jobContext.getConfiguration().
-                        getInt(JobContext.NUM_MAPS, 1);
+                        getInt(MRJobConfig.NUM_MAPS, 1);
       for (int i = 0; i < numSplits; ++i) {
         ret.add(new EmptySplit());
       }
@@ -201,7 +201,7 @@ public class SleepJob extends Configured implements Tool {
     conf.setLong(REDUCE_SLEEP_TIME, reduceSleepTime);
     conf.setInt(MAP_SLEEP_COUNT, mapSleepCount);
     conf.setInt(REDUCE_SLEEP_COUNT, reduceSleepCount);
-    conf.setInt(JobContext.NUM_MAPS, numMapper);
+    conf.setInt(MRJobConfig.NUM_MAPS, numMapper);
     Job job = new Job(conf, "sleep");
     job.setNumReduceTasks(numReducer);
     job.setJarByClass(SleepJob.class);

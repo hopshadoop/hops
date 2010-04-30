@@ -27,6 +27,7 @@ import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.Partitioner;
 import org.apache.hadoop.mapreduce.lib.partition.KeyFieldHelper.KeyDescription;
 
@@ -59,7 +60,7 @@ public class KeyFieldBasedPartitioner<K2, V2> extends Partitioner<K2, V2>
   public void setConf(Configuration conf) {
     this.conf = conf;
     String keyFieldSeparator = 
-      conf.get(JobContext.MAP_OUTPUT_KEY_FIELD_SEPERATOR, "\t");
+      conf.get(MRJobConfig.MAP_OUTPUT_KEY_FIELD_SEPERATOR, "\t");
     keyFieldHelper.setKeyFieldSeparator(keyFieldSeparator);
     if (conf.get("num.key.fields.for.partition") != null) {
       LOG.warn("Using deprecated num.key.fields.for.partition. " +

@@ -31,6 +31,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
@@ -56,7 +57,7 @@ public class TeraInputFormat extends FileInputFormat<Text,Text> {
   static final int KEY_LENGTH = 10;
   static final int VALUE_LENGTH = 90;
   static final int RECORD_LENGTH = KEY_LENGTH + VALUE_LENGTH;
-  private static JobContext lastContext = null;
+  private static MRJobConfig lastContext = null;
   private static List<InputSplit> lastResult = null;
 
   static class TeraFileSplit extends FileSplit {

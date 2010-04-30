@@ -122,7 +122,7 @@ public class TestJobACLs {
 
     // Set the job up.
     final Configuration myConf = mr.createJobConf();
-    myConf.set(JobContext.JOB_ACL_VIEW_JOB, "user1,user3");
+    myConf.set(MRJobConfig.JOB_ACL_VIEW_JOB, "user1,user3");
 
     // Submit the job as user1
     Job job = submitJobAsUser(myConf, "user1");
@@ -256,7 +256,7 @@ public class TestJobACLs {
 
     // Set the job up.
     final Configuration myConf = mr.createJobConf();
-    myConf.set(JobContext.JOB_ACL_MODIFY_JOB, "user1,user3");
+    myConf.set(MRJobConfig.JOB_ACL_MODIFY_JOB, "user1,user3");
 
     // Submit the job as user1
     Job job = submitJobAsUser(myConf, "user1");
@@ -364,7 +364,7 @@ public class TestJobACLs {
 
     // Set the job up.
     final Configuration myConf = mr.createJobConf();
-    myConf.set(JobContext.JOB_ACL_VIEW_JOB, "user1,user2");
+    myConf.set(MRJobConfig.JOB_ACL_VIEW_JOB, "user1,user2");
 
     // Submit the job as user1
     Job job = submitJobAsUser(myConf, "user1");

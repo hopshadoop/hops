@@ -45,7 +45,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.MRConfig;
-import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.filecache.DistributedCache;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.fs.Path;
@@ -271,14 +271,14 @@ public class StreamJob implements Tool {
       values = cmdLine.getOptionValues("file");
       if (values != null && values.length > 0) {
         StringBuilder unpackRegex = new StringBuilder(
-          config_.getPattern(JobContext.JAR_UNPACK_PATTERN,
+          config_.getPattern(MRJobConfig.JAR_UNPACK_PATTERN,
                              JobConf.UNPACK_JAR_PATTERN_DEFAULT).pattern());
         for (String file : values) {
           packageFiles_.add(file);
           String fname = new File(file).getName();
           unpackRegex.append("|(?:").append(Pattern.quote(fname)).append(")");
         }
-        config_.setPattern(JobContext.JAR_UNPACK_PATTERN,
+        config_.setPattern(MRJobConfig.JAR_UNPACK_PATTERN,
                            Pattern.compile(unpackRegex.toString()));
         validate(packageFiles_);
       }
@@ -511,7 +511,7 @@ public class StreamJob implements Tool {
     System.out.println("  The location of this working directory is unspecified.");
     System.out.println();
     System.out.println("To set the number of reduce tasks (num. of output files):");
-    System.out.println("  -D " + JobContext.NUM_REDUCES + "=10");
+    System.out.println("  -D " + MRJobConfig.NUM_REDUCES + "=10");
     System.out.println("To skip the sort/combine/shuffle/sort/reduce step:");
     System.out.println("  Use -numReduceTasks 0");
     System.out
@@ -522,11 +522,11 @@ public class StreamJob implements Tool {
     System.out.println("  This equivalent -reducer NONE");
     System.out.println();
     System.out.println("To speed up the last maps:");
-    System.out.println("  -D " + JobContext.MAP_SPECULATIVE + "=true");
+    System.out.println("  -D " + MRJobConfig.MAP_SPECULATIVE + "=true");
     System.out.println("To speed up the last reduces:");
-    System.out.println("  -D " + JobContext.REDUCE_SPECULATIVE + "=true");
+    System.out.println("  -D " + MRJobConfig.REDUCE_SPECULATIVE + "=true");
     System.out.println("To name the job (appears in the JobTracker Web UI):");
-    System.out.println("  -D " + JobContext.JOB_NAME + "='My Job'");
+    System.out.println("  -D " + MRJobConfig.JOB_NAME + "='My Job'");
     System.out.println("To change the local temp directory:");
     System.out.println("  -D dfs.data.dir=/tmp/dfs");
     System.out.println("  -D stream.tmpdir=/tmp/streaming");

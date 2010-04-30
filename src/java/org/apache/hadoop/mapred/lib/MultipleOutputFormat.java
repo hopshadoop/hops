@@ -29,6 +29,7 @@ import org.apache.hadoop.mapred.FileOutputFormat;
 import org.apache.hadoop.mapred.RecordWriter;
 import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.util.Progressable;
 
 /**
@@ -189,7 +190,7 @@ extends FileOutputFormat<K, V> {
    * @return the outfile name based on a given anme and the input file name.
    */
   protected String getInputFileBasedOutputFileName(JobConf job, String name) {
-    String infilepath = job.get(JobContext.MAP_INPUT_FILE);
+    String infilepath = job.get(MRJobConfig.MAP_INPUT_FILE);
     if (infilepath == null) {
       // if the {@link JobContext#MAP_INPUT_FILE} does not exists,
       // then return the given name

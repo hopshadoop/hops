@@ -92,7 +92,7 @@ public class GenericMRLoadJobCreator extends GenericMRLoadGenerator {
       }
     }
 
-    conf.setBoolean(JobContext.MAP_OUTPUT_COMPRESS, mapoutputCompressed);
+    conf.setBoolean(MRJobConfig.MAP_OUTPUT_COMPRESS, mapoutputCompressed);
     conf.setBoolean(FileOutputFormat.COMPRESS, outputCompressed);
     return job;
   }

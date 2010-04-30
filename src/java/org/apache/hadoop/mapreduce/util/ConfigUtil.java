@@ -19,8 +19,8 @@ package org.apache.hadoop.mapreduce.util;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.MRConfig;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
 
@@ -168,215 +168,215 @@ public class ConfigUtil {
     Configuration.addDeprecation("tasktracker.contention.tracking", 
       new String[] {TTConfig.TT_CONTENTION_TRACKING});
     Configuration.addDeprecation("hadoop.job.history.user.location", 
-      new String[] {JobContext.HISTORY_LOCATION});
+      new String[] {MRJobConfig.HISTORY_LOCATION});
     Configuration.addDeprecation("job.end.notification.url", 
-      new String[] {JobContext.END_NOTIFICATION_URL});
+      new String[] {MRJobConfig.END_NOTIFICATION_URL});
     Configuration.addDeprecation("job.end.retry.attempts", 
-      new String[] {JobContext.END_NOTIFICATION_RETRIES});
+      new String[] {MRJobConfig.END_NOTIFICATION_RETRIES});
     Configuration.addDeprecation("job.end.retry.interval", 
-      new String[] {JobContext.END_NOTIFICATION_RETRIE_INTERVAL});
+      new String[] {MRJobConfig.END_NOTIFICATION_RETRIE_INTERVAL});
     Configuration.addDeprecation("mapred.committer.job.setup.cleanup.needed", 
-      new String[] {JobContext.SETUP_CLEANUP_NEEDED});
+      new String[] {MRJobConfig.SETUP_CLEANUP_NEEDED});
     Configuration.addDeprecation("mapred.jar", 
-      new String[] {JobContext.JAR});
+      new String[] {MRJobConfig.JAR});
     Configuration.addDeprecation("mapred.job.id", 
-      new String[] {JobContext.ID});
+      new String[] {MRJobConfig.ID});
     Configuration.addDeprecation("mapred.job.name", 
-      new String[] {JobContext.JOB_NAME});
+      new String[] {MRJobConfig.JOB_NAME});
     Configuration.addDeprecation("mapred.job.priority", 
-      new String[] {JobContext.PRIORITY});
+      new String[] {MRJobConfig.PRIORITY});
     Configuration.addDeprecation("mapred.job.queue.name", 
-      new String[] {JobContext.QUEUE_NAME});
+      new String[] {MRJobConfig.QUEUE_NAME});
     Configuration.addDeprecation("mapred.job.reuse.jvm.num.tasks", 
-      new String[] {JobContext.JVM_NUMTASKS_TORUN});
+      new String[] {MRJobConfig.JVM_NUMTASKS_TORUN});
     Configuration.addDeprecation("mapred.map.tasks", 
-      new String[] {JobContext.NUM_MAPS});
+      new String[] {MRJobConfig.NUM_MAPS});
     Configuration.addDeprecation("mapred.max.tracker.failures", 
-      new String[] {JobContext.MAX_TASK_FAILURES_PER_TRACKER});
+      new String[] {MRJobConfig.MAX_TASK_FAILURES_PER_TRACKER});
     Configuration.addDeprecation("mapred.reduce.slowstart.completed.maps", 
-      new String[] {JobContext.COMPLETED_MAPS_FOR_REDUCE_SLOWSTART});
+      new String[] {MRJobConfig.COMPLETED_MAPS_FOR_REDUCE_SLOWSTART});
     Configuration.addDeprecation("mapred.reduce.tasks", 
-      new String[] {JobContext.NUM_REDUCES});
+      new String[] {MRJobConfig.NUM_REDUCES});
     Configuration.addDeprecation("mapred.skip.on", 
-      new String[] {JobContext.SKIP_RECORDS});
+      new String[] {MRJobConfig.SKIP_RECORDS});
     Configuration.addDeprecation("mapred.skip.out.dir", 
-      new String[] {JobContext.SKIP_OUTDIR});
+      new String[] {MRJobConfig.SKIP_OUTDIR});
     Configuration.addDeprecation(
       "mapred.speculative.execution.slowNodeThreshold", 
-      new String[] {JobContext.SPECULATIVE_SLOWNODE_THRESHOLD});
+      new String[] {MRJobConfig.SPECULATIVE_SLOWNODE_THRESHOLD});
     Configuration.addDeprecation(
       "mapred.speculative.execution.slowTaskThreshold", 
-      new String[] {JobContext.SPECULATIVE_SLOWTASK_THRESHOLD});
+      new String[] {MRJobConfig.SPECULATIVE_SLOWTASK_THRESHOLD});
     Configuration.addDeprecation("mapred.speculative.execution.speculativeCap", 
-      new String[] {JobContext.SPECULATIVECAP});
+      new String[] {MRJobConfig.SPECULATIVECAP});
     Configuration.addDeprecation("job.local.dir", 
-      new String[] {JobContext.JOB_LOCAL_DIR});
+      new String[] {MRJobConfig.JOB_LOCAL_DIR});
     Configuration.addDeprecation("mapreduce.inputformat.class", 
-      new String[] {JobContext.INPUT_FORMAT_CLASS_ATTR});
+      new String[] {MRJobConfig.INPUT_FORMAT_CLASS_ATTR});
     Configuration.addDeprecation("mapreduce.map.class", 
-      new String[] {JobContext.MAP_CLASS_ATTR});
+      new String[] {MRJobConfig.MAP_CLASS_ATTR});
     Configuration.addDeprecation("mapreduce.combine.class", 
-      new String[] {JobContext.COMBINE_CLASS_ATTR});
+      new String[] {MRJobConfig.COMBINE_CLASS_ATTR});
     Configuration.addDeprecation("mapreduce.reduce.class", 
-      new String[] {JobContext.REDUCE_CLASS_ATTR});
+      new String[] {MRJobConfig.REDUCE_CLASS_ATTR});
     Configuration.addDeprecation("mapreduce.outputformat.class", 
-      new String[] {JobContext.OUTPUT_FORMAT_CLASS_ATTR});
+      new String[] {MRJobConfig.OUTPUT_FORMAT_CLASS_ATTR});
     Configuration.addDeprecation("mapreduce.partitioner.class", 
-      new String[] {JobContext.PARTITIONER_CLASS_ATTR});
+      new String[] {MRJobConfig.PARTITIONER_CLASS_ATTR});
     Configuration.addDeprecation("mapred.job.classpath.archives", 
-      new String[] {JobContext.CLASSPATH_ARCHIVES});
+      new String[] {MRJobConfig.CLASSPATH_ARCHIVES});
     Configuration.addDeprecation("mapred.job.classpath.files", 
-      new String[] {JobContext.CLASSPATH_FILES});
+      new String[] {MRJobConfig.CLASSPATH_FILES});
     Configuration.addDeprecation("mapred.cache.files", 
-      new String[] {JobContext.CACHE_FILES});
+      new String[] {MRJobConfig.CACHE_FILES});
     Configuration.addDeprecation("mapred.cache.archives", 
-      new String[] {JobContext.CACHE_ARCHIVES});
+      new String[] {MRJobConfig.CACHE_ARCHIVES});
     Configuration.addDeprecation("mapred.cache.localFiles", 
-      new String[] {JobContext.CACHE_LOCALFILES});
+      new String[] {MRJobConfig.CACHE_LOCALFILES});
     Configuration.addDeprecation("mapred.cache.localArchives", 
-      new String[] {JobContext.CACHE_LOCALARCHIVES});
+      new String[] {MRJobConfig.CACHE_LOCALARCHIVES});
     Configuration.addDeprecation("mapred.cache.files.timestamps", 
-      new String[] {JobContext.CACHE_FILE_TIMESTAMPS});
+      new String[] {MRJobConfig.CACHE_FILE_TIMESTAMPS});
     Configuration.addDeprecation("mapred.cache.archives.timestamps", 
-      new String[] {JobContext.CACHE_ARCHIVES_TIMESTAMPS});
+      new String[] {MRJobConfig.CACHE_ARCHIVES_TIMESTAMPS});
     Configuration.addDeprecation("mapred.create.symlink", 
-      new String[] {JobContext.CACHE_SYMLINK});
+      new String[] {MRJobConfig.CACHE_SYMLINK});
     Configuration.addDeprecation("mapred.working.dir", 
-      new String[] {JobContext.WORKING_DIR});
+      new String[] {MRJobConfig.WORKING_DIR});
     Configuration.addDeprecation("hadoop.job.history.user.location", 
-      new String[] {JobContext.HISTORY_LOCATION});
+      new String[] {MRJobConfig.HISTORY_LOCATION});
     Configuration.addDeprecation("user.name", 
-      new String[] {JobContext.USER_NAME});
+      new String[] {MRJobConfig.USER_NAME});
     Configuration.addDeprecation("mapred.output.key.class", 
-      new String[] {JobContext.OUTPUT_KEY_CLASS});
+      new String[] {MRJobConfig.OUTPUT_KEY_CLASS});
     Configuration.addDeprecation("mapred.output.value.class", 
-      new String[] {JobContext.OUTPUT_VALUE_CLASS});
+      new String[] {MRJobConfig.OUTPUT_VALUE_CLASS});
     Configuration.addDeprecation("mapred.output.value.groupfn.class", 
-      new String[] {JobContext.GROUP_COMPARATOR_CLASS});
+      new String[] {MRJobConfig.GROUP_COMPARATOR_CLASS});
     Configuration.addDeprecation("mapred.output.key.comparator.class", 
-      new String[] {JobContext.KEY_COMPARATOR});
+      new String[] {MRJobConfig.KEY_COMPARATOR});
     Configuration.addDeprecation("io.sort.factor", 
-      new String[] {JobContext.IO_SORT_FACTOR});
+      new String[] {MRJobConfig.IO_SORT_FACTOR});
     Configuration.addDeprecation("io.sort.mb", 
-      new String[] {JobContext.IO_SORT_MB});
+      new String[] {MRJobConfig.IO_SORT_MB});
     Configuration.addDeprecation("keep.failed.task.files", 
-      new String[] {JobContext.PRESERVE_FAILED_TASK_FILES});
+      new String[] {MRJobConfig.PRESERVE_FAILED_TASK_FILES});
     Configuration.addDeprecation("keep.task.files.pattern", 
-      new String[] {JobContext.PRESERVE_FILES_PATTERN});
+      new String[] {MRJobConfig.PRESERVE_FILES_PATTERN});
     Configuration.addDeprecation("mapred.child.tmp", 
-      new String[] {JobContext.TASK_TEMP_DIR});
+      new String[] {MRJobConfig.TASK_TEMP_DIR});
     Configuration.addDeprecation("mapred.debug.out.lines", 
-      new String[] {JobContext.TASK_DEBUGOUT_LINES});
+      new String[] {MRJobConfig.TASK_DEBUGOUT_LINES});
     Configuration.addDeprecation("mapred.merge.recordsBeforeProgress", 
-      new String[] {JobContext.RECORDS_BEFORE_PROGRESS});
+      new String[] {MRJobConfig.RECORDS_BEFORE_PROGRESS});
     Configuration.addDeprecation("mapred.skip.attempts.to.start.skipping", 
-      new String[] {JobContext.SKIP_START_ATTEMPTS});
+      new String[] {MRJobConfig.SKIP_START_ATTEMPTS});
     Configuration.addDeprecation("mapred.task.id", 
-      new String[] {JobContext.TASK_ATTEMPT_ID});
+      new String[] {MRJobConfig.TASK_ATTEMPT_ID});
     Configuration.addDeprecation("mapred.task.is.map", 
-      new String[] {JobContext.TASK_ISMAP});
+      new String[] {MRJobConfig.TASK_ISMAP});
     Configuration.addDeprecation("mapred.task.partition", 
-      new String[] {JobContext.TASK_PARTITION});
+      new String[] {MRJobConfig.TASK_PARTITION});
     Configuration.addDeprecation("mapred.task.profile", 
-      new String[] {JobContext.TASK_PROFILE});
+      new String[] {MRJobConfig.TASK_PROFILE});
     Configuration.addDeprecation("mapred.task.profile.maps", 
-      new String[] {JobContext.NUM_MAP_PROFILES});
+      new String[] {MRJobConfig.NUM_MAP_PROFILES});
     Configuration.addDeprecation("mapred.task.profile.reduces", 
-      new String[] {JobContext.NUM_REDUCE_PROFILES});
+      new String[] {MRJobConfig.NUM_REDUCE_PROFILES});
     Configuration.addDeprecation("mapred.task.timeout", 
-      new String[] {JobContext.TASK_TIMEOUT});
+      new String[] {MRJobConfig.TASK_TIMEOUT});
     Configuration.addDeprecation("mapred.tip.id", 
-      new String[] {JobContext.TASK_ID});
+      new String[] {MRJobConfig.TASK_ID});
     Configuration.addDeprecation("mapred.work.output.dir", 
-      new String[] {JobContext.TASK_OUTPUT_DIR});
+      new String[] {MRJobConfig.TASK_OUTPUT_DIR});
     Configuration.addDeprecation("mapred.userlog.limit.kb", 
-      new String[] {JobContext.TASK_USERLOG_LIMIT});
+      new String[] {MRJobConfig.TASK_USERLOG_LIMIT});
     Configuration.addDeprecation("mapred.userlog.retain.hours", 
-      new String[] {JobContext.USER_LOG_RETAIN_HOURS});
+      new String[] {MRJobConfig.USER_LOG_RETAIN_HOURS});
     Configuration.addDeprecation("mapred.task.profile.params", 
-      new String[] {JobContext.TASK_PROFILE_PARAMS});
+      new String[] {MRJobConfig.TASK_PROFILE_PARAMS});
     Configuration.addDeprecation("io.sort.spill.percent", 
-      new String[] {JobContext.MAP_SORT_SPILL_PERCENT});
+      new String[] {MRJobConfig.MAP_SORT_SPILL_PERCENT});
     Configuration.addDeprecation("map.input.file", 
-      new String[] {JobContext.MAP_INPUT_FILE});
+      new String[] {MRJobConfig.MAP_INPUT_FILE});
     Configuration.addDeprecation("map.input.length", 
-      new String[] {JobContext.MAP_INPUT_PATH});
+      new String[] {MRJobConfig.MAP_INPUT_PATH});
     Configuration.addDeprecation("map.input.start", 
-      new String[] {JobContext.MAP_INPUT_START});
+      new String[] {MRJobConfig.MAP_INPUT_START});
     Configuration.addDeprecation("mapred.job.map.memory.mb", 
-      new String[] {JobContext.MAP_MEMORY_MB});
+      new String[] {MRJobConfig.MAP_MEMORY_MB});
     Configuration.addDeprecation("mapred.map.child.env", 
-      new String[] {JobContext.MAP_ENV});
+      new String[] {MRJobConfig.MAP_ENV});
     Configuration.addDeprecation("mapred.map.child.java.opts", 
-      new String[] {JobContext.MAP_JAVA_OPTS});
+      new String[] {MRJobConfig.MAP_JAVA_OPTS});
     Configuration.addDeprecation("mapred.map.child.ulimit", 
-      new String[] {JobContext.MAP_ULIMIT});
+      new String[] {MRJobConfig.MAP_ULIMIT});
     Configuration.addDeprecation("mapred.map.max.attempts", 
-      new String[] {JobContext.MAP_MAX_ATTEMPTS});
+      new String[] {MRJobConfig.MAP_MAX_ATTEMPTS});
     Configuration.addDeprecation("mapred.map.task.debug.script", 
-      new String[] {JobContext.MAP_DEBUG_SCRIPT});
+      new String[] {MRJobConfig.MAP_DEBUG_SCRIPT});
     Configuration.addDeprecation("mapred.map.tasks.speculative.execution", 
-      new String[] {JobContext.MAP_SPECULATIVE});
+      new String[] {MRJobConfig.MAP_SPECULATIVE});
     Configuration.addDeprecation("mapred.max.map.failures.percent", 
-      new String[] {JobContext.MAP_FAILURES_MAX_PERCENT});
+      new String[] {MRJobConfig.MAP_FAILURES_MAX_PERCENT});
     Configuration.addDeprecation("mapred.skip.map.auto.incr.proc.count", 
-      new String[] {JobContext.MAP_SKIP_INCR_PROC_COUNT});
+      new String[] {MRJobConfig.MAP_SKIP_INCR_PROC_COUNT});
     Configuration.addDeprecation("mapred.skip.map.max.skip.records", 
-      new String[] {JobContext.MAP_SKIP_MAX_RECORDS});
+      new String[] {MRJobConfig.MAP_SKIP_MAX_RECORDS});
     Configuration.addDeprecation("min.num.spills.for.combine", 
-      new String[] {JobContext.MAP_COMBINE_MIN_SPILLS});
+      new String[] {MRJobConfig.MAP_COMBINE_MIN_SPILLS});
     Configuration.addDeprecation("mapred.compress.map.output", 
-      new String[] {JobContext.MAP_OUTPUT_COMPRESS});
+      new String[] {MRJobConfig.MAP_OUTPUT_COMPRESS});
     Configuration.addDeprecation("mapred.map.output.compression.codec", 
-      new String[] {JobContext.MAP_OUTPUT_COMPRESS_CODEC});
+      new String[] {MRJobConfig.MAP_OUTPUT_COMPRESS_CODEC});
     Configuration.addDeprecation("mapred.mapoutput.key.class", 
-      new String[] {JobContext.MAP_OUTPUT_KEY_CLASS});
+      new String[] {MRJobConfig.MAP_OUTPUT_KEY_CLASS});
     Configuration.addDeprecation("mapred.mapoutput.value.class", 
-      new String[] {JobContext.MAP_OUTPUT_VALUE_CLASS});
+      new String[] {MRJobConfig.MAP_OUTPUT_VALUE_CLASS});
     Configuration.addDeprecation("map.output.key.field.separator", 
-      new String[] {JobContext.MAP_OUTPUT_KEY_FIELD_SEPERATOR});
+      new String[] {MRJobConfig.MAP_OUTPUT_KEY_FIELD_SEPERATOR});
     Configuration.addDeprecation("mapred.map.child.log.level", 
-      new String[] {JobContext.MAP_LOG_LEVEL});
+      new String[] {MRJobConfig.MAP_LOG_LEVEL});
     Configuration.addDeprecation("mapred.inmem.merge.threshold", 
-      new String[] {JobContext.REDUCE_MERGE_INMEM_THRESHOLD});
+      new String[] {MRJobConfig.REDUCE_MERGE_INMEM_THRESHOLD});
     Configuration.addDeprecation("mapred.job.reduce.input.buffer.percent", 
-      new String[] {JobContext.REDUCE_INPUT_BUFFER_PERCENT});
+      new String[] {MRJobConfig.REDUCE_INPUT_BUFFER_PERCENT});
     Configuration.addDeprecation("mapred.job.reduce.markreset.buffer.percent", 
-      new String[] {JobContext.REDUCE_MARKRESET_BUFFER_PERCENT});
+      new String[] {MRJobConfig.REDUCE_MARKRESET_BUFFER_PERCENT});
     Configuration.addDeprecation("mapred.job.reduce.memory.mb", 
-      new String[] {JobContext.REDUCE_MEMORY_MB});
+      new String[] {MRJobConfig.REDUCE_MEMORY_MB});
     Configuration.addDeprecation("mapred.job.reduce.total.mem.bytes", 
-      new String[] {JobContext.REDUCE_MEMORY_TOTAL_BYTES});
+      new String[] {MRJobConfig.REDUCE_MEMORY_TOTAL_BYTES});
     Configuration.addDeprecation("mapred.job.shuffle.input.buffer.percent", 
-      new String[] {JobContext.SHUFFLE_INPUT_BUFFER_PERCENT});
+      new String[] {MRJobConfig.SHUFFLE_INPUT_BUFFER_PERCENT});
     Configuration.addDeprecation("mapred.job.shuffle.merge.percent", 
-      new String[] {JobContext.SHUFFLE_MERGE_EPRCENT});
+      new String[] {MRJobConfig.SHUFFLE_MERGE_EPRCENT});
     Configuration.addDeprecation("mapred.max.reduce.failures.percent", 
-      new String[] {JobContext.REDUCE_FAILURES_MAXPERCENT});
+      new String[] {MRJobConfig.REDUCE_FAILURES_MAXPERCENT});
     Configuration.addDeprecation("mapred.reduce.child.env", 
-      new String[] {JobContext.REDUCE_ENV});
+      new String[] {MRJobConfig.REDUCE_ENV});
     Configuration.addDeprecation("mapred.reduce.child.java.opts", 
-      new String[] {JobContext.REDUCE_JAVA_OPTS});
+      new String[] {MRJobConfig.REDUCE_JAVA_OPTS});
     Configuration.addDeprecation("mapred.reduce.child.ulimit", 
-      new String[] {JobContext.REDUCE_ULIMIT});
+      new String[] {MRJobConfig.REDUCE_ULIMIT});
     Configuration.addDeprecation("mapred.reduce.max.attempts", 
-      new String[] {JobContext.REDUCE_MAX_ATTEMPTS});
+      new String[] {MRJobConfig.REDUCE_MAX_ATTEMPTS});
     Configuration.addDeprecation("mapred.reduce.parallel.copies", 
-      new String[] {JobContext.SHUFFLE_PARALLEL_COPIES});
+      new String[] {MRJobConfig.SHUFFLE_PARALLEL_COPIES});
     Configuration.addDeprecation("mapred.reduce.task.debug.script", 
-      new String[] {JobContext.REDUCE_DEBUG_SCRIPT});
+      new String[] {MRJobConfig.REDUCE_DEBUG_SCRIPT});
     Configuration.addDeprecation("mapred.reduce.tasks.speculative.execution", 
-      new String[] {JobContext.REDUCE_SPECULATIVE});
+      new String[] {MRJobConfig.REDUCE_SPECULATIVE});
     Configuration.addDeprecation("mapred.shuffle.connect.timeout", 
-      new String[] {JobContext.SHUFFLE_CONNECT_TIMEOUT});
+      new String[] {MRJobConfig.SHUFFLE_CONNECT_TIMEOUT});
     Configuration.addDeprecation("mapred.shuffle.read.timeout", 
-      new String[] {JobContext.SHUFFLE_READ_TIMEOUT});
+      new String[] {MRJobConfig.SHUFFLE_READ_TIMEOUT});
     Configuration.addDeprecation("mapred.skip.reduce.auto.incr.proc.count", 
-      new String[] {JobContext.REDUCE_SKIP_INCR_PROC_COUNT});
+      new String[] {MRJobConfig.REDUCE_SKIP_INCR_PROC_COUNT});
     Configuration.addDeprecation("mapred.skip.reduce.max.skip.groups", 
-      new String[] {JobContext.REDUCE_SKIP_MAXGROUPS});
+      new String[] {MRJobConfig.REDUCE_SKIP_MAXGROUPS});
     Configuration.addDeprecation("mapred.reduce.child.log.level", 
-      new String[] {JobContext.REDUCE_LOG_LEVEL});
+      new String[] {MRJobConfig.REDUCE_LOG_LEVEL});
     Configuration.addDeprecation("jobclient.completion.poll.interval", 
       new String[] {Job.COMPLETION_POLL_INTERVAL_KEY});
     Configuration.addDeprecation("jobclient.progress.monitor.poll.interval", 

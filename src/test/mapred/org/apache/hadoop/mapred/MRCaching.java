@@ -35,7 +35,7 @@ import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.util.*;
 import org.apache.hadoop.mapred.MapReduceBase;
 import org.apache.hadoop.mapreduce.filecache.DistributedCache;
-import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 
 import java.net.URI;
 
@@ -311,9 +311,9 @@ public class MRCaching {
     // Note, the underlying job clones the original conf before determine
     // various stats (timestamps etc.), so we have to getConfiguration here.
     validateCacheFileSizes(job.getConfiguration(), fileSizes,
-                           JobContext.CACHE_FILES_SIZES);
+                           MRJobConfig.CACHE_FILES_SIZES);
     validateCacheFileSizes(job.getConfiguration(), archiveSizes,
-                           JobContext.CACHE_ARCHIVES_SIZES);
+                           MRJobConfig.CACHE_ARCHIVES_SIZES);
 
     return new TestResult(job, true);
 

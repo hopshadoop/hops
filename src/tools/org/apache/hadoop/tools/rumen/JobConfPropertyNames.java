@@ -17,13 +17,13 @@
  */
 package org.apache.hadoop.tools.rumen;
 
-import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 
 public enum JobConfPropertyNames {
-  QUEUE_NAMES("mapred.job.queue.name", JobContext.QUEUE_NAME), JOB_NAMES(
-      JobContext.JOB_NAME), TASK_JAVA_OPTS_S("mapred.child.java.opts"),
-  MAP_JAVA_OPTS_S("mapred.child.java.opts", JobContext.MAP_JAVA_OPTS),
-  REDUCE_JAVA_OPTS_S("mapred.child.java.opts", JobContext.REDUCE_JAVA_OPTS);
+  QUEUE_NAMES("mapred.job.queue.name", MRJobConfig.QUEUE_NAME), JOB_NAMES(
+      MRJobConfig.JOB_NAME), TASK_JAVA_OPTS_S("mapred.child.java.opts"),
+  MAP_JAVA_OPTS_S("mapred.child.java.opts", MRJobConfig.MAP_JAVA_OPTS),
+  REDUCE_JAVA_OPTS_S("mapred.child.java.opts", MRJobConfig.REDUCE_JAVA_OPTS);
 
   private String[] candidates;
 

@@ -37,7 +37,7 @@ import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.mapred.Counters;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.TaskStatus;
-import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskID;
 import org.apache.hadoop.mapreduce.task.reduce.MapHost.State;
@@ -112,9 +112,9 @@ class ShuffleScheduler<K,V> {
     this.maxFailedUniqueFetches = Math.min(totalMaps,
         this.maxFailedUniqueFetches);
     this.maxFetchFailuresBeforeReporting = job.getInt(
-        JobContext.SHUFFLE_FETCH_FAILURES, REPORT_FAILURE_LIMIT);
+        MRJobConfig.SHUFFLE_FETCH_FAILURES, REPORT_FAILURE_LIMIT);
     this.reportReadErrorImmediately = job.getBoolean(
-        JobContext.SHUFFLE_NOTIFY_READERROR, true);
+        MRJobConfig.SHUFFLE_NOTIFY_READERROR, true);
   }
 
   public synchronized void copySucceeded(TaskAttemptID mapId, 

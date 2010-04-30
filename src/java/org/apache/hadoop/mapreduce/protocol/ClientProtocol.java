@@ -26,9 +26,9 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.VersionedProtocol;
 import org.apache.hadoop.mapreduce.ClusterMetrics;
 import org.apache.hadoop.mapreduce.Counters;
-import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.JobStatus;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.QueueAclsInfo;
 import org.apache.hadoop.mapreduce.QueueInfo;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
@@ -48,7 +48,7 @@ import org.apache.hadoop.security.token.TokenInfo;
  * JobClient can use these methods to submit a Job for execution, and learn about
  * the current system status.
  */ 
-@KerberosInfo(JobContext.JOB_JOBTRACKER_ID)
+@KerberosInfo(MRJobConfig.JOB_JOBTRACKER_ID)
 @TokenInfo(DelegationTokenSelector.class)
 public interface ClientProtocol extends VersionedProtocol {
   /* 

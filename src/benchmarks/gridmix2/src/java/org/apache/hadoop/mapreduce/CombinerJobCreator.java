@@ -58,7 +58,7 @@ public class CombinerJobCreator {
         return null;
       }
     }
-    conf.setBoolean(JobContext.MAP_OUTPUT_COMPRESS, mapoutputCompressed);
+    conf.setBoolean(MRJobConfig.MAP_OUTPUT_COMPRESS, mapoutputCompressed);
     conf.setBoolean(FileOutputFormat.COMPRESS, outputCompressed);
 
     Job job = new Job(conf);

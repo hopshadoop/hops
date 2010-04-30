@@ -41,6 +41,7 @@ import org.apache.hadoop.mapreduce.InputFormat;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
@@ -172,7 +173,7 @@ public class TeraGen extends Configured implements Tool {
      */
     public List<InputSplit> getSplits(JobContext job) {
       long totalRows = getNumberOfRows(job);
-      int numSplits = job.getConfiguration().getInt(JobContext.NUM_MAPS, 1);
+      int numSplits = job.getConfiguration().getInt(MRJobConfig.NUM_MAPS, 1);
       LOG.info("Generating " + totalRows + " using " + numSplits);
       List<InputSplit> splits = new ArrayList<InputSplit>();
       long currentRow = 0;

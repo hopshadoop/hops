@@ -29,7 +29,7 @@ import java.util.Map;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.filecache.DistributedCache;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.io.FloatWritable;
@@ -98,7 +98,7 @@ class Application<K1 extends WritableComparable, V1 extends Writable,
     cmd.add(executable);
     // wrap the command in a stdout/stderr capture
     TaskAttemptID taskid = 
-      TaskAttemptID.forName(conf.get(JobContext.TASK_ATTEMPT_ID));
+      TaskAttemptID.forName(conf.get(MRJobConfig.TASK_ATTEMPT_ID));
     File stdout = TaskLog.getTaskLogFile(taskid, TaskLog.LogName.STDOUT);
     File stderr = TaskLog.getTaskLogFile(taskid, TaskLog.LogName.STDERR);
     long logLength = TaskLog.getTaskLogLength(conf);

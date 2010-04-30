@@ -27,6 +27,7 @@ import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.lib.partition.KeyFieldHelper.KeyDescription;
 
 
@@ -58,7 +59,7 @@ public class KeyFieldBasedComparator<K, V> extends WritableComparator
   public void setConf(Configuration conf) {
     this.conf = conf;
     String option = conf.get(COMPARATOR_OPTIONS);
-    String keyFieldSeparator = conf.get(JobContext.MAP_OUTPUT_KEY_FIELD_SEPERATOR,"\t");
+    String keyFieldSeparator = conf.get(MRJobConfig.MAP_OUTPUT_KEY_FIELD_SEPERATOR,"\t");
     keyFieldHelper.setKeyFieldSeparator(keyFieldSeparator);
     keyFieldHelper.parseOption(option);
   }

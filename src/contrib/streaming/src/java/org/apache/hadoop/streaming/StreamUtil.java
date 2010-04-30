@@ -36,7 +36,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.JobConf;
-import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 
 /** Utilities not available elsewhere in Hadoop.
@@ -422,13 +422,13 @@ public class StreamUtil {
   // JobConf helpers
 
   public static FileSplit getCurrentSplit(JobConf job) {
-    String path = job.get(JobContext.MAP_INPUT_FILE);
+    String path = job.get(MRJobConfig.MAP_INPUT_FILE);
     if (path == null) {
       return null;
     }
     Path p = new Path(path);
-    long start = Long.parseLong(job.get(JobContext.MAP_INPUT_START));
-    long length = Long.parseLong(job.get(JobContext.MAP_INPUT_PATH));
+    long start = Long.parseLong(job.get(MRJobConfig.MAP_INPUT_START));
+    long length = Long.parseLong(job.get(MRJobConfig.MAP_INPUT_PATH));
     return new FileSplit(p, start, length, job);
   }
 
@@ -447,10 +447,10 @@ public class StreamUtil {
   public static TaskId getTaskInfo(JobConf job) {
     TaskId res = new TaskId();
 
-    String id = job.get(JobContext.TASK_ATTEMPT_ID);
+    String id = job.get(MRJobConfig.TASK_ATTEMPT_ID);
     if (isLocalJobTracker(job)) {
       // it uses difft naming 
-      res.mapTask = job.getBoolean(JobContext.TASK_ISMAP, true);
+      res.mapTask = job.getBoolean(MRJobConfig.TASK_ISMAP, true);
       res.jobid = "0";
       res.taskid = 0;
       res.execid = 0;
