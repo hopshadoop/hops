@@ -2,6 +2,19 @@ Hadoop MapReduce Change Log
 
 Trunk (unreleased changes)
 
+  INCOMPATIBLE CHANGES
+
+  NEW FEATURES
+
+  IMPROVEMENTS
+
+  OPTIMIZATIONS
+
+  BUG FIXES
+
+    MAPREDUCE-1707. TaskRunner can get NPE in getting ugi from TaskTracker.
+    (Vinod Kumar Vavilapalli)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
