@@ -110,6 +110,7 @@
   <property name="test.junit.printsummary" value="yes" />
   <property name="test.junit.haltonfailure" value="no" />
   <property name="test.junit.maxmemory" value="512m" />
+  <property name="test.junit.jvmargs" value="-ea" />
   <property name="test.tmp.dir" value="${env.TMP}" />
   <property name="test.temp.dir" value="${env.TEMP}" />
   <property name="test.conf.dir" value="${build.dir}/test/conf" />
@@ -625,6 +626,7 @@
         maxmemory="${test.junit.maxmemory}"
         dir="${basedir}" timeout="${test.timeout}"
         errorProperty="tests.failed" failureProperty="tests.failed">
+        <jvmarg value="${test.junit.jvmargs}" />
         <sysproperty key="test.build.data" value="${test.build.data}"/>
         <sysproperty key="test.tools.input.dir" value = "${test.tools.input.dir}"/>
         <sysproperty key="test.cache.data" value="${test.cache.data}"/>     

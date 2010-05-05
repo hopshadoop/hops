@@ -8,8 +8,11 @@ Trunk (unreleased changes)
 
   IMPROVEMENTS
 
-  MAPREDUCE-1546. Redirect all job pages to corresponding history page 
-  if job is not in JT memory. (Scott Chen via sharad)
+    MAPREDUCE-1546. Redirect all job pages to corresponding history page
+    if job is not in JT memory. (Scott Chen via sharad)
+
+    MAPREDUCE-1092. Enable assertions for unit tests. (Eli Collins via
+    cdouglas)
 
   OPTIMIZATIONS
 
