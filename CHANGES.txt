@@ -1558,3 +1558,6 @@ Release 0.21.0 - Unreleased
     displays wrong error message about job ACLs. (Ravi Gummadi via vinodkv)
 
     MAPREDUCE-1727. TestJobACLs fails after HADOOP-6686. (Ravi Gummadi via vinodkv)
+
+    MAPREDUCE-1611. Refresh nodes and refresh queues doesnt work with service
+    authorization enabled. (Amar Kamat via vinodkv)
