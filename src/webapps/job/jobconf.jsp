@@ -49,15 +49,23 @@
 
 <%
 
+  final JobID jobIdObj = JobID.forName(jobId);
   JobWithViewAccessCheck myJob = JSPUtil.checkAccessAndGetJob(tracker,
-      JobID.forName(jobId), request, response);
+      jobIdObj, request, response);
   if (!myJob.isViewJobAllowed()) {
     return; // user is not authorized to view this job
   }
 
   JobInProgress job = myJob.getJob();
+  // redirect to history page if it cannot be found in memory
   if (job == null) {
-    out.print("<b>Job " + jobId + " not found.</b><br>\n");
+    String historyFile = tracker.getJobHistory().getHistoryFilePath(jobIdObj);
+    if (historyFile == null) {
+      out.println("<h2>Job " + jobId + " not known!</h2>");
+      return;
+    }
+    String historyUrl = "/jobconf_history.jsp?logFile=" + historyFile;
+    response.sendRedirect(response.encodeRedirectURL(historyUrl));
     return;
   }
 

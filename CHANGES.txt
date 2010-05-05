@@ -8,6 +8,9 @@ Trunk (unreleased changes)
 
   IMPROVEMENTS
 
+  MAPREDUCE-1546. Redirect all job pages to corresponding history page 
+  if job is not in JT memory. (Scott Chen via sharad)
+
   OPTIMIZATIONS
 
   BUG FIXES

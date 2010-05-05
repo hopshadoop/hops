@@ -85,8 +85,17 @@
 <a href="jobdetails.jsp?jobid=<%=jobid%>"><%=jobid%></a> on 
 <a href="jobtracker.jsp"><%=trackerName%></a></h1>
 <%
-    if (job == null) {
-    out.print("<b>Job " + jobid + " not found.</b><br>\n");
+  // redirect to history page if it cannot be found in memory
+  if (job == null) {
+    JobID jobIdObj = JobID.forName(jobid);
+    String historyFile = tracker.getJobHistory().getHistoryFilePath(jobIdObj);
+    if (historyFile == null) {
+      out.println("<h2>Job " + jobid + " not known!</h2>");
+      return;
+    }
+    String historyUrl = "/jobtaskshistory.jsp?logFile=" + historyFile +
+                        "&status=" + state + "&taskType=" + type;
+    response.sendRedirect(response.encodeRedirectURL(historyUrl));
     return;
   }
   // Filtering the reports if some filter is specified

@@ -78,8 +78,16 @@
     }
 
     JobInProgress job = myJob.getJob();
+    // redirect to history page if it cannot be found in memory
     if (job == null) {
-      out.print("<b>Job " + jobid + " not found.</b><br>\n");
+      String historyFile = tracker.getJobHistory().getHistoryFilePath(jobidObj);
+      if (historyFile == null) {
+        out.println("<h2>Job " + jobid + " not known!</h2>");
+        return;
+      }
+      String historyUrl = "/taskdetailshistory.jsp?logFile=" + historyFile +
+                          "&tipid=" + tipidObj.toString();
+      response.sendRedirect(response.encodeRedirectURL(historyUrl));
       return;
     }
     boolean privateActions = JSPUtil.privateActionsAllowed(tracker.conf);

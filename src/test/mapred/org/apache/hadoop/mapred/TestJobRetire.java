@@ -33,6 +33,8 @@ import org.apache.hadoop.mapred.MiniMRCluster.TaskTrackerRunner;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.SleepJob;
 import org.apache.hadoop.mapreduce.TaskType;
+import org.apache.hadoop.mapreduce.TaskID;
+import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
 import org.apache.hadoop.mapreduce.split.JobSplit;
@@ -102,20 +104,59 @@ public class TestJobRetire extends TestCase {
  
     assertFalse("JobConf file not deleted", file.exists());
     
-    //test redirection
-    URL jobUrl = new URL(rj.getTrackingURL());
-    HttpURLConnection conn = (HttpURLConnection) jobUrl.openConnection();
+    // test redirections
+    final String JOBDETAILS = "jobdetails";
+    final String JOBCONF = "jobconf";
+    final String JOBTASKS = "jobtasks";
+    final String TASKSTATS = "taskstats";
+    final String TASKDETAILS = "taskdetails";
+
+    // test redirections of job related pages
+    String jobUrlStr = rj.getTrackingURL();
+    URL jobUrl = new URL(jobUrlStr);
+    URL jobConfUrl = new URL(jobUrlStr.replace(JOBDETAILS, JOBCONF));
+    URL jobTasksUrl = new URL(jobUrlStr.replace(JOBDETAILS, JOBTASKS)
+                              + "&type=map&pagenum=1");
+    verifyRedirection(jobConfUrl);
+    verifyRedirection(jobTasksUrl);
+    verifyRedirection(jobUrl);
+
+    // test redirections of task and task attempt pages
+    String jobTrackerUrlStr =
+        jobUrlStr.substring(0, jobUrlStr.indexOf(JOBDETAILS));
+    Path logFile = new Path(jobtracker.getJobHistory().getHistoryFilePath(id));
+    JobHistoryParser.JobInfo jobInfo =
+      JSPUtil.getJobInfo(logFile, logFile.getFileSystem(jobConf), jobtracker);
+    for (TaskID tid : jobInfo.getAllTasks().keySet()) {
+      URL taskDetailsUrl = new URL(jobTrackerUrlStr + TASKDETAILS +
+                                   ".jsp?tipid=" + tid);
+      // test redirections of all tasks
+      verifyRedirection(taskDetailsUrl);
+    }
+    for (JobHistoryParser.TaskInfo task : jobInfo.getAllTasks().values()) {
+      for(org.apache.hadoop.mapreduce.TaskAttemptID attemptid :
+          task.getAllTaskAttempts().keySet()) {
+        URL taskstats = new URL(jobTrackerUrlStr + TASKSTATS +
+            ".jsp?attemptid=" + attemptid);
+        // test redirections of all task attempts
+        verifyRedirection(taskstats);
+      }
+    }
+    return id;
+  }
+
+  private void verifyRedirection(URL url) throws IOException {
+    LOG.info("Verifying redirection of " + url);
+    HttpURLConnection conn = (HttpURLConnection) url.openConnection();
     conn.setInstanceFollowRedirects(false);
     conn.connect();
     assertEquals(HttpURLConnection.HTTP_MOVED_TEMP, conn.getResponseCode());
     conn.disconnect();
-    
     URL redirectedUrl = new URL(conn.getHeaderField("Location"));
     conn = (HttpURLConnection) redirectedUrl.openConnection();
     conn.connect();
     assertEquals(HttpURLConnection.HTTP_OK, conn.getResponseCode());
     conn.disconnect();
-    return id;
   }
 
   // wait till the job retires
