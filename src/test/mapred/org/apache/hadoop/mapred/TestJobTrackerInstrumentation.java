@@ -156,6 +156,8 @@ public class TestJobTrackerInstrumentation extends TestCase {
     assertTrue("Mismatch in num reduce slots",
         mi.numReduceSlots == (reduceSlotsPerTracker * trackers.length));
 
+    assertTrue("No heartbeats were recorded, but at least one was sent.",
+               mi.numHeartbeats > 0);
   }
   
   public void testBlackListing() throws IOException {
@@ -433,6 +435,8 @@ public class TestJobTrackerInstrumentation extends TestCase {
 
     private int numTrackersDecommissioned = 0;
 
+    private long numHeartbeats = 0;
+
     @Override
     public synchronized void launchMap(TaskAttemptID taskAttemptID) {
       ++numMapTasksLaunched;
@@ -675,6 +679,11 @@ public class TestJobTrackerInstrumentation extends TestCase {
     public synchronized void setDecommissionedTrackers(int trackers)
     {
       numTrackersDecommissioned = trackers;
+    }
+
+    @Override
+    public synchronized void heartbeat() {
+      ++numHeartbeats;
     }
   }
 }

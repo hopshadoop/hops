@@ -2664,6 +2664,9 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   synchronized boolean processHeartbeat(
                                  TaskTrackerStatus trackerStatus, 
                                  boolean initialContact) {
+    
+    getInstrumentation().heartbeat();
+
     String trackerName = trackerStatus.getTrackerName();
 
     synchronized (taskTrackers) {

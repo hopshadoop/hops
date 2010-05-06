@@ -14,6 +14,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1092. Enable assertions for unit tests. (Eli Collins via
     cdouglas)
 
+    MAPREDUCE-1680. Add a metric recording JobTracker heartbeats processed.
+    (Dick King via cdouglas)
+
   OPTIMIZATIONS
 
   BUG FIXES
