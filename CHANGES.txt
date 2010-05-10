@@ -770,6 +770,9 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-1613. Install/deploy source jars to Maven repo 
     (Patrick Angeles via ddas)
 
+    MAPREDUCE-1610. Forrest documentation should be updated to reflect
+    the changes in MAPREDUCE-856. (Ravi Gummadi via vinodkv)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 

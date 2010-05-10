@@ -1375,61 +1375,87 @@
         <section>
         <title> Directory Structure </title>
         <p>The task tracker has local directory,
-        <code> ${mapreduce.cluster.local.dir}/taskTracker/</code> to create localized
-        cache and localized job. It can define multiple local directories 
-        (spanning multiple disks) and then each filename is assigned to a
-        semi-random local directory. When the job starts, task tracker 
+        <code> ${mapreduce.cluster.local.dir}/taskTracker/</code> to create
+        localized cache and localized job. It can define multiple local
+        directories (spanning multiple disks) and then each filename is assigned
+        to a semi-random local directory. When the job starts, task tracker 
         creates a localized job directory relative to the local directory
         specified in the configuration. Thus the task tracker directory 
-        structure looks the following: </p>         
+        structure looks as following: </p>
         <ul>
-        <li><code>${mapreduce.cluster.local.dir}/taskTracker/archive/</code> :
-        The distributed cache. This directory holds the localized distributed
-        cache. Thus localized distributed cache is shared among all
-        the tasks and jobs </li>
-        <li><code>${mapreduce.cluster.local.dir}/taskTracker/jobcache/$jobid/</code> :
-        The localized job directory 
+        <li><code>${mapreduce.cluster.local.dir}/taskTracker/distcache/</code> :
+        The public distributed cache for the jobs of all users. This directory
+        holds the localized public distributed cache. Thus localized public
+        distributed cache is shared among all the tasks and jobs of all users.
+        </li>
+        <li><code>${mapreduce.cluster.local.dir}/taskTracker/$user/distcache/
+        </code> :
+        The private distributed cache for the jobs of the specific user. This
+        directory holds the localized private distributed cache. Thus localized
+        private distributed cache is shared among all the tasks and jobs of the
+        specific user only. It is not accessible to jobs of other users.
+        </li>
+        <li><code>
+        ${mapreduce.cluster.local.dir}/taskTracker/$user/jobcache/$jobid/
+        </code> : The localized job directory
         <ul>
-        <li><code>${mapreduce.cluster.local.dir}/taskTracker/jobcache/$jobid/work/</code> 
+        <li><code>
+        ${mapreduce.cluster.local.dir}/taskTracker/$user/jobcache/$jobid/work/
+        </code>
         : The job-specific shared directory. The tasks can use this space as 
         scratch space and share files among them. This directory is exposed
         to the users through the configuration property  
-        <code>mapreduce.job.local.dir</code>. It is available as System property also.
-        So, users (streaming etc.) can call 
+        <code>mapreduce.job.local.dir</code>. It is available as System property
+        also. So, users (streaming etc.) can call 
         <code>System.getProperty("mapreduce.job.local.dir")</code> to access the 
         directory.</li>
-        <li><code>${mapreduce.cluster.local.dir}/taskTracker/jobcache/$jobid/jars/</code>
+        <li><code>
+        ${mapreduce.cluster.local.dir}/taskTracker/$user/jobcache/$jobid/jars/
+        </code>
         : The jars directory, which has the job jar file and expanded jar.
         The <code>job.jar</code> is the application's jar file that is
-        automatically distributed to each machine. Any library jars that are dependencies
-        of the application code may be packaged inside this jar in a <code>lib/</code> directory.
-        This directory is extracted from <code>job.jar</code> and its contents are
-        automatically added to the classpath for each task.
-        The job.jar location is accessible to the application through the api
+        automatically distributed to each machine. Any library jars that are
+        dependencies of the application code may be packaged inside this jar in
+        a <code>lib/</code> directory.
+        This directory is extracted from <code>job.jar</code> and its contents
+        are automatically added to the classpath for each task.
+        The job.jar location is accessible to the application through the API
         <a href="ext:api/org/apache/hadoop/mapreduce/task/jobcontextimpl/getjar"> 
         Job.getJar() </a>. To access the unjarred directory,
         Job.getJar().getParent() can be called.</li>
-        <li><code>${mapreduce.cluster.local.dir}/taskTracker/jobcache/$jobid/job.xml</code>
+        <li><code>
+        ${mapreduce.cluster.local.dir}/taskTracker/$user/jobcache/$jobid/job.xml
+        </code>
         : The job.xml file, the generic job configuration, localized for 
         the job. </li>
-        <li><code>${mapreduce.cluster.local.dir}/taskTracker/jobcache/$jobid/$taskid</code>
+        <li><code>
+        ${mapreduce.cluster.local.dir}/taskTracker/$user/jobcache/$jobid/$taskid
+        </code>
         : The task directory for each task attempt. Each task directory
         again has the following structure :
         <ul>
-        <li><code>${mapreduce.cluster.local.dir}/taskTracker/jobcache/$jobid/$taskid/job.xml</code>
+        <li><code>
+        ${mapreduce.cluster.local.dir}/taskTracker/$user/jobcache/$jobid/$taskid/job.xml
+        </code>
         : A job.xml file, task localized job configuration, Task localization
         means that properties have been set that are specific to
         this particular task within the job. The properties localized for 
         each task are described below.</li>
-        <li><code>${mapreduce.cluster.local.dir}/taskTracker/jobcache/$jobid/$taskid/output</code>
+        <li><code>
+        ${mapreduce.cluster.local.dir}/taskTracker/$user/jobcache/$jobid/$taskid/output
+        </code>
         : A directory for intermediate output files. This contains the
         temporary map reduce data generated by the framework
         such as map output files etc. </li>
-        <li><code>${mapreduce.cluster.local.dir}/taskTracker/jobcache/$jobid/$taskid/work</code>
+        <li><code>
+        ${mapreduce.cluster.local.dir}/taskTracker/$user/jobcache/$jobid/$taskid/work
+        </code>
         : The curernt working directory of the task. 
         With <a href="#Task+JVM+Reuse">jvm reuse</a> enabled for tasks, this 
         directory will be the directory on which the jvm has started</li>
-        <li><code>${mapreduce.cluster.local.dir}/taskTracker/jobcache/$jobid/$taskid/work/tmp</code>
+        <li><code>
+        ${mapreduce.cluster.local.dir}/taskTracker/$user/jobcache/$jobid/$taskid/work/tmp
+        </code>
         : The temporary directory for the task. 
         (User can specify the property <code>mapreduce.task.tmp.dir</code> to set
         the value of temporary directory for map and reduce tasks. This 
@@ -1438,7 +1464,7 @@
         directly assigned. The directory will be created if it doesn't exist.
         Then, the child java tasks are executed with option
         <code>-Djava.io.tmpdir='the absolute path of the tmp dir'</code>.
-        Anp pipes and streaming are set with environment variable,
+        Pipes and streaming are set with environment variable,
         <code>TMPDIR='the absolute path of the tmp dir'</code>). This 
         directory is created, if <code>mapreduce.task.tmp.dir</code> has the value
         <code>./tmp</code> </li>
@@ -2151,7 +2177,8 @@
             Next, go to the node on which the failed task ran and go to the 
             <code>TaskTracker</code>'s local directory and run the 
             <code>IsolationRunner</code>:<br/>
-            <code>$ cd &lt;local path&gt;/taskTracker/${taskid}/work</code><br/>
+            <code>$ cd &lt;local path&gt;
+            /taskTracker/$user/jobcache/$jobid/${taskid}/work</code><br/>
             <code>
               $ bin/hadoop org.apache.hadoop.mapred.IsolationRunner ../job.xml
             </code>
