@@ -72,19 +72,21 @@ public class TaskLog {
     }
   }
 
-  public static File getTaskLogFile(TaskAttemptID taskid, LogName filter) {
-    return new File(getAttemptDir(taskid.toString()), filter.toString());
-  }
-  public static File getRealTaskLogFileLocation(TaskAttemptID taskid, 
+  public static File getTaskLogFile(TaskAttemptID taskid, boolean isCleanup,
       LogName filter) {
+    return new File(getAttemptDir(taskid, isCleanup), filter.toString());
+  }
+
+  static File getRealTaskLogFileLocation(TaskAttemptID taskid,
+      boolean isCleanup, LogName filter) {
     LogFileDetail l;
     try {
-      l = getTaskLogFileDetail(taskid, filter);
+      l = getLogFileDetail(taskid, filter, isCleanup);
     } catch (IOException ie) {
       LOG.error("getTaskLogFileDetail threw an exception " + ie);
       return null;
     }
-    return new File(getAttemptDir(l.location), filter.toString());
+    return new File(l.location, filter.toString());
   }
   private static class LogFileDetail {
     final static String LOCATION = "LOG_DIR:";
@@ -93,16 +95,11 @@ public class TaskLog {
     long length;
   }
   
-  private static LogFileDetail getTaskLogFileDetail(TaskAttemptID taskid,
-      LogName filter) throws IOException {
-    return getLogFileDetail(taskid, filter, false);
-  }
-  
   private static LogFileDetail getLogFileDetail(TaskAttemptID taskid, 
                                                 LogName filter,
                                                 boolean isCleanup) 
   throws IOException {
-    File indexFile = getIndexFile(taskid.toString(), isCleanup);
+    File indexFile = getIndexFile(taskid, isCleanup);
     BufferedReader fis = new BufferedReader(new java.io.FileReader(indexFile));
     //the format of the index file is
     //LOG_DIR: <the dir where the task logs are really stored>
@@ -120,7 +117,7 @@ public class TaskLog {
     //to be associated with each task attempt since jvm reuse is disabled
     //when profiling/debugging is enabled
     if (filter.equals(LogName.DEBUGOUT) || filter.equals(LogName.PROFILE)) {
-      l.length = new File(getAttemptDir(l.location), filter.toString()).length();
+      l.length = new File(l.location, filter.toString()).length();
       l.start = 0;
       fis.close();
       return l;
@@ -141,39 +138,32 @@ public class TaskLog {
     return l;
   }
   
-  private static File getTmpIndexFile(String taskid) {
-    return new File(getAttemptDir(taskid), "log.tmp");
+  private static File getTmpIndexFile(TaskAttemptID taskid, boolean isCleanup) {
+    return new File(getAttemptDir(taskid, isCleanup), "log.tmp");
   }
-  public static File getIndexFile(String taskid) {
-    return getIndexFile(taskid, false);
-  }
-  
-  public static File getIndexFile(String taskid, boolean isCleanup) {
-    if (isCleanup) {
-      return new File(getAttemptDir(taskid), "log.index.cleanup");
-    } else {
-      return new File(getAttemptDir(taskid), "log.index");
-    }
+
+  static File getIndexFile(TaskAttemptID taskid, boolean isCleanup) {
+    return new File(getAttemptDir(taskid, isCleanup), "log.index");
   }
 
   static String getBaseLogDir() {
     return System.getProperty("hadoop.log.dir");
   }
 
-  static File getAttemptDir(String taskid) {
-    return new File(getJobDir(TaskAttemptID.forName(taskid).getJobID()),
-        taskid);
+  static File getAttemptDir(TaskAttemptID taskid, boolean isCleanup) {
+    String cleanupSuffix = isCleanup ? ".cleanup" : "";
+    return new File(getJobDir(taskid.getJobID()), taskid + cleanupSuffix);
   }
   private static long prevOutLength;
   private static long prevErrLength;
   private static long prevLogLength;
   
-  private static void writeToIndexFile(TaskAttemptID firstTaskid,
+  private static void writeToIndexFile(String logLocation,
                                        boolean isCleanup) 
   throws IOException {
     // To ensure atomicity of updates to index file, write to temporary index
     // file first and then rename.
-    File tmpIndexFile = getTmpIndexFile(currentTaskid.toString());
+    File tmpIndexFile = getTmpIndexFile(currentTaskid, isCleanup);
     
     BufferedOutputStream bos = 
       new BufferedOutputStream(new FileOutputStream(tmpIndexFile,false));
@@ -183,20 +173,23 @@ public class TaskLog {
     //STDOUT: <start-offset in the stdout file> <length>
     //STDERR: <start-offset in the stderr file> <length>
     //SYSLOG: <start-offset in the syslog file> <length>    
-    dos.writeBytes(LogFileDetail.LOCATION + firstTaskid.toString()+"\n"+
-        LogName.STDOUT.toString()+":");
-    dos.writeBytes(Long.toString(prevOutLength)+" ");
-    dos.writeBytes(Long.toString(getTaskLogFile(firstTaskid, LogName.STDOUT)
-        .length() - prevOutLength)+"\n"+LogName.STDERR+":");
-    dos.writeBytes(Long.toString(prevErrLength)+" ");
-    dos.writeBytes(Long.toString(getTaskLogFile(firstTaskid, LogName.STDERR)
-        .length() - prevErrLength)+"\n"+LogName.SYSLOG.toString()+":");
-    dos.writeBytes(Long.toString(prevLogLength)+" ");
-    dos.writeBytes(Long.toString(getTaskLogFile(firstTaskid, LogName.SYSLOG)
-        .length() - prevLogLength)+"\n");
+    dos.writeBytes(LogFileDetail.LOCATION + logLocation + "\n"
+        + LogName.STDOUT.toString() + ":");
+    dos.writeBytes(Long.toString(prevOutLength) + " ");
+    dos.writeBytes(Long.toString(new File(logLocation, LogName.STDOUT
+        .toString()).length() - prevOutLength)
+        + "\n" + LogName.STDERR + ":");
+    dos.writeBytes(Long.toString(prevErrLength) + " ");
+    dos.writeBytes(Long.toString(new File(logLocation, LogName.STDERR
+        .toString()).length() - prevErrLength)
+        + "\n" + LogName.SYSLOG.toString() + ":");
+    dos.writeBytes(Long.toString(prevLogLength) + " ");
+    dos.writeBytes(Long.toString(new File(logLocation, LogName.SYSLOG
+        .toString()).length() - prevLogLength)
+        + "\n");
     dos.close();
 
-    File indexFile = getIndexFile(currentTaskid.toString(), isCleanup);
+    File indexFile = getIndexFile(currentTaskid, isCleanup);
     Path indexFilePath = new Path(indexFile.getAbsolutePath());
     Path tmpIndexFilePath = new Path(tmpIndexFile.getAbsolutePath());
 
@@ -205,21 +198,15 @@ public class TaskLog {
     }
     localFS.rename (tmpIndexFilePath, indexFilePath);
   }
-  private static void resetPrevLengths(TaskAttemptID firstTaskid) {
-    prevOutLength = getTaskLogFile(firstTaskid, LogName.STDOUT).length();
-    prevErrLength = getTaskLogFile(firstTaskid, LogName.STDERR).length();
-    prevLogLength = getTaskLogFile(firstTaskid, LogName.SYSLOG).length();
+  private static void resetPrevLengths(String logLocation) {
+    prevOutLength = new File(logLocation, LogName.STDOUT.toString()).length();
+    prevErrLength = new File(logLocation, LogName.STDERR.toString()).length();
+    prevLogLength = new File(logLocation, LogName.SYSLOG.toString()).length();
   }
   private volatile static TaskAttemptID currentTaskid = null;
 
-  public synchronized static void syncLogs(TaskAttemptID firstTaskid, 
-                                           TaskAttemptID taskid) 
-  throws IOException {
-    syncLogs(firstTaskid, taskid, false);
-  }
-  
   @SuppressWarnings("unchecked")
-  public synchronized static void syncLogs(TaskAttemptID firstTaskid, 
+  public synchronized static void syncLogs(String logLocation, 
                                            TaskAttemptID taskid,
                                            boolean isCleanup) 
   throws IOException {
@@ -238,9 +225,9 @@ public class TaskLog {
     }
     if (currentTaskid != taskid) {
       currentTaskid = taskid;
-      resetPrevLengths(firstTaskid);
+      resetPrevLengths(logLocation);
     }
-    writeToIndexFile(firstTaskid, isCleanup);
+    writeToIndexFile(logLocation, isCleanup);
   }
   
   /**
@@ -274,15 +261,10 @@ public class TaskLog {
     }
   }
 
-  static class Reader extends InputStream {
+  public static class Reader extends InputStream {
     private long bytesRemaining;
     private FileInputStream file;
 
-    public Reader(TaskAttemptID taskid, LogName kind, 
-                  long start, long end) throws IOException {
-      this(taskid, kind, start, end, false);
-    }
-    
     /**
      * Read a log file from start to end positions. The offsets may be negative,
      * in which case they are relative to the end of the file. For example,
@@ -312,8 +294,7 @@ public class TaskLog {
       start += fileDetail.start;
       end += fileDetail.start;
       bytesRemaining = end - start;
-      file = new FileInputStream(new File(getAttemptDir(fileDetail.location), 
-          kind.toString()));
+      file = new FileInputStream(new File(fileDetail.location, kind.toString()));
       // skip upto start
       long pos = 0;
       while (pos < start) {

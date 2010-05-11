@@ -69,8 +69,9 @@ class Child {
     int port = Integer.parseInt(args[1]);
     final InetSocketAddress address = new InetSocketAddress(host, port);
     final TaskAttemptID firstTaskid = TaskAttemptID.forName(args[2]);
+    final String logLocation = args[3];
     final int SLEEP_LONGER_COUNT = 5;
-    int jvmIdInt = Integer.parseInt(args[3]);
+    int jvmIdInt = Integer.parseInt(args[4]);
     JVMId jvmId = new JVMId(firstTaskid.getJobID(),
         firstTaskid.getTaskType() == TaskType.MAP,jvmIdInt);
     
@@ -109,7 +110,7 @@ class Child {
       public void run() {
         try {
           if (taskid != null) {
-            TaskLog.syncLogs(firstTaskid, taskid, isCleanup);
+            TaskLog.syncLogs(logLocation, taskid, isCleanup);
           }
         } catch (Throwable throwable) {
         }
@@ -123,7 +124,7 @@ class Child {
           try {
             Thread.sleep(5000);
             if (taskid != null) {
-              TaskLog.syncLogs(firstTaskid, taskid, isCleanup);
+              TaskLog.syncLogs(logLocation, taskid, isCleanup);
             }
           } catch (InterruptedException ie) {
           } catch (IOException iee) {
@@ -175,7 +176,7 @@ class Child {
 
         //create the index file so that the log files 
         //are viewable immediately
-        TaskLog.syncLogs(firstTaskid, taskid, isCleanup);
+        TaskLog.syncLogs(logLocation, taskid, isCleanup);
         final JobConf job = new JobConf(task.getJobFile());
         
         // set the jobTokenFile into task
@@ -215,7 +216,7 @@ class Child {
               FileSystem.get(job).setWorkingDirectory(job.getWorkingDirectory());
               taskFinal.run(job, umbilical);             // run the task
             } finally {
-              TaskLog.syncLogs(firstTaskid, taskid, isCleanup);
+              TaskLog.syncLogs(logLocation, taskid, isCleanup);
             }
             
             return null;

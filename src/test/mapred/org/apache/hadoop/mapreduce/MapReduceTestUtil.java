@@ -23,6 +23,7 @@ import java.io.DataOutput;
 import java.io.BufferedReader;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.text.NumberFormat;
 import java.util.ArrayList;
@@ -43,7 +44,10 @@ import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableComparable;
+import org.apache.hadoop.mapred.TaskLog;
 import org.apache.hadoop.mapred.Utils;
+import org.apache.hadoop.mapred.TaskLog.LogName;
+import org.apache.hadoop.mapred.TaskLog.Reader;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
@@ -413,6 +417,46 @@ public class MapReduceTestUtil {
       file.close();
     }
     return result.toString();
+  }
+
+  /**
+   * Reads tasklog and returns it as string after trimming it.
+   * 
+   * @param filter
+   *          Task log filter; can be STDOUT, STDERR, SYSLOG, DEBUGOUT, PROFILE
+   * @param taskId
+   *          The task id for which the log has to collected
+   * @param isCleanup
+   *          whether the task is a cleanup attempt or not.
+   * @return task log as string
+   * @throws IOException
+   */
+  public static String readTaskLog(TaskLog.LogName filter,
+      org.apache.hadoop.mapred.TaskAttemptID taskId, boolean isCleanup)
+      throws IOException {
+    // string buffer to store task log
+    StringBuffer result = new StringBuffer();
+    int res;
+
+    // reads the whole tasklog into inputstream
+    InputStream taskLogReader = new TaskLog.Reader(taskId, filter, 0, -1,
+        isCleanup);
+    // construct string log from inputstream.
+    byte[] b = new byte[65536];
+    while (true) {
+      res = taskLogReader.read(b);
+      if (res > 0) {
+        result.append(new String(b));
+      } else {
+        break;
+      }
+    }
+    taskLogReader.close();
+
+    // trim the string and return it
+    String str = result.toString();
+    str = str.trim();
+    return str;
   }
 
 }

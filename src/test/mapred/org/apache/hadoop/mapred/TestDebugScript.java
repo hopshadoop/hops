@@ -146,7 +146,7 @@ public class TestDebugScript {
    */
   static void verifyDebugScriptOutput(TaskAttemptID taskId, String expectedUser, 
       String expectedGroup, String expectedPerms) throws Exception {
-    File output = TaskLog.getRealTaskLogFileLocation(taskId, 
+    File output = TaskLog.getRealTaskLogFileLocation(taskId, false,
         TaskLog.LogName.DEBUGOUT);
     // Check the presence of the output file if the script is to be run.
     assertTrue("Output file does not exists. DebugScript has not been run",

@@ -2759,17 +2759,17 @@ public class TaskTracker
       String jobConf = task.getJobFile();
       try {
         // get task's stdout file 
-        taskStdout = FileUtil.makeShellPath(
-            TaskLog.getRealTaskLogFileLocation
-                          (task.getTaskID(), TaskLog.LogName.STDOUT));
-        // get task's stderr file 
-        taskStderr = FileUtil.makeShellPath(
-            TaskLog.getRealTaskLogFileLocation
-                          (task.getTaskID(), TaskLog.LogName.STDERR));
-        // get task's syslog file 
-        taskSyslog = FileUtil.makeShellPath(
-            TaskLog.getRealTaskLogFileLocation
-                          (task.getTaskID(), TaskLog.LogName.SYSLOG));
+        taskStdout = FileUtil
+            .makeShellPath(TaskLog.getRealTaskLogFileLocation(task.getTaskID(),
+                task.isTaskCleanupTask(), TaskLog.LogName.STDOUT));
+        // get task's stderr file
+        taskStderr = FileUtil
+            .makeShellPath(TaskLog.getRealTaskLogFileLocation(task.getTaskID(),
+                task.isTaskCleanupTask(), TaskLog.LogName.STDERR));
+        // get task's syslog file
+        taskSyslog = FileUtil
+            .makeShellPath(TaskLog.getRealTaskLogFileLocation(task.getTaskID(),
+                task.isTaskCleanupTask(), TaskLog.LogName.SYSLOG));
       } catch(IOException e){
         LOG.warn("Exception finding task's stdout/err/syslog files");
       }
@@ -2788,8 +2788,8 @@ public class TaskTracker
                   StringUtils.stringifyException(e));
       }
       // Build the command  
-      File stdout = TaskLog.getRealTaskLogFileLocation(
-                           task.getTaskID(), TaskLog.LogName.DEBUGOUT);
+      File stdout = TaskLog.getTaskLogFile(task.getTaskID(), task
+          .isTaskCleanupTask(), TaskLog.LogName.DEBUGOUT);
       // add pipes program as argument if it exists.
       String program ="";
       String executable = Submitter.getExecutable(localJobConf);

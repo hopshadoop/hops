@@ -97,10 +97,12 @@ class Application<K1 extends WritableComparable, V1 extends Writable,
     }
     cmd.add(executable);
     // wrap the command in a stdout/stderr capture
+    // we are starting map/reduce task of the pipes job. this is not a cleanup
+    // attempt. 
     TaskAttemptID taskid = 
       TaskAttemptID.forName(conf.get(MRJobConfig.TASK_ATTEMPT_ID));
-    File stdout = TaskLog.getTaskLogFile(taskid, TaskLog.LogName.STDOUT);
-    File stderr = TaskLog.getTaskLogFile(taskid, TaskLog.LogName.STDERR);
+    File stdout = TaskLog.getTaskLogFile(taskid, false, TaskLog.LogName.STDOUT);
+    File stderr = TaskLog.getTaskLogFile(taskid, false, TaskLog.LogName.STDERR);
     long logLength = TaskLog.getTaskLogLength(conf);
     cmd = TaskLog.captureOutAndError(null, cmd, stdout, stderr, logLength,
                                      false);
