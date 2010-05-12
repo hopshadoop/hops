@@ -507,7 +507,8 @@ public class TestFairScheduler extends TestCase {
     conf.setBoolean("mapred.fairscheduler.assignmultiple", assignMultiple);
     // Manually set locality delay because we aren't using a JobTracker so
     // we can't auto-compute it from the heartbeat interval.
-    conf.setLong("mapred.fairscheduler.locality.delay", 10000);
+    conf.setLong("mapred.fairscheduler.locality.delay.node", 5000);
+    conf.setLong("mapred.fairscheduler.locality.delay.rack", 10000);
     taskTrackerManager = new FakeTaskTrackerManager(numRacks, numNodesPerRack);
     clock = new FakeClock();
     scheduler = new FairScheduler(clock, true);
@@ -2221,8 +2222,8 @@ public class TestFairScheduler extends TestCase {
     checkAssignment("tt3", "attempt_test_0002_m_000004_0 on tt3",
                            "attempt_test_0002_m_000005_0 on tt3");
     
-    // Advance time by 11 seconds to put us past the 10-second locality delay
-    advanceTime(11000);
+    // Advance time by 6 seconds to put us past the 5-second node locality delay
+    advanceTime(6000);
     
     // Finish some tasks on each node
     taskTrackerManager.finishTask("tt1", "attempt_test_0002_m_000000_0");
@@ -2297,8 +2298,8 @@ public class TestFairScheduler extends TestCase {
     assertNull(scheduler.assignTasks(tracker("tt2")));
     assertNull(scheduler.assignTasks(tracker("tt3")));
     
-    // Advance time by 11 seconds to put us past the 10-sec node locality delay
-    advanceTime(11000);
+    // Advance time by 6 seconds to put us past the 5-sec node locality delay
+    advanceTime(6000);
 
     // Check that nothing is assigned on trackers 1-2; the job would assign
     // a task on tracker 3 (rack1.node2) so we skip that one 
@@ -2315,7 +2316,7 @@ public class TestFairScheduler extends TestCase {
 
     // Check that delay scheduling info is properly set
     assertEquals(info1.lastMapLocalityLevel, LocalityLevel.NODE);
-    assertEquals(info1.timeWaitedForLocalMap, 11200);
+    assertEquals(info1.timeWaitedForLocalMap, 6200);
     assertEquals(info1.skippedAtLastHeartbeat, true);
     
     // Advance time by 11 seconds to put us past the 10-sec rack locality delay

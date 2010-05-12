@@ -73,7 +73,8 @@ public class FairScheduler extends TaskScheduler {
   protected boolean assignMultiple; // Simultaneously assign map and reduce?
   protected int mapAssignCap = -1;    // Max maps to launch per heartbeat
   protected int reduceAssignCap = -1; // Max reduces to launch per heartbeat
-  protected long localityDelay;       // Time to wait for node and rack locality
+  protected long nodeLocalityDelay;   // Time to wait for node locality
+  protected long rackLocalityDelay;   // Time to wait for rack locality
   protected boolean autoComputeLocalityDelay = false; // Compute locality delay
                                                       // from heartbeat interval
   protected boolean sizeBasedWeight; // Give larger weights to larger jobs
@@ -184,10 +185,16 @@ public class FairScheduler extends TaskScheduler {
           "mapred.fairscheduler.preemption", false);
       onlyLogPreemption = conf.getBoolean(
           "mapred.fairscheduler.preemption.only.log", false);
-      localityDelay = conf.getLong(
+      long defaultDelay = conf.getLong(
           "mapred.fairscheduler.locality.delay", -1);
-      if (localityDelay == -1)
+      nodeLocalityDelay = conf.getLong(
+          "mapred.fairscheduler.locality.delay.node", defaultDelay);
+      rackLocalityDelay = conf.getLong(
+          "mapred.fairscheduler.locality.delay.rack", defaultDelay);
+      if (defaultDelay == -1 && 
+          (nodeLocalityDelay == -1 || rackLocalityDelay == -1)) {
         autoComputeLocalityDelay = true; // Compute from heartbeat interval
+      }
       initialized = true;
       running = true;
       lastUpdateTime = clock.getTime();
@@ -490,9 +497,10 @@ public class FairScheduler extends TaskScheduler {
    * If the job has no locality information (e.g. it does not use HDFS), this 
    * method returns LocalityLevel.ANY, allowing tasks at any level.
    * Otherwise, the job can only launch tasks at its current locality level
-   * or lower, unless it has waited at least localityDelay milliseconds
-   * (in which case it can go one level beyond) or 2 * localityDelay millis
-   * (in which case it can go to any level).
+   * or lower, unless it has waited at least nodeLocalityDelay or
+   * rackLocalityDelay milliseconds depends on the current level. If it
+   * has waited (nodeLocalityDelay + rackLocalityDelay) milliseconds,
+   * it can go to any level.
    */
   protected LocalityLevel getAllowedLocalityLevel(JobInProgress job,
       long currentTime) {
@@ -519,14 +527,15 @@ public class FairScheduler extends TaskScheduler {
     // In the common case, compute locality level based on time waited
     switch(info.lastMapLocalityLevel) {
     case NODE: // Last task launched was node-local
-      if (info.timeWaitedForLocalMap >= 2 * localityDelay)
+      if (info.timeWaitedForLocalMap >=
+          nodeLocalityDelay + rackLocalityDelay)
         return LocalityLevel.ANY;
-      else if (info.timeWaitedForLocalMap >= localityDelay)
+      else if (info.timeWaitedForLocalMap >= nodeLocalityDelay)
         return LocalityLevel.RACK;
       else
         return LocalityLevel.NODE;
     case RACK: // Last task launched was rack-local
-      if (info.timeWaitedForLocalMap >= localityDelay)
+      if (info.timeWaitedForLocalMap >= rackLocalityDelay)
         return LocalityLevel.ANY;
       else
         return LocalityLevel.RACK;
@@ -549,8 +558,9 @@ public class FairScheduler extends TaskScheduler {
     // This will also lock the JT, so do it outside of a fair scheduler lock.
     if (autoComputeLocalityDelay) {
       JobTracker jobTracker = (JobTracker) taskTrackerManager;
-      localityDelay = Math.min(MAX_AUTOCOMPUTED_LOCALITY_DELAY,
+      nodeLocalityDelay = Math.min(MAX_AUTOCOMPUTED_LOCALITY_DELAY,
           (long) (1.5 * jobTracker.getNextHeartbeatInterval()));
+      rackLocalityDelay = nodeLocalityDelay;
     }
     
     // Got clusterStatus hence acquiring scheduler lock now.
