@@ -79,6 +79,7 @@ import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistory;
 import org.apache.hadoop.mapreduce.protocol.ClientProtocol;
 import org.apache.hadoop.security.TokenStorage;
+import org.apache.hadoop.mapreduce.security.token.DelegationTokenRenewal;
 import org.apache.hadoop.mapreduce.security.token.JobTokenSecretManager;
 import org.apache.hadoop.mapreduce.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.mapreduce.security.token.delegation.DelegationTokenSecretManager;
@@ -1769,7 +1770,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     if (jobHistory != null) {
       jobHistory.shutDown();
     }
-    
+    DelegationTokenRenewal.close();
     LOG.info("stopped all jobtracker services");
     return;
   }

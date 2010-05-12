@@ -407,8 +407,10 @@ public class JobInProgress {
       this.conf.setUser(user);
     }
     if (!conf.getUser().equals(user)) {
-      throw new IOException("The username obtained from the conf doesn't " +
-      		"match the username the user authenticated as");
+      String desc = "The username " + conf.getUser() + " obtained from the " +
+                     "conf doesn't match the username " + user + " the user " +
+                                     "authenticated as";
+      throw new IOException(desc);
     }
     this.priority = conf.getJobPriority();
     this.profile = new JobProfile(conf.getUser(), this.jobId, 

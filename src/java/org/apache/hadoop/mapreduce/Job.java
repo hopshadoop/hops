@@ -29,6 +29,7 @@ import java.io.OutputStreamWriter;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.URI;
+import java.security.PrivilegedExceptionAction;
 
 import javax.security.auth.login.LoginException;
 
@@ -958,8 +959,14 @@ public class Job extends JobContextImpl implements JobContext {
                               ClassNotFoundException {
     ensureState(JobState.DEFINE);
     setUseNewAPI();
-    status = new JobSubmitter(cluster.getFileSystem(),
-      cluster.getClient()).submitJobInternal(this, cluster);
+    final JobSubmitter submitter = new JobSubmitter(cluster.getFileSystem(),
+        cluster.getClient());
+    status = ugi.doAs(new PrivilegedExceptionAction<JobStatus>() {
+      public JobStatus run() throws IOException, InterruptedException, 
+      ClassNotFoundException {
+        return submitter.submitJobInternal(Job.this, cluster);
+      }
+    });
     state = JobState.RUNNING;
    }
   

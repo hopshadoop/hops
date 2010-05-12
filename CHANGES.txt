@@ -23,6 +23,10 @@ Trunk (unreleased changes)
 
     MAPREDUCE-1707. TaskRunner can get NPE in getting ugi from TaskTracker.
     (Vinod Kumar Vavilapalli)
+    
+    MAPREDUCE-1532. Ensures that delegation tokens is obtained as the
+    actual user when the proxy-user is used for submitting jobs. Also
+    refactors the DelegationTokenToRenew class. (ddas)
 
 Release 0.21.0 - Unreleased
 

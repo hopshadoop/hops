@@ -127,8 +127,16 @@ public class Cluster {
   public synchronized FileSystem getFileSystem() 
       throws IOException, InterruptedException {
     if (this.fs == null) {
-      final Path sysDir = new Path(client.getSystemDir());
-      this.fs = sysDir.getFileSystem(getConf());
+      try {
+        this.fs = ugi.doAs(new PrivilegedExceptionAction<FileSystem>() {
+          public FileSystem run() throws IOException, InterruptedException {
+            final Path sysDir = new Path(client.getSystemDir());
+            return sysDir.getFileSystem(getConf());
+          }
+        });
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
     }
     return fs;
   }
