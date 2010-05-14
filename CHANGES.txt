@@ -34,6 +34,10 @@ Trunk (unreleased changes)
     actual user when the proxy-user is used for submitting jobs. Also
     refactors the DelegationTokenToRenew class. (ddas)
 
+    MAPREDUCE-1558. Fixes MRAdmin to look up the principal of the 
+    JobTracker and use that in the RefreshUserToGroupsMapping protocol and
+    RefreshAuthorizationPolicyProtocol. (Boris Shkolnik via ddas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
