@@ -21,14 +21,17 @@ package org.apache.hadoop.mapred;
 import java.io.IOException;
 
 import org.apache.hadoop.ipc.VersionedProtocol;
-import org.apache.hadoop.mapreduce.MRJobConfig;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
+import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
 import org.apache.hadoop.security.KerberosInfo;
 
 /** 
  * Protocol that a TaskTracker and the central JobTracker use to communicate.
  * The JobTracker is the Server, which implements this protocol.
  */ 
-@KerberosInfo(MRJobConfig.JOB_JOBTRACKER_ID)
+@KerberosInfo(
+    serverPrincipal = JTConfig.JT_USER_NAME,
+    clientPrincipal = TTConfig.TT_USER_NAME)
 interface InterTrackerProtocol extends VersionedProtocol {
   /**
    * version 3 introduced to replace 

@@ -20,6 +20,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1761. FairScheduler allows separate configuration of node
     and rack locality wait time (Scott Chen via dhruba)
 
+    MAPREDUCE-1539. authorization checks for inter-server protocol
+    (based on HADOOP-6600) (Boris Shkolnik via shv)
+
   OPTIMIZATIONS
 
   BUG FIXES

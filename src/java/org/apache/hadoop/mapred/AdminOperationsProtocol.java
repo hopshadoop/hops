@@ -21,14 +21,15 @@ package org.apache.hadoop.mapred;
 import java.io.IOException;
 
 import org.apache.hadoop.ipc.VersionedProtocol;
-import org.apache.hadoop.mapreduce.MRJobConfig;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.security.KerberosInfo;
 
 /**
  * Protocol for admin operations. This is a framework-public interface and is
  * NOT_TO_BE_USED_BY_USERS_DIRECTLY.
  */
-@KerberosInfo(MRJobConfig.JOB_JOBTRACKER_ID)
+@KerberosInfo(
+    serverPrincipal = JTConfig.JT_USER_NAME)
 public interface AdminOperationsProtocol extends VersionedProtocol {
   
   /**

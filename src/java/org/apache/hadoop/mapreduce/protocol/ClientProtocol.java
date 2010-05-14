@@ -20,7 +20,6 @@ package org.apache.hadoop.mapreduce.protocol;
 
 import java.io.IOException;
 
-
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenSelector;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.VersionedProtocol;
@@ -28,7 +27,6 @@ import org.apache.hadoop.mapreduce.ClusterMetrics;
 import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.JobStatus;
-import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.QueueAclsInfo;
 import org.apache.hadoop.mapreduce.QueueInfo;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
@@ -37,9 +35,10 @@ import org.apache.hadoop.mapreduce.TaskReport;
 import org.apache.hadoop.mapreduce.TaskTrackerInfo;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.security.token.delegation.DelegationTokenIdentifier;
-import org.apache.hadoop.security.TokenStorage;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.mapreduce.server.jobtracker.State;
 import org.apache.hadoop.security.KerberosInfo;
+import org.apache.hadoop.security.TokenStorage;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenInfo;
 
@@ -48,7 +47,8 @@ import org.apache.hadoop.security.token.TokenInfo;
  * JobClient can use these methods to submit a Job for execution, and learn about
  * the current system status.
  */ 
-@KerberosInfo(MRJobConfig.JOB_JOBTRACKER_ID)
+@KerberosInfo(
+    serverPrincipal = JTConfig.JT_USER_NAME)
 @TokenInfo(DelegationTokenSelector.class)
 public interface ClientProtocol extends VersionedProtocol {
   /* 

@@ -46,6 +46,7 @@ import org.apache.hadoop.mapred.MiniMRCluster;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.SleepJob;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.security.TokenStorage;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
@@ -209,7 +210,7 @@ public class TestTokenCache {
     String nnUri = dfsCluster.getURI().toString();
     jConf.set(MRJobConfig.JOB_NAMENODES, nnUri + "," + nnUri);
     // job tracker principla id..
-    jConf.set(MRJobConfig.JOB_JOBTRACKER_ID, "jt_id");
+    jConf.set(JTConfig.JT_USER_NAME, "jt_id");
     
     // using argument to pass the file name
     String[] args = {
