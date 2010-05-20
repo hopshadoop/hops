@@ -142,7 +142,6 @@ class EventFetcher<K,V> extends Thread {
           break;
         case FAILED:
         case KILLED:
-          break;
         case OBSOLETE:
           scheduler.obsoleteMapOutput(event.getTaskAttemptId());
           LOG.info("Ignoring obsolete output of " + event.getTaskStatus() + 

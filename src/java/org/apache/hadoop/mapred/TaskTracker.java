@@ -3658,8 +3658,12 @@ public class TaskTracker
           len =
             mapOutputIn.read(buffer, 0, (int)Math.min(rem, MAX_BYTES_TO_READ));
         }
-        
-        mapOutputIn.close();
+        try {
+          outStream.flush();
+        } catch (IOException ie) {
+          isInputException = false;
+          throw ie;
+        }
       } catch (IOException ie) {
         String errorMsg = "error on sending map " + mapId + " to reduce " + 
                           reduce;
@@ -3667,6 +3671,8 @@ public class TaskTracker
           tracker.mapOutputLost(TaskAttemptID.forName(mapId), errorMsg + 
                                 StringUtils.stringifyException(ie));
         }
+        throw new IOException(errorMsg, ie);
+      } finally {
         if (mapOutputIn != null) {
           try {
             mapOutputIn.close();
@@ -3674,7 +3680,6 @@ public class TaskTracker
             LOG.info("problem closing map output file", ioe);
           }
         }
-        throw new IOException(errorMsg, ie);
       }
       
       LOG.info("Sent out " + totalRead + " bytes to reduce " + reduce + 

@@ -200,10 +200,11 @@ class Fetcher<K,V> extends Thread {
       // put url hash into http header
       connection.addRequestProperty(
           SecureShuffleUtils.HTTP_HEADER_URL_HASH, encHash);
+      // set the read timeout
+      connection.setReadTimeout(readTimeout);
+      connect(connection, connectionTimeout);
       connectSucceeded = true;
-      input = 
-        new DataInputStream(getInputStream(connection, connectionTimeout,
-                                           readTimeout));
+      input = new DataInputStream(connection.getInputStream());
       
       // get the replyHash which is HMac of the encHash we sent to the server
       String replyHash = connection.getHeaderField(SecureShuffleUtils.HTTP_HEADER_REPLY_URL_HASH);
@@ -250,14 +251,7 @@ class Fetcher<K,V> extends Thread {
         good = copyMapOutput(host, input, remaining);
       }
       
-      // Drain the buffer, just in case
-      final int DRAIN_BUF_SIZE = 4096;
-      byte[] drainBuf = new byte[DRAIN_BUF_SIZE];
-      int retVal = 0;
-      while ( retVal != -1) {
-        retVal = input.read(drainBuf, 0, DRAIN_BUF_SIZE);
-      }
-      input.close();
+      IOUtils.cleanup(LOG, input);
       
       // Sanity check
       if (good && !remaining.isEmpty()) {
@@ -425,9 +419,7 @@ class Fetcher<K,V> extends Thread {
    * only on the last failure. Instead of connecting with a timeout of 
    * X, we try connecting with a timeout of x < X but multiple times. 
    */
-  private InputStream getInputStream(URLConnection connection, 
-                                     int connectionTimeout, 
-                                     int readTimeout) 
+  private void connect(URLConnection connection, int connectionTimeout)
   throws IOException {
     int unit = 0;
     if (connectionTimeout < 0) {
@@ -436,13 +428,12 @@ class Fetcher<K,V> extends Thread {
     } else if (connectionTimeout > 0) {
       unit = Math.min(UNIT_CONNECT_TIMEOUT, connectionTimeout);
     }
-    // set the read timeout to the total timeout
-    connection.setReadTimeout(readTimeout);
     // set the connect timeout to the unit-connect-timeout
     connection.setConnectTimeout(unit);
     while (true) {
       try {
-        return connection.getInputStream();
+        connection.connect();
+        break;
       } catch (IOException ioe) {
         // update the total remaining connect-timeout
         connectionTimeout -= unit;

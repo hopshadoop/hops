@@ -1593,3 +1593,6 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1611. Refresh nodes and refresh queues doesnt work with service
     authorization enabled. (Amar Kamat via vinodkv)
+
+    MAPREDUCE-1276. Correct flaws in the shuffle related to connection setup
+    and failure attribution. (Amareshwari Sriramadasu via cdouglas)
