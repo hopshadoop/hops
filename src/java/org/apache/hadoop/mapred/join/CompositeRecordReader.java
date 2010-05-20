@@ -23,6 +23,8 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.PriorityQueue;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Writable;
@@ -40,6 +42,8 @@ import org.apache.hadoop.util.ReflectionUtils;
  * {@link org.apache.hadoop.mapreduce.lib.join.CompositeRecordReader} instead
  */
 @Deprecated
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public abstract class CompositeRecordReader<
     K extends WritableComparable, // key type
     V extends Writable,           // accepts RecordReader<K,V> as children

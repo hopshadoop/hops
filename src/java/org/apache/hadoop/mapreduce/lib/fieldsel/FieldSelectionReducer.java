@@ -24,6 +24,8 @@ import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Reducer;
@@ -53,6 +55,8 @@ import org.apache.hadoop.mapreduce.Reducer;
  * Here is an example: "4,3,0,1:6,5,1-3,7-". It specifies to use fields
  * 4,3,0 and 1 for keys, and use fields 6,5,1,2,3,7 and above for values.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class FieldSelectionReducer<K, V>
     extends Reducer<Text, Text, Text, Text> {
 

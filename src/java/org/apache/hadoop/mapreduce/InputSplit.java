@@ -20,6 +20,8 @@ package org.apache.hadoop.mapreduce;
 
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.mapreduce.InputFormat;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.RecordReader;
@@ -35,6 +37,8 @@ import org.apache.hadoop.mapreduce.RecordReader;
  * @see InputFormat
  * @see RecordReader
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public abstract class InputSplit {
   /**
    * Get the size of the split, so that the input splits can be sorted by size.

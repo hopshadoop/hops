@@ -28,6 +28,8 @@ import java.util.NoSuchElementException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalDirAllocator;
@@ -51,6 +53,8 @@ import org.apache.hadoop.mapreduce.TaskAttemptID;
  * file cache when the memory cache becomes full.
  * 
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class BackupStore<K,V> {
 
   private static final Log LOG = LogFactory.getLog(BackupStore.class.getName());

@@ -36,12 +36,14 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobSubmissionFiles;
 import org.apache.hadoop.mapreduce.split.JobSplit.SplitMetaInfo;
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 
-@InterfaceAudience.Private
 /**
  * The class that is used by the Job clients to write splits (both the meta
  * and the raw bytes parts)
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class JobSplitWriter {
 
   private static final int splitVersion = JobSplit.META_SPLIT_VERSION;

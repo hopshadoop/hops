@@ -17,9 +17,14 @@
  */
 package org.apache.hadoop.mapreduce.server.jobtracker;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 /**
  * Describes the state of JobTracker 
  */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public enum State {
   INITIALIZING, RUNNING;
 }

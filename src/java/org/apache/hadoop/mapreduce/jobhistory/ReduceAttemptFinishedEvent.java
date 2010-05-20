@@ -20,6 +20,8 @@ package org.apache.hadoop.mapreduce.jobhistory;
 
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskID;
@@ -31,6 +33,8 @@ import org.apache.avro.util.Utf8;
  * Event to record successful completion of a reduce attempt
  *
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class ReduceAttemptFinishedEvent  implements HistoryEvent {
   private ReduceAttemptFinished datum =
     new ReduceAttemptFinished();

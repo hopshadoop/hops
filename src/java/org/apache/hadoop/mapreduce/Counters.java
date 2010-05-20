@@ -26,9 +26,13 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeMap;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class Counters implements Writable,Iterable<CounterGroup> {
   /**
    * A cache from enum values to the associated counter. Dramatically speeds up

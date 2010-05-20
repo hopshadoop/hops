@@ -20,6 +20,8 @@ package org.apache.hadoop.mapreduce.jobhistory;
 
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskID;
 import org.apache.hadoop.mapreduce.TaskType;
@@ -30,6 +32,8 @@ import org.apache.avro.util.Utf8;
  * Event to record unsuccessful (Killed/Failed) completion of task attempts
  *
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class TaskAttemptUnsuccessfulCompletionEvent implements HistoryEvent {
   private TaskAttemptUnsuccessfulCompletion datum =
     new TaskAttemptUnsuccessfulCompletion();

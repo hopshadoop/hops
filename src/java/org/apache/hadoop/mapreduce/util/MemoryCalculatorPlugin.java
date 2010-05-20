@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.mapreduce.util;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.util.ReflectionUtils;
@@ -29,6 +31,8 @@ import org.apache.hadoop.util.ReflectionUtils;
  *             instead
  */
 @Deprecated
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public abstract class MemoryCalculatorPlugin extends Configured {
 
   /**

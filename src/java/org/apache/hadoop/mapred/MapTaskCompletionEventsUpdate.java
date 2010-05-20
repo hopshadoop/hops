@@ -21,17 +21,17 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Writable;
 
 /**
  * A class that represents the communication between the tasktracker and child
- * tasks w.r.t the map task completion events. It also indicates whether the 
+ * tasks w.r.t the map task completion events. It also indicates whether the
  * child task should reset its events index.
- *
- * <FRAMEWORK-USE-ONLY>
- * This method is intended only for use by the Map/Reduce framework and not
- * for external users
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class MapTaskCompletionEventsUpdate implements Writable {
   TaskCompletionEvent[] events;
   boolean reset;

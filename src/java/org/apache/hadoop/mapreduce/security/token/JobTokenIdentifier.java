@@ -23,6 +23,7 @@ import java.io.DataOutput;
 import java.io.IOException;
 
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -31,6 +32,7 @@ import org.apache.hadoop.security.UserGroupInformation;
  * The token identifier for job token
  */
 @InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class JobTokenIdentifier extends TokenIdentifier {
   private Text jobid;
   final static Text KIND_NAME = new Text("mapreduce.job");

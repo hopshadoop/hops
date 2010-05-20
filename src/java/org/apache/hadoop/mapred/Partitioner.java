@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.mapred;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 /** 
  * Partitions the key space.
  * 
@@ -32,6 +35,8 @@ package org.apache.hadoop.mapred;
  * @deprecated Use {@link org.apache.hadoop.mapreduce.Partitioner} instead.
  */
 @Deprecated
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public interface Partitioner<K2, V2> extends JobConfigurable {
   
   /** 

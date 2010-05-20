@@ -20,11 +20,16 @@ package org.apache.hadoop.mapreduce.lib.aggregate;
 
 import java.util.ArrayList;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 /**
  * This class implements a value aggregator that maintain the smallest of 
  * a sequence of strings.
  * 
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class StringValueMin implements ValueAggregator<String> {
 
   String minVal = null;

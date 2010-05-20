@@ -21,6 +21,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.InputFormat;
@@ -33,6 +35,8 @@ import org.apache.hadoop.util.ReflectionUtils;
  * This class supports MapReduce jobs that have multiple input paths with
  * a different {@link InputFormat} and {@link Mapper} for each path 
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class MultipleInputs {
   public static final String DIR_FORMATS = 
     "mapreduce.input.multipleinputs.dir.formats";

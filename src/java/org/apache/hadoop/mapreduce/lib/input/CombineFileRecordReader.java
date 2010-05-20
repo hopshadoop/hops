@@ -24,6 +24,8 @@ import java.lang.reflect.*;
 import org.apache.hadoop.fs.FileSystem;
 
 import org.apache.hadoop.mapreduce.*;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 
 /**
@@ -34,7 +36,8 @@ import org.apache.hadoop.conf.Configuration;
  * these data chunks from different files.
  * @see CombineFileSplit
  */
-
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class CombineFileRecordReader<K, V> extends RecordReader<K, V> {
 
   static final Class [] constructorSignature = new Class [] 

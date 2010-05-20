@@ -22,6 +22,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.mapreduce.lib.jobcontrol.ControlledJob;
 
 /**
@@ -29,6 +31,8 @@ import org.apache.hadoop.mapreduce.lib.jobcontrol.ControlledJob;
  *{@link org.apache.hadoop.mapreduce.lib.jobcontrol.JobControl} instead
  **/
 @Deprecated
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class JobControl extends 
     org.apache.hadoop.mapreduce.lib.jobcontrol.JobControl {
 

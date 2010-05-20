@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
@@ -37,6 +39,8 @@ import org.apache.hadoop.fs.Path;
  * @deprecated Use {@link org.apache.hadoop.mapred.lib.CombineFileInputFormat} instead
  */
 @Deprecated
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public abstract class MultiFileInputFormat<K, V>
   extends FileInputFormat<K, V> {
 

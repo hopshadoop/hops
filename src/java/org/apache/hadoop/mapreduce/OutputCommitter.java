@@ -19,6 +19,9 @@
 package org.apache.hadoop.mapreduce;
 
 import java.io.IOException;
+
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 /**
  * <code>OutputCommitter</code> describes the commit of task output for a 
  * Map-Reduce job.
@@ -54,6 +57,8 @@ import java.io.IOException;
  * @see TaskAttemptContext 
  *
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public abstract class OutputCommitter {
   /**
    * For the framework to setup the job output during initialization

@@ -20,11 +20,16 @@ package org.apache.hadoop.mapreduce.lib.aggregate;
 
 import java.util.ArrayList;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 /**
  * This class implements a value aggregator that maintain the minimum of 
  * a sequence of long values.
  * 
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class LongValueMin implements ValueAggregator<String> {
 
   long minVal = Long.MAX_VALUE;

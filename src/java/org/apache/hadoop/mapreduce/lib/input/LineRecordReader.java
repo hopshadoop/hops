@@ -20,6 +20,8 @@ package org.apache.hadoop.mapreduce.lib.input;
 
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -46,6 +48,8 @@ import org.apache.hadoop.fs.Seekable;
 /**
  * Treats keys as offset in file and value as line. 
  */
+@InterfaceAudience.LimitedPrivate({"MapReduce", "Pig"})
+@InterfaceStability.Evolving
 public class LineRecordReader extends RecordReader<LongWritable, Text> {
   private static final Log LOG = LogFactory.getLog(LineRecordReader.class);
   public static final String MAX_LINE_LENGTH = 

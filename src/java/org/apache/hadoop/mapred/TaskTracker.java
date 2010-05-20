@@ -52,6 +52,8 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.DF;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -116,6 +118,8 @@ import org.apache.hadoop.mapreduce.util.MRAsyncDiskService;
  * for Task assignments and reporting results.
  *
  *******************************************************/
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class TaskTracker 
     implements MRConstants, TaskUmbilicalProtocol, Runnable, TTConfig {
   /**
@@ -3478,6 +3482,8 @@ public class TaskTracker
    * This class is used in TaskTracker's Jetty to serve the map outputs
    * to other nodes.
    */
+  @InterfaceAudience.Private
+  @InterfaceStability.Unstable
   public static class MapOutputServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
     private static final int MAX_BYTES_TO_READ = 64 * 1024;

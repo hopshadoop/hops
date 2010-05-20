@@ -20,6 +20,8 @@ package org.apache.hadoop.mapreduce.task;
 
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.MapContext;
@@ -37,6 +39,8 @@ import org.apache.hadoop.mapreduce.TaskAttemptID;
  * @param <KEYOUT> the key output type from the Mapper
  * @param <VALUEOUT> the value output type from the Mapper
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class MapContextImpl<KEYIN,VALUEIN,KEYOUT,VALUEOUT> 
     extends TaskInputOutputContextImpl<KEYIN,VALUEIN,KEYOUT,VALUEOUT> 
     implements MapContext<KEYIN, VALUEIN, KEYOUT, VALUEOUT> {

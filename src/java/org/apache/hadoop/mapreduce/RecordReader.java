@@ -21,12 +21,17 @@ package org.apache.hadoop.mapreduce;
 import java.io.Closeable;
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 /**
  * The record reader breaks the data into key/value pairs for input to the
  * {@link Mapper}.
  * @param <KEYIN>
  * @param <VALUEIN>
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public abstract class RecordReader<KEYIN, VALUEIN> implements Closeable {
 
   /**

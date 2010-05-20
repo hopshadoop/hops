@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.mapred.lib;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableComparable;
@@ -116,6 +118,8 @@ import java.util.*;
  * {@link org.apache.hadoop.mapreduce.lib.output.MultipleOutputs} instead
  */
 @Deprecated
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class MultipleOutputs {
 
   private static final String NAMED_OUTPUTS = "mo.namedOutputs";

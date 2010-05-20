@@ -52,6 +52,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -111,6 +113,8 @@ import org.apache.hadoop.util.VersionInfo;
  * tracking MR jobs in a network environment.
  *
  *******************************************************/
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class JobTracker implements MRConstants, InterTrackerProtocol,
     ClientProtocol, TaskTrackerManager, RefreshUserToGroupMappingsProtocol,
     RefreshAuthorizationPolicyProtocol, AdminOperationsProtocol, JTConfig {
@@ -148,6 +152,8 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   private final float MIN_HEARTBEATS_SCALING_FACTOR = 0.01f;
   private final float DEFAULT_HEARTBEATS_SCALING_FACTOR = 1.0f;
   
+  @InterfaceAudience.Private
+  @InterfaceStability.Unstable
   public static enum State { INITIALIZING, RUNNING }
   State state = State.INITIALIZING;
   private static final int FS_ACCESS_RETRY_PERIOD = 10000;
@@ -188,6 +194,8 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   /**
    * A client tried to submit a job before the Job Tracker was ready.
    */
+  @InterfaceAudience.Private
+  @InterfaceStability.Unstable
   public static class IllegalStateException extends IOException {
  
     private static final long serialVersionUID = 1L;

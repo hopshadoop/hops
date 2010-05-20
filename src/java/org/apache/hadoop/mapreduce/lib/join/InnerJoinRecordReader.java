@@ -20,6 +20,8 @@ package org.apache.hadoop.mapreduce.lib.join;
 
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.io.WritableComparator;
@@ -27,6 +29,8 @@ import org.apache.hadoop.io.WritableComparator;
 /**
  * Full inner join.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class InnerJoinRecordReader<K extends WritableComparable<?>>
     extends JoinRecordReader<K> {
 

@@ -21,6 +21,8 @@ package org.apache.hadoop.mapreduce.lib.input;
 import java.io.IOException;
 import java.util.List;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -34,6 +36,8 @@ import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
 /** An {@link InputFormat} for {@link SequenceFile}s. */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class SequenceFileInputFormat<K, V> extends FileInputFormat<K, V> {
 
   @Override

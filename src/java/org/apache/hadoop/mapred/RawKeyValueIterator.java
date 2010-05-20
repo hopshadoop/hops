@@ -19,6 +19,8 @@ package org.apache.hadoop.mapred;
 
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.util.Progress;
 
@@ -26,6 +28,8 @@ import org.apache.hadoop.util.Progress;
  * <code>RawKeyValueIterator</code> is an iterator used to iterate over
  * the raw keys and values during sort/merge of intermediate data. 
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public interface RawKeyValueIterator {
   /** 
    * Gets the current raw key.

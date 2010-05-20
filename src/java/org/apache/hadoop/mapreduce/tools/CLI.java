@@ -23,6 +23,8 @@ import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.ipc.RemoteException;
@@ -47,6 +49,8 @@ import org.apache.hadoop.util.ToolRunner;
 /**
  * Interprets the map reduce cli options 
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class CLI extends Configured implements Tool {
   private static final Log LOG = LogFactory.getLog(CLI.class);
 

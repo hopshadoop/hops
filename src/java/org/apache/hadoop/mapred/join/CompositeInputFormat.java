@@ -24,6 +24,8 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.mapred.InputFormat;
@@ -48,6 +50,8 @@ import org.apache.hadoop.mapred.Reporter;
  * {@link org.apache.hadoop.mapreduce.lib.join.CompositeInputFormat} instead
  */
 @Deprecated
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class CompositeInputFormat<K extends WritableComparable>
       implements ComposableInputFormat<K,TupleWritable> {
 

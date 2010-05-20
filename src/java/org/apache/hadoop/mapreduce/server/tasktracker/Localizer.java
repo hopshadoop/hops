@@ -25,6 +25,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
@@ -34,10 +36,8 @@ import org.apache.hadoop.mapred.TaskTracker;
 import org.apache.hadoop.mapred.TaskController.InitializationContext;
 import org.apache.hadoop.mapreduce.JobID;
 
-/**
- * 
- * NOTE: This class is internal only and not intended for users!!
- */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class Localizer {
 
   static final Log LOG = LogFactory.getLog(Localizer.class);
@@ -59,10 +59,8 @@ public class Localizer {
     taskController = tc;
   }
 
-  /**
-   * NOTE: This class is internal only class and not intended for users!!
-   * 
-   */
+  @InterfaceAudience.Private
+  @InterfaceStability.Unstable
   public static class PermissionsHandler {
     /**
      * Permission information useful for setting permissions for a given path.
@@ -71,6 +69,8 @@ public class Localizer {
      * be set together, i.e. permissions for group cannot be set different from
      * those for others and vice versa.
      */
+    @InterfaceAudience.Private
+    @InterfaceStability.Unstable
     public static class PermissionsInfo {
       public boolean readPermissions;
       public boolean writePermissions;

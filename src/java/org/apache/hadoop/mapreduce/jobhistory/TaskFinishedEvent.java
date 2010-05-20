@@ -20,6 +20,8 @@ package org.apache.hadoop.mapreduce.jobhistory;
 
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.TaskID;
 import org.apache.hadoop.mapreduce.TaskType;
@@ -30,6 +32,8 @@ import org.apache.avro.util.Utf8;
  * Event to record the successful completion of a task
  *
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class TaskFinishedEvent implements HistoryEvent {
   private TaskFinished datum = new TaskFinished();
   

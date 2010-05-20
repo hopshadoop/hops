@@ -25,6 +25,8 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.HashSet;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
@@ -37,6 +39,8 @@ import org.apache.hadoop.util.ReflectionUtils;
  * This InputSplit contains a set of child InputSplits. Any InputSplit inserted
  * into this collection must have a public default constructor.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class CompositeInputSplit extends InputSplit implements Writable {
 
   private int fill = 0;

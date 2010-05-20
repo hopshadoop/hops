@@ -25,6 +25,8 @@ import java.io.DataOutput;
 import org.apache.hadoop.mapreduce.InputFormat;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
@@ -32,6 +34,8 @@ import org.apache.hadoop.io.Writable;
 /** A section of an input file.  Returned by {@link
  * InputFormat#getSplits(JobContext)} and passed to
  * {@link InputFormat#createRecordReader(InputSplit,TaskAttemptContext)}. */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class FileSplit extends InputSplit implements Writable {
   private Path file;
   private long start;

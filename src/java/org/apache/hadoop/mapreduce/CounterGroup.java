@@ -26,6 +26,8 @@ import java.util.MissingResourceException;
 import java.util.ResourceBundle;
 import java.util.TreeMap;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
@@ -34,6 +36,8 @@ import org.apache.hadoop.io.WritableUtils;
  * A group of {@link Counter}s that logically belong together. Typically,
  * it is an {@link Enum} subclass and the counters are the values.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class CounterGroup implements Writable, Iterable<Counter> {
   private String name;
   private String displayName;

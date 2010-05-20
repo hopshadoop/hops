@@ -19,6 +19,8 @@
 package org.apache.hadoop.mapreduce.lib.map;
 
 import org.apache.hadoop.util.ReflectionUtils;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.Counter;
 import org.apache.hadoop.mapreduce.InputSplit;
@@ -54,6 +56,8 @@ import java.util.List;
  * value is 10 threads.
  * <p>
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class MultithreadedMapper<K1, V1, K2, V2> 
   extends Mapper<K1, V1, K2, V2> {
 

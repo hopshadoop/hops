@@ -20,6 +20,8 @@ package org.apache.hadoop.mapreduce.lib.input;
 
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.InputSplit;
@@ -32,6 +34,8 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
  * under the attribute name mapreduce.input.keyvaluelinerecordreader.key.value.separator. The default
  * separator is the tab character ('\t').
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class KeyValueLineRecordReader extends RecordReader<Text, Text> {
   public static final String KEY_VALUE_SEPERATOR = 
     "mapreduce.input.keyvaluelinerecordreader.key.value.separator";

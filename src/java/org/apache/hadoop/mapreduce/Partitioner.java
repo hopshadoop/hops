@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.mapreduce;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 /** 
  * Partitions the key space.
  * 
@@ -30,6 +33,8 @@ package org.apache.hadoop.mapreduce;
  * 
  * @see Reducer
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public abstract class Partitioner<KEY, VALUE> {
   
   /** 

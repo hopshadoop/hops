@@ -22,6 +22,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.DefaultStringifier;
 import org.apache.hadoop.io.Stringifier;
@@ -43,6 +45,8 @@ import org.apache.hadoop.util.ReflectionUtils;
  * The Chain class provides all the common functionality for the
  * {@link ChainMapper} and the {@link ChainReducer} classes.
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class Chain {
   protected static final String CHAIN_MAPPER = "mapreduce.chain.mapper";
   protected static final String CHAIN_REDUCER = "mapreduce.chain.reducer";

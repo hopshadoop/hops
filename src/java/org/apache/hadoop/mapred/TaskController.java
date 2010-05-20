@@ -34,6 +34,7 @@ import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Shell.ShellCommandExecutor;
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 
 /**
  * Controls initialization, finalization and clean up of tasks, and
@@ -326,10 +327,8 @@ public abstract class TaskController implements Configurable {
     }
   }
   
-  /**
-   * NOTE: This class is internal only class and not intended for users!!
-   * 
-   */
+  @InterfaceAudience.Private
+  @InterfaceStability.Unstable
   public static class InitializationContext {
     public File workDir;
     public String user;
@@ -347,6 +346,8 @@ public abstract class TaskController implements Configurable {
    * This is used for initializing the private localized files in distributed
    * cache. Initialization would involve changing permission, ownership and etc.
    */
+  @InterfaceAudience.Private
+  @InterfaceStability.Unstable
   public static class DistributedCacheFileContext extends InitializationContext {
     // base directory under which file has been localized
     Path localizedBaseDir;

@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.util;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 /**
  * A Proc file-system based ProcessTree. Works only on Linux.
  * 
@@ -26,6 +29,8 @@ package org.apache.hadoop.util;
  *             instead
  */
 @Deprecated
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class ProcfsBasedProcessTree extends
     org.apache.hadoop.mapreduce.util.ProcfsBasedProcessTree {
 

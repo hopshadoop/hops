@@ -20,6 +20,8 @@ package org.apache.hadoop.mapreduce.lib.input;
 
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableComparable;
@@ -32,6 +34,8 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
  * calling toString() method. This class to SequenceFileAsTextInputFormat
  * class is as LineRecordReader class to TextInputFormat class.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class SequenceFileAsTextRecordReader
   extends RecordReader<Text, Text> {
   

@@ -25,6 +25,8 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.WritableComparable;
@@ -49,6 +51,8 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
  * @see MultiFilterRecordReader
  */
 @SuppressWarnings("unchecked")
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class CompositeInputFormat<K extends WritableComparable>
     extends InputFormat<K, TupleWritable> {
 

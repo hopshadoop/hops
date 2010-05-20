@@ -22,6 +22,8 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.mapred.IFile.Reader;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
@@ -29,6 +31,8 @@ import org.apache.hadoop.mapreduce.TaskAttemptID;
 /**
  * <code>IFile.InMemoryReader</code> to read map-outputs present in-memory.
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class InMemoryReader<K, V> extends Reader<K, V> {
   private final TaskAttemptID taskAttemptId;
   private final MergeManager<K,V> merger;

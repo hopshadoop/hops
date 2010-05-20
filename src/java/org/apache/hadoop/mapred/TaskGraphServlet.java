@@ -24,12 +24,16 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.mapred.JSPUtil.JobWithViewAccessCheck;
 import org.apache.hadoop.security.UserGroupInformation;
 
 /** The servlet that outputs svg graphics for map / reduce task
  *  statuses
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class TaskGraphServlet extends HttpServlet {
 
   private static final long serialVersionUID = -1365683739392460020L;

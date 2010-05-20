@@ -24,6 +24,8 @@ import java.lang.reflect.*;
 import org.apache.hadoop.fs.FileSystem;
 
 import org.apache.hadoop.mapred.*;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 
 /**
@@ -37,6 +39,8 @@ import org.apache.hadoop.conf.Configuration;
  * {@link org.apache.hadoop.mapreduce.lib.input.CombineFileRecordReader}
  */
 @Deprecated
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class CombineFileRecordReader<K, V> implements RecordReader<K, V> {
 
   static final Class [] constructorSignature = new Class [] 

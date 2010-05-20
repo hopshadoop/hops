@@ -24,6 +24,8 @@ import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
@@ -33,14 +35,20 @@ import org.apache.hadoop.util.StringUtils;
  * not intended to be a comprehensive piece of data.
  *
  **************************************************/
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public abstract class TaskStatus implements Writable, Cloneable {
   static final Log LOG =
     LogFactory.getLog(TaskStatus.class.getName());
   
-  //enumeration for reporting current phase of a task. 
+  //enumeration for reporting current phase of a task.
+  @InterfaceAudience.Private
+  @InterfaceStability.Unstable
   public static enum Phase{STARTING, MAP, SHUFFLE, SORT, REDUCE, CLEANUP}
 
   // what state is the task in?
+  @InterfaceAudience.Private
+  @InterfaceStability.Unstable
   public static enum State {RUNNING, SUCCEEDED, FAILED, UNASSIGNED, KILLED, 
                             COMMIT_PENDING, FAILED_UNCLEAN, KILLED_UNCLEAN}
     

@@ -20,6 +20,8 @@ package org.apache.hadoop.mapreduce.lib.output;
 import java.io.IOException;
 import java.io.DataOutputStream;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.BytesWritable;
@@ -36,6 +38,8 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
  * An {@link org.apache.hadoop.mapreduce.OutputFormat} that writes keys, 
  * values to {@link SequenceFile}s in binary(raw) format
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class SequenceFileAsBinaryOutputFormat 
     extends SequenceFileOutputFormat <BytesWritable,BytesWritable> {
   public static String KEY_CLASS = "mapreduce.output.seqbinaryoutputformat.key.class"; 

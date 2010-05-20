@@ -762,6 +762,9 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-1749. Move configuration strings out of JobContext so that it
     can be made public stable. (omalley)
 
+    MAPREDUCE-1623. Apply audience and stability notations to Hadoop
+    Map-Reduce. (tomwhite via acmurthy) 
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band

@@ -19,6 +19,8 @@ package org.apache.hadoop.mapreduce.lib.input;
 
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.mapreduce.InputFormat;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.RecordReader;
@@ -29,6 +31,8 @@ import org.apache.hadoop.util.ReflectionUtils;
  * This is a delegating RecordReader, which delegates the functionality to the
  * underlying record reader in {@link TaggedInputSplit}  
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class DelegatingRecordReader<K, V> extends RecordReader<K, V> {
   RecordReader<K, V> originalRR;
 

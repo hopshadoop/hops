@@ -21,6 +21,8 @@ package org.apache.hadoop.mapred;
 import java.io.IOException;
 import java.io.InputStream;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -43,6 +45,8 @@ import org.apache.commons.logging.Log;
  *   {@link org.apache.hadoop.mapreduce.lib.input.LineRecordReader} instead.
  */
 @Deprecated
+@InterfaceAudience.LimitedPrivate({"MapReduce", "Pig"})
+@InterfaceStability.Unstable
 public class LineRecordReader implements RecordReader<LongWritable, Text> {
   private static final Log LOG
     = LogFactory.getLog(LineRecordReader.class.getName());

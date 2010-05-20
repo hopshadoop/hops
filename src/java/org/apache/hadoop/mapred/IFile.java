@@ -24,6 +24,8 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -43,15 +45,12 @@ import org.apache.hadoop.io.serializer.Serializer;
 /**
  * <code>IFile</code> is the simple <key-len, value-len, key, value> format
  * for the intermediate map-outputs in Map-Reduce.
- * 
+ *
  * There is a <code>Writer</code> to write out map-outputs in this format and 
  * a <code>Reader</code> to read files of this format.
- *
- * <FRAMEWORK-USE-ONLY>
- * This method is intended only for use by the Map/Reduce framework and not
- * for external users
- *
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class IFile {
 
   public static final int EOF_MARKER = -1; // End of File Marker
@@ -59,6 +58,8 @@ public class IFile {
   /**
    * <code>IFile.Writer</code> to write out intermediate map-outputs. 
    */
+  @InterfaceAudience.Private
+  @InterfaceStability.Unstable
   public static class Writer<K extends Object, V extends Object> {
     FSDataOutputStream out;
     boolean ownOutputStream = false;
@@ -270,6 +271,8 @@ public class IFile {
   /**
    * <code>IFile.Reader</code> to read intermediate map-outputs. 
    */
+  @InterfaceAudience.Private
+  @InterfaceStability.Unstable
   public static class Reader<K extends Object, V extends Object> {
     private static final int DEFAULT_BUFFER_SIZE = 128*1024;
     private static final int MAX_VINT_SIZE = 9;

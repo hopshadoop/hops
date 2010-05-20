@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.mapred.lib;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.mapred.*;
 
 import java.io.IOException;
@@ -90,6 +92,8 @@ import java.util.Iterator;
  * Use {@link org.apache.hadoop.mapreduce.lib.chain.ChainReducer} instead
  */
 @Deprecated
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class ChainReducer implements Reducer {
 
   /**

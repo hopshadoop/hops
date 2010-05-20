@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.mapreduce.server.jobtracker;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.mapreduce.MRConfig;
 
 /**
@@ -24,6 +26,8 @@ import org.apache.hadoop.mapreduce.MRConfig;
  * 
  * The keys should have "mapreduce.jobtracker." as the prefix
  */
+@InterfaceAudience.Private
+@InterfaceStability.Evolving
 public interface JTConfig extends MRConfig {
   // JobTracker configuration parameters
   public static final String JT_IPC_ADDRESS  = "mapreduce.jobtracker.address";

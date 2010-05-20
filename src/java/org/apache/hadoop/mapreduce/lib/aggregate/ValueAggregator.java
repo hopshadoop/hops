@@ -20,10 +20,15 @@ package org.apache.hadoop.mapreduce.lib.aggregate;
 
 import java.util.ArrayList;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 /**
  * This interface defines the minimal protocol for value aggregators.
  * 
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public interface ValueAggregator<E> {
 
   /**

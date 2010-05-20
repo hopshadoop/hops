@@ -21,6 +21,8 @@ package org.apache.hadoop.mapreduce.lib.output;
 import java.io.IOException;
 import java.text.NumberFormat;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -38,6 +40,8 @@ import org.apache.hadoop.mapreduce.TaskInputOutputContext;
 import org.apache.hadoop.mapreduce.security.TokenCache;
 
 /** A base class for {@link OutputFormat}s that read from {@link FileSystem}s.*/
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public abstract class FileOutputFormat<K, V> extends OutputFormat<K, V> {
 
   /** Construct output file names so that, when an output directory listing is

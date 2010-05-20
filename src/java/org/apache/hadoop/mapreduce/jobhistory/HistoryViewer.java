@@ -29,6 +29,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -49,6 +51,8 @@ import org.apache.hadoop.util.StringUtils;
  * HistoryViewer is used to parse and view the JobHistory files 
  *
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class HistoryViewer {
   private static SimpleDateFormat dateFormat = 
     new SimpleDateFormat("d-MMM-yyyy HH:mm:ss");

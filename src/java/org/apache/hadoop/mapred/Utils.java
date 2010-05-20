@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.mapred;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 
@@ -25,6 +27,8 @@ import org.apache.hadoop.fs.PathFilter;
  * A utility class. It provides
  *   A path filter utility to filter out output/part files in the output dir
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class Utils {
   public static class OutputFileUtils {
     /**

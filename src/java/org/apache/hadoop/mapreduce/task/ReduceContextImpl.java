@@ -23,6 +23,8 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DataInputBuffer;
@@ -49,6 +51,8 @@ import org.apache.hadoop.util.Progressable;
  * @param <KEYOUT> the class of the output keys
  * @param <VALUEOUT> the class of the output values
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class ReduceContextImpl<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
     extends TaskInputOutputContextImpl<KEYIN,VALUEIN,KEYOUT,VALUEOUT> 
     implements ReduceContext<KEYIN, VALUEIN, KEYOUT, VALUEOUT> {

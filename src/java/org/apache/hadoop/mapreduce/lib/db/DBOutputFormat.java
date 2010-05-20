@@ -25,6 +25,8 @@ import java.sql.SQLException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.OutputCommitter;
@@ -43,6 +45,8 @@ import org.apache.hadoop.util.StringUtils;
  * writes <b>only the key</b> to the database with a batch SQL query.  
  * 
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class DBOutputFormat<K  extends DBWritable, V> 
 extends OutputFormat<K,V> {
 
@@ -59,6 +63,7 @@ extends OutputFormat<K,V> {
   /**
    * A RecordWriter that writes the reduce output to a SQL table
    */
+  @InterfaceStability.Evolving
   public class DBRecordWriter 
       extends RecordWriter<K, V> {
 

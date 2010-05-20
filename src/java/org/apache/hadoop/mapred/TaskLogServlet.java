@@ -28,6 +28,8 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.JobACL;
@@ -40,6 +42,8 @@ import org.apache.hadoop.util.StringUtils;
 /**
  * A servlet that is run by the TaskTrackers to provide the task logs via http.
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class TaskLogServlet extends HttpServlet {
   private static final long serialVersionUID = -6615764817774487321L;
   

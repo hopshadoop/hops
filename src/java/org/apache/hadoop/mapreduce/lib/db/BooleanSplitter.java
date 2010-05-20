@@ -23,12 +23,16 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.InputSplit;
 
 /**
  * Implement DBSplitter over boolean values.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public class BooleanSplitter implements DBSplitter {
   public List<InputSplit> split(Configuration conf, ResultSet results, String colName)
       throws SQLException {

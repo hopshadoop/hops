@@ -33,9 +33,13 @@ import org.apache.hadoop.mapreduce.OutputFormat;
 import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.util.ReflectionUtils;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 
 /** An {@link OutputFormat} that writes {@link SequenceFile}s. */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class SequenceFileOutputFormat <K,V> extends FileOutputFormat<K, V> {
 
   protected SequenceFile.Writer getSequenceWriter(TaskAttemptContext context,

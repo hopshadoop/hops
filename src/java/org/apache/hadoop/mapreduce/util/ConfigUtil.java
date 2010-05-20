@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.mapreduce.util;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.MRConfig;
@@ -27,6 +29,8 @@ import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
 /**
  * Place holder for deprecated keys in the framework 
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class ConfigUtil {
 
   /**

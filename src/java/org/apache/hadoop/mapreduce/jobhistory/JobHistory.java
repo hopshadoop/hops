@@ -35,6 +35,8 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.ChecksumException;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -54,6 +56,8 @@ import org.apache.hadoop.util.StringUtils;
  * job history information.
  *
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class JobHistory {
 
   final Log LOG = LogFactory.getLog(JobHistory.class);

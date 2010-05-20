@@ -20,6 +20,8 @@ package org.apache.hadoop.mapreduce.lib.join;
 
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Writable;
@@ -37,6 +39,8 @@ import org.apache.hadoop.util.ReflectionUtils;
  * provided RecordReader and keeps a store of values matching a key when
  * this source is participating in a join.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class WrappedRecordReader<K extends WritableComparable<?>,
     U extends Writable> extends ComposableRecordReader<K,U> {
 

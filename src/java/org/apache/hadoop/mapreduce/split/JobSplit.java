@@ -27,6 +27,7 @@ import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 
 /**
  * This class groups the fundamental classes associated with
@@ -43,6 +44,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
  * file.
  */
 @InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class JobSplit {
   static final int META_SPLIT_VERSION = 1;
   static final byte[] META_SPLIT_FILE_HEADER;

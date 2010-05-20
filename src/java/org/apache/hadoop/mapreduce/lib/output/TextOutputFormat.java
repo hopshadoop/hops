@@ -22,6 +22,8 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -37,6 +39,8 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.util.*;
 
 /** An {@link OutputFormat} that writes plain text files. */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class TextOutputFormat<K, V> extends FileOutputFormat<K, V> {
   public static String SEPERATOR = "mapreduce.output.textoutputformat.separator";
   protected static class LineRecordWriter<K, V>

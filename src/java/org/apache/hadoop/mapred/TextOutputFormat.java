@@ -22,6 +22,8 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -37,6 +39,8 @@ import org.apache.hadoop.util.*;
  *   {@link org.apache.hadoop.mapreduce.lib.output.TextOutputFormat} instead.
  */
 @Deprecated
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class TextOutputFormat<K, V> extends FileOutputFormat<K, V> {
 
   protected static class LineRecordWriter<K, V>

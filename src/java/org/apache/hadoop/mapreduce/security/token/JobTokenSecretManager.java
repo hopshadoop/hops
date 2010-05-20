@@ -24,6 +24,7 @@ import java.util.TreeMap;
 import javax.crypto.SecretKey;
 
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.Token;
 
@@ -31,6 +32,7 @@ import org.apache.hadoop.security.token.Token;
  * SecretManager for job token. It can be used to cache generated job tokens.
  */
 @InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class JobTokenSecretManager extends SecretManager<JobTokenIdentifier> {
   private final SecretKey masterKey;
   private final Map<String, SecretKey> currentJobTokens;

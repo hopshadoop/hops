@@ -20,6 +20,9 @@ package org.apache.hadoop.mapred;
 
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 /**
  * Collects the <code>&lt;key, value&gt;</code> pairs output by {@link Mapper}s
  * and {@link Reducer}s.
@@ -29,6 +32,8 @@ import java.io.IOException;
  * <code>Mapper</code> or the <code>Reducer</code> i.e. intermediate outputs 
  * or the output of the job.</p>  
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public interface OutputCollector<K, V> {
   
   /** Adds a key/value pair to the output.

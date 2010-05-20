@@ -22,19 +22,17 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.ChecksumException;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.DataChecksum;
 /**
  * A checksum input stream, used for IFiles.
  * Used to validate the checksum of files created by {@link IFileOutputStream}. 
- * 
- * <FRAMEWORK-USE-ONLY>
- * This method is intended only for use by the Map/Reduce framework and not
- * for external users
- *
 */
-
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class IFileInputStream extends InputStream {
   
   private final InputStream in; //The input stream to be verified for checksum. 

@@ -40,6 +40,8 @@ import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.util.ReflectionUtils;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 /**
@@ -51,6 +53,8 @@ import org.apache.hadoop.conf.Configuration;
  * The SQL query, and input class can be using one of the two 
  * setInput methods.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class DBInputFormat<T extends DBWritable>
     extends InputFormat<LongWritable, T> implements Configurable {
 
@@ -59,6 +63,7 @@ public class DBInputFormat<T extends DBWritable>
   /**
    * A Class that does nothing, implementing DBWritable
    */
+  @InterfaceStability.Evolving
   public static class NullDBWritable implements DBWritable, Writable {
     @Override
     public void readFields(DataInput in) throws IOException { }
@@ -73,6 +78,7 @@ public class DBInputFormat<T extends DBWritable>
   /**
    * A InputSplit that spans a set of rows
    */
+  @InterfaceStability.Evolving
   public static class DBInputSplit extends InputSplit implements Writable {
 
     private long end = 0;

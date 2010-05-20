@@ -40,6 +40,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalFileSystem;
@@ -88,15 +90,13 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.util.StringUtils;
 
-/*************************************************************
- * JobInProgress maintains all the info for keeping
- * a Job on the straight and narrow.  It keeps its JobProfile
- * and its latest JobStatus, plus a set of tables for 
- * doing bookkeeping of its Tasks.
- * ***********************************************************
- * 
- * This is NOT a public interface!
+/**
+ * JobInProgress maintains all the info for keeping a Job on the straight and
+ * narrow. It keeps its JobProfile and its latest JobStatus, plus a set of
+ * tables for doing bookkeeping of its Tasks.
  */
+@InterfaceAudience.LimitedPrivate({"MapReduce"})
+@InterfaceStability.Unstable
 public class JobInProgress {
   /**
    * Used when the a kill is issued to a job which is initializing.

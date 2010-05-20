@@ -23,10 +23,15 @@ import java.util.Iterator;
 import java.util.Set;
 import java.util.TreeMap;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 /**
  * This class implements a value aggregator that dedupes a sequence of objects.
  * 
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class UniqValueCount implements ValueAggregator<Object> {
   public static final String MAX_NUM_UNIQUE_VALUES = 
     "mapreduce.aggregate.max.num.unique.values";

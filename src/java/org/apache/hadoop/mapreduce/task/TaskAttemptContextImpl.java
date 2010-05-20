@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.mapreduce.task;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
@@ -25,6 +27,8 @@ import org.apache.hadoop.mapreduce.TaskAttemptID;
 /**
  * The context for task attempts.
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class TaskAttemptContextImpl extends JobContextImpl 
     implements TaskAttemptContext {
   private final TaskAttemptID taskId;

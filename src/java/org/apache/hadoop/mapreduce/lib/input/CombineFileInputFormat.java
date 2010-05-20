@@ -28,6 +28,8 @@ import java.util.Set;
 import java.util.Iterator;
 import java.util.Map;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
@@ -66,6 +68,8 @@ import org.apache.hadoop.net.NetworkTopology;
  * 
  * @see CombineFileSplit
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public abstract class CombineFileInputFormat<K, V>
   extends FileInputFormat<K, V> {
 

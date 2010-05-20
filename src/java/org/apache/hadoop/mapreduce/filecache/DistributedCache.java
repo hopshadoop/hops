@@ -20,6 +20,8 @@ package org.apache.hadoop.mapreduce.filecache;
 
 import java.io.*;
 import java.util.*;
+
+import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.*;
 import org.apache.hadoop.util.*;
 import org.apache.hadoop.fs.*;
@@ -130,6 +132,7 @@ import java.net.URI;
  * @see org.apache.hadoop.mapred.JobClient
  */
 @Deprecated
+@InterfaceAudience.Private
 public class DistributedCache {
   /**
    * Get the locally cached file or archive; it could either be 

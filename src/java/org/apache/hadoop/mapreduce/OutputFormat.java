@@ -20,6 +20,8 @@ package org.apache.hadoop.mapreduce;
 
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileSystem;
 
 /** 
@@ -41,6 +43,8 @@ import org.apache.hadoop.fs.FileSystem;
  * 
  * @see RecordWriter
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public abstract class OutputFormat<K, V> {
 
   /** 

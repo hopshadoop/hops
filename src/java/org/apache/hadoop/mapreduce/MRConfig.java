@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.mapreduce;
 
+import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.mapred.JobTracker;
 import org.apache.hadoop.mapred.TaskTracker;
 
@@ -27,6 +28,7 @@ import org.apache.hadoop.mapred.TaskTracker;
  * keys should have "mapreduce.cluster." as the prefix. 
  *
  */
+@InterfaceAudience.Private
 public interface MRConfig {
 
   // Cluster-level configuration parameters

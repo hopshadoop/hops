@@ -27,6 +27,8 @@ import java.util.Random;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
@@ -51,6 +53,8 @@ import org.apache.hadoop.util.ToolRunner;
  * Utility for collecting samples and writing a partition file for
  * {@link TotalOrderPartitioner}.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class InputSampler<K,V> extends Configured implements Tool  {
 
   private static final Log LOG = LogFactory.getLog(InputSampler.class);

@@ -23,6 +23,8 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.PriorityQueue;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.NullWritable;
@@ -38,6 +40,8 @@ import org.apache.hadoop.util.ReflectionUtils;
  * A RecordReader that can effect joins of RecordReaders sharing a common key
  * type and partitioning.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public abstract class CompositeRecordReader<
     K extends WritableComparable<?>, // key type
     V extends Writable,  // accepts RecordReader<K,V> as children

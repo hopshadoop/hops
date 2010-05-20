@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.Map.Entry;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableComparable;
@@ -35,6 +37,8 @@ import org.apache.hadoop.mapred.Reporter;
  * instead
  */
 @Deprecated
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class ValueAggregatorMapper<K1 extends WritableComparable,
                                    V1 extends Writable>
   extends ValueAggregatorJobBase<K1, V1> {

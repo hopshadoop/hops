@@ -21,6 +21,8 @@ package org.apache.hadoop.mapreduce.task;
 import java.io.IOException;
 import java.net.URI;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configuration.IntegerRanges;
 import org.apache.hadoop.fs.Path;
@@ -43,6 +45,8 @@ import org.apache.hadoop.security.UserGroupInformation;
  * A read-only view of the job that is provided to the tasks while they
  * are running.
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class JobContextImpl implements JobContext {
 
   protected final org.apache.hadoop.mapred.JobConf conf;

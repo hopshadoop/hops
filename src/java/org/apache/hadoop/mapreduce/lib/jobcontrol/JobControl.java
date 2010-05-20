@@ -25,6 +25,8 @@ import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.mapreduce.lib.jobcontrol.ControlledJob.State;
 
 /** 
@@ -44,6 +46,8 @@ import org.apache.hadoop.mapreduce.lib.jobcontrol.ControlledJob.State;
  *  for stopping the thread.
  *  
  */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public class JobControl implements Runnable {
 
   // The thread can be in one of the following state

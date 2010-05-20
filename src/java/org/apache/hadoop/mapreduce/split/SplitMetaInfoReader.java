@@ -31,13 +31,14 @@ import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.JobSubmissionFiles;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 
-@InterfaceAudience.Private
 /**
  * A utility that reads the split meta info and creates
  * split meta info objects
  */
-
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class SplitMetaInfoReader {
   
   public static JobSplit.TaskSplitMetaInfo[] readSplitMetaInfo(

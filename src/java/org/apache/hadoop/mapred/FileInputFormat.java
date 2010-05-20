@@ -31,6 +31,8 @@ import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -56,6 +58,8 @@ import org.apache.hadoop.util.StringUtils;
  *  instead.
  */
 @Deprecated
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
 
   public static final Log LOG =

@@ -24,12 +24,17 @@ import java.util.TreeMap;
 import java.util.Map.Entry;
 import java.util.Arrays;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 
 /**
  * This class implements a value aggregator that computes the 
  * histogram of a sequence of strings.
  * 
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class ValueHistogram implements ValueAggregator<String> {
 
   TreeMap<Object, Object> items = null;

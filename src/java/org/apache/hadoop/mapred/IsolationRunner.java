@@ -28,6 +28,8 @@ import java.util.List;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
@@ -43,6 +45,8 @@ import org.apache.hadoop.mapreduce.split.JobSplit.TaskSplitIndex;
  * Users may coerce MapReduce to keep task files around by setting 
  * mapreduce.task.files.preserve.failedtasks.  See mapred_tutorial.xml for more documentation.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public class IsolationRunner {
   private static final Log LOG = 
     LogFactory.getLog(IsolationRunner.class.getName());

@@ -29,6 +29,8 @@ import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.SequenceFile.CompressionType;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.io.compress.DefaultCodec;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.util.*;
 
@@ -38,6 +40,8 @@ import org.apache.hadoop.util.*;
  *   instead.
  */
 @Deprecated
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class SequenceFileOutputFormat <K,V> extends FileOutputFormat<K, V> {
 
   public RecordWriter<K, V> getRecordWriter(

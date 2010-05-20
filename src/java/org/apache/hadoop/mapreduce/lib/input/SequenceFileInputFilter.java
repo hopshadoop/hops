@@ -28,6 +28,8 @@ import java.util.regex.PatternSyntaxException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.BytesWritable;
@@ -42,6 +44,8 @@ import org.apache.hadoop.util.ReflectionUtils;
  * A class that allows a map/red job to work on a sample of sequence files.
  * The sample is decided by the filter class set by the job.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class SequenceFileInputFilter<K, V>
     extends SequenceFileInputFormat<K, V> {
   public static final Log LOG = LogFactory.getLog(FileInputFormat.class);

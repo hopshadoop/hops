@@ -21,6 +21,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hadoop.mapred.JobConf;
@@ -34,6 +36,8 @@ import org.apache.hadoop.util.ReflectionUtils;
  * {@link org.apache.hadoop.mapreduce.lib.input.MultipleInputs} instead
  */
 @Deprecated
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class MultipleInputs {
   /**
    * Add a {@link Path} with a custom {@link InputFormat} to the list of

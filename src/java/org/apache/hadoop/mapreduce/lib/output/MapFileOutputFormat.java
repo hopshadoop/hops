@@ -35,12 +35,16 @@ import org.apache.hadoop.mapreduce.Partitioner;
 import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.util.ReflectionUtils;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 
 /** 
  * An {@link org.apache.hadoop.mapreduce.OutputFormat} that writes 
  * {@link MapFile}s.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class MapFileOutputFormat 
     extends FileOutputFormat<WritableComparable<?>, Writable> {
 

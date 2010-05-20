@@ -45,6 +45,8 @@ import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.util.ReflectionUtils;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 
@@ -54,6 +56,8 @@ import org.apache.hadoop.conf.Configuration;
  * splits, it tries to generate WHERE clauses which separate the data into roughly
  * equivalent shards.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public class DataDrivenDBInputFormat<T extends DBWritable>
     extends DBInputFormat<T> implements Configurable {
 
@@ -67,6 +71,7 @@ public class DataDrivenDBInputFormat<T extends DBWritable>
   /**
    * A InputSplit that spans a set of rows
    */
+  @InterfaceStability.Evolving
   public static class DataDrivenDBInputSplit extends DBInputFormat.DBInputSplit {
 
     private String lowerBoundClause;

@@ -22,18 +22,17 @@ import java.io.IOException;
 import java.io.OutputStream; 
 import java.io.FilterOutputStream;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.util.DataChecksum;
 /**
  * A Checksum output stream.
  * Checksum for the contents of the file is calculated and
  * appended to the end of the file on close of the stream.
  * Used for IFiles
- *
- * <FRAMEWORK-USE-ONLY>
- * This method is intended only for use by the Map/Reduce framework and not
- * for external users
- *
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class IFileOutputStream extends FilterOutputStream {
   /**
    * The output stream to be checksummed. 

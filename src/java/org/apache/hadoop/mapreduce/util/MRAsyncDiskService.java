@@ -33,6 +33,7 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.util.AsyncDiskService;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 
 /**
  * This class is a container of multiple thread pools, each for a volume,
@@ -49,6 +50,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
  * thread pools. 
  */
 @InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class MRAsyncDiskService {
   
   public static final Log LOG = LogFactory.getLog(MRAsyncDiskService.class);

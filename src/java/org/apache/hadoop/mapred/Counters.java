@@ -32,6 +32,8 @@ import java.util.MissingResourceException;
 import java.util.ResourceBundle;
 
 import org.apache.commons.logging.*;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
@@ -51,6 +53,8 @@ import org.apache.hadoop.util.StringUtils;
  * @deprecated Use {@link org.apache.hadoop.mapreduce.Counters} instead.
  */
 @Deprecated
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class Counters implements Writable, Iterable<Counters.Group> {
   private static final Log LOG = LogFactory.getLog(Counters.class);
   private static final char GROUP_OPEN = '{';

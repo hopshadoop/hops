@@ -24,6 +24,8 @@ import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -47,6 +49,8 @@ import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 /**
  * Provides a way to access information about the map/reduce cluster.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public class Cluster {
   private ClientProtocol client;
   private UserGroupInformation ugi;

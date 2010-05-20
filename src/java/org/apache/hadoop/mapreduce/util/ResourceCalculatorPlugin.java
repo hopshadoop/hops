@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.mapreduce.util;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.util.ReflectionUtils;
@@ -26,6 +28,8 @@ import org.apache.hadoop.util.ReflectionUtils;
  * Plugin to calculate resource information on the system.
  * 
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public abstract class ResourceCalculatorPlugin extends Configured {
 
   /**

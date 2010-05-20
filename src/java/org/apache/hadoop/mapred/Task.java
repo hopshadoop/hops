@@ -36,6 +36,8 @@ import javax.crypto.SecretKey;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -64,11 +66,11 @@ import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.StringUtils;
 
-/** 
+/**
  * Base class for tasks.
- * 
- * This is NOT a public interface.
  */
+@InterfaceAudience.LimitedPrivate({"MapReduce"})
+@InterfaceStability.Unstable
 abstract public class Task implements Writable, Configurable {
   private static final Log LOG =
     LogFactory.getLog(Task.class);
@@ -500,6 +502,8 @@ abstract public class Task implements Writable, Configurable {
     committer.setupTask(taskContext);
   }
   
+  @InterfaceAudience.Private
+  @InterfaceStability.Unstable
   protected class TaskReporter 
       extends org.apache.hadoop.mapreduce.StatusReporter
       implements Runnable, Reporter {
@@ -1077,6 +1081,8 @@ abstract public class Task implements Writable, Configurable {
   /**
    * OutputCollector for the combiner.
    */
+  @InterfaceAudience.Private
+  @InterfaceStability.Unstable
   public static class CombineOutputCollector<K extends Object, V extends Object> 
   implements OutputCollector<K, V> {
     private Writer<K, V> writer;
@@ -1206,6 +1212,8 @@ abstract public class Task implements Writable, Configurable {
   }
 
     /** Iterator to return Combined values */
+  @InterfaceAudience.Private
+  @InterfaceStability.Unstable
   public static class CombineValuesIterator<KEY,VALUE>
       extends ValuesIterator<KEY,VALUE> {
 
@@ -1262,6 +1270,8 @@ abstract public class Task implements Writable, Configurable {
     return reducerContext;
   }
 
+  @InterfaceAudience.Private
+  @InterfaceStability.Unstable
   protected static abstract class CombinerRunner<K,V> {
     protected final Counters.Counter inputCounter;
     protected final JobConf job;
@@ -1314,6 +1324,8 @@ abstract public class Task implements Writable, Configurable {
     }
   }
   
+  @InterfaceAudience.Private
+  @InterfaceStability.Unstable
   protected static class OldCombinerRunner<K,V> extends CombinerRunner<K,V> {
     private final Class<? extends Reducer<K,V,K,V>> combinerClass;
     private final Class<K> keyClass;
@@ -1354,6 +1366,8 @@ abstract public class Task implements Writable, Configurable {
     }
   }
   
+  @InterfaceAudience.Private
+  @InterfaceStability.Unstable
   protected static class NewCombinerRunner<K, V> extends CombinerRunner<K,V> {
     private final Class<? extends org.apache.hadoop.mapreduce.Reducer<K,V,K,V>> 
         reducerClass;

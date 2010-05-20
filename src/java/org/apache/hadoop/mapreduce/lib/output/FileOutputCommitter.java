@@ -23,6 +23,8 @@ import java.net.URI;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -38,6 +40,8 @@ import org.apache.hadoop.util.StringUtils;
 /** An {@link OutputCommitter} that commits files specified 
  * in job output directory i.e. ${mapreduce.output.fileoutputformat.outputdir}. 
  **/
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class FileOutputCommitter extends OutputCommitter {
 
   private static final Log LOG = LogFactory.getLog(FileOutputCommitter.class);

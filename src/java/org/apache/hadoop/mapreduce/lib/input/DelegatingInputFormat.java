@@ -26,6 +26,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.InputFormat;
@@ -43,6 +45,8 @@ import org.apache.hadoop.util.ReflectionUtils;
  * 
  * @see MultipleInputs#addInputPath(Job, Path, Class, Class)
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class DelegatingInputFormat<K, V> extends InputFormat<K, V> {
 
   @SuppressWarnings("unchecked")

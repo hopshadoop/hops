@@ -23,6 +23,8 @@ import java.io.DataOutput;
 import java.io.IOException;
 import java.util.HashSet;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.mapred.InputSplit;
@@ -36,6 +38,8 @@ import org.apache.hadoop.util.ReflectionUtils;
  * {@link org.apache.hadoop.mapreduce.lib.join.CompositeInputSplit} instead
  */
 @Deprecated
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class CompositeInputSplit implements InputSplit {
 
   private int fill = 0;

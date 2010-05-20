@@ -26,6 +26,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.FileInputFormat;
 import org.apache.hadoop.mapred.InputFormat;
@@ -45,6 +47,8 @@ import org.apache.hadoop.util.ReflectionUtils;
  * {@link org.apache.hadoop.mapreduce.lib.input.DelegatingInputFormat} instead
  */
 @Deprecated
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class DelegatingInputFormat<K, V> implements InputFormat<K, V> {
 
   public InputSplit[] getSplits(JobConf conf, int numSplits) throws IOException {

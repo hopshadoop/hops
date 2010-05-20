@@ -20,11 +20,16 @@ package org.apache.hadoop.mapreduce.lib.aggregate;
 
 import java.util.ArrayList;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 /**
  * This class implements a value aggregator that sums up 
  * a sequence of long values.
  * 
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class LongValueSum implements ValueAggregator<String> {
 
   long sum = 0;

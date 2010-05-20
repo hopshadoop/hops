@@ -20,6 +20,8 @@ package org.apache.hadoop.mapreduce.protocol;
 
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenSelector;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.VersionedProtocol;
@@ -50,6 +52,8 @@ import org.apache.hadoop.security.token.TokenInfo;
 @KerberosInfo(
     serverPrincipal = JTConfig.JT_USER_NAME)
 @TokenInfo(DelegationTokenSelector.class)
+@InterfaceAudience.Private
+@InterfaceStability.Stable
 public interface ClientProtocol extends VersionedProtocol {
   /* 
    *Changing the versionID to 2L since the getTaskCompletionEvents method has

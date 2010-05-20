@@ -20,6 +20,8 @@ package org.apache.hadoop.mapreduce.jobhistory;
 
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.JobID;
 
@@ -29,6 +31,8 @@ import org.apache.avro.util.Utf8;
  * Event to record successful completion of job
  *
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class JobFinishedEvent  implements HistoryEvent {
   private JobFinished datum = new JobFinished();
 

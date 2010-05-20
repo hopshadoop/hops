@@ -20,6 +20,8 @@ package org.apache.hadoop.mapred.lib;
 
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.OutputFormat;
@@ -34,6 +36,8 @@ import org.apache.hadoop.util.ReflectionUtils;
  *   {@link org.apache.hadoop.mapreduce.lib.output.LazyOutputFormat} instead.
  */
 @Deprecated
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class LazyOutputFormat<K, V> extends FilterOutputFormat<K, V> {
   /**
    * Set the underlying output format for LazyOutputFormat.

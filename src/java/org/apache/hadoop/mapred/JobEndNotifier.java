@@ -30,7 +30,11 @@ import org.apache.commons.httpclient.URI;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class JobEndNotifier {
   private static final Log LOG =
     LogFactory.getLog(JobEndNotifier.class.getName());

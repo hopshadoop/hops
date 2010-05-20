@@ -51,6 +51,7 @@ import org.apache.hadoop.security.UserGroupInformation;
  * The secrets can be stored just before submission of jobs and read during
  * the task execution.  
  */
+@InterfaceAudience.Public
 @InterfaceStability.Evolving
 public class TokenCache {
   

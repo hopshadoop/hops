@@ -20,6 +20,8 @@ package org.apache.hadoop.mapreduce.lib.partition;
 
 import java.util.List;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.WritableComparator;
@@ -46,7 +48,8 @@ import org.apache.hadoop.mapreduce.lib.partition.KeyFieldHelper.KeyDescription;
  * We assume that the fields in the key are separated by 
  * {@link JobContext#MAP_OUTPUT_KEY_FIELD_SEPERATOR}.
  */
-
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class KeyFieldBasedComparator<K, V> extends WritableComparator 
     implements Configurable {
   private KeyFieldHelper keyFieldHelper = new KeyFieldHelper();

@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.mapreduce.server.tasktracker;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.mapreduce.MRConfig;
 
 /**
@@ -24,7 +26,8 @@ import org.apache.hadoop.mapreduce.MRConfig;
  * 
  * The keys should have "mapreduce.tasktracker." as the prefix
  */
-
+@InterfaceAudience.Private
+@InterfaceStability.Evolving
 public interface TTConfig extends MRConfig {
 
   // Task-tracker configuration properties

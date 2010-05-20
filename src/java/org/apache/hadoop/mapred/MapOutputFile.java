@@ -20,6 +20,8 @@ package org.apache.hadoop.mapred;
 
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
@@ -27,17 +29,15 @@ import org.apache.hadoop.mapreduce.MRConfig;
 
 /**
  * Manipulate the working area for the transient store for maps and reduces.
- * 
+ *
  * This class is used by map and reduce tasks to identify the directories that
- * they need to write to/read from for intermediate files. The callers of 
- * these methods are from child space and see mapreduce.cluster.local.dir as 
+ * they need to write to/read from for intermediate files. The callers of
+ * these methods are from child space and see mapreduce.cluster.local.dir as
  * taskTracker/jobCache/jobId/attemptId
  * This class should not be used from TaskTracker space.
- * 
- * <FRAMEWORK-USE-ONLY>
- * This method is intended only for use by the Map/Reduce framework and not
- * for external users
- */ 
+ */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class MapOutputFile {
 
   private JobConf conf;

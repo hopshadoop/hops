@@ -23,6 +23,8 @@ import java.io.DataOutput;
 import java.io.IOException;
 import java.text.NumberFormat;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Text;
 
 /**
@@ -44,6 +46,8 @@ import org.apache.hadoop.io.Text;
  * @see org.apache.hadoop.mapred.JobTracker#getNewJobId()
  * @see org.apache.hadoop.mapred.JobTracker#getStartTime()
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class JobID extends org.apache.hadoop.mapred.ID 
                    implements Comparable<ID> {
   protected static final String JOB = "job";

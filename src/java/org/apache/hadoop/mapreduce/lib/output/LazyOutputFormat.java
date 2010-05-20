@@ -20,6 +20,8 @@ package org.apache.hadoop.mapreduce.lib.output;
 
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
@@ -32,6 +34,8 @@ import org.apache.hadoop.util.ReflectionUtils;
 /**
  * A Convenience class that creates output lazily.  
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class LazyOutputFormat <K,V> extends FilterOutputFormat<K, V> {
   public static String OUTPUT_FORMAT = 
     "mapreduce.output.lazyoutputformat.outputformat";

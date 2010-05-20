@@ -21,6 +21,8 @@ package org.apache.hadoop.mapreduce.lib.aggregate;
 import java.io.IOException;
 import java.util.ArrayList;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
@@ -78,6 +80,8 @@ import org.apache.hadoop.util.GenericOptionsParser;
  * user plugin class
  * 
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class ValueAggregatorJob {
 
   public static JobControl createValueAggregatorJobs(String args[],

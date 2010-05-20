@@ -18,7 +18,12 @@
 
 package org.apache.hadoop.mapreduce;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 // Per-job counters
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public enum JobCounter {
   NUM_FAILED_MAPS, 
   NUM_FAILED_REDUCES,

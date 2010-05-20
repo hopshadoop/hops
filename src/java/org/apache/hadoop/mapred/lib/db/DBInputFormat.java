@@ -23,6 +23,8 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.List;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Writable;
@@ -39,6 +41,8 @@ import org.apache.hadoop.mapreduce.Job;
  * Use {@link org.apache.hadoop.mapreduce.lib.db.DBInputFormat} instead.
  */
 @Deprecated
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class DBInputFormat<T  extends DBWritable>
     extends org.apache.hadoop.mapreduce.lib.db.DBInputFormat<T> 
     implements InputFormat<LongWritable, T>, JobConfigurable {

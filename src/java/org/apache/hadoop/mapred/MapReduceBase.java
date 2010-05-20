@@ -20,6 +20,8 @@ package org.apache.hadoop.mapred;
 
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Closeable;
 import org.apache.hadoop.mapred.JobConfigurable;
 
@@ -30,6 +32,8 @@ import org.apache.hadoop.mapred.JobConfigurable;
  * applications need to override some of them.</p>
  */
 @Deprecated
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class MapReduceBase implements Closeable, JobConfigurable {
 
   /** Default implementation that does nothing. */

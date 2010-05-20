@@ -25,6 +25,8 @@ import java.text.DecimalFormat;
 import javax.servlet.jsp.JspWriter;
 import javax.servlet.http.*;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.mapred.ClusterStatus;
 import org.apache.hadoop.mapred.JobInProgress;
 import org.apache.hadoop.mapred.JobProfile;
@@ -38,6 +40,8 @@ import org.apache.hadoop.util.StringUtils;
 /**
  * Methods to help format output for JobTracker XML JSPX
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class JobTrackerJspHelper {
 
   public JobTrackerJspHelper() {

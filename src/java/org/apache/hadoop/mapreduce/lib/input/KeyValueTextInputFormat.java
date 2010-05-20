@@ -20,6 +20,8 @@ package org.apache.hadoop.mapreduce.lib.input;
 
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.compress.CompressionCodec;
@@ -37,6 +39,8 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
  * Each line is divided into key and value parts by a separator byte. If no
  * such a byte exists, the key will be the entire line and value will be empty.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class KeyValueTextInputFormat extends FileInputFormat<Text, Text> {
 
   @Override

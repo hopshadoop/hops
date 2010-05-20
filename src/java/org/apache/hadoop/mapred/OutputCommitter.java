@@ -20,6 +20,9 @@ package org.apache.hadoop.mapred;
 
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 /**
  * <code>OutputCommitter</code> describes the commit of task output for a 
  * Map-Reduce job.
@@ -56,6 +59,8 @@ import java.io.IOException;
  * @deprecated Use {@link org.apache.hadoop.mapreduce.OutputCommitter} instead.
  */
 @Deprecated
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public abstract class OutputCommitter 
                 extends org.apache.hadoop.mapreduce.OutputCommitter {
   /**

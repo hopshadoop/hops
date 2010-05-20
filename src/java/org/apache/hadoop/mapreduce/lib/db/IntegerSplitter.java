@@ -23,6 +23,8 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.MRJobConfig;
@@ -30,6 +32,8 @@ import org.apache.hadoop.mapreduce.MRJobConfig;
 /**
  * Implement DBSplitter over integer values.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public class IntegerSplitter implements DBSplitter {
   public List<InputSplit> split(Configuration conf, ResultSet results, String colName)
       throws SQLException {

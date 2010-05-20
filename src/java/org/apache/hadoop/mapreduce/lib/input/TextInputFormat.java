@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.mapreduce.lib.input;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
@@ -33,6 +35,8 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 /** An {@link InputFormat} for plain text files.  Files are broken into lines.
  * Either linefeed or carriage-return are used to signal end of line.  Keys are
  * the position in the file, and values are the line of text.. */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class TextInputFormat extends FileInputFormat<LongWritable, Text> {
 
   @Override

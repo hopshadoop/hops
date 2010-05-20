@@ -19,6 +19,8 @@ package org.apache.hadoop.mapreduce.server.jobtracker;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.mapred.JobInProgress;
 import org.apache.hadoop.mapred.JobTracker;
 import org.apache.hadoop.mapred.TaskTrackerStatus;
@@ -29,6 +31,8 @@ import org.apache.hadoop.mapreduce.TaskType;
  * The representation of a single <code>TaskTracker</code> as seen by 
  * the {@link JobTracker}.
  */
+@InterfaceAudience.LimitedPrivate("MapReduce")
+@InterfaceStability.Unstable
 public class TaskTracker {
   static final Log LOG = LogFactory.getLog(TaskTracker.class);
   

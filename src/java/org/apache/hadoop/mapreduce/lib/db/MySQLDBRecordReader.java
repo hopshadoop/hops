@@ -23,11 +23,15 @@ import java.sql.ResultSet;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 
 /**
  * A RecordReader that reads records from a MySQL table.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public class MySQLDBRecordReader<T extends DBWritable> extends DBRecordReader<T> {
 
   public MySQLDBRecordReader(DBInputFormat.DBInputSplit split, 

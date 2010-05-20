@@ -22,6 +22,8 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.db.DBInputFormat.NullDBWritable;
@@ -39,6 +41,8 @@ import org.apache.hadoop.mapreduce.lib.db.DBInputFormat.NullDBWritable;
  * @see DBInputFormat#setInput(Job, Class, String, String, String, String...)
  * @see DBOutputFormat#setOutput(Job, String, String...)
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class DBConfiguration {
 
   /** The JDBC Driver class name */

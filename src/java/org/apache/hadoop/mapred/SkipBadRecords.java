@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.mapred;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 
@@ -48,6 +50,8 @@ import org.apache.hadoop.fs.Path;
  * If task crashes, the Task tracker knows which one was the last reported
  * range. On further attempts that range get skipped.</p>
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class SkipBadRecords {
   
   /**

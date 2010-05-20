@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.mapreduce.util;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 /**
  * Plugin to calculate virtual and physical memories on Linux systems.
  * @deprecated 
@@ -25,6 +28,8 @@ package org.apache.hadoop.mapreduce.util;
  * instead
  */
 @Deprecated
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class LinuxMemoryCalculatorPlugin extends MemoryCalculatorPlugin {
   private LinuxResourceCalculatorPlugin resourceCalculatorPlugin;
   // Use everything from LinuxResourceCalculatorPlugin

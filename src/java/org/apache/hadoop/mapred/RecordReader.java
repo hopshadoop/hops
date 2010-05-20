@@ -21,6 +21,9 @@ package org.apache.hadoop.mapred;
 import java.io.IOException;
 import java.io.DataInput;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 /**
  * <code>RecordReader</code> reads &lt;key, value&gt; pairs from an 
  * {@link InputSplit}.
@@ -34,6 +37,8 @@ import java.io.DataInput;
  * @see InputSplit
  * @see InputFormat
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public interface RecordReader<K, V> {
   /** 
    * Reads the next key/value pair from the input for processing.

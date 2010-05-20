@@ -22,6 +22,8 @@ import java.io.DataOutput;
 import java.io.IOException;
 import java.net.URL;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableFactories;
@@ -32,6 +34,8 @@ import org.apache.hadoop.io.WritableFactory;
  * whether living or dead.
  *
  **************************************************/
+@InterfaceAudience.LimitedPrivate({"MapReduce"})
+@InterfaceStability.Unstable
 public class JobProfile implements Writable {
 
   static {                                      // register a ctor

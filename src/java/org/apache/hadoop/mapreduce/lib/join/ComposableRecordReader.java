@@ -20,6 +20,8 @@ package org.apache.hadoop.mapreduce.lib.join;
 
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.mapreduce.RecordReader;
@@ -27,6 +29,8 @@ import org.apache.hadoop.mapreduce.RecordReader;
 /**
  * Additional operations required of a RecordReader to participate in a join.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public abstract class ComposableRecordReader<K extends WritableComparable<?>,
                                              V extends Writable>
     extends RecordReader<K,V>

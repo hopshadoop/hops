@@ -23,6 +23,8 @@ import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -40,6 +42,8 @@ import org.apache.hadoop.util.ReflectionUtils;
  * Partitioner effecting a total order by reading split points from
  * an externally generated source.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class TotalOrderPartitioner<K extends WritableComparable<?>,V>
     extends Partitioner<K,V> implements Configurable {
 

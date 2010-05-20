@@ -37,6 +37,8 @@ import org.apache.commons.cli.ParseException;
 import org.apache.commons.cli.Parser;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.mapreduce.MRJobConfig;
@@ -64,6 +66,8 @@ import org.apache.hadoop.util.Tool;
  * The main entry point and job submitter. It may either be used as a command
  * line-based or API-based method to launch Pipes jobs.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class Submitter extends Configured implements Tool {
 
   protected static final Log LOG = LogFactory.getLog(Submitter.class);

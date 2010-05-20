@@ -21,16 +21,16 @@ package org.apache.hadoop.mapred;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Writable;
 
 /**
- * Task abstraction that can be serialized, implements the writable interface
- * 
- * <FRAMEWORK-USE-ONLY>
- * This method is intended only for use by the Map/Reduce framework and not
- * for external users
- *
+ * Task abstraction that can be serialized, implements the writable interface.
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class JvmTask implements Writable {
   Task t;
   boolean shouldDie;

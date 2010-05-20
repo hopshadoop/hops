@@ -24,12 +24,16 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.mapred.TIPStatus;
 
 /** A report on the state of a task. */
+@InterfaceAudience.Private
+@InterfaceStability.Evolving
 public class TaskReport implements Writable {
   private TaskID taskid;
   private float progress;

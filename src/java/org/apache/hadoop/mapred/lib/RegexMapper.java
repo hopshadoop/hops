@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.JobConf;
@@ -35,6 +37,8 @@ import org.apache.hadoop.mapred.Reporter;
  * @deprecated Use {@link org.apache.hadoop.mapreduce.lib.map.RegexMapper}
  */
 @Deprecated
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class RegexMapper<K> extends MapReduceBase
     implements Mapper<K, Text, Text, LongWritable> {
 

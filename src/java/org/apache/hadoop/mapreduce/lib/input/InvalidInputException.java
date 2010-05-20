@@ -21,11 +21,16 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Iterator;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 /**
  * This class wraps a list of problems with the input, so that the user
  * can get a list of problems together instead of finding and fixing them one 
  * by one.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class InvalidInputException extends IOException {
   private static final long serialVersionUID = -380668190578456802L;
   private List<IOException> problems;

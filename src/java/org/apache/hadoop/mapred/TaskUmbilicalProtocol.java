@@ -20,6 +20,8 @@ package org.apache.hadoop.mapred;
 
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.ipc.VersionedProtocol;
 import org.apache.hadoop.mapred.JvmTask;
 import org.apache.hadoop.mapreduce.security.token.JobTokenSelector;
@@ -30,6 +32,8 @@ import org.apache.hadoop.security.token.TokenInfo;
  * reduce task and runs it as a child process.  All communication between child
  * and parent is via this protocol. */ 
 @TokenInfo(JobTokenSelector.class)
+@InterfaceAudience.Private
+@InterfaceStability.Stable
 public interface TaskUmbilicalProtocol extends VersionedProtocol {
 
   /** 

@@ -19,6 +19,7 @@
 package org.apache.hadoop.mapreduce.security.token.delegation;
 
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenIdentifier;
 
@@ -26,6 +27,7 @@ import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenIdenti
  * A delegation token identifier that is specific to MapReduce.
  */
 @InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class DelegationTokenIdentifier 
     extends AbstractDelegationTokenIdentifier {
   static final Text MAPREDUCE_DELEGATION_KIND = 

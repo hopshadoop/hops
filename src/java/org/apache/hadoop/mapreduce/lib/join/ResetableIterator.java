@@ -19,6 +19,8 @@ package org.apache.hadoop.mapreduce.lib.join;
 
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Writable;
 
 /**
@@ -26,6 +28,8 @@ import org.apache.hadoop.io.Writable;
  * added to it directly.
  * Note that this does not extend {@link java.util.Iterator}.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public interface ResetableIterator<T extends Writable> {
 
   public static class EMPTY<U extends Writable>

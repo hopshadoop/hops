@@ -21,6 +21,9 @@ package org.apache.hadoop.mapred;
 import java.io.DataInput;
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 /**
  * JobID represents the immutable and unique identifier for 
  * the job. JobID consists of two parts. First part 
@@ -39,6 +42,8 @@ import java.io.IOException;
  * @see TaskAttemptID
  */
 @Deprecated
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class JobID extends org.apache.hadoop.mapreduce.JobID {
   /**
    * Constructs a JobID object 

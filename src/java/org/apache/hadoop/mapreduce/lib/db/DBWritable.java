@@ -21,6 +21,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Writable;
 
 /**
@@ -73,6 +75,8 @@ import org.apache.hadoop.io.Writable;
  * }
  * </pre></p>
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public interface DBWritable {
 
   /**

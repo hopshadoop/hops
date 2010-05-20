@@ -23,12 +23,16 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Writable;
 
 /**
  * This class provides an implementation of ResetableIterator. This
  * implementation uses a byte array to store elements added to it.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class StreamBackedIterator<X extends Writable>
     implements ResetableIterator<X> {
 

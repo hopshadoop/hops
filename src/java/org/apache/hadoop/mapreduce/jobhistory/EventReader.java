@@ -24,6 +24,8 @@ import java.io.IOException;
 import java.io.EOFException;
 import java.io.StringBufferInputStream;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.Counter;
@@ -37,6 +39,8 @@ import org.apache.avro.io.JsonDecoder;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.specific.SpecificDatumReader;
 
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class EventReader implements Closeable {
   private String version;
   private Schema schema;

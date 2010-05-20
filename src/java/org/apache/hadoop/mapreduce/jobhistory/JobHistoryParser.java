@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -42,6 +44,8 @@ import org.apache.hadoop.security.authorize.AccessControlList;
  * job = parser.parse();
  *
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class JobHistoryParser {
 
   private final FSDataInputStream in;

@@ -17,11 +17,16 @@
  */
 package org.apache.hadoop.mapred;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 /**
  * Used to describe the priority of the running job. 
  * @deprecated Use {@link org.apache.hadoop.mapreduce.JobPriority} instead
  */
 @Deprecated
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public enum JobPriority {
 
   VERY_HIGH,

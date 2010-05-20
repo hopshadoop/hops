@@ -32,6 +32,8 @@ import java.util.ListIterator;
 import java.util.Map;
 import java.util.Stack;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.WritableComparator;
 import org.apache.hadoop.mapred.FileInputFormat;
 import org.apache.hadoop.mapred.InputFormat;
@@ -62,13 +64,19 @@ import org.apache.hadoop.util.ReflectionUtils;
  * @deprecated Use {@link org.apache.hadoop.mapreduce.lib.join.Parser} instead
  */
 @Deprecated
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public class Parser {
+  @InterfaceAudience.Public
+  @InterfaceStability.Evolving
   public enum TType { CIF, IDENT, COMMA, LPAREN, RPAREN, QUOT, NUM, }
 
   /**
    * Tagged-union type for tokens from the join expression.
    * @see Parser.TType
    */
+  @InterfaceAudience.Public
+  @InterfaceStability.Evolving
   public static class Token {
 
     private TType type;
@@ -89,6 +97,8 @@ public class Parser {
     }
   }
 
+  @InterfaceAudience.Public
+  @InterfaceStability.Evolving
   public static class NumToken extends Token {
     private double num;
     public NumToken(double num) {
@@ -98,6 +108,8 @@ public class Parser {
     public double getNum() { return num; }
   }
 
+  @InterfaceAudience.Public
+  @InterfaceStability.Evolving
   public static class NodeToken extends Token {
     private Node node;
     NodeToken(Node node) {
@@ -109,6 +121,8 @@ public class Parser {
     }
   }
 
+  @InterfaceAudience.Public
+  @InterfaceStability.Evolving
   public static class StrToken extends Token {
     private String str;
     public StrToken(TType type, String str) {
@@ -167,6 +181,8 @@ public class Parser {
     }
   }
 
+  @InterfaceAudience.Public
+  @InterfaceStability.Evolving
   public abstract static class Node implements ComposableInputFormat {
     /**
      * Return the node type registered for the particular identifier.

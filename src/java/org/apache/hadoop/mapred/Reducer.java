@@ -22,6 +22,8 @@ import java.io.IOException;
 
 import java.util.Iterator;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.io.Closeable;
 
@@ -163,6 +165,8 @@ import org.apache.hadoop.io.Closeable;
  * @deprecated Use {@link org.apache.hadoop.mapreduce.Reducer} instead.
  */
 @Deprecated
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public interface Reducer<K2, V2, K3, V3> extends JobConfigurable, Closeable {
   
   /** 

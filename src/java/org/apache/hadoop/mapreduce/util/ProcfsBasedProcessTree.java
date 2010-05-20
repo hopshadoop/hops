@@ -33,12 +33,16 @@ import java.util.LinkedList;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.util.Shell.ShellCommandExecutor;
 import org.apache.hadoop.util.StringUtils;
 
 /**
  * A Proc file-system based ProcessTree. Works only on Linux.
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class ProcfsBasedProcessTree extends ProcessTree {
 
   static final Log LOG = LogFactory

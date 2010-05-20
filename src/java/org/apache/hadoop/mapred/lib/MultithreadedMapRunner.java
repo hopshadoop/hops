@@ -19,6 +19,8 @@
 package org.apache.hadoop.mapred.lib;
 
 import org.apache.hadoop.util.ReflectionUtils;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.mapred.MapRunnable;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.Mapper;
@@ -51,6 +53,8 @@ import java.util.concurrent.*;
  * @deprecated Use {@link MultithreadedMapper} instead.
  */
 @Deprecated
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class MultithreadedMapRunner<K1, V1, K2, V2>
     implements MapRunnable<K1, V1, K2, V2> {
 

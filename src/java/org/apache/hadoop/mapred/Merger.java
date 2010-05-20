@@ -25,6 +25,8 @@ import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.ChecksumFileSystem;
@@ -45,6 +47,8 @@ import org.apache.hadoop.util.Progressable;
  * Merger is an utility class used by the Map and Reduce tasks for merging
  * both their memory and disk segments
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class Merger {  
   private static final Log LOG = LogFactory.getLog(Merger.class);
 
@@ -201,6 +205,8 @@ public class Merger {
     }
 }
 
+  @InterfaceAudience.Private
+  @InterfaceStability.Unstable
   public static class Segment<K extends Object, V extends Object> {
     Reader<K, V> reader = null;
     final DataInputBuffer key = new DataInputBuffer();

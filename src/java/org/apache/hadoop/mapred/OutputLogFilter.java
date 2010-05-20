@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.mapred;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 
@@ -31,6 +33,8 @@ import org.apache.hadoop.fs.PathFilter;
  *   {@link org.apache.hadoop.mapred.Utils.OutputFileUtils.OutputLogFilter} 
  *   instead.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class OutputLogFilter implements PathFilter {
   private static final PathFilter LOG_FILTER = 
     new Utils.OutputFileUtils.OutputLogFilter();

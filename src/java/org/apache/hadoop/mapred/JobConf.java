@@ -32,6 +32,8 @@ import org.apache.hadoop.mapreduce.filecache.DistributedCache;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 
 import org.apache.hadoop.io.*;
@@ -106,6 +108,8 @@ import org.apache.log4j.Level;
  * @deprecated Use {@link Configuration} instead
  */
 @Deprecated
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class JobConf extends Configuration {
   
   private static final Log LOG = LogFactory.getLog(JobConf.class);

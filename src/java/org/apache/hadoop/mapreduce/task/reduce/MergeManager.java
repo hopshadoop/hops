@@ -27,6 +27,8 @@ import java.util.TreeSet;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.ChecksumFileSystem;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalDirAllocator;
@@ -58,7 +60,8 @@ import org.apache.hadoop.util.Progress;
 import org.apache.hadoop.util.ReflectionUtils;
 
 @SuppressWarnings(value={"unchecked", "deprecation"})
-
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class MergeManager<K, V> {
   
   private static final Log LOG = LogFactory.getLog(MergeManager.class);

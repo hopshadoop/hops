@@ -23,6 +23,8 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.OutputFormat;
@@ -38,6 +40,8 @@ import org.apache.hadoop.util.Progressable;
  * @deprecated Use org.apache.hadoop.mapreduce.lib.db.DBOutputFormat instead
  */
 @Deprecated
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class DBOutputFormat<K  extends DBWritable, V> 
     extends org.apache.hadoop.mapreduce.lib.db.DBOutputFormat<K, V>
     implements OutputFormat<K, V> {

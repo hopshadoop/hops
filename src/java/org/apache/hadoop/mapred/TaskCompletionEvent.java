@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.mapred;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 /**
  * This is used to track task completion events on 
  * job tracker. 
@@ -25,8 +28,12 @@ package org.apache.hadoop.mapred;
  * {@link org.apache.hadoop.mapreduce.TaskCompletionEvent} instead
  */
 @Deprecated
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class TaskCompletionEvent 
     extends org.apache.hadoop.mapreduce.TaskCompletionEvent {
+  @InterfaceAudience.Public
+  @InterfaceStability.Stable
   static public enum Status {FAILED, KILLED, SUCCEEDED, OBSOLETE, TIPFAILED};
   
   public static final TaskCompletionEvent[] EMPTY_ARRAY = 

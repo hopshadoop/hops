@@ -21,11 +21,16 @@ package org.apache.hadoop.mapreduce;
 import java.io.IOException;
 import java.util.Iterator;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 /**
  * <code>MarkableIterator</code> is a wrapper iterator class that 
  * implements the {@link MarkableIteratorInterface}.
  * 
  */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public class MarkableIterator<VALUE> 
   implements MarkableIteratorInterface<VALUE> {
 

@@ -26,6 +26,8 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.WritableUtils;
 
 
@@ -51,6 +53,8 @@ import org.apache.hadoop.io.WritableUtils;
  * @see JobID
  * @see TaskAttemptID
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class TaskID extends org.apache.hadoop.mapred.ID {
   protected static final String TASK = "task";
   protected static final NumberFormat idFormat = NumberFormat.getInstance();

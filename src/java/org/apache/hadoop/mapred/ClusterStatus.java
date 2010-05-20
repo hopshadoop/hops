@@ -24,6 +24,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
@@ -62,6 +64,8 @@ import org.apache.hadoop.mapreduce.TaskTrackerInfo;
  * @deprecated  Use {@link ClusterMetrics} or {@link TaskTrackerInfo} instead
  */
 @Deprecated
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public class ClusterStatus implements Writable {
   /**
    * Class which encapsulates information about a blacklisted tasktracker.

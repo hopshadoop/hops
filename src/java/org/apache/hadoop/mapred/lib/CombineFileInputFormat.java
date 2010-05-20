@@ -20,6 +20,8 @@ package org.apache.hadoop.mapred.lib;
 
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
@@ -50,6 +52,8 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
  * {@link org.apache.hadoop.mapreduce.lib.input.CombineFileInputFormat}
  */
 @Deprecated
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public abstract class CombineFileInputFormat<K, V>
   extends org.apache.hadoop.mapreduce.lib.input.CombineFileInputFormat<K, V> 
   implements InputFormat<K, V>{

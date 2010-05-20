@@ -35,6 +35,8 @@ import javax.security.auth.login.LoginException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configuration.IntegerRanges;
 import org.apache.hadoop.fs.Path;
@@ -80,9 +82,12 @@ import org.apache.hadoop.util.StringUtils;
  * 
  * 
  */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public class Job extends JobContextImpl implements JobContext {  
   private static final Log LOG = LogFactory.getLog(Job.class);
 
+  @InterfaceStability.Evolving
   public static enum JobState {DEFINE, RUNNING};
   private static final long MAX_JOBSTATUS_AGE = 1000 * 2;
   public static final String OUTPUT_FILTER = "mapreduce.client.output.filter";
@@ -103,6 +108,7 @@ public class Job extends JobContextImpl implements JobContext {
   public static final String SUBMIT_REPLICATION = 
     "mapreduce.client.submit.file.replication";
 
+  @InterfaceStability.Evolving
   public static enum TaskStatusFilter { NONE, KILLED, FAILED, SUCCEEDED, ALL }
 
   static {

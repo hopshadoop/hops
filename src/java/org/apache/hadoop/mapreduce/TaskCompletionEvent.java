@@ -22,6 +22,8 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
 
@@ -29,7 +31,11 @@ import org.apache.hadoop.io.WritableUtils;
  * This is used to track task completion events on 
  * job tracker. 
  */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public class TaskCompletionEvent implements Writable{
+  @InterfaceAudience.Public
+  @InterfaceStability.Evolving
   static public enum Status {FAILED, KILLED, SUCCEEDED, OBSOLETE, TIPFAILED};
     
   private int eventId; 

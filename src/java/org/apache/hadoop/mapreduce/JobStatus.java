@@ -24,6 +24,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableFactories;
@@ -34,6 +36,8 @@ import org.apache.hadoop.security.authorize.AccessControlList;
 /**************************************************
  * Describes the current status of a job.
  **************************************************/
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public class JobStatus implements Writable, Cloneable {
 
   static {                                      // register a ctor
