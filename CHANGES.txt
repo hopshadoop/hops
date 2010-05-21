@@ -44,6 +44,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1662. Remove unused methods from TaskRunner. (Amareshwari
     Sriramadasu via cdouglas)
 
+    MAPREDUCE-1617. Use IPv4 stack for unit tests. (Amar Kamat and Luke Lu via
+    cdouglas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
