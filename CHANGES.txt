@@ -23,6 +23,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1539. authorization checks for inter-server protocol
     (based on HADOOP-6600) (Boris Shkolnik via shv)
 
+    MAPREDUCE-1804. Stress-test tool for HDFS introduced in HDFS-708.
+    (Joshua Harlow via shv)
+
   OPTIMIZATIONS
 
   BUG FIXES
