@@ -77,11 +77,6 @@ abstract class TaskRunner extends Thread {
   protected JobConf conf;
   JvmManager jvmManager;
 
-  /** 
-   * for cleaning up old map outputs
-   */
-  protected MapOutputFile mapOutputFile;
-
   static String jobACLsFile = "job-acl.xml";
 
   public TaskRunner(TaskTracker.TaskInProgress tip, TaskTracker tracker, 
@@ -90,8 +85,6 @@ abstract class TaskRunner extends Thread {
     this.t = tip.getTask();
     this.tracker = tracker;
     this.conf = conf;
-    this.mapOutputFile = new MapOutputFile();
-    this.mapOutputFile.setConf(conf);
     this.jvmManager = tracker.getJvmManagerInstance();
   }
 
@@ -100,13 +93,6 @@ abstract class TaskRunner extends Thread {
   public TaskTracker getTracker() { return tracker; }
 
   public JvmManager getJvmManager() { return jvmManager; }
-
-  /** Called to assemble this task's input.  This method is run in the parent
-   * process before the child is spawned.  It should not execute user code,
-   * only system code. */
-  public boolean prepare() throws IOException {
-    return true;
-  }
 
   /** Called when this task's output is no longer needed.
    * This method is run in the parent process after the child exits.  It should
@@ -193,10 +179,6 @@ abstract class TaskRunner extends Thread {
       // of files should happen in the TaskTracker's process space. Any changes to
       // the conf object after this will NOT be reflected to the child.
       setupChildTaskConfiguration(lDirAlloc);
-
-      if (!prepare()) {
-        return;
-      }
 
       // Build classpath
       List<String> classPaths =

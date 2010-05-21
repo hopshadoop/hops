@@ -31,23 +31,8 @@ class ReduceTaskRunner extends TaskRunner {
     super(task, tracker, conf);
   }
 
-  /** Assemble all of the map output files */
-  public boolean prepare() throws IOException {
-    if (!super.prepare()) {
-      return false;
-    }
-    
-    // cleanup from failures
-    mapOutputFile.removeAll();
-    return true;
-  }
-  
-  
-  /** Delete all of the temporary map output files. */
   public void close() throws IOException {
-    LOG.info(getTask()+" done; removing files.");
     getTask().getProgress().setStatus("closed");
-    mapOutputFile.removeAll();
   }
 
   @Override

@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.mapred;
 
-import java.io.*;
-
 import org.apache.hadoop.mapred.TaskTracker.TaskInProgress;
 import org.apache.log4j.Level;
 
@@ -29,22 +27,6 @@ class MapTaskRunner extends TaskRunner {
     super(task, tracker, conf);
   }
   
-  /** Delete any temporary files from previous failed attempts. */
-  public boolean prepare() throws IOException {
-    if (!super.prepare()) {
-      return false;
-    }
-    
-    mapOutputFile.removeAll();
-    return true;
-  }
-
-  /** Delete all of the temporary map output files. */
-  public void close() throws IOException {
-    LOG.info(getTask()+" done; removing files.");
-    mapOutputFile.removeAll();
-  }
-
   @Override
   public String getChildJavaOpts(JobConf jobConf, String defaultValue) {
     return jobConf.get(JobConf.MAPRED_MAP_TASK_JAVA_OPTS, 

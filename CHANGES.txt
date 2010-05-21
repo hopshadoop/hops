@@ -41,6 +41,9 @@ Trunk (unreleased changes)
     JobTracker and use that in the RefreshUserToGroupsMapping protocol and
     RefreshAuthorizationPolicyProtocol. (Boris Shkolnik via ddas)
 
+    MAPREDUCE-1662. Remove unused methods from TaskRunner. (Amareshwari
+    Sriramadasu via cdouglas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
