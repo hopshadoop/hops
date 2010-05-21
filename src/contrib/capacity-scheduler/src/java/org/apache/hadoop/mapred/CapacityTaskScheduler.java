@@ -238,6 +238,25 @@ class CapacityTaskScheduler extends TaskScheduler {
     TaskSchedulingMgr(CapacityTaskScheduler sched) {
       scheduler = sched;
     }
+  
+    /**
+     * Ceil of result of dividing two integers.
+     * 
+     * This is *not* a utility method. 
+     * Neither <code>a</code> or <code>b</code> should be negative.
+     *  
+     * @param a
+     * @param b
+     * @return ceil of the result of a/b
+     */
+    private int divideAndCeil(int a, int b) {
+      if (b != 0) {
+        return (a + (b - 1)) / b;
+      }
+      
+      LOG.info("divideAndCeil called with a=" + a + " b=" + b);
+      return 0;
+    }
 
     private boolean isUserOverLimit(JobInProgress j,
                                     QueueSchedulingContext qsc) {
@@ -255,13 +274,14 @@ class CapacityTaskScheduler extends TaskScheduler {
           tsi.getNumSlotsOccupied() +
             TaskDataView.getTaskDataView(type).getSlotsPerTask(j);
       }
-      int limit = Math.max((int)(Math.ceil((double)currentCapacity/
-          (double) qsc.getNumJobsByUser().size())),
-          (int)(Math.ceil((double)(qsc.getUlMin() *currentCapacity)/100.0)));
+      int limit = Math.max(divideAndCeil(currentCapacity, qsc.getNumJobsByUser().size()),
+			   divideAndCeil(qsc.getUlMin() * currentCapacity, 100));
       String user = j.getProfile().getUser();
       if (tsi.getNumSlotsOccupiedByUser().get(user) >= limit) {
-        LOG.debug("User " + user + " is over limit, num slots occupied = " +
-            tsi.getNumSlotsOccupiedByUser().get(user) + ", limit = " + limit);
+	if (LOG.isDebugEnabled()) {
+          LOG.debug("User " + user + " is over limit, num slots occupied = " +
+              tsi.getNumSlotsOccupiedByUser().get(user) + ", limit = " + limit);
+	}
         return true;
       }
       else {
@@ -604,7 +624,7 @@ class CapacityTaskScheduler extends TaskScheduler {
     boolean hasSpeculativeTask(JobInProgress job, TaskTrackerStatus tts) {
       //Check if job supports speculative map execution first then
       //check if job has speculative maps.
-      return (job.getJobConf().getMapSpeculativeExecution())&& (
+      return (job.getMapSpeculativeExecution()) && (
           hasSpeculativeTask(job.getTasks(TaskType.MAP),
                              tts));
     }
@@ -651,7 +671,7 @@ class CapacityTaskScheduler extends TaskScheduler {
     boolean hasSpeculativeTask(JobInProgress job, TaskTrackerStatus tts) {
       //check if the job supports reduce speculative execution first then
       //check if the job has speculative tasks.
-      return (job.getJobConf().getReduceSpeculativeExecution()) && (
+      return (job.getReduceSpeculativeExecution()) && (
           hasSpeculativeTask(job.getTasks(TaskType.REDUCE),
                              tts));
     }

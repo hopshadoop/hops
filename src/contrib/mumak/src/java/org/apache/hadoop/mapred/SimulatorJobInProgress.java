@@ -53,7 +53,7 @@ public class SimulatorJobInProgress extends JobInProgress {
   @SuppressWarnings("deprecation")
   public SimulatorJobInProgress(JobID jobid, String jobSubmitDir, JobTracker jobtracker,
       JobConf default_conf, JobStory jobStory) {
-    super();
+    super(default_conf);
     // jobSetupCleanupNeeded set to false in parent cstr, though
     // default is true
 

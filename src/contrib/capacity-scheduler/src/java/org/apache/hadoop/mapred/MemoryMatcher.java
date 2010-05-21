@@ -98,11 +98,11 @@ class MemoryMatcher {
     long totalMemUsableOnTT = 0;
     long memForThisTask = 0;
     if (taskType == TaskType.MAP) {
-      memForThisTask = job.getJobConf().getMemoryForMapTask();
+      memForThisTask = job.getMemoryForMapTask();
       totalMemUsableOnTT =
           getMemSizeForMapSlot() * taskTracker.getMaxMapSlots();
     } else if (taskType == TaskType.REDUCE) {
-      memForThisTask = job.getJobConf().getMemoryForReduceTask();
+      memForThisTask = job.getMemoryForReduceTask();
       totalMemUsableOnTT =
           getMemSizeForReduceSlot()
               * taskTracker.getMaxReduceSlots();
