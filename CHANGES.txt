@@ -6,6 +6,9 @@ Trunk (unreleased changes)
 
   NEW FEATURES
 
+    MAPREDUCE-1804. Stress-test tool for HDFS introduced in HDFS-708.
+    (Joshua Harlow via shv)
+
   IMPROVEMENTS
 
     MAPREDUCE-1546. Redirect all job pages to corresponding history page
@@ -22,9 +25,6 @@ Trunk (unreleased changes)
 
     MAPREDUCE-1539. authorization checks for inter-server protocol
     (based on HADOOP-6600) (Boris Shkolnik via shv)
-
-    MAPREDUCE-1804. Stress-test tool for HDFS introduced in HDFS-708.
-    (Joshua Harlow via shv)
 
   OPTIMIZATIONS
 
