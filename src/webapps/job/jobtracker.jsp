@@ -22,6 +22,9 @@
   import="javax.servlet.*"
   import="javax.servlet.http.*"
   import="java.io.*"
+  import="java.lang.management.MemoryUsage"
+  import="java.lang.management.MemoryMXBean"
+  import="java.lang.management.ManagementFactory"
   import="java.util.*"
   import="java.text.DecimalFormat"
   import="org.apache.hadoop.http.HtmlQuoting"
@@ -34,6 +37,7 @@
 <%
   JobTracker tracker = (JobTracker) application.getAttribute("job.tracker");
   ClusterStatus status = tracker.getClusterStatus();
+  MemoryMXBean mem = ManagementFactory.getMemoryMXBean();
   ClusterMetrics metrics = tracker.getClusterMetrics();
   String trackerName = 
            StringUtils.simpleHostname(tracker.getJobTrackerMachine());
@@ -130,7 +134,12 @@
 <b>Identifier:</b> <%= tracker.getTrackerIdentifier()%><br>                 
                    
 <hr>
-<h2>Cluster Summary (Heap Size is <%= StringUtils.byteDesc(status.getUsedMemory()) %>/<%= StringUtils.byteDesc(status.getMaxMemory()) %>)</h2>
+<h2>Cluster Summary (Heap Size is
+    <% MemoryUsage heap = mem.getHeapMemoryUsage();
+       out.print(StringUtils.byteDesc(heap.getUsed()) + "/");
+       out.print(StringUtils.byteDesc(heap.getCommitted()) + "/");
+       out.print(StringUtils.byteDesc(heap.getMax()) + ")");
+    %>
 <% 
  generateSummaryTable(out, metrics, tracker); 
 %>
