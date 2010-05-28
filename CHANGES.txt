@@ -783,6 +783,9 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-1623. Apply audience and stability notations to Hadoop
     Map-Reduce. (tomwhite via acmurthy) 
 
+    MAPREDUCE-1751. Change MapReduce to depend on Hadoop 'common' artifacts
+    instead of 'core'. (tomwhite)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band

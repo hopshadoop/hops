@@ -414,7 +414,7 @@
   <target name="compile-contrib" depends="compile-core,tools">
      <subant target="compile">
         <property name="version" value="${version}"/>
-        <property name="hadoop-core.version" value="${hadoop-core.version}"/>
+        <property name="hadoop-common.version" value="${hadoop-common.version}"/>
         <fileset file="${contrib.dir}/build.xml"/>
      </subant>  	
   </target>
@@ -883,7 +883,7 @@
           </fileset>
           <path refid="javadoc-classpath"/>
           <pathelement path="${java.class.path}"/>
-          <pathelement path="${lib.dir}/hadoop-core-test-${hadoop-core.version}.jar"/>
+          <pathelement path="${lib.dir}/hadoop-common-test-${hadoop-common.version}.jar"/>
           <pathelement location="${build.tools}"/>
         </classpath>
 
@@ -943,7 +943,7 @@
           </fileset>
           <path refid="javadoc-classpath"/>
           <pathelement path="${java.class.path}"/>
-          <pathelement path="${lib.dir}/hadoop-core-test-${hadoop-core.version}.jar"/>
+          <pathelement path="${lib.dir}/hadoop-common-test-${hadoop-common.version}.jar"/>
           <pathelement location="${build.tools}"/>
         </classpath>
 
@@ -956,14 +956,14 @@
        <group title="contrib: Index" packages="org.apache.hadoop.contrib.index*"/>
        <group title="contrib: Streaming" packages="org.apache.hadoop.streaming*:org.apache.hadoop.typedbytes*"/>
        <doclet name="org.apache.hadoop.classification.tools.ExcludePrivateAnnotationsStandardDoclet"
-         path="${common.ivy.lib.dir}/hadoop-core-${version}.jar"/>
+         path="${common.ivy.lib.dir}/hadoop-common-${version}.jar"/>
     </javadoc>
   </target>	
 
   <target name="api-xml" depends="ivy-retrieve-jdiff,javadoc,write-null">
     <javadoc maxmemory="${javadoc.maxmemory}">
        <doclet name="org.apache.hadoop.classification.tools.ExcludePrivateAnnotationsJDiffDoclet"
-         path="${common.ivy.lib.dir}/hadoop-core-${version}.jar:${jdiff.jar}:${xerces.jar}">
+         path="${common.ivy.lib.dir}/hadoop-common-${version}.jar:${jdiff.jar}:${xerces.jar}">
          <param name="-apidir" value="${jdiff.xml.dir}"/>
          <param name="-apiname" value="hadoop-mapred ${version}"/>
          <param name="${jdiff.stability}"/>
@@ -991,7 +991,7 @@
 	     sourceFiles="${jdiff.home}/Null.java"
 	     maxmemory="${javadoc.maxmemory}">
        <doclet name="org.apache.hadoop.classification.tools.ExcludePrivateAnnotationsJDiffDoclet"
-         path="${common.ivy.lib.dir}/hadoop-core-${version}.jar:${jdiff.jar}:${xerces.jar}">
+         path="${common.ivy.lib.dir}/hadoop-common-${version}.jar:${jdiff.jar}:${xerces.jar}">
          <param name="-oldapi" value="hadoop-mapred ${jdiff.stable}"/>
          <param name="-newapi" value="hadoop-mapred ${version}"/>
          <param name="-oldapidir" value="${jdiff.xml.dir}"/>
@@ -1219,8 +1219,8 @@
   </target>   
 
   <target name="clean-cache" description="Clean. Delete ivy cache">
-    <delete dir="${user.home}/.ivy2/cache/org.apache.hadoop/hadoop-core"/>
-    <delete dir="${user.home}/.ivy2/cache/org.apache.hadoop/hadoop-core-test"/>
+    <delete dir="${user.home}/.ivy2/cache/org.apache.hadoop/hadoop-common"/>
+    <delete dir="${user.home}/.ivy2/cache/org.apache.hadoop/hadoop-common-test"/>
     <delete dir="${user.home}/.ivy2/cache/org.apache.hadoop/hadoop-hdfs"/>
     <delete dir="${user.home}/.ivy2/cache/org.apache.hadoop/hadoop-hdfs-test"/>
   </target>

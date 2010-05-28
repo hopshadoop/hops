@@ -27,7 +27,7 @@
   <dependencies>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-core</artifactId>
+      <artifactId>hadoop-common</artifactId>
       <version>0.22.0-dev-SNAPSHOT</version>
     </dependency>
   </dependencies>

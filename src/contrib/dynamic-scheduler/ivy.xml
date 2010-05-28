@@ -37,7 +37,7 @@
   </publications>
 
   <dependencies>
-    <dependency org="org.apache.hadoop" name="hadoop-core" rev="${hadoop-core.version}" conf="common->default"/>
+    <dependency org="org.apache.hadoop" name="hadoop-common" rev="${hadoop-common.version}" conf="common->default"/>
     <dependency org="org.mortbay.jetty" name="jetty" rev="${jetty.version}" conf="common->master"/>
     <dependency org="org.mortbay.jetty" name="jetty-util" rev="${jetty-util.version}" conf="common->master"/>
     <dependency org="tomcat" name="jasper-runtime" rev="${jasper.version}" conf="common->master"/>
