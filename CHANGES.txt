@@ -1620,3 +1620,6 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1276. Correct flaws in the shuffle related to connection setup
     and failure attribution. (Amareshwari Sriramadasu via cdouglas)
+
+    MAPREDUCE-1372. ConcurrentModificationException in JobInProgress.
+    (Dick King and Amareshwari Sriramadasu via tomwhite)
