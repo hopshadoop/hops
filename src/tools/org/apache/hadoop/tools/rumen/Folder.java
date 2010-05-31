@@ -193,7 +193,7 @@ public class Folder extends Configured implements Tool {
           tempDirName == null ? outPath.getParent() : new Path(tempDirName);
 
       FileSystem fs = tempDir.getFileSystem(getConf());
-      if (!fs.getFileStatus(tempDir).isDir()) {
+      if (!fs.getFileStatus(tempDir).isDirectory()) {
         throw new IOException("Your temp directory is not a directory");
       }
 

@@ -493,7 +493,7 @@ abstract class TaskRunner extends Thread {
       tmpDir = new Path(workDir.toString(), tmp);
 
       FileSystem localFs = FileSystem.getLocal(conf);
-      if (!localFs.mkdirs(tmpDir) && !localFs.getFileStatus(tmpDir).isDir()) {
+      if (!localFs.mkdirs(tmpDir) && localFs.getFileStatus(tmpDir).isFile()) {
         throw new IOException("Mkdirs failed to create " + tmpDir.toString());
       }
     }

@@ -786,6 +786,9 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-1751. Change MapReduce to depend on Hadoop 'common' artifacts
     instead of 'core'. (tomwhite)
 
+    MAPREDUCE-1535.  Replace usage of FileStatus#isDir().  (Eli Collins via
+    tomwhite)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band

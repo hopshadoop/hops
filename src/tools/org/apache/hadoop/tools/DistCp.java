@@ -492,15 +492,15 @@ public class DistCp implements Tool {
         // destination file rather than destination directory
         Path dstparent = absdst.getParent();
         if (!(destFileSys.exists(dstparent) &&
-              destFileSys.getFileStatus(dstparent).isDir())) {
+              destFileSys.getFileStatus(dstparent).isDirectory())) {
           absdst = dstparent;
         }
       }
       
       // if a directory, ensure created even if empty
-      if (srcstat.isDir()) {
+      if (srcstat.isDirectory()) {
         if (destFileSys.exists(absdst)) {
-          if (!destFileSys.getFileStatus(absdst).isDir()) {
+          if (destFileSys.getFileStatus(absdst).isFile()) {
             throw new IOException("Failed to mkdirs: " + absdst+" is a file.");
           }
         }
@@ -531,7 +531,7 @@ public class DistCp implements Tool {
       }
       else {
         if (destFileSys.exists(absdst) &&
-            destFileSys.getFileStatus(absdst).isDir()) {
+            destFileSys.getFileStatus(absdst).isDirectory()) {
           throw new IOException(absdst + " is a directory");
         }
         if (!destFileSys.mkdirs(absdst.getParent())) {
@@ -1178,7 +1178,7 @@ public class DistCp implements Tool {
     }catch (FileNotFoundException e) {
       return false;
     }
-    if (!status.isDir()) {
+    if (status.isFile()) {
       throw new FileAlreadyExistsException("Not a dir: " + dst+" is a file.");
     }
     return true;
@@ -1236,7 +1236,7 @@ public class DistCp implements Tool {
     boolean dstExists = dstfs.exists(args.dst);
     boolean dstIsDir = false;
     if (dstExists) {
-      dstIsDir = dstfs.getFileStatus(args.dst).isDir();
+      dstIsDir = dstfs.getFileStatus(args.dst).isDirectory();
     }
 
     // default logPath
@@ -1305,9 +1305,9 @@ public class DistCp implements Tool {
         final Path src = srcItr.next();
         FileSystem srcfs = src.getFileSystem(conf);
         FileStatus srcfilestat = srcfs.getFileStatus(src);
-        Path root = special && srcfilestat.isDir()? src: src.getParent();
+        Path root = special && srcfilestat.isDirectory()? src: src.getParent();
         if (dstExists && !dstIsDir &&
-            (args.srcs.size() > 1 || srcfilestat.isDir())) {
+            (args.srcs.size() > 1 || srcfilestat.isDirectory())) {
           // destination should not be a file
           throw new IOException("Destination " + args.dst + " should be a dir" +
                                 " if multiple source paths are there OR if" +
@@ -1339,7 +1339,7 @@ public class DistCp implements Tool {
           }
         }
         
-        if (srcfilestat.isDir()) {
+        if (srcfilestat.isDirectory()) {
           ++srcCount;
           final String dst = makeRelative(root,src);
           if (!update || !dirExists(conf, new Path(args.dst, dst))) {
@@ -1360,7 +1360,7 @@ public class DistCp implements Tool {
             final String dst = makeRelative(root, child.getPath());
             ++srcCount;
 
-            if (child.isDir()) {
+            if (child.isDirectory()) {
               pathstack.push(child);
               if (!update || !dirExists(conf, new Path(args.dst, dst))) {
                 ++dirCount;
@@ -1371,13 +1371,13 @@ public class DistCp implements Tool {
             }
             else {
               Path destPath = new Path(args.dst, dst);
-              if (!cur.isDir() && (args.srcs.size() == 1)) {
+              if (cur.isFile() && (args.srcs.size() == 1)) {
                 // Copying a single file; use dst path provided by user as
                 // destination file rather than destination directory
                 Path dstparent = destPath.getParent();
                 FileSystem destFileSys = destPath.getFileSystem(jobConf);
                 if (!(destFileSys.exists(dstparent) &&
-                    destFileSys.getFileStatus(dstparent).isDir())) {
+                    destFileSys.getFileStatus(dstparent).isDirectory())) {
                   destPath = dstparent;
                 }
               }
@@ -1415,7 +1415,7 @@ public class DistCp implements Tool {
             }
 
             if (!skipPath) {
-              src_writer.append(new LongWritable(child.isDir()? 0: child.getLen()),
+              src_writer.append(new LongWritable(child.isDirectory()? 0: child.getLen()),
                   new FilePair(child, dst));
             }
 
@@ -1423,7 +1423,7 @@ public class DistCp implements Tool {
                 new Text(child.getPath().toString()));
           }
 
-          if (cur.isDir()) {
+          if (cur.isDirectory()) {
             String dst = makeRelative(root, cur.getPath());
             dir_writer.append(new Text(dst), new FilePair(cur, dst));
             if (++dirsyn > SYNC_FILE_MAX) {
@@ -1564,7 +1564,7 @@ public class DistCp implements Tool {
       FileSystem dstfs, FileStatus dstroot, Path dstsorted,
       FileSystem jobfs, Path jobdir, JobConf jobconf, Configuration conf
       ) throws IOException {
-    if (!dstroot.isDir()) {
+    if (dstroot.isFile()) {
       throw new IOException("dst must be a directory when option "
           + Options.DELETE.cmd + " is set, but dst (= " + dstroot.getPath()
           + ") is not a directory.");
@@ -1580,7 +1580,7 @@ public class DistCp implements Tool {
       final Stack<FileStatus> lsrstack = new Stack<FileStatus>();
       for(lsrstack.push(dstroot); !lsrstack.isEmpty(); ) {
         final FileStatus status = lsrstack.pop();
-        if (status.isDir()) {
+        if (status.isDirectory()) {
           for(FileStatus child : dstfs.listStatus(status.getPath())) {
             String relative = makeRelative(dstroot.getPath(), child.getPath());
             writer.append(new Text(relative), NullWritable.get());

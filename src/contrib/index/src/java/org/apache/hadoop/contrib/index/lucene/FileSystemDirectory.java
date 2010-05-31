@@ -66,7 +66,7 @@ public class FileSystemDirectory extends Directory {
     try {
       FileStatus status = fs.getFileStatus(directory);
       if (status != null) {
-        isDir = status.isDir();
+        isDir = status.isDirectory();
       }
     } catch (IOException e) {
       // file does not exist, isDir already set to false
@@ -85,7 +85,7 @@ public class FileSystemDirectory extends Directory {
     try {
       FileStatus status = fs.getFileStatus(directory);
       if (status != null) {
-        isDir = status.isDir();
+        isDir = status.isDirectory();
       }
     } catch (IOException e) {
       // file does not exist, isDir already set to false

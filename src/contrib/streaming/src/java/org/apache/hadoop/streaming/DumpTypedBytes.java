@@ -74,7 +74,7 @@ public class DumpTypedBytes implements Tool {
     for (Path p : FileUtil.stat2Paths(fs.globStatus(pattern), pattern)) {
       List<FileStatus> inputFiles = new ArrayList<FileStatus>();
       FileStatus status = fs.getFileStatus(p);
-      if (status.isDir()) {
+      if (status.isDirectory()) {
         FileStatus[] files = fs.listStatus(p);
         Collections.addAll(inputFiles, files);
       } else {

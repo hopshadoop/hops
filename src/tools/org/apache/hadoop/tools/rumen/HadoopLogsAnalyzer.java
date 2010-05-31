@@ -304,7 +304,7 @@ public class HadoopLogsAnalyzer extends Configured implements Tool {
 
   private boolean pathIsDirectory(Path p) throws IOException {
     FileSystem fs = p.getFileSystem(getConf());
-    return fs.getFileStatus(p).isDir();
+    return fs.getFileStatus(p).isDirectory();
   }
 
   /**

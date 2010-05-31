@@ -60,7 +60,7 @@ public class SequenceFileInputFormat<K, V> extends FileInputFormat<K, V> {
     int len = files.size();
     for(int i=0; i < len; ++i) {
       FileStatus file = files.get(i);
-      if (file.isDir()) {     // it's a MapFile
+      if (file.isDirectory()) {     // it's a MapFile
         Path p = file.getPath();
         FileSystem fs = p.getFileSystem(job.getConfiguration());
         // use the data file

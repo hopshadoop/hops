@@ -111,7 +111,7 @@ public class UpdateIndex {
       String[] shardNames = new String[fileStatus.length];
       int count = 0;
       for (int i = 0; i < fileStatus.length; i++) {
-        if (fileStatus[i].isDir()) {
+        if (fileStatus[i].isDirectory()) {
           shardNames[count] = fileStatus[i].getPath().getName();
           count++;
         }

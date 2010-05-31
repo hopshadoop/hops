@@ -90,7 +90,7 @@ public class NLineInputFormat extends FileInputFormat<LongWritable, Text> {
       Configuration conf, int numLinesPerSplit) throws IOException {
     List<FileSplit> splits = new ArrayList<FileSplit> ();
     Path fileName = status.getPath();
-    if (status.isDir()) {
+    if (status.isDirectory()) {
       throw new IOException("Not a file: " + fileName);
     }
     FileSystem  fs = fileName.getFileSystem(conf);

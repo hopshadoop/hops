@@ -164,7 +164,7 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
       FileSystem fs, Path path, PathFilter inputFilter) 
       throws IOException {
     for(FileStatus stat: fs.listStatus(path, inputFilter)) {
-      if (stat.isDir()) {
+      if (stat.isDirectory()) {
         addInputPathRecursively(result, fs, stat.getPath(), inputFilter);
       } else {
         result.add(stat);
@@ -214,10 +214,10 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
         errors.add(new IOException("Input Pattern " + p + " matches 0 files"));
       } else {
         for (FileStatus globStat: matches) {
-          if (globStat.isDir()) {
+          if (globStat.isDirectory()) {
             for(FileStatus stat: fs.listStatus(globStat.getPath(),
                 inputFilter)) {
-              if (recursive && stat.isDir()) {
+              if (recursive && stat.isDirectory()) {
                 addInputPathRecursively(result, fs, stat.getPath(), inputFilter);
               } else {
                 result.add(stat);
@@ -257,7 +257,7 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
     job.setLong(NUM_INPUT_FILES, files.length);
     long totalSize = 0;                           // compute total size
     for (FileStatus file: files) {                // check we have valid files
-      if (file.isDir()) {
+      if (file.isDirectory()) {
         throw new IOException("Not a file: "+ file.getPath());
       }
       totalSize += file.getLen();

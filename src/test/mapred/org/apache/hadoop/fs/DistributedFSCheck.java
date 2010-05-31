@@ -123,7 +123,7 @@ public class DistributedFSCheck extends TestCase {
                            SequenceFile.Writer writer
                            ) throws IOException {
     Path rootFile = rootStatus.getPath();
-    if (!rootStatus.isDir()) {
+    if (rootStatus.isFile()) {
       nrFiles++;
       // For a regular file generate <fName,offset> pairs
       long blockSize = fs.getDefaultBlockSize();

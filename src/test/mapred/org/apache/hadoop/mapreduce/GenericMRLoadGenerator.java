@@ -166,7 +166,7 @@ public class GenericMRLoadGenerator extends Configured implements Tool {
           pathstack.push(p);
           while (!pathstack.empty()) {
             for (FileStatus stat : fs.listStatus(pathstack.pop())) {
-              if (stat.isDir()) {
+              if (stat.isDirectory()) {
                 if (!stat.getPath().getName().startsWith("_")) {
                   pathstack.push(stat.getPath());
                 }

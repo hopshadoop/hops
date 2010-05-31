@@ -175,7 +175,7 @@ public class DistCh extends DistTool {
       }
       if (permission != null) {
         FsPermission orig = original.getPermission();
-        return original.isDir()? !permission.equals(orig):
+        return original.isDirectory()? !permission.equals(orig):
           !permission.applyUMask(FILE_UMASK).equals(orig);
       }
       return false;
@@ -460,7 +460,7 @@ public class DistCh extends DistTool {
           FileOperation.class, SequenceFile.CompressionType.NONE);
       for(FileOperation op : ops) {
         FileStatus srcstat = fs.getFileStatus(op.src); 
-        if (srcstat.isDir() && op.isDifferent(srcstat)) {
+        if (srcstat.isDirectory() && op.isDifferent(srcstat)) {
           ++opCount;
           opWriter.append(new Text(op.src.toString()), op);
         }
@@ -468,7 +468,7 @@ public class DistCh extends DistTool {
         Stack<Path> pathstack = new Stack<Path>();
         for(pathstack.push(op.src); !pathstack.empty(); ) {
           for(FileStatus stat : fs.listStatus(pathstack.pop())) {
-            if (stat.isDir()) {
+            if (stat.isDirectory()) {
               pathstack.push(stat.getPath());
             }
 

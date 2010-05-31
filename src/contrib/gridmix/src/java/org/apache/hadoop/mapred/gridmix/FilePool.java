@@ -271,7 +271,7 @@ class FilePool {
       final ArrayList<FileStatus> curFiles = new ArrayList<FileStatus>();
       final ArrayList<FileStatus> curDirs = new ArrayList<FileStatus>();
       for (FileStatus stat : fs.listStatus(thisDir.getPath())) {
-        if (stat.isDir()) {
+        if (stat.isDirectory()) {
           curDirs.add(stat);
         } else if (filter.accept(stat)) {
           curFiles.add(stat);

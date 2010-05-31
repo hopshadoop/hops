@@ -98,13 +98,13 @@ public class TraceBuilder extends Configured implements Tool {
         Path thisPath = new Path(args[i]);
 
         FileSystem fs = thisPath.getFileSystem(conf);
-        if (fs.getFileStatus(thisPath).isDir()) {
+        if (fs.getFileStatus(thisPath).isDirectory()) {
           FileStatus[] statuses = fs.listStatus(thisPath);
 
           List<String> dirNames = new ArrayList<String>();
 
           for (FileStatus s : statuses) {
-            if (s.isDir()) continue;
+            if (s.isDirectory()) continue;
             String name = s.getPath().getName();
 
             if (!(name.endsWith(".crc") || name.startsWith("."))) {

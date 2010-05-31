@@ -142,7 +142,7 @@ public class HadoopArchives implements Tool {
    */
   private void recursivels(FileSystem fs, FileStatusDir fdir, List<FileStatusDir> out) 
   throws IOException {
-    if (!fdir.getFileStatus().isDir()) {
+    if (fdir.getFileStatus().isFile()) {
       out.add(fdir);
       return;
     }
@@ -509,10 +509,10 @@ public class HadoopArchives implements Tool {
         recursivels(fs, fdir, allFiles);
         for (FileStatusDir statDir: allFiles) {
           FileStatus stat = statDir.getFileStatus();
-          long len = stat.isDir()? 0:stat.getLen();
+          long len = stat.isDirectory()? 0:stat.getLen();
           final Path path = relPathToRoot(stat.getPath(), parentPath);
           final String[] children;
-          if (stat.isDir()) {
+          if (stat.isDirectory()) {
             //get the children 
             FileStatus[] list = statDir.getChildren();
             children = new String[list.length];

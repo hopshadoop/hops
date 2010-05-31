@@ -229,7 +229,7 @@ public abstract class FileInputFormat<K, V> extends InputFormat<K, V> {
         errors.add(new IOException("Input Pattern " + p + " matches 0 files"));
       } else {
         for (FileStatus globStat: matches) {
-          if (globStat.isDir()) {
+          if (globStat.isDirectory()) {
             for(FileStatus stat: fs.listStatus(globStat.getPath(),
                 inputFilter)) {
               result.add(stat);

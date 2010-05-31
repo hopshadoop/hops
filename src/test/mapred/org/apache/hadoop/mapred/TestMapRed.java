@@ -690,7 +690,7 @@ public class TestMapRed extends Configured implements Tool {
     FileSystem fs = dir.getFileSystem(conf);
     for(FileStatus f: fs.listStatus(dir)) {
       System.out.println("Reading " + f.getPath() + ": ");
-      if (f.isDir()) {
+      if (f.isDirectory()) {
         System.out.println("  it is a map file.");
         printSequenceFile(fs, new Path(f.getPath(), "data"), conf);
       } else if (isSequenceFile(fs, f.getPath())) {

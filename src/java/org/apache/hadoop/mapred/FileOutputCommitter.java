@@ -163,7 +163,7 @@ public class FileOutputCommitter extends OutputCommitter {
         }
       }
       LOG.debug("Moved " + taskOutput + " to " + finalOutputPath);
-    } else if(fs.getFileStatus(taskOutput).isDir()) {
+    } else if(fs.getFileStatus(taskOutput).isDirectory()) {
       FileStatus[] paths = fs.listStatus(taskOutput);
       Path finalOutputPath = getFinalPath(jobOutputDir, taskOutput, 
 	          getTempTaskOutputPath(context));

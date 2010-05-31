@@ -607,7 +607,7 @@ public class RaidNode implements RaidProtocol {
     // src file and the src file has not been modified
     // recently, then that file is a candidate for RAID.
 
-    if (!src.isDir()) {      // a file
+    if (src.isFile()) {
 
       // if the source file has fewer than or equal to 2 blocks, then no need to RAID
       long blockSize = src.getBlockSize();
@@ -1245,7 +1245,7 @@ public class RaidNode implements RaidProtocol {
         return;
       }
       
-      if (dest.isDir()) {
+      if (dest.isDirectory()) {
         FileStatus[] files = null;
         files = destFs.listStatus(destPath);
         if (files != null) {
@@ -1361,7 +1361,7 @@ public class RaidNode implements RaidProtocol {
   private void recurseHar(FileSystem destFs, FileStatus dest, long cutoff, String tmpHarPath)
     throws IOException {
 
-    if (!dest.isDir()) {
+    if (dest.isFile()) {
       return;
     }
     
@@ -1378,7 +1378,7 @@ public class RaidNode implements RaidProtocol {
     if (files != null) {
       shouldHar = files.length > 0;
       for (FileStatus one: files) {
-        if (one.isDir()){
+        if (one.isDirectory()){
           recurseHar(destFs, one, cutoff, tmpHarPath);
           shouldHar = false;
         } else if (one.getModificationTime() > cutoff ) {

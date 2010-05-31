@@ -89,7 +89,7 @@ public class TestDistCh extends junit.framework.TestCase {
 
     Path mkdir(Path dir) throws IOException {
       assertTrue(fs.mkdirs(dir));
-      assertTrue(fs.getFileStatus(dir).isDir());
+      assertTrue(fs.getFileStatus(dir).isDirectory());
       return dir;
     }
     
@@ -191,7 +191,7 @@ public class TestDistCh extends junit.framework.TestCase {
     assertEquals(expected.getUserName(), actual.getOwner());
     assertEquals(expected.getGroupName(), actual.getGroup());
     FsPermission perm = expected.getPermission(); 
-    if (!actual.isDir()) {
+    if (actual.isFile()) {
       perm = perm.applyUMask(UMASK);
     }
     assertEquals(perm, actual.getPermission());
