@@ -29,6 +29,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1798. Names the configuration keys for the Kerberos
     principals better. (Boris Shkolnik via ddas)
 
+    MAPREDUCE-1773. streaming doesn't support jobclient.output.filter.
+    (Amareshwari Sriramadasu via vinodkv)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and

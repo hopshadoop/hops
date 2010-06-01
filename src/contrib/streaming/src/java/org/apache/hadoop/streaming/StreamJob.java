@@ -925,40 +925,16 @@ public class StreamJob implements Tool {
 
     // if jobConf_ changes must recreate a JobClient
     jc_ = new JobClient(jobConf_);
-    boolean error = true;
     running_ = null;
-    String lastReport = null;
     try {
       running_ = jc_.submitJob(jobConf_);
       jobId_ = running_.getID();
-
-      LOG.info("getLocalDirs(): " + Arrays.asList(jobConf_.getLocalDirs()));
-      LOG.info("Running job: " + jobId_);
       jobInfo();
-
-      while (!running_.isComplete()) {
-        try {
-          Thread.sleep(1000);
-        } catch (InterruptedException e) {
-        }
-        running_ = jc_.getJob(jobId_);
-        String report = null;
-        report = " map " + Math.round(running_.mapProgress() * 100) + "%  reduce "
-          + Math.round(running_.reduceProgress() * 100) + "%";
-
-        if (!report.equals(lastReport)) {
-          LOG.info(report);
-          lastReport = report;
-        }
+      if (!jc_.monitorAndPrintJob(jobConf_, running_)) {
+        LOG.error("Job not Successful!");
+        return 1;
       }
-      if (!running_.isSuccessful()) {
-        jobInfo();
-	LOG.error("Job not Successful!");
-	return 1;
-      }
-      LOG.info("Job complete: " + jobId_);
-      LOG.info("Output: " + output_);
-      error = false;
+      LOG.info("Output directory: " + output_);
     } catch(FileNotFoundException fe) {
       LOG.error("Error launching job , bad input path : " + fe.getMessage());
       return 2;
@@ -972,11 +948,10 @@ public class StreamJob implements Tool {
     } catch(IOException ioe) {
       LOG.error("Error Launching job : " + ioe.getMessage());
       return 5;
+    } catch (InterruptedException ie) {
+      LOG.error("Error monitoring job : " + ie.getMessage());
+      return 6;
     } finally {
-      if (error && (running_ != null)) {
-        LOG.info("killJob...");
-        running_.killJob();
-      }
       jc_.close();
     }
     return 0;
