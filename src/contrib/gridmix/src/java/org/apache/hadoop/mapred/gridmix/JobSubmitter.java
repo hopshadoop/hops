@@ -99,7 +99,7 @@ class JobSubmitter implements Gridmix.Component<GridmixJob> {
           // submit job
           monitor.add(job.call());
           LOG.debug("SUBMIT " + job + "@" + System.currentTimeMillis() +
-              " (" + job.getJob().getID() + ")");
+              " (" + job.getJob().getJobID() + ")");
         } catch (IOException e) {
           LOG.warn("Failed to submit " + job.getJob().getJobName(), e);
           if (e.getCause() instanceof ClosedByInterruptException) {

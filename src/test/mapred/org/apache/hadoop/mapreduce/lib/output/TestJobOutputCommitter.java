@@ -149,13 +149,13 @@ public class TestJobOutputCommitter extends HadoopTestCase {
     assertTrue("Job failed!", job.waitForCompletion(true));
 
     Path testFile = new Path(outDir, filename);
-    assertTrue("Done file missing for job " + job.getID(), fs.exists(testFile));
+    assertTrue("Done file missing for job " + job.getJobID(), fs.exists(testFile));
 
     // check if the files from the missing set exists
     for (String ex : exclude) {
       Path file = new Path(outDir, ex);
       assertFalse("File " + file + " should not be present for successful job "
-          + job.getID(), fs.exists(file));
+          + job.getJobID(), fs.exists(file));
     }
   }
 
@@ -170,7 +170,7 @@ public class TestJobOutputCommitter extends HadoopTestCase {
 
     if (fileName != null) {
       Path testFile = new Path(outDir, fileName);
-      assertTrue("File " + testFile + " missing for failed job " + job.getID(),
+      assertTrue("File " + testFile + " missing for failed job " + job.getJobID(),
           fs.exists(testFile));
     }
 
@@ -178,7 +178,7 @@ public class TestJobOutputCommitter extends HadoopTestCase {
     for (String ex : exclude) {
       Path file = new Path(outDir, ex);
       assertFalse("File " + file + " should not be present for failed job "
-          + job.getID(), fs.exists(file));
+          + job.getJobID(), fs.exists(file));
     }
   }
 
@@ -202,7 +202,7 @@ public class TestJobOutputCommitter extends HadoopTestCase {
 
     if (fileName != null) {
       Path testFile = new Path(outDir, fileName);
-      assertTrue("File " + testFile + " missing for job " + job.getID(), fs
+      assertTrue("File " + testFile + " missing for job " + job.getJobID(), fs
           .exists(testFile));
     }
 
@@ -210,7 +210,7 @@ public class TestJobOutputCommitter extends HadoopTestCase {
     for (String ex : exclude) {
       Path file = new Path(outDir, ex);
       assertFalse("File " + file + " should not be present for killed job "
-          + job.getID(), fs.exists(file));
+          + job.getJobID(), fs.exists(file));
     }
   }
 

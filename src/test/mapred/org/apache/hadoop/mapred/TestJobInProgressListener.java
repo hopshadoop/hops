@@ -387,7 +387,7 @@ public class TestJobInProgressListener extends TestCase {
     j.submit();
     j.waitForCompletion(true);
     
-    JobID id = (org.apache.hadoop.mapred.JobID)j.getID();
+    JobID id = JobID.downgrade(j.getJobID());
     
     // check if the job is in the waiting queue
     assertFalse("Missing event notification on no-set-cleanup no task job", 

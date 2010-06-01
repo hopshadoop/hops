@@ -404,9 +404,9 @@ public class TestTaskTrackerMemoryManager {
     while (true) {
       List<TaskReport> allTaskReports = new ArrayList<TaskReport>();
       allTaskReports.addAll(Arrays.asList(jClient
-          .getSetupTaskReports((org.apache.hadoop.mapred.JobID) job.getID())));
+          .getSetupTaskReports(JobID.downgrade(job.getJobID()))));
       allTaskReports.addAll(Arrays.asList(jClient
-          .getMapTaskReports((org.apache.hadoop.mapred.JobID) job.getID())));
+          .getMapTaskReports(JobID.downgrade(job.getJobID()))));
       for (TaskReport tr : allTaskReports) {
         String[] diag = tr.getDiagnostics();
         for (String str : diag) {
@@ -575,9 +575,9 @@ public class TestTaskTrackerMemoryManager {
     while (true) {
       List<TaskReport> allTaskReports = new ArrayList<TaskReport>();
       allTaskReports.addAll(Arrays.asList(jClient
-          .getSetupTaskReports((org.apache.hadoop.mapred.JobID) job.getID())));
+          .getSetupTaskReports(JobID.downgrade(job.getJobID()))));
       allTaskReports.addAll(Arrays.asList(jClient
-          .getMapTaskReports((org.apache.hadoop.mapred.JobID) job.getID())));
+          .getMapTaskReports(JobID.downgrade(job.getJobID()))));
       for (TaskReport tr : allTaskReports) {
         String[] diag = tr.getDiagnostics();
         for (String str : diag) {

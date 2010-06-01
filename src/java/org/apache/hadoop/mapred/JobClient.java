@@ -39,7 +39,6 @@ import org.apache.hadoop.mapreduce.filecache.DistributedCache;
 import org.apache.hadoop.mapreduce.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.mapreduce.tools.CLI;
 import org.apache.hadoop.mapreduce.util.ConfigUtil;
-import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
@@ -175,7 +174,7 @@ public class JobClient extends CLI {
      * An identifier for the job
      */
     public JobID getID() {
-      return JobID.downgrade(job.getID());
+      return JobID.downgrade(job.getJobID());
     }
     
     /** @deprecated This method is deprecated and will be removed. Applications should 

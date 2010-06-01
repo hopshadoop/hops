@@ -92,14 +92,14 @@ class JobMonitor implements Gridmix.Component<Job> {
    * Temporary hook for recording job success.
    */
   protected void onSuccess(Job job) {
-    LOG.info(job.getJobName() + " (" + job.getID() + ")" + " success");
+    LOG.info(job.getJobName() + " (" + job.getJobID() + ")" + " success");
   }
 
   /**
    * Temporary hook for recording job failure.
    */
   protected void onFailure(Job job) {
-    LOG.info(job.getJobName() + " (" + job.getID() + ")" + " failure");
+    LOG.info(job.getJobName() + " (" + job.getJobID() + ")" + " failure");
   }
 
   /**

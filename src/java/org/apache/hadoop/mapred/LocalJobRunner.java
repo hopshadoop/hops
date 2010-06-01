@@ -594,8 +594,8 @@ public class LocalJobRunner implements ClientProtocol {
   }
 
   public void killJob(org.apache.hadoop.mapreduce.JobID id) {
-    jobs.get(id).killed = true;
-    jobs.get(id).interrupt();
+    jobs.get(JobID.downgrade(id)).killed = true;
+    jobs.get(JobID.downgrade(id)).interrupt();
   }
 
   public void setJobPriority(org.apache.hadoop.mapreduce.JobID id,

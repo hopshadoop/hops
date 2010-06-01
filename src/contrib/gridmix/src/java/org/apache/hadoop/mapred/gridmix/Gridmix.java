@@ -296,7 +296,7 @@ public class Gridmix extends Configured implements Tool {
           try {
             if (!job.isComplete()) {
               job.killJob();
-              LOG.info("Killed " + job.getJobName() + " (" + job.getID() + ")");
+              LOG.info("Killed " + job.getJobName() + " (" + job.getJobID() + ")");
             } else {
               if (job.isSuccessful()) {
                 monitor.onSuccess(job);

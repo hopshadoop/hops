@@ -185,7 +185,7 @@ public class TestWebUIAuthorization extends ClusterMapReduceTestCase {
   private TaskID getTIPId(MiniMRCluster cluster,
       org.apache.hadoop.mapreduce.JobID jobid) throws Exception {
     JobClient client = new JobClient(cluster.createJobConf());
-    JobID jobId = (JobID) jobid;
+    JobID jobId = JobID.downgrade(jobid);
     TaskReport[] mapReports = null;
 
     TaskID tipId = null;
@@ -214,7 +214,7 @@ public class TestWebUIAuthorization extends ClusterMapReduceTestCase {
       JobConf conf, String jtURL, String jobTrackerJSP, String user)
       throws Exception {
     Job job = startSleepJobAsUser(jobSubmitter, conf);
-    org.apache.hadoop.mapreduce.JobID jobid = job.getID();
+    org.apache.hadoop.mapreduce.JobID jobid = job.getJobID();
     getTIPId(cluster, jobid);// wait till the map task is started
     // jobDetailsJSP killJob url
     String url = jtURL + "/jobdetails.jsp?" +
@@ -283,7 +283,7 @@ public class TestWebUIAuthorization extends ClusterMapReduceTestCase {
       }
     });
 
-    org.apache.hadoop.mapreduce.JobID jobid = job.getID();
+    org.apache.hadoop.mapreduce.JobID jobid = job.getJobID();
 
     String historyFileName = job.getStatus().getHistoryFile();
     String jtURL = "http://localhost:" + infoPort;
@@ -407,7 +407,7 @@ public class TestWebUIAuthorization extends ClusterMapReduceTestCase {
 
     String jobTrackerJSP =  jtURL + "/jobtracker.jsp?a=b";
     Job job = startSleepJobAsUser(jobSubmitter, conf);
-    org.apache.hadoop.mapreduce.JobID jobid = job.getID();
+    org.apache.hadoop.mapreduce.JobID jobid = job.getJobID();
     getTIPId(cluster, jobid);// wait till the map task is started
     // jobDetailsJSPKillJobAction url
     String url = jtURL + "/jobdetails.jsp?" +
@@ -453,7 +453,7 @@ public class TestWebUIAuthorization extends ClusterMapReduceTestCase {
       throws Exception {
     String jobTrackerJSP =  jtURL + "/jobtracker.jsp?a=b";
     Job job = startSleepJobAsUser(jobSubmitter, conf);
-    org.apache.hadoop.mapreduce.JobID jobid = job.getID();
+    org.apache.hadoop.mapreduce.JobID jobid = job.getJobID();
     getTIPId(cluster, jobid);// wait till the map task is started
     // jobTrackerJSP killJob url
     String url = jobTrackerJSP +
@@ -497,19 +497,19 @@ public class TestWebUIAuthorization extends ClusterMapReduceTestCase {
     // Out of these 4 users, only jobSubmitter can do killJob on 1st job
     conf.set(MRJobConfig.JOB_ACL_MODIFY_JOB, "");
     Job job1 = startSleepJobAsUser(jobSubmitter, conf);
-    org.apache.hadoop.mapreduce.JobID jobid = job1.getID();
+    org.apache.hadoop.mapreduce.JobID jobid = job1.getJobID();
     getTIPId(cluster, jobid);// wait till the map task is started
     url = url.concat("&jobCheckBox=" + jobid.toString());
     // start 2nd job.
     // Out of these 4 users, only viewColleague can do killJob on 2nd job
     Job job2 = startSleepJobAsUser(viewColleague, conf);
-    jobid = job2.getID();
+    jobid = job2.getJobID();
     getTIPId(cluster, jobid);// wait till the map task is started
     url = url.concat("&jobCheckBox=" + jobid.toString());
     // start 3rd job.
     // Out of these 4 users, only modifyColleague can do killJob on 3rd job
     Job job3 = startSleepJobAsUser(modifyColleague, conf);
-    jobid = job3.getID();
+    jobid = job3.getJobID();
     getTIPId(cluster, jobid);// wait till the map task is started
     url = url.concat("&jobCheckBox=" + jobid.toString());
     // start 4rd job.
@@ -517,7 +517,7 @@ public class TestWebUIAuthorization extends ClusterMapReduceTestCase {
     // can do killJob on 4th job
     conf.set(MRJobConfig.JOB_ACL_MODIFY_JOB, viewColleague);
     Job job4 = startSleepJobAsUser(viewAndModifyColleague, conf);
-    jobid = job4.getID();
+    jobid = job4.getJobID();
     getTIPId(cluster, jobid);// wait till the map task is started
     url = url.concat("&jobCheckBox=" + jobid.toString());
 
@@ -590,7 +590,7 @@ public class TestWebUIAuthorization extends ClusterMapReduceTestCase {
     
     Job job = startSleepJobAsUser(jobSubmitter, conf);
 
-    org.apache.hadoop.mapreduce.JobID jobid = job.getID();
+    org.apache.hadoop.mapreduce.JobID jobid = job.getJobID();
 
     String jtURL = "http://localhost:" + infoPort;
 

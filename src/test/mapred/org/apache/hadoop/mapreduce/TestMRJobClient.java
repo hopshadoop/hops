@@ -68,7 +68,7 @@ public class TestMRJobClient extends ClusterMapReduceTestCase {
   public void testJobClient() throws Exception {
     Configuration conf = createJobConf();
     Job job = runJob(conf);
-    String jobId = job.getID().toString();
+    String jobId = job.getJobID().toString();
     testGetCounter(jobId, conf);
     testJobList(jobId, conf);
     testChangingJobPriority(jobId, conf);

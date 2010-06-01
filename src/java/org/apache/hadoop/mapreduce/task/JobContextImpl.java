@@ -50,7 +50,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 public class JobContextImpl implements JobContext {
 
   protected final org.apache.hadoop.mapred.JobConf conf;
-  private final JobID jobId;
+  private JobID jobId;
   /**
    * The UserGroupInformation object that has a reference to the current user
    */
@@ -80,6 +80,13 @@ public class JobContextImpl implements JobContext {
    */
   public JobID getJobID() {
     return jobId;
+  }
+  
+  /**
+   * Set the JobID.
+   */
+  public void setJobID(JobID jobId) {
+    this.jobId = jobId;
   }
   
   /**

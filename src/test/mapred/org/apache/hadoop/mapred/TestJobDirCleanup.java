@@ -42,7 +42,7 @@ public class TestJobDirCleanup extends TestCase {
     sleep.setConf(conf);
     Job job = sleep.createJob(1, 10, 1000, 1, 10000, 1);
     job.waitForCompletion(true);
-    return job.getID();
+    return job.getJobID();
   }
 
   public void testJobDirCleanup() throws Exception {

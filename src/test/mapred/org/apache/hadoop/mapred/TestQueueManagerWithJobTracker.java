@@ -176,7 +176,7 @@ public class TestQueueManagerWithJobTracker {
     //signal to the job.
     jip =  tracker.getJob(org.apache.hadoop.mapred.JobID.downgrade(jobID));
     tracker.initJob(jip);
-    tracker.killJob(job.getID());
+    tracker.killJob(job.getJobID());
     // kill the job by the user who submitted the job
     assertEquals("job submitted for u1 and queue p1:p11 is not killed.",
         cluster.getJob(jobID).getStatus().getState(), (State.KILLED));

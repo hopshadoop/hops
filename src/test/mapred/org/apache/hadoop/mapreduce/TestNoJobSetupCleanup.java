@@ -27,8 +27,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.mapred.HadoopTestCase;
-import org.apache.hadoop.mapred.JobClient;
-import org.apache.hadoop.mapred.JobID;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl;
 
@@ -51,12 +49,10 @@ public class TestNoJobSetupCleanup extends HadoopTestCase {
     job.setOutputFormatClass(MyOutputFormat.class);
     job.waitForCompletion(true);
     assertTrue(job.isSuccessful());
-    JobID jobid = (org.apache.hadoop.mapred.JobID)job.getID();
-    JobClient jc = new JobClient(conf);
-    assertTrue(jc.getSetupTaskReports(jobid).length == 0);
-    assertTrue(jc.getCleanupTaskReports(jobid).length == 0);
-    assertTrue(jc.getMapTaskReports(jobid).length == numMaps);
-    assertTrue(jc.getReduceTaskReports(jobid).length == numReds);
+    assertTrue(job.getTaskReports(TaskType.JOB_SETUP).length == 0);
+    assertTrue(job.getTaskReports(TaskType.JOB_CLEANUP).length == 0);
+    assertTrue(job.getTaskReports(TaskType.MAP).length == numMaps);
+    assertTrue(job.getTaskReports(TaskType.REDUCE).length == numReds);
     FileSystem fs = FileSystem.get(conf);
     assertTrue("Job output directory doesn't exit!", fs.exists(outDir));
     FileStatus[] list = fs.listStatus(outDir, new OutputFilter());

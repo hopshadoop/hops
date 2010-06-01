@@ -318,6 +318,7 @@ class JobSubmitter {
     //configure the command line options correctly on the submitting dfs
     Configuration conf = job.getConfiguration();
     JobID jobId = submitClient.getNewJobID();
+    job.setJobID(jobId);
     Path submitJobDir = new Path(jobStagingArea, jobId.toString());
     JobStatus status = null;
     try {

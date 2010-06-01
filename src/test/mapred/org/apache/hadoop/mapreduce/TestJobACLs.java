@@ -127,7 +127,7 @@ public class TestJobACLs {
     // Submit the job as user1
     Job job = submitJobAsUser(myConf, "user1");
 
-    final JobID jobId = job.getID();
+    final JobID jobId = job.getJobID();
 
     // Try operations as an unauthorized user.
     verifyViewJobAsUnauthorizedUser(myConf, jobId, "user2");
@@ -261,7 +261,7 @@ public class TestJobACLs {
     // Submit the job as user1
     Job job = submitJobAsUser(myConf, "user1");
 
-    final JobID jobId = job.getID();
+    final JobID jobId = job.getJobID();
 
     // Try operations as an unauthorized user.
     verifyModifyJobAsUnauthorizedUser(myConf, jobId, "user2");
@@ -369,7 +369,7 @@ public class TestJobACLs {
     // Submit the job as user1
     Job job = submitJobAsUser(myConf, "user1");
 
-    final JobID jobId = job.getID();
+    final JobID jobId = job.getJobID();
 
     // Kill the job and wait till it is actually killed so that it is written to
     // CompletedJobStore

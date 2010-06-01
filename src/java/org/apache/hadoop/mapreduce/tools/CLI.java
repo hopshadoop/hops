@@ -217,7 +217,7 @@ public class CLI extends Configured implements Tool {
       if (submitJobFile != null) {
         Job job = Job.getInstance(cluster, new JobConf(submitJobFile));
         job.submit();
-        System.out.println("Created job " + job.getID());
+        System.out.println("Created job " + job.getJobID());
         exitCode = 0;
       } else if (getStatus) {
         Job job = cluster.getJob(JobID.forName(jobid));
@@ -423,7 +423,7 @@ public class CLI extends Configured implements Tool {
       throws IOException, InterruptedException {
     TaskCompletionEvent[] events = job.
       getTaskCompletionEvents(fromEventId, numEvents);
-    System.out.println("Task completion events for " + job.getID());
+    System.out.println("Task completion events for " + job.getJobID());
     System.out.println("Number of events (from " + fromEventId + ") are: " 
       + events.length);
     for(TaskCompletionEvent event: events) {
@@ -529,7 +529,7 @@ public class CLI extends Configured implements Tool {
     System.out.println("JobId\tState\tStartTime\t" +
       "UserName\tPriority\tSchedulingInfo");
     for (Job job : jobs) {
-      System.out.printf("%s\t%s\t%d\t%s\t%s\t%s\n", job.getID().toString(),
+      System.out.printf("%s\t%s\t%d\t%s\t%s\t%s\n", job.getJobID().toString(),
         job.getJobState(), job.getStartTime(),
         job.getUser(), job.getPriority().name(), job.getSchedulingInfo());
     }
