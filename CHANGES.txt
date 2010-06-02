@@ -35,6 +35,10 @@ Trunk (unreleased changes)
     MAPREDUCE-1785. Add streaming config option for not emitting the key.
     (Eli Collins via sharad)
 
+    MAPREDUCE-572. If #link is missing from uri format of -cacheArchive
+    then streaming does not throw error. (Amareshwari Sriramadasu via
+    vinodkv)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and
