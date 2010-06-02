@@ -2093,7 +2093,16 @@ public class TaskTracker
       reduceLauncher.addToTaskQueue(action);
     }
   }
-  
+
+  // This method is called from unit tests
+  int getFreeSlots(boolean isMap) {
+    if (isMap) {
+      return mapLauncher.numFreeSlots.get();
+    } else {
+      return reduceLauncher.numFreeSlots.get();
+    }
+  }
+
   class TaskLauncher extends Thread {
     private IntWritable numFreeSlots;
     private final int maxSlots;
@@ -2657,8 +2666,11 @@ public class TaskTracker
      */
     void reportTaskFinished(boolean commitPending) {
       if (!commitPending) {
-        taskFinished();
-        releaseSlot();
+        try {
+          taskFinished(); 
+        } finally {
+          releaseSlot();
+        }
       }
       notifyTTAboutTaskCompletion();
     }
@@ -2728,7 +2740,15 @@ public class TaskTracker
             setTaskFailState(true);
             // call the script here for the failed tasks.
             if (debugCommand != null) {
-              runDebugScript();
+              try {
+                runDebugScript();
+              } catch (Exception e) {
+                String msg =
+                    "Debug-script could not be run successfully : "
+                        + StringUtils.stringifyException(e);
+                LOG.warn(msg);
+                reportDiagnosticInfo(msg);
+              }
             }
           }
           taskStatus.setProgress(0.0f);
@@ -2749,14 +2769,17 @@ public class TaskTracker
       if (needCleanup) {
         removeTaskFromJob(task.getJobID(), this);
       }
-      try {
-        cleanup(needCleanup);
-      } catch (IOException ie) {
-      }
 
+      cleanup(needCleanup);
     }
-    
-    private void runDebugScript() {
+
+    /**
+     * Run the debug-script now. Because debug-script can be user code, we use
+     * {@link TaskController} to execute the debug script.
+     * 
+     * @throws IOException
+     */
+    private void runDebugScript() throws IOException {
       String taskStdout ="";
       String taskStderr ="";
       String taskSyslog ="";
@@ -2774,23 +2797,14 @@ public class TaskTracker
         taskSyslog = FileUtil
             .makeShellPath(TaskLog.getRealTaskLogFileLocation(task.getTaskID(),
                 task.isTaskCleanupTask(), TaskLog.LogName.SYSLOG));
-      } catch(IOException e){
-        LOG.warn("Exception finding task's stdout/err/syslog files");
+      } catch(Exception e){
+        LOG.warn("Exception finding task's stdout/err/syslog files", e);
       }
-      File workDir = null;
-      try {
-        workDir =
-            new File(lDirAlloc.getLocalPathToRead(
-                TaskTracker.getLocalTaskDir(task.getUser(), task
-                    .getJobID().toString(), task.getTaskID()
-                    .toString(), task.isTaskCleanupTask())
-                    + Path.SEPARATOR + MRConstants.WORKDIR,
-                localJobConf).toString());
-      } catch (IOException e) {
-        LOG.warn("Working Directory of the task " + task.getTaskID() +
-                        " doesnt exist. Caught exception " +
-                  StringUtils.stringifyException(e));
-      }
+      File workDir = new File(lDirAlloc.getLocalPathToRead(
+          TaskTracker.getLocalTaskDir(task.getUser(), task.getJobID()
+              .toString(), task.getTaskID().toString(), task
+              .isTaskCleanupTask())
+              + Path.SEPARATOR + MRConstants.WORKDIR, localJobConf).toString());
       // Build the command  
       File stdout = TaskLog.getTaskLogFile(task.getTaskID(), task
           .isTaskCleanupTask(), TaskLog.LogName.DEBUGOUT);
@@ -2820,21 +2834,10 @@ public class TaskTracker
       context.stdout = stdout;
       context.workDir = workDir;
       context.task = task;
-      try {
-        getTaskController().runDebugScript(context);
-        // add all lines of debug out to diagnostics
-        try {
-          int num = localJobConf.getInt(MRJobConfig.TASK_DEBUGOUT_LINES,
-              -1);
-          addDiagnostics(FileUtil.makeShellPath(stdout),num,
-              "DEBUG OUT");
-        } catch(IOException ioe) {
-          LOG.warn("Exception in add diagnostics!");
-        }
-      } catch (IOException ie) {
-        LOG.warn("runDebugScript failed with: " + StringUtils.
-                                              stringifyException(ie));
-      }
+      getTaskController().runDebugScript(context);
+      // add the lines of debug out to diagnostics
+      int num = localJobConf.getInt(MRJobConfig.TASK_DEBUGOUT_LINES, -1);
+      addDiagnostics(FileUtil.makeShellPath(stdout), num, "DEBUG OUT");
     }
 
     /**
@@ -2998,7 +3001,7 @@ public class TaskTracker
      * otherwise the current working directory of the task 
      * i.e. &lt;taskid&gt;/work is cleaned up.
      */
-    void cleanup(boolean needCleanup) throws IOException {
+    void cleanup(boolean needCleanup) {
       TaskAttemptID taskId = task.getTaskID();
       LOG.debug("Cleaning up " + taskId);
 

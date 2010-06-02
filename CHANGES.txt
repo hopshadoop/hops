@@ -1638,3 +1638,7 @@ Release 0.21.0 - Unreleased
     (Dick King and Amareshwari Sriramadasu via tomwhite)
 
     MAPREDUCE-118. Fix Job.getJobID(). (Amareshwari Sriramadasu via sharad)
+
+    MAPREDUCE-913. TaskRunner crashes with NPE resulting in held up slots,
+    UNINITIALIZED tasks and hung TaskTracker. (Amareshwari Sriramadasu and
+    Sreekanth Ramakrishnan via vinodkv)
