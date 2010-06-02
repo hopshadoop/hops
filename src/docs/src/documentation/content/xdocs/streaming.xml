@@ -310,6 +310,7 @@ the nth field separator in a line of the reduce outputs as the separator between
 </p>
 <p> Similarly, you can specify "stream.map.input.field.separator" and "stream.reduce.input.field.separator" as the input separator for MapReduce 
 inputs. By default the separator is the tab character.</p>
+<p> You can specify "stream.map.input.ignoreKey" so the key is not emitted to the mapper when using text input. This is the default behavior when using TextInputFormat.</p>
 </section>
 
 <section>

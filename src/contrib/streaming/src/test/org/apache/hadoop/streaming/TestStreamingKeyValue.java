@@ -43,11 +43,17 @@ public class TestStreamingKeyValue
     "roses are \tred\t\n\tviolets are blue\nbunnies are pink\n" +
     "this is for testing a big\tinput line\n" +
     "small input\n";
-  protected String outputExpect = 
+  protected String outputWithoutKey = 
     "\tviolets are blue\nbunnies are pink\t\n" + 
     "roses are \tred\t\n" +
     "small input\t\n" +
     "this is for testing a big\tinput line\n";
+  protected String outputWithKey = 
+    "0\troses are \tred\t\n" +  
+    "16\t\tviolets are blue\n" +
+    "34\tbunnies are pink\n" +
+    "51\tthis is for testing a big\tinput line\n" +
+    "88\tsmall input\n";
 
   private StreamJob job;
 
@@ -66,19 +72,20 @@ public class TestStreamingKeyValue
     out.close();
   }
 
-  protected String[] genArgs() {
+  protected String[] genArgs(boolean ignoreKey) {
     return new String[] {
       "-input", INPUT_FILE.getAbsolutePath(),
       "-output", OUTPUT_DIR.getAbsolutePath(),
       "-mapper", "cat",
       "-jobconf", MRJobConfig.PRESERVE_FAILED_TASK_FILES + "=true", 
       "-jobconf", "stream.non.zero.exit.is.failure=true",
-      "-jobconf", "stream.tmpdir="+System.getProperty("test.build.data","/tmp")
+      "-jobconf", "stream.tmpdir="+System.getProperty("test.build.data","/tmp"),
+      "-jobconf", "stream.map.input.ignoreKey="+ignoreKey,      
     };
   }
   
-  @Test
-  public void testCommandLine() throws Exception
+  public void runStreamJob(final String outputExpect, boolean ignoreKey) 
+      throws Exception
   {
     String outFileName = "part-00000";
     File outFile = null;
@@ -93,7 +100,7 @@ public class TestStreamingKeyValue
 
       // During tests, the default Configuration will use a local mapred
       // So don't specify -config or -cluster
-      job = new StreamJob(genArgs(), mayExit);      
+      job = new StreamJob(genArgs(ignoreKey), mayExit);      
       job.go();
       outFile = new File(OUTPUT_DIR, outFileName).getAbsoluteFile();
       String output = StreamUtil.slurp(outFile);
@@ -106,9 +113,27 @@ public class TestStreamingKeyValue
     }
   }
 
-  public static void main(String[]args) throws Exception
+  /**
+   * Run the job with the indicating the input format key should be emitted. 
+   */
+  @Test
+  public void testCommandLineWithKey() throws Exception
   {
-    new TestStreamingKeyValue().testCommandLine();
+    runStreamJob(outputWithKey, false);
   }
 
+  /**
+   * Run the job the default way (the input format key is not emitted).
+   */
+  @Test
+  public void testCommandLineWithoutKey() throws Exception
+  {
+      runStreamJob(outputWithoutKey, true);
+  }
+  
+  public static void main(String[]args) throws Exception
+  {
+    new TestStreamingKeyValue().testCommandLineWithKey();    
+    new TestStreamingKeyValue().testCommandLineWithoutKey();
+  }
 }

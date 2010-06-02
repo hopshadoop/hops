@@ -32,6 +32,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1773. streaming doesn't support jobclient.output.filter.
     (Amareshwari Sriramadasu via vinodkv)
 
+    MAPREDUCE-1785. Add streaming config option for not emitting the key.
+    (Eli Collins via sharad)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and

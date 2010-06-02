@@ -72,7 +72,8 @@ public class PipeMapper extends PipeMapRed implements Mapper {
     skipping = job.getBoolean(MRJobConfig.SKIP_RECORDS, false);
     if (mapInputWriterClass_.getCanonicalName().equals(TextInputWriter.class.getCanonicalName())) {
       String inputFormatClassName = job.getClass("mapred.input.format.class", TextInputFormat.class).getCanonicalName();
-      ignoreKey = inputFormatClassName.equals(TextInputFormat.class.getCanonicalName());
+      ignoreKey = job.getBoolean("stream.map.input.ignoreKey", 
+        inputFormatClassName.equals(TextInputFormat.class.getCanonicalName()));
     }
     
     try {
