@@ -805,6 +805,8 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-1535.  Replace usage of FileStatus#isDir().  (Eli Collins via
     tomwhite)
 
+    MAPREDUCE-1832. Allow file sizes less than 1MB in DFSIO benchmark. (shv)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
@@ -1645,5 +1647,3 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-913. TaskRunner crashes with NPE resulting in held up slots,
     UNINITIALIZED tasks and hung TaskTracker. (Amareshwari Sriramadasu and
     Sreekanth Ramakrishnan via vinodkv)
-
-    MAPREDUCE-1832. Allow file sizes less than 1MB in DFSIO benchmark. (shv)
