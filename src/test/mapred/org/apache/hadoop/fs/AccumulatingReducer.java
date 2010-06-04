@@ -52,7 +52,6 @@ public class AccumulatingReducer extends MapReduceBase
   protected String hostName;
   
   public AccumulatingReducer () {
-    LOG.info("Starting AccumulatingReducer !!!");
     try {
       hostName = java.net.InetAddress.getLocalHost().getHostName();
     } catch(Exception e) {
