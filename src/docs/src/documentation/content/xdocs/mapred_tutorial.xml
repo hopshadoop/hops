@@ -44,7 +44,7 @@
           <a href="ext:single-node-setup">Single Node Setup</a> for first-time users.
         </li>
         <li>
-          <a href="cluster_setup.html">Cluster Setup</a> for large, distributed clusters.
+          <a href="ext:cluster-setup">Cluster Setup</a> for large, distributed clusters.
         </li>
       </ul>
     </section>
@@ -159,7 +159,7 @@
       
       <p>This example works with a 
       pseudo-distributed (<a href="ext:single-node-setup">Single Node Setup</a>) 
-     or fully-distributed (<a href="cluster_setup.html">Cluster Setup</a>) 
+     or fully-distributed (<a href="ext:cluster-setup">Cluster Setup</a>) 
       Hadoop installation.</p>   
       
       <section>
@@ -392,7 +392,7 @@
         provides this functionality is called the <em>distributed cache</em>.
         More details about the command line options surrounding job launching
         and control of the distributed cache are available at 
-        <a href="commands_manual.html"> Hadoop Commands Guide.</a></p>
+        <a href="ext:commands-manual"> Hadoop Commands Guide.</a></p>
         
         <p>Hadoop ships with some example code in a jar precompiled for you;
         one of these is (another) wordcount program. Here's an example
@@ -1214,7 +1214,7 @@
         <p>Note: <code>mapred.{map|reduce}.child.java.opts</code> are used only 
         for configuring the launched child tasks from task tracker. Configuring 
         the memory options for daemons is documented under
-        <a href="cluster_setup.html#Configuring+the+Environment+of+the+Hadoop+Daemons">
+        <a href="ext:cluster-setup/ConfiguringEnvironmentHadoopDaemons">
         Configuring the Environment of the Hadoop Daemons</a> (Cluster Setup).</p>
         
         <p>The memory available to some parts of the framework is also
@@ -1675,7 +1675,7 @@
           
           <p>The format of a job level ACL is the same as the format for a
           queue level ACL as defined in the
-          <a href ="cluster_setup.html#Configuring+the+Hadoop+Daemons">
+          <a href ="ext:cluster-setup/ConfiguringHadoopDaemons">
           Cluster Setup</a> documentation.
           </p>
           
@@ -2420,7 +2420,7 @@
       <p>This example needs the HDFS to be up and running, especially for the 
       <code>DistributedCache</code>-related features. Hence it only works with a 
       pseudo-distributed (<a href="ext:single-node-setup">Single Node Setup</a>) 
-     or fully-distributed (<a href="cluster_setup.html#Fully-Distributed+Operation">Cluster Setup</a>) 
+     or fully-distributed (<a href="ext:cluster-setup/FullyDistributedOperation">Cluster Setup</a>) 
       Hadoop installation.</p>     
       
       <section>

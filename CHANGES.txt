@@ -807,6 +807,9 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1832. Allow file sizes less than 1MB in DFSIO benchmark. (shv)
 
+    MAPREDUCE-1404.  Move Cluster-Setup and Single-Node-Setup Docs from
+    MapReduce to Common.  (tomwhite)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band

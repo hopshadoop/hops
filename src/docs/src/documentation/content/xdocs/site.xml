@@ -34,13 +34,11 @@ See http://forrest.apache.org/docs/linking.html for more info.
   
    <docs label="Getting Started"> 
 		<overview   				label="Overview" 					href="index.html" />
-		<setup label="Cluster Setup" href="cluster_setup.html"/>
 		<mapred    				label="MapReduce Tutorial" 	href="mapred_tutorial.html" />
 		 <streaming 				label="Hadoop Streaming"  href="streaming.html" />
    </docs>	
 		
   <docs label="Guides">
-		<commands 				label="Hadoop Commands"  href="commands_manual.html" />
 		<distcp    					label="DistCp"       href="distcp.html" />
 		<vaidya    					label="Vaidya" 		href="vaidya.html"/>
 		<archives  				label="Hadoop Archives"     href="hadoop_archives.html"/>
@@ -50,7 +48,6 @@ See http://forrest.apache.org/docs/linking.html for more info.
     <docs label="Schedulers">
         <cap_scheduler 		label="Capacity Scheduler"     href="capacity_scheduler.html"/>
 		<fair_scheduler 			label="Fair Scheduler"            href="fair_scheduler.html"/>
-		<cap_scheduler 		label="Hod Scheduler" 			href="hod_scheduler.html"/>
     </docs>
    
    <docs label="Miscellaneous"> 
@@ -83,6 +80,17 @@ See http://forrest.apache.org/docs/linking.html for more info.
       <PreReqs href="#PreReqs" />
       <Download href="#Download" />
     </single-node-setup>
+    <cluster-setup href="http://hadoop.apache.org/common/docs/current/cluster_setup.html">
+      <property_tag href="#property_tag" />
+      <RefreshingQueueConfiguration href="#Refreshing+queue+configuration"/>
+      <mapred-queues.xml href="#mapred-queues.xml"/>
+      <ConfiguringEnvironmentHadoopDaemons href="#Configuring+the+Environment+of+the+Hadoop+Daemons"/>
+      <ConfiguringHadoopDaemons href="#Configuring+the+Hadoop+Daemons"/>
+      <FullyDistributedOperation href="#Fully-Distributed+Operation"/>
+    </cluster-setup>
+    <commands-manual href="http://hadoop.apache.org/common/docs/current/commands_default.html">
+      <RefreshQueues href="#RefreshQueues"/>
+    </commands-manual>
 
     <zlib      href="http://www.zlib.net/" />
     <gzip      href="http://www.gzip.org/" />

@@ -87,7 +87,7 @@
         <li>
           Support for refreshing/reloading some of the queue-properties
           without restarting the JobTracker, taking advantage of the
-          <a href="cluster_setup.html#Refreshing+queue+configuration">
+          <a href="ext:cluster-setup/RefreshingQueueConfiguration">
           queue-refresh</a> feature in the framework.
         </li>
       </ul>
@@ -160,7 +160,7 @@
           You can define multiple, possibly hierarchical queues to which users
           can submit jobs with the Capacity Scheduler. To define queues,
           various properties should be set in two configuration files -
-          <a href="cluster_setup.html#mapred-queues.xml">mapred-queues.xml</a>
+          <a href="ext:cluster-setup/mapred-queues.xml">mapred-queues.xml</a>
           and
           <a href="ext:capacity-scheduler-conf">conf/capacity-scheduler.xml</a>
           .</p>
@@ -194,7 +194,7 @@
         <p>To specify a property for a specific queue that is defined in the
         mapred-queues.xml, you should set the corresponding property in a
         &lt;property&gt; tag explained
-        <a href="cluster_setup.html#property_tag">here</a>.
+        <a href="ext:cluster-setup/property_tag">here</a>.
         </p>
 
         <p>The properties defined for queues and their descriptions are
@@ -204,7 +204,7 @@
           <tr>
           	<th>Name</th>
             <th>
-            	<a href="commands_manual.html#RefreshQueues">
+            	<a href="ext:commands-manual/RefreshQueues">
             	Refresh-able?</a>
            	</th>
             <th>Applicable to?</th>
