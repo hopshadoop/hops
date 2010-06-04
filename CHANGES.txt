@@ -66,6 +66,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1599. Fixes MRBench so that it reuses tokens across jobs
     correctly. (Jitendra Nath Pandey via ddas)
 
+    MAPREDUCE-1836. Refresh for proxy superuser config (mr part for HDFS-1096).
+    (Boris Shkolnik via shv)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
