@@ -33,6 +33,7 @@ import junit.extensions.TestSetup;
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
+import static org.mockito.Mockito.*;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -41,6 +42,7 @@ import org.apache.hadoop.mapred.FakeObjectUtilities.FakeJobTracker;
 import org.apache.hadoop.mapred.TaskStatus.Phase;
 import org.apache.hadoop.mapred.UtilsForTests.FakeClock;
 import org.apache.hadoop.mapreduce.JobCounter;
+import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.mapreduce.split.JobSplit.TaskSplitMetaInfo;
 import org.apache.hadoop.net.DNSToSwitchMapping;
@@ -112,7 +114,7 @@ public class TestJobInProgress extends TestCase {
       return splits;
     }
 
-    private void makeRunning(TaskAttemptID taskId, TaskInProgress tip, 
+    private void makeRunning(TaskAttemptID taskId, TaskInProgress tip,
         String taskTracker) {
       TaskStatus status = TaskStatus.createTaskStatus(tip.isMapTask(), taskId, 
           0.0f, 1, TaskStatus.State.RUNNING, "", "", taskTracker,
@@ -284,4 +286,58 @@ public class TestJobInProgress extends TestCase {
     assertEquals(pendingReduces, jip.pendingReduces());
   }
 
+  public void testJobSummary() throws Exception {
+    int numMaps = 2;
+    int numReds = 2;
+    JobConf conf = new JobConf();
+    conf.setNumMapTasks(numMaps);
+    conf.setNumReduceTasks(numReds);
+    // Spying a fake is easier than mocking here
+    MyFakeJobInProgress jspy = spy(new MyFakeJobInProgress(conf, jobTracker));
+    jspy.initTasks();
+    TaskAttemptID tid;
+
+    // Launch some map tasks
+    for (int i = 0; i < numMaps; i++) {
+      jspy.maps[i].setExecStartTime(i + 1);
+      tid = jspy.findAndRunNewTask(true, trackers[i], hosts[i],
+                                   clusterSize, numUniqueHosts);
+      jspy.finishTask(tid);
+    }
+
+    // Launch some reduce tasks
+    for (int i = 0; i < numReds; i++) {
+      jspy.reduces[i].setExecStartTime(i + numMaps + 1);
+      tid = jspy.findAndRunNewTask(false, trackers[i], hosts[i],
+                                   clusterSize, numUniqueHosts);
+      jspy.finishTask(tid);
+    }
+
+    // Should be invoked numMaps + numReds times by different TIP objects
+    verify(jspy, times(4)).setFirstTaskLaunchTime(any(TaskInProgress.class));
+
+    ClusterStatus cspy = spy(new ClusterStatus(4, 0, 0, 0, 0, 4, 4,
+                                               JobTracker.State.RUNNING, 0));
+
+    JobInProgress.JobSummary.logJobSummary(jspy, cspy);
+
+    verify(jspy).getStatus();
+    verify(jspy).getProfile();
+    verify(jspy).getJobCounters();
+    verify(jspy, atLeastOnce()).getJobID();
+    verify(jspy).getStartTime();
+    verify(jspy).getFirstTaskLaunchTimes();
+    verify(jspy).getFinishTime();
+    verify(jspy).getTasks(TaskType.MAP);
+    verify(jspy).getTasks(TaskType.REDUCE);
+    verify(jspy).getNumSlotsPerMap();
+    verify(jspy).getNumSlotsPerReduce();
+    verify(cspy).getMaxMapTasks();
+    verify(cspy).getMaxReduceTasks();
+
+    assertEquals("firstMapTaskLaunchTime", 1,
+        jspy.getFirstTaskLaunchTimes().get(TaskType.MAP).longValue());
+    assertEquals("firstReduceTaskLaunchTime", 3,
+        jspy.getFirstTaskLaunchTimes().get(TaskType.REDUCE).longValue());
+  }
 }

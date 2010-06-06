@@ -39,6 +39,9 @@ Trunk (unreleased changes)
     then streaming does not throw error. (Amareshwari Sriramadasu via
     vinodkv)
 
+    MAPREDUCE-1545. Add timestamps for first task type launched in job summary.
+    (Luke Lu via cdouglas)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and
