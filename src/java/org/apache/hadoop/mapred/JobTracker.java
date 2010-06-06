@@ -70,6 +70,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ipc.RPC.VersionMismatch;
+import org.apache.hadoop.mapred.AuditLogger.Constants;
 import org.apache.hadoop.mapred.ClusterStatus.BlackListInfo;
 import org.apache.hadoop.mapred.JobInProgress.KillInterruptedException;
 import org.apache.hadoop.mapred.JobStatusChangeEvent.EventType;
@@ -3085,6 +3086,8 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     LOG.info("Job " + jobId + " added successfully for user '" 
              + job.getJobConf().getUser() + "' to queue '" 
              + job.getJobConf().getQueueName() + "'");
+    AuditLogger.logSuccess(job.getUser(),
+        Queue.QueueOperation.SUBMIT_JOB.name(), jobId.toString());
     return job.getStatus();
   }
 
@@ -4114,14 +4117,18 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    * Rereads the files to update the hosts and exclude lists.
    */
   public synchronized void refreshNodes() throws IOException {
+    String user = UserGroupInformation.getCurrentUser().getShortUserName();
     // check access
     if (!isSuperUserOrSuperGroup(UserGroupInformation.getCurrentUser(), mrOwner,
                                  supergroup)) {
-      String user = UserGroupInformation.getCurrentUser().getShortUserName();
+      AuditLogger.logFailure(user, Constants.REFRESH_NODES,
+          mrOwner + " " + supergroup, Constants.JOBTRACKER,
+          Constants.UNAUTHORIZED_USER);
       throw new AccessControlException(user + 
                                        " is not authorized to refresh nodes.");
     }
     
+    AuditLogger.logSuccess(user, Constants.REFRESH_NODES, Constants.JOBTRACKER);
     // call the actual api
     refreshHosts();
   }

@@ -23,6 +23,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.mapred.AuditLogger.Constants;
 import org.apache.hadoop.mapred.TaskScheduler.QueueRefresher;
 import org.apache.hadoop.mapreduce.QueueState;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -258,6 +259,8 @@ class QueueManager {
     UserGroupInformation ugi) {
     
     Queue q = leafQueues.get(queueName);
+    String user = ugi.getShortUserName();
+    String jobId = job == null ? "-" : job.getJobID().toString();
 
     if (q == null) {
       LOG.info("Queue " + queueName + " is not present");
@@ -282,6 +285,7 @@ class QueueManager {
     if (oper.isJobOwnerAllowed()) {
       if (job != null
         && job.getJobConf().getUser().equals(ugi.getShortUserName())) {
+        AuditLogger.logSuccess(user, oper.name(), queueName);
         return true;
       }
     }
@@ -291,6 +295,8 @@ class QueueManager {
         queueName,
         oper.getAclName()));
     if (acl == null) {
+      AuditLogger.logFailure(user, oper.name(), null, queueName,
+                             "Disabled queue ACLs, job : " + jobId);
       return false;
     }
 
@@ -301,6 +307,12 @@ class QueueManager {
       if (acl.isUserAllowed(ugi)) {
         allowed = true;
       }
+    }
+    if (allowed) {
+      AuditLogger.logSuccess(user, oper.name(), queueName);
+    } else {
+      AuditLogger.logFailure(user, oper.name(), null, queueName,
+                             Constants.UNAUTHORIZED_USER + ", job : " + jobId);
     }
 
     return allowed;

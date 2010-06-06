@@ -428,6 +428,8 @@ public class JobInProgress {
       String desc = "The username " + conf.getUser() + " obtained from the " +
                      "conf doesn't match the username " + user + " the user " +
                                      "authenticated as";
+      AuditLogger.logFailure(user, Queue.QueueOperation.SUBMIT_JOB.name(),
+                             conf.getUser(), jobId.toString(), desc);
       throw new IOException(desc);
     }
     this.priority = conf.getJobPriority();

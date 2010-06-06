@@ -42,6 +42,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1545. Add timestamps for first task type launched in job summary.
     (Luke Lu via cdouglas)
 
+    MAPREDUCE-1543. Add an audit log for authentication events. (Amar Kamat and
+    Luke Lu via cdouglas)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and
