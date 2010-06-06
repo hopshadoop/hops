@@ -45,6 +45,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1543. Add an audit log for authentication events. (Amar Kamat and
     Luke Lu via cdouglas)
 
+    MAPREDUCE-1762. Add ability to set values of task counters. (Scott Chen via
+    cdouglas)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and

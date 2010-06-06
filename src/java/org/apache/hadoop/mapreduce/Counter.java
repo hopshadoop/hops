@@ -117,7 +117,15 @@ public class Counter implements Writable {
   public synchronized long getValue() {
     return value;
   }
-    
+
+  /**
+   * Set this counter by the given value
+   * @param the value to set
+   */
+  public synchronized void setValue(long value) {
+    this.value = value;
+  }
+
   /**
    * Increment this counter by the given value
    * @param incr the value to increase this counter by
