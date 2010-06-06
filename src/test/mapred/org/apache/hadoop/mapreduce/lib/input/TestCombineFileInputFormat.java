@@ -276,7 +276,7 @@ public class TestCombineFileInputFormat extends TestCase {
 
       // split it using a CombinedFile input format
       DummyInputFormat inFormat = new DummyInputFormat();
-      Job job = new Job(conf);
+      Job job = Job.getInstance(conf);
       FileInputFormat.setInputPaths(job, dir1 + "," + dir2);
       inFormat.setMinSplitSizeRack(BLOCKSIZE);
       List<InputSplit> splits = inFormat.getSplits(job);
@@ -646,7 +646,7 @@ public class TestCombineFileInputFormat extends TestCase {
    */
   private void splitRealFiles(String[] args) throws IOException {
     Configuration conf = new Configuration();
-    Job job = new Job();
+    Job job = Job.getInstance();
     FileSystem fs = FileSystem.get(conf);
     if (!(fs instanceof DistributedFileSystem)) {
       throw new IOException("Wrong file system: " + fs.getClass().getName());

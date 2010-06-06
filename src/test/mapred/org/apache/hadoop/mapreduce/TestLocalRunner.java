@@ -294,7 +294,7 @@ public class TestLocalRunner extends TestCase {
     createInputFile(inputPath, 0, 20);
 
     // Now configure and run the job.
-    Job job = new Job();
+    Job job = Job.getInstance();
     job.setMapperClass(GCMapper.class);
     job.setNumReduceTasks(0);
     job.getConfiguration().set("io.sort.mb", "25");
@@ -320,7 +320,7 @@ public class TestLocalRunner extends TestCase {
    */
   @Test
   public void testMultiMaps() throws Exception {
-    Job job = new Job();
+    Job job = Job.getInstance();
 
     Path inputPath = createMultiMapsInput();
     Path outputPath = getOutputPath();
@@ -352,7 +352,7 @@ public class TestLocalRunner extends TestCase {
    */
   @Test
   public void testInvalidMultiMapParallelism() throws Exception {
-    Job job = new Job();
+    Job job = Job.getInstance();
 
     Path inputPath = createMultiMapsInput();
     Path outputPath = getOutputPath();
@@ -413,7 +413,7 @@ public class TestLocalRunner extends TestCase {
 
   /** Test case for zero mappers */
   public void testEmptyMaps() throws Exception {
-    Job job = new Job();
+    Job job = Job.getInstance();
     Path outputPath = getOutputPath();
 
     Configuration conf = new Configuration();

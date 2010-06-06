@@ -71,7 +71,7 @@ public class TestFileOutputCommitter extends TestCase {
 
   @SuppressWarnings("unchecked")
   public void testCommitter() throws Exception {
-    Job job = new Job();
+    Job job = Job.getInstance();
     FileOutputFormat.setOutputPath(job, outDir);
     Configuration conf = job.getConfiguration();
     conf.set(MRJobConfig.TASK_ATTEMPT_ID, attempt);
@@ -108,7 +108,7 @@ public class TestFileOutputCommitter extends TestCase {
 
   @SuppressWarnings("unchecked")
   public void testAbort() throws IOException, InterruptedException {
-    Job job = new Job();
+    Job job = Job.getInstance();
     FileOutputFormat.setOutputPath(job, outDir);
     Configuration conf = job.getConfiguration();
     conf.set(MRJobConfig.TASK_ATTEMPT_ID, attempt);
@@ -157,7 +157,7 @@ public class TestFileOutputCommitter extends TestCase {
 
   @SuppressWarnings("unchecked")
   public void testFailAbort() throws IOException, InterruptedException {
-    Job job = new Job();
+    Job job = Job.getInstance();
     Configuration conf = job.getConfiguration();
     conf.set(FileSystem.FS_DEFAULT_NAME_KEY, "faildel:///");
     conf.setClass("fs.faildel.impl", FakeFileSystem.class, FileSystem.class);

@@ -366,7 +366,7 @@ public class TestJoinProperties extends TestCase {
   public int testFormat(Configuration conf, int tupleSize,
       boolean firstTuple, boolean secondTuple, TestType ttype)
       throws Exception {
-    Job job = new Job(conf);
+    Job job = Job.getInstance(conf);
     CompositeInputFormat format = new CompositeInputFormat();
     int count = 0;
     for (InputSplit split : (List<InputSplit>)format.getSplits(job)) {

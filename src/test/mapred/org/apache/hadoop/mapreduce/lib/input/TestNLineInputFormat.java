@@ -47,7 +47,7 @@ public class TestNLineInputFormat extends TestCase {
              "TestNLineInputFormat");
   
   public void testFormat() throws Exception {
-    Job job = new Job(conf);
+    Job job = Job.getInstance(conf);
     Path file = new Path(workDir, "test.txt");
 
     int seed = new Random().nextInt();

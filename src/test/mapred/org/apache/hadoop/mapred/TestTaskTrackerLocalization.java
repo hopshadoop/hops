@@ -138,7 +138,7 @@ public class TestTaskTrackerLocalization extends TestCase {
     jobConf.setInt(MRJobConfig.USER_LOG_RETAIN_HOURS, 0);
     jobConf.setUser(getJobOwner().getShortUserName());
 
-    Job job = new Job(jobConf);
+    Job job = Job.getInstance(jobConf);
     String jtIdentifier = "200907202331";
     jobId = new JobID(jtIdentifier, 1);
 

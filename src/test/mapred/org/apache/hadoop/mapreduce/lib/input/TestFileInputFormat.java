@@ -39,7 +39,7 @@ public class TestFileInputFormat {
   public void testAddInputPath() throws IOException {
     final Configuration conf = new Configuration();
     conf.set("fs.default.name", "s3://abc:xyz@hostname/");
-    final Job j = new Job(conf);
+    final Job j = Job.getInstance(conf);
     j.getConfiguration().set("fs.default.name", "s3://abc:xyz@hostname/");
 
     //setup default fs

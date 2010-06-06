@@ -34,7 +34,7 @@ public class TestDelegatingInputFormat extends TestCase {
 
   @SuppressWarnings("unchecked")
   public void testSplitting() throws Exception {
-    Job job = new Job();
+    Job job = Job.getInstance();
     MiniDFSCluster dfs = null;
     try {
       dfs = new MiniDFSCluster(job.getConfiguration(), 4, true, new String[] { "/rack0",

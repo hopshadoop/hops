@@ -50,7 +50,7 @@ public class TestMRSequenceFileAsBinaryOutputFormat extends TestCase {
   
   public void testBinary() throws IOException, InterruptedException {
     Configuration conf = new Configuration();
-    Job job = new Job(conf);
+    Job job = Job.getInstance(conf);
     
     Path outdir = new Path(System.getProperty("test.build.data", "/tmp"),
                     "outseq");
@@ -146,7 +146,7 @@ public class TestMRSequenceFileAsBinaryOutputFormat extends TestCase {
 
   public void testSequenceOutputClassDefaultsToMapRedOutputClass() 
          throws IOException {
-    Job job = new Job();
+    Job job = Job.getInstance();
     // Setting Random class to test getSequenceFileOutput{Key,Value}Class
     job.setOutputKeyClass(FloatWritable.class);
     job.setOutputValueClass(BooleanWritable.class);
@@ -174,7 +174,7 @@ public class TestMRSequenceFileAsBinaryOutputFormat extends TestCase {
 
   public void testcheckOutputSpecsForbidRecordCompression() 
       throws IOException {
-    Job job = new Job();
+    Job job = Job.getInstance();
     FileSystem fs = FileSystem.getLocal(job.getConfiguration());
     Path outputdir = new Path(System.getProperty("test.build.data", "/tmp") 
                               + "/output");

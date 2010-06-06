@@ -102,7 +102,7 @@ public class TestMultipleInputs extends HadoopTestCase {
     file2.writeBytes("a\tblah\nb\tblah\nc\tblah\nd\tblah\ne\tblah");
     file2.close();
 
-    Job job = new Job(conf);
+    Job job = Job.getInstance(conf);
     job.setJobName("mi");
 
     MultipleInputs.addInputPath(job, in1Dir, TextInputFormat.class,
@@ -141,7 +141,7 @@ public class TestMultipleInputs extends HadoopTestCase {
 
   @SuppressWarnings("unchecked")
   public void testAddInputPathWithFormat() throws IOException {
-    final Job conf = new Job();
+    final Job conf = Job.getInstance();
     MultipleInputs.addInputPath(conf, new Path("/foo"), TextInputFormat.class);
     MultipleInputs.addInputPath(conf, new Path("/bar"),
         KeyValueTextInputFormat.class);
@@ -154,7 +154,7 @@ public class TestMultipleInputs extends HadoopTestCase {
 
   @SuppressWarnings("unchecked")
   public void testAddInputPathWithMapper() throws IOException {
-    final Job conf = new Job();
+    final Job conf = Job.getInstance();
     MultipleInputs.addInputPath(conf, new Path("/foo"), TextInputFormat.class,
        MapClass.class);
     MultipleInputs.addInputPath(conf, new Path("/bar"),

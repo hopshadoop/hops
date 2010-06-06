@@ -152,6 +152,49 @@ public class Job extends JobContextImpl implements JobContext {
     this.status = status;
     state = JobState.RUNNING;
   }
+
+      
+  /**
+   * Creates a new {@link Job} with no particular {@link Cluster} .
+   * A Cluster will be created with a generic {@link Configuration}.
+   * 
+   * @return the {@link Job} , with no connection to a cluster yet.
+   * @throws IOException
+   */
+  public static Job getInstance() throws IOException {
+    // create with a null Cluster
+    return getInstance(new Configuration());
+  }
+      
+  /**
+   * Creates a new {@link Job} with no particular {@link Cluster} .
+   * A Cluster will be created from the conf parameter only when it's needed.
+   * 
+   * @param conf the configuration
+   * @return the {@link Job} , with no connection to a cluster yet.
+   * @throws IOException
+   */
+  public static Job getInstance(Configuration conf) throws IOException {
+    // create with a null Cluster
+    return new Job(null, conf);
+  }
+
+      
+  /**
+   * Creates a new {@link Job} with no particular {@link Cluster} and a given jobName.
+   * A Cluster will be created from the conf parameter only when it's needed.
+   * 
+   * @param conf the configuration
+   * @return the {@link Job} , with no connection to a cluster yet.
+   * @throws IOException
+   */
+  public static Job getInstance(Configuration conf, String jobName)
+           throws IOException {
+    // create with a null Cluster
+    Job result = new Job(null, conf);
+    result.setJobName(jobName);
+    return result;
+  }
   
   public static Job getInstance(Cluster cluster) throws IOException {
      return new Job(cluster);
@@ -171,6 +214,12 @@ public class Job extends JobContextImpl implements JobContext {
     if (state != this.state) {
       throw new IllegalStateException("Job in state "+ this.state + 
                                       " instead of " + state);
+    }
+
+    if (state == JobState.RUNNING && cluster == null) {
+      throw new IllegalStateException
+        ("Job in state " + this.state
+         + ", but it isn't attached to any job tracker!");
     }
   }
 
@@ -949,14 +998,33 @@ public class Job extends JobContextImpl implements JobContext {
     }   
   }
 
+  private synchronized void connect()
+          throws IOException, InterruptedException, ClassNotFoundException {
+    if (cluster == null) {
+      cluster = 
+        ugi.doAs(new PrivilegedExceptionAction<Cluster>() {
+                   public Cluster run()
+                          throws IOException, InterruptedException, 
+                                 ClassNotFoundException {
+                     return new Cluster(getConfiguration());
+                   }
+                 });
+    }
+  }
+
+  boolean isConnected() {
+    return cluster != null;
+  }
+
   /**
    * Submit the job to the cluster and return immediately.
    * @throws IOException
    */
-  public void submit() throws IOException, InterruptedException, 
-                              ClassNotFoundException {
+  public void submit() 
+         throws IOException, InterruptedException, ClassNotFoundException {
     ensureState(JobState.DEFINE);
     setUseNewAPI();
+    connect();
     final JobSubmitter submitter = new JobSubmitter(cluster.getFileSystem(),
         cluster.getClient());
     status = ugi.doAs(new PrivilegedExceptionAction<JobStatus>() {

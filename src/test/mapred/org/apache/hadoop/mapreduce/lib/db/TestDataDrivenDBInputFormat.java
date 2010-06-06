@@ -196,7 +196,7 @@ public class TestDataDrivenDBInputFormat extends HadoopTestCase {
     fs.delete(new Path(OUT_DIR), true);
 
     // now do a dd import
-    Job job = new Job(conf);
+    Job job = Job.getInstance(conf);
     job.setMapperClass(ValMapper.class);
     job.setReducerClass(Reducer.class);
     job.setMapOutputKeyClass(DateCol.class);

@@ -521,7 +521,7 @@ public class TestValueIterReset extends TestCase {
   public void testValueIterReset() {
     try {
       Configuration conf = new Configuration();
-      Job job = new Job(conf, "TestValueIterReset") ;
+      Job job = Job.getInstance(conf, "TestValueIterReset") ;
       job.setJarByClass(TestValueIterReset.class);
       job.setMapperClass(TestMapper.class);
       job.setReducerClass(TestReducer.class);

@@ -130,7 +130,7 @@ public class TestMapReduceLocal extends TestCase {
     localFs.delete(new Path(TEST_ROOT_DIR + "/out"), true);    
     writeFile("in/part1", "this is a test\nof word count test\ntest\n");
     writeFile("in/part2", "more test");
-    Job job = new Job(conf, "word count");     
+    Job job = Job.getInstance(conf, "word count");     
     job.setJarByClass(WordCount.class);
     job.setMapperClass(TokenizerMapper.class);
     job.setCombinerClass(IntSumReducer.class);

@@ -129,7 +129,7 @@ public class GenericMRLoadGenerator extends Configured implements Tool {
   }
 
   public int run(String [] argv) throws Exception {
-    Job job = new Job(getConf());
+    Job job = Job.getInstance(getConf());
     job.setJarByClass(GenericMRLoadGenerator.class);
     job.setMapperClass(SampleMapper.class);
     job.setReducerClass(SampleReducer.class);

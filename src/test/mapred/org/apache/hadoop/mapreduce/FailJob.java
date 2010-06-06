@@ -80,7 +80,7 @@ public class FailJob extends Configured implements Tool {
     Configuration conf = getConf();
     conf.setBoolean(FAIL_MAP, failMappers);
     conf.setBoolean(FAIL_REDUCE, failReducers);
-    Job job = new Job(conf, "fail");
+    Job job = Job.getInstance(conf, "fail");
     job.setJarByClass(FailJob.class);
     job.setMapperClass(FailMapper.class);
     job.setMapOutputKeyClass(LongWritable.class);

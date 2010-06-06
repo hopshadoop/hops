@@ -202,7 +202,7 @@ public class SleepJob extends Configured implements Tool {
     conf.setInt(MAP_SLEEP_COUNT, mapSleepCount);
     conf.setInt(REDUCE_SLEEP_COUNT, reduceSleepCount);
     conf.setInt(MRJobConfig.NUM_MAPS, numMapper);
-    Job job = new Job(conf, "sleep");
+    Job job = Job.getInstance(conf, "sleep");
     job.setNumReduceTasks(numReducer);
     job.setJarByClass(SleepJob.class);
     job.setNumReduceTasks(numReducer);

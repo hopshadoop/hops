@@ -38,7 +38,7 @@ public class TestMRSequenceFileAsTextInputFormat extends TestCase {
   private static Configuration conf = new Configuration();
 
   public void testFormat() throws Exception {
-    Job job = new Job(conf);
+    Job job = Job.getInstance(conf);
     FileSystem fs = FileSystem.getLocal(conf);
     Path dir = new Path(System.getProperty("test.build.data",".") + "/mapred");
     Path file = new Path(dir, "test.seq");

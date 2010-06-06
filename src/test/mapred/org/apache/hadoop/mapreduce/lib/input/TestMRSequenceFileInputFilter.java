@@ -51,7 +51,7 @@ public class TestMRSequenceFileInputFilter extends TestCase {
   
   static {
     try {
-      job = new Job(conf);
+      job = Job.getInstance(conf);
       FileInputFormat.setInputPaths(job, inDir);
       fs = FileSystem.getLocal(conf);
     } catch (IOException e) {

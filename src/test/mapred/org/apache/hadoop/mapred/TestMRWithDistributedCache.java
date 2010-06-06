@@ -134,7 +134,7 @@ public class TestMRWithDistributedCache extends TestCase {
         makeJar(new Path(TEST_ROOT_DIR, "distributed.fourth.jar"), 4);
 
 
-    Job job = new Job(conf);
+    Job job = Job.getInstance(conf);
     job.setMapperClass(DistributedCacheChecker.class);
     job.setOutputFormatClass(NullOutputFormat.class);
     FileInputFormat.setInputPaths(job, first);

@@ -286,7 +286,7 @@ public class TestMapReduce extends TestCase {
     fs.delete(randomOuts, true);
 
 
-    Job genJob = new Job(conf);
+    Job genJob = Job.getInstance(conf);
     FileInputFormat.setInputPaths(genJob, randomIns);
     genJob.setInputFormatClass(SequenceFileInputFormat.class);
     genJob.setMapperClass(RandomGenMapper.class);
@@ -331,7 +331,7 @@ public class TestMapReduce extends TestCase {
     int intermediateReduces = 10;
     Path intermediateOuts = new Path(testdir, "intermediateouts");
     fs.delete(intermediateOuts, true);
-    Job checkJob = new Job(conf);
+    Job checkJob = Job.getInstance(conf);
     FileInputFormat.setInputPaths(checkJob, randomOuts);
     checkJob.setMapperClass(RandomCheckMapper.class);
 
@@ -353,7 +353,7 @@ public class TestMapReduce extends TestCase {
     //
     Path finalOuts = new Path(testdir, "finalouts");
     fs.delete(finalOuts, true);
-    Job mergeJob = new Job(conf);
+    Job mergeJob = Job.getInstance(conf);
     FileInputFormat.setInputPaths(mergeJob, intermediateOuts);
     mergeJob.setInputFormatClass(SequenceFileInputFormat.class);
     mergeJob.setMapperClass(MergeMapper.class);

@@ -128,6 +128,11 @@ public class TestChild extends HadoopTestCase {
                 numMaps, numReds);
     job.setMapperClass(MyMapper.class);
     job.setReducerClass(MyReducer.class);
+    assertFalse("Job already has a job tracker connection, before it's submitted",
+                job.isConnected());
+    job.submit();
+    assertTrue("Job doesn't have a job tracker connection, even though it's been submitted",
+               job.isConnected());
     job.waitForCompletion(true);
     assertTrue(job.isSuccessful());
 

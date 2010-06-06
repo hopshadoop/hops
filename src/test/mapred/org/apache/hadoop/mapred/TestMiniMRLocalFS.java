@@ -311,7 +311,7 @@ public class TestMiniMRLocalFS extends TestCase {
     TestMapReduceLocal.writeFile
              ("in/part1", "-1 -4\n-3 23\n5 10\n-1 -2\n-1 300\n-1 10\n4 1\n" +
               "4 2\n4 10\n4 -1\n4 -10\n10 20\n10 30\n10 25\n");
-    Job job = new Job(conf, "word count");
+    Job job = Job.getInstance(conf, "word count");
     job.setJarByClass(WordCount.class);
     job.setNumReduceTasks(2);
     job.setMapperClass(SecondarySort.MapClass.class);

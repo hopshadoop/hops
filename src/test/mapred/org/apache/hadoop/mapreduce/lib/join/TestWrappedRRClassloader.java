@@ -54,8 +54,9 @@ public class TestWrappedRRClassloader extends TestCase {
     // create dummy TaskAttemptID
     TaskAttemptID tid = new TaskAttemptID("jt", 1, TaskType.MAP, 0, 0);
     conf.set(MRJobConfig.TASK_ATTEMPT_ID, tid.toString());
-    inputFormat.createRecordReader(inputFormat.getSplits(new Job(conf)).get(0), 
-      new TaskAttemptContextImpl(conf, tid));
+    inputFormat.createRecordReader
+      (inputFormat.getSplits(Job.getInstance(conf)).get(0), 
+       new TaskAttemptContextImpl(conf, tid));
   }
 
   public static class Fake_ClassLoader extends ClassLoader {

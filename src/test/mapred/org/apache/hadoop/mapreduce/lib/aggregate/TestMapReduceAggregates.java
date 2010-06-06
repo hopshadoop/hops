@@ -89,7 +89,7 @@ public class TestMapReduceAggregates extends TestCase {
       "UserDefined,org.apache.hadoop.mapreduce.lib.aggregate.AggregatorTests");
     conf.setLong(UniqValueCount.MAX_NUM_UNIQUE_VALUES, 14);
     
-    Job job = new Job(conf);
+    Job job = Job.getInstance(conf);
     FileInputFormat.setInputPaths(job, INPUT_DIR);
     job.setInputFormatClass(TextInputFormat.class);
     FileOutputFormat.setOutputPath(job, OUTPUT_DIR);

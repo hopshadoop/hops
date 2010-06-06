@@ -45,7 +45,7 @@ public class TestDBOutputFormat extends TestCase {
   }
   
   public void testSetOutput() throws IOException {
-    Job job = new Job(new Configuration());
+    Job job = Job.getInstance(new Configuration());
     DBOutputFormat.setOutput(job, "hadoop_output", fieldNames);
     
     DBConfiguration dbConf = new DBConfiguration(job.getConfiguration());
@@ -54,7 +54,7 @@ public class TestDBOutputFormat extends TestCase {
     
     assertEquals(expected, actual);
     
-    job = new Job(new Configuration());
+    job = Job.getInstance(new Configuration());
     dbConf = new DBConfiguration(job.getConfiguration());
     DBOutputFormat.setOutput(job, "hadoop_output", nullFieldNames.length);
     assertNull(dbConf.getOutputFieldNames());

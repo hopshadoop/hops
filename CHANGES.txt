@@ -69,6 +69,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1836. Refresh for proxy superuser config (mr part for HDFS-1096).
     (Boris Shkolnik via shv)
 
+    MAPREDUCE-1505. Create RPC client on job submission, not in cstr of Job
+    instance. (Dick King via cdouglas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

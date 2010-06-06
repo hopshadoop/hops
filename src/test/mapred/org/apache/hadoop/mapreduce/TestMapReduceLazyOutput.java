@@ -88,7 +88,7 @@ public class TestMapReduceLazyOutput extends TestCase {
   private static void runTestLazyOutput(Configuration conf, Path output,
       int numReducers, boolean createLazily) 
   throws Exception {
-    Job job = new Job(conf, "Test-Lazy-Output");
+    Job job = Job.getInstance(conf, "Test-Lazy-Output");
 
     FileInputFormat.setInputPaths(job, INPUT);
     FileOutputFormat.setOutputPath(job, output);

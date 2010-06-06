@@ -38,7 +38,7 @@ public class TestMRSequenceFileAsBinaryInputFormat extends TestCase {
   private static final int RECORDS = 10000;
 
   public void testBinary() throws IOException, InterruptedException {
-    Job job = new Job();
+    Job job = Job.getInstance();
     FileSystem fs = FileSystem.getLocal(job.getConfiguration());
     Path dir = new Path(System.getProperty("test.build.data",".") + "/mapred");
     Path file = new Path(dir, "testbinary.seq");

@@ -255,7 +255,7 @@ public class TestJoinDatamerge extends TestCase {
     conf.set(CompositeInputFormat.JOIN_EXPR, CompositeInputFormat.compose(jointype,
         SequenceFileInputFormat.class, src));
     conf.setInt("testdatamerge.sources", srcs);
-    Job job = new Job(conf);
+    Job job = Job.getInstance(conf);
     job.setInputFormatClass(CompositeInputFormat.class);
     FileOutputFormat.setOutputPath(job, new Path(base, "out"));
 
@@ -377,7 +377,7 @@ public class TestJoinDatamerge extends TestCase {
     MapReduceTestUtil.Fake_IF.setKeyClass(conf, IntWritable.class);
     MapReduceTestUtil.Fake_IF.setValClass(conf, IntWritable.class);
 
-    Job job = new Job(conf);
+    Job job = Job.getInstance(conf);
     Path outf = new Path(base, "out");
     FileOutputFormat.setOutputPath(job, outf);
     job.setInputFormatClass(CompositeInputFormat.class);
@@ -430,7 +430,7 @@ public class TestJoinDatamerge extends TestCase {
         MapReduceTestUtil.Fake_IF.class, src));
     MapReduceTestUtil.Fake_IF.setKeyClass(conf, 
       MapReduceTestUtil.IncomparableKey.class);
-    Job job = new Job(conf);
+    Job job = Job.getInstance(conf);
     job.setInputFormatClass(CompositeInputFormat.class);
     FileOutputFormat.setOutputPath(job, new Path(base, "out"));
 

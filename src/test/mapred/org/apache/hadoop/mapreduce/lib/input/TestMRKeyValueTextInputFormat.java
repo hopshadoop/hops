@@ -69,7 +69,7 @@ public class TestMRKeyValueTextInputFormat {
   
   @Test
   public void testFormat() throws Exception {
-    Job job = new Job(new Configuration(defaultConf));
+    Job job = Job.getInstance(new Configuration(defaultConf));
     Path file = new Path(workDir, "test.txt");
 
     int seed = new Random().nextInt();
@@ -157,7 +157,7 @@ public class TestMRKeyValueTextInputFormat {
 
   @Test
   public void testSplitableCodecs() throws Exception {
-    final Job job = new Job(defaultConf);
+    final Job job = Job.getInstance(defaultConf);
     final Configuration conf = job.getConfiguration();
 
     // Create the codec
@@ -338,7 +338,7 @@ public class TestMRKeyValueTextInputFormat {
               "fox jumped\nline-4\tover\nline-5\t the lazy\nline-6\t dog\n");
     writeFile(localFs, new Path(workDir, "part2.txt.gz"), gzip,
               "line-1\tthis is a test\nline-1\tof gzip\n");
-    Job job = new Job(conf);
+    Job job = Job.getInstance(conf);
     FileInputFormat.setInputPaths(job, workDir);
     KeyValueTextInputFormat format = new KeyValueTextInputFormat();
     List<InputSplit> splits = format.getSplits(job);
