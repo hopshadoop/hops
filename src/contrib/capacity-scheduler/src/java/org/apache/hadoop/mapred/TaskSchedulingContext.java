@@ -61,10 +61,6 @@ public class TaskSchedulingContext {
    */
   private Map<String, Integer> numSlotsOccupiedByUser =
     new HashMap<String, Integer>();
-  final static String JOB_SCHEDULING_INFO_FORMAT_STRING =
-    "%s running map tasks using %d map slots. %d additional slots reserved." +
-      " %s running reduce tasks using %d reduce slots." +
-      " %d additional slots reserved.";
 
   /**
    * reset the variables associated with tasks

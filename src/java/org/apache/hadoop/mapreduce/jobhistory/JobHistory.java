@@ -396,7 +396,9 @@ public class JobHistory {
         LOG.warn("Unable to move " + fromPath +", deleting it");
         try {
           boolean b = logDirFs.delete(fromPath, false);
-          LOG.debug("Deletion of corrupt file " + fromPath + " returned " + b);
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Deletion of corrupt file " + fromPath + " returned " + b);
+          }
         } catch (IOException ioe) {
           // Cannot delete either? Just log and carry on
           LOG.warn("Unable to delete " + fromPath + "Exception: " +

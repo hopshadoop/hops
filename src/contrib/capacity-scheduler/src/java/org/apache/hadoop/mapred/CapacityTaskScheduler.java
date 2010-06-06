@@ -117,7 +117,9 @@ class CapacityTaskScheduler extends TaskScheduler {
     }
     
     static TaskLookupResult getTaskFoundResult(Task t) {
-      LOG.debug("Returning task " + t);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Returning task " + t);
+      }
       return new TaskLookupResult(t, LookUpStatus.TASK_FOUND);
     }
     static TaskLookupResult getNoTaskFoundResult() {
@@ -333,8 +335,10 @@ class CapacityTaskScheduler extends TaskScheduler {
             return TaskLookupResult.getTaskFoundResult(t);
           } else {
             //skip to the next job in the queue.
-            LOG.debug("Job " + j.getJobID().toString()
-                + " returned no tasks of type " + type);
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Job " + j.getJobID().toString()
+                        + " returned no tasks of type " + type);
+            }
           }
         } else {
           // if memory requirements don't match then we check if the job has
@@ -413,8 +417,10 @@ class CapacityTaskScheduler extends TaskScheduler {
       }//end of for loop
 
       // found nothing for this queue, look at the next one.
-      String msg = "Found no task from the queue " + qsi.getQueueName();
-      LOG.debug(msg);
+      if (LOG.isDebugEnabled()) {
+        String msg = "Found no task from the queue " + qsi.getQueueName();
+        LOG.debug(msg);
+      }
       return TaskLookupResult.getNoTaskFoundResult();
     }
 
@@ -973,13 +979,15 @@ class CapacityTaskScheduler extends TaskScheduler {
     int currentMapSlots = taskTrackerStatus.countOccupiedMapSlots();
     int maxReduceSlots = taskTrackerStatus.getMaxReduceSlots();
     int currentReduceSlots = taskTrackerStatus.countOccupiedReduceSlots();
-    LOG.debug("TT asking for task, max maps="
-      + taskTrackerStatus.getMaxMapSlots() + 
-        ", run maps=" + taskTrackerStatus.countMapTasks() + ", max reds=" + 
-        taskTrackerStatus.getMaxReduceSlots() + ", run reds=" + 
-        taskTrackerStatus.countReduceTasks() + ", map cap=" + 
-        mapClusterCapacity + ", red cap = " + 
-        reduceClusterCapacity);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("TT asking for task, max maps="
+                + taskTrackerStatus.getMaxMapSlots() + 
+                ", run maps=" + taskTrackerStatus.countMapTasks() + ", max reds=" + 
+                taskTrackerStatus.getMaxReduceSlots() + ", run reds=" + 
+                taskTrackerStatus.countReduceTasks() + ", map cap=" + 
+                mapClusterCapacity + ", red cap = " + 
+                reduceClusterCapacity);
+    }
 
     /* 
      * update all our QSC objects.

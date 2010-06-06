@@ -1503,11 +1503,8 @@ public class TestCapacityScheduler extends TestCase {
       // Total 1 map slot should be accounted for.
       checkOccupiedSlots("default", TaskType.MAP, 1, 1, 16.7f);
       checkOccupiedSlots("default", TaskType.REDUCE, 1, 1, 16.7f);
-      assertEquals(
-        String.format(
-          TaskSchedulingContext.JOB_SCHEDULING_INFO_FORMAT_STRING,
-          1, 1, 0, 1, 1, 0),
-        (String) job1.getSchedulingInfo());
+      assertEquals(JobQueue.getJobQueueSchedInfo(1, 1, 0, 1, 1, 0),
+                   job1.getSchedulingInfo().toString());
       checkMemReservedForTasksOnTT("tt1", 1 * 1024L, 1 * 1024L);
 
       expectedStrings.clear();
@@ -1546,11 +1543,8 @@ public class TestCapacityScheduler extends TestCase {
           "tt3", expectedStrings);
       checkOccupiedSlots("default", TaskType.MAP, 1, 4, 66.7f);
       checkOccupiedSlots("default", TaskType.REDUCE, 1, 4, 66.7f);
-      assertEquals(
-        String.format(
-          TaskSchedulingContext.JOB_SCHEDULING_INFO_FORMAT_STRING,
-          1, 2, 0, 1, 2, 0),
-        (String) job2.getSchedulingInfo());
+      assertEquals(JobQueue.getJobQueueSchedInfo(1, 2, 0, 1, 2, 0),
+                   job2.getSchedulingInfo().toString());
       checkMemReservedForTasksOnTT("tt3", 2 * 1024L, 2 * 1024L);
 
       LOG.debug(
@@ -1575,16 +1569,10 @@ public class TestCapacityScheduler extends TestCase {
       checkOccupiedSlots("default", TaskType.REDUCE, 1, 6, 100.0f);
       checkMemReservedForTasksOnTT("tt1", 1 * 1024L, 1 * 1024L);
       LOG.info(job2.getSchedulingInfo());
-      assertEquals(
-        String.format(
-          TaskSchedulingContext.JOB_SCHEDULING_INFO_FORMAT_STRING,
-          1, 2, 2, 1, 2, 2),
-        (String) job2.getSchedulingInfo());
-      assertEquals(
-        String.format(
-          TaskSchedulingContext.JOB_SCHEDULING_INFO_FORMAT_STRING,
-          0, 0, 0, 0, 0, 0),
-        (String) job3.getSchedulingInfo());
+      assertEquals(JobQueue.getJobQueueSchedInfo(1, 2, 2, 1, 2, 2),
+                   job2.getSchedulingInfo().toString());
+      assertEquals(JobQueue.getJobQueueSchedInfo(0, 0, 0, 0, 0, 0),
+                   job3.getSchedulingInfo().toString());
 
       // Reservations are already done for job2. So job3 should go ahead.
       expectedStrings.clear();
@@ -2187,10 +2175,8 @@ public class TestCapacityScheduler extends TestCase {
     scheduler.updateContextInfoForTests();
 
     LOG.info(job1.getSchedulingInfo());
-    assertEquals(
-      String.format(
-        TaskSchedulingContext.JOB_SCHEDULING_INFO_FORMAT_STRING, 3, 3, 0, 0,
-        0, 0), (String) job1.getSchedulingInfo());
+    assertEquals(JobQueue.getJobQueueSchedInfo(3, 3, 0, 0, 0, 0), 
+                 job1.getSchedulingInfo().toString());
 
     LOG.debug(
       "Submit one high memory(2GB maps, 0MB reduces) job of "
@@ -2220,18 +2206,14 @@ public class TestCapacityScheduler extends TestCase {
     assertNull(scheduler.assignTasks(tracker("tt1")));
     scheduler.updateContextInfoForTests();
     LOG.info(job2.getSchedulingInfo());
-    assertEquals(
-      String.format(
-        TaskSchedulingContext.JOB_SCHEDULING_INFO_FORMAT_STRING, 0, 0, 2, 0,
-        0, 0), (String) job2.getSchedulingInfo());
+    assertEquals(JobQueue.getJobQueueSchedInfo(0, 0, 2, 0, 0, 0), 
+                 job2.getSchedulingInfo().toString()); 
 
     assertNull(scheduler.assignTasks(tracker("tt2")));
     scheduler.updateContextInfoForTests();
     LOG.info(job2.getSchedulingInfo());
-    assertEquals(
-      String.format(
-        TaskSchedulingContext.JOB_SCHEDULING_INFO_FORMAT_STRING, 0, 0, 4, 0,
-        0, 0), (String) job2.getSchedulingInfo());
+    assertEquals(JobQueue.getJobQueueSchedInfo(0, 0, 4, 0, 0, 0), 
+                 job2.getSchedulingInfo().toString());
 
     // Job2 has only 2 pending tasks. So no more reservations. Job3 should get
     // slots on tt3. tt1 and tt2 should not be assigned any slots with the
@@ -2239,28 +2221,22 @@ public class TestCapacityScheduler extends TestCase {
     assertNull(scheduler.assignTasks(tracker("tt1")));
     scheduler.updateContextInfoForTests();
     LOG.info(job2.getSchedulingInfo());
-    assertEquals(
-      String.format(
-        TaskSchedulingContext.JOB_SCHEDULING_INFO_FORMAT_STRING, 0, 0, 4, 0,
-        0, 0), (String) job2.getSchedulingInfo());
+    assertEquals(JobQueue.getJobQueueSchedInfo(0, 0, 4, 0, 0, 0), 
+                 job2.getSchedulingInfo().toString()); 
 
     assertNull(scheduler.assignTasks(tracker("tt2")));
     scheduler.updateContextInfoForTests();
     LOG.info(job2.getSchedulingInfo());
-    assertEquals(
-      String.format(
-        TaskSchedulingContext.JOB_SCHEDULING_INFO_FORMAT_STRING, 0, 0, 4, 0,
-        0, 0), (String) job2.getSchedulingInfo());
+    assertEquals(JobQueue.getJobQueueSchedInfo(0, 0, 4, 0, 0, 0), 
+                 job2.getSchedulingInfo().toString());
 
     checkAssignment(
       taskTrackerManager, scheduler, "tt3",
       "attempt_test_0003_m_000001_0 on tt3");
     scheduler.updateContextInfoForTests();
     LOG.info(job2.getSchedulingInfo());
-    assertEquals(
-      String.format(
-        TaskSchedulingContext.JOB_SCHEDULING_INFO_FORMAT_STRING, 0, 0, 4, 0,
-        0, 0), (String) job2.getSchedulingInfo());
+    assertEquals(JobQueue.getJobQueueSchedInfo(0, 0, 4, 0, 0, 0), 
+                 job2.getSchedulingInfo().toString());
 
     // No more tasks there in job3 also
     assertNull(scheduler.assignTasks(tracker("tt3")));

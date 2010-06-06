@@ -48,6 +48,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1762. Add ability to set values of task counters. (Scott Chen via
     cdouglas)
 
+    MAPREDUCE-1533. Reduce overhead of logging and string manipulation during
+    heartbeat processing. (Amar Kamat and Dick King via cdouglas)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and

@@ -93,9 +93,7 @@ abstract class TaskDataView {
 
     @Override
     int getSlotsPerTask(JobInProgress job) {
-      return
-        job.getJobConf().computeNumSlotsPerMap(
-          MemoryMatcher.getMemSizeForMapSlot());
+      return job.getNumSlotsPerMap();
     }
 
     @Override
@@ -128,9 +126,7 @@ abstract class TaskDataView {
 
     @Override
     int getSlotsPerTask(JobInProgress job) {
-      return
-        job.getJobConf().
-          computeNumSlotsPerReduce(MemoryMatcher.getMemSizeForReduceSlot());
+      return job.getNumSlotsPerReduce();
     }
 
     @Override

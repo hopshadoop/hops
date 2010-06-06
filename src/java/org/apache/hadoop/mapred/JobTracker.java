@@ -329,7 +329,9 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
           // Every 3 minutes check for any tasks that are overdue
           Thread.sleep(tasktrackerExpiryInterval/3);
           long now = clock.getTime();
-          LOG.debug("Starting launching task sweep");
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Starting launching task sweep");
+          }
           synchronized (JobTracker.this) {
             synchronized (launchingTasks) {
               Iterator<Map.Entry<TaskAttemptID, Long>> itr =
@@ -701,7 +703,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     private void blackListTracker(String hostName, String reason, ReasonForBlackListing rfb) {
       FaultInfo fi = getFaultInfo(hostName, true);
       boolean blackListed = fi.isBlacklisted();
-      if(blackListed) {
+      if (blackListed) {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Adding blacklisted reason for tracker : " + hostName 
               + " Reason for blacklisting is : " + rfb);
@@ -729,7 +731,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     private boolean canUnBlackListTracker(String hostName,
         ReasonForBlackListing rfb) {
       FaultInfo fi = getFaultInfo(hostName, false);
-      if(fi == null) {
+      if (fi == null) {
         return false;
       }
       
@@ -741,15 +743,15 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
         ReasonForBlackListing rfb) {
       // check if you can black list the tracker then call this methods
       FaultInfo fi = getFaultInfo(hostName, false);
-      if(fi.removeBlackListedReason(rfb)) {
-        if(fi.getReasonforblacklisting().isEmpty()) {
+      if (fi.removeBlackListedReason(rfb)) {
+        if (fi.getReasonforblacklisting().isEmpty()) {
           addHostCapacity(hostName);
           LOG.info("Unblacklisting tracker : " + hostName);
           fi.unBlacklist();
           //We have unBlackListed tracker, so tracker should
           //definitely be healthy. Check fault count if fault count
           //is zero don't keep it memory.
-          if(fi.numFaults == 0) {
+          if (fi.numFaults == 0) {
             potentiallyFaultyTrackers.remove(hostName);
           }
         }
@@ -1464,7 +1466,9 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
       for (Iterator it = p.keySet().iterator(); it.hasNext();) {
         String key = (String) it.next();
         String val = p.getProperty(key);
-        LOG.debug("Property '" + key + "' is " + val);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Property '" + key + "' is " + val);
+        }
       }
     }
 
@@ -1525,7 +1529,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
         }
         // clean up the system dir, which will only work if hdfs is out of 
         // safe mode
-        if(systemDir == null) {
+        if (systemDir == null) {
           systemDir = new Path(getSystemDir());    
         }
         try {
@@ -1870,7 +1874,9 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     }
     taskset.add(taskid);
       
-    LOG.debug("Marked '" + taskid + "' from '" + taskTracker + "'");
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Marked '" + taskid + "' from '" + taskTracker + "'");
+    }
   }
 
   /**
@@ -2456,7 +2462,9 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
         if (tasks != null) {
           for (Task task : tasks) {
             expireLaunchingTasks.addNewTask(task.getTaskID());
-            LOG.debug(trackerName + " -> LaunchTask: " + task.getTaskID());
+            if (LOG.isDebugEnabled()) {
+              LOG.debug(trackerName + " -> LaunchTask: " + task.getTaskID());
+            }
             actions.add(new LaunchTaskAction(task));
           }
         }
@@ -2753,7 +2761,9 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
           //
           if (!tip.getJob().isComplete()) {
             killList.add(new KillTaskAction(killTaskId));
-            LOG.debug(taskTracker + " -> KillTaskAction: " + killTaskId);
+            if (LOG.isDebugEnabled()) {
+              LOG.debug(taskTracker + " -> KillTaskAction: " + killTaskId);
+            }
           }
         }
       }
@@ -2776,7 +2786,10 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    */
   private void addJobForCleanup(JobID id) {
     for (String taskTracker : taskTrackers.keySet()) {
-      LOG.debug("Marking job " + id + " for cleanup by tracker " + taskTracker);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Marking job " + id
+                  + " for cleanup by tracker " + taskTracker);
+      }
       synchronized (trackerToJobsToCleanup) {
         Set<JobID> jobsToKill = trackerToJobsToCleanup.get(taskTracker);
         if (jobsToKill == null) {
@@ -2801,7 +2814,9 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
       List<TaskTrackerAction> killList = new ArrayList<TaskTrackerAction>();
       for (JobID killJobId : jobs) {
         killList.add(new KillJobAction(killJobId));
-        LOG.debug(taskTracker + " -> KillJobAction: " + killJobId);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug(taskTracker + " -> KillJobAction: " + killJobId);
+        }
       }
 
       return killList;
@@ -2826,8 +2841,10 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
           }
           if (tip.shouldCommit(taskId)) {
             saveList.add(new CommitTaskAction(taskId));
-            LOG.debug(tts.getTrackerName() + 
-                      " -> CommitTaskAction: " + taskId);
+            if (LOG.isDebugEnabled()) {
+              LOG.debug(tts.getTrackerName() + 
+                        " -> CommitTaskAction: " + taskId);
+            }
           }
         }
       }
@@ -3805,7 +3822,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   public synchronized boolean killTask(TaskAttemptID taskid, 
       boolean shouldFail) throws IOException {
     TaskInProgress tip = taskidToTIPMap.get(taskid);
-    if(tip != null) {
+    if (tip != null) {
 
       // check both queue-level and job-level access
       checkAccess(tip.getJob(), UserGroupInformation.getCurrentUser(),
@@ -4209,7 +4226,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     StringUtils.startupShutdownMessage(JobTracker.class, argv, LOG);
     
     try {
-      if(argv.length == 0) {
+      if (argv.length == 0) {
         JobTracker tracker = startTracker(new JobConf());
         tracker.offerService();
       }
@@ -4324,7 +4341,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
 
   private synchronized JobStatus[] getJobStatus(Collection<JobInProgress> jips,
       boolean toComplete) {
-    if(jips == null || jips.isEmpty()) {
+    if (jips == null || jips.isEmpty()) {
       return new JobStatus[]{};
     }
     ArrayList<JobStatus> jobStatusList = new ArrayList<JobStatus>();
@@ -4332,8 +4349,8 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
       JobStatus status = jip.getStatus();
       status.setStartTime(jip.getStartTime());
       status.setUsername(jip.getProfile().getUser());
-      if(toComplete) {
-        if(status.getRunState() == JobStatus.RUNNING || 
+      if (toComplete) {
+        if (status.getRunState() == JobStatus.RUNNING || 
             status.getRunState() == JobStatus.PREP) {
           jobStatusList.add(status);
         }
@@ -4455,8 +4472,10 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   private void checkMemoryRequirements(JobInProgress job)
       throws IOException {
     if (!perTaskMemoryConfigurationSetOnJT()) {
-      LOG.debug("Per-Task memory configuration is not set on JT. "
-          + "Not checking the job for invalid memory requirements.");
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Per-Task memory configuration is not set on JT. "
+                  + "Not checking the job for invalid memory requirements.");
+      }
       return;
     }
 

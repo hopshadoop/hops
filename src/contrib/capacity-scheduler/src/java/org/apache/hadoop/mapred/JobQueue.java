@@ -130,15 +130,12 @@ class JobQueue extends AbstractQueue {
       (reduceScheduler.getNumReservedTaskTrackers(j) *
         reduceScheduler.getSlotsPerTask(j));
 
-    j.setSchedulingInfo(
-      String.format(
-        TaskSchedulingContext.JOB_SCHEDULING_INFO_FORMAT_STRING,
-        numMapsRunningForThisJob,
-        numRunningMapSlots,
-        numReservedMapSlotsForThisJob,
-        numReducesRunningForThisJob,
-        numRunningReduceSlots,
-        numReservedReduceSlotsForThisJob));
+    j.setSchedulingInfo
+      (getJobQueueSchedInfo(numMapsRunningForThisJob, numRunningMapSlots,
+                            numReservedMapSlotsForThisJob,
+                            numReducesRunningForThisJob,
+                            numRunningReduceSlots,
+                            numReservedReduceSlotsForThisJob));
 
 
     mapTSI.setNumRunningTasks(
@@ -181,6 +178,23 @@ class JobQueue extends AbstractQueue {
   * can keep a list of running jobs per user. Then we only need to
   * consider the first few jobs per user.
   */
+  }
+ 
+  private static final int JOBQUEUE_SCHEDULINGINFO_INITIAL_LENGTH = 175;
+  
+  static String getJobQueueSchedInfo
+    (int numMapsRunningForThisJob, 
+     int numRunningMapSlots, int numReservedMapSlotsForThisJob, 
+     int numReducesRunningForThisJob, int numRunningReduceSlots, 
+     int numReservedReduceSlotsForThisJob) {
+    StringBuilder sb = new StringBuilder(JOBQUEUE_SCHEDULINGINFO_INITIAL_LENGTH);
+    sb.append(numMapsRunningForThisJob).append(" running map tasks using ")
+      .append(numRunningMapSlots).append(" map slots. ")
+      .append(numReservedMapSlotsForThisJob).append(" additional slots reserved. ")
+      .append(numReducesRunningForThisJob).append(" running reduce tasks using ")
+      .append(numRunningReduceSlots).append(" reduce slots. ")
+      .append(numReservedReduceSlotsForThisJob).append(" additional slots reserved.");
+    return sb.toString();
   }
 
 
@@ -270,9 +284,10 @@ class JobQueue extends AbstractQueue {
     // setup scheduler specific job information
     preInitializeJob(job);
 
-    LOG.debug(
-      "Job " + job.getJobID().toString() + " is added under user "
-        + job.getProfile().getUser() + ", user now has " + i + " jobs");
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Job " + job.getJobID().toString() + " is added under user "
+                + job.getProfile().getUser() + ", user now has " + i + " jobs");
+    }
   }
 
 
@@ -303,7 +318,9 @@ class JobQueue extends AbstractQueue {
   // called when a job completes
   synchronized void jobCompleted(JobInProgress job) {
 
-    LOG.debug("Job to be removed for user " + job.getProfile().getUser());
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Job to be removed for user " + job.getProfile().getUser());
+    }
     Integer i = qsc.getNumJobsByUser().get(job.getProfile().getUser());
     i--;
     if (0 == i.intValue()) {
@@ -313,14 +330,16 @@ class JobQueue extends AbstractQueue {
         job.getProfile().getUser());
       qsc.getReduceTSC().getNumSlotsOccupiedByUser().remove(
         job.getProfile().getUser());
-      LOG.debug(
-        "No more jobs for user, number of users = " + qsc
-          .getNumJobsByUser().size());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("No more jobs for user, number of users = "
+                  + qsc.getNumJobsByUser().size());
+      }
     } else {
       qsc.getNumJobsByUser().put(job.getProfile().getUser(), i);
-      LOG.debug(
-        "User still has " + i + " jobs, number of users = "
-          + qsc.getNumJobsByUser().size());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("User still has " + i + " jobs, number of users = "
+                  + qsc.getNumJobsByUser().size());
+      }
     }
   }
 

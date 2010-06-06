@@ -1228,7 +1228,7 @@ public class JobInProgress {
     //
     // Update JobInProgress status
     //
-    if(LOG.isDebugEnabled()) {
+    if (LOG.isDebugEnabled()) {
       LOG.debug("Taking progress for " + tip.getTIPId() + " from " + 
                  oldProgress + " to " + tip.getProgress());
     }
@@ -1636,8 +1636,10 @@ public class JobInProgress {
       splits = tip.getSplitNodes();
       if (tip.isSpeculating()) {
         speculativeMapTasks++;
-        LOG.debug("Chosen speculative task, current speculativeMap task count: "
-            + speculativeMapTasks);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Chosen speculative task, current speculativeMap task count: "
+                    + speculativeMapTasks);
+        }
       }
       metrics.launchMap(id);
     } else {
@@ -1646,8 +1648,10 @@ public class JobInProgress {
       counter = JobCounter.TOTAL_LAUNCHED_REDUCES;
       if (tip.isSpeculating()) {
         speculativeReduceTasks++;
-        LOG.debug("Chosen speculative task, current speculativeReduce task count: "
-          + speculativeReduceTasks);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Chosen speculative task, current speculativeReduce task count: "
+                    + speculativeReduceTasks);
+        }
       }
       metrics.launchReduce(id);
     }
@@ -2332,7 +2336,9 @@ public class JobInProgress {
       LOG.info("Choosing map task " + tip.getTIPId() + 
           " for speculative execution");
     } else {
-      LOG.debug("No speculative map task found for tracker " + taskTrackerName);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("No speculative map task found for tracker " + taskTrackerName);
+      }
     }
     return tip;
   }
@@ -2400,8 +2406,11 @@ public class JobInProgress {
     if (tip != null) {
       LOG.info("Choosing reduce task " + tip.getTIPId() + 
           " for speculative execution");
-    }else {
-      LOG.debug("No speculative map task found for tracker " + taskTrackerHost);
+    } else {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("No speculative map task found for tracker "
+                  + taskTrackerHost);
+      }
     }
     return tip;
   }
@@ -2576,9 +2585,11 @@ public class JobInProgress {
     if ((flakyTaskTrackers < (clusterSize * CLUSTER_BLACKLIST_PERCENT)) && 
         taskTrackerFailedTasks >= maxTaskFailuresPerTracker) {
       if (LOG.isDebugEnabled()) {
-        String flakyTracker = convertTrackerNameToHostName(taskTracker); 
-        LOG.debug("Ignoring the black-listed tasktracker: '" + flakyTracker 
-                  + "' for assigning a new task");
+        String flakyTracker = convertTrackerNameToHostName(taskTracker);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Ignoring the black-listed tasktracker: '" + flakyTracker 
+                    + "' for assigning a new task");
+        }
       }
       return false;
     }
@@ -3019,14 +3030,20 @@ public class JobInProgress {
     if (wasSpeculating) {
       if (tip.isMapTask()) {
         speculativeMapTasks--;
-        LOG.debug("Decremented count for " + 
-            tip.getTIPId()+"/"+tip.getJob().getJobID() + 
-          ". Current speculativeMap task count: " + speculativeMapTasks);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Decremented count for " + 
+                    tip.getTIPId()+"/"+tip.getJob().getJobID() + 
+                    ". Current speculativeMap task count: "
+                    + speculativeMapTasks);
+        }
       } else {
         speculativeReduceTasks--;
-        LOG.debug("Decremented count for " +
-            tip.getTIPId()+"/"+tip.getJob().getJobID() +
-          ". Current speculativeReduce task count: " + speculativeReduceTasks);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Decremented count for " +
+                    tip.getTIPId()+"/"+tip.getJob().getJobID() +
+                    ". Current speculativeReduce task count: "
+                    + speculativeReduceTasks);
+        }
       }
     }
   }
@@ -3640,7 +3657,9 @@ public class JobInProgress {
     File f = new File (localJobFilePath);
     LOG.info("Deleting localized job conf at " + f);
     if (!f.delete()) {
-      LOG.debug("Failed to delete file " + f);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Failed to delete file " + f);
+      }
     }
   }
   

@@ -752,7 +752,9 @@ class TaskInProgress {
         machinesWhereFailed.add(trackerHostName);
         if(maxSkipRecords>0) {
           //skipping feature enabled
-          LOG.debug("TaskInProgress adding" + status.getNextRecordRange());
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("TaskInProgress adding" + status.getNextRecordRange());
+          }
           failedRanges.add(status.getNextRecordRange());
           skipping = startSkipping();
         }
@@ -1054,8 +1056,10 @@ class TaskInProgress {
     // create the task
     Task t = null;
     if (isMapTask()) {
-      LOG.debug("attempt " + numTaskFailures + " sending skippedRecords "
-          + failedRanges.getIndicesCount());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("attempt " + numTaskFailures + " sending skippedRecords "
+                  + failedRanges.getIndicesCount());
+      }
       t = new MapTask(jobFile, taskid, partition, splitInfo.getSplitIndex(),
           numSlotsNeeded);
     } else {
@@ -1074,7 +1078,9 @@ class TaskInProgress {
     }
     t.setConf(conf);
     t.setUser(getUser());
-    LOG.debug("Launching task with skipRanges:"+failedRanges.getSkipRanges());
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Launching task with skipRanges:"+failedRanges.getSkipRanges());
+    }
     t.setSkipRanges(failedRanges.getSkipRanges());
     t.setSkipping(skipping);
     if(failedRanges.isTestAttempt()) {
