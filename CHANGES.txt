@@ -1665,3 +1665,6 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-913. TaskRunner crashes with NPE resulting in held up slots,
     UNINITIALIZED tasks and hung TaskTracker. (Amareshwari Sriramadasu and
     Sreekanth Ramakrishnan via vinodkv)
+
+    MAPREDUCE-1725.  Fix MapReduce API incompatibilities between 0.20 and 0.21.
+    (tomwhite)

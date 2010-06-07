@@ -55,6 +55,32 @@ public class TaskID extends org.apache.hadoop.mapreduce.TaskID {
   /**
    * Constructs a TaskID object from given {@link JobID}.  
    * @param jobId JobID that this tip belongs to 
+   * @param isMap whether the tip is a map 
+   * @param id the tip number
+   * @deprecated Use {@link #TaskID(String, int, TaskType, int)}
+   */
+  @Deprecated
+  public TaskID(org.apache.hadoop.mapreduce.JobID jobId, boolean isMap,int id) {
+    this(jobId, isMap ? TaskType.MAP : TaskType.REDUCE, id);
+  }
+   
+  /**
+   * Constructs a TaskInProgressId object from given parts.
+   * @param jtIdentifier jobTracker identifier
+   * @param jobId job number 
+   * @param isMap whether the tip is a map 
+   * @param id the tip number
+   * @deprecated Use {@link #TaskID(org.apache.hadoop.mapreduce.JobID, TaskType,
+   * int)}
+   */
+  @Deprecated
+  public TaskID(String jtIdentifier, int jobId, boolean isMap, int id) {
+    this(jtIdentifier, jobId, isMap ? TaskType.MAP : TaskType.REDUCE, id);
+  }
+    
+  /**
+   * Constructs a TaskID object from given {@link JobID}.  
+   * @param jobId JobID that this tip belongs to 
    * @param type the {@link TaskType} 
    * @param id the tip number
    */
@@ -102,6 +128,31 @@ public class TaskID extends org.apache.hadoop.mapreduce.TaskID {
     return (JobID) super.getJobID();
   }
 
+  /** 
+   * Returns a regex pattern which matches task IDs. Arguments can 
+   * be given null, in which case that part of the regex will be generic.  
+   * For example to obtain a regex matching <i>the first map task</i> 
+   * of <i>any jobtracker</i>, of <i>any job</i>, we would use :
+   * <pre> 
+   * TaskID.getTaskIDsPattern(null, null, true, 1);
+   * </pre>
+   * which will return :
+   * <pre> "task_[^_]*_[0-9]*_m_000001*" </pre> 
+   * @param jtIdentifier jobTracker identifier, or null
+   * @param jobId job number, or null
+   * @param isMap whether the tip is a map, or null 
+   * @param taskId taskId number, or null
+   * @return a regex pattern matching TaskIDs
+   * @deprecated Use {@link TaskID#getTaskIDsPattern(String, Integer, TaskType,
+   * Integer)}
+   */
+  @Deprecated
+  public static String getTaskIDsPattern(String jtIdentifier, Integer jobId
+      , Boolean isMap, Integer taskId) {
+    return getTaskIDsPattern(jtIdentifier, jobId,
+	isMap ? TaskType.MAP : TaskType.REDUCE, taskId);
+  }
+  
   /** 
    * Returns a regex pattern which matches task IDs. Arguments can 
    * be given null, in which case that part of the regex will be generic.  

@@ -63,6 +63,22 @@ public class TaskAttemptID extends org.apache.hadoop.mapreduce.TaskAttemptID {
    * Constructs a TaskId object from given parts.
    * @param jtIdentifier jobTracker identifier
    * @param jobId job number 
+   * @param isMap whether the tip is a map 
+   * @param taskId taskId number
+   * @param id the task attempt number
+   * @deprecated Use {@link #TaskAttemptID(String, int, TaskType, int, int)}.
+   */
+  @Deprecated
+  public TaskAttemptID(String jtIdentifier, int jobId, boolean isMap, 
+      int taskId, int id) {
+    this(jtIdentifier, jobId, isMap ? TaskType.MAP : TaskType.REDUCE, taskId,
+	id);
+  }
+  
+  /**
+   * Constructs a TaskId object from given parts.
+   * @param jtIdentifier jobTracker identifier
+   * @param jobId job number 
    * @param type the TaskType 
    * @param taskId taskId number
    * @param id the task attempt number
@@ -113,6 +129,31 @@ public class TaskAttemptID extends org.apache.hadoop.mapreduce.TaskAttemptID {
                                       ) throws IllegalArgumentException {
     return (TaskAttemptID) 
              org.apache.hadoop.mapreduce.TaskAttemptID.forName(str);
+  }
+  
+  /** 
+   * Returns a regex pattern which matches task attempt IDs. Arguments can 
+   * be given null, in which case that part of the regex will be generic.  
+   * For example to obtain a regex matching <i>all task attempt IDs</i> 
+   * of <i>any jobtracker</i>, in <i>any job</i>, of the <i>first 
+   * map task</i>, we would use :
+   * <pre> 
+   * TaskAttemptID.getTaskAttemptIDsPattern(null, null, true, 1, null);
+   * </pre>
+   * which will return :
+   * <pre> "attempt_[^_]*_[0-9]*_m_000001_[0-9]*" </pre> 
+   * @param jtIdentifier jobTracker identifier, or null
+   * @param jobId job number, or null
+   * @param isMap whether the tip is a map, or null 
+   * @param taskId taskId number, or null
+   * @param attemptId the task attempt number, or null
+   * @return a regex pattern matching TaskAttemptIDs
+   */
+  @Deprecated
+  public static String getTaskAttemptIDsPattern(String jtIdentifier,
+      Integer jobId, Boolean isMap, Integer taskId, Integer attemptId) {
+    return getTaskAttemptIDsPattern(jtIdentifier, jobId,
+	isMap ? TaskType.MAP : TaskType.REDUCE, taskId, attemptId);
   }
   
   /** 
