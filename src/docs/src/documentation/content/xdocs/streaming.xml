@@ -157,6 +157,22 @@ $HADOOP_HOME/bin/hadoop  jar $HADOOP_HOME/hadoop-streaming.jar \
     -file myPythonScript.py \
     -file myDictionary.txt \
 </source>
+<p>
+If files with extension .class are added using -file option, they are packaged
+into "classes" directory in the job jar. Similarly, if files with extension .jar
+or .zip are added using -file option they are packaged into "lib" directory in
+the job jar. When unjarred on tasktracker, symlinks to the directories "classes"
+and "lib" are created from the cwd of the task. All the files in classes and lib
+directories are automatically added to classpath of the task. If you'd like to 
+explicitly access these .class or .jar/.zip files inside your mapper/reducer
+code, access them as ./lib/jarfile.jar or ./lib/zipfile.zip or 
+./classes/classFile.class".
+</p>
+<p>
+All other files added using -file option (e.g, .txt or .pl) are packaged
+directly in the job jar. When unjarred on tasktracker, symlinks to these files
+are created from the cwd of the task.
+</p>
 </section>
 
 <section>

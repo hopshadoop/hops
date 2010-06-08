@@ -270,6 +270,8 @@ public class StreamJob implements Tool {
       
       values = cmdLine.getOptionValues("file");
       if (values != null && values.length > 0) {
+        LOG.warn("-file option is deprecated, please use generic option" +
+        		" -files instead.");
         StringBuilder unpackRegex = new StringBuilder(
           config_.getPattern(MRJobConfig.JAR_UNPACK_PATTERN,
                              JobConf.UNPACK_JAR_PATTERN_DEFAULT).pattern());
@@ -475,7 +477,8 @@ public class StreamJob implements Tool {
     System.out.println("  -combiner <cmd|JavaClassName>" + 
                        " The streaming command to run");
     System.out.println("  -reducer  <cmd|JavaClassName>      The streaming command to run");
-    System.out.println("  -file     <file>     File/dir to be shipped in the Job jar file");
+    System.out.println("  -file     <file>     File/dir to be shipped in the" +
+    		" Job jar file.\n Deprecated. Use generic option \"-files\" instead");
     System.out.println("  -inputformat TextInputFormat(default)|SequenceFileAsTextInputFormat|JavaClassName Optional.");
     System.out.println("  -outputformat TextOutputFormat(default)|JavaClassName  Optional.");
     System.out.println("  -partitioner JavaClassName  Optional.");
@@ -506,7 +509,13 @@ public class StreamJob implements Tool {
     System.out.println("Map output format, reduce input/output format:");
     System.out.println("  Format defined by what the mapper command outputs. Line-oriented");
     System.out.println();
-    System.out.println("The files named in the -file argument[s] end up in the");
+    System.out.println("The files with extensions .class and .jar/.zip, ");
+    System.out.println("  specified for the -file argument[s], end up in ");
+    System.out.println("  \"classes\" and \"lib\" directories respectively" +
+    		" inside the");
+    System.out.println("  working directory when the mapper and reducer are run.");
+    System.out.println("  All other files specified for the -file argument[s]" +
+    		" end up in the");
     System.out.println("  working directory when the mapper and reducer are run.");
     System.out.println("  The location of this working directory is unspecified.");
     System.out.println();

@@ -825,6 +825,10 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-1404.  Move Cluster-Setup and Single-Node-Setup Docs from
     MapReduce to Common.  (tomwhite)
 
+    MAPREDUCE-1697. Document the behavior of -file option and deprecate it
+    in favour of -files option in streaming. (Amareshwari Sriramadasu
+    via vinodkv)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
