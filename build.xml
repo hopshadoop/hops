@@ -1073,6 +1073,9 @@
       <fileset file="${build.dir}/${tools.final.name}.jar"/> 
     </copy>
     
+    <copy todir="${dist.dir}/bin">
+      <fileset dir="bin"/>
+    </copy>
 
     <copy todir="${dist.dir}/conf">
       <fileset dir="${conf.dir}" excludes="**/*.template"/>
@@ -1105,6 +1108,7 @@
     <copy todir="${dist.dir}/" file="build.xml"/>
 
     <chmod perm="ugo+x" type="file" parallel="false">
+        <fileset dir="${dist.dir}/bin"/>
         <fileset dir="${dist.dir}/src/contrib/">
           <include name="*/bin/*" />
         </fileset>
@@ -1170,6 +1174,10 @@
       <fileset file="${build.dir}/${tools.final.name}.jar"/> -->
     </copy>
     
+    <copy todir="${dist.dir}/bin">
+      <fileset dir="bin"/>
+    </copy>
+      	
     <copy todir="${dist.dir}/conf">
       <fileset dir="${conf.dir}" excludes="**/*.template"/>
     </copy>
@@ -1202,6 +1210,9 @@
           <exclude name="${final.name}/src/**" />
           <exclude name="${final.name}/docs/**" />
           <include name="${final.name}/**" />
+        </tarfileset>
+        <tarfileset dir="${build.dir}" mode="755">
+          <include name="${final.name}/bin/*" />
         </tarfileset>
       </param.listofitems>
     </macro_tar>

@@ -829,6 +829,9 @@ Release 0.21.0 - Unreleased
     in favour of -files option in streaming. (Amareshwari Sriramadasu
     via vinodkv)
 
+    MAPREDUCE-1033. Resolve location of scripts and configuration files after
+    project split. (tomwhite)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band

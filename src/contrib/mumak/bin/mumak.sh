@@ -70,9 +70,9 @@ if [ -f "${HADOOP_CONF_DIR}/hadoop-env.sh" ]; then
   . "${HADOOP_CONF_DIR}/hadoop-env.sh"
 fi
 
-# Define HADOOP_CORE_HOME
+# Define HADOOP_COMMON_HOME
 if [ "$HADOP_CORE_HOME" = "" ]; then
-  HADOOP_CORE_HOME=$HADOOP_HOME
+  HADOOP_COMMON_HOME=$HADOOP_HOME
 fi
 
 if [ "$JAVA_HOME" = "" ]; then
@@ -144,18 +144,18 @@ fi
 
 # setup 'java.library.path' for native-hadoop code if necessary
 JAVA_LIBRARY_PATH=''
-if [ -d "${HADOOP_CORE_HOME}/build/native" -o -d "${HADOOP_CORE_HOME}/lib/native" ]; then
+if [ -d "${HADOOP_COMMON_HOME}/build/native" -o -d "${HADOOP_COMMON_HOME}/lib/native" ]; then
   JAVA_PLATFORM=`CLASSPATH=${CLASSPATH} ${JAVA} -Xmx32m org.apache.hadoop.util.PlatformName | sed -e "s/ /_/g"`
   
-  if [ -d "$HADOOP_CORE_HOME/build/native" ]; then
-    JAVA_LIBRARY_PATH=${HADOOP_CORE_HOME}/build/native/${JAVA_PLATFORM}/lib
+  if [ -d "$HADOOP_COMMON_HOME/build/native" ]; then
+    JAVA_LIBRARY_PATH=${HADOOP_COMMON_HOME}/build/native/${JAVA_PLATFORM}/lib
   fi
   
-  if [ -d "${HADOOP_CORE_HOME}/lib/native" ]; then
+  if [ -d "${HADOOP_COMMON_HOME}/lib/native" ]; then
     if [ "x$JAVA_LIBRARY_PATH" != "x" ]; then
-      JAVA_LIBRARY_PATH=${JAVA_LIBRARY_PATH}:${HADOOP_CORE_HOME}/lib/native/${JAVA_PLATFORM}
+      JAVA_LIBRARY_PATH=${JAVA_LIBRARY_PATH}:${HADOOP_COMMON_HOME}/lib/native/${JAVA_PLATFORM}
     else
-      JAVA_LIBRARY_PATH=${HADOOP_CORE_HOME}/lib/native/${JAVA_PLATFORM}
+      JAVA_LIBRARY_PATH=${HADOOP_COMMON_HOME}/lib/native/${JAVA_PLATFORM}
     fi
   fi
 fi
