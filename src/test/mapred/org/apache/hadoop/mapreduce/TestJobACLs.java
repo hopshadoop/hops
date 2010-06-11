@@ -28,6 +28,8 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.JobACLsManager;
 import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapred.JobInProgress;
+import org.apache.hadoop.mapred.JobTracker;
 import org.apache.hadoop.mapred.MiniMRCluster;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -82,8 +84,7 @@ public class TestJobACLs {
     conf.setBoolean(JTConfig.JT_PERSIST_JOBSTATUS, true);
     conf.set(JTConfig.JT_PERSIST_JOBSTATUS_HOURS, "1");
 
-    mr =
-        new MiniMRCluster(0, 0, 0, "file:///", 1, null, null, MR_UGI, conf);
+    mr = new MiniMRCluster(0, 0, 1, "file:///", 1, null, null, MR_UGI, conf);
   }
 
   /**
@@ -139,6 +140,15 @@ public class TestJobACLs {
     job.killJob();
   }
 
+  /**
+   * Submits a sleep job with 1 map task that runs for a long time(60 sec) and
+   * wait for the job to go into RUNNING state.
+   * @param clusterConf
+   * @param user the jobOwner
+   * @return Job that is started
+   * @throws IOException
+   * @throws InterruptedException
+   */
   private Job submitJobAsUser(final Configuration clusterConf, String user)
       throws IOException, InterruptedException {
     UserGroupInformation ugi =
@@ -148,11 +158,20 @@ public class TestJobACLs {
       public Object run() throws Exception {
         SleepJob sleepJob = new SleepJob();
         sleepJob.setConf(clusterConf);
-        Job myJob = sleepJob.createJob(0, 0, 1000, 1000, 1000, 1000);
+        // Disable setup/cleanup tasks at the job level
+        sleepJob.getConf().setBoolean(MRJobConfig.SETUP_CLEANUP_NEEDED, false);
+        Job myJob = sleepJob.createJob(1, 0, 60000, 1, 1, 1);
         myJob.submit();
         return myJob;
       }
     });
+
+    // Make the job go into RUNNING state by forceful initialization.
+    JobTracker jt = mr.getJobTrackerRunner().getJobTracker();
+    JobInProgress jip =
+        jt.getJob(org.apache.hadoop.mapred.JobID.downgrade(job.getJobID()));
+    jt.initJob(jip);
+
     return job;
   }
 
