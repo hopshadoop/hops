@@ -30,6 +30,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.MapReduceTestUtil;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 
 /**
@@ -93,7 +94,7 @@ public class TestJobSysDirWithDFS extends TestCase {
     // Check if the Job Tracker system dir is propogated to client
     assertFalse(sysDir.contains("/tmp/subru/mapred/system"));
     assertTrue(sysDir.contains("custom"));
-    return new TestResult(job, TestMiniMRWithDFS.readOutput(outDir, conf));
+    return new TestResult(job, MapReduceTestUtil.readOutput(outDir, conf));
   }
 
  static void runWordCount(MiniMRCluster mr, JobConf jobConf, String sysDir) 

@@ -38,9 +38,9 @@ import org.apache.hadoop.mapred.FileOutputFormat;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.MiniMRCluster;
 import org.apache.hadoop.mapred.RunningJob;
-import org.apache.hadoop.mapred.TestMiniMRWithDFS;
 import org.apache.hadoop.mapred.Utils;
 import org.apache.hadoop.mapred.Counters.Counter;
+import org.apache.hadoop.mapreduce.MapReduceTestUtil;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.ToolRunner;
 
@@ -199,7 +199,7 @@ public class TestPipes extends TestCase {
     for (Path p:FileUtil.stat2Paths(dfs.getFileSystem().listStatus(outputPath,
     		                        new Utils.OutputFileUtils
     		                                 .OutputFilesFilter()))) {
-      results.add(TestMiniMRWithDFS.readOutput(p, job));
+      results.add(MapReduceTestUtil.readOutput(p, job));
     }
     assertEquals("number of reduces is wrong", 
                  expectedResults.length, results.size());

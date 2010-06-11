@@ -21,6 +21,8 @@ import org.apache.hadoop.fs.*;
 import org.apache.hadoop.io.*;
 import org.apache.hadoop.mapred.*;
 import org.apache.hadoop.mapred.lib.*;
+import org.apache.hadoop.mapreduce.MapReduceTestUtil;
+
 import junit.framework.TestCase;
 import java.io.*;
 import java.util.*;
@@ -107,7 +109,7 @@ public class TestAggregates extends TestCase {
     //
     boolean success = true;
     Path outPath = new Path(OUTPUT_DIR, "part-00000");
-    String outdata = TestMiniMRWithDFS.readOutput(outPath,job);
+    String outdata = MapReduceTestUtil.readOutput(outPath,job);
     System.out.println("full out data:");
     System.out.println(outdata.toString());
     outdata = outdata.substring(0, expectedOutput.toString().length());

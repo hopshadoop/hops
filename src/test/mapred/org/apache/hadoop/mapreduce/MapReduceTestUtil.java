@@ -396,7 +396,8 @@ public class MapReduceTestUtil {
       }
     };
   }
-  
+
+  // Return output of MR job by reading from the given output directory
   public static String readOutput(Path outDir, Configuration conf) 
       throws IOException {
     FileSystem fs = outDir.getFileSystem(conf);

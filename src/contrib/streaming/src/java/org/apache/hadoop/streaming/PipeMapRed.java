@@ -222,8 +222,6 @@ public abstract class PipeMapRed {
       clientErr_ = new DataInputStream(new BufferedInputStream(sim.getErrorStream()));
       startTime_ = System.currentTimeMillis();
 
-      errThread_ = new MRErrorThread();
-      errThread_.start();
     } catch (IOException e) {
       logStackTrace(e);
       LOG.error("configuration exception", e);
@@ -338,7 +336,9 @@ public abstract class PipeMapRed {
     outReader_ = createOutputReader();
     outThread_ = new MROutputThread(outReader_, output, reporter);
     outThread_.start();
+    errThread_ = new MRErrorThread();
     errThread_.setReporter(reporter);
+    errThread_.start();
   }
   
   void waitOutputThreads() throws IOException {

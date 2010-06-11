@@ -26,8 +26,8 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.MiniMRCluster;
-import org.apache.hadoop.mapred.TestMiniMRWithDFS;
 import org.apache.hadoop.mapreduce.MRJobConfig;
+import org.apache.hadoop.mapreduce.MapReduceTestUtil;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.util.StringUtils;
 
@@ -122,7 +122,7 @@ public class TestUlimit {
     boolean mayExit = false;
     StreamJob job = new StreamJob(genArgs(memLimit), mayExit);
     job.go();
-    String output = TestMiniMRWithDFS.readOutput(outputPath,
+    String output = MapReduceTestUtil.readOutput(outputPath,
                                         mr.createJobConf());
     assertEquals("output is wrong", SET_MEMORY_LIMIT,
                                     output.trim());

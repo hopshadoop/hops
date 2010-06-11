@@ -42,6 +42,7 @@ import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.mapred.MRCaching.TestResult;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.MapReduceTestUtil;
 import org.apache.hadoop.mapreduce.TaskCounter;
 import org.apache.hadoop.mapreduce.TestMapReduceLocal;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
@@ -125,7 +126,7 @@ public class TestMiniMRLocalFS extends TestCase {
     try {
       JobClient.runJob(job);
       String result = 
-        TestMiniMRWithDFS.readOutput(outDir, job);
+        MapReduceTestUtil.readOutput(outDir, job);
       assertEquals("output", ("aunt annie\t1\n" +
                               "bumble boat\t4\n" +
                               "crocodile pants\t0\n" +

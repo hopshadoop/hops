@@ -23,6 +23,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.io.*;
 import org.apache.hadoop.mapred.Utils;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.MapReduceTestUtil;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
@@ -112,7 +113,7 @@ public class TestMapReduceAggregates extends TestCase {
     // original one.  Remember, we need to ignore zero-count items
     // in the original key.
     //
-    String outdata = readOutput(OUTPUT_DIR, conf);
+    String outdata = MapReduceTestUtil.readOutput(OUTPUT_DIR, conf);
     System.out.println("full out data:");
     System.out.println(outdata.toString());
     outdata = outdata.substring(0, expectedOutput.toString().length());
@@ -120,26 +121,6 @@ public class TestMapReduceAggregates extends TestCase {
     assertEquals(expectedOutput.toString(),outdata);
     fs.delete(OUTPUT_DIR, true);
     fs.delete(INPUT_DIR, true);
-  }
-
-  public static String readOutput(Path outDir, Configuration conf) 
-    throws IOException {
-    FileSystem fs = outDir.getFileSystem(conf);
-    StringBuffer result = new StringBuffer();
-    Path[] fileList = FileUtil.stat2Paths(fs.listStatus(outDir,
-                        new Utils.OutputFileUtils.OutputFilesFilter()));
-    for(int i=0; i < fileList.length; ++i) {
-      BufferedReader file = 
-        new BufferedReader(new InputStreamReader(fs.open(fileList[i])));
-      String line = file.readLine();
-      while (line != null) {
-        result.append(line);
-        result.append("\n");
-        line = file.readLine();
-      }
-      file.close();
-    }
-    return result.toString();
   }
   
   /**

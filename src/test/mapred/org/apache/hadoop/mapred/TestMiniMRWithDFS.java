@@ -41,6 +41,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.MRConfig;
+import org.apache.hadoop.mapreduce.MapReduceTestUtil;
 import org.apache.hadoop.mapreduce.TaskCounter;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -97,32 +98,7 @@ public class TestMiniMRWithDFS extends TestCase {
     conf.setNumMapTasks(numMaps);
     conf.setNumReduceTasks(numReduces);
     RunningJob job = JobClient.runJob(conf);
-    return new TestResult(job, readOutput(outDir, conf));
-  }
-
-  public static String readOutput(Path outDir, 
-                                  JobConf conf) throws IOException {
-    FileSystem fs = outDir.getFileSystem(conf);
-    StringBuffer result = new StringBuffer();
-    {
-      
-      Path[] fileList = FileUtil.stat2Paths(fs.listStatus(outDir,
-                                   new Utils.OutputFileUtils
-                                            .OutputFilesFilter()));
-      for(int i=0; i < fileList.length; ++i) {
-        LOG.info("File list[" + i + "]" + ": "+ fileList[i]);
-        BufferedReader file = 
-          new BufferedReader(new InputStreamReader(fs.open(fileList[i])));
-        String line = file.readLine();
-        while (line != null) {
-          result.append(line);
-          result.append("\n");
-          line = file.readLine();
-        }
-        file.close();
-      }
-    }
-    return result.toString();
+    return new TestResult(job, MapReduceTestUtil.readOutput(outDir, conf));
   }
 
   /**

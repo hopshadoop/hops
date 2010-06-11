@@ -25,7 +25,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.MiniMRCluster;
-import org.apache.hadoop.mapred.TestMiniMRWithDFS;
+import org.apache.hadoop.mapreduce.MapReduceTestUtil;
 import org.apache.hadoop.util.Shell;
 
 import org.junit.Test;
@@ -131,7 +131,7 @@ public class TestStreamingTaskLog {
     assertEquals("StreamJob failed.", 0, returnStatus);
     
     // validate environment variables set for the child(script) of java process
-    String env = TestMiniMRWithDFS.readOutput(outputPath, mr.createJobConf());
+    String env = MapReduceTestUtil.readOutput(outputPath, mr.createJobConf());
     long logSize = USERLOG_LIMIT_KB * 1024;
     assertTrue("environment set for child is wrong", env.contains("INFO,TLA")
                && env.contains("-Dhadoop.tasklog.taskid=attempt_")

@@ -25,6 +25,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.mapreduce.MapReduceTestUtil;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -217,7 +218,7 @@ public abstract class NotificationTestCase extends HadoopTestCase {
     conf.setNumMapTasks(numMaps);
     conf.setNumReduceTasks(numReduces);
     JobClient.runJob(conf);
-    return TestMiniMRWithDFS.readOutput(outDir, conf);
+    return MapReduceTestUtil.readOutput(outDir, conf);
   }
 
 }
