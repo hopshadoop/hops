@@ -51,6 +51,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1533. Reduce overhead of logging and string manipulation during
     heartbeat processing. (Amar Kamat and Dick King via cdouglas)
 
+    MAPREDUCE-1516. JobTracker issues delegation tokens only if the user's
+    authentication is Kerberos. (Jitendra Pandey via ddas)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and

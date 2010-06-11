@@ -103,6 +103,7 @@ import org.apache.hadoop.security.Groups;
 import org.apache.hadoop.security.RefreshUserMappingsProtocol;
 import org.apache.hadoop.security.TokenStorage;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.authorize.AuthorizationException;
 import org.apache.hadoop.security.authorize.ProxyUsers;
 import org.apache.hadoop.security.authorize.RefreshAuthorizationPolicyProtocol;
@@ -203,6 +204,15 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   }
 
   private MRAsyncDiskService asyncDiskService;
+  
+  /**
+   * Returns the delegation token secret manager instance in JobTracker.
+   * 
+   * @return DelegationTokenSecretManager object
+   */
+  public DelegationTokenSecretManager getDelegationTokenSecretManager() {
+    return secretManager;
+  }
   
   /**
    * A client tried to submit a job before the Job Tracker was ready.
@@ -4706,6 +4716,10 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   public Token<DelegationTokenIdentifier> 
      getDelegationToken(Text renewer
                         )throws IOException, InterruptedException {
+    if (!isAllowedDelegationTokenOp()) {
+      throw new IOException(
+          "Delegation Token can be issued only with kerberos authentication");
+    }
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     Text owner = new Text(ugi.getUserName());
     Text realUser = null;
@@ -4724,11 +4738,29 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   public long renewDelegationToken(Token<DelegationTokenIdentifier> token
                                       ) throws IOException,
                                                InterruptedException {
+    if (!isAllowedDelegationTokenOp()) {
+      throw new IOException(
+          "Delegation Token can be renewed only with kerberos authentication");
+    }
     String user = UserGroupInformation.getCurrentUser().getUserName();
     return secretManager.renewToken(token, user);
   }
 
   JobACLsManager getJobACLsManager() {
     return jobACLsManager;
+  }
+  
+  /**
+   * 
+   * @return true if delegation token operation is allowed
+   */
+  private boolean isAllowedDelegationTokenOp() throws IOException {
+    AuthenticationMethod authMethod = UserGroupInformation
+        .getRealAuthenticationMethod(UserGroupInformation.getCurrentUser());
+    if (UserGroupInformation.isSecurityEnabled()
+        && (authMethod != AuthenticationMethod.KERBEROS)) {
+      return false;
+    }
+    return true;
   }
 }
