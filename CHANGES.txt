@@ -1675,3 +1675,6 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1725.  Fix MapReduce API incompatibilities between 0.20 and 0.21.
     (tomwhite)
+
+    MAPREDUCE-1606. TestJobACLs may timeout as there are no slots for launching
+    JOB_CLEANUP task. (Ravi Gummadi via vinodkv)
