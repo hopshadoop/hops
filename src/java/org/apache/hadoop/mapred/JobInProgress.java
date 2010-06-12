@@ -2109,36 +2109,45 @@ public class JobInProgress {
       return null;
     }
     long now = JobTracker.getClock().getTime();
+
+    // Don't return anything if either the TaskTracker is slow or we have
+    // already launched enough speculative tasks in the cluster.
     if (isSlowTracker(taskTrackerName) || atSpeculativeCap(list, taskType)) {
       return null;
     }
-    // List of speculatable candidates, start with all, and chop it down
-    ArrayList<TaskInProgress> candidates = new ArrayList<TaskInProgress>(list);
-    
-    Iterator<TaskInProgress> iter = candidates.iterator();
+
+    TaskInProgress slowestTIP = null;
+    Comparator<TaskInProgress> LateComparator =
+      new EstimatedTimeLeftComparator(now);
+
+    Iterator<TaskInProgress> iter = list.iterator();
     while (iter.hasNext()) {
       TaskInProgress tip = iter.next();
+
+      // If this tip has already run on this machine once or it doesn't need any
+      // more speculative attempts, skip it.
       if (tip.hasRunOnMachine(taskTrackerHost, taskTrackerName) ||
           !tip.canBeSpeculated(now)) {
-          //remove it from candidates
-          iter.remove();
+          continue;
+      }
+
+      if (slowestTIP == null) {
+        slowestTIP = tip;
+      } else {
+        slowestTIP =
+            LateComparator.compare(tip, slowestTIP) < 0 ? tip : slowestTIP;
       }
     }
-    //resort according to expected time till completion
-    Comparator<TaskInProgress> LateComparator = 
-      new EstimatedTimeLeftComparator(now);
-    Collections.sort(candidates, LateComparator);
-    if (candidates.size() > 0 ) {
-      TaskInProgress tip = candidates.get(0);
+
+    if (slowestTIP != null) {
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Chose task " + tip.getTIPId() + ". Statistics: Task's : " +
-            tip.getCurrentProgressRate(now) + " Job's : " + 
-            (tip.isMapTask() ? runningMapTaskStats : runningReduceTaskStats));
+        LOG.debug("Chose task " + slowestTIP.getTIPId() + ". Statistics: Task's : " +
+            slowestTIP.getCurrentProgressRate(now) + " Job's : " + 
+            (slowestTIP.isMapTask() ? runningMapTaskStats : runningReduceTaskStats));
       }
-      return tip;
-    } else {
-      return null;
     }
+
+  return slowestTIP;
   }
 
   /**

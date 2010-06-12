@@ -59,6 +59,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and
     scalability. (Arun C. Murthy & Richard King via acmurthy) 
 
+    MAPREDUCE-1829. JobInProgress.findSpeculativeTask should use min() to
+    find the candidate instead of sort(). (Scott Chen via vinodkv)
+
   BUG FIXES
 
     MAPREDUCE-1707. TaskRunner can get NPE in getting ugi from TaskTracker.
