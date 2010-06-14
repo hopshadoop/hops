@@ -85,6 +85,7 @@ See http://forrest.apache.org/docs/linking.html for more info.
       <RefreshingQueueConfiguration href="#Refreshing+queue+configuration"/>
       <mapred-queues.xml href="#mapred-queues.xml"/>
       <ConfiguringEnvironmentHadoopDaemons href="#Configuring+the+Environment+of+the+Hadoop+Daemons"/>
+      <ConfiguringMemoryParameters href="#Configuring+Memory+Parameters+for+MapReduce+Jobs" />
       <ConfiguringHadoopDaemons href="#Configuring+the+Hadoop+Daemons"/>
       <FullyDistributedOperation href="#Fully-Distributed+Operation"/>
     </cluster-setup>

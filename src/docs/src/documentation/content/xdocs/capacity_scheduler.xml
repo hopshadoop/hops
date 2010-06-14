@@ -114,6 +114,69 @@
       
       <p>Once a job is selected, the Scheduler picks a task to run. This logic 
       to pick a task remains unchanged from earlier versions.</p> 
+
+      <section>
+        <title>Scheduling Tasks Considering Memory Requirements</title>
+      
+        <p>
+        The Capacity Scheduler supports scheduling of tasks on a
+        TaskTracker based on a job's virtual memory requirements and 
+        the availability
+        of enough virtual memory on the TaskTracker node. By doing so, it
+        simplifies the virtual memory monitoring function on the 
+        TaskTracker node, described in the section on 
+        <a href="ext:cluster-setup/ConfiguringMemoryParameters">
+        Monitoring Task Memory Usage</a> in the Cluster Setup guide. 
+        Refer to that section for more details on how memory for 
+        MapReduce tasks is handled.
+        </p>
+        
+        <p>
+        Virtual memory based task scheduling uses the same parameters as
+        the memory monitoring function of the TaskTracker, and is enabled
+        along with virtual memory monitoring. When enabled, the scheduler
+        ensures that a task is scheduled on a TaskTracker only when the
+        virtual memory required by the map or reduce task can be assured 
+        by the TaskTracker. That is, the task is scheduled only if the 
+        following constraint is satisfied:<br/>
+        <code>
+        Job's mapreduce.{map|reduce}.memory.mb of the job &lt;=
+          total virtual memory for all map or reduce tasks on the TaskTracker -
+            total virtual memory required for all running map or reduce tasks 
+            on the TaskTracker
+        </code><br/>
+        </p>
+        
+        <p>
+        When a task at the front of the scheduler's queue cannot be scheduled
+        on a TaskTracker due to insufficient memory, the scheduler creates
+        a virtual <em>reservation</em> for this task. This can continue
+        for all pending tasks on a job, subject to other capacity constraints.
+        Once all tasks are either scheduled or have reservations, the 
+        scheduler will proceed to schedule other jobs's tasks that are not 
+        necessarily at the front of the queue, but meet memory constraints 
+        of the TaskTracker.
+        By following this reservation procedure of reserving just enough
+        TaskTrackers, the scheduler balances between not starving jobs with 
+        high memory requirements and under-utilizing cluster resources.
+        </p>
+
+        <p>
+        Tasks of jobs that require more virtual memory than the
+        per slot <code>mapreduce.cluster.{map|reduce}memory.mb</code>
+        value, are treated as occupying more than one slot, and account
+        for a corresponding increased capacity usage for their queue.
+        The number of slots they occupy is determined as:<br/>
+        <code>
+        Number of slots for a task = mapreduce.{map|reduce}.memory.mb / 
+        mapreduce.cluster.{map|reduce}memory.mb
+        </code><br/>
+        However, special tasks run by the framework like setup 
+        and cleanup tasks do not count for more than 1 slot, 
+        irrespective of their job's memory requirements.
+        </p>
+
+      </section>
       
     </section>
     
@@ -295,82 +358,6 @@
         capacity-scheduler.</p>
       </section>
       
-      <section>
-        <title>Memory Management</title>
-      
-        <p>The Capacity Scheduler supports scheduling of tasks on a
-        <code>TaskTracker</code>(TT) based on a job's memory requirements
-        and the availability of RAM and Virtual Memory (VMEM) on the TT node.
-        See the 
-        <a href="mapred_tutorial.html">MapReduce Tutorial</a> 
-        for details on how the TT monitors memory usage.</p>
-        <p>Currently the memory based scheduling is only supported in Linux platform.</p>
-        <p>Memory-based scheduling works as follows:</p>
-        <ol>
-          <li>The absence of any one or more of three config parameters 
-          or -1 being set as value of any of the parameters, 
-          <code>mapred.tasktracker.vmem.reserved</code>, 
-          <code>mapred.task.default.maxvmem</code>, or
-          <code>mapred.task.limit.maxvmem</code>, disables memory-based
-          scheduling, just as it disables memory monitoring for a TT. These
-          config parameters are described in the 
-          <a href="mapred_tutorial.html">MapReduce Tutorial</a>. 
-          The value of  
-          <code>mapred.tasktracker.vmem.reserved</code> is 
-          obtained from the TT via its heartbeat. 
-          </li>
-          <li>If all the three mandatory parameters are set, the Scheduler 
-          enables VMEM-based scheduling. First, the Scheduler computes the free
-          VMEM on the TT. This is the difference between the available VMEM on the
-          TT (the node's total VMEM minus the offset, both of which are sent by 
-          the TT on each heartbeat)and the sum of VMs already allocated to 
-          running tasks (i.e., sum of the VMEM task-limits). Next, the Scheduler
-          looks at the VMEM requirements for the job that's first in line to 
-          run. If the job's VMEM requirements are less than the available VMEM on 
-          the node, the job's task can be scheduled. If not, the Scheduler 
-          ensures that the TT does not get a task to run (provided the job 
-          has tasks to run). This way, the Scheduler ensures that jobs with 
-          high memory requirements are not starved, as eventually, the TT 
-          will have enough VMEM available. If the high-mem job does not have 
-          any task to run, the Scheduler moves on to the next job. 
-          </li>
-          <li>In addition to VMEM, the Capacity Scheduler can also consider 
-          RAM on the TT node. RAM is considered the same way as VMEM. TTs report
-          the total RAM available on their node, and an offset. If both are
-          set, the Scheduler computes the available RAM on the node. Next, 
-          the Scheduler figures out the RAM requirements of the job, if any. 
-          As with VMEM, users can optionally specify a RAM limit for their job
-          (<code>mapred.task.maxpmem</code>, described in the MapReduce 
-          tutorial). The Scheduler also maintains a limit for this value 
-          (<code>mapred.capacity-scheduler.task.default-pmem-percentage-in-vmem</code>, 
-          described below). All these three values must be set for the 
-          Scheduler to schedule tasks based on RAM constraints.
-          </li>
-          <li>The Scheduler ensures that jobs cannot ask for RAM or VMEM higher
-          than configured limits. If this happens, the job is failed when it
-          is submitted. 
-          </li>
-        </ol>
-        
-        <p>As described above, the additional scheduler-based config 
-        parameters are as follows:</p>
-
-        <table>
-          <tr><th>Name</th><th>Description</th></tr>
-          <tr><td>mapred.capacity-scheduler.task.default-pmem-<br/>percentage-in-vmem</td>
-          	<td>A percentage of the default VMEM limit for jobs
-          	(<code>mapred.task.default.maxvmem</code>). This is the default 
-          	RAM task-limit associated with a task. Unless overridden by a 
-          	job's setting, this number defines the RAM task-limit.</td>
-          </tr>
-          <tr><td>mapred.capacity-scheduler.task.limit.maxpmem</td>
-          <td>Configuration which provides an upper limit to maximum physical
-           memory which can be specified by a job. If a job requires more 
-           physical memory than what is specified in this limit then the same
-           is rejected.</td>
-          </tr>
-        </table>
-      </section>
    <section>
         <title>Job Initialization Parameters</title>
         <p>Capacity scheduler lazily initializes the jobs before they are

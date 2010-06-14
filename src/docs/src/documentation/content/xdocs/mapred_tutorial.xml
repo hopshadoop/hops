@@ -1201,49 +1201,107 @@
         </p>
         
         <section>
-        <title> Memory Management</title>
-        <p>Users/admins can also specify the maximum virtual memory 
-        of the launched child-task, and any sub-process it launches 
-        recursively, using <code>mapred.{map|reduce}.child.ulimit</code>. Note 
-        that the value set here is a per process limit.
-        The value for <code>mapred.{map|reduce}.child.ulimit</code> should be 
-        specified in kilo bytes (KB). And also the value must be greater than
-        or equal to the -Xmx passed to JavaVM, or else the VM might not start. 
-        </p>
-        
-        <p>Note: <code>mapred.{map|reduce}.child.java.opts</code> are used only 
-        for configuring the launched child tasks from task tracker. Configuring 
-        the memory options for daemons is documented under
-        <a href="ext:cluster-setup/ConfiguringEnvironmentHadoopDaemons">
-        Configuring the Environment of the Hadoop Daemons</a> (Cluster Setup).</p>
-        
-        <p>The memory available to some parts of the framework is also
-        configurable. In map and reduce tasks, performance may be influenced
-        by adjusting parameters influencing the concurrency of operations and
-        the frequency with which data will hit disk. Monitoring the filesystem
-        counters for a job- particularly relative to byte counts from the map
-        and into the reduce- is invaluable to the tuning of these
-        parameters.</p>
-        
-        <p>Users can choose to override default limits of Virtual Memory and RAM 
-          enforced by the task tracker, if memory management is enabled. 
-          Users can set the following parameter per job:</p>
+         <title>Configuring Memory Requirements For A Job</title>
+         
+         <p>
+         MapReduce tasks are launched with some default memory limits
+         that are provided by the system or by the cluster's administrators.
+         Memory intensive jobs might need to use more than these default
+         values. Hadoop has some configuration options that allow these to 
+         be changed.
+         Without such modifications, memory intensive jobs could fail due
+         to <code>OutOfMemory</code> errors in tasks or could get killed
+         when the limits are enforced by the system. This section describes
+         the various options that can be used to configure specific
+         memory requirements.
+         </p>
+          
+         <ul>
+         
+           <li>
+           <code>mapreduce.{map|reduce}.java.opts</code>: If the task
+           requires more Java heap space, this option must be used. The
+           value of this option should pass the desired heap using the JVM
+           option -Xmx. For example, to use 1G of heap space, the option
+           should be passed in as -Xmx1024m. Note that other JVM options
+           are also passed using the same option. Hence, append the
+           heap space option along with other options already configured.
+           </li>
+         
+           <li>
+           <code>mapreduce.{map|reduce}.ulimit</code>: The slaves where
+           tasks are run could be configured with a ulimit value that
+           applies a limit to every process that is launched on the slave.
+           If the task, or any child that the task launches (like in
+           streaming), requires more than the configured limit, this option
+           must be used. The value is given in kilobytes. For example, to
+           increase the ulimit to 1G, the option should be set to 1048576.
+           Note that this value is a per process limit. Since it applies 
+           to the JVM as well, the heap space given to the JVM through 
+           the <code>mapreduce.{map|reduce}.java.opts</code> should be less
+           than the value configured for the ulimit. Otherwise the JVM
+           will not start.
+           </li>
            
-          <table>
-          <tr><th>Name</th><th>Type</th><th>Description</th></tr>
-          <tr><td><code>mapred.task.maxvmem</code></td><td>int</td>
-            <td>A number, in bytes, that represents the maximum Virtual Memory
-            task-limit for each task of the job. A task will be killed if 
-            it consumes more Virtual Memory than this number. 
-          </td></tr>
-          <tr><td>mapred.task.maxpmem</td><td>int</td>
-            <td>A number, in bytes, that represents the maximum RAM task-limit
-            for each task of the job. This number can be optionally used by
-            Schedulers to prevent over-scheduling of tasks on a node based 
-            on RAM needs.  
-          </td></tr>
-        </table>       
+           <li>
+           <code>mapreduce.{map|reduce}.memory.mb</code>: In some 
+           environments, administrators might have configured a total limit
+           on the virtual memory used by the entire process tree for a task, 
+           including all processes launched recursively by the task or 
+           its children, like in streaming. More details about this can be
+           found in the section on 
+           <a href="ext:cluster-setup/ConfiguringMemoryParameters">
+           Monitoring Task Memory Usage</a> in the Cluster SetUp guide.
+           If a task requires more virtual memory for its entire tree, 
+           this option 
+           must be used. The value is given in MB. For example, to set 
+           the limit to 1G, the option should be set to 1024. Note that this 
+           value does not automatically influence the per process ulimit or 
+           heap space. Hence, you may need to set those parameters as well 
+           (as described above) in order to give your tasks the right amount 
+           of memory.
+           </li>
+          
+           <li>
+           <code>mapreduce.{map|reduce}.memory.physical.mb</code>: 
+           This parameter is similar to 
+           <code>mapreduce.{map|reduce}.memory.mb</code>, except it specifies
+           how much physical memory is required by a task for its entire
+           tree of processes. The parameter is applicable if administrators
+           have configured a total limit on the physical memory used by
+           all MapReduce tasks.
+           </li>
+ 
+         </ul>
+         
+         <p>
+         As seen above, each of the options can be specified separately for
+         map and reduce tasks. It is typically the case that the different
+         types of tasks have different memory requirements. Hence different
+         values can be set for the corresponding options.
+         </p>
+         
+         <p>
+         The memory available to some parts of the framework is also
+         configurable. In map and reduce tasks, performance may be influenced
+         by adjusting parameters influencing the concurrency of operations and
+         the frequency with which data will hit disk. Monitoring the filesystem
+         counters for a job- particularly relative to byte counts from the map
+         and into the reduce- is invaluable to the tuning of these
+         parameters.
+         </p>
+           
+         <p>
+         Note: The memory related configuration options described above 
+         are used only for configuring the launched child tasks from the 
+         tasktracker. Configuring the memory options for daemons is documented 
+         under
+         <a href="ext:cluster-setup/ConfiguringEnvironmentHadoopDaemons">
+         Configuring the Environment of the Hadoop Daemons</a> (Cluster Setup).
+         </p>
+          
         </section>
+
         <section>
           <title>Map Parameters</title>
 

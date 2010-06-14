@@ -840,6 +840,9 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-1033. Resolve location of scripts and configuration files after
     project split. (tomwhite)
 
+    MAPREDUCE-1018. Document changes to the memory management and scheduling
+    model. (Hemanth Yamijala via vinodkv)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
