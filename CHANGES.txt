@@ -142,8 +142,6 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1493. Authorization for job-history pages. (vinodkv)
 
-    MAPREDUCE-1644. Remove Sqoop contrib module. (Aaron Kimball via cdouglas)
-
     MAPREDUCE-1607. Task controller may not set permissions for a
     task cleanup attempt's log directory (Amareshwari Sriramadasu via vinodkv)
 
@@ -159,9 +157,6 @@ Release 0.21.0 - Unreleased
     it by default if no other config file is specified. (Matei Zaharia)
 
     MAPREDUCE-551. Preemption support in the Fair Scheduler. (Matei Zaharia)
-
-    HADOOP-5887. Sqoop should create tables in Hive metastore after importing
-    to HDFS. (Aaron Kimball via tomwhite)
 
     MAPREDUCE-567. Add a new example MR that always fails. (Philip Zeyliger
     via tomwhite)
@@ -183,9 +178,6 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-740. Log a job-summary at the end of a job, while allowing it
     to be configured to use a custom appender if desired. (acmurthy)
 
-    MAPREDUCE-705. User-configurable quote and delimiter characters for Sqoop
-    records and record reparsing. (Aaron Kimball via tomwhite)
-
     MAPREDUCE-814. Provide a way to configure completed job history files 
     to be on HDFS. (sharad)
 
@@ -204,8 +196,6 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-751. Add Rumen, a tool for extracting statistics from job tracker
     logs and generating job traces for simulation and analysis. (Dick King via
     cdouglas)
-
-    MAPREDUCE-938. Postgresql support for Sqoop. (Aaron Kimball via tomwhite)	
 
     MAPREDUCE-830. Add support for splittable compression to TextInputFormats.
     (Abdul Qadeer via cdouglas)
@@ -243,15 +233,9 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-698. Per-pool task limits for the fair scheduler.
     (Kevin Peterson via matei)
 
-    MAPREDUCE-1017. Compression and output splitting for Sqoop.
-    (Aaron Kimball via tomwhite)
-
     MAPREDUCE-1026. Does mutual authentication of the shuffle
     transfers using a shared JobTracker generated key.
     (Boris Shkolnik via ddas)
-
-    MAPREDUCE-1168. Export data to databases via Sqoop. (Aaron Kimball via
-    tomwhite)
 
     MAPREDUCE-744. Introduces the notion of a public distributed cache.
     (Devaraj Das)
@@ -276,9 +260,6 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1433. Add a delegation token for MapReduce. (omalley)
 
-    MAPREDUCE-1341. Sqoop should have an option to create hive tables and
-    skip the table import step. (Leonid Furman via tomwhite)
-
     MAPREDUCE-1307. Introduces the Job level ACLs feature. 
     (Vinod Kumar Vavilapalli via ddas)
 
@@ -288,19 +269,7 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-1455. Introduces job-level authorization for mapreduce servlets.
     (Ravi Gummadi via vinodkv)
 
-    MAPREDUCE-1446. Sqoop should support CLOB and BLOB datatypes.
-    (Aaron Kimball via tomwhite)
-
   IMPROVEMENTS
-
-    MAPREDUCE-816. Rename "local" mysql import to "direct" in Sqoop.
-    (Aaron Kimball via matei)
-
-    HADOOP-5967. Sqoop should only use a single map task. (Aaron Kimball via
-    tomwhite)
-
-    HADOOP-5968. Sqoop should only print a warning about mysql import speed
-    once. (Aaron Kimball via tomwhite)
 
     MAPREDUCE-463. Makes job setup and cleanup tasks as optional.
     (Amareshwari Sriramadasu via sharad)
@@ -331,23 +300,11 @@ Release 0.21.0 - Unreleased
     test for o.a.h.mapreduce.lib.MultithreadedMapper.
     (Amareshwari Sriramadasu via sharad)
 
-    MAPREDUCE-692. Make Hudson run Sqoop unit tests.
-    (Aaron Kimball via tomwhite)
-
     MAPREDUCE-701. Improves the runtime of the TestRackAwareTaskPlacement
     by making it a unit test.  (Jothi Padmanabhan via ddas)
 
-    MAPREDUCE-674. Sqoop should allow a "where" clause to avoid having to
-    export entire tables. (Kevin Weil via tomwhite)
-
-    MAPREDUCE-675. Sqoop should allow user-defined class and package names.
-    (Aaron Kimball via tomwhite)
-
     MAPREDUCE-371. Change KeyFieldBasedComparator and KeyFieldBasedPartitioner
     to use new api. (Amareshwari Sriramadasu via sharad)
-
-    MAPREDUCE-713. Sqoop has some superfluous imports. (Aaron Kimball via
-    tomwhite)
 
     MAPREDUCE-623. Resolve javac warnings in mapreduce. (Jothi Padmanabhan
     via sharad)
@@ -357,9 +314,6 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-632. Merge TestCustomOutputCommitter with 
     TestCommandLineJobSubmission. (Jothi Padmanabhan via sharad)
-
-    MAPREDUCE-710. Sqoop should read and transmit passwords in a more secure
-    manner. (Aaron Kimball via tomwhite)
 
     MAPREDUCE-627. Improves execution time of TestTrackerBlacklistAcrossJobs.
     (Jothi Padmanabhan via ddas)
@@ -419,8 +373,6 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-779. Added node health failure counts into 
     JobTrackerStatistics. (Sreekanth Ramakrishnan via yhemanth)
 
-    MAPREDUCE-789. Oracle support for Sqoop. (Aaron Kimball via tomwhite)
-
     MAPREDUCE-842. Setup secure permissions for localized job files,
     intermediate outputs and log files on tasktrackers.
     (Vinod Kumar Vavilapalli via yhemanth)
@@ -447,9 +399,6 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-870. Remove the job retire thread and the associated 
     config parameters. (sharad)
 
-    MAPREDUCE-749. Make Sqoop unit tests more Hudson-friendly.
-    (Aaron Kimball via tomwhite)
-
     MAPREDUCE-874. Rename the PiEstimator example to QuasiMonteCarlo.
     (szetszwo)
 
@@ -468,9 +417,6 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-476. Extend DistributedCache to work locally (LocalJobRunner).
     (Philip Zeyliger via tomwhite)
-
-    MAPREDUCE-750. Extensible ConnManager factory API. (Aaron Kimball via
-    tomwhite)
 
     MAPREDUCE-825. JobClient completion poll interval of 5s causes slow tests
     in local mode. (Aaron Kimball via tomwhite)
@@ -494,12 +440,6 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-898. Changes DistributedCache to use the new API.
     (Amareshwari Sriramadasu via ddas)
-
-    MAPREDUCE-876. Sqoop import of large tables can time out.
-    (Aaron Kimball via tomwhite)
-
-    MAPREDUCE-918. Test hsqldb server should be memory-only.
-    (Aaron Kimball via tomwhite)
 
     MAPREDUCE-144. Includes dump of the process tree in task diagnostics when 
     a task is killed due to exceeding memory limits.
@@ -537,9 +477,6 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-284. Enables ipc.client.tcpnodelay in Tasktracker's Child.
     (Ravi Gummadi via sharad)
-
-    MAPREDUCE-907. Sqoop should use more intelligent splits. (Aaron Kimball
-    via tomwhite)
 
     MAPREDUCE-916. Split the documentation to match the project split.
     (Corinne Chandel via omalley)
@@ -616,11 +553,6 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-707. Provide a jobconf property for explicitly assigning a job to 
     a pool in the Fair Scheduler. (Alan Heirich via matei)
 
-    MAPREDUCE-999. Improve Sqoop test speed and refactor tests.
-    (Aaron Kimball via tomwhite)
-
-    MAPREDUCE-906. Update Sqoop documentation. (Aaron Kimball via cdouglas)
-
     MAPREDUCE-947. Added commitJob and abortJob apis to OutputCommitter.
     Enhanced FileOutputCommitter to create a _SUCCESS file for successful
     jobs. (Amar Kamat & Jothi Padmanabhan via acmurthy) 
@@ -633,18 +565,10 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-1090. Modified log statement in TaskMemoryManagerThread to
     include task attempt id. (yhemanth)
 
-    MAPREDUCE-1069. Implement Sqoop API refactoring. (Aaron Kimball via
-    tomwhite)
-
-    MAPREDUCE-1036. Document Sqoop API. (Aaron Kimball via cdouglas)
-
     MAPREDUCE-1189. Reduce ivy console output to ovservable level (cos)
 
     MAPREDUCE-1167. ProcfsBasedProcessTree collects rss memory information.
     (Scott Chen via dhruba)
-
-    MAPREDUCE-1169. Improvements to mysqldump use in Sqoop.
-    (Aaron Kimball via tomwhite)
 
     MAPREDUCE-1231. Added a new DistCp option, -skipcrccheck, so that the CRC
     check during setup can be skipped.  (Jothi Padmanabhan via szetszwo)
@@ -705,9 +629,6 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-361. Port terasort example to the new mapreduce API. (Amareshwari
     Sriramadasu via cdouglas)
 
-    MAPREDUCE-1356. Allow user-specified hive table name in sqoop.
-    (Aaron Kimball via tomwhite)
-
     MAPREDUCE-1367. LocalJobRunner should support parallel mapper execution.
     (Aaron Kimball via tomwhite)
 
@@ -724,9 +645,6 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1441. Trim whitespace from directory lists pulled from the
     configuration. (Todd Lipcon via cdouglas)
-
-    MAPREDUCE-1445. Refactor Sqoop tests to support better ConnManager testing.
-    (Aaron Kimball via tomwhite)
 
     MAPREDUCE-1309. Refactor Rumen trace generator to improve code structure
     and add extensible support for log formats. (Dick King via cdouglas)
@@ -850,15 +768,9 @@ Release 0.21.0 - Unreleased
     Configuration changes:
       add mapreduce.tasktracker.outofband.heartbeat 
 
-    MAPREDUCE-1224. Calling "SELECT t.* from <table> AS t" to get meta
-    information is too expensive for big tables. (Spencer Ho via tomwhite)
-
     MAPREDUCE-1186. Modified code in distributed cache to set permissions
     only on required set of localized paths.
     (Amareshwari Sriramadasu via yhemanth)
-
-    MAPREDUCE-1467. Add a --verbose flag to Sqoop.
-    (Aaron Kimball via tomwhite)
 
     MAPREDUCE-1501. FileInputFormat supports multi-level, recursive 
     directory listing.  (Zheng Shao via dhruba)
@@ -875,9 +787,6 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-878. Rename fair scheduler design doc to 
     fair-scheduler-design-doc.tex and add Apache license header (matei)
-
-    MAPREDUCE-703. Sqoop requires dependency on hsqldb in ivy.
-    (Aaron Kimball via matei)
 
     HADOOP-4687. MapReduce is split from Hadoop Core. It is a subproject under 
     Hadoop (Owen O'Malley)
@@ -910,14 +819,8 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-124. Fix a bug in failure handling of abort task of 
     OutputCommiter. (Amareshwari Sriramadasu via sharad)
 
-    MAPREDUCE-673. Sqoop depends on commons-cli, which is not in its ivy.xml.
-    (Kevin Weil via tomwhite)
-
     MAPREDUCE-694. Fix to add jsp-api jars to capacity-scheduler classpath.
     (Giridharan Kesavan)
-
-    MAPREDUCE-690. Sqoop's test "hive" script needs to be executable.
-    (Aaron Kimball via tomwhite)
     
     MAPREDUCE-702. Fix eclipse-plugin jar target (Giridharan Kesavan) 
 
@@ -949,9 +852,6 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-732. Removed spurious log statements in the node
     blacklisting logic. (Sreekanth Ramakrishnan via yhemanth)
-
-    MAPREDUCE-685. Sqoop will fail with OutOfMemory on large tables
-    using mysql. (Aaron Kimball via tomwhite)
 
     MAPREDUCE-734. Fix a ConcurrentModificationException in unreserving
     unused reservations for a job when it completes.
@@ -1158,9 +1058,6 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-941. Vaidya script fails on Solaris. (Chad Metcalf
     via tomwhite)
 
-    MAPREDUCE-923. Sqoop classpath breaks for jar files with a
-    plus sign in their names. (Aaron Kimball via tomwhite)
-
     MAPREDUCE-912. Add and standardize Apache license headers. (Chad Metcalf
     via cdouglas)
 
@@ -1228,9 +1125,6 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1038. Weave Mumak aspects only if related files have changed.
     (Aaron Kimball via cdouglas)
-
-    MAPREDUCE-1037. Continue running contrib tests if Sqoop tests fail. (Aaron
-    Kimball via cdouglas)
 
     MAPREDUCE-1163. Remove unused, hard-coded paths from libhdfs. (Allen
     Wittenauer via cdouglas)
@@ -1415,19 +1309,10 @@ Release 0.21.0 - Unreleased
     parameter instead of using FileStatus.class.  (Peter Romianowski via
     szetszwo)
 
-    MAPREDUCE-1148. SQL identifiers are a superset of Java identifiers.
-    (Aaron Kimball via tomwhite)
-
     MAPREDUCE-1294. Build fails to pull latest hadoop-core-* artifacts (cos)
 
     MAPREDUCE-1213. TaskTrackers restart is faster because it deletes
     distributed cache directory asynchronously. (Zheng Shao via dhruba)
-
-    MAPREDUCE-1146. Sqoop dependencies break Eclipse build on Linux.
-    (Aaron Kimball via tomwhite)
-
-    MAPREDUCE-1174. Sqoop improperly handles table/column names which are
-    reserved sql words. (Aaron Kimball via tomwhite)
 
     MAPREDUCE-1265. The task attempt error log prints the name of the 
     tasktracker machine. (Scott Chen via dhruba)
@@ -1436,9 +1321,6 @@ Release 0.21.0 - Unreleased
     (Scott Chen via dhruba)
 
     MAPREDUCE-1326. fi tests don't use fi-site.xml (cos)
-
-    MAPREDUCE-1235. Fix a MySQL timestamp incompatibility in Sqoop. (Aaron
-    Kimball via cdouglas)
 
     MAPREDUCE-1165. Replace non-portable function name with C99 equivalent.
     (Allen Wittenauer via cdouglas)
@@ -1454,26 +1336,11 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-1155. Streaming tests swallow exceptions.
     (Todd Lipcon via tomwhite)
 
-    MAPREDUCE-1310. CREATE TABLE statements for Hive do not correctly specify
-    delimiters. (Aaron Kimball via tomwhite)
-
     MAPREDUCE-1212. Mapreduce contrib project ivy dependencies are not included
     in binary target. (Aaron Kimball via tomwhite)
 
     MAPREDUCE-1388. Move the HDFS RAID package from HDFS to MAPREDUCE.
     (Eli Collins via dhruba)
-
-    MAPREDUCE-1313. Fix NPE in Sqoop when table with null fields uses escape
-    during import. (Aaron Kimball via cdouglas)
-
-    MAPREDUCE-1327. Fix Sqoop handling of Oracle timezone with timestamp data
-    types in import. (Leonid Furman via cdouglas)
-
-    MAPREDUCE-1394. Sqoop generates incorrect URIs in paths sent to Hive.
-    (Aaron Kimball via tomwhite)
-
-    MAPREDUCE-1395. Sqoop does not check return value of Job.waitForCompletion().
-    (Aaron Kimball via tomwhite)
 
     MAPREDUCE-1322. Defines default value for staging directory to be user
     based fixing a failing streaming test.
@@ -1493,9 +1360,6 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1399. The archive command shows a null error message (nicholas
     via mahadev)
-
-    MAPREDUCE-1469. Sqoop should disable speculative execution in export.
-    (Aaron Kimball via tomwhite)
 
     MAPREDUCE-1305. Improve efficiency of distcp -delete. (Peter Romianowski
     via cdouglas)
@@ -1520,9 +1384,6 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-1398. Fix TaskLauncher to stop waiting for slots on a TIP that
     is killed / failed.
     (Amareshwari Sriramadasu via yhemanth)
-
-    MAPREDUCE-1444. Sqoop ConnManager instances can leak Statement objects.
-    (Aaron Kimball via tomwhite)
 
     MAPREDUCE-1491. The parity files created by the RAID are combined
     using Hadoop Archive Files (HAR).  (Rodrigo Schmidt via dhruba)
