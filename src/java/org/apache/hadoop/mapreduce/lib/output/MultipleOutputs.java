@@ -131,6 +131,11 @@ public class MultipleOutputs<KEYOUT, VALUEOUT> {
   private static final String COUNTERS_GROUP = MultipleOutputs.class.getName();
 
   /**
+   * Cache for the taskContexts
+   */
+  private Map<String, TaskAttemptContext> taskContexts = new HashMap<String, TaskAttemptContext>();
+
+  /**
    * Checks if a named output name is valid token.
    *
    * @param namedOutput named output Name
@@ -422,15 +427,25 @@ public class MultipleOutputs<KEYOUT, VALUEOUT> {
    // Create a taskAttemptContext for the named output with 
    // output format and output key/value types put in the context
   private TaskAttemptContext getContext(String nameOutput) throws IOException {
+      
+    TaskAttemptContext taskContext = taskContexts.get(nameOutput);
+    
+    if (taskContext != null) {
+        return taskContext;
+    }
+    
     // The following trick leverages the instantiation of a record writer via
     // the job thus supporting arbitrary output formats.
     Job job = new Job(context.getConfiguration());
     job.setOutputFormatClass(getNamedOutputFormatClass(context, nameOutput));
     job.setOutputKeyClass(getNamedOutputKeyClass(context, nameOutput));
     job.setOutputValueClass(getNamedOutputValueClass(context, nameOutput));
-    TaskAttemptContext taskContext = 
+    taskContext = 
       new TaskAttemptContextImpl(job.getConfiguration(), 
                                  context.getTaskAttemptID());
+
+    taskContexts.put(nameOutput, taskContext);
+
     return taskContext;
   }
   

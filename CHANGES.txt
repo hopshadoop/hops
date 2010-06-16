@@ -783,6 +783,9 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-1610. Forrest documentation should be updated to reflect
     the changes in MAPREDUCE-856. (Ravi Gummadi via vinodkv)
 
+    MAPREDUCE-1853. Adds caching for TaskAttemptContext in MultipleOutputs.
+    (Torsten Curdt via amareshwari)
+
   BUG FIXES
 
     MAPREDUCE-878. Rename fair scheduler design doc to 
