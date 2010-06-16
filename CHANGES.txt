@@ -1550,3 +1550,6 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1606. TestJobACLs may timeout as there are no slots for launching
     JOB_CLEANUP task. (Ravi Gummadi via vinodkv)
+
+    MAPREDUCE-1765. Correct streaming documentation for StreamXmlRecordReader.
+    (Corinne Chandel via amareshwari)

@@ -810,7 +810,7 @@ At least as late as version 0.14, Hadoop does not support multiple jar files. So
 You can use the record reader StreamXmlRecordReader to process XML documents. 
 </p>
 <source>
-hadoop jar hadoop-streaming.jar -inputreader "StreamXmlRecord,begin=BEGIN_STRING,end=END_STRING" ..... (rest of the command)
+hadoop jar hadoop-streaming.jar -inputreader "StreamXmlRecordReader,begin=BEGIN_STRING,end=END_STRING" ..... (rest of the command)
 </source>
 <p>
 Anything found between BEGIN_STRING and END_STRING would be treated as one record for map tasks.
