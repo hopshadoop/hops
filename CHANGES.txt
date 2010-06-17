@@ -92,6 +92,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-1813. NPE in PipeMapred.MRErrorThread. (Ravi Gummadi via vinodkv)
 
+    MAPREDUCE-1225. Fixes DistributedCache to check if the file is fresh or not,
+    for the first localization also. (Zhong Wang via amareshwari)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

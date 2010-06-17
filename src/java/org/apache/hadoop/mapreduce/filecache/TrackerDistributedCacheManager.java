@@ -174,8 +174,11 @@ public class TrackerDistributedCacheManager {
       // do the localization, after releasing the global lock
       synchronized (lcacheStatus) {
         if (!lcacheStatus.isInited()) {
+          FileSystem fs = FileSystem.get(cache, conf);
+          checkStampSinceJobStarted(conf, fs, cache, confFileStamp,
+              lcacheStatus, fileStatus);
           localizedPath = localizeCache(conf, cache, confFileStamp,
-              lcacheStatus, fileStatus, isArchive, isPublic);
+              lcacheStatus, isArchive, isPublic);
           lcacheStatus.initComplete();
         } else {
           localizedPath = checkCacheStatusValidity(conf, cache, confFileStamp,
@@ -404,7 +407,6 @@ public class TrackerDistributedCacheManager {
   Path localizeCache(Configuration conf,
                                     URI cache, long confFileStamp,
                                     CacheStatus cacheStatus,
-                                    FileStatus fileStatus,
                                     boolean isArchive, boolean isPublic)
   throws IOException {
     FileSystem fs = FileSystem.get(cache, conf);
@@ -488,9 +490,9 @@ public class TrackerDistributedCacheManager {
     return (filename.endsWith(".tgz") || filename.endsWith(".tar.gz") ||
            filename.endsWith(".tar"));
   }
-
-  // Checks if the cache has already been localized and is fresh
-  private boolean ifExistsAndFresh(Configuration conf, FileSystem fs,
+  
+  // ensure that the file on hdfs hasn't been modified since the job started
+  private long checkStampSinceJobStarted(Configuration conf, FileSystem fs,
                                           URI cache, long confFileStamp,
                                           CacheStatus lcacheStatus,
                                           FileStatus fileStatus)
@@ -502,13 +504,23 @@ public class TrackerDistributedCacheManager {
       dfsFileStamp = getTimestamp(conf, cache);
     }
 
-    // ensure that the file on hdfs hasn't been modified since the job started
     if (dfsFileStamp != confFileStamp) {
       LOG.fatal("File: " + cache + " has changed on HDFS since job started");
       throw new IOException("File: " + cache +
                             " has changed on HDFS since job started");
     }
+    
+    return dfsFileStamp;
+  }
 
+  // Checks if the cache has already been localized and is fresh
+  private boolean ifExistsAndFresh(Configuration conf, FileSystem fs,
+                                          URI cache, long confFileStamp,
+                                          CacheStatus lcacheStatus,
+                                          FileStatus fileStatus)
+  throws IOException {
+    long dfsFileStamp = checkStampSinceJobStarted(conf, fs, cache,
+        confFileStamp, lcacheStatus, fileStatus);
     if (dfsFileStamp != lcacheStatus.mtime) {
       return false;
     }
