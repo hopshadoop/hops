@@ -56,10 +56,12 @@ bash$ hadoop distcp hdfs://nn1:8020/foo/bar \
         tasks, and start a copy on each TaskTracker from nn1 to nn2. Note
         that DistCp expects absolute paths.</p>
 
-    <p>One can also specify multiple source directories on the command line:</p>
+    <p>One can also specify multiple source directories on the command line and
+    use globbing for one or more source paths:</p>
 <source>
 bash$ hadoop distcp hdfs://nn1:8020/foo/a \ 
-            hdfs://nn1:8020/foo/b \ 
+            hdfs://nn1:8020/foo/b* \
+            hdfs://nn1:8020/foo/car* \
             hdfs://nn2:8020/bar/foo 
 </source>             
 
@@ -116,17 +118,24 @@ hdfs://nn1:8020/foo/b
         <table>
           <tr><th> Flag </th><th> Description </th><th> Notes </th></tr>
 
-          <tr><td><code>-p[rbugp]</code></td>
+          <tr><td><code>-p[rbugpt]</code></td>
               <td>Preserve<br/>
                   &nbsp;&nbsp;r: replication number<br/>
                   &nbsp;&nbsp;b: block size<br/>
                   &nbsp;&nbsp;u: user<br/>
                   &nbsp;&nbsp;g: group<br/>
-                  &nbsp;&nbsp;p: permission<br/></td>
-              <td>Modification times are not preserved. Also, when
+                  &nbsp;&nbsp;p: permission<br/>
+                  &nbsp;&nbsp;t: modification and access times<br/></td>
+              <td>Notice that when
               <code>-update</code> is specified, status updates will
               <strong>not</strong> be synchronized unless the file sizes
               also differ (i.e. unless the file is re-created).
+              </td></tr>
+          <tr><td><code>-basedir &lt;dir&gt;</code></td>
+              <td>Defines new base directory for the copy</td>
+              <td>This option starts the copy from the base directory up to
+              every source, keeping the partial source tree. The specified
+              directory must be a common ancestor to all sources.
               </td></tr>
           <tr><td><code>-i</code></td>
               <td>Ignore failures</td>

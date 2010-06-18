@@ -54,6 +54,10 @@ Trunk (unreleased changes)
     MAPREDUCE-1516. JobTracker issues delegation tokens only if the user's
     authentication is Kerberos. (Jitendra Pandey via ddas)
 
+    MAPREDUCE-647. Update distcp forrest documentation to reflect the changes
+    of HADOOP-5472, MAPREDUCE-642 and HADOOP-5620.  (Rodrigo Schmidt via
+    szetszwo)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and
