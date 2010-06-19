@@ -99,6 +99,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1225. Fixes DistributedCache to check if the file is fresh or not,
     for the first localization also. (Zhong Wang via amareshwari)
 
+    MAPREDUCE-1559. Fixes the token renewer to use the JobTracker's 
+    credentials for talking to the NameNode. (ddas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
