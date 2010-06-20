@@ -102,6 +102,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1559. Fixes the token renewer to use the JobTracker's 
     credentials for talking to the NameNode. (ddas)
 
+    MAPREDUCE-1492. Delete  obsolete har files used on the parity files
+    of hdfs raid. (Rodrigo Schmidt via dhruba)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

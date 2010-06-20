@@ -1153,6 +1153,7 @@ public class RaidNode implements RaidProtocol {
           Thread.sleep(SLEEP_TIME);
         }
 
+        LOG.info("Started purge scan");
         prevExec = now();
         
         // fetch all categories
@@ -1235,6 +1236,12 @@ public class RaidNode implements RaidProtocol {
 
       // Verify if it is a har file
       if (destStr.endsWith(HAR_SUFFIX)) {
+        String destParentStr = destPath.getParent().toUri().getPath();
+        String src = destParentStr.replaceFirst(destPrefix, "");
+        Path srcPath = new Path(src);
+        if (!srcFs.exists(srcPath)) {
+          destFs.delete(destPath, true);
+        }
         return;
       }
       

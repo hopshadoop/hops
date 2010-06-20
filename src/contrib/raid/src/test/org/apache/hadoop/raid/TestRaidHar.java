@@ -198,11 +198,11 @@ public class TestRaidHar extends TestCase {
              " blockSize=" + blockSize + " stripeLength=" + stripeLength);
     mySetup(srcPath, targetReplication, metaReplication, stripeLength);
     RaidShell shell = null;
-    Path dir = new Path("/user/test/raidtest/");
+    Path dir = new Path("/user/test/raidtest/subdir/");
     Path file1 = new Path(dir + "/file" + iter);
     RaidNode cnode = null;
     try {
-      Path destPath = new Path("/destraid/user/test/raidtest");
+      Path destPath = new Path("/destraid/user/test/raidtest/subdir");
       fileSys.delete(dir, true);
       fileSys.delete(destPath, true);
       TestRaidNode.createOldFile(fileSys, file1, 1, numBlock, blockSize);
@@ -250,6 +250,26 @@ public class TestRaidHar extends TestCase {
         Thread.sleep(1000);                  // keep waiting
       }
       
+      fileSys.delete(dir, true);
+      // wait till raid file is deleted
+      int count = 1;
+      while (count > 0) {
+        count = 0;
+        try {
+          listPaths = fileSys.listStatus(destPath);
+          if (listPaths != null) {
+            for (FileStatus s : listPaths) {
+              LOG.info("doTestHar found path " + s.getPath());
+              if (s.getPath().toString().endsWith(".har")) {
+                count++;
+              }
+            }
+          }
+        } catch (FileNotFoundException e) { } //ignoring
+        LOG.info("doTestHar waiting for har file to be deleted. Found " + 
+                (listPaths == null ? "none" : listPaths.length) + " files");
+        Thread.sleep(1000);
+      }
       
     } catch (Exception e) {
       LOG.info("doTestHar Exception " + e +
