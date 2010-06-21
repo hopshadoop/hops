@@ -1572,3 +1572,5 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1765. Correct streaming documentation for StreamXmlRecordReader.
     (Corinne Chandel via amareshwari)
+
+    MAPREDUCE-1880. Fix BigDecimal.divide(..) in the pi example.  (szetszwo)
