@@ -6,9 +6,6 @@ Trunk (unreleased changes)
 
   NEW FEATURES
 
-    MAPREDUCE-1774. Large-scale Automated Framework (Sharad Agarwal, Sreekanth
-    Ramakrishnan, Konstantin Boudnik, at all via cos)
-
     MAPREDUCE-1804. Stress-test tool for HDFS introduced in HDFS-708.
     (Joshua Harlow via shv)
 
@@ -165,6 +162,9 @@ Release 0.21.0 - Unreleased
     Luke Lu via cdouglas)
 
   NEW FEATURES
+
+    MAPREDUCE-1774. Large-scale Automated Framework (Sharad Agarwal, Sreekanth
+    Ramakrishnan, Konstantin Boudnik, at all via cos)
 
     MAPREDUCE-706. Support for FIFO pools in the fair scheduler.
     (Matei Zaharia)
