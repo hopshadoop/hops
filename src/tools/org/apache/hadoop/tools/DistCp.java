@@ -382,7 +382,7 @@ public class DistCp implements Tool {
           srcstat.getReplication(): destFileSys.getDefaultReplication();
       long blockSize = preseved.contains(FileAttribute.BLOCK_SIZE)?
           srcstat.getBlockSize(): destFileSys.getDefaultBlockSize();
-      return destFileSys.create(f, permission, EnumSet.of(CreateFlag.OVERWRITE), sizeBuf, replication,
+      return destFileSys.create(f, permission, true, sizeBuf, replication,
           blockSize, reporter);
     }
 

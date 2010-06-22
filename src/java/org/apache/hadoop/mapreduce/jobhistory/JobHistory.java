@@ -276,8 +276,7 @@ public class JobHistory {
   
     FSDataOutputStream out = logDirFs.create(logFile, 
         new FsPermission(JobHistory.HISTORY_FILE_PERMISSION),
-        EnumSet.of(CreateFlag.OVERWRITE), 
-        defaultBufferSize, 
+        true, defaultBufferSize, 
         logDirFs.getDefaultReplication(), 
         jobHistoryBlockSize, null);
   
@@ -296,8 +295,7 @@ public class JobHistory {
         if (!logDirFs.exists(logDirConfPath)) {
           jobFileOut = logDirFs.create(logDirConfPath,
               new FsPermission(JobHistory.HISTORY_FILE_PERMISSION),
-              EnumSet.of(CreateFlag.OVERWRITE),
-              defaultBufferSize,
+              true, defaultBufferSize,
               logDirFs.getDefaultReplication(),
               logDirFs.getDefaultBlockSize(), null);
           jobConf.writeXml(jobFileOut);

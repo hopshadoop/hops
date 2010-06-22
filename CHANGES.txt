@@ -1574,3 +1574,7 @@ Release 0.21.0 - Unreleased
     (Corinne Chandel via amareshwari)
 
     MAPREDUCE-1880. Fix BigDecimal.divide(..) in the pi example.  (szetszwo)
+
+    MAPREDUCE-1885. Revert FileSystem create method that takes CreateFlags
+    (MapReduce part of HADOOP-6826). (Ravi Gummadi via tomwhite)
+
