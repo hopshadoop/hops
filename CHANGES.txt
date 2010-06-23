@@ -60,6 +60,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-1851. Documents configuration parameters in streaming.
     (amareshwari)
+    
+    MAPREDUCE-1868. Add a read and connection timeout to JobClient while
+    pulling tasklogs. (Krishna Ramachandran via acmurthy)
 
   OPTIMIZATIONS
 

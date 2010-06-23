@@ -107,6 +107,9 @@ public class Job extends JobContextImpl implements JobContext {
     "mapreduce.client.genericoptionsparser.used";
   public static final String SUBMIT_REPLICATION = 
     "mapreduce.client.submit.file.replication";
+  private static final String TASKLOG_PULL_TIMEOUT_KEY =
+           "mapreduce.client.tasklog.timeout";
+  private static final int DEFAULT_TASKLOG_TIMEOUT = 60000;
 
   @InterfaceStability.Evolving
   public static enum TaskStatusFilter { NONE, KILLED, FAILED, SUCCEEDED, ALL }
@@ -1227,7 +1230,11 @@ public class Job extends JobContextImpl implements JobContext {
   private void getTaskLogs(TaskAttemptID taskId, URL taskLogUrl, 
                            OutputStream out) {
     try {
+      int tasklogtimeout = cluster.getConf().getInt(
+        TASKLOG_PULL_TIMEOUT_KEY, DEFAULT_TASKLOG_TIMEOUT);
       URLConnection connection = taskLogUrl.openConnection();
+      connection.setReadTimeout(tasklogtimeout);
+      connection.setConnectTimeout(tasklogtimeout);
       BufferedReader input = 
         new BufferedReader(new InputStreamReader(connection.getInputStream()));
       BufferedWriter output = 
