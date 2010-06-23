@@ -64,6 +64,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1868. Add a read and connection timeout to JobClient while
     pulling tasklogs. (Krishna Ramachandran via acmurthy)
 
+    MAPREDUCE-1788. Ensure failure to setup CompletedJobStatusStore is not
+    silently ignored by the JobTracker. (Krishna Ramachandran via acmurthy)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and
