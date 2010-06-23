@@ -161,6 +161,9 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-1683. Remove JNI calls from ClusterStatus cstr. (Arun Murthy and
     Luke Lu via cdouglas)
 
+    MAPREDUCE-1855. Makes the refresh methods (for groups and proxy users) 
+    independent of the client side configuration. (Boris Shkolnik via ddas)
+
   NEW FEATURES
 
     MAPREDUCE-1774. Large-scale Automated Framework (Sharad Agarwal, Sreekanth
