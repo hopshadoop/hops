@@ -653,6 +653,80 @@ from field 5 (corresponding to all the original fields).
 </section>
 </section>
 
+<section>
+<title>Configurable parameters</title>
+<p>This section lists all the streaming specific configuration parameters which
+ are configurable for a streaming job.</p>
+
+<p>The Hadoop streaming configurable parameters are</p>
+<table>
+<tr><th>Parameter</th><th>Default value </th><th>Description </th></tr>
+<tr><td> stream.map.streamprocessor </td><td> - </td>
+    <td> The command for mapper. </td></tr>
+<tr><td> stream.map.input.ignoreKey </td><td> true </td><td> Specifies whether
+    to ignore key or not while writing input for the mapper. The configuration
+    parameter is valid only if stream.map.input.writer.class is 
+    org.apache.hadoop.streaming.io.TextInputWriter.class. By default, for 
+    TextInputFormat, it is true. </td></tr>
+<tr><td> stream.map.input.field.separator </td><td> \t </td><td> Seperator for
+    key and value, while writing input for mapper. This is honoured only if
+    "stream.map.input.ignoreKey" is false. </td></tr>
+<tr><td> stream.map.output.field.separator </td><td> \t </td><td> Seperator for
+    key and value, while reading output from mapper. </td></tr>
+<tr><td> stream.num.map.output.key.fields </td><td> 1 </td><td> Specifies the
+    nth field separator in the line of the map output as the
+    separator between the key and the value. </td></tr>
+<tr><td> stream.combine.streamprocessor </td><td> - </td>
+    <td> The command for combiner. </td></tr>
+<tr><td> stream.reduce.streamprocessor </td><td> - </td>
+    <td> The command for reducer. </td></tr>
+<tr><td> stream.reduce.input.field.separator </td><td> \t </td><td> Seperator 
+    for key and value, while writing input for reducer. </td></tr>
+<tr><td> stream.reduce.output.field.separator </td><td> \t </td><td> Seperator 
+    for key and value, while reading output from reducer. </td></tr>
+<tr><td> stream.num.reduce.output.key.fields </td><td> 1 </td><td> Specifies the
+    nth field separator in the line of the reduce output as the separator 
+     between the key and the value. </td></tr>
+<tr><td> stream.map.input </td><td> text </td><td> Identifier to specify the
+    communication format used for map input. Possible values are text,
+    typedbytes and rawbytes. This value is honored only if no identifier is
+    specified via -io option</td></tr>
+<tr><td> stream.map.output </td><td> text </td><td> Identifier to specify the
+    communication format used for map output. Possible values are text,
+    typedbytes and rawbytes. This value is honored only if no identifier is
+    specified via -io option. </td></tr>
+<tr><td> stream.reduce.input </td><td> text </td><td> Identifier to specify the
+    communication format used for reduce input. Possible values are text,
+    typedbytes and rawbytes. This value is honored only if no identifier is
+    specified via -io option. </td></tr>
+<tr><td> stream.reduce.output </td><td> text </td><td> Identifier to specify the
+    communication format used for reduce output. Possible values are text,
+    typedbytes and rawbytes. This value is honored only if no identifier is
+    specified via -io option. </td></tr>
+<tr><td> stream.io.identifier.resolver.class </td>
+    <td> org.apache.hadoop.streaming.io.IdentifierResolver.class </td>
+    <td> The class to resolve iospec passed via option -io. </td></tr>
+<tr><td> stream.recordreader.class </td><td> - </td><td> RecordReader class 
+    passed via -inputReader option. </td></tr>
+<tr><td> stream.recordreader.* </td><td> - </td><td> Configuration properties
+    for record reader passed via stream.recordreader.class. </td></tr>
+<tr><td> stream.shipped.hadoopstreaming </td><td> - </td><td> Custom streaming
+    build along with standard hadoop install</td></tr>
+<tr><td> stream.non.zero.exit.is.failure </td><td> true </td><td> Specifies 
+    whether to treat non-zero exit code of the map/reduce process as a failure
+    or not. </td></tr>
+<tr><td> stream.tmpdir </td><td> - </td><td> Temporary directory used for jar
+    packaging</td></tr>
+<tr><td> stream.joindelay.milli </td><td> 0 </td><td> Timeout in milliseconds
+    for joining the error and output threads at the end of mapper/reducer. A
+    timeout of "0" means to wait forever. </td></tr>
+<tr><td> stream.minRecWrittenToEnableSkip_ </td><td> - </td><td> Minimum number 
+    of input records written to skip map failure </td></tr>
+<tr><td> stream.stderr.reporter.prefix </td><td> reporter: </td><td> Reporter 
+    prefix to indicate reporter statements emitted from stderr. </td>
+    </tr> 
+</table>
+</section>
 
 <!-- FREQUENTLY ASKED QUESTIONS -->
 <section>
@@ -824,7 +898,10 @@ Anything found between BEGIN_STRING and END_STRING would be treated as one recor
 <p>
 A streaming process can use the stderr to emit counter information.
 <code>reporter:counter:&lt;group&gt;,&lt;counter&gt;,&lt;amount&gt;</code> 
-should be sent to stderr to update the counter.
+should be sent to stderr to update the counter. You can specify a different
+reporter prefix by specifying the value for the configuration property 
+<code>stream.stderr.reporter.prefix</code>, by default it is
+<code>reporter:</code>.
 </p>
 </section>
 
@@ -835,7 +912,9 @@ should be sent to stderr to update the counter.
 <p>
 A streaming process can use the stderr to emit status information.
 To set a status, <code>reporter:status:&lt;message&gt;</code> should be sent 
-to stderr.
+to stderr. You can specify a different reporter prefix by specifying the value
+for the configuration property <code>stream.stderr.reporter.prefix</code>, by 
+default it is <code>reporter:</code>.
 </p>
 </section>
 

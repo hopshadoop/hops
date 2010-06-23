@@ -58,6 +58,9 @@ Trunk (unreleased changes)
     of HADOOP-5472, MAPREDUCE-642 and HADOOP-5620.  (Rodrigo Schmidt via
     szetszwo)
 
+    MAPREDUCE-1851. Documents configuration parameters in streaming.
+    (amareshwari)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and
