@@ -63,8 +63,6 @@ public class TestStreamAggregate
       "-output", OUTPUT_DIR.getAbsolutePath(),
       "-mapper", map,
       "-reducer", "aggregate",
-      //"-verbose",
-      //"-jobconf", "stream.debug=set"
       "-jobconf", MRJobConfig.PRESERVE_FAILED_TASK_FILES + "=true",
       "-jobconf", "stream.tmpdir="+System.getProperty("test.build.data","/tmp")
     };

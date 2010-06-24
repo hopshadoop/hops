@@ -183,7 +183,6 @@ public class TestStreamingBadRecords extends ClusterMapReduceTestCase
                    clusterConf.get(JTConfig.JT_IPC_ADDRESS),
       "-jobconf", "mapreduce.jobtracker.http.address="
                     +clusterConf.get(JTConfig.JT_HTTP_ADDRESS),
-      "-jobconf", "stream.debug=set",
       "-jobconf", "mapreduce.task.files.preserve.failedtasks=true",
       "-jobconf", "stream.tmpdir="+System.getProperty("test.build.data","/tmp")
     };
@@ -218,7 +217,6 @@ public class TestStreamingBadRecords extends ClusterMapReduceTestCase
       "-jobconf", "mapreduce.jobtracker.address="+clusterConf.get(JTConfig.JT_IPC_ADDRESS),
       "-jobconf", "mapreduce.jobtracker.http.address="
                     +clusterConf.get(JTConfig.JT_HTTP_ADDRESS),
-      "-jobconf", "stream.debug=set",
       "-jobconf", "mapreduce.task.files.preserve.failedtasks=true",
       "-jobconf", "stream.tmpdir="+System.getProperty("test.build.data","/tmp")
     };

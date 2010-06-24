@@ -114,6 +114,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1492. Delete  obsolete har files used on the parity files
     of hdfs raid. (Rodrigo Schmidt via dhruba)
 
+    MAPREDUCE-1857. Removes unused configuration parameters in streaming.
+    (amareshwari)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

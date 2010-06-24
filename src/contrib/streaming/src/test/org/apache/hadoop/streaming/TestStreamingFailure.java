@@ -51,8 +51,6 @@ public class TestStreamingFailure extends TestStreaming
       "-output", OUTPUT_DIR.getAbsolutePath(),
       "-mapper", map,
       "-reducer", reduce,
-      //"-verbose",
-      //"-jobconf", "stream.debug=set"
       "-jobconf", "mapreduce.task.files.preserve.failedtasks=true",
       "-jobconf", "stream.tmpdir="+System.getProperty("test.build.data","/tmp")
     };

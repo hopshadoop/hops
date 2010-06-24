@@ -20,10 +20,7 @@ package org.apache.hadoop.streaming;
 
 import java.io.BufferedReader;
 import java.io.DataOutputStream;
-import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 
 import org.junit.Test;
 import static org.junit.Assert.*;
@@ -74,8 +71,6 @@ public class TestSymLink
         "-output", OUTPUT_DIR,
         "-mapper", map,
         "-reducer", reduce,
-        //"-verbose",
-        //"-jobconf", "stream.debug=set"
         "-jobconf", strNamenode,
         "-jobconf", strJobtracker,
         "-jobconf", "stream.tmpdir="+System.getProperty("test.build.data","/tmp"),

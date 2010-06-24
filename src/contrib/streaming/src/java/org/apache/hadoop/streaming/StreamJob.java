@@ -674,7 +674,6 @@ public class StreamJob implements Tool {
       FileInputFormat.addInputPaths(jobConf_, 
                         (String) inputSpecs_.get(i));
     }
-    jobConf_.set("stream.numinputspecs", "" + inputSpecs_.size());
 
     String defaultPackage = this.getClass().getPackage().getName();
     Class c;

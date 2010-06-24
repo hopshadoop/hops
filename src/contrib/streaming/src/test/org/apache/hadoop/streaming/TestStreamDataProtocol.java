@@ -70,7 +70,6 @@ public class TestStreamDataProtocol
       "-mapper", map,
       "-reducer", reduce,
       "-partitioner", KeyFieldBasedPartitioner.class.getCanonicalName(),
-      //"-verbose",
       "-jobconf", "stream.map.output.field.separator=.",
       "-jobconf", "stream.num.map.output.key.fields=2",
       "-jobconf", "mapreduce.map.output.key.field.separator=.",

@@ -82,8 +82,6 @@ public class TestMultipleCachefiles
         "-output", OUTPUT_DIR,
         "-mapper", map,
         "-reducer", reduce,
-        //"-verbose",
-        //"-jobconf", "stream.debug=set"
         "-jobconf", strNamenode,
         "-jobconf", strJobtracker,
         "-jobconf", "stream.tmpdir="+System.getProperty("test.build.data","/tmp"),
