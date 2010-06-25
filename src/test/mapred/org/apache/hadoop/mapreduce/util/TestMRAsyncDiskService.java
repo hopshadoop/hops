@@ -21,6 +21,10 @@ import java.io.File;
 import java.io.IOException;
 
 import junit.framework.TestCase;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -31,9 +35,122 @@ import org.junit.Test;
  * A test for MRAsyncDiskService.
  */
 public class TestMRAsyncDiskService extends TestCase {
+
+  public static final Log LOG = LogFactory.getLog(TestMRAsyncDiskService.class);
   
   private static String TEST_ROOT_DIR = new Path(System.getProperty(
       "test.build.data", "/tmp")).toString();
+
+  /**
+   * Given 'pathname', compute an equivalent path relative to the cwd.
+   * @param pathname the path to a directory.
+   * @return the path to that same directory, relative to ${user.dir}.
+   */
+  private String relativeToWorking(String pathname) {
+    String cwd = System.getProperty("user.dir", "/");
+
+    // normalize pathname and cwd into full directory paths.
+    pathname = (new Path(pathname)).toUri().getPath();
+    cwd = (new Path(cwd)).toUri().getPath();
+
+    String [] cwdParts = cwd.split(File.separator);
+    String [] pathParts = pathname.split(File.separator);
+
+    // There are three possible cases:
+    // 1) pathname and cwd are equal. Return '.'
+    // 2) pathname is under cwd. Return the components that are under it.
+    //     e.g., cwd = /a/b, path = /a/b/c, return 'c'
+    // 3) pathname is outside of cwd. Find the common components, if any,
+    //    and subtract them from the returned path, then return enough '..'
+    //    components to "undo" the non-common components of cwd, then all 
+    //    the remaining parts of pathname.
+    //    e.g., cwd = /a/b, path = /a/c, return '../c'
+
+    if (cwd.equals(pathname)) {
+      LOG.info("relative to working: " + pathname + " -> .");
+      return "."; // They match exactly.
+    }
+
+    // Determine how many path components are in common between cwd and path.
+    int common = 0;
+    for (int i = 0; i < Math.min(cwdParts.length, pathParts.length); i++) {
+      if (cwdParts[i].equals(pathParts[i])) {
+        common++;
+      } else {
+        break;
+      }
+    }
+
+    // output path stringbuilder.
+    StringBuilder sb = new StringBuilder();
+
+    // For everything in cwd that isn't in pathname, add a '..' to undo it.
+    int parentDirsRequired = cwdParts.length - common;
+    for (int i = 0; i < parentDirsRequired; i++) {
+      sb.append("..");
+      sb.append(File.separator);
+    }
+
+    // Then append all non-common parts of 'pathname' itself.
+    for (int i = common; i < pathParts.length; i++) {
+      sb.append(pathParts[i]);
+      sb.append(File.separator);
+    }
+
+    // Don't end with a '/'.
+    String s = sb.toString();
+    if (s.endsWith(File.separator)) {
+      s = s.substring(0, s.length() - 1);
+    }
+
+    LOG.info("relative to working: " + pathname + " -> " + s);
+    return s;
+  }
+
+  @Test
+  /** Test that the relativeToWorking() method above does what we expect. */
+  public void testRelativeToWorking() {
+    assertEquals(".", relativeToWorking(System.getProperty("user.dir", ".")));
+
+    String cwd = System.getProperty("user.dir", ".");
+    Path cwdPath = new Path(cwd);
+
+    Path subdir = new Path(cwdPath, "foo");
+    assertEquals("foo", relativeToWorking(subdir.toUri().getPath()));
+
+    Path subsubdir = new Path(subdir, "bar");
+    assertEquals("foo/bar", relativeToWorking(subsubdir.toUri().getPath()));
+
+    Path parent = new Path(cwdPath, "..");
+    assertEquals("..", relativeToWorking(parent.toUri().getPath()));
+
+    Path sideways = new Path(parent, "baz");
+    assertEquals("../baz", relativeToWorking(sideways.toUri().getPath()));
+  }
+
+
+  @Test
+  /** Test that volumes specified as relative paths are handled properly
+   * by MRAsyncDiskService (MAPREDUCE-1887).
+   */
+  public void testVolumeNormalization() throws Throwable {
+    LOG.info("TEST_ROOT_DIR is " + TEST_ROOT_DIR);
+
+    String relativeTestRoot = relativeToWorking(TEST_ROOT_DIR);
+
+    FileSystem localFileSystem = FileSystem.getLocal(new Configuration());
+    String [] vols = new String[] { relativeTestRoot + "/0",
+        relativeTestRoot + "/1" };
+
+    // Put a file in one of the volumes to be cleared on startup.
+    Path delDir = new Path(vols[0], MRAsyncDiskService.TOBEDELETED);
+    localFileSystem.mkdirs(delDir);
+    localFileSystem.create(new Path(delDir, "foo")).close();
+
+    MRAsyncDiskService service = new MRAsyncDiskService(
+        localFileSystem, vols);
+    makeSureCleanedUp(vols, service);
+  }
 
   /**
    * This test creates some directories and then removes them through 

@@ -63,20 +63,24 @@ public class MRAsyncDiskService {
    * Create a AsyncDiskServices with a set of volumes (specified by their
    * root directories).
    * 
-   * The AsyncDiskServices uses one ThreadPool per volume to do the async
-   * disk operations.
+   * The AsyncDiskServices uses one ThreadPool per volume to do the async disk
+   * operations.
    * 
    * @param localFileSystem The localFileSystem used for deletions.
-   * @param volumes The roots of the file system volumes.
+   * @param nonCanonicalVols The roots of the file system volumes, which may
+   * be absolte paths, or paths relative to the ${user.dir} system property
+   * ("cwd").
    */
-  public MRAsyncDiskService(FileSystem localFileSystem, String... volumes)
-      throws IOException {
+  public MRAsyncDiskService(FileSystem localFileSystem,
+      String... nonCanonicalVols) throws IOException {
     
-    this.volumes = new String[volumes.length];
-    for (int v = 0; v < volumes.length; v++) {
-      this.volumes[v] = normalizePath(volumes[v]);
-    }  
     this.localFileSystem = localFileSystem;
+    this.volumes = new String[nonCanonicalVols.length];
+    for (int v = 0; v < nonCanonicalVols.length; v++) {
+      this.volumes[v] = normalizePath(nonCanonicalVols[v]);
+      LOG.debug("Normalized volume: " + nonCanonicalVols[v]
+          + " -> " + this.volumes[v]);
+    }  
     
     asyncDiskService = new AsyncDiskService(this.volumes);
     
@@ -85,7 +89,8 @@ public class MRAsyncDiskService {
       // Create the root for file deletion
       Path absoluteSubdir = new Path(volumes[v], TOBEDELETED);
       if (!localFileSystem.mkdirs(absoluteSubdir)) {
-        throw new IOException("Cannot create " + TOBEDELETED + " in " + volumes[v]);
+        throw new IOException("Cannot create " + TOBEDELETED + " in "
+            + volumes[v]);
       }
     }
     
@@ -312,8 +317,9 @@ public class MRAsyncDiskService {
   /**
    * Returns the normalized path of a path.
    */
-  private static String normalizePath(String path) {
-    return (new Path(path)).toUri().getPath();
+  private String normalizePath(String path) {
+    return (new Path(path)).makeQualified(this.localFileSystem)
+        .toUri().getPath();
   }
   
   /**
@@ -322,7 +328,7 @@ public class MRAsyncDiskService {
    * @param volume Root of the volume.
    * @return null if the absolute path name is outside of the volume.
    */
-  private static String getRelativePathName(String absolutePathName,
+  private String getRelativePathName(String absolutePathName,
       String volume) {
     
     absolutePathName = normalizePath(absolutePathName);
