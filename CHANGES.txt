@@ -120,6 +120,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1887. MRAsyncDiskService now properly absolutizes volume root
     paths. (Aaron Kimball via zshao)
 
+    MAPREDUCE-1876. Fixes TaskAttemptStartedEvent to correctly log event type
+    for all task types. (Amar Kamat via amareshwari)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
