@@ -825,6 +825,9 @@ Release 0.21.0 - Unreleased
 
   BUG FIXES
 
+    MAPREDUCE-1791. Remote cluster control functionality needs JavaDocs
+    improvement (Konstantin Boudnik)
+
     MAPREDUCE-878. Rename fair scheduler design doc to 
     fair-scheduler-design-doc.tex and add Apache license header (matei)
 
