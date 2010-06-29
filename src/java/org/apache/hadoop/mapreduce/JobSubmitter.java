@@ -56,6 +56,8 @@ class JobSubmitter {
   protected static final Log LOG = LogFactory.getLog(JobSubmitter.class);
   private FileSystem jtFs;
   private ClientProtocol submitClient;
+  private String submitHostName;
+  private String submitHostAddress;
   
   JobSubmitter(FileSystem submitFs, ClientProtocol submitClient) 
   throws IOException {
@@ -317,6 +319,13 @@ class JobSubmitter {
                                                      job.getConfiguration());
     //configure the command line options correctly on the submitting dfs
     Configuration conf = job.getConfiguration();
+    InetAddress ip = InetAddress.getLocalHost();
+    if (ip != null) {
+      submitHostAddress = ip.getHostAddress();
+      submitHostName = ip.getHostName();
+      conf.set(MRJobConfig.JOB_SUBMITHOST,submitHostName);
+      conf.set(MRJobConfig.JOB_SUBMITHOSTADDR,submitHostAddress);
+    }
     JobID jobId = submitClient.getNewJobID();
     job.setJobID(jobId);
     Path submitJobDir = new Path(jobStagingArea, jobId.toString());

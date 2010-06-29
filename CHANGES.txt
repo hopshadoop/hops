@@ -67,6 +67,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1788. Ensure failure to setup CompletedJobStatusStore is not
     silently ignored by the JobTracker. (Krishna Ramachandran via acmurthy)
 
+    MAPREDUCE-1850. Includes job submit host information (name and ip) in
+    jobconf and jobdetails display (Krishna Ramachandran via amareshwari)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and

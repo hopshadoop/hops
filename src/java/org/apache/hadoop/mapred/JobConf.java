@@ -45,6 +45,7 @@ import org.apache.hadoop.mapred.lib.HashPartitioner;
 import org.apache.hadoop.mapred.lib.KeyFieldBasedComparator;
 import org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner;
 import org.apache.hadoop.mapreduce.MRConfig;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.util.ConfigUtil;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Tool;
@@ -1435,6 +1436,46 @@ public class JobConf extends Configuration {
     }
     
     return JobPriority.valueOf(prio);
+  }
+
+  /**
+   * Set JobSubmitHostName for this job.
+   * 
+   * @param hostname the JobSubmitHostName for this job.
+   */
+  void setJobSubmitHostName(String hostname) {
+    set(MRJobConfig.JOB_SUBMITHOST, hostname);
+  }
+  
+  /**
+   * Get the  JobSubmitHostName for this job.
+   * 
+   * @return the JobSubmitHostName for this job.
+   */
+  String getJobSubmitHostName() {
+    String hostname = get(MRJobConfig.JOB_SUBMITHOST);
+    
+    return hostname;
+  }
+
+  /**
+   * Set JobSubmitHostAddress for this job.
+   * 
+   * @param hostadd the JobSubmitHostAddress for this job.
+   */
+  void setJobSubmitHostAddress(String hostadd) {
+    set(MRJobConfig.JOB_SUBMITHOSTADDR, hostadd);
+  }
+  
+  /**
+   * Get JobSubmitHostAddress for this job.
+   * 
+   * @return  JobSubmitHostAddress for this job.
+   */
+  String getJobSubmitHostAddress() {
+    String hostadd = get(MRJobConfig.JOB_SUBMITHOSTADDR);
+    
+    return hostadd;
   }
 
   /**

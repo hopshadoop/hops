@@ -261,6 +261,8 @@ public class JobInProgress {
     new TreeMap<TaskAttemptID, Integer>();
 
   private Object schedulingInfo;
+  private String submitHostName;
+  private String submitHostAddress;
 
   //thresholds for speculative execution
   float slowTaskThreshold;
@@ -472,6 +474,8 @@ public class JobInProgress {
     this.nonRunningReduces = new LinkedList<TaskInProgress>();    
     this.runningReduces = new LinkedHashSet<TaskInProgress>();
     this.resourceEstimator = new ResourceEstimator(this);
+    this.submitHostName = conf.getJobSubmitHostName();
+    this.submitHostAddress = conf.getJobSubmitHostAddress();
     
     this.nonLocalMaps = new LinkedList<TaskInProgress>();
     this.nonLocalRunningMaps = new LinkedHashSet<TaskInProgress>();
@@ -3702,4 +3706,11 @@ public class JobInProgress {
         + keysFile.toUri().getPath());
   }
 
+  public String getJobSubmitHostAddress() {
+    return submitHostAddress;
+  }
+
+  public String getJobSubmitHostName() {
+    return submitHostName;
+  }
 }
