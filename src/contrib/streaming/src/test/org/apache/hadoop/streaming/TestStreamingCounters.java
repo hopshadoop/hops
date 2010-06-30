@@ -21,6 +21,7 @@ package org.apache.hadoop.streaming;
 import org.junit.Test;
 import static org.junit.Assert.*;
 
+import java.io.File;
 import java.io.IOException;
 
 import org.apache.hadoop.fs.FileUtil;
@@ -37,11 +38,33 @@ public class TestStreamingCounters extends TestStreaming {
   }
 
   @Test
-  public void testCommandLine() throws Exception {
+  public void testCommandLine() throws IOException
+  {
     try {
-      super.testCommandLine();
+      try {
+        FileUtil.fullyDelete(OUTPUT_DIR.getAbsoluteFile());
+      } catch (Exception e) {
+      }
 
-      validateCounters();
+      createInput();
+      boolean mayExit = false;
+
+      // During tests, the default Configuration will use a local mapred
+      // So don't specify -config or -cluster
+      StreamJob job = new StreamJob(genArgs(), mayExit);      
+      job.go();
+      File outFile = new File(OUTPUT_DIR, "part-00000").getAbsoluteFile();
+      String output = StreamUtil.slurp(outFile);
+      outFile.delete();
+      assertEquals(outputExpect, output);
+      
+      Counters counters = job.running_.getCounters();
+      assertNotNull("Counters", counters);
+      Group group = counters.getGroup("UserCounters");
+      assertNotNull("Group", group);
+      Counter counter = group.getCounterForName("InputLines");
+      assertNotNull("Counter", counter);
+      assertEquals(3, counter.getCounter());
     } finally {
       try {
         INPUT_FILE.delete();
@@ -52,13 +75,4 @@ public class TestStreamingCounters extends TestStreaming {
     }
   }
   
-  private void validateCounters() throws IOException {
-    Counters counters = job.running_.getCounters();
-    assertNotNull("Counters", counters);
-    Group group = counters.getGroup("UserCounters");
-    assertNotNull("Group", group);
-    Counter counter = group.getCounterForName("InputLines");
-    assertNotNull("Counter", counter);
-    assertEquals(3, counter.getCounter());
-  }
 }

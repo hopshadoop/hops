@@ -23,9 +23,8 @@ import java.io.*;
 import org.apache.hadoop.streaming.Environment;
 
 /** A minimal Java implementation of /usr/bin/tr.
- *  Used to test the usage of external applications without adding
- *  platform-specific dependencies.
- *  Use TrApp as mapper only. For reducer, use TrAppReduce.
+    Used to test the usage of external applications without adding
+    platform-specific dependencies.
  */
 public class TrApp
 {
@@ -44,8 +43,8 @@ public class TrApp
     // property names have been escaped in PipeMapRed.safeEnvVarName()
     expectDefined("mapreduce_cluster_local_dir");
     expect("mapred_output_format_class", "org.apache.hadoop.mapred.TextOutputFormat");
-    expect("mapreduce_map_output_key_class", "org.apache.hadoop.io.Text");
-    expect("mapreduce_map_output_value_class", "org.apache.hadoop.io.Text");
+    expect("mapreduce_job_output_key_class", "org.apache.hadoop.io.Text");
+    expect("mapreduce_job_output_value_class", "org.apache.hadoop.io.Text");
 
     expect("mapreduce_task_ismap", "true");
     expectDefined("mapreduce_task_attempt_id");

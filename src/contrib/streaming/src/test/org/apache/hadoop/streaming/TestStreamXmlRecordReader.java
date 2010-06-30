@@ -22,23 +22,26 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
+import org.apache.hadoop.fs.FileUtil;
+
+import org.junit.Test;
+import static org.junit.Assert.*;
+
 /**
  * This class tests StreamXmlRecordReader
  * The test creates an XML file, uses StreamXmlRecordReader and compares
  * the expected output against the generated output
  */
-public class TestStreamXmlRecordReader extends TestStreaming {
+public class TestStreamXmlRecordReader extends TestStreaming
+{
+
+  private StreamJob job;
 
   public TestStreamXmlRecordReader() throws IOException {
     INPUT_FILE = new File("input.xml");
-    input = "<xmltag>\t\nroses.are.red\t\nviolets.are.blue\t\n" +
-        "bunnies.are.pink\t\n</xmltag>\t\n";
-    map = "cat";
-    reduce = "NONE";
-    outputExpect = input;
+    input = "<xmltag>\t\nroses.are.red\t\nviolets.are.blue\t\nbunnies.are.pink\t\n</xmltag>\t\n";
   }
-
-  @Override
+  
   protected void createInput() throws IOException
   {
     FileOutputStream out = new FileOutputStream(INPUT_FILE.getAbsoluteFile());
@@ -50,10 +53,42 @@ public class TestStreamXmlRecordReader extends TestStreaming {
     out.close();
   }
 
-  @Override
   protected String[] genArgs() {
-    args.add("-inputreader");
-    args.add("StreamXmlRecordReader,begin=<xmltag>,end=</xmltag>");
-    return super.genArgs();
+    return new String[] {
+      "-input", INPUT_FILE.getAbsolutePath(),
+      "-output", OUTPUT_DIR.getAbsolutePath(),
+      "-mapper","cat", 
+      "-reducer", "NONE", 
+      "-inputreader", "StreamXmlRecordReader,begin=<xmltag>,end=</xmltag>"
+    };
+  }
+
+  @Test
+  public void testCommandLine() throws Exception {
+    try {
+      try {
+        FileUtil.fullyDelete(OUTPUT_DIR.getAbsoluteFile());
+      } catch (Exception e) {
+      }
+      createInput();
+      job = new StreamJob(genArgs(), false);
+      job.go();
+      File outFile = new File(OUTPUT_DIR, "part-00000").getAbsoluteFile();
+      String output = StreamUtil.slurp(outFile);
+      outFile.delete();
+      assertEquals(input, output);
+    } finally {
+      try {
+        INPUT_FILE.delete();
+        FileUtil.fullyDelete(OUTPUT_DIR.getAbsoluteFile());
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+    }
+  }
+
+  public static void main(String[]args) throws Exception
+  {
+    new TestStreamXmlRecordReader().testCommandLine();
   }
 }

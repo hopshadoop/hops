@@ -67,6 +67,9 @@ public class TestFileOutputFormat extends HadoopTestCase {
     conf.setJobName("fof");
     conf.setInputFormat(TextInputFormat.class);
 
+    conf.setOutputKeyClass(LongWritable.class);
+    conf.setOutputValueClass(Text.class);
+
     conf.setMapOutputKeyClass(LongWritable.class);
     conf.setMapOutputValueClass(Text.class);
 

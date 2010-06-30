@@ -19,11 +19,14 @@
 package org.apache.hadoop.streaming;
 
 import org.junit.Test;
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.*;
 
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
+import java.util.*;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.fs.Path;
 
 /**
  * This class tests if hadoopStreaming returns Exception 
@@ -34,31 +37,55 @@ import org.apache.hadoop.fs.FileUtil;
 public class TestStreamingFailure extends TestStreaming
 {
 
-  protected File INVALID_INPUT_FILE;
+  protected File INVALID_INPUT_FILE;// = new File("invalid_input.txt");
+  private StreamJob job;
 
   public TestStreamingFailure() throws IOException
   {
     INVALID_INPUT_FILE = new File("invalid_input.txt");
   }
 
-  @Override
-  protected void setInputOutput() {
-    inputFile = INVALID_INPUT_FILE.getAbsolutePath();
-    outDir = OUTPUT_DIR.getAbsolutePath();
+  protected String[] genArgs() {
+    return new String[] {
+      "-input", INVALID_INPUT_FILE.getAbsolutePath(),
+      "-output", OUTPUT_DIR.getAbsolutePath(),
+      "-mapper", map,
+      "-reducer", reduce,
+      "-jobconf", "mapreduce.task.files.preserve.failedtasks=true",
+      "-jobconf", "stream.tmpdir="+System.getProperty("test.build.data","/tmp")
+    };
   }
 
-  @Override
   @Test
-  public void testCommandLine() throws IOException {
-    try {    
-      int returnStatus = runStreamJob();
-      assertEquals("Streaming Job Failure code expected", 5, returnStatus);
-    } finally {
+  public void testCommandLine()
+  {
+    try {
       try {
         FileUtil.fullyDelete(OUTPUT_DIR.getAbsoluteFile());
+      } catch (Exception e) {
+      }
+
+      boolean mayExit = false;
+      int returnStatus = 0;
+
+      // During tests, the default Configuration will use a local mapred
+      // So don't specify -config or -cluster
+      job = new StreamJob(genArgs(), mayExit);      
+      returnStatus = job.go();
+      assertEquals("Streaming Job Failure code expected", 5, returnStatus);
+    } catch(Exception e) {
+      // Expecting an exception
+    } finally {
+      try {
+      FileUtil.fullyDelete(OUTPUT_DIR.getAbsoluteFile());
       } catch (IOException e) {
         e.printStackTrace();
       }
     }
+  }
+
+  public static void main(String[]args) throws Exception
+  {
+      new TestStreamingFailure().testCommandLine();
   }
 }

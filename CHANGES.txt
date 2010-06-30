@@ -129,9 +129,6 @@ Trunk (unreleased changes)
     MAPREDUCE-1863. Fix NPE in Rumen when processing null CDF for failed task
     attempts. (Amar Kamat via cdouglas)
 
-    MAPREDUCE-1888. Fixes Streaming to override output key and value types,
-    only if mapper and reducer are commands. (Ravi Gummadi via amareshwari)
-
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
