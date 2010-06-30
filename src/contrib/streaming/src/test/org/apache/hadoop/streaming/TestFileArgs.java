@@ -21,7 +21,6 @@ package org.apache.hadoop.streaming;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.URI;
-import java.util.zip.GZIPOutputStream;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -59,6 +58,7 @@ public class TestFileArgs extends TestStreaming
     strJobTracker = JTConfig.JT_IPC_ADDRESS + "=localhost:" + mr.getJobTrackerPort();
     strNamenode = "fs.default.name=hdfs://" + namenode;
 
+    map = LS_PATH;
     FileSystem.setDefaultUri(conf, "hdfs://" + namenode);
 
     // Set up side file
@@ -80,22 +80,14 @@ public class TestFileArgs extends TestStreaming
 
   @Override
   protected String[] genArgs() {
-    return new String[] {
-      "-input", INPUT_FILE.getAbsolutePath(),
-      "-output", OUTPUT_DIR.getAbsolutePath(),
-      "-file", new java.io.File("sidefile").getAbsolutePath(),
-      "-mapper", LS_PATH,
-      "-numReduceTasks", "0",
-      "-jobconf", strNamenode,
-      "-jobconf", strJobTracker,
-      "-jobconf", "stream.tmpdir=" + System.getProperty("test.build.data","/tmp")
-    };
+    args.add("-file");
+    args.add(new java.io.File("sidefile").getAbsolutePath());
+    args.add("-numReduceTasks");
+    args.add("0");
+    args.add("-jobconf");
+    args.add(strNamenode);
+    args.add("-jobconf");
+    args.add(strJobTracker);
+    return super.genArgs();
   }
-
-
-  public static void main(String[]args) throws Exception
-  {
-    new TestFileArgs().testCommandLine();
-  }
-
 }

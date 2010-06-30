@@ -19,11 +19,11 @@
 package org.apache.hadoop.streaming;
 
 import java.io.*;
+import java.util.ArrayList;
 
 import org.junit.Test;
 import static org.junit.Assert.*;
 
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.conf.Configuration;
@@ -40,6 +40,8 @@ public class TestStreaming
   protected File TEST_DIR;
   protected File INPUT_FILE;
   protected File OUTPUT_DIR;
+  protected String inputFile;
+  protected String outDir;
   protected String input = "roses.are.red\nviolets.are.blue\nbunnies.are.pink\n";
   // map behaves like "/usr/bin/tr . \\n"; (split words into lines)
   protected String map = StreamUtil.makeJavaCommand(TrApp.class, new String[]{".", "\\n"});
@@ -48,6 +50,7 @@ public class TestStreaming
   protected String reduce = StreamUtil.makeJavaCommand(UniqApp.class, new String[]{"R"});
   protected String outputExpect = "Rare\t\nRblue\t\nRbunnies\t\nRpink\t\nRred\t\nRroses\t\nRviolets\t\n";
 
+  protected ArrayList<String> args = new ArrayList<String>();
   protected StreamJob job;
 
   public TestStreaming() throws IOException
@@ -72,15 +75,25 @@ public class TestStreaming
     out.close();
   }
 
+  protected void setInputOutput() {
+    inputFile = INPUT_FILE.getAbsolutePath();
+    outDir = OUTPUT_DIR.getAbsolutePath();
+  }
+
   protected String[] genArgs() {
-    return new String[] {
-      "-input", INPUT_FILE.getAbsolutePath(),
-      "-output", OUTPUT_DIR.getAbsolutePath(),
-      "-mapper", map,
-      "-reducer", reduce,
-      "-jobconf", "mapreduce.task.files.preserve.failedtasks=true",
-      "-jobconf", "stream.tmpdir="+System.getProperty("test.build.data","/tmp")
-    };
+    setInputOutput();
+    args.add("-input");args.add(inputFile);
+    args.add("-output");args.add(outDir);
+    args.add("-mapper");args.add(map);
+    args.add("-reducer");args.add(reduce);
+    args.add("-jobconf");
+    args.add("mapreduce.task.files.preserve.failedtasks=true");
+    args.add("-jobconf");
+    args.add("stream.tmpdir="+System.getProperty("test.build.data","/tmp"));
+
+    String str[] = new String [args.size()];
+    args.toArray(str);
+    return str;
   }
 
   protected Configuration getConf() {
@@ -105,9 +118,12 @@ public class TestStreaming
     assertEquals(getExpectedOutput(), output);
   }
 
-  @Test
-  public void testCommandLine() throws Exception
-  {
+  /**
+   * Runs a streaming job with the given arguments
+   * @return the streaming job return status
+   * @throws IOException
+   */
+  protected int runStreamJob() throws IOException {
     UtilTest.recursiveDelete(TEST_DIR);
     assertTrue("Creating " + TEST_DIR, TEST_DIR.mkdirs());
     createInput();
@@ -116,14 +132,14 @@ public class TestStreaming
     // During tests, the default Configuration will use a local mapred
     // So don't specify -config or -cluster
     job = new StreamJob(genArgs(), mayExit);
-    int ret = job.go();
+    return job.go();
+  }
+
+  @Test
+  public void testCommandLine() throws Exception
+  {
+    int ret = runStreamJob();
     assertEquals(0, ret);
     checkOutput();
   }
-
-  public static void main(String[]args) throws Exception
-  {
-    new TestStreaming().testCommandLine();
-  }
-
 }
