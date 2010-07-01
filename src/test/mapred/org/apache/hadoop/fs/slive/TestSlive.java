@@ -40,6 +40,7 @@ import org.apache.hadoop.fs.slive.ArgumentParser.ParsedOutput;
 import org.apache.hadoop.fs.slive.Constants.OperationType;
 import org.apache.hadoop.fs.slive.DataVerifier.VerifyOutput;
 import org.apache.hadoop.fs.slive.DataWriter.GenerateOutput;
+import org.apache.hadoop.util.ToolRunner;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -55,43 +56,43 @@ public class TestSlive {
   private static final String TEST_DATA_PROP = "test.build.data";
 
   private static Configuration getBaseConfig() {
-    return new Configuration();
+    Configuration conf = new Configuration();
+    return conf;
   }
 
-  // gets the test write location according to the coding guidelines
+  /** gets the test write location according to the coding guidelines */
   private static File getWriteLoc() {
-    String writeLoc = System.getProperty(TEST_DATA_PROP);
-    if (writeLoc == null || writeLoc.isEmpty()) {
-      throw new RuntimeException("No " + TEST_DATA_PROP
-          + " system property specified");
-    }
+    String writeLoc = System.getProperty(TEST_DATA_PROP, "build/test/data/");
     return new File(writeLoc, "slive");
   }
 
-  // gets where the MR job places its data + output + results
+  /** gets where the MR job places its data + output + results */
   private static File getFlowLocation() {
     return new File(getWriteLoc(), "flow");
   }
 
-  // gets the test directory which is created
-  // by the mkdir op
+  /** gets the test directory which is created by the mkdir op */
   private static File getTestDir() {
     return new File(getWriteLoc(), "slivedir");
   }
 
-  // gets the test file location
-  // which is used for reading, appending and created
+  /**
+   * gets the test file location
+   * which is used for reading, appending and created
+   */
   private static File getTestFile() {
     return new File(getWriteLoc(), "slivefile");
   }
 
-  // gets the rename file which is used in combination
-  // with the test file to do a rename operation
+  /**
+   * gets the rename file which is used in combination
+   * with the test file to do a rename operation
+   */
   private static File getTestRenameFile() {
     return new File(getWriteLoc(), "slivefile1");
   }
 
-  // gets the MR result file name
+  /** gets the MR result file name */
   private static File getResultFile() {
     return new File(getWriteLoc(), "sliveresfile");
   }
@@ -100,8 +101,7 @@ public class TestSlive {
     return new File(getWriteLoc(), "slivenofile");
   }
 
-  // gets the test program arguments
-  // used for merging and main MR running
+  /** gets the test program arguments used for merging and main MR running */
   private String[] getTestArgs(boolean sleep) {
     List<String> args = new LinkedList<String>();
     // setup the options
@@ -111,7 +111,9 @@ public class TestSlive {
       args.add("-" + ConfigOption.OPS.getOpt());
       args.add(Constants.OperationType.values().length + "");
       args.add("-" + ConfigOption.MAPS.getOpt());
-      args.add("1");
+      args.add("2");
+      args.add("-" + ConfigOption.REDUCES.getOpt());
+      args.add("2");
       args.add("-" + ConfigOption.APPEND_SIZE.getOpt());
       args.add("1M,2M");
       args.add("-" + ConfigOption.BLOCK_SIZE.getOpt());
@@ -197,8 +199,7 @@ public class TestSlive {
     rDelete(getImaginaryFile());
   }
 
-  // cleans up a file or directory
-  // recursively if needbe
+  /** cleans up a file or directory recursively if need be */
   private void rDelete(File place) throws Exception {
     if (place.isFile()) {
       LOG.info("Deleting file " + place);
@@ -208,7 +209,7 @@ public class TestSlive {
     }
   }
 
-  // deletes a dir and its contents
+  /** deletes a dir and its contents */
   private void deleteDir(File dir) throws Exception {
     String fns[] = dir.list();
     // delete contents first
@@ -226,7 +227,8 @@ public class TestSlive {
     ConfigExtractor extractor = getTestConfig(true);
     assertEquals(extractor.getOpCount().intValue(), Constants.OperationType
         .values().length);
-    assertEquals(extractor.getMapAmount().intValue(), 1);
+    assertEquals(extractor.getMapAmount().intValue(), 2);
+    assertEquals(extractor.getReducerAmount().intValue(), 2);
     Range<Long> apRange = extractor.getAppendSize();
     assertEquals(apRange.getLower().intValue(), Constants.MEGABYTES * 1);
     assertEquals(apRange.getUpper().intValue(), Constants.MEGABYTES * 2);
@@ -402,8 +404,8 @@ public class TestSlive {
   @Test
   public void testMRFlow() throws Exception {
     ConfigExtractor extractor = getTestConfig(false);
-    SliveTest s = new SliveTest(getTestArgs(false), getBaseConfig());
-    int ec = s.run();
+    SliveTest s = new SliveTest(getBaseConfig());
+    int ec = ToolRunner.run(s, getTestArgs(false));
     assertTrue(ec == 0);
     String resFile = extractor.getResultFile();
     File fn = new File(resFile);
@@ -470,11 +472,14 @@ public class TestSlive {
     // attempt to read it
     DataVerifier vf = new DataVerifier();
     VerifyOutput vout = new VerifyOutput(0, 0, 0, 0);
+    DataInputStream in = null;
     try {
-      vout = vf
-          .verifyFile(byteAm, new DataInputStream(new FileInputStream(fn)));
+      in = new DataInputStream(new FileInputStream(fn));
+      vout = vf.verifyFile(byteAm, in);
     } catch (Exception e) {
 
+    } finally {
+      if(in != null) in.close();
     }
     assertTrue(vout.getChunksSame() == 0);
   }

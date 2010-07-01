@@ -138,6 +138,7 @@ class ArgumentParser {
   private Options getOptions() {
     Options cliopt = new Options();
     cliopt.addOption(ConfigOption.MAPS);
+    cliopt.addOption(ConfigOption.REDUCES);
     cliopt.addOption(ConfigOption.PACKET_SIZE);
     cliopt.addOption(ConfigOption.OPS);
     cliopt.addOption(ConfigOption.DURATION);

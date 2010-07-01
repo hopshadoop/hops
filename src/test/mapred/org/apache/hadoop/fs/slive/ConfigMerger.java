@@ -218,6 +218,24 @@ class ConfigMerger {
         base.set(ConfigOption.MAPS.getCfgOption(), mapAmount.toString());
       }
     }
+    // overwrite the reducer amount and check to ensure > 0
+    {
+      Integer reduceAmount = null;
+      try {
+        reduceAmount = extractor.getMapAmount(opts.getValue(ConfigOption.REDUCES
+            .getOpt()));
+      } catch (Exception e) {
+        throw new ConfigException(
+            "Error extracting & merging reducer amount", e);
+      }
+      if (reduceAmount != null) {
+        if (reduceAmount <= 0) {
+          throw new ConfigException(
+              "Reducer amount can not be less than or equal to zero");
+        }
+        base.set(ConfigOption.REDUCES.getCfgOption(), reduceAmount.toString());
+      }
+    }
     // overwrite the duration amount and ensure > 0
     {
       Integer duration = null;

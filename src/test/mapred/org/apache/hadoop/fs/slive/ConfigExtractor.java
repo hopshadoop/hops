@@ -134,7 +134,8 @@ class ConfigExtractor {
    * @return the number of reducers to use
    */
   Integer getReducerAmount() {
-    return 1;
+    // should be slive.reduces
+    return getInteger(null, ConfigOption.REDUCES);
   }
 
   /**
@@ -670,6 +671,7 @@ class ConfigExtractor {
       LOG.info(duration);
     }
     LOG.info("Map amount = " + cfg.getMapAmount());
+    LOG.info("Reducer amount = " + cfg.getReducerAmount());
     LOG.info("Operation amount = " + cfg.getOpCount());
     LOG.info("Total file limit = " + cfg.getTotalFiles());
     LOG.info("Total dir file limit = " + cfg.getDirSize());

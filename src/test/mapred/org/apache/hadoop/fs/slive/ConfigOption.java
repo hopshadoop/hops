@@ -34,7 +34,10 @@ class ConfigOption<T> extends Option {
 
   // command line options and descriptions and config option name
   static final ConfigOption<Integer> MAPS = new ConfigOption<Integer>(
-      "maps", true, "Number of maps", SLIVE_PREFIX + " .maps", 10);
+      "maps", true, "Number of maps", SLIVE_PREFIX + ".maps", 10);
+
+  static final ConfigOption<Integer> REDUCES = new ConfigOption<Integer>(
+      "reduces", true, "Number of reduces", SLIVE_PREFIX + ".reduces", 1);
 
   static final ConfigOption<Integer> OPS = new ConfigOption<Integer>(
       "ops", true, "Max number of operations per map", SLIVE_PREFIX

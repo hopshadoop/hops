@@ -87,13 +87,6 @@ class OperationOutput {
     this(key.toString(), value);
   }
 
-  OperationOutput(OperationOutput r1) {
-    this.dataType = r1.dataType;
-    this.measurementType = r1.measurementType;
-    this.opType = r1.opType;
-    this.value = r1.value;
-  }
-
   public String toString() {
     return getKeyString() + " (" + this.value + ")";
   }
@@ -230,8 +223,6 @@ class OperationOutput {
 
   /**
    * Gets the output data type of this class.
-   * 
-   * @return
    */
   OutputType getOutputType() {
     return dataType;

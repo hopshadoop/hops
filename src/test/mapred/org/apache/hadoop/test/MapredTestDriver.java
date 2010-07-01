@@ -39,6 +39,7 @@ import org.apache.hadoop.fs.DFSCIOTest;
 import org.apache.hadoop.fs.DistributedFSCheck;
 import org.apache.hadoop.io.FileBench;
 import org.apache.hadoop.fs.JHLogAnalyzer;
+import org.apache.hadoop.fs.slive.SliveTest;
 
 /**
  * Driver for Map-reduce tests.
@@ -86,7 +87,7 @@ public class MapredTestDriver {
           "A benchmark that stresses the namenode.");
       pgd.addClass("testfilesystem", TestFileSystem.class, 
           "A test for FileSystem read/write.");
-      pgd.addClass("TestDFSIO", TestDFSIO.class, 
+      pgd.addClass(TestDFSIO.class.getSimpleName(), TestDFSIO.class, 
           "Distributed i/o benchmark.");
       pgd.addClass("DFSCIOTest", DFSCIOTest.class, "" +
           "Distributed i/o benchmark of libhdfs.");
@@ -98,6 +99,8 @@ public class MapredTestDriver {
           "Text(Input|Output)Format (compressed and uncompressed)");
       pgd.addClass(JHLogAnalyzer.class.getSimpleName(), JHLogAnalyzer.class, 
           "Job History Log analyzer.");
+      pgd.addClass(SliveTest.class.getSimpleName(), SliveTest.class, 
+          "HDFS Stress Test and Live Data Verification.");
     } catch(Throwable e) {
       e.printStackTrace();
     }

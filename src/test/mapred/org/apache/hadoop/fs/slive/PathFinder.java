@@ -59,7 +59,7 @@ class PathFinder {
    *          operations to calculate the file name and path tree
    * @param type
    *          directory or file enumeration
-   * @return
+   * @return Path
    */
   private Path getPath(int curId, int limitPerDir, Type type) {
     if (curId <= 0) {

@@ -70,6 +70,8 @@ Trunk (unreleased changes)
     MAPREDUCE-1850. Includes job submit host information (name and ip) in
     jobconf and jobdetails display (Krishna Ramachandran via amareshwari)
 
+    MAPREDUCE-1893. Slive with multiple reducers. (shv)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and

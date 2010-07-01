@@ -33,6 +33,7 @@ import java.util.TreeMap;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.slive.ArgumentParser.ParsedOutput;
@@ -41,6 +42,8 @@ import org.apache.hadoop.mapred.FileOutputFormat;
 import org.apache.hadoop.mapred.JobClient;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.TextOutputFormat;
+import org.apache.hadoop.util.Tool;
+import org.apache.hadoop.util.ToolRunner;
 
 /**
  * Slive test entry point + main program
@@ -51,9 +54,12 @@ import org.apache.hadoop.mapred.TextOutputFormat;
  * command line and process them (and merge) and then establish a job which will
  * thereafter run a set of mappers & reducers and then the output of the
  * reduction will be reported on.
+ * 
+ * The number of maps is specified by "slive.maps".
+ * The number of reduces is specified by "slive.reduces".
  */
 @SuppressWarnings("deprecation")
-public class SliveTest {
+public class SliveTest implements Tool {
 
   private static final Log LOG = LogFactory.getLog(SliveTest.class);
 
@@ -63,20 +69,13 @@ public class SliveTest {
     Configuration.addDefaultResource("hdfs-site.xml");
   }
 
-  private String[] args;
   private Configuration base;
 
   public SliveTest(Configuration base) {
-    this.args = null;
     this.base = base;
   }
 
-  public SliveTest(String[] args, Configuration base) {
-    this.args = args;
-    this.base = base;
-  }
-
-  public int run() {
+  public int run(String[] args) {
     ParsedOutput parsedOpts = null;
     try {
       ArgumentParser argHolder = new ArgumentParser(args);
@@ -86,21 +85,20 @@ public class SliveTest {
         return 1;
       }
     } catch (Exception e) {
-      LOG.error("Unable to parse arguments due to error: " + e.getMessage());
-      e.printStackTrace();
+      LOG.error("Unable to parse arguments due to error: ", e);
       return 1;
     }
     LOG.info("Running with option list " + Helper.stringifyArray(args, " "));
     ConfigExtractor config = null;
     try {
       ConfigMerger cfgMerger = new ConfigMerger();
-      Configuration cfg = cfgMerger.getMerged(parsedOpts, getBaseConfig());
+      Configuration cfg = cfgMerger.getMerged(parsedOpts,
+                                              new Configuration(base));
       if (cfg != null) {
         config = new ConfigExtractor(cfg);
       }
     } catch (Exception e) {
-      LOG.error("Unable to merge config due to error: " + e.getMessage());
-      e.printStackTrace();
+      LOG.error("Unable to merge config due to error: ", e);
       return 1;
     }
     if (config == null) {
@@ -111,8 +109,7 @@ public class SliveTest {
       LOG.info("Options are:");
       ConfigExtractor.dumpOptions(config);
     } catch (Exception e) {
-      LOG.error("Unable to dump options due to error: " + e.getMessage());
-      e.printStackTrace();
+      LOG.error("Unable to dump options due to error: ", e);
       return 1;
     }
     boolean jobOk = false;
@@ -121,16 +118,14 @@ public class SliveTest {
       runJob(config);
       jobOk = true;
     } catch (Exception e) {
-      LOG.error("Unable to run job due to error: " + e.getMessage());
-      e.printStackTrace();
+      LOG.error("Unable to run job due to error: ", e);
     }
     if (jobOk) {
       try {
         LOG.info("Reporting on job:");
         writeReport(config);
       } catch (Exception e) {
-        LOG.error("Unable to report on job due to error: " + e.getMessage());
-        e.printStackTrace();
+        LOG.error("Unable to report on job due to error: ", e);
       }
     }
     // attempt cleanup (not critical)
@@ -141,8 +136,7 @@ public class SliveTest {
         LOG.info("Cleaning up job:");
         cleanup(config);
       } catch (Exception e) {
-        LOG.error("Unable to cleanup job due to error: " + e.getMessage());
-        e.printStackTrace();
+        LOG.error("Unable to cleanup job due to error: ", e);
       }
     }
     // all mostly worked
@@ -187,6 +181,7 @@ public class SliveTest {
     job.setInputFormat(DummyInputFormat.class);
     FileOutputFormat.setOutputPath(job, config.getOutputPath());
     job.setMapperClass(SliveMapper.class);
+    job.setPartitionerClass(SlivePartitioner.class);
     job.setReducerClass(SliveReducer.class);
     job.setOutputKeyClass(Text.class);
     job.setOutputValueClass(Text.class);
@@ -224,36 +219,40 @@ public class SliveTest {
    *           if files can not be opened/closed/read or invalid format
    */
   private void writeReport(ConfigExtractor cfg) throws Exception {
-    Path fn = new Path(cfg.getOutputPath(), String.format(
-        Constants.REDUCER_FILE, "00000"));
-    LOG.info("Writing report using contents of " + fn);
+    Path dn = cfg.getOutputPath();
+    LOG.info("Writing report using contents of " + dn);
     FileSystem fs = FileSystem.get(cfg.getConfig());
+    FileStatus[] reduceFiles = fs.listStatus(dn);
     BufferedReader fileReader = null;
     PrintWriter reportWriter = null;
     try {
-      fileReader = new BufferedReader(new InputStreamReader(
-          new DataInputStream(fs.open(fn))));
-      String line;
-      Map<String, List<OperationOutput>> splitTypes = new TreeMap<String, List<OperationOutput>>();
       List<OperationOutput> noOperations = new ArrayList<OperationOutput>();
-      while ((line = fileReader.readLine()) != null) {
-        String pieces[] = line.split("\t", 2);
-        if (pieces.length == 2) {
-          OperationOutput data = new OperationOutput(pieces[0], pieces[1]);
-          String op = (data.getOperationType());
-          if (op != null) {
-            List<OperationOutput> opList = splitTypes.get(op);
-            if (opList == null) {
-              opList = new ArrayList<OperationOutput>();
+      Map<String, List<OperationOutput>> splitTypes = new TreeMap<String, List<OperationOutput>>();
+      for(FileStatus fn : reduceFiles) {
+        fileReader = new BufferedReader(new InputStreamReader(
+            new DataInputStream(fs.open(fn.getPath()))));
+        String line;
+        while ((line = fileReader.readLine()) != null) {
+          String pieces[] = line.split("\t", 2);
+          if (pieces.length == 2) {
+            OperationOutput data = new OperationOutput(pieces[0], pieces[1]);
+            String op = (data.getOperationType());
+            if (op != null) {
+              List<OperationOutput> opList = splitTypes.get(op);
+              if (opList == null) {
+                opList = new ArrayList<OperationOutput>();
+              }
+              opList.add(data);
+              splitTypes.put(op, opList);
+            } else {
+              noOperations.add(data);
             }
-            opList.add(data);
-            splitTypes.put(op, opList);
           } else {
-            noOperations.add(data);
+            throw new IOException("Unparseable line " + line);
           }
-        } else {
-          throw new IOException("Unparseable line " + line);
         }
+        fileReader.close();
+        fileReader = null;
       }
       File resFile = null;
       if (cfg.getResultFile() != null) {
@@ -284,17 +283,6 @@ public class SliveTest {
   }
 
   /**
-   * Gets the base configuration to use for a "starting" configuration to be
-   * merged with.
-   * 
-   * @return Configuration starting configuration.
-   */
-  private Configuration getBaseConfig() {
-    // ensure a copy is made
-    return new Configuration(base);
-  }
-
-  /**
    * Cleans up the base directory by removing it
    * 
    * @param cfg
@@ -320,10 +308,20 @@ public class SliveTest {
    * @param args
    *          command line options
    */
-  public static void main(String[] args) {
+  public static void main(String[] args) throws Exception {
     Configuration startCfg = new Configuration(true);
-    SliveTest runner = new SliveTest(args, startCfg);
-    int ec = runner.run();
+    SliveTest runner = new SliveTest(startCfg);
+    int ec = ToolRunner.run(runner, args);
     System.exit(ec);
+  }
+
+  @Override // Configurable
+  public Configuration getConf() {
+    return this.base;
+  }
+
+  @Override // Configurable
+  public void setConf(Configuration conf) {
+    this.base = conf;
   }
 }
