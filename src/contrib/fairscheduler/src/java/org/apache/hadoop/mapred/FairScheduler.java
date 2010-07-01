@@ -850,11 +850,11 @@ public class FairScheduler extends TaskScheduler {
     int tasksDueToFairShare = 0;
     if (curTime - sched.getLastTimeAtMinShare() > minShareTimeout) {
       int target = Math.min(sched.getMinShare(), sched.getDemand());
-      tasksDueToMinShare = target - sched.getRunningTasks();
+      tasksDueToMinShare = Math.max(0, target - sched.getRunningTasks());
     }
     if (curTime - sched.getLastTimeAtHalfFairShare() > fairShareTimeout) {
       int target = (int) Math.min(sched.getFairShare(), sched.getDemand());
-      tasksDueToFairShare = target - sched.getRunningTasks();
+      tasksDueToFairShare = Math.max(0, target - sched.getRunningTasks());
     }
     int tasksToPreempt = Math.max(tasksDueToMinShare, tasksDueToFairShare);
     if (tasksToPreempt > 0) {
