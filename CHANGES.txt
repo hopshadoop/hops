@@ -1608,3 +1608,5 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-1885. Revert FileSystem create method that takes CreateFlags
     (MapReduce part of HADOOP-6826). (Ravi Gummadi via tomwhite)
 
+    MAPREDUCE-1870. Harmonize MapReduce JAR library versions with Common and
+    HDFS. (tomwhite)
