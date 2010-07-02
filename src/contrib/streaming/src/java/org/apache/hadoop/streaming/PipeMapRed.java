@@ -19,7 +19,6 @@
 package org.apache.hadoop.streaming;
 
 import java.io.*;
-import java.util.Date;
 import java.util.Map;
 import java.util.Iterator;
 import java.util.Arrays;
@@ -39,11 +38,8 @@ import org.apache.hadoop.streaming.io.TextInputWriter;
 import org.apache.hadoop.streaming.io.TextOutputReader;
 import org.apache.hadoop.util.LineReader;
 import org.apache.hadoop.util.ReflectionUtils;
-import org.apache.hadoop.util.StringUtils;
 
 import org.apache.hadoop.io.Text;
-
-import org.apache.hadoop.fs.FileSystem;
 
 /** Shared functionality for PipeMapper, PipeReducer.
  */
@@ -155,7 +151,6 @@ public abstract class PipeMapRed {
       joinDelay_ = job.getLong("stream.joindelay.milli", 0);
 
       job_ = job;
-      fs_ = FileSystem.get(job_);
       
       mapInputWriterClass_ = 
         job_.getClass("stream.map.input.writer.class", 
@@ -201,7 +196,7 @@ public abstract class PipeMapRed {
         }
         f = null;
       }
-      logprintln("PipeMapRed exec " + Arrays.asList(argvSplit));
+      LOG.info("PipeMapRed exec " + Arrays.asList(argvSplit));
       Environment childEnv = (Environment) StreamUtil.env().clone();
       addJobConfToEnvironment(job_, childEnv);
       addEnvironment(childEnv, job_.get("stream.addenvironment"));
@@ -223,52 +218,25 @@ public abstract class PipeMapRed {
       startTime_ = System.currentTimeMillis();
 
     } catch (IOException e) {
-      logStackTrace(e);
       LOG.error("configuration exception", e);
       throw new RuntimeException("configuration exception", e);
     } catch (InterruptedException e)  {
-        logStackTrace(e);
-        LOG.error("configuration exception", e);
-        throw new RuntimeException("configuration exception", e);
-      }
+      LOG.error("configuration exception", e);
+      throw new RuntimeException("configuration exception", e);
+    }
   }
   
   void setStreamJobDetails(JobConf job) {
-    jobLog_ = job.get("stream.jobLog_");
     String s = job.get("stream.minRecWrittenToEnableSkip_");
     if (s != null) {
       minRecWrittenToEnableSkip_ = Long.parseLong(s);
-      logprintln("JobConf set minRecWrittenToEnableSkip_ =" + minRecWrittenToEnableSkip_);
+      LOG.info("JobConf set minRecWrittenToEnableSkip_ ="
+          + minRecWrittenToEnableSkip_);
     }
     taskId_ = StreamUtil.getTaskInfo(job_);
   }
 
-  void logStackTrace(Exception e) {
-    if (e == null) return;
-    e.printStackTrace();
-    if (log_ != null) {
-      e.printStackTrace(log_);
-    }
-  }
-
-  void logprintln(String s) {
-    if (log_ != null) {
-      log_.println(s);
-    } else {
-      LOG.info(s); // or LOG.info()
-    }
-  }
-
-  void logflush() {
-    if (log_ != null) {
-      log_.flush();
-    }
-  }
-
   void addJobConfToEnvironment(JobConf conf, Properties env) {
-    if (debug_) {
-      logprintln("addJobConfToEnvironment: begin");
-    }
     Iterator it = conf.iterator();
     while (it.hasNext()) {
       Map.Entry en = (Map.Entry) it.next();
@@ -277,9 +245,6 @@ public abstract class PipeMapRed {
       String value = conf.get(name); // does variable expansion 
       name = safeEnvVarName(name);
       envPut(env, name, value);
-    }
-    if (debug_) {
-      logprintln("addJobConfToEnvironment: end");
     }
   }
 
@@ -306,7 +271,7 @@ public abstract class PipeMapRed {
     for (int i = 0; i < nv.length; i++) {
       String[] pair = nv[i].split("=", 2);
       if (pair.length != 2) {
-        logprintln("Skip ev entry:" + nv[i]);
+        LOG.info("Skip env entry:" + nv[i]);
       } else {
         envPut(env, pair[0], pair[1]);
       }
@@ -314,20 +279,10 @@ public abstract class PipeMapRed {
   }
 
   void envPut(Properties env, String name, String value) {
-    if (debug_) {
-      logprintln("Add  ev entry:" + name + "=" + value);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Add  env entry:" + name + "=" + value);
     }
     env.put(name, value);
-  }
-
-  /** .. and if successful: delete the task log */
-  void appendLogToJobLog(String status) {
-    if (jobLog_ == null) {
-      return; // not using a common joblog
-    }
-    if (log_ != null) {
-      StreamUtil.exec("/bin/rm " + LOGNAME, log_);
-    }
   }
 
   void startOutputThreads(OutputCollector output, Reporter reporter) 
@@ -366,8 +321,8 @@ public abstract class PipeMapRed {
           throw new RuntimeException("PipeMapRed.waitOutputThreads(): subprocess failed with code "
                                      + exitVal);
         } else {
-          logprintln("PipeMapRed.waitOutputThreads(): subprocess exited with code " + exitVal
-                     + " in " + PipeMapRed.class.getName());
+          LOG.info("PipeMapRed.waitOutputThreads(): subprocess exited with " +
+          		"code " + exitVal + " in " + PipeMapRed.class.getName());
         }
       }
       if (outThread_ != null) {
@@ -433,13 +388,12 @@ public abstract class PipeMapRed {
             } else {
               reporter.progress();
             }
-            logprintln(hline);
-            logflush();
+            LOG.info(hline);
           }
         }
       } catch (Throwable th) {
         outerrThreadsThrowable = th;
-        LOG.warn(StringUtils.stringifyException(th));
+        LOG.warn(th);
       } finally {
         try {
           if (clientIn_ != null) {
@@ -447,7 +401,7 @@ public abstract class PipeMapRed {
             clientIn_ = null;
           }
         } catch (IOException io) {
-          LOG.info(StringUtils.stringifyException(io));
+          LOG.info(io);
         }
       }
     }
@@ -508,7 +462,7 @@ public abstract class PipeMapRed {
         }
       } catch (Throwable th) {
         outerrThreadsThrowable = th;
-        LOG.warn(StringUtils.stringifyException(th));
+        LOG.warn(th);
         try {
           if (lineReader != null) {
             lineReader.close();
@@ -518,7 +472,7 @@ public abstract class PipeMapRed {
             clientErr_ = null;
           }
         } catch (IOException io) {
-          LOG.info(StringUtils.stringifyException(io));
+          LOG.info(io);
         }
       }
     }
@@ -565,7 +519,7 @@ public abstract class PipeMapRed {
   public void mapRedFinished() {
     try {
       if (!doPipe_) {
-        logprintln("mapRedFinished");
+        LOG.info("mapRedFinished");
         return;
       }
       try {
@@ -575,25 +529,20 @@ public abstract class PipeMapRed {
         }
         waitOutputThreads();
       } catch (IOException io) {
-        LOG.warn(StringUtils.stringifyException(io));
+        LOG.warn(io);
       }
       if (sim != null) sim.destroy();
-      logprintln("mapRedFinished");
+      LOG.info("mapRedFinished");
     } catch (RuntimeException e) {
-      logprintln("PipeMapRed failed!");
-      logStackTrace(e);
+      LOG.info("PipeMapRed failed!", e);
       throw e;
-    }
-    if (debugFailLate_) {
-      throw new RuntimeException("debugFailLate_");
     }
   }
 
   void maybeLogRecord() {
     if (numRecRead_ >= nextRecReadLog_) {
       String info = numRecInfo();
-      logprintln(info);
-      logflush();
+      LOG.info(info);
       if (nextRecReadLog_ < 100000) {
 	  nextRecReadLog_ *= 10;
       } else {
@@ -606,18 +555,12 @@ public abstract class PipeMapRed {
 
     String s = numRecInfo() + "\n";
     s += "minRecWrittenToEnableSkip_=" + minRecWrittenToEnableSkip_ + " ";
-    s += "LOGNAME=" + LOGNAME + "\n";
     s += envline("HOST");
     s += envline("USER");
     s += envline("HADOOP_USER");
-    //s += envline("PWD"); // =/home/crawler/hadoop/trunk
-    s += "last Hadoop input: |" + mapredKey_ + "|\n";
     if (outThread_ != null) {
       s += "last tool output: |" + outReader_.getLastOutput() + "|\n";
     }
-    s += "Date: " + new Date() + "\n";
-    // s += envline("HADOOP_HOME");
-    // s += envline("REMOTE_HOST");
     return s;
   }
 
@@ -636,15 +579,6 @@ public abstract class PipeMapRed {
     return (d == 0) ? "NA" : "" + n / d + "=" + n + "/" + d;
   }
 
-  String logFailure(Exception e) {
-    StringWriter sw = new StringWriter();
-    PrintWriter pw = new PrintWriter(sw);
-    e.printStackTrace(pw);
-    String msg = "log:" + jobLog_ + "\n" + getContext() + sw + "\n";
-    logprintln(msg);
-    return msg;
-  }
-
   long startTime_;
   long numRecRead_ = 0;
   long numRecWritten_ = 0;
@@ -657,13 +591,8 @@ public abstract class PipeMapRed {
   long reporterErrDelay_ = 10*1000L; 
   long joinDelay_;
   JobConf job_;
-  FileSystem fs_;
 
   boolean doPipe_;
-  boolean debug_;
-  boolean debugFailEarly_;
-  boolean debugFailDuring_;
-  boolean debugFailLate_;
 
   Class<? extends InputWriter> mapInputWriterClass_;
   Class<? extends OutputReader> mapOutputReaderClass_;
@@ -675,21 +604,16 @@ public abstract class PipeMapRed {
   InputWriter inWriter_;
   OutputReader outReader_;
   MROutputThread outThread_;
-  String jobLog_;
   MRErrorThread errThread_;
   DataOutputStream clientOut_;
   DataInputStream clientErr_;
   DataInputStream clientIn_;
 
   // set in PipeMapper/PipeReducer subclasses
-  String mapredKey_;
   int numExceptions_;
   StreamUtil.TaskId taskId_;
 
   protected volatile Throwable outerrThreadsThrowable;
-
-  String LOGNAME;
-  PrintStream log_;
 
   volatile boolean processProvidedStatus_ = false;
 }

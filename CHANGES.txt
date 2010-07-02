@@ -134,6 +134,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1863. Fix NPE in Rumen when processing null CDF for failed task
     attempts. (Amar Kamat via cdouglas)
 
+    MAPREDUCE-1864. Removes uninitialized/unused variables in
+    org.apache.hadoop.streaming.PipeMapRed. (amareshwari)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

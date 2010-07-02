@@ -31,7 +31,6 @@ import org.apache.hadoop.mapred.SkipBadRecords;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.streaming.io.InputWriter;
 import org.apache.hadoop.streaming.io.OutputReader;
-import org.apache.hadoop.util.StringUtils;
 
 import org.apache.hadoop.io.Writable;
 
@@ -96,9 +95,8 @@ public class PipeReducer extends PipeMapRed implements Reducer {
         if (doPipe_) {
           if (outerrThreadsThrowable != null) {
             mapRedFinished();
-            throw new IOException ("MROutput/MRErrThread failed:"
-                                   + StringUtils.stringifyException(
-                                                                    outerrThreadsThrowable));
+            throw new IOException("MROutput/MRErrThread failed:",
+                outerrThreadsThrowable);
           }
           inWriter_.writeKey(key);
           inWriter_.writeValue(val);
@@ -127,14 +125,12 @@ public class PipeReducer extends PipeMapRed implements Reducer {
         // hmm, but child is still running.  go figure.
 	extraInfo = "subprocess still running\n";
       };
-      appendLogToJobLog("failure");
       mapRedFinished();
       throw new IOException(extraInfo + getContext() + io.getMessage());
     }
   }
 
   public void close() {
-    appendLogToJobLog("success");
     mapRedFinished();
   }
 
