@@ -82,6 +82,15 @@ public class TestMultipleArchiveFiles extends TestStreaming
     mr  = new MiniMRCluster(1, namenode, 3);
     strJobTracker = JTConfig.JT_IPC_ADDRESS + "=localhost:" + mr.getJobTrackerPort();
     strNamenode = "fs.default.name=" + namenode;
+
+    map = "xargs cat";
+    reduce = "cat";
+  }
+
+  @Override
+  protected void setInputOutput() {
+    inputFile = INPUT_FILE;
+    outDir = OUTPUT_DIR;
   }
   
   protected void createInput() throws IOException
@@ -114,30 +123,20 @@ public class TestMultipleArchiveFiles extends TestStreaming
     String cache1 = workDir + CACHE_ARCHIVE_1 + "#symlink1";
     String cache2 = workDir + CACHE_ARCHIVE_2 + "#symlink2";
 
-    return new String[] {
-      "-input", INPUT_FILE.toString(),
-      "-output", OUTPUT_DIR,
-      "-mapper", "xargs cat", 
-      "-reducer", "cat",
-      "-jobconf", "mapreduce.job.reduces=1",
-      "-cacheArchive", cache1,
-      "-cacheArchive", cache2,
-      "-jobconf", strNamenode,
-      "-jobconf", strJobTracker,
-      "-jobconf", "stream.tmpdir=" + System.getProperty("test.build.data","/tmp")
-    };
+    args.add("-jobconf");
+    args.add("mapreduce.job.reduces=1");
+    args.add("-cacheArchive");
+    args.add(cache1);
+    args.add("-cacheArchive");
+    args.add(cache2);
+    args.add("-jobconf");
+    args.add(strNamenode);
+    args.add("-jobconf");
+    args.add(strJobTracker);
+    return super.genArgs();
   }
 
-  //@Test
-  public void testCommandLine() throws Exception {
-    createInput();
-    String args[] = genArgs();
-    LOG.info("Testing streaming command line:\n" +
-             StringUtils.join(" ", Arrays.asList(args)));
-    job = new StreamJob(genArgs(), true);
-    if(job.go() != 0) {
-      throw new Exception("Job Failed");
-    }
+  protected void checkOutput() throws IOException {
     StringBuffer output = new StringBuffer(256);
     Path[] fileList = FileUtil.stat2Paths(fileSys.listStatus(
                                             new Path(OUTPUT_DIR)));
@@ -146,10 +145,5 @@ public class TestMultipleArchiveFiles extends TestStreaming
       output.append(StreamUtil.slurpHadoop(fileList[i], fileSys));
     }
     assertEquals(expectedOutput, output.toString());
-  }
-
-  public static void main(String[]args) throws Exception
-  {
-    new TestMultipleArchiveFiles().testCommandLine();
   }
 }

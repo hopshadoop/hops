@@ -40,21 +40,4 @@ public class TestGzipInput extends TestStreaming
     out.write(input.getBytes("UTF-8"));
     out.close();
   }
-
-
-  protected String[] genArgs() {
-    return new String[] {
-      "-input", INPUT_FILE.getAbsolutePath(),
-      "-output", OUTPUT_DIR.getAbsolutePath(),
-      "-mapper", map,
-      "-reducer", reduce,
-    };
-    
-  }
-
-  public static void main(String[]args) throws Exception
-  {
-    new TestGzipInput().testCommandLine();
-  }
-
 }

@@ -27,25 +27,21 @@ import static org.junit.Assert.*;
 
 public class TestStreamingCombiner extends TestStreaming {
 
-  protected String combine = StreamUtil.makeJavaCommand(UniqApp.class, new String[]{""});
+  protected String combine = StreamUtil.makeJavaCommand(
+      UniqApp.class, new String[]{""});
   
   public TestStreamingCombiner() throws IOException {
     super();
   }
   
   protected String[] genArgs() {
-    return new String[] {
-      "-input", INPUT_FILE.getAbsolutePath(),
-      "-output", OUTPUT_DIR.getAbsolutePath(),
-      "-mapper", map,
-      "-reducer", reduce,
-      "-combiner", combine,
-      "-jobconf", "stream.tmpdir="+System.getProperty("test.build.data","/tmp")
-    };
+    args.add("-combiner");
+    args.add(combine);
+    return super.genArgs();
   }
 
   @Test
-  public void testCommandLine() throws Exception  {
+  public void testCommandLine() throws Exception {
     super.testCommandLine();
     // validate combiner counters
     String counterGrp = "org.apache.hadoop.mapred.Task$Counter";
@@ -55,10 +51,4 @@ public class TestStreamingCombiner extends TestStreaming {
     assertTrue(counters.findCounter(
                counterGrp, "COMBINE_OUTPUT_RECORDS").getValue() != 0);
   }
-
-  public static void main(String[]args) throws Exception
-  {
-    new TestStreamingCombiner().testCommandLine();
-  }
-
 }

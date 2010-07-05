@@ -137,6 +137,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1864. Removes uninitialized/unused variables in
     org.apache.hadoop.streaming.PipeMapRed. (amareshwari)
 
+    MAPREDUCE-1888. Fixes Streaming to override output key and value types, 
+    only if mapper/reducer is a command. (Ravi Gummadi via amareshwari)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

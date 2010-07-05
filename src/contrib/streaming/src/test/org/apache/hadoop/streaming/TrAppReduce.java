@@ -23,8 +23,9 @@ import java.io.*;
 import org.apache.hadoop.streaming.Environment;
 
 /** A minimal Java implementation of /usr/bin/tr.
-    Used to test the usage of external applications without adding
-    platform-specific dependencies.
+ *  Used to test the usage of external applications without adding
+ *  platform-specific dependencies.
+ *  Use TrAppReduce as reducer only. For mapper, use TrApp.
  */
 public class TrAppReduce
 {

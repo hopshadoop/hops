@@ -744,25 +744,15 @@ public class StreamJob implements Tool {
     jobConf_.setClass("stream.reduce.input.writer.class",
       idResolver.getInputWriterClass(), InputWriter.class);
     
-    idResolver.resolve(jobConf_.get("stream.map.output", IdentifierResolver.TEXT_ID));
-    jobConf_.setClass("stream.map.output.reader.class",
-      idResolver.getOutputReaderClass(), OutputReader.class);
-    jobConf_.setMapOutputKeyClass(idResolver.getOutputKeyClass());
-    jobConf_.setMapOutputValueClass(idResolver.getOutputValueClass());
-    
-    idResolver.resolve(jobConf_.get("stream.reduce.output", IdentifierResolver.TEXT_ID));
-    jobConf_.setClass("stream.reduce.output.reader.class",
-      idResolver.getOutputReaderClass(), OutputReader.class);
-    jobConf_.setOutputKeyClass(idResolver.getOutputKeyClass());
-    jobConf_.setOutputValueClass(idResolver.getOutputValueClass());
-    
     jobConf_.set("stream.addenvironment", addTaskEnvironment_);
 
+    boolean isMapperACommand = false;
     if (mapCmd_ != null) {
       c = StreamUtil.goodClassOrNull(jobConf_, mapCmd_, defaultPackage);
       if (c != null) {
         jobConf_.setMapperClass(c);
       } else {
+        isMapperACommand = true;
         jobConf_.setMapperClass(PipeMapper.class);
         jobConf_.setMapRunnerClass(PipeMapRunner.class);
         jobConf_.set("stream.map.streamprocessor", 
@@ -781,23 +771,60 @@ public class StreamJob implements Tool {
       }
     }
 
-    boolean reducerNone_ = false;
-    if (redCmd_ != null) {
-      reducerNone_ = redCmd_.equals(REDUCE_NONE);
-      if (redCmd_.compareToIgnoreCase("aggregate") == 0) {
-        jobConf_.setReducerClass(ValueAggregatorReducer.class);
-        jobConf_.setCombinerClass(ValueAggregatorCombiner.class);
-      } else {
+    if (numReduceTasksSpec_!= null) {
+      int numReduceTasks = Integer.parseInt(numReduceTasksSpec_);
+      jobConf_.setNumReduceTasks(numReduceTasks);
+    }
 
-        c = StreamUtil.goodClassOrNull(jobConf_, redCmd_, defaultPackage);
-        if (c != null) {
-          jobConf_.setReducerClass(c);
+    boolean isReducerACommand = false;
+    if (redCmd_ != null) {
+      if (redCmd_.equals(REDUCE_NONE)) {
+        jobConf_.setNumReduceTasks(0);
+      }
+      if (jobConf_.getNumReduceTasks() != 0) {
+        if (redCmd_.compareToIgnoreCase("aggregate") == 0) {
+          jobConf_.setReducerClass(ValueAggregatorReducer.class);
+          jobConf_.setCombinerClass(ValueAggregatorCombiner.class);
         } else {
-          jobConf_.setReducerClass(PipeReducer.class);
-          jobConf_.set("stream.reduce.streamprocessor", URLEncoder.encode(
-              redCmd_, "UTF-8"));
+
+          c = StreamUtil.goodClassOrNull(jobConf_, redCmd_, defaultPackage);
+          if (c != null) {
+            jobConf_.setReducerClass(c);
+          } else {
+            isReducerACommand = true;
+            jobConf_.setReducerClass(PipeReducer.class);
+            jobConf_.set("stream.reduce.streamprocessor", URLEncoder.encode(
+                redCmd_, "UTF-8"));
+          }
         }
       }
+    }
+
+    idResolver.resolve(jobConf_.get("stream.map.output",
+        IdentifierResolver.TEXT_ID));
+    jobConf_.setClass("stream.map.output.reader.class",
+      idResolver.getOutputReaderClass(), OutputReader.class);
+    if (isMapperACommand) {
+      // if mapper is a command, then map output key/value classes come from the
+      // idResolver
+      jobConf_.setMapOutputKeyClass(idResolver.getOutputKeyClass());
+      jobConf_.setMapOutputValueClass(idResolver.getOutputValueClass());
+
+      if (jobConf_.getNumReduceTasks() == 0) {
+        jobConf_.setOutputKeyClass(idResolver.getOutputKeyClass());
+        jobConf_.setOutputValueClass(idResolver.getOutputValueClass());
+      }
+    }
+
+    idResolver.resolve(jobConf_.get("stream.reduce.output",
+        IdentifierResolver.TEXT_ID));
+    jobConf_.setClass("stream.reduce.output.reader.class",
+      idResolver.getOutputReaderClass(), OutputReader.class);
+    if (isReducerACommand) {
+      // if reducer is a command, then output key/value classes come from the
+      // idResolver
+      jobConf_.setOutputKeyClass(idResolver.getOutputKeyClass());
+      jobConf_.setOutputValueClass(idResolver.getOutputValueClass());
     }
 
     if (inReaderSpec_ != null) {
@@ -844,14 +871,6 @@ public class StreamJob implements Tool {
       } else {
         fail("-partitioner : class not found : " + partitionerSpec_);
       }
-    }
-    
-    if (numReduceTasksSpec_!= null) {
-      int numReduceTasks = Integer.parseInt(numReduceTasksSpec_);
-      jobConf_.setNumReduceTasks(numReduceTasks);
-    }
-    if (reducerNone_) {
-      jobConf_.setNumReduceTasks(0);
     }
     
     if(mapDebugSpec_ != null){
