@@ -23,7 +23,13 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.util.Shell.ShellCommandExecutor;
+
 class UtilTest {
+
+  private static final Log LOG = LogFactory.getLog(UtilTest.class);
 
   /**
    * Utility routine to recurisvely delete a directory.
@@ -74,6 +80,28 @@ class UtilTest {
       System.setOut(out);
       System.setErr(out);
     }
+  }
+
+  /**
+   * Is perl supported on this machine ?
+   * @return true if perl is available and is working as expected
+   */
+  public static boolean hasPerlSupport() {
+    boolean hasPerl = false;
+    ShellCommandExecutor shexec = new ShellCommandExecutor(
+      new String[] { "perl", "-e", "print 42" });
+    try {
+      shexec.execute();
+      if (shexec.getOutput().equals("42")) {
+        hasPerl = true;
+      }
+      else {
+        LOG.warn("Perl is installed, but isn't behaving as expected.");
+      }
+    } catch (Exception e) {
+      LOG.warn("Could not run perl: " + e);
+    }
+    return hasPerl;
   }
 
   private String userDir_;

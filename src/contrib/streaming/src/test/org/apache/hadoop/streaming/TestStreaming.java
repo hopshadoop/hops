@@ -69,6 +69,7 @@ public class TestStreaming
   public void setUp() throws IOException {
     UtilTest.recursiveDelete(TEST_DIR);
     assertTrue("Creating " + TEST_DIR, TEST_DIR.mkdirs());
+    args.clear();
   }
 
   @After

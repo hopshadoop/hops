@@ -140,6 +140,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1888. Fixes Streaming to override output key and value types, 
     only if mapper/reducer is a command. (Ravi Gummadi via amareshwari)
 
+    MAPREDUCE-577. Fixes duplicate records in StreamXmlRecordReader.
+    (Ravi Gummadi via amareshwari)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

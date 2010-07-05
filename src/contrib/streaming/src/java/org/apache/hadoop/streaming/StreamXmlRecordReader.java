@@ -88,7 +88,7 @@ public class StreamXmlRecordReader extends StreamBaseRecordReader {
     if (!readUntilMatchBegin()) {
       return false;
     }
-    if (!readUntilMatchEnd(buf)) {
+    if (pos_ >= end_ || !readUntilMatchEnd(buf)) {
       return false;
     }
 
@@ -258,8 +258,8 @@ public class StreamXmlRecordReader extends StreamBaseRecordReader {
         if (outBufOrNull != null) {
           outBufOrNull.write(cpat, 0, m);
           outBufOrNull.write(c);
-          pos_ += m;
         }
+        pos_ += m + 1; // skip m chars, +1 for 'c'
         m = 0;
       }
     }
