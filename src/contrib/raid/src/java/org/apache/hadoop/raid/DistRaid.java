@@ -324,6 +324,11 @@ public class DistRaid {
       opWriter = SequenceFile.createWriter(fs, jobconf, opList, Text.class,
           PolicyInfo.class, SequenceFile.CompressionType.NONE);
       for (RaidPolicyPathPair p : raidPolicyPathPairList) {
+        // If a large set of files are Raided for the first time, files
+        // in the same directory that tend to have the same size will end up
+        // with the same map. This shuffle mixes things up, allowing a better
+        // mix of files.
+        java.util.Collections.shuffle(p.srcPaths);
         for (FileStatus st : p.srcPaths) {
           opWriter.append(new Text(st.getPath().toString()), p.policy);
           opCount++;

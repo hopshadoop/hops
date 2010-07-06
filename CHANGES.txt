@@ -146,6 +146,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1894. Fixed a bug in DistributedRaidFileSystem.readFully() 
     that was causing it to loop infinitely. (Ramkumar Vadali via dhruba)
 
+    MAPREDUCE-1838. Reduce the time needed for raiding a bunch of files
+    by randomly assigning files to map tasks. (Ramkumar Vadali via dhruba)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
