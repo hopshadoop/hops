@@ -200,6 +200,40 @@ public class TestRaidDfs extends TestCase {
     }
     LOG.info("Test testPathFilter completed.");
   }
+
+  /**
+   * Test DistributedRaidFileSystem.readFully()
+   */
+  public void testReadFully() throws Exception {
+    mySetup();
+
+    try {
+      Path file = new Path("/user/raid/raidtest/file1");
+      createOldFile(fileSys, file, 1, 7, 8192L);
+
+      // filter all filesystem calls from client
+      Configuration clientConf = new Configuration(conf);
+      clientConf.set("fs.hdfs.impl",
+                      "org.apache.hadoop.hdfs.DistributedRaidFileSystem");
+      clientConf.set("fs.raid.underlyingfs.impl",
+                      "org.apache.hadoop.hdfs.DistributedFileSystem");
+      URI dfsUri = dfs.getFileSystem().getUri();
+      FileSystem.closeAll();
+      FileSystem raidfs = FileSystem.get(dfsUri, clientConf);
+
+      FileStatus stat = raidfs.getFileStatus(file);
+      byte[] filebytes = new byte[(int)stat.getLen()];
+      FSDataInputStream stm = raidfs.open(file);
+      // Test that readFully returns.
+      stm.readFully(filebytes, 0, (int)stat.getLen());
+
+      stm = raidfs.open(file);
+      // Test that readFully returns.
+      stm.readFully(filebytes);
+    } finally {
+      myTearDown();
+    }
+  }
   
   //
   // creates a file and populate it with random data. Returns its crc.

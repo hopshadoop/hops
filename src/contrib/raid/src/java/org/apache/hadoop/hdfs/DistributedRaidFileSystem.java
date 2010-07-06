@@ -297,6 +297,7 @@ public class DistributedRaidFileSystem extends FilterFileSystem {
           try {
             underLyingStream.readFully(pos, b, offset, length);
             nextLocation = 0;
+            return;
           } catch (BlockMissingException e) {
             setAlternateLocations(e, post);
           } catch (ChecksumException e) {
@@ -312,6 +313,7 @@ public class DistributedRaidFileSystem extends FilterFileSystem {
           try {
             underLyingStream.readFully(pos, b);
             nextLocation = 0;
+            return;
           } catch (BlockMissingException e) {
             setAlternateLocations(e, post);
           } catch (ChecksumException e) {

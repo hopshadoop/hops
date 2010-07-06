@@ -143,6 +143,9 @@ Trunk (unreleased changes)
     MAPREDUCE-577. Fixes duplicate records in StreamXmlRecordReader.
     (Ravi Gummadi via amareshwari)
 
+    MAPREDUCE-1894. Fixed a bug in DistributedRaidFileSystem.readFully() 
+    that was causing it to loop infinitely. (Ramkumar Vadali via dhruba)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
