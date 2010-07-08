@@ -149,6 +149,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1838. Reduce the time needed for raiding a bunch of files
     by randomly assigning files to map tasks. (Ramkumar Vadali via dhruba)
 
+    MAPREDUCE-1820. Fix InputSampler to clone sampled keys. (Alex Kozlov via
+    cdouglas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
