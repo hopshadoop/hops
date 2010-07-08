@@ -69,13 +69,9 @@ public class StreamKeyValUtil {
       throw new IllegalArgumentException("splitPos must be in the range " +
                                          "[" + start + ", " + (start+length) + "]: " + splitPos);
     int keyLen = (splitPos-start);
-    byte [] keyBytes = new byte[keyLen];
-    System.arraycopy(utf, start, keyBytes, 0, keyLen);
     int valLen = (start+length)-splitPos-separatorLength;
-    byte [] valBytes = new byte[valLen];
-    System.arraycopy(utf, splitPos+separatorLength, valBytes, 0, valLen);
-    key.set(keyBytes);
-    val.set(valBytes);
+    key.set(utf, start, keyLen);
+    val.set(utf, splitPos+separatorLength, valLen);
   }
 
   /**

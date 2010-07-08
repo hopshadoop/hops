@@ -72,6 +72,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-1893. Slive with multiple reducers. (shv)
 
+    MAPREDUCE-1248. Fixes redudant memory copying in StreamKeyValUtil.
+    (Ruibang He via amareshwari)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and
