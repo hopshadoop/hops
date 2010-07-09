@@ -37,6 +37,7 @@ import org.apache.hadoop.mapreduce.Partitioner;
 import org.apache.hadoop.mapreduce.ReduceContext;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
+import org.apache.hadoop.security.Credentials;
 
 /**
  * A {@link Reducer} which wraps a given one to allow for custom 
@@ -309,6 +310,11 @@ public class WrappedReducer<KEYIN, VALUEIN, KEYOUT, VALUEOUT>
     @Override
     public String getUser() {
       return reduceContext.getUser();
+    }
+
+    @Override
+    public Credentials getCredentials() {
+      return reduceContext.getCredentials();
     }
   }
 }

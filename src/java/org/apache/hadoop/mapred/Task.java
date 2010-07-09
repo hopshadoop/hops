@@ -61,6 +61,7 @@ import org.apache.hadoop.mapreduce.lib.reduce.WrappedReducer;
 import org.apache.hadoop.mapreduce.task.ReduceContextImpl;
 import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.util.Progress;
 import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.ReflectionUtils;
@@ -592,7 +593,7 @@ abstract public class Task implements Writable, Configurable {
       } else {
         return split;
       }
-    }    
+    }  
     /** 
      * The communication thread handles communication with the parent (Task Tracker). 
      * It sends progress updates if progress has been made or if the task needs to 

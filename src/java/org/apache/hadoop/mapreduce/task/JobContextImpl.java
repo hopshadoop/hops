@@ -39,6 +39,7 @@ import org.apache.hadoop.mapreduce.filecache.DistributedCache;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.mapreduce.lib.partition.HashPartitioner;
+import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 
 /**
@@ -55,10 +56,12 @@ public class JobContextImpl implements JobContext {
    * The UserGroupInformation object that has a reference to the current user
    */
   protected UserGroupInformation ugi;
+  protected final Credentials credentials;
   
   public JobContextImpl(Configuration conf, JobID jobId) {
     this.conf = new org.apache.hadoop.mapred.JobConf(conf);
     this.jobId = jobId;
+    this.credentials = this.conf.getCredentials();
     try {
       this.ugi = UserGroupInformation.getCurrentUser();
     } catch (IOException e) {
@@ -403,6 +406,10 @@ public class JobContextImpl implements JobContext {
    */
   public String getUser() {
     return conf.getUser();
+  }
+
+  public Credentials getCredentials() {
+    return credentials;
   }
   
 }

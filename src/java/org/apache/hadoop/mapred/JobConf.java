@@ -47,6 +47,7 @@ import org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner;
 import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.util.ConfigUtil;
+import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Tool;
 import org.apache.log4j.Level;
@@ -322,6 +323,8 @@ public class JobConf extends Configuration {
    */
   public static final String MAPRED_REDUCE_TASK_ENV = JobContext.REDUCE_ENV;
 
+  private Credentials credentials = new Credentials();
+  
   /**
    * Configuration key to set the logging {@link Level} for the map task.
    *
@@ -369,6 +372,12 @@ public class JobConf extends Configuration {
    */
   public JobConf(Configuration conf) {
     super(conf);
+    
+    if (conf instanceof JobConf) {
+      JobConf that = (JobConf)conf;
+      credentials = that.credentials;
+    }
+    
     checkAndWarnDeprecation();
   }
 
@@ -415,6 +424,18 @@ public class JobConf extends Configuration {
     checkAndWarnDeprecation();
   }
 
+  /**
+   * Get credentials for the job.
+   * @return credentials for the job
+   */
+  public Credentials getCredentials() {
+    return credentials;
+  }
+  
+  void setCredentials(Credentials credentials) {
+    this.credentials = credentials;
+  }
+  
   /**
    * Get the user jar for the map-reduce job.
    * 

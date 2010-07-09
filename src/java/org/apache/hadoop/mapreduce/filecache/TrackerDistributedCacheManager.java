@@ -46,6 +46,7 @@ import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.util.RunJar;
 import org.apache.hadoop.classification.InterfaceAudience;
 
@@ -694,9 +695,11 @@ public class TrackerDistributedCacheManager {
   /**
    * For each archive or cache file - get the corresponding delegation token
    * @param job
+   * @param credentials
    * @throws IOException
    */
-  public static void getDelegationTokens(Configuration job) throws IOException {
+  public static void getDelegationTokens(Configuration job,
+      Credentials credentials) throws IOException {
     URI[] tarchives = DistributedCache.getCacheArchives(job);
     URI[] tfiles = DistributedCache.getCacheFiles(job);
     
@@ -716,7 +719,7 @@ public class TrackerDistributedCacheManager {
       }
     }
     
-    TokenCache.obtainTokensForNamenodes(ps, job);
+    TokenCache.obtainTokensForNamenodes(credentials, ps, job);
   }
   
   /**

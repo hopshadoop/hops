@@ -35,6 +35,7 @@ import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.ReduceContext;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
+import org.apache.hadoop.security.Credentials;
 
 /**
  * A simple wrapper class that delegates most of its functionality to the
@@ -296,5 +297,10 @@ class ChainReduceContextImpl<KEYIN, VALUEIN, KEYOUT, VALUEOUT> implements
   @Override
   public void progress() {
     base.progress();
+  }
+
+  @Override
+  public Credentials getCredentials() {
+    return base.getCredentials();
   }
 }

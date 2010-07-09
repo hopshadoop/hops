@@ -35,7 +35,7 @@ import org.apache.hadoop.tools.rumen.JobStory;
 import org.apache.hadoop.tools.rumen.TaskAttemptInfo;
 import org.apache.hadoop.mapred.SimulatorJobInProgress;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.security.TokenStorage;
+import org.apache.hadoop.security.Credentials;
 
 /**
  * {@link SimulatorJobTracker} extends {@link JobTracker}. It implements the
@@ -175,7 +175,7 @@ public class SimulatorJobTracker extends JobTracker {
 
   @Override
   public synchronized JobStatus submitJob(
-      JobID jobId, String jobSubmitDir, TokenStorage ts) 
+      JobID jobId, String jobSubmitDir, Credentials ts) 
   throws IOException {
     boolean loggingEnabled = LOG.isDebugEnabled();
     if (loggingEnabled) {

@@ -45,6 +45,7 @@ import org.apache.hadoop.mapreduce.filecache.TrackerDistributedCacheManager;
 import org.apache.hadoop.mapreduce.protocol.ClientProtocol;
 import org.apache.hadoop.mapreduce.security.TokenCache;
 import org.apache.hadoop.mapreduce.split.JobSplitWriter;
+import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.codehaus.jackson.JsonParseException;
 import org.codehaus.jackson.map.JsonMappingException;
@@ -240,7 +241,8 @@ class JobSubmitter {
     //  set the public/private visibility of the archives and files
     TrackerDistributedCacheManager.determineCacheVisibilities(conf);
     // get DelegationToken for each cached file
-    TrackerDistributedCacheManager.getDelegationTokens(conf);
+    TrackerDistributedCacheManager.getDelegationTokens(conf, job
+        .getCredentials());
   }
   
   private URI getPathURI(Path destPath, String fragment) 
@@ -335,7 +337,8 @@ class JobSubmitter {
       LOG.debug("Configuring job " + jobId + " with " + submitJobDir 
           + " as the submit dir");
       // get delegation token for the dir
-      TokenCache.obtainTokensForNamenodes(new Path [] {submitJobDir}, conf);
+      TokenCache.obtainTokensForNamenodes(job.getCredentials(),
+          new Path[] { submitJobDir }, conf);
       
       copyAndConfigureFiles(job, submitJobDir);
       Path submitJobFile = JobSubmissionFiles.getJobConfPath(submitJobDir);
@@ -354,9 +357,9 @@ class JobSubmitter {
       //
       // Now, actually submit the job (using the submit name)
       //
-      populateTokenCache(conf);
+      populateTokenCache(conf, job.getCredentials());
       status = submitClient.submitJob(
-          jobId, submitJobDir.toString(), TokenCache.getTokenStorage());
+          jobId, submitJobDir.toString(), job.getCredentials());
       if (status != null) {
         return status;
       } else {
@@ -484,7 +487,8 @@ class JobSubmitter {
   
   // get secret keys and tokens and store them into TokenCache
   @SuppressWarnings("unchecked")
-  private void populateTokenCache(Configuration conf) throws IOException{
+  private void populateTokenCache(Configuration conf, Credentials credentials)
+      throws IOException {
     // create TokenStorage object with user secretKeys
     String tokensFileName = conf.get("tokenCacheFile");
     if(tokensFileName != null) {
@@ -499,7 +503,8 @@ class JobSubmitter {
           mapper.readValue(new File(localFileName), Map.class);
 
         for(Map.Entry<String, String> ent: nm.entrySet()) {
-          TokenCache.addSecretKey(new Text(ent.getKey()), ent.getValue().getBytes());
+          credentials.addSecretKey(new Text(ent.getKey()), ent.getValue()
+              .getBytes());
         }
       } catch (JsonMappingException e) {
         json_error = true;
@@ -518,7 +523,7 @@ class JobSubmitter {
       for(int i=0; i< nameNodes.length; i++) {
         ps[i] = new Path(nameNodes[i]);
       }
-      TokenCache.obtainTokensForNamenodes(ps, conf);
+      TokenCache.obtainTokensForNamenodes(credentials, ps, conf);
     }
   }
 }

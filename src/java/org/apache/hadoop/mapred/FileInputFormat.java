@@ -187,7 +187,7 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
     }
 
     // get tokens for all the required FileSystems..
-    TokenCache.obtainTokensForNamenodes(dirs, job);
+    TokenCache.obtainTokensForNamenodes(job.getCredentials(), dirs, job);
     
     // Whether we need to recursive look into the directory structure
     boolean recursive = job.getBoolean("mapred.input.dir.recursive", false);

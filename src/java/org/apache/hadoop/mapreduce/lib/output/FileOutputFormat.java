@@ -134,8 +134,9 @@ public static final String OUTDIR = "mapreduce.output.fileoutputformat.outputdir
     }
 
     // get delegation token for outDir's file system
-    TokenCache.obtainTokensForNamenodes(new Path[] {outDir}, job.getConfiguration());
-    
+    TokenCache.obtainTokensForNamenodes(job.getCredentials(),
+        new Path[] { outDir }, job.getConfiguration());
+
     if (outDir.getFileSystem(job.getConfiguration()).exists(outDir)) {
       throw new FileAlreadyExistsException("Output directory " + outDir + 
                                            " already exists");

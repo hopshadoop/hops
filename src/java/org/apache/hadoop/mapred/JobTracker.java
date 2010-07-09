@@ -101,7 +101,7 @@ import org.apache.hadoop.net.ScriptBasedMapping;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.Groups;
 import org.apache.hadoop.security.RefreshUserMappingsProtocol;
-import org.apache.hadoop.security.TokenStorage;
+import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.authorize.AuthorizationException;
@@ -2991,7 +2991,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   public synchronized 
   org.apache.hadoop.mapreduce.JobStatus 
     submitJob(org.apache.hadoop.mapreduce.JobID jobId, String jobSubmitDir,
-              TokenStorage ts
+              Credentials ts
               ) throws IOException, InterruptedException {
     return submitJob(JobID.downgrade(jobId), jobSubmitDir, ts);
   }
@@ -3004,12 +3004,11 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    * of the JobTracker.  But JobInProgress adds info that's useful for
    * the JobTracker alone.
    * @deprecated Use 
-   * {@link #submitJob(org.apache.hadoop.mapreduce.JobID, String, TokenStorage)}
+   * {@link #submitJob(org.apache.hadoop.mapreduce.JobID, String, Credentials)}
    *  instead
    */
   @Deprecated
-  public JobStatus submitJob(JobID jobId, String jobSubmitDir,
-			     TokenStorage ts)
+  public JobStatus submitJob(JobID jobId, String jobSubmitDir, Credentials ts)
       throws IOException, InterruptedException {
 
     return submitJob(jobId, 0, UserGroupInformation.getCurrentUser(), 
@@ -3021,7 +3020,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    */
   private JobStatus submitJob(org.apache.hadoop.mapreduce.JobID jobID, 
 			      int restartCount, UserGroupInformation ugi, 
-			      String jobSubmitDir, boolean recovered, TokenStorage ts
+			      String jobSubmitDir, boolean recovered, Credentials ts
 			      )
       throws IOException, InterruptedException {
 
@@ -3393,9 +3392,11 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   }
 
   /**
-   * @see ClientProtocol#setJobPriority(org.apache.hadoop.mapreduce.JobID, String)
+   * Set the priority of a job
+   * @param jobid
+   * @param priority
+   * @throws IOException
    */
-  @Override
   public synchronized void setJobPriority(org.apache.hadoop.mapreduce.JobID 
       jobid, String priority) throws IOException {
     setJobPriority(JobID.downgrade(jobid), priority);

@@ -19,15 +19,15 @@ package org.apache.hadoop.mapreduce.security;
 
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.security.NoSuchAlgorithmException;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 
 import javax.crypto.KeyGenerator;
@@ -35,95 +35,131 @@ import javax.crypto.spec.SecretKeySpec;
 
 import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
+import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapred.EmptyInputFormat;
+import org.apache.hadoop.mapred.JobClient;
 import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapred.JobTracker;
+import org.apache.hadoop.mapred.Mapper;
 import org.apache.hadoop.mapred.MiniMRCluster;
-import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.MRJobConfig;
-import org.apache.hadoop.mapreduce.SleepJob;
-import org.apache.hadoop.mapreduce.Mapper.Context;
-import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
+import org.apache.hadoop.mapred.OutputCollector;
+import org.apache.hadoop.mapred.Partitioner;
+import org.apache.hadoop.mapred.Reducer;
+import org.apache.hadoop.mapred.Reporter;
+import org.apache.hadoop.mapred.lib.NullOutputFormat;
+import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
-import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.junit.AfterClass;
+import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.junit.Assert;
 
-public class TestTokenCache {
+
+@SuppressWarnings("deprecation")
+public class TestTokenCacheOldApi {
   private static final int NUM_OF_KEYS = 10;
 
   // my sleep class - adds check for tokenCache
-  static class MySleepMapper extends SleepJob.SleepMapper {
+  static class MyDummyJob extends Configured implements Tool,
+      Mapper<IntWritable, IntWritable, IntWritable, NullWritable>,
+      Reducer<IntWritable, NullWritable, NullWritable, NullWritable>,
+      Partitioner<IntWritable, NullWritable> {
+    Credentials ts;
+
+    public void configure(JobConf job) {
+    }
+    
     /**
      * attempts to access tokenCache as from client
      */
-    @Override
-    public void map(IntWritable key, IntWritable value, Context context)
-    throws IOException, InterruptedException {
+    public void map(IntWritable key, IntWritable value,
+        OutputCollector<IntWritable, NullWritable> output, Reporter reporter)
+        throws IOException {
       // get token storage and a key
-      Credentials ts = context.getCredentials();
       byte[] key1 = ts.getSecretKey(new Text("alias1"));
       Collection<Token<? extends TokenIdentifier>> dts = ts.getAllTokens();
       int dts_size = 0;
       if(dts != null)
         dts_size = dts.size();
-      
-      
+
       if(dts.size() != 2) { // one job token and one delegation token
         throw new RuntimeException("tokens are not available"); // fail the test
       }
-      
-      
+
       if(key1 == null || ts == null || ts.numberOfSecretKeys() != NUM_OF_KEYS) {
         throw new RuntimeException("secret keys are not available"); // fail the test
-      } 
-      super.map(key, value, context);
-    }
-  }
-  
-  class MySleepJob extends SleepJob {
-    @Override
-    public Job createJob(int numMapper, int numReducer, 
-        long mapSleepTime, int mapSleepCount, 
-        long reduceSleepTime, int reduceSleepCount) 
-    throws IOException {
-      Job job =  super.createJob(numMapper, numReducer,
-           mapSleepTime, mapSleepCount, 
-          reduceSleepTime, reduceSleepCount);
+      }
       
-      job.setMapperClass(MySleepMapper.class);
-      //Populate tokens here because security is disabled.
+      output.collect(new IntWritable(1), NullWritable.get());
+    }
+    
+    public JobConf setupJobConf() {
+      
+      JobConf job = new JobConf(getConf(), MyDummyJob.class);
+      job.setNumMapTasks(1);
+      job.setNumReduceTasks(1);
+      job.setMapperClass(MyDummyJob.class);
+      job.setMapOutputKeyClass(IntWritable.class);
+      job.setMapOutputValueClass(NullWritable.class);
+      job.setReducerClass(MyDummyJob.class);
+      job.setOutputFormat(NullOutputFormat.class);
+      job.setInputFormat(EmptyInputFormat.class);
+      job.setPartitionerClass(MyDummyJob.class);
+      job.setSpeculativeExecution(false);
+      job.setJobName("Sleep job");
       populateTokens(job);
       return job;
     }
     
-    private void populateTokens(Job job) {
-    // Credentials in the job will not have delegation tokens
-    // because security is disabled. Fetch delegation tokens
-    // and populate the credential in the job.
+    private void populateTokens(JobConf job) {
+      // Credentials in the job will not have delegation tokens
+      // because security is disabled. Fetch delegation tokens
+      // and populate the credential in the job.
       try {
         Credentials ts = job.getCredentials();
         Path p1 = new Path("file1");
-        p1 = p1.getFileSystem(job.getConfiguration()).makeQualified(p1);
+        p1 = p1.getFileSystem(job).makeQualified(p1);
         Credentials cred = new Credentials();
         TokenCache.obtainTokensForNamenodesInternal(cred, new Path[] { p1 },
-            job.getConfiguration());
+            job);
         for (Token<? extends TokenIdentifier> t : cred.getAllTokens()) {
           ts.addToken(new Text("Hdfs"), t);
         }
       } catch (IOException e) {
         Assert.fail("Exception " + e);
       }
+    }
+
+    public void close() throws IOException {
+    }
+
+    public void reduce(IntWritable key, Iterator<NullWritable> values,
+        OutputCollector<NullWritable, NullWritable> output, Reporter reporter)
+        throws IOException {
+      return;
+    }
+
+    public int getPartition(IntWritable key, NullWritable value,
+        int numPartitions) {
+      return key.get() % numPartitions;
+    }
+
+    public int run(String[] args) throws Exception {
+      JobConf job = setupJobConf();
+      JobClient.runJob(job);
+      return 0;
     }
   }
   
@@ -149,12 +185,12 @@ public class TestTokenCache {
     
     createTokenFileJson();
     verifySecretKeysInJSONFile();
-    dfsCluster.getNamesystem().getDelegationTokenSecretManager().startThreads();
+    dfsCluster.getNamesystem()
+				.getDelegationTokenSecretManager().startThreads();
     FileSystem fs = dfsCluster.getFileSystem();
     
     p1 = new Path("file1");
     p2 = new Path("file2");
-    
     p1 = fs.makeQualified(p1);
   }
 
@@ -208,18 +244,17 @@ public class TestTokenCache {
    */
   @Test
   public void testTokenCache() throws IOException {
-    
-    System.out.println("running dist job");
-    
     // make sure JT starts
     jConf = mrCluster.createJobConf();
     
     // provide namenodes names for the job to get the delegation tokens for
-    String nnUri = dfsCluster.getURI().toString();
-    jConf.set(MRJobConfig.JOB_NAMENODES, nnUri + "," + nnUri);
-    // job tracker principla id..
-    jConf.set(JTConfig.JT_USER_NAME, "jt_id");
-    
+    //String nnUri = dfsCluster.getNameNode().getUri(namenode).toString();
+    NameNode nn = dfsCluster.getNameNode();
+    URI nnUri = NameNode.getUri(nn.getNameNodeAddress());
+    jConf.set(JobContext.JOB_NAMENODES, nnUri + "," + nnUri.toString());
+    // job tracker principle id..
+    jConf.set(JobTracker.JT_USER_NAME, "jt_id");
+
     // using argument to pass the file name
     String[] args = {
        "-tokenCacheFile", tokenFileName.toString(), 
@@ -228,11 +263,11 @@ public class TestTokenCache {
      
     int res = -1;
     try {
-      res = ToolRunner.run(jConf, new MySleepJob(), args);
+      res = ToolRunner.run(jConf, new MyDummyJob(), args);
     } catch (Exception e) {
       System.out.println("Job failed with" + e.getLocalizedMessage());
       e.printStackTrace(System.out);
-      fail("Job failed");
+      Assert.fail("Job failed");
     }
     assertEquals("dist job res is not 0", res, 0);
   }
@@ -244,49 +279,18 @@ public class TestTokenCache {
    */
   @Test
   public void testLocalJobTokenCache() throws NoSuchAlgorithmException, IOException {
-    
-    System.out.println("running local job");
     // this is local job
     String[] args = {"-m", "1", "-r", "1", "-mt", "1", "-rt", "1"}; 
-    jConf.set("tokenCacheFile", tokenFileName.toString());
-    
+    jConf.set("mapreduce.job.credentials.json", tokenFileName.toString());
+
     int res = -1;
     try {
-      res = ToolRunner.run(jConf, new MySleepJob(), args);
+      res = ToolRunner.run(jConf, new MyDummyJob(), args);
     } catch (Exception e) {
       System.out.println("Job failed with" + e.getLocalizedMessage());
       e.printStackTrace(System.out);
       fail("local Job failed");
     }
     assertEquals("local job res is not 0", res, 0);
-  }
-  
-  @Test
-  public void testGetTokensForNamenodes() throws IOException {
-    FileSystem fs = dfsCluster.getFileSystem();
-    
-    Credentials credentials = new Credentials();
-    TokenCache.obtainTokensForNamenodesInternal(credentials, new Path[] { p1,
-        p2 }, jConf);
-
-    // this token is keyed by hostname:port key.
-    String fs_addr = TokenCache.buildDTServiceName(p1.toUri());
-    Token<DelegationTokenIdentifier> nnt = TokenCache.getDelegationToken(
-        credentials, fs_addr);
-    System.out.println("dt for " + p1 + "(" + fs_addr + ")" + " = " +  nnt);
-    assertNotNull("Token for nn is null", nnt);
-    
-    // verify the size
-    Collection<Token<? extends TokenIdentifier>> tns = credentials.getAllTokens();
-    assertEquals("number of tokens is not 1", 1, tns.size());
-    
-    boolean found = false;
-    for(Token<? extends TokenIdentifier> t: tns) {
-      if(t.getKind().equals(DelegationTokenIdentifier.HDFS_DELEGATION_KIND) &&
-          t.getService().equals(new Text(fs_addr))) {
-        found = true;
-      }
-      assertTrue("didn't find token for " + p1 ,found);
-    }
   }
 }

@@ -39,8 +39,8 @@ import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.mapreduce.server.jobtracker.State;
+import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.KerberosInfo;
-import org.apache.hadoop.security.TokenStorage;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenInfo;
 
@@ -107,8 +107,9 @@ public interface ClientProtocol extends VersionedProtocol {
    * Version 31: Added TokenStorage to submitJob      
    * Version 32: Added delegation tokens (add, renew, cancel)
    * Version 33: Added JobACLs to JobStatus as part of MAPREDUCE-1307
+   * Version 34: Modified submitJob to use Credentials instead of TokenStorage.
    */
-  public static final long versionID = 33L;
+  public static final long versionID = 34L;
 
   /**
    * Allocate a name for the job.
@@ -121,8 +122,8 @@ public interface ClientProtocol extends VersionedProtocol {
    * Submit a Job for execution.  Returns the latest profile for
    * that job.
    */
-  public JobStatus submitJob(JobID jobId, String jobSubmitDir, TokenStorage ts) 
-  throws IOException, InterruptedException;
+  public JobStatus submitJob(JobID jobId, String jobSubmitDir, Credentials ts)
+      throws IOException, InterruptedException;
 
   /**
    * Get the current status of the cluster

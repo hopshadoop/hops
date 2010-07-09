@@ -53,7 +53,7 @@ import org.apache.hadoop.mapreduce.filecache.TrackerDistributedCacheManager;
 import org.apache.hadoop.mapreduce.protocol.ClientProtocol;
 import org.apache.hadoop.mapreduce.security.TokenCache;
 import org.apache.hadoop.mapreduce.security.token.delegation.DelegationTokenIdentifier;
-import org.apache.hadoop.security.TokenStorage;
+import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.mapreduce.server.jobtracker.State;
 import org.apache.hadoop.mapreduce.split.SplitMetaInfoReader;
@@ -587,10 +587,12 @@ public class LocalJobRunner implements ClientProtocol {
   }
 
   public org.apache.hadoop.mapreduce.JobStatus submitJob(
-      org.apache.hadoop.mapreduce.JobID jobid, String jobSubmitDir, TokenStorage ts) 
-      throws IOException {
-    TokenCache.setTokenStorage(ts);
-    return new Job(JobID.downgrade(jobid), jobSubmitDir).status;
+      org.apache.hadoop.mapreduce.JobID jobid, String jobSubmitDir,
+      Credentials credentials) throws IOException {
+    Job job = new Job(JobID.downgrade(jobid), jobSubmitDir);
+    job.job.setCredentials(credentials);
+    return job.status;
+
   }
 
   public void killJob(org.apache.hadoop.mapreduce.JobID id) {

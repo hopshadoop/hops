@@ -71,7 +71,7 @@ import org.apache.hadoop.mapreduce.jobhistory.TaskFailedEvent;
 import org.apache.hadoop.mapreduce.jobhistory.TaskFinishedEvent;
 import org.apache.hadoop.mapreduce.jobhistory.TaskStartedEvent;
 import org.apache.hadoop.mapreduce.security.TokenCache;
-import org.apache.hadoop.security.TokenStorage;
+import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.mapreduce.security.token.DelegationTokenRenewal;
 import org.apache.hadoop.mapreduce.security.token.JobTokenIdentifier;
 import org.apache.hadoop.mapreduce.server.jobtracker.TaskTracker;
@@ -157,7 +157,7 @@ public class JobInProgress {
   JobPriority priority = JobPriority.NORMAL;
   protected JobTracker jobtracker;
   
-  protected TokenStorage tokenStorage;
+  protected Credentials tokenStorage;
   
   JobHistory jobHistory;
 
@@ -390,7 +390,7 @@ public class JobInProgress {
   public JobInProgress(JobTracker jobtracker, 
                        final JobConf default_conf, int rCount,
                        JobInfo jobInfo,
-                       TokenStorage ts
+                       Credentials ts
                       ) throws IOException, InterruptedException {
     this.restartCount = rCount;
     this.jobId = JobID.downgrade(jobInfo.getJobID());
@@ -3695,7 +3695,7 @@ public class JobInProgress {
     
     // add this token to the tokenStorage
     if(tokenStorage == null)
-      tokenStorage = new TokenStorage();
+      tokenStorage = new Credentials();
     
     TokenCache.setJobToken(token, tokenStorage);
     

@@ -155,6 +155,10 @@ Trunk (unreleased changes)
     MAPREDUCE-1820. Fix InputSampler to clone sampled keys. (Alex Kozlov via
     cdouglas)
 
+    MAPREDUCE-1528. Incorporates the changes to the credentials API done in
+    HADOOP-6845. Also, introduces Credentials in JobConf, and in JobContext.
+    (Jitendra Pandey and Arun Murthy via ddas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

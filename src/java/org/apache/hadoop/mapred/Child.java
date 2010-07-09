@@ -34,7 +34,7 @@ import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.security.TokenCache;
-import org.apache.hadoop.security.TokenStorage;
+import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.mapreduce.security.token.JobTokenIdentifier;
 import org.apache.hadoop.mapreduce.security.token.JobTokenSecretManager;
@@ -78,11 +78,11 @@ class Child {
     //load token cache storage
     String jobTokenFile = 
       System.getenv().get(UserGroupInformation.HADOOP_TOKEN_FILE_LOCATION);
-    TokenStorage ts = 
-      TokenCache.loadTaskTokenStorage(jobTokenFile, defaultConf);
-    LOG.debug("loading token. # keys =" +ts.numberOfSecretKeys() + 
+    Credentials credentials = 
+      TokenCache.loadTokens(jobTokenFile, defaultConf);
+    LOG.debug("loading token. # keys =" +credentials.numberOfSecretKeys() + 
         "; from file=" + jobTokenFile);
-    Token<JobTokenIdentifier> jt = TokenCache.getJobToken(ts);
+    Token<JobTokenIdentifier> jt = TokenCache.getJobToken(credentials);
     jt.setService(new Text(address.getAddress().getHostAddress() + ":"
         + address.getPort()));
     UserGroupInformation current = UserGroupInformation.getCurrentUser();
@@ -92,6 +92,9 @@ class Child {
     UserGroupInformation taskOwner 
      = UserGroupInformation.createRemoteUser(firstTaskid.getJobID().toString());
     taskOwner.addToken(jt);
+    
+    // Set the credentials
+    defaultConf.setCredentials(credentials);
     
     final TaskUmbilicalProtocol umbilical = 
       taskOwner.doAs(new PrivilegedExceptionAction<TaskUmbilicalProtocol>() {
@@ -177,7 +180,10 @@ class Child {
         //create the index file so that the log files 
         //are viewable immediately
         TaskLog.syncLogs(logLocation, taskid, isCleanup);
+        
+        // Create the job-conf and set credentials
         final JobConf job = new JobConf(task.getJobFile());
+        job.setCredentials(defaultConf.getCredentials());
         
         // set the jobTokenFile into task
         task.setJobTokenSecret(JobTokenSecretManager.
