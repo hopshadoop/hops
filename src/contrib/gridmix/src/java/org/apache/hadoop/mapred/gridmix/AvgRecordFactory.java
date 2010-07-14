@@ -31,6 +31,8 @@ class AvgRecordFactory extends RecordFactory {
    * Percentage of record for key data.
    */
   public static final String GRIDMIX_KEY_FRC = "gridmix.key.fraction";
+  public static final String GRIDMIX_MISSING_REC_SIZE = 
+    "gridmix.missing.rec.size";
 
 
   private final long targetBytes;
@@ -51,7 +53,7 @@ class AvgRecordFactory extends RecordFactory {
     this.targetBytes = targetBytes;
     this.targetRecords = targetRecords <= 0 && this.targetBytes >= 0
       ? Math.max(1,
-          this.targetBytes / conf.getInt("gridmix.missing.rec.size", 64 * 1024))
+          this.targetBytes / conf.getInt(GRIDMIX_MISSING_REC_SIZE, 64 * 1024))
       : targetRecords;
     final long tmp = this.targetBytes / this.targetRecords;
     step = this.targetBytes - this.targetRecords * tmp;

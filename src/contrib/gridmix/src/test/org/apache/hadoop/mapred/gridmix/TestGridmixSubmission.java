@@ -28,68 +28,59 @@ import java.util.concurrent.LinkedBlockingQueue;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.mapred.Counters;
+import org.apache.hadoop.mapred.JobClient;
 import org.apache.hadoop.mapred.JobConf;
-import org.apache.hadoop.mapred.MiniMRCluster;
-import org.apache.hadoop.mapreduce.Counters;
+import org.apache.hadoop.mapred.JobID;
+import org.apache.hadoop.mapred.Task;
+import org.apache.hadoop.mapred.TaskReport;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.TaskCounter;
-import org.apache.hadoop.mapreduce.TaskReport;
 import org.apache.hadoop.mapreduce.TaskType;
-import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.tools.rumen.JobStory;
 import org.apache.hadoop.tools.rumen.TaskInfo;
 import org.apache.hadoop.util.ToolRunner;
-import static org.apache.hadoop.mapreduce.TaskCounter.*;
 
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import static org.junit.Assert.*;
 
+import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.log4j.Level;
 
+import static org.apache.hadoop.mapreduce.TaskCounter.MAP_INPUT_RECORDS;
+import static org.apache.hadoop.mapreduce.TaskCounter.MAP_OUTPUT_BYTES;
+import static org.apache.hadoop.mapreduce.TaskCounter.MAP_OUTPUT_RECORDS;
+import static org.apache.hadoop.mapreduce.TaskCounter.REDUCE_INPUT_RECORDS;
+import static org.apache.hadoop.mapreduce.TaskCounter.REDUCE_OUTPUT_RECORDS;
+import static org.apache.hadoop.mapreduce.TaskCounter.REDUCE_SHUFFLE_BYTES;
+import static org.apache.hadoop.mapreduce.TaskCounter.SPLIT_RAW_BYTES;
+
 public class TestGridmixSubmission {
   static GridmixJobSubmissionPolicy policy = GridmixJobSubmissionPolicy.REPLAY;
+  public static final Log LOG = LogFactory.getLog(Gridmix.class);
 
   {
     ((Log4JLogger)LogFactory.getLog("org.apache.hadoop.mapred.gridmix")
         ).getLogger().setLevel(Level.DEBUG);
   }
 
-  private static FileSystem dfs = null;
-  private static MiniDFSCluster dfsCluster = null;
-  private static MiniMRCluster mrCluster = null;
-
-  private static final int NJOBS = 2;
-  private static final long GENDATA = 50; // in megabytes
+  private static final int NJOBS = 3;
+  private static final long GENDATA = 30; // in megabytes
   private static final int GENSLOP = 100 * 1024; // +/- 100k for logs
 
   @BeforeClass
-  public static void initCluster() throws IOException {
-    Configuration conf = new Configuration();
-    conf.setBoolean(JTConfig.JT_RETIREJOBS, false);
-    conf.setInt(JTConfig.JT_RETIREJOB_CACHE_SIZE, 1000);
-    conf.setBoolean(JTConfig.JT_PERSIST_JOBSTATUS, true);
-    conf.setInt(JTConfig.JT_PERSIST_JOBSTATUS_HOURS, 1);
-    dfsCluster = new MiniDFSCluster(conf, 3, true, null);
-    dfs = dfsCluster.getFileSystem();
-    mrCluster = new MiniMRCluster(3, dfs.getUri().toString(), 1, null, null,
-        new JobConf(conf));
+  public static void init() throws IOException {
+    GridmixTestUtils.initCluster();
   }
 
   @AfterClass
-  public static void shutdownCluster() throws IOException {
-    if (mrCluster != null) {
-      mrCluster.shutdown();
-    }
-    if (dfsCluster != null) {
-      dfsCluster.shutdown();
-    }
+  public static void shutDown() throws IOException {
+    GridmixTestUtils.shutdownCluster();
   }
 
   static class TestMonitor extends JobMonitor {
@@ -109,36 +100,72 @@ public class TestGridmixSubmission {
       assertEquals("Bad job count", expected, retiredJobs.drainTo(succeeded));
       final HashMap<String,JobStory> sub = new HashMap<String,JobStory>();
       for (JobStory spec : submitted) {
-        sub.put(spec.getName(), spec);
+        sub.put(spec.getJobID().toString(), spec);
       }
+      final JobClient client = new JobClient(
+        GridmixTestUtils.mrCluster.createJobConf());
       for (Job job : succeeded) {
         final String jobname = job.getJobName();
         if ("GRIDMIX_GENDATA".equals(jobname)) {
-          final Path in = new Path("foo").makeQualified(dfs);
-          final Path out = new Path("/gridmix").makeQualified(dfs);
-          final ContentSummary generated = dfs.getContentSummary(in);
+          if (!job.getConfiguration().getBoolean(
+            GridmixJob.GRIDMIX_USE_QUEUE_IN_TRACE, true)) {
+            assertEquals(" Improper queue for " + job.getJobName(),
+                         job.getConfiguration().get("mapred.job.queue.name"), 
+                         "q1");
+          } else {
+            assertEquals(" Improper queue for " + job.getJobName(),
+                         job.getConfiguration().get("mapred.job.queue.name"), 
+                         "default");
+          }
+          final Path in = new Path("foo").makeQualified(GridmixTestUtils.dfs);
+          final Path out = new Path("/gridmix").makeQualified(GridmixTestUtils.dfs);
+          final ContentSummary generated = GridmixTestUtils.dfs.getContentSummary(in);
           assertTrue("Mismatched data gen", // +/- 100k for logs
               (GENDATA << 20) < generated.getLength() + GENSLOP ||
               (GENDATA << 20) > generated.getLength() - GENSLOP);
-          FileStatus[] outstat = dfs.listStatus(out);
+          FileStatus[] outstat = GridmixTestUtils.dfs.listStatus(out);
           assertEquals("Mismatched job count", NJOBS, outstat.length);
           continue;
         }
+        
+        if (!job.getConfiguration().getBoolean(
+          GridmixJob.GRIDMIX_USE_QUEUE_IN_TRACE, true)) {
+          assertEquals(" Improper queue for  " + job.getJobName() + " " ,
+          job.getConfiguration().get("mapred.job.queue.name"),"q1" );
+        } else {
+          assertEquals(" Improper queue for  " + job.getJobName() + " ",
+                       job.getConfiguration().get("mapred.job.queue.name"), 
+                       sub.get(job.getConfiguration().get(GridmixJob.ORIGNAME))
+                          .getQueueName());
+        }
+
         final JobStory spec =
-          sub.get(job.getJobName().replace("GRIDMIX", "MOCKJOB"));
+          sub.get(job.getConfiguration().get(GridmixJob.ORIGNAME));
         assertNotNull("No spec for " + job.getJobName(), spec);
         assertNotNull("No counters for " + job.getJobName(), job.getCounters());
+        final String specname = spec.getName();
+        final FileStatus stat = 
+          GridmixTestUtils.dfs.getFileStatus(
+            new Path(GridmixTestUtils.DEST, 
+            "" + Integer.valueOf(specname.substring(specname.length() - 5))));
+        assertEquals("Wrong owner for " + job.getJobName(), spec.getUser(),
+                     stat.getOwner());
 
         final int nMaps = spec.getNumberMaps();
         final int nReds = spec.getNumberReduces();
 
+        // TODO Blocked by MAPREDUCE-118
+        if (true) return;
+        // TODO
         System.out.println(jobname + ": " + nMaps + "/" + nReds);
-        final TaskReport[] mReports = job.getTaskReports(TaskType.MAP);
+        final TaskReport[] mReports =
+          client.getMapTaskReports(JobID.downgrade(job.getJobID()));
         assertEquals("Mismatched map count", nMaps, mReports.length);
         check(TaskType.MAP, job, spec, mReports,
             0, 0, SLOPBYTES, nReds);
 
-        final TaskReport[] rReports = job.getTaskReports(TaskType.REDUCE);
+        final TaskReport[] rReports =
+          client.getReduceTaskReports(JobID.downgrade(job.getJobID()));
         assertEquals("Mismatched reduce count", nReds, rReports.length);
         check(TaskType.REDUCE, job, spec, rReports,
             nMaps * SLOPBYTES, 2 * nMaps, 0, 0);
@@ -161,12 +188,12 @@ public class TestGridmixSubmission {
 
       for (int i = 0; i < runTasks.length; ++i) {
         final TaskInfo specInfo;
-        final Counters counters = runTasks[i].getTaskCounters();
+        final Counters counters = runTasks[i].getCounters();
         switch (type) {
           case MAP:
              runInputBytes[i] = counters.findCounter("FileSystemCounters",
                  "HDFS_BYTES_READ").getValue() - 
-                 counters.findCounter(TaskCounter.SPLIT_RAW_BYTES).getValue();
+                 counters.findCounter(SPLIT_RAW_BYTES).getValue();
              runInputRecords[i] =
                (int)counters.findCounter(MAP_INPUT_RECORDS).getValue();
              runOutputBytes[i] =
@@ -287,8 +314,6 @@ public class TestGridmixSubmission {
 
     @Override
     protected JobMonitor createJobMonitor(Statistics stats) {
-      Configuration conf = new Configuration();
-      conf.set(GridmixJobSubmissionPolicy.JOB_SUBMISSION_POLICY, policy.name());
       monitor = new TestMonitor(NJOBS + 1, stats);
       return monitor;
     }
@@ -296,9 +321,10 @@ public class TestGridmixSubmission {
     @Override
     protected JobFactory createJobFactory(JobSubmitter submitter,
         String traceIn, Path scratchDir, Configuration conf,
-        CountDownLatch startFlag) throws IOException {
+        CountDownLatch startFlag, UserResolver userResolver)
+        throws IOException {
       factory = DebugJobFactory.getFactory(
-        submitter, scratchDir, NJOBS, conf, startFlag);
+        submitter, scratchDir, NJOBS, conf, startFlag, userResolver);
       return factory;
     }
   }
@@ -307,7 +333,7 @@ public class TestGridmixSubmission {
   public void testReplaySubmit() throws Exception {
     policy = GridmixJobSubmissionPolicy.REPLAY;
     System.out.println(" Replay started at " + System.currentTimeMillis());
-    doSubmission();
+    doSubmission(false);
     System.out.println(" Replay ended at " + System.currentTimeMillis());
   }
 
@@ -315,35 +341,55 @@ public class TestGridmixSubmission {
   public void testStressSubmit() throws Exception {
     policy = GridmixJobSubmissionPolicy.STRESS;
     System.out.println(" Stress started at " + System.currentTimeMillis());
-    doSubmission();
+    doSubmission(false);
     System.out.println(" Stress ended at " + System.currentTimeMillis());
+  }
+
+  @Test
+  public void testStressSubmitWithDefaultQueue() throws Exception {
+    policy = GridmixJobSubmissionPolicy.STRESS;
+    System.out.println(" Stress with default q started at " 
+                       + System.currentTimeMillis());
+    doSubmission(true);
+    System.out.println(" Stress with default q ended at " 
+                       + System.currentTimeMillis());
   }
 
   @Test
   public void testSerialSubmit() throws Exception {
     policy = GridmixJobSubmissionPolicy.SERIAL;
     System.out.println("Serial started at " + System.currentTimeMillis());
-    doSubmission();
+    doSubmission(false);
     System.out.println("Serial ended at " + System.currentTimeMillis());
   }
 
-  public void doSubmission() throws Exception {
-    final Path in = new Path("foo").makeQualified(dfs);
-    final Path out = new Path("/gridmix").makeQualified(dfs);
+  private void doSubmission(boolean useDefaultQueue) throws Exception {
+    final Path in = new Path("foo").makeQualified(GridmixTestUtils.dfs);
+    final Path out = GridmixTestUtils.DEST.makeQualified(GridmixTestUtils.dfs);
     final Path root = new Path("/user");
     Configuration conf = null;
     try{
     final String[] argv = {
       "-D" + FilePool.GRIDMIX_MIN_FILE + "=0",
       "-D" + Gridmix.GRIDMIX_OUT_DIR + "=" + out,
+      "-D" + Gridmix.GRIDMIX_USR_RSV + "=" + EchoUserResolver.class.getName(),
       "-generate", String.valueOf(GENDATA) + "m",
       in.toString(),
       "-" // ignored by DebugGridmix
     };
     DebugGridmix client = new DebugGridmix();
-    conf = mrCluster.createJobConf();
-    conf.set(GridmixJobSubmissionPolicy.JOB_SUBMISSION_POLICY,policy.name());
-    //conf.setInt(Gridmix.GRIDMIX_KEY_LEN, 2);
+    conf = new Configuration();
+      conf.setEnum(GridmixJobSubmissionPolicy.JOB_SUBMISSION_POLICY,policy);
+      if (useDefaultQueue) {
+        conf.setBoolean(GridmixJob.GRIDMIX_USE_QUEUE_IN_TRACE, false);
+        conf.set(GridmixJob.GRIDMIX_DEFAULT_QUEUE, "q1");
+      } else {
+        conf.setBoolean(GridmixJob.GRIDMIX_USE_QUEUE_IN_TRACE, true);
+      }
+    conf = GridmixTestUtils.mrCluster.createJobConf(new JobConf(conf));
+    // allow synthetic users to create home directories
+    GridmixTestUtils.dfs.mkdirs(root, new FsPermission((short)0777));
+    GridmixTestUtils.dfs.setPermission(root, new FsPermission((short)0777));
     int res = ToolRunner.run(conf, client, argv);
     assertEquals("Client exited with nonzero status", 0, res);
     client.checkMonitor();
@@ -352,7 +398,7 @@ public class TestGridmixSubmission {
     } finally {
       in.getFileSystem(conf).delete(in, true);
       out.getFileSystem(conf).delete(out, true);
-      root.getFileSystem(conf).delete(root, true);
+      root.getFileSystem(conf).delete(root,true);
     }
   }
 

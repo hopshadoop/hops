@@ -23,6 +23,7 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.tools.rumen.JobStory;
 import org.apache.hadoop.tools.rumen.JobStoryProducer;
 import org.apache.hadoop.mapred.gridmix.Statistics.JobStats;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -48,9 +49,9 @@ public class SerialJobFactory extends JobFactory<JobStats> {
    */
   public SerialJobFactory(
     JobSubmitter submitter, JobStoryProducer jobProducer, Path scratch,
-    Configuration conf, CountDownLatch startFlag)
+    Configuration conf, CountDownLatch startFlag, UserResolver resolver)
     throws IOException {
-    super(submitter, jobProducer, scratch, conf, startFlag);
+    super(submitter, jobProducer, scratch, conf, startFlag, resolver);
   }
 
   @Override
@@ -96,8 +97,11 @@ public class SerialJobFactory extends JobFactory<JobStats> {
               LOG.debug(
                 "Serial mode submitting job " + job.getName());
             }
-            prevJob = new GridmixJob(
-              conf, 0L, job, scratch,sequence.getAndIncrement());
+            prevJob = jobCreator.createGridmixJob(
+              conf, 0L, job, scratch, 
+              userResolver.getTargetUgi(
+                UserGroupInformation.createRemoteUser(job.getUser())),
+              sequence.getAndIncrement());
 
             lock.lock();
             try {

@@ -40,7 +40,9 @@ public class TestRecordFactory {
     final RecordFactory f = new AvgRecordFactory(targetBytes, targetRecs, conf);
     targetRecs = targetRecs <= 0 && targetBytes >= 0
       ? Math.max(1,
-          targetBytes / conf.getInt("gridmix.missing.rec.size", 64 * 1024))
+                 targetBytes 
+                 / conf.getInt(AvgRecordFactory.GRIDMIX_MISSING_REC_SIZE, 
+                               64 * 1024))
       : targetRecs;
 
     long records = 0L;

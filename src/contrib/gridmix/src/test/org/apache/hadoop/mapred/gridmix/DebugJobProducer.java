@@ -17,8 +17,11 @@
  */
 package org.apache.hadoop.mapred.gridmix;
 
+import org.apache.hadoop.mapred.TaskStatus.State;
 import org.apache.hadoop.tools.rumen.JobStoryProducer;
 import org.apache.hadoop.tools.rumen.JobStory;
+import org.apache.hadoop.tools.rumen.MapTaskAttemptInfo;
+import org.apache.hadoop.tools.rumen.ReduceTaskAttemptInfo;
 import org.apache.hadoop.tools.rumen.TaskInfo;
 import org.apache.hadoop.tools.rumen.TaskAttemptInfo;
 import org.apache.hadoop.tools.rumen.Pre21JobHistoryConstants.Values;
@@ -100,6 +103,7 @@ public class DebugJobProducer implements JobStoryProducer {
     static final int VAR_BYTES = 4 << 20;
     static final int MAX_MAP = 5;
     static final int MAX_RED = 3;
+    final Configuration conf;
 
     static void initDist(
       Random r, double min, int[] recs, long[] bytes, long tot_recs,
@@ -143,6 +147,7 @@ public class DebugJobProducer implements JobStoryProducer {
       id = seq.getAndIncrement();
       name = String.format("MOCKJOB%05d", id);
 
+      this.conf = conf;
       LOG.info(name + " (" + seed + ")");
       submitTime = timestamp.addAndGet(
         TimeUnit.MILLISECONDS.convert(
@@ -204,7 +209,9 @@ public class DebugJobProducer implements JobStoryProducer {
 
    @Override
    public String getUser() {
-     return "FOOBAR";
+     String s = String.format("foobar%d", id);
+     GridmixTestUtils.createHomeAndStagingDirectory(s, (JobConf)conf);
+     return s;
    }
 
    @Override
@@ -254,6 +261,23 @@ public class DebugJobProducer implements JobStoryProducer {
     @Override
     public TaskAttemptInfo getTaskAttemptInfo(
       TaskType taskType, int taskNumber, int taskAttemptNumber) {
+      switch (taskType) {
+        case MAP:
+          return new MapTaskAttemptInfo(
+            State.SUCCEEDED, 
+            new TaskInfo(
+              m_bytesIn[taskNumber], m_recsIn[taskNumber],
+              m_bytesOut[taskNumber], m_recsOut[taskNumber], -1),
+            100);
+
+        case REDUCE:
+          return new ReduceTaskAttemptInfo(
+            State.SUCCEEDED, 
+            new TaskInfo(
+              r_bytesIn[taskNumber], r_recsIn[taskNumber],
+              r_bytesOut[taskNumber], r_recsOut[taskNumber], -1),
+            100, 100, 100);
+      }
       throw new UnsupportedOperationException();
     }
 
@@ -270,7 +294,8 @@ public class DebugJobProducer implements JobStoryProducer {
 
     @Override
     public String getQueueName() {
-      return JobConf.DEFAULT_QUEUE_NAME;
+      String qName = "q" + ((id % 2) + 1);
+      return qName;
     }
     
     public static void reset() {

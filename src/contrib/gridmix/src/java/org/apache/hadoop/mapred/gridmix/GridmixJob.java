@@ -18,40 +18,33 @@
 package org.apache.hadoop.mapred.gridmix;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Formatter;
 import java.util.List;
-import java.util.Random;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.TimeUnit;
+import java.security.PrivilegedExceptionAction;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.DataInputBuffer;
-import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.RawComparator;
-import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableComparator;
 import org.apache.hadoop.io.WritableUtils;
-import org.apache.hadoop.mapreduce.InputFormat;
+import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
-import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Partitioner;
-import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.RecordWriter;
-import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
-import org.apache.hadoop.mapreduce.TaskType;
-import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.MRJobConfig;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.tools.rumen.JobStory;
-import org.apache.hadoop.tools.rumen.TaskInfo;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -59,7 +52,7 @@ import org.apache.commons.logging.LogFactory;
 /**
  * Synthetic job generated from a trace description.
  */
-class GridmixJob implements Callable<Job>, Delayed {
+abstract class GridmixJob implements Callable<Job>, Delayed {
 
   public static final String JOBNAME = "GRIDMIX";
   public static final String ORIGNAME = "gridmix.job.name.original";
@@ -75,31 +68,88 @@ class GridmixJob implements Callable<Job>, Delayed {
       }
     };
 
-  private final int seq;
-  private final Path outdir;
+  protected final int seq;
+  protected final Path outdir;
   protected final Job job;
-  private final JobStory jobdesc;
-  private final long submissionTimeNanos;
+  protected final JobStory jobdesc;
+  protected final UserGroupInformation ugi;
+  protected final long submissionTimeNanos;
+  private static final ConcurrentHashMap<Integer,List<InputSplit>> descCache =
+     new ConcurrentHashMap<Integer,List<InputSplit>>();
+  protected static final String GRIDMIX_JOB_SEQ = "gridmix.job.seq";
+  protected static final String GRIDMIX_USE_QUEUE_IN_TRACE = 
+      "gridmix.job-submission.use-queue-in-trace";
+  protected static final String GRIDMIX_DEFAULT_QUEUE = 
+      "gridmix.job-submission.default-queue";
 
-  public GridmixJob(Configuration conf, long submissionMillis,
-      JobStory jobdesc, Path outRoot, int seq) throws IOException {
-    ((StringBuilder)nameFormat.get().out()).setLength(JOBNAME.length());
-    job = new Job(conf, nameFormat.get().format("%05d", seq).toString());
-    submissionTimeNanos = TimeUnit.NANOSECONDS.convert(
-        submissionMillis, TimeUnit.MILLISECONDS);
+  private static void setJobQueue(Job job, String queue) {
+    if (queue != null) {
+      job.getConfiguration().set(MRJobConfig.QUEUE_NAME, queue);
+    }
+  }
+  
+  public GridmixJob(final Configuration conf, long submissionMillis,
+      final JobStory jobdesc, Path outRoot, UserGroupInformation ugi, 
+      final int seq) throws IOException {
+    this.ugi = ugi;
     this.jobdesc = jobdesc;
     this.seq = seq;
+
+    ((StringBuilder)nameFormat.get().out()).setLength(JOBNAME.length());
+    try {
+      job = this.ugi.doAs(new PrivilegedExceptionAction<Job>() {
+        public Job run() throws IOException {
+          Job ret = 
+            new Job(conf, 
+                    nameFormat.get().format("%05d", seq).toString());
+          ret.getConfiguration().setInt(GRIDMIX_JOB_SEQ, seq);
+          String jobId = null == jobdesc.getJobID() 
+                         ? "<unknown>" 
+                         : jobdesc.getJobID().toString();
+          ret.getConfiguration().set(ORIGNAME, jobId);
+          if (conf.getBoolean(GRIDMIX_USE_QUEUE_IN_TRACE, false)) {
+            setJobQueue(ret, jobdesc.getQueueName());
+          } else {
+            setJobQueue(ret, conf.get(GRIDMIX_DEFAULT_QUEUE));
+          }
+
+          return ret;
+        }
+      });
+    } catch (InterruptedException e) {
+      throw new IOException(e);
+    }
+
+    submissionTimeNanos = TimeUnit.NANOSECONDS.convert(
+        submissionMillis, TimeUnit.MILLISECONDS);
     outdir = new Path(outRoot, "" + seq);
   }
 
-  protected GridmixJob(Configuration conf, long submissionMillis, String name)
-      throws IOException {
-    job = new Job(conf, name);
+  protected GridmixJob(final Configuration conf, long submissionMillis, 
+                       final String name) throws IOException {
     submissionTimeNanos = TimeUnit.NANOSECONDS.convert(
         submissionMillis, TimeUnit.MILLISECONDS);
     jobdesc = null;
     outdir = null;
     seq = -1;
+    ugi = UserGroupInformation.getCurrentUser();
+
+    try {
+      job = this.ugi.doAs(new PrivilegedExceptionAction<Job>() {
+        public Job run() throws IOException {
+          Job ret = new Job(conf, name);
+          ret.getConfiguration().setInt(GRIDMIX_JOB_SEQ, seq);
+          setJobQueue(ret, conf.get(GRIDMIX_DEFAULT_QUEUE));
+          return ret;
+        }
+      });
+    } catch (InterruptedException e) {
+      throw new IOException(e);
+    }
+  }
+
+  public UserGroupInformation getUgi() {
+    return ugi;
   }
 
   public String toString() {
@@ -157,27 +207,29 @@ class GridmixJob implements Callable<Job>, Delayed {
     return jobdesc;
   }
 
-  public Job call() throws IOException, InterruptedException,
-                           ClassNotFoundException {
-    job.setMapperClass(GridmixMapper.class);
-    job.setReducerClass(GridmixReducer.class);
-    job.setNumReduceTasks(jobdesc.getNumberReduces());
-    job.setMapOutputKeyClass(GridmixKey.class);
-    job.setMapOutputValueClass(GridmixRecord.class);
-    job.setSortComparatorClass(GridmixKey.Comparator.class);
-    job.setGroupingComparatorClass(SpecGroupingComparator.class);
-    job.setInputFormatClass(GridmixInputFormat.class);
-    job.setOutputFormatClass(RawBytesOutputFormat.class);
-    job.setPartitionerClass(DraftPartitioner.class);
-    job.setJarByClass(GridmixJob.class);
-    job.getConfiguration().setInt("gridmix.job.seq", seq);
-    job.getConfiguration().set(ORIGNAME, null == jobdesc.getJobID()
-        ? "<unknown>" : jobdesc.getJobID().toString());
-    job.getConfiguration().setBoolean(Job.USED_GENERIC_PARSER, true);
-    FileInputFormat.addInputPath(job, new Path("ignored"));
-    FileOutputFormat.setOutputPath(job, outdir);
-    job.submit();
-    return job;
+  static void pushDescription(int seq, List<InputSplit> splits) {
+    if (null != descCache.putIfAbsent(seq, splits)) {
+      throw new IllegalArgumentException("Description exists for id " + seq);
+    }
+  }
+
+  static List<InputSplit> pullDescription(JobContext jobCtxt) {
+    return pullDescription(GridmixJob.getJobSeqId(jobCtxt));
+  }
+  
+  static List<InputSplit> pullDescription(int seq) {
+    return descCache.remove(seq);
+  }
+
+  static void clearAll() {
+    descCache.clear();
+  }
+
+  void buildSplits(FilePool inputDir) throws IOException {
+
+  }
+  static int getJobSeqId(JobContext job) {
+    return job.getConfiguration().getInt(GRIDMIX_JOB_SEQ,-1);
   }
 
   public static class DraftPartitioner<V> extends Partitioner<GridmixKey,V> {
@@ -229,204 +281,6 @@ class GridmixJob implements Callable<Job>, Delayed {
     }
   }
 
-  public static class GridmixMapper
-      extends Mapper<NullWritable,GridmixRecord,GridmixKey,GridmixRecord> {
-
-    private double acc;
-    private double ratio;
-    private final ArrayList<RecordFactory> reduces =
-      new ArrayList<RecordFactory>();
-    private final Random r = new Random();
-
-    private final GridmixKey key = new GridmixKey();
-    private final GridmixRecord val = new GridmixRecord();
-
-    @Override
-    protected void setup(Context ctxt)
-        throws IOException, InterruptedException {
-      final Configuration conf = ctxt.getConfiguration();
-      final GridmixSplit split = (GridmixSplit) ctxt.getInputSplit();
-      final int maps = split.getMapCount();
-      final long[] reduceBytes = split.getOutputBytes();
-      final long[] reduceRecords = split.getOutputRecords();
-
-      long totalRecords = 0L;
-      final int nReduces = ctxt.getNumReduceTasks();
-      if (nReduces > 0) {
-        int idx = 0;
-        int id = split.getId();
-        for (int i = 0; i < nReduces; ++i) {
-          final GridmixKey.Spec spec = new GridmixKey.Spec();
-          if (i == id) {
-            spec.bytes_out = split.getReduceBytes(idx);
-            spec.rec_out = split.getReduceRecords(idx);
-            ++idx;
-            id += maps;
-          }
-          reduces.add(new IntermediateRecordFactory(
-              new AvgRecordFactory(reduceBytes[i], reduceRecords[i], conf),
-              i, reduceRecords[i], spec, conf));
-          totalRecords += reduceRecords[i];
-        }
-      } else {
-        reduces.add(new AvgRecordFactory(reduceBytes[0], reduceRecords[0],
-              conf));
-        totalRecords = reduceRecords[0];
-      }
-      final long splitRecords = split.getInputRecords();
-      final long inputRecords = splitRecords <= 0 && split.getLength() >= 0
-        ? Math.max(1,
-          split.getLength() / conf.getInt("gridmix.missing.rec.size", 64*1024))
-        : splitRecords;
-      ratio = totalRecords / (1.0 * inputRecords);
-      acc = 0.0;
-    }
-
-    @Override
-    public void map(NullWritable ignored, GridmixRecord rec,
-        Context context) throws IOException, InterruptedException {
-      acc += ratio;
-      while (acc >= 1.0 && !reduces.isEmpty()) {
-        key.setSeed(r.nextLong());
-        val.setSeed(r.nextLong());
-        final int idx = r.nextInt(reduces.size());
-        final RecordFactory f = reduces.get(idx);
-        if (!f.next(key, val)) {
-          reduces.remove(idx);
-          continue;
-        }
-        context.write(key, val);
-        acc -= 1.0;
-      }
-    }
-
-    @Override
-    public void cleanup(Context context)
-        throws IOException, InterruptedException {
-      for (RecordFactory factory : reduces) {
-        key.setSeed(r.nextLong());
-        while (factory.next(key, val)) {
-          context.write(key, val);
-          key.setSeed(r.nextLong());
-        }
-      }
-    }
-  }
-
-  public static class GridmixReducer
-      extends Reducer<GridmixKey,GridmixRecord,NullWritable,GridmixRecord> {
-
-    private final Random r = new Random();
-    private final GridmixRecord val = new GridmixRecord();
-
-    private double acc;
-    private double ratio;
-    private RecordFactory factory;
-
-    @Override
-    protected void setup(Context context)
-        throws IOException, InterruptedException {
-      if (!context.nextKey() ||
-           context.getCurrentKey().getType() != GridmixKey.REDUCE_SPEC) {
-        throw new IOException("Missing reduce spec");
-      }
-      long outBytes = 0L;
-      long outRecords = 0L;
-      long inRecords = 0L;
-      for (GridmixRecord ignored : context.getValues()) {
-        final GridmixKey spec = context.getCurrentKey();
-        inRecords += spec.getReduceInputRecords();
-        outBytes += spec.getReduceOutputBytes();
-        outRecords += spec.getReduceOutputRecords();
-      }
-      if (0 == outRecords && inRecords > 0) {
-        LOG.info("Spec output bytes w/o records. Using input record count");
-        outRecords = inRecords;
-      }
-      factory =
-        new AvgRecordFactory(outBytes, outRecords, context.getConfiguration());
-      ratio = outRecords / (1.0 * inRecords);
-      acc = 0.0;
-    }
-    @Override
-    protected void reduce(GridmixKey key, Iterable<GridmixRecord> values,
-        Context context) throws IOException, InterruptedException {
-      for (GridmixRecord ignored : values) {
-        acc += ratio;
-        while (acc >= 1.0 && factory.next(null, val)) {
-          context.write(NullWritable.get(), val);
-          acc -= 1.0;
-        }
-      }
-    }
-    @Override
-    protected void cleanup(Context context)
-        throws IOException, InterruptedException {
-      val.setSeed(r.nextLong());
-      while (factory.next(null, val)) {
-        context.write(NullWritable.get(), val);
-        val.setSeed(r.nextLong());
-      }
-    }
-  }
-
-  static class GridmixRecordReader
-      extends RecordReader<NullWritable,GridmixRecord> {
-
-    private RecordFactory factory;
-    private final Random r = new Random();
-    private final GridmixRecord val = new GridmixRecord();
-
-    public GridmixRecordReader() { }
-
-    @Override
-    public void initialize(InputSplit genericSplit, TaskAttemptContext ctxt)
-            throws IOException, InterruptedException {
-      final GridmixSplit split = (GridmixSplit)genericSplit;
-      final Configuration conf = ctxt.getConfiguration();
-      factory = new ReadRecordFactory(split.getLength(),
-          split.getInputRecords(), new FileQueue(split, conf), conf);
-    }
-
-    @Override
-    public boolean nextKeyValue() throws IOException {
-      val.setSeed(r.nextLong());
-      return factory.next(null, val);
-    }
-    @Override
-    public float getProgress() throws IOException {
-      return factory.getProgress();
-    }
-    @Override
-    public NullWritable getCurrentKey() {
-      return NullWritable.get();
-    }
-    @Override
-    public GridmixRecord getCurrentValue() {
-      return val;
-    }
-    @Override
-    public void close() throws IOException {
-      factory.close();
-    }
-  }
-
-  static class GridmixInputFormat
-      extends InputFormat<NullWritable,GridmixRecord> {
-
-    @Override
-    public List<InputSplit> getSplits(JobContext jobCtxt) throws IOException {
-      return pullDescription(jobCtxt.getConfiguration().getInt(
-            "gridmix.job.seq", -1));
-    }
-    @Override
-    public RecordReader<NullWritable,GridmixRecord> createRecordReader(
-        InputSplit split, final TaskAttemptContext taskContext)
-        throws IOException {
-      return new GridmixRecordReader();
-    }
-  }
-
   static class RawBytesOutputFormat<K>
       extends FileOutputFormat<K,GridmixRecord> {
 
@@ -450,74 +304,4 @@ class GridmixJob implements Callable<Job>, Delayed {
       };
     }
   }
-
-  // TODO replace with ThreadLocal submitter?
-  private static final ConcurrentHashMap<Integer,List<InputSplit>> descCache =
-    new ConcurrentHashMap<Integer,List<InputSplit>>();
-
-  static void pushDescription(int seq, List<InputSplit> splits) {
-    if (null != descCache.putIfAbsent(seq, splits)) {
-      throw new IllegalArgumentException("Description exists for id " + seq);
-    }
-  }
-
-  static List<InputSplit> pullDescription(int seq) {
-    return descCache.remove(seq);
-  }
-
-  // not nesc when TL
-  static void clearAll() {
-    descCache.clear();
-  }
-
-  void buildSplits(FilePool inputDir) throws IOException {
-    long mapInputBytesTotal = 0L;
-    long mapOutputBytesTotal = 0L;
-    long mapOutputRecordsTotal = 0L;
-    final JobStory jobdesc = getJobDesc();
-    if (null == jobdesc) {
-      return;
-    }
-    final int maps = jobdesc.getNumberMaps();
-    final int reds = jobdesc.getNumberReduces();
-    for (int i = 0; i < maps; ++i) {
-      final TaskInfo info = jobdesc.getTaskInfo(TaskType.MAP, i);
-      mapInputBytesTotal += info.getInputBytes();
-      mapOutputBytesTotal += info.getOutputBytes();
-      mapOutputRecordsTotal += info.getOutputRecords();
-    }
-    final double[] reduceRecordRatio = new double[reds];
-    final double[] reduceByteRatio = new double[reds];
-    for (int i = 0; i < reds; ++i) {
-      final TaskInfo info = jobdesc.getTaskInfo(TaskType.REDUCE, i);
-      reduceByteRatio[i] = info.getInputBytes() / (1.0 * mapOutputBytesTotal);
-      reduceRecordRatio[i] =
-        info.getInputRecords() / (1.0 * mapOutputRecordsTotal);
-    }
-    final InputStriper striper = new InputStriper(inputDir, mapInputBytesTotal);
-    final List<InputSplit> splits = new ArrayList<InputSplit>();
-    for (int i = 0; i < maps; ++i) {
-      final int nSpec = reds / maps + ((reds % maps) > i ? 1 : 0);
-      final long[] specBytes = new long[nSpec];
-      final long[] specRecords = new long[nSpec];
-      for (int j = 0; j < nSpec; ++j) {
-        final TaskInfo info =
-          jobdesc.getTaskInfo(TaskType.REDUCE, i + j * maps);
-        specBytes[j] = info.getOutputBytes();
-        specRecords[j] = info.getOutputRecords();
-        if (LOG.isDebugEnabled()) {
-          LOG.debug(String.format("SPEC(%d) %d -> %d %d %d", id(), i,
-              i + j * maps, info.getOutputRecords(), info.getOutputBytes()));
-        }
-      }
-      final TaskInfo info = jobdesc.getTaskInfo(TaskType.MAP, i);
-      splits.add(new GridmixSplit(striper.splitFor(inputDir,
-              info.getInputBytes(), 3), maps, i,
-            info.getInputBytes(), info.getInputRecords(),
-            info.getOutputBytes(), info.getOutputRecords(),
-            reduceByteRatio, reduceRecordRatio, specBytes, specRecords));
-    }
-    pushDescription(id(), splits);
-  }
-
 }

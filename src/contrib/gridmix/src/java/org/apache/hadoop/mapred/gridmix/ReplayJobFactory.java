@@ -22,6 +22,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.tools.rumen.JobStory;
 import org.apache.hadoop.tools.rumen.JobStoryProducer;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -41,13 +42,14 @@ import java.util.concurrent.TimeUnit;
    * @param scratch     Directory into which to write output from simulated jobs
    * @param conf        Config passed to all jobs to be submitted
    * @param startFlag   Latch released from main to start pipeline
+   * @param resolver
    * @throws java.io.IOException
    */
   public ReplayJobFactory(
     JobSubmitter submitter, JobStoryProducer jobProducer, Path scratch,
-    Configuration conf, CountDownLatch startFlag)
+    Configuration conf, CountDownLatch startFlag, UserResolver resolver)
     throws IOException {
-    super(submitter, jobProducer, scratch, conf, startFlag);
+    super(submitter, jobProducer, scratch, conf, startFlag, resolver);
   }
 
    
@@ -96,9 +98,12 @@ import java.util.concurrent.TimeUnit;
             }
             last = current;
             submitter.add(
-              new GridmixJob(
+              jobCreator.createGridmixJob(
                 conf, initTime + Math.round(rateFactor * (current - first)),
-                job, scratch,sequence.getAndIncrement()));
+                job, scratch,
+                userResolver.getTargetUgi(
+                  UserGroupInformation.createRemoteUser(job.getUser())), 
+                sequence.getAndIncrement()));
           } catch (IOException e) {
             error = e;
             return;

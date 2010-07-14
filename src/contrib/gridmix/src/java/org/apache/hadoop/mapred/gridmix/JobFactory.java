@@ -58,6 +58,8 @@ abstract class JobFactory<T> implements Gridmix.Component<Void>,StatListener<T> 
   protected final AtomicInteger sequence;
   protected final JobSubmitter submitter;
   protected final CountDownLatch startFlag;
+  protected final UserResolver userResolver;
+  protected final JobCreator jobCreator;
   protected volatile IOException error = null;
   protected final JobStoryProducer jobProducer;
   protected final ReentrantLock lock = new ReentrantLock(true);
@@ -73,10 +75,10 @@ abstract class JobFactory<T> implements Gridmix.Component<Void>,StatListener<T> 
    * @throws java.io.IOException
    */
   public JobFactory(JobSubmitter submitter, InputStream jobTrace,
-      Path scratch, Configuration conf, CountDownLatch startFlag)
-      throws IOException {
+      Path scratch, Configuration conf, CountDownLatch startFlag,
+      UserResolver userResolver) throws IOException {
     this(submitter, new ZombieJobProducer(jobTrace, null), scratch, conf,
-        startFlag);
+        startFlag, userResolver);
   }
 
   /**
@@ -88,7 +90,8 @@ abstract class JobFactory<T> implements Gridmix.Component<Void>,StatListener<T> 
    * @param startFlag Latch released from main to start pipeline
    */
   protected JobFactory(JobSubmitter submitter, JobStoryProducer jobProducer,
-      Path scratch, Configuration conf, CountDownLatch startFlag) {
+      Path scratch, Configuration conf, CountDownLatch startFlag,
+      UserResolver userResolver) {
     sequence = new AtomicInteger(0);
     this.scratch = scratch;
     this.rateFactor = conf.getFloat(Gridmix.GRIDMIX_SUB_MUL, 1.0f);
@@ -97,6 +100,11 @@ abstract class JobFactory<T> implements Gridmix.Component<Void>,StatListener<T> 
     this.submitter = submitter;
     this.startFlag = startFlag;
     this.rThread = createReaderThread();
+    if(LOG.isDebugEnabled()) {
+      LOG.debug(" The submission thread name is " + rThread.getName());
+    }
+    this.userResolver = userResolver;
+    this.jobCreator = JobCreator.getPolicy(conf, JobCreator.LOADJOB);
   }
 
   static class MinTaskInfo extends TaskInfo {

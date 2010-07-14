@@ -32,9 +32,10 @@ enum GridmixJobSubmissionPolicy {
     @Override
     public JobFactory<ClusterStats> createJobFactory(
       JobSubmitter submitter, JobStoryProducer producer, Path scratchDir,
-      Configuration conf, CountDownLatch startFlag) throws IOException {
+      Configuration conf, CountDownLatch startFlag, UserResolver userResolver)
+      throws IOException {
       return new ReplayJobFactory(
-        submitter, producer, scratchDir, conf, startFlag);
+        submitter, producer, scratchDir, conf, startFlag, userResolver);
     }
   },
 
@@ -42,9 +43,10 @@ enum GridmixJobSubmissionPolicy {
     @Override
     public JobFactory<ClusterStats> createJobFactory(
       JobSubmitter submitter, JobStoryProducer producer, Path scratchDir,
-      Configuration conf, CountDownLatch startFlag) throws IOException {
+      Configuration conf, CountDownLatch startFlag, UserResolver userResolver)
+      throws IOException {
       return new StressJobFactory(
-        submitter, producer, scratchDir, conf, startFlag);
+        submitter, producer, scratchDir, conf, startFlag, userResolver);
     }
   },
 
@@ -52,14 +54,10 @@ enum GridmixJobSubmissionPolicy {
     @Override
     public JobFactory<JobStats> createJobFactory(
       JobSubmitter submitter, JobStoryProducer producer, Path scratchDir,
-      Configuration conf, CountDownLatch startFlag) throws IOException {
+      Configuration conf, CountDownLatch startFlag, UserResolver userResolver)
+      throws IOException {
       return new SerialJobFactory(
-        submitter, producer, scratchDir, conf, startFlag);
-    }
-
-    @Override
-    public int getPollingInterval() {
-      return 0;
+        submitter, producer, scratchDir, conf, startFlag, userResolver);
     }
   };
 
@@ -76,7 +74,8 @@ enum GridmixJobSubmissionPolicy {
 
   public abstract JobFactory createJobFactory(
     JobSubmitter submitter, JobStoryProducer producer, Path scratchDir,
-    Configuration conf, CountDownLatch startFlag) throws IOException;
+    Configuration conf, CountDownLatch startFlag, UserResolver userResolver)
+    throws IOException;
 
   public int getPollingInterval() {
     return pollingInterval;

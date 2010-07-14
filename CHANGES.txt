@@ -75,6 +75,11 @@ Trunk (unreleased changes)
     MAPREDUCE-1248. Fixes redudant memory copying in StreamKeyValUtil.
     (Ruibang He via amareshwari)
 
+    MAPREDUCE-1840. Enhancements to Gridmix benchmark simulating user
+    diversity, queue replay, and task duration for JobTracker load testing.
+    Also includes compatibility with security enhancements, and scalability
+    improvements. (Amar Kamat, Rahul Singh, Hong Tang, and cdouglas)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and

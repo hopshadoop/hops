@@ -20,14 +20,21 @@ package org.apache.hadoop.mapred.gridmix;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.mapred.ClusterStatus;
+import org.apache.hadoop.mapred.JobClient;
+import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.gridmix.Gridmix.Component;
-import org.apache.hadoop.mapreduce.Cluster;
-import org.apache.hadoop.mapreduce.ClusterMetrics;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.tools.rumen.JobStory;
 
 import java.io.IOException;
+import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
@@ -45,7 +52,7 @@ public class Statistics implements Component<Job> {
   public static final Log LOG = LogFactory.getLog(Statistics.class);
 
   private final StatCollector statistics = new StatCollector();
-  private final Cluster cluster;
+  private JobClient cluster;
 
   //List of cluster status listeners.
   private final List<StatListener<ClusterStats>> clusterStatlisteners =
@@ -54,6 +61,10 @@ public class Statistics implements Component<Job> {
   //List of job status listeners.
   private final List<StatListener<JobStats>> jobStatListeners =
     new ArrayList<StatListener<JobStats>>();
+
+  //List of jobids and noofMaps for each job
+  private static final Map<Integer, JobStats> jobMaps =
+    new ConcurrentHashMap<Integer,JobStats>();
 
   private int completedJobsInCurrentInterval = 0;
   private final int jtPollingInterval;
@@ -66,13 +77,38 @@ public class Statistics implements Component<Job> {
   private final CountDownLatch startFlag;
 
   public Statistics(
-    Configuration conf, int pollingInterval, CountDownLatch startFlag)
-    throws IOException {
-    this.cluster = new Cluster(conf);
+    final Configuration conf, int pollingInterval, CountDownLatch startFlag)
+    throws IOException, InterruptedException {
+      UserGroupInformation ugi = UserGroupInformation.getLoginUser();
+      this.cluster = ugi.doAs(new PrivilegedExceptionAction<JobClient>() {
+        public JobClient run() throws IOException {
+          return new JobClient(new JobConf(conf));
+        }
+      });
+
     this.jtPollingInterval = pollingInterval;
     maxJobCompletedInInterval = conf.getInt(
       MAX_JOBS_COMPLETED_IN_POLL_INTERVAL_KEY, 1);
     this.startFlag = startFlag;
+  }
+
+  public void addJobStats(Job job, JobStory jobdesc) {
+    int seq = GridmixJob.getJobSeqId(job);
+    if (seq < 0) {
+      LOG.info("Not tracking job " + job.getJobName()
+               + " as seq id is less than zero: " + seq);
+      return;
+    }
+    
+    int maps = 0;
+    if (jobdesc == null) {
+      throw new IllegalArgumentException(
+        " JobStory not available for job " + job.getJobName());
+    } else {
+      maps = jobdesc.getNumberMaps();
+    }
+    JobStats stats = new JobStats(maps,job);
+    jobMaps.put(seq,stats);
   }
 
   /**
@@ -86,6 +122,10 @@ public class Statistics implements Component<Job> {
     if (!statistics.isAlive()) {
       return;
     }
+    JobStats stat = jobMaps.remove(GridmixJob.getJobSeqId(job));
+
+    if (stat == null) return;
+    
     completedJobsInCurrentInterval++;
     //check if we have reached the maximum level of job completions.
     if (completedJobsInCurrentInterval >= maxJobCompletedInInterval) {
@@ -98,12 +138,8 @@ public class Statistics implements Component<Job> {
       lock.lock();
       try {
         //Job is completed notify all the listeners.
-        if (jobStatListeners.size() > 0) {
-          for (StatListener<JobStats> l : jobStatListeners) {
-            JobStats stats = new JobStats();
-            stats.setCompleteJob(job);
-            l.update(stats);
-          }
+        for (StatListener<JobStats> l : jobStatListeners) {
+          l.update(stat);
         }
         this.jobCompleted.signalAll();
       } finally {
@@ -165,18 +201,11 @@ public class Statistics implements Component<Job> {
         // only if there are clusterStats listener.
         if (clusterStatlisteners.size() > 0) {
           try {
-            ClusterMetrics clusterStatus = cluster.getClusterStatus();
-            Job[] allJobs = cluster.getAllJobs();
-            List<Job> runningWaitingJobs = getRunningWaitingJobs(allJobs);
-            updateAndNotifyClusterStatsListeners(
-              clusterStatus, runningWaitingJobs);
+            ClusterStatus clusterStatus = cluster.getClusterStatus();
+            updateAndNotifyClusterStatsListeners(clusterStatus);
           } catch (IOException e) {
             LOG.error(
               "Statistics io exception while polling JT ", e);
-            return;
-          } catch (InterruptedException e) {
-            LOG.error(
-              "Statistics interrupt exception while polling JT ", e);
             return;
           }
         }
@@ -184,39 +213,14 @@ public class Statistics implements Component<Job> {
     }
 
     private void updateAndNotifyClusterStatsListeners(
-      ClusterMetrics clusterMetrics, List<Job> runningWaitingJobs) {
+      ClusterStatus clusterStatus) {
       ClusterStats stats = ClusterStats.getClusterStats();
-      stats.setClusterMetric(clusterMetrics);
-      stats.setRunningWaitingJobs(runningWaitingJobs);
+      stats.setClusterMetric(clusterStatus);
       for (StatListener<ClusterStats> listener : clusterStatlisteners) {
         listener.update(stats);
       }
     }
 
-
-    /**
-     * From the list of Jobs , give the list of jobs whoes state is eigther
-     * PREP or RUNNING.
-     *
-     * @param allJobs
-     * @return
-     * @throws java.io.IOException
-     * @throws InterruptedException
-     */
-    private List<Job> getRunningWaitingJobs(Job[] allJobs)
-      throws IOException, InterruptedException {
-      List<Job> result = new ArrayList<Job>();
-      for (Job job : allJobs) {
-        //TODO Check if job.getStatus() makes a rpc call
-        org.apache.hadoop.mapreduce.JobStatus.State state =
-          job.getStatus().getState();
-        if (org.apache.hadoop.mapreduce.JobStatus.State.PREP.equals(state) ||
-          org.apache.hadoop.mapreduce.JobStatus.State.RUNNING.equals(state)) {
-          result.add(job);
-        }
-      }
-      return result;
-    }
   }
 
   /**
@@ -231,6 +235,7 @@ public class Statistics implements Component<Job> {
   @Override
   public void shutdown() {
     shutdown = true;
+    jobMaps.clear();
     clusterStatlisteners.clear();
     jobStatListeners.clear();
     statistics.interrupt();
@@ -239,6 +244,7 @@ public class Statistics implements Component<Job> {
   @Override
   public void abort() {
     shutdown = true;
+    jobMaps.clear();
     clusterStatlisteners.clear();
     jobStatListeners.clear();
     statistics.interrupt();
@@ -250,21 +256,31 @@ public class Statistics implements Component<Job> {
    * TODO: In future we need to extend this to send more information.
    */
   static class JobStats {
-    private Job completedJob;
+    private int noOfMaps;
+    private Job job;
 
-    public Job getCompleteJob() {
-      return completedJob;
+    public JobStats(int noOfMaps,Job job){
+      this.job = job;
+      this.noOfMaps = noOfMaps;
+    }
+    public int getNoOfMaps() {
+      return noOfMaps;
     }
 
-    public void setCompleteJob(Job job) {
-      this.completedJob = job;
+    /**
+     * Returns the job ,
+     * We should not use job.getJobID it returns null in 20.1xx.
+     * Use (GridmixJob.getJobSeqId(job)) instead
+     * @return job
+     */
+    public Job getJob() {
+      return job;
     }
   }
 
   static class ClusterStats {
-    private ClusterMetrics status = null;
+    private ClusterStatus status = null;
     private static ClusterStats stats = new ClusterStats();
-    private List<Job> runningWaitingJobs;
 
     private ClusterStats() {
 
@@ -280,26 +296,26 @@ public class Statistics implements Component<Job> {
     /**
      * @param metrics
      */
-    void setClusterMetric(ClusterMetrics metrics) {
+    void setClusterMetric(ClusterStatus metrics) {
       this.status = metrics;
     }
 
     /**
      * @return metrics
      */
-    public ClusterMetrics getStatus() {
+    public ClusterStatus getStatus() {
       return status;
+    }
+
+    int getNumRunningJob() {
+      return jobMaps.size();
     }
 
     /**
      * @return runningWatitingJobs
      */
-    public List<Job> getRunningWaitingJobs() {
-      return runningWaitingJobs;
-    }
-
-    public void setRunningWaitingJobs(List<Job> runningWaitingJobs) {
-      this.runningWaitingJobs = runningWaitingJobs;
+    static Collection<JobStats> getRunningJobStats() {
+      return jobMaps.values();
     }
 
   }

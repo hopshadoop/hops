@@ -40,7 +40,8 @@ class JobSubmitter implements Gridmix.Component<GridmixJob> {
 
   public static final Log LOG = LogFactory.getLog(JobSubmitter.class);
 
-  final Semaphore sem;
+  private final Semaphore sem;
+  private final Statistics statistics;
   private final FilePool inputDir;
   private final JobMonitor monitor;
   private final ExecutorService sched;
@@ -56,14 +57,16 @@ class JobSubmitter implements Gridmix.Component<GridmixJob> {
    *   See {@link Gridmix#GRIDMIX_QUE_DEP}.
    * @param inputDir Set of files from which split data may be mined for
    *   synthetic jobs.
+   * @param statistics
    */
   public JobSubmitter(JobMonitor monitor, int threads, int queueDepth,
-      FilePool inputDir) {
+      FilePool inputDir, Statistics statistics) {
     sem = new Semaphore(queueDepth);
     sched = new ThreadPoolExecutor(threads, threads, 0L,
         TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>());
     this.inputDir = inputDir;
     this.monitor = monitor;
+    this.statistics = statistics;
   }
 
   /**
@@ -81,11 +84,13 @@ class JobSubmitter implements Gridmix.Component<GridmixJob> {
         try {
           job.buildSplits(inputDir);
         } catch (IOException e) {
-          LOG.warn("Failed to submit " + job.getJob().getJobName(), e);
+          LOG.warn("Failed to submit " + job.getJob().getJobName() + " as " 
+                   + job.getUgi(), e);
           monitor.submissionFailed(job.getJob());
           return;
         } catch (Exception e) {
-          LOG.warn("Failed to submit " + job.getJob().getJobName(), e);
+          LOG.warn("Failed to submit " + job.getJob().getJobName() + " as " 
+                   + job.getUgi(), e);
           monitor.submissionFailed(job.getJob());
           return;
         }
@@ -98,10 +103,12 @@ class JobSubmitter implements Gridmix.Component<GridmixJob> {
         try {
           // submit job
           monitor.add(job.call());
+          statistics.addJobStats(job.getJob(), job.getJobDesc());
           LOG.debug("SUBMIT " + job + "@" + System.currentTimeMillis() +
               " (" + job.getJob().getJobID() + ")");
         } catch (IOException e) {
-          LOG.warn("Failed to submit " + job.getJob().getJobName(), e);
+          LOG.warn("Failed to submit " + job.getJob().getJobName() + " as " 
+                   + job.getUgi(), e);
           if (e.getCause() instanceof ClosedByInterruptException) {
             throw new InterruptedException("Failed to submit " +
                 job.getJob().getJobName());
@@ -117,12 +124,10 @@ class JobSubmitter implements Gridmix.Component<GridmixJob> {
         GridmixJob.pullDescription(job.id());
         Thread.currentThread().interrupt();
         monitor.submissionFailed(job.getJob());
-        return;
       } catch(Exception e) {
         //Due to some exception job wasnt submitted.
         LOG.info(" Job " + job.getJob() + " submission failed " , e);
         monitor.submissionFailed(job.getJob());
-        return;
       } finally {
         sem.release();
       }
@@ -147,6 +152,7 @@ class JobSubmitter implements Gridmix.Component<GridmixJob> {
 
   /**
    * (Re)scan the set of input files from which splits are derived.
+   * @throws java.io.IOException
    */
   public void refreshFilePool() throws IOException {
     inputDir.refresh();

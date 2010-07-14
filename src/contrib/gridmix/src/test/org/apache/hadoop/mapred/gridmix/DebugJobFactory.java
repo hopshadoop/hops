@@ -37,18 +37,18 @@ class DebugJobFactory {
 
   public static JobFactory getFactory(
     JobSubmitter submitter, Path scratch, int numJobs, Configuration conf,
-    CountDownLatch startFlag) throws IOException {
+    CountDownLatch startFlag, UserResolver resolver) throws IOException {
     GridmixJobSubmissionPolicy policy = GridmixJobSubmissionPolicy.getPolicy(
       conf, GridmixJobSubmissionPolicy.STRESS);
-    if (policy.name().equalsIgnoreCase("REPLAY")) {
+    if (policy == GridmixJobSubmissionPolicy.REPLAY) {
       return new DebugReplayJobFactory(
-        submitter, scratch, numJobs, conf, startFlag);
-    } else if (policy.name().equalsIgnoreCase("STRESS")) {
+        submitter, scratch, numJobs, conf, startFlag, resolver);
+    } else if (policy == GridmixJobSubmissionPolicy.STRESS) {
       return new DebugStressJobFactory(
-        submitter, scratch, numJobs, conf, startFlag);
-    } else if (policy.name().equalsIgnoreCase("SERIAL")) {
+        submitter, scratch, numJobs, conf, startFlag, resolver);
+    } else if (policy == GridmixJobSubmissionPolicy.SERIAL) {
       return new DebugSerialJobFactory(
-        submitter, scratch, numJobs, conf, startFlag);
+        submitter, scratch, numJobs, conf, startFlag, resolver);
 
     }
     return null;
@@ -58,10 +58,10 @@ class DebugJobFactory {
     implements Debuggable {
     public DebugReplayJobFactory(
       JobSubmitter submitter, Path scratch, int numJobs, Configuration conf,
-      CountDownLatch startFlag) throws IOException {
+      CountDownLatch startFlag, UserResolver resolver) throws IOException {
       super(
         submitter, new DebugJobProducer(numJobs, conf), scratch, conf,
-        startFlag);
+        startFlag, resolver);
     }
 
     @Override
@@ -75,10 +75,10 @@ class DebugJobFactory {
     implements Debuggable {
     public DebugSerialJobFactory(
       JobSubmitter submitter, Path scratch, int numJobs, Configuration conf,
-      CountDownLatch startFlag) throws IOException {
+      CountDownLatch startFlag, UserResolver resolver) throws IOException {
       super(
         submitter, new DebugJobProducer(numJobs, conf), scratch, conf,
-        startFlag);
+        startFlag, resolver);
     }
 
     @Override
@@ -91,10 +91,10 @@ class DebugJobFactory {
     implements Debuggable {
     public DebugStressJobFactory(
       JobSubmitter submitter, Path scratch, int numJobs, Configuration conf,
-      CountDownLatch startFlag) throws IOException {
+      CountDownLatch startFlag, UserResolver resolver) throws IOException {
       super(
         submitter, new DebugJobProducer(numJobs, conf), scratch, conf,
-        startFlag);
+        startFlag, resolver);
     }
 
     @Override

@@ -22,30 +22,50 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.mapred.JobConf;
-import org.apache.hadoop.mapreduce.ClusterMetrics;
-import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapred.ClusterStatus;
+import org.apache.hadoop.mapred.gridmix.Statistics.ClusterStats;
+import org.apache.hadoop.mapred.gridmix.Statistics.JobStats;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.tools.rumen.JobStory;
 import org.apache.hadoop.tools.rumen.JobStoryProducer;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.locks.Condition;
 
 public class StressJobFactory extends JobFactory<Statistics.ClusterStats> {
   public static final Log LOG = LogFactory.getLog(StressJobFactory.class);
 
-  private LoadStatus loadStatus = new LoadStatus();
-  private List<Job> runningWaitingJobs;
-  private final Condition overloaded = this.lock.newCondition();
+  private final LoadStatus loadStatus = new LoadStatus();
+  private final Condition condUnderloaded = this.lock.newCondition();
   /**
    * The minimum ratio between pending+running map tasks (aka. incomplete map
    * tasks) and cluster map slot capacity for us to consider the cluster is
    * overloaded. For running maps, we only count them partially. Namely, a 40%
    * completed map is counted as 0.6 map tasks in our calculation.
    */
-  static final float OVERLAOD_MAPTASK_MAPSLOT_RATIO = 2.0f;
+  static final float OVERLOAD_MAPTASK_MAPSLOT_RATIO = 2.0f;
+
+  /**
+   * The minimum ratio between pending+running reduce tasks (aka. incomplete
+   * reduce tasks) and cluster reduce slot capacity for us to consider the
+   * cluster is overloaded. For running reduces, we only count them partially.
+   * Namely, a 40% completed reduce is counted as 0.6 reduce tasks in our
+   * calculation.
+   */
+  static final float OVERLOAD_REDUCETASK_REDUCESLOT_RATIO = 2.5f;
+
+  /**
+   * The maximum share of the cluster's mapslot capacity that can be counted
+   * toward a job's incomplete map tasks in overload calculation.
+   */
+  static final float MAX_MAPSLOT_SHARE_PER_JOB=0.1f;
+
+  /**
+   * The maximum share of the cluster's reduceslot capacity that can be counted
+   * toward a job's incomplete reduce tasks in overload calculation.
+   */
+  static final float MAX_REDUCESLOT_SHARE_PER_JOB=0.1f;
 
   /**
    * Creating a new instance does not start the thread.
@@ -60,14 +80,10 @@ public class StressJobFactory extends JobFactory<Statistics.ClusterStats> {
    */
   public StressJobFactory(
     JobSubmitter submitter, JobStoryProducer jobProducer, Path scratch,
-    Configuration conf, CountDownLatch startFlag) throws IOException {
+    Configuration conf, CountDownLatch startFlag, UserResolver resolver)
+    throws IOException {
     super(
-      submitter, jobProducer, scratch, conf, startFlag);
-
-    //Setting isOverloaded as true , now JF would wait for atleast first
-    //set of ClusterStats based on which it can decide how many job it has
-    //to submit.
-    this.loadStatus.isOverloaded = true;
+      submitter, jobProducer, scratch, conf, startFlag, resolver);
   }
 
   public Thread createReaderThread() {
@@ -104,33 +120,39 @@ public class StressJobFactory extends JobFactory<Statistics.ClusterStats> {
         while (!Thread.currentThread().isInterrupted()) {
           lock.lock();
           try {
-            while (loadStatus.isOverloaded) {
+            while (loadStatus.overloaded()) {
               //Wait while JT is overloaded.
               try {
-                overloaded.await();
+                condUnderloaded.await();
               } catch (InterruptedException ie) {
                 return;
               }
             }
 
-            int noOfSlotsAvailable = loadStatus.numSlotsBackfill;
-            LOG.info(" No of slots to be backfilled are " + noOfSlotsAvailable);
-
-            for (int i = 0; i < noOfSlotsAvailable; i++) {
+            while (!loadStatus.overloaded()) {
               try {
                 final JobStory job = getNextJobFiltered();
                 if (null == job) {
                   return;
                 }
-                //TODO: We need to take care of scenario when one map takes more
-                //than 1 slot.
-                i += job.getNumberMaps();
-
                 submitter.add(
-                  new GridmixJob(
-                    conf, 0L, job, scratch, sequence.getAndIncrement()));
+                  jobCreator.createGridmixJob(
+                    conf, 0L, job, scratch, 
+                    userResolver.getTargetUgi(
+                      UserGroupInformation.createRemoteUser(job.getUser())), 
+                    sequence.getAndIncrement()));
+                // TODO: We need to take care of scenario when one map/reduce
+                // takes more than 1 slot.
+                loadStatus.mapSlotsBackfill -= 
+                  calcEffectiveIncompleteMapTasks(
+                    loadStatus.mapSlotCapacity, job.getNumberMaps(), 0.0f);
+                loadStatus.reduceSlotsBackfill -= 
+                  calcEffectiveIncompleteReduceTasks(
+                    loadStatus.reduceSlotCapacity, job.getNumberReduces(), 
+                    0.0f);
+                --loadStatus.numJobsBackfill;
               } catch (IOException e) {
-                LOG.error(" EXCEPTOIN in availableSlots ", e);
+                LOG.error("Error while submitting the job ", e);
                 error = e;
                 return;
               }
@@ -149,7 +171,6 @@ public class StressJobFactory extends JobFactory<Statistics.ClusterStats> {
   }
 
   /**
-   * <p/>
    * STRESS Once you get the notification from StatsCollector.Collect the
    * clustermetrics. Update current loadStatus with new load status of JT.
    *
@@ -159,98 +180,145 @@ public class StressJobFactory extends JobFactory<Statistics.ClusterStats> {
   public void update(Statistics.ClusterStats item) {
     lock.lock();
     try {
-      ClusterMetrics clusterMetrics = item.getStatus();
-      LoadStatus newStatus;
-      runningWaitingJobs = item.getRunningWaitingJobs();
-      newStatus = checkLoadAndGetSlotsToBackfill(clusterMetrics);
-      loadStatus.isOverloaded = newStatus.isOverloaded;
-      loadStatus.numSlotsBackfill = newStatus.numSlotsBackfill;
-      overloaded.signalAll();
+      ClusterStatus clusterMetrics = item.getStatus();
+      try {
+        checkLoadAndGetSlotsToBackfill(item,clusterMetrics);
+      } catch (Exception e) {
+        LOG.error("Couldn't get the new Status",e);
+      }
+      if (!loadStatus.overloaded()) {
+        condUnderloaded.signalAll();
+      }
     } finally {
       lock.unlock();
     }
   }
 
+  static float calcEffectiveIncompleteMapTasks(int mapSlotCapacity,
+      int numMaps, float mapProgress) {
+    float maxEffIncompleteMapTasks = 
+      Math.max(1.0f, mapSlotCapacity * MAX_MAPSLOT_SHARE_PER_JOB);
+    float mapProgressAdjusted = Math.max(Math.min(mapProgress, 1.0f), 0.0f);
+    return Math.min(maxEffIncompleteMapTasks, 
+                    numMaps * (1.0f - mapProgressAdjusted));
+  }
+
+  static float calcEffectiveIncompleteReduceTasks(int reduceSlotCapacity,
+      int numReduces, float reduceProgress) {
+    float maxEffIncompleteReduceTasks = 
+      Math.max(1.0f, reduceSlotCapacity * MAX_REDUCESLOT_SHARE_PER_JOB);
+    float reduceProgressAdjusted = 
+      Math.max(Math.min(reduceProgress, 1.0f), 0.0f);
+    return Math.min(maxEffIncompleteReduceTasks, 
+                    numReduces * (1.0f - reduceProgressAdjusted));
+  }
+
   /**
    * We try to use some light-weight mechanism to determine cluster load.
    *
-   * @param clusterStatus
-   * @return Whether, from job client perspective, the cluster is overloaded.
+   * @param stats
+   * @param clusterStatus Cluster status
+   * @throws java.io.IOException
    */
-  private LoadStatus checkLoadAndGetSlotsToBackfill(
-    ClusterMetrics clusterStatus) {
-    LoadStatus loadStatus = new LoadStatus();
-    // If there are more jobs than number of task trackers, we assume the
-    // cluster is overloaded. This is to bound the memory usage of the
-    // simulator job tracker, in situations where we have jobs with small
-    // number of map tasks and large number of reduce tasks.
-    if (runningWaitingJobs.size() >= clusterStatus.getTaskTrackerCount()) {
+  private void checkLoadAndGetSlotsToBackfill(
+    ClusterStats stats, ClusterStatus clusterStatus) throws IOException, InterruptedException {
+    loadStatus.mapSlotCapacity = clusterStatus.getMaxMapTasks();
+    loadStatus.reduceSlotCapacity = clusterStatus.getMaxReduceTasks();
+    
+    
+    loadStatus.numJobsBackfill = 
+      clusterStatus.getTaskTrackers() - stats.getNumRunningJob();
+    if (loadStatus.numJobsBackfill <= 0) {
       if (LOG.isDebugEnabled()) {
-        LOG.debug(
-          System.currentTimeMillis() + " Overloaded is " +
-            Boolean.TRUE.toString() + " #runningJobs >= taskTrackerCount (" +
-            runningWaitingJobs.size() + " >= " +
-            clusterStatus.getTaskTrackerCount() + " )\n");
+        LOG.debug(System.currentTimeMillis() + " Overloaded is "
+                  + Boolean.TRUE.toString() + " NumJobsBackfill is "
+                  + loadStatus.numJobsBackfill);
       }
-      loadStatus.isOverloaded = true;
-      loadStatus.numSlotsBackfill = 0;
-      return loadStatus;
+      return; // stop calculation because we know it is overloaded.
     }
 
     float incompleteMapTasks = 0; // include pending & running map tasks.
-    for (Job job : runningWaitingJobs) {
-      try{
-      incompleteMapTasks += (1 - Math.min(
-        job.getStatus().getMapProgress(), 1.0)) *
-        ((JobConf) job.getConfiguration()).getNumMapTasks();
-      }catch(IOException io) {
-        //There might be issues with this current job
-        //try others
-        LOG.error(" Error while calculating load " , io);
-        continue;
-      }catch(InterruptedException ie) {
-        //There might be issues with this current job
-        //try others        
-        LOG.error(" Error while calculating load " , ie);
-        continue;
+    for (JobStats job : ClusterStats.getRunningJobStats()) {
+      float mapProgress = job.getJob().mapProgress();
+      int noOfMaps = job.getNoOfMaps();
+      incompleteMapTasks += 
+        calcEffectiveIncompleteMapTasks(
+          clusterStatus.getMaxMapTasks(), noOfMaps, mapProgress);
+    }
+    loadStatus.mapSlotsBackfill = 
+    (int) ((OVERLOAD_MAPTASK_MAPSLOT_RATIO * clusterStatus.getMaxMapTasks()) 
+           - incompleteMapTasks);
+    if (loadStatus.mapSlotsBackfill <= 0) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(System.currentTimeMillis() + " Overloaded is "
+                  + Boolean.TRUE.toString() + " MapSlotsBackfill is "
+                  + loadStatus.mapSlotsBackfill);
+      }
+      return; // stop calculation because we know it is overloaded.
+    }
+
+    float incompleteReduceTasks = 0; // include pending & running reduce tasks.
+    for (JobStats job : ClusterStats.getRunningJobStats()) {
+      int noOfReduces = job.getJob().getNumReduceTasks();
+      if (noOfReduces > 0) {
+        float reduceProgress = job.getJob().reduceProgress();
+        incompleteReduceTasks += 
+          calcEffectiveIncompleteReduceTasks(
+            clusterStatus.getMaxReduceTasks(), noOfReduces, reduceProgress);
       }
     }
-
-    float overloadedThreshold =
-      OVERLAOD_MAPTASK_MAPSLOT_RATIO * clusterStatus.getMapSlotCapacity();
-    boolean overloaded = incompleteMapTasks > overloadedThreshold;
-    String relOp = (overloaded) ? ">" : "<=";
-    if (LOG.isDebugEnabled()) {
-      LOG.info(
-        System.currentTimeMillis() + " Overloaded is " + Boolean.toString(
-          overloaded) + " incompleteMapTasks " + relOp + " " +
-          OVERLAOD_MAPTASK_MAPSLOT_RATIO + "*mapSlotCapacity" + "(" +
-          incompleteMapTasks + " " + relOp + " " +
-          OVERLAOD_MAPTASK_MAPSLOT_RATIO + "*" +
-          clusterStatus.getMapSlotCapacity() + ")");
-    }
-    if (overloaded) {
-      loadStatus.isOverloaded = true;
-      loadStatus.numSlotsBackfill = 0;
-    } else {
-      loadStatus.isOverloaded = false;
-      loadStatus.numSlotsBackfill =
-        (int) (overloadedThreshold - incompleteMapTasks);
+    loadStatus.reduceSlotsBackfill = 
+      (int) ((OVERLOAD_REDUCETASK_REDUCESLOT_RATIO * clusterStatus.getMaxReduceTasks()) 
+             - incompleteReduceTasks);
+    if (loadStatus.reduceSlotsBackfill <= 0) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(System.currentTimeMillis() + " Overloaded is "
+                  + Boolean.TRUE.toString() + " ReduceSlotsBackfill is "
+                  + loadStatus.reduceSlotsBackfill);
+      }
+      return; // stop calculation because we know it is overloaded.
     }
 
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Current load Status is " + loadStatus);
+      LOG.debug(System.currentTimeMillis() + " Overloaded is "
+                + Boolean.FALSE.toString() + "Current load Status is " 
+                + loadStatus);
     }
-    return loadStatus;
   }
 
   static class LoadStatus {
-    volatile boolean isOverloaded = false;
-    volatile int numSlotsBackfill = -1;
+    int mapSlotsBackfill;
+    int mapSlotCapacity;
+    int reduceSlotsBackfill;
+    int reduceSlotCapacity;
+    int numJobsBackfill;
 
+    /**
+     * Construct the LoadStatus in an unknown state - assuming the cluster is
+     * overloaded by setting numSlotsBackfill=0.
+     */
+    LoadStatus() {
+      mapSlotsBackfill = 0;
+      reduceSlotsBackfill = 0;
+      numJobsBackfill = 0;
+      
+      mapSlotCapacity = -1;
+      reduceSlotCapacity = -1;
+    }
+    
+    public boolean overloaded() {
+      return (mapSlotsBackfill <= 0) || (reduceSlotsBackfill <= 0)
+             || (numJobsBackfill <= 0);
+    }
+    
     public String toString() {
-      return " is Overloaded " + isOverloaded + " no of slots available " +
-        numSlotsBackfill;
+    // TODO Use StringBuilder instead
+      return " Overloaded = " + overloaded()
+             + ", MapSlotBackfill = " + mapSlotsBackfill 
+             + ", MapSlotCapacity = " + mapSlotCapacity
+             + ", ReduceSlotBackfill = " + reduceSlotsBackfill 
+             + ", ReduceSlotCapacity = " + reduceSlotCapacity
+             + ", NumJobsBackfill = " + numJobsBackfill;
     }
   }
 

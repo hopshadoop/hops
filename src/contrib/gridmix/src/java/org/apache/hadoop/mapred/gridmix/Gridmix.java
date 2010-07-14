@@ -20,15 +20,22 @@ package org.apache.hadoop.mapred.gridmix;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
+import java.net.URI;
+import java.security.PrivilegedExceptionAction;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FsShell;
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
@@ -78,6 +85,12 @@ public class Gridmix extends Configured implements Tool {
    */
   public static final String GRIDMIX_SUB_MUL = "gridmix.submit.multiplier";
 
+  /**
+   * Class used to resolve users in the trace to the list of target users
+   * on the cluster.
+   */
+  public static final String GRIDMIX_USR_RSV = "gridmix.user.resolve.class";
+
   // Submit data structures
   private JobFactory factory;
   private JobSubmitter submitter;
@@ -108,6 +121,15 @@ public class Gridmix extends Configured implements Tool {
     if (!genData.getJob().isSuccessful()) {
       throw new IOException("Data generation failed!");
     }
+
+    FsShell shell = new FsShell(conf);
+    try {
+      LOG.info("Changing the permissions for inputPath " + ioPath.toString());
+      shell.run(new String[] {"-chmod","-R","777", ioPath.toString()});
+    } catch (Exception e) {
+      LOG.error("Couldnt change the file permissions " , e);
+      throw new IOException(e);
+    }
     LOG.info("Done.");
   }
 
@@ -129,24 +151,28 @@ public class Gridmix extends Configured implements Tool {
    * @param startFlag Semaphore for starting job trace pipeline
    */
   private void startThreads(Configuration conf, String traceIn, Path ioPath,
-      Path scratchDir, CountDownLatch startFlag) throws IOException {
+      Path scratchDir, CountDownLatch startFlag, UserResolver userResolver)
+      throws IOException {
     try {
       GridmixJobSubmissionPolicy policy = GridmixJobSubmissionPolicy.getPolicy(
         conf, GridmixJobSubmissionPolicy.STRESS);
       LOG.info(" Submission policy is " + policy.name());
       statistics = new Statistics(conf, policy.getPollingInterval(), startFlag);
       monitor = createJobMonitor(statistics);
-      int noOfSubmitterThreads = policy.name().equals(
-        GridmixJobSubmissionPolicy.SERIAL.name()) ? 1 :
-        Runtime.getRuntime().availableProcessors() + 1;
+      int noOfSubmitterThreads = 
+        (policy == GridmixJobSubmissionPolicy.SERIAL) 
+        ? 1
+        : Runtime.getRuntime().availableProcessors() + 1;
 
-      submitter = createJobSubmitter(
-        monitor, conf.getInt(
-          GRIDMIX_SUB_THR, noOfSubmitterThreads),
-        conf.getInt(GRIDMIX_QUE_DEP, 5), new FilePool(conf, ioPath));
-      factory = createJobFactory(
-        submitter, traceIn, scratchDir, conf, startFlag);
-      if (policy.name().equals(GridmixJobSubmissionPolicy.SERIAL.name())) {
+      int numThreads = conf.getInt(GRIDMIX_SUB_THR, noOfSubmitterThreads);
+      int queueDep = conf.getInt(GRIDMIX_QUE_DEP, 5);
+      submitter = createJobSubmitter(monitor, numThreads, queueDep,
+                                     new FilePool(conf, ioPath), userResolver, 
+                                     statistics);
+      
+      factory = createJobFactory(submitter, traceIn, scratchDir, conf, 
+                                 startFlag, userResolver);
+      if (policy == GridmixJobSubmissionPolicy.SERIAL) {
         statistics.addJobStatsListeners(factory);
       } else {
         statistics.addClusterStatsObservers(factory);
@@ -165,52 +191,95 @@ public class Gridmix extends Configured implements Tool {
   }
 
   protected JobSubmitter createJobSubmitter(JobMonitor monitor, int threads,
-      int queueDepth, FilePool pool) throws IOException {
-    return new JobSubmitter(monitor, threads, queueDepth, pool);
+      int queueDepth, FilePool pool, UserResolver resolver, 
+      Statistics statistics) throws IOException {
+    return new JobSubmitter(monitor, threads, queueDepth, pool, statistics);
   }
 
   protected JobFactory createJobFactory(JobSubmitter submitter, String traceIn,
-      Path scratchDir, Configuration conf, CountDownLatch startFlag)
+      Path scratchDir, Configuration conf, CountDownLatch startFlag, 
+      UserResolver resolver)
       throws IOException {
      return GridmixJobSubmissionPolicy.getPolicy(
        conf, GridmixJobSubmissionPolicy.STRESS).createJobFactory(
        submitter, new ZombieJobProducer(
          createInputStream(
-           traceIn), null), scratchDir, conf, startFlag);  }
+           traceIn), null), scratchDir, conf, startFlag, resolver);  }
 
-  public int run(String[] argv) throws IOException, InterruptedException {
+  private static UserResolver userResolver;
+
+  public UserResolver getCurrentUserResolver() {
+    return userResolver;
+  }
+  
+  public int run(final String[] argv) throws IOException, InterruptedException {
+    int val = -1;
+    final Configuration conf = getConf();
+    UserGroupInformation.setConfiguration(conf);
+    UserGroupInformation ugi = UserGroupInformation.getLoginUser();
+
+    val = ugi.doAs(new PrivilegedExceptionAction<Integer>() {
+      public Integer run() throws Exception {
+        return runJob(conf, argv);
+      }
+    });
+    return val; 
+  }
+
+  private int runJob(Configuration conf, String[] argv)
+    throws IOException, InterruptedException {
     if (argv.length < 2) {
       printUsage(System.err);
       return 1;
     }
-    long genbytes = 0;
+    long genbytes = -1L;
     String traceIn = null;
     Path ioPath = null;
+    URI userRsrc = null;
+    userResolver = ReflectionUtils.newInstance(
+                     conf.getClass(GRIDMIX_USR_RSV, 
+                       SubmitterUserResolver.class,
+                       UserResolver.class), 
+                     conf);
     try {
-      int i = 0;
-      genbytes = "-generate".equals(argv[i++])
-        ? StringUtils.TraditionalBinaryPrefix.string2long(argv[i++])
-        : --i;
-      ioPath = new Path(argv[i++]);
-      traceIn = argv[i++];
-      if (i != argv.length) {
-        printUsage(System.err);
-        return 1;
+      for (int i = 0; i < argv.length - 2; ++i) {
+        if ("-generate".equals(argv[i])) {
+          genbytes = StringUtils.TraditionalBinaryPrefix.string2long(argv[++i]);
+        } else if ("-users".equals(argv[i])) {
+          userRsrc = new URI(argv[++i]);
+        } else {
+          printUsage(System.err);
+          return 1;
+        }
       }
+      if (!userResolver.setTargetUsers(userRsrc, conf)) {
+        LOG.warn("Resource " + userRsrc + " ignored");
+      }
+      ioPath = new Path(argv[argv.length - 2]);
+      traceIn = argv[argv.length - 1];
     } catch (Exception e) {
+      e.printStackTrace();
       printUsage(System.err);
       return 1;
     }
+    return start(conf, traceIn, ioPath, genbytes, userResolver);
+  }
+
+  int start(Configuration conf, String traceIn, Path ioPath, long genbytes,
+      UserResolver userResolver) throws IOException, InterruptedException {
     InputStream trace = null;
     try {
-      final Configuration conf = getConf();
       Path scratchDir = new Path(ioPath, conf.get(GRIDMIX_OUT_DIR, "gridmix"));
+      final FileSystem scratchFs = scratchDir.getFileSystem(conf);
+      scratchFs.mkdirs(scratchDir, new FsPermission((short) 0777));
+      scratchFs.setPermission(scratchDir, new FsPermission((short) 0777));
       // add shutdown hook for SIGINT, etc.
       Runtime.getRuntime().addShutdownHook(sdh);
       CountDownLatch startFlag = new CountDownLatch(1);
       try {
         // Create, start job submission threads
-        startThreads(conf, traceIn, ioPath, scratchDir, startFlag);
+        startThreads(conf, traceIn, ioPath, scratchDir, startFlag,
+                     userResolver);
         // Write input data if specified
         if (genbytes > 0) {
           writeInputData(genbytes, ioPath);
@@ -327,14 +396,29 @@ public class Gridmix extends Configured implements Tool {
 
   protected void printUsage(PrintStream out) {
     ToolRunner.printGenericCommandUsage(out);
-    out.println("Usage: gridmix [-generate <MiB>] <iopath> <trace>");
+    out.println("Usage: gridmix [-generate <MiB>] [-users URI] <iopath> <trace>");
     out.println("  e.g. gridmix -generate 100m foo -");
     out.println("Configuration parameters:");
-    out.printf("       %-40s : Output directory\n", GRIDMIX_OUT_DIR);
-    out.printf("       %-40s : Submitting threads\n", GRIDMIX_SUB_THR);
-    out.printf("       %-40s : Queued job desc\n", GRIDMIX_QUE_DEP);
-    out.printf("       %-40s : Key fraction of rec\n",
+    out.printf("       %-42s : Output directory\n", GRIDMIX_OUT_DIR);
+    out.printf("       %-42s : Submitting threads\n", GRIDMIX_SUB_THR);
+    out.printf("       %-42s : Queued job desc\n", GRIDMIX_QUE_DEP);
+    out.printf("       %-42s : Key fraction of rec\n",
         AvgRecordFactory.GRIDMIX_KEY_FRC);
+    out.printf("       %-42s : User resolution class\n", GRIDMIX_USR_RSV);
+    out.printf("       %-42s : Enable/disable using queues in trace\n",
+        GridmixJob.GRIDMIX_USE_QUEUE_IN_TRACE);
+    out.printf("       %-42s : Default queue\n",
+        GridmixJob.GRIDMIX_DEFAULT_QUEUE);
+    
+    StringBuilder sb = new StringBuilder();
+    String sep = "";
+    for (GridmixJobSubmissionPolicy p : GridmixJobSubmissionPolicy.values()) {
+      sb.append(sep);
+      sb.append(p.name());
+      sep = "|";
+    }
+    out.printf("       %-42s : Job submission policy (%s)\n",
+        GridmixJobSubmissionPolicy.JOB_SUBMISSION_POLICY, sb.toString());
   }
 
   /**
