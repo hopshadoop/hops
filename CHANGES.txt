@@ -80,6 +80,9 @@ Trunk (unreleased changes)
     Also includes compatibility with security enhancements, and scalability
     improvements. (Amar Kamat, Rahul Singh, Hong Tang, and cdouglas)
 
+    MAPREDUCE-1848. Put number of speculative, data local, rack local 
+    tasks in JobTracker metrics. (Scott Chen via dhruba)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and

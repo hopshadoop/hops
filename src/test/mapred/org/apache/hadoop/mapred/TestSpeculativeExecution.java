@@ -28,6 +28,7 @@ import org.apache.commons.logging.LogFactory;
 
 import org.apache.hadoop.mapred.FakeObjectUtilities.FakeJobInProgress;
 import org.apache.hadoop.mapred.FakeObjectUtilities.FakeJobTracker;
+import org.apache.hadoop.mapred.FakeObjectUtilities.FakeJobTrackerMetricsInst;
 import org.apache.hadoop.mapred.UtilsForTests.FakeClock;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 
@@ -43,6 +44,7 @@ public class TestSpeculativeExecution extends TestCase {
   };
   static SpecFakeClock clock;
   static final Log LOG = LogFactory.getLog(TestSpeculativeExecution.class);
+  private static FakeJobTrackerMetricsInst fakeInst;
 
   
   static String trackers[] = new String[] {"tracker_tracker1:1000", 
@@ -56,8 +58,11 @@ public class TestSpeculativeExecution extends TestCase {
         JobConf conf = new JobConf();
         conf.set(JTConfig.JT_IPC_ADDRESS, "localhost:0");
         conf.set(JTConfig.JT_HTTP_ADDRESS, "0.0.0.0:0");
+        conf.set(JTConfig.JT_INSTRUMENTATION,
+            FakeJobTrackerMetricsInst.class.getName());
         jobTracker = new FakeJobTracker(conf, (clock = new SpecFakeClock()),
             trackers);
+        fakeInst = (FakeJobTrackerMetricsInst) jobTracker.getInstrumentation();
         for (String tracker : trackers) {
           FakeObjectUtilities.establishFirstContact(jobTracker, tracker);
         }
@@ -127,6 +132,12 @@ public class TestSpeculativeExecution extends TestCase {
       "Running reduces count should be updated from " + oldRunningReduces +
         " to " + (oldRunningReduces - 1), job.runningReduces(),
       oldRunningReduces - 1);
+    // Verify total speculative tasks by jobtracker instrumentation
+    assertEquals("Total speculative maps", 1, fakeInst.numSpeculativeMaps);
+    assertEquals("Total speculative reduces", 1,
+                 fakeInst.numSpeculativeReduces);
+    LOG.info("Total speculative maps = " + fakeInst.numSpeculativeMaps);
+    LOG.info("Total speculative reduces = " + fakeInst.numSpeculativeReduces);
     
     job.finishTask(taskAttemptID[7]);
   }
@@ -168,6 +179,12 @@ public class TestSpeculativeExecution extends TestCase {
     job.finishTask(taskAttemptID[8]);
     assertEquals("Tracker "+ trackers[2] + " expected to be slow ",
         job.isSlowTracker(trackers[2]), true);
+    // Verify total speculative tasks by jobtracker instrumentation
+    assertEquals("Total speculative maps", 1, fakeInst.numSpeculativeMaps);
+    assertEquals("Total speculative reduces", 1,
+                 fakeInst.numSpeculativeReduces);
+    LOG.info("Total speculative maps = " + fakeInst.numSpeculativeMaps);
+    LOG.info("Total speculative reduces = " + fakeInst.numSpeculativeReduces);
   }
   
   public void testTaskToSpeculate() throws IOException {
@@ -200,6 +217,12 @@ public class TestSpeculativeExecution extends TestCase {
     taskAttemptID[5] = job.findReduceTask(trackers[4]);
     assertEquals(taskAttemptID[5].getTaskID().getId(),3);
     
+    // Verify total speculative tasks by jobtracker instrumentation
+    assertEquals("Total speculative maps", 1, fakeInst.numSpeculativeMaps);
+    assertEquals("Total speculative reduces", 3,
+                 fakeInst.numSpeculativeReduces);
+    LOG.info("Total speculative maps = " + fakeInst.numSpeculativeMaps);
+    LOG.info("Total speculative reduces = " + fakeInst.numSpeculativeReduces);
   }
   
   /*
@@ -236,6 +259,12 @@ public class TestSpeculativeExecution extends TestCase {
     job.progressMade(taskAttemptID[4], 0.20f);
     taskAttemptID[5] = job.findMapTask(trackers[4]);
     assertEquals(taskAttemptID[5].getTaskID().getId(),4);
+    // Verify total speculative tasks by jobtracker instrumentation
+    assertEquals("Total speculative maps", 2, fakeInst.numSpeculativeMaps);
+    assertEquals("Total speculative reduces", 3,
+                 fakeInst.numSpeculativeReduces);
+    LOG.info("Total speculative maps = " + fakeInst.numSpeculativeMaps);
+    LOG.info("Total speculative reduces = " + fakeInst.numSpeculativeReduces);
   }
 
   /*
@@ -254,6 +283,12 @@ public class TestSpeculativeExecution extends TestCase {
     assertEquals(speculativeCap(1200,1150,20), 10);
     //Tests the fact that the max tasks launched is 0.01 * #slots
     assertEquals(speculativeCap(1200,1150,4000), 20);
+    // Verify total speculative tasks by jobtracker instrumentation
+    assertEquals("Total speculative maps", 72, fakeInst.numSpeculativeMaps);
+    assertEquals("Total speculative reduces", 3,
+                 fakeInst.numSpeculativeReduces);
+    LOG.info("Total speculative maps = " + fakeInst.numSpeculativeMaps);
+    LOG.info("Total speculative reduces = " + fakeInst.numSpeculativeReduces);
   }
   
   private int speculativeCap(int totalTasks, int numEarlyComplete, int slots)

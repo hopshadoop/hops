@@ -298,4 +298,324 @@ public class FakeObjectUtilities {
     @Override
     public void closeWriter(org.apache.hadoop.mapreduce.JobID id) { }
   }
+
+  static class FakeJobTrackerMetricsInst extends JobTrackerInstrumentation  {
+    public FakeJobTrackerMetricsInst(JobTracker tracker, JobConf conf) {
+      super(tracker, conf);
+    }
+
+    int numMapTasksLaunched = 0;
+    int numMapTasksCompleted = 0;
+    int numMapTasksFailed = 0;
+    int numReduceTasksLaunched = 0;
+    int numReduceTasksCompleted = 0;
+    int numReduceTasksFailed = 0;
+    int numJobsSubmitted = 0;
+    int numJobsCompleted = 0;
+    int numWaitingMaps = 0;
+    int numWaitingReduces = 0;
+    int numSpeculativeMaps = 0;
+    int numSpeculativeReduces = 0;
+    int numDataLocalMaps = 0;
+    int numRackLocalMaps = 0;
+
+    //Cluster status fields.
+    volatile int numMapSlots = 0;
+    volatile int numReduceSlots = 0;
+    int numBlackListedMapSlots = 0;
+    int numBlackListedReduceSlots = 0;
+
+    int numReservedMapSlots = 0;
+    int numReservedReduceSlots = 0;
+    int numOccupiedMapSlots = 0;
+    int numOccupiedReduceSlots = 0;
+
+    int numJobsFailed = 0;
+    int numJobsKilled = 0;
+
+    int numJobsPreparing = 0;
+    int numJobsRunning = 0;
+
+    int numRunningMaps = 0;
+    int numRunningReduces = 0;
+
+    int numMapTasksKilled = 0;
+    int numReduceTasksKilled = 0;
+
+    int numTrackers = 0;
+    int numTrackersBlackListed = 0;
+
+    int numTrackersDecommissioned = 0;
+
+    long numHeartbeats = 0;
+
+    @Override
+    public synchronized void launchMap(TaskAttemptID taskAttemptID) {
+      ++numMapTasksLaunched;
+      decWaitingMaps(taskAttemptID.getJobID(), 1);
+    }
+
+    @Override
+    public synchronized void completeMap(TaskAttemptID taskAttemptID) {
+      ++numMapTasksCompleted;
+    }
+
+    @Override
+    public synchronized void failedMap(TaskAttemptID taskAttemptID) {
+      ++numMapTasksFailed;
+      addWaitingMaps(taskAttemptID.getJobID(), 1);
+    }
+
+    @Override
+    public synchronized void launchReduce(TaskAttemptID taskAttemptID) {
+      ++numReduceTasksLaunched;
+      decWaitingReduces(taskAttemptID.getJobID(), 1);
+    }
+
+    @Override
+    public synchronized void completeReduce(TaskAttemptID taskAttemptID) {
+      ++numReduceTasksCompleted;
+    }
+
+    @Override
+    public synchronized void failedReduce(TaskAttemptID taskAttemptID) {
+      ++numReduceTasksFailed;
+      addWaitingReduces(taskAttemptID.getJobID(), 1);
+    }
+
+    @Override
+    public synchronized void submitJob(JobConf conf, JobID id) {
+      ++numJobsSubmitted;
+    }
+
+    @Override
+    public synchronized void completeJob(JobConf conf, JobID id) {
+      ++numJobsCompleted;
+    }
+
+    @Override
+    public synchronized void addWaitingMaps(JobID id, int task) {
+      numWaitingMaps  += task;
+    }
+
+    @Override
+    public synchronized void decWaitingMaps(JobID id, int task) {
+      numWaitingMaps -= task;
+    }
+
+    @Override
+    public synchronized void addWaitingReduces(JobID id, int task) {
+      numWaitingReduces += task;
+    }
+
+    @Override
+    public synchronized void decWaitingReduces(JobID id, int task){
+      numWaitingReduces -= task;
+    }
+
+    @Override
+    public void setMapSlots(int slots) {
+      numMapSlots = slots;
+    }
+
+    @Override
+    public void setReduceSlots(int slots) {
+      numReduceSlots = slots;
+    }
+
+    @Override
+    public synchronized void addBlackListedMapSlots(int slots){
+      numBlackListedMapSlots += slots;
+    }
+
+    @Override
+    public synchronized void decBlackListedMapSlots(int slots){
+      numBlackListedMapSlots -= slots;
+    }
+
+    @Override
+    public synchronized void addBlackListedReduceSlots(int slots){
+      numBlackListedReduceSlots += slots;
+    }
+
+    @Override
+    public synchronized void decBlackListedReduceSlots(int slots){
+      numBlackListedReduceSlots -= slots;
+    }
+
+    @Override
+    public synchronized void addReservedMapSlots(int slots)
+    {
+      numReservedMapSlots += slots;
+    }
+
+    @Override
+    public synchronized void decReservedMapSlots(int slots)
+    {
+      numReservedMapSlots -= slots;
+    }
+
+    @Override
+    public synchronized void addReservedReduceSlots(int slots)
+    {
+      numReservedReduceSlots += slots;
+    }
+
+    @Override
+    public synchronized void decReservedReduceSlots(int slots)
+    {
+      numReservedReduceSlots -= slots;
+    }
+
+    @Override
+    public synchronized void addOccupiedMapSlots(int slots)
+    {
+      numOccupiedMapSlots += slots;
+    }
+
+    @Override
+    public synchronized void decOccupiedMapSlots(int slots)
+    {
+      numOccupiedMapSlots -= slots;
+    }
+
+    @Override
+    public synchronized void addOccupiedReduceSlots(int slots)
+    {
+      numOccupiedReduceSlots += slots;
+    }
+
+    @Override
+    public synchronized void decOccupiedReduceSlots(int slots)
+    {
+      numOccupiedReduceSlots -= slots;
+    }
+
+    @Override
+    public synchronized void failedJob(JobConf conf, JobID id)
+    {
+      numJobsFailed++;
+    }
+
+    @Override
+    public synchronized void killedJob(JobConf conf, JobID id)
+    {
+      numJobsKilled++;
+    }
+
+    @Override
+    public synchronized void addPrepJob(JobConf conf, JobID id)
+    {
+      numJobsPreparing++;
+    }
+
+    @Override
+    public synchronized void decPrepJob(JobConf conf, JobID id)
+    {
+      numJobsPreparing--;
+    }
+
+    @Override
+    public synchronized void addRunningJob(JobConf conf, JobID id)
+    {
+      numJobsRunning++;
+    }
+
+    @Override
+    public synchronized void decRunningJob(JobConf conf, JobID id)
+    {
+      numJobsRunning--;
+    }
+
+    @Override
+    public synchronized void addRunningMaps(int task)
+    {
+      numRunningMaps += task;
+    }
+
+    @Override
+    public synchronized void decRunningMaps(int task)
+    {
+      numRunningMaps -= task;
+    }
+
+    @Override
+    public synchronized void addRunningReduces(int task)
+    {
+      numRunningReduces += task;
+    }
+
+    @Override
+    public synchronized void decRunningReduces(int task)
+    {
+      numRunningReduces -= task;
+    }
+
+    @Override
+    public synchronized void killedMap(TaskAttemptID taskAttemptID)
+    {
+      numMapTasksKilled++;
+    }
+
+    @Override
+    public synchronized void killedReduce(TaskAttemptID taskAttemptID)
+    {
+      numReduceTasksKilled++;
+    }
+
+    @Override
+    public synchronized void addTrackers(int trackers)
+    {
+      numTrackers += trackers;
+    }
+
+    @Override
+    public synchronized void decTrackers(int trackers)
+    {
+      numTrackers -= trackers;
+    }
+
+    @Override
+    public synchronized void addBlackListedTrackers(int trackers)
+    {
+      numTrackersBlackListed += trackers;
+    }
+
+    @Override
+    public synchronized void decBlackListedTrackers(int trackers)
+    {
+      numTrackersBlackListed -= trackers;
+    }
+
+    @Override
+    public synchronized void setDecommissionedTrackers(int trackers)
+    {
+      numTrackersDecommissioned = trackers;
+    }
+
+    @Override
+    public synchronized void heartbeat() {
+      ++numHeartbeats;
+    }
+
+    @Override
+    public synchronized void speculateReduce(TaskAttemptID taskAttemptID) {
+      ++numSpeculativeReduces;
+    }
+
+    @Override
+    public synchronized void speculateMap(TaskAttemptID taskAttemptID) {
+      ++numSpeculativeMaps;
+    }
+
+    @Override
+    public synchronized void launchDataLocalMap(TaskAttemptID taskAttemptID) {
+      ++numDataLocalMaps;
+    }
+
+    @Override
+    public synchronized void launchRackLocalMap(TaskAttemptID taskAttemptID) {
+      ++numRackLocalMaps;
+    }
+  }
 }

@@ -36,6 +36,10 @@ class JobTrackerMetricsInst extends JobTrackerInstrumentation implements Updater
   private int numJobsCompleted = 0;
   private int numWaitingMaps = 0;
   private int numWaitingReduces = 0;
+  private int numSpeculativeMaps = 0;
+  private int numSpeculativeReduces = 0;
+  private int numDataLocalMaps = 0;
+  private int numRackLocalMaps = 0;
 
   //Cluster status fields.
   private volatile int numMapSlots = 0;
@@ -101,6 +105,10 @@ class JobTrackerMetricsInst extends JobTrackerInstrumentation implements Updater
       metricsRecord.incrMetric("jobs_completed", numJobsCompleted);
       metricsRecord.incrMetric("waiting_maps", numWaitingMaps);
       metricsRecord.incrMetric("waiting_reduces", numWaitingReduces);
+      metricsRecord.incrMetric("speculative_maps", numSpeculativeMaps);
+      metricsRecord.incrMetric("speculative_reduces", numSpeculativeReduces);
+      metricsRecord.incrMetric("datalocal_maps", numDataLocalMaps);
+      metricsRecord.incrMetric("racklocal_maps", numRackLocalMaps);
       
       metricsRecord.incrMetric("reserved_map_slots", numReservedMapSlots);
       metricsRecord.incrMetric("reserved_reduce_slots", numReservedReduceSlots);
@@ -138,6 +146,10 @@ class JobTrackerMetricsInst extends JobTrackerInstrumentation implements Updater
       numWaitingReduces = 0;
       numBlackListedMapSlots = 0;
       numBlackListedReduceSlots = 0;
+      numSpeculativeMaps = 0;
+      numSpeculativeReduces = 0;
+      numDataLocalMaps = 0;
+      numRackLocalMaps = 0;
       
       numReservedMapSlots = 0;
       numReservedReduceSlots = 0;
@@ -171,6 +183,16 @@ class JobTrackerMetricsInst extends JobTrackerInstrumentation implements Updater
   }
 
   @Override
+  public synchronized void launchDataLocalMap(TaskAttemptID taskAttemptID) {
+    ++numDataLocalMaps;
+  }
+
+  @Override
+  public synchronized void launchRackLocalMap(TaskAttemptID taskAttemptID) {
+    ++numRackLocalMaps;
+  }
+
+  @Override
   public synchronized void completeMap(TaskAttemptID taskAttemptID) {
     ++numMapTasksCompleted;
   }
@@ -179,6 +201,11 @@ class JobTrackerMetricsInst extends JobTrackerInstrumentation implements Updater
   public synchronized void failedMap(TaskAttemptID taskAttemptID) {
     ++numMapTasksFailed;
     addWaitingMaps(taskAttemptID.getJobID(), 1);
+  }
+
+  @Override
+  public synchronized void speculateMap(TaskAttemptID taskAttemptID) {
+    ++numSpeculativeMaps;
   }
 
   @Override
@@ -196,6 +223,11 @@ class JobTrackerMetricsInst extends JobTrackerInstrumentation implements Updater
   public synchronized void failedReduce(TaskAttemptID taskAttemptID) {
     ++numReduceTasksFailed;
     addWaitingReduces(taskAttemptID.getJobID(), 1);
+  }
+
+  @Override
+  public synchronized void speculateReduce(TaskAttemptID taskAttemptID) {
+    ++numSpeculativeReduces;
   }
 
   @Override

@@ -1640,6 +1640,7 @@ public class JobInProgress {
       splits = tip.getSplitNodes();
       if (tip.isSpeculating()) {
         speculativeMapTasks++;
+        metrics.speculateMap(id);
         if (LOG.isDebugEnabled()) {
           LOG.debug("Chosen speculative task, current speculativeMap task count: "
                     + speculativeMapTasks);
@@ -1652,6 +1653,7 @@ public class JobInProgress {
       counter = JobCounter.TOTAL_LAUNCHED_REDUCES;
       if (tip.isSpeculating()) {
         speculativeReduceTasks++;
+        metrics.speculateReduce(id);
         if (LOG.isDebugEnabled()) {
           LOG.debug("Chosen speculative task, current speculativeReduce task count: "
                     + speculativeReduceTasks);
@@ -1691,10 +1693,12 @@ public class JobInProgress {
       case 0 :
         LOG.info("Choosing data-local task " + tip.getTIPId());
         jobCounters.incrCounter(JobCounter.DATA_LOCAL_MAPS, 1);
+        metrics.launchDataLocalMap(id);
         break;
       case 1:
         LOG.info("Choosing rack-local task " + tip.getTIPId());
         jobCounters.incrCounter(JobCounter.RACK_LOCAL_MAPS, 1);
+        metrics.launchRackLocalMap(id);
         break;
       default :
         // check if there is any locality

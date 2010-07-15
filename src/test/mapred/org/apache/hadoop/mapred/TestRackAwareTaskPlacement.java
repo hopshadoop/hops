@@ -28,6 +28,7 @@ import junit.framework.TestSuite;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.FakeObjectUtilities.FakeJobHistory;
 import org.apache.hadoop.mapred.FakeObjectUtilities.FakeJobTracker;
+import org.apache.hadoop.mapred.FakeObjectUtilities.FakeJobTrackerMetricsInst;
 import org.apache.hadoop.mapred.UtilsForTests.FakeClock;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobCounter;
@@ -37,6 +38,7 @@ import org.apache.hadoop.mapreduce.split.JobSplit;
 import org.apache.hadoop.mapreduce.split.JobSplit.TaskSplitMetaInfo;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.StaticMapping;
+import org.mortbay.log.Log;
 
 /**
  * A JUnit test to test configured task limits.
@@ -57,6 +59,7 @@ public class TestRackAwareTaskPlacement extends TestCase {
   static FakeJobTracker jobTracker;
   static String jtIdentifier = "test";
   private static int jobCounter;
+  private static FakeJobTrackerMetricsInst fakeInst;
   
   public static Test suite() {
     TestSetup setup = 
@@ -67,7 +70,10 @@ public class TestRackAwareTaskPlacement extends TestCase {
         conf.set(JTConfig.JT_HTTP_ADDRESS, "0.0.0.0:0");
         conf.setClass("topology.node.switch.mapping.impl", 
           StaticMapping.class, DNSToSwitchMapping.class);
+        conf.set(JTConfig.JT_INSTRUMENTATION,
+            FakeJobTrackerMetricsInst.class.getName());
         jobTracker = new FakeJobTracker(conf, new FakeClock(), trackers);
+        fakeInst = (FakeJobTrackerMetricsInst) jobTracker.getInstrumentation();
         // Set up the Topology Information
         for (int i = 0; i < allHosts.length; i++) {
           StaticMapping.addNodeToRack(allHosts[i], allRacks[i]);
@@ -169,6 +175,9 @@ public class TestRackAwareTaskPlacement extends TestCase {
     
     assertEquals("Number of Other-local maps", 0, 
         counters.getCounter(JobCounter.OTHER_LOCAL_MAPS));
+    // Also verify jobtracker instrumentation
+    assertEquals("Number of data local maps", 3, fakeInst.numDataLocalMaps);
+    assertEquals("Number of rack local maps", 1, fakeInst.numRackLocalMaps);
 
   }
 }
