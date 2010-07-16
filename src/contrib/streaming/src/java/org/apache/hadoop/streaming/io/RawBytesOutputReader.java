@@ -68,7 +68,11 @@ public class RawBytesOutputReader
 
   @Override
   public String getLastOutput() {
-    return new BytesWritable(bytes).toString();
+    if (bytes != null) {
+      return new BytesWritable(bytes).toString();
+    } else {
+      return null;
+    }
   }
 
   private int readLength() throws IOException {

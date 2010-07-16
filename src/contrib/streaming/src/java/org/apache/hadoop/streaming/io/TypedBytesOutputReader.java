@@ -70,7 +70,11 @@ public class TypedBytesOutputReader extends
 
   @Override
   public String getLastOutput() {
-    return new TypedBytesWritable(bytes).toString();
+    if (bytes != null) {
+      return new TypedBytesWritable(bytes).toString();
+    } else {
+      return null;
+    }
   }
 
 }

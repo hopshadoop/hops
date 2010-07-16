@@ -170,6 +170,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1865. Rumen should also support jobhistory files generated using
     trunk. (Amar Kamat via amareshwari)
 
+    MAPREDUCE-1621. Fixes NPE in TextOutputReader.getLastOutput if it has never
+    read any output. (amareshwari)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

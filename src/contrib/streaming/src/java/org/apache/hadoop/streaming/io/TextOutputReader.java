@@ -83,10 +83,14 @@ public class TextOutputReader extends OutputReader<Text, Text> {
 
   @Override
   public String getLastOutput() {
-    try {
-      return new String(bytes, "UTF-8");
-    } catch (UnsupportedEncodingException e) {
-      return "<undecodable>";
+    if (bytes != null) {
+      try {
+        return new String(bytes, "UTF-8");
+      } catch (UnsupportedEncodingException e) {
+        return "<undecodable>";
+      }
+    } else {
+      return null;
     }
   }
 
