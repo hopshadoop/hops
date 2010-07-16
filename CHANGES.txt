@@ -881,6 +881,9 @@ Release 0.21.0 - Unreleased
 
   BUG FIXES
 
+    MAPREDUCE-1942. 'compile-fault-inject' should never be called directly.
+    (Konstantin Boudnik)
+
     MAPREDUCE-1791. Remote cluster control functionality needs JavaDocs
     improvement (Konstantin Boudnik)
 
