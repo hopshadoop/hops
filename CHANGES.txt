@@ -167,6 +167,9 @@ Trunk (unreleased changes)
     HADOOP-6845. Also, introduces Credentials in JobConf, and in JobContext.
     (Jitendra Pandey and Arun Murthy via ddas)
 
+    MAPREDUCE-1865. Rumen should also support jobhistory files generated using
+    trunk. (Amar Kamat via amareshwari)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

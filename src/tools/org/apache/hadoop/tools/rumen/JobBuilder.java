@@ -26,6 +26,7 @@ import java.util.StringTokenizer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.hadoop.mapred.TaskStatus;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.jobhistory.HistoryEvent;
 import org.apache.hadoop.mapreduce.jobhistory.JobFinishedEvent;
@@ -403,6 +404,12 @@ public class JobBuilder {
       return Values.SETUP;
     }
 
+    // Note that pre-21, the task state of a successful task was logged as 
+    // SUCCESS while from 21 onwards, its logged as SUCCEEDED.
+    if (name.equalsIgnoreCase(TaskStatus.State.SUCCEEDED.toString())) {
+      return Values.SUCCESS;
+    }
+    
     return Values.valueOf(name.toUpperCase());
   }
 

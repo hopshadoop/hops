@@ -26,6 +26,7 @@ import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -36,13 +37,23 @@ import org.apache.hadoop.io.compress.CodecPool;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.io.compress.CompressionCodecFactory;
 import org.apache.hadoop.io.compress.Compressor;
+import org.apache.hadoop.mapred.JobClient;
+import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapred.MiniMRCluster;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.JobID;
+import org.apache.hadoop.mapreduce.MRJobConfig;
+import org.apache.hadoop.mapreduce.MapReduceTestUtil;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskID;
 import org.apache.hadoop.mapreduce.TaskType;
+import org.apache.hadoop.mapreduce.TestNoJobSetupCleanup.MyOutputFormat;
 import org.apache.hadoop.mapreduce.jobhistory.HistoryEvent;
+import org.apache.hadoop.mapreduce.jobhistory.JobHistory;
 import org.apache.hadoop.mapreduce.jobhistory.TaskAttemptFinishedEvent;
 import org.apache.hadoop.mapreduce.jobhistory.TaskAttemptUnsuccessfulCompletionEvent;
 import org.apache.hadoop.mapreduce.jobhistory.TaskStartedEvent;
+import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
 import org.apache.hadoop.util.LineReader;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
@@ -324,6 +335,165 @@ public class TestRumenJobTraces {
     }
   }
 
+  /**
+   * Tests if {@link TraceBuilder} can correctly identify and parse jobhistory
+   * filenames. The testcase checks if {@link TraceBuilder}
+   *   - correctly identifies a jobhistory filename without suffix
+   *   - correctly parses a jobhistory filename without suffix to extract out 
+   *     the jobid
+   *   - correctly identifies a jobhistory filename with suffix
+   *   - correctly parses a jobhistory filename with suffix to extract out the 
+   *     jobid
+   *   - correctly identifies a job-configuration filename stored along with the 
+   *     jobhistory files
+   */
+  @Test
+  public void testJobHistoryFilenameParsing() throws IOException {
+    final Configuration conf = new Configuration();
+    final FileSystem lfs = FileSystem.getLocal(conf);
+    String user = "test";
+    org.apache.hadoop.mapred.JobID jid = 
+      new org.apache.hadoop.mapred.JobID("12345", 1);
+    final Path rootInputDir =
+      new Path(System.getProperty("test.tools.input.dir", ""))
+            .makeQualified(lfs.getUri(), lfs.getWorkingDirectory());
+    
+    // Check if jobhistory filename are detected properly
+    Path jhFilename = JobHistory.getJobHistoryFile(rootInputDir, jid, user);
+    JobID extractedJID = 
+      JobID.forName(TraceBuilder.extractJobID(jhFilename.getName()));
+    assertEquals("TraceBuilder failed to parse the current JH filename", 
+                 jid, extractedJID);
+    // test jobhistory filename with old/stale file suffix
+    jhFilename = jhFilename.suffix(JobHistory.getOldFileSuffix("123"));
+    extractedJID =
+      JobID.forName(TraceBuilder.extractJobID(jhFilename.getName()));
+    assertEquals("TraceBuilder failed to parse the current JH filename"
+                 + "(old-suffix)", 
+                 jid, extractedJID);
+    
+    // Check if the conf filename in jobhistory are detected properly
+    Path jhConfFilename = JobHistory.getConfFile(rootInputDir, jid);
+    assertTrue("TraceBuilder failed to parse the current JH conf filename", 
+               TraceBuilder.isJobConfXml(jhConfFilename.getName(), null));
+    // test jobhistory conf filename with old/stale file suffix
+    jhConfFilename = jhConfFilename.suffix(JobHistory.getOldFileSuffix("123"));
+    assertTrue("TraceBuilder failed to parse the current JH conf filename" 
+               + " (old suffix)", 
+               TraceBuilder.isJobConfXml(jhConfFilename.getName(), null));
+  }
+
+  /**
+   * Test if {@link CurrentJHParser} can read events from current JH files.
+   */
+  @Test
+  public void testCurrentJHParser() throws Exception {
+    final Configuration conf = new Configuration();
+    final FileSystem lfs = FileSystem.getLocal(conf);
+
+    final Path rootTempDir =
+      new Path(System.getProperty("test.build.data", "/tmp")).makeQualified(
+          lfs.getUri(), lfs.getWorkingDirectory());
+
+    final Path tempDir = new Path(rootTempDir, "TestCurrentJHParser");
+    lfs.delete(tempDir, true);
+    
+    // Run a MR job
+    // create a MR cluster
+    conf.setInt(TTConfig.TT_MAP_SLOTS, 1);
+    conf.setInt(TTConfig.TT_REDUCE_SLOTS, 1);
+    MiniMRCluster mrCluster = new MiniMRCluster(1, "file:///", 1, null, null, 
+                                                new JobConf(conf));
+    
+    // run a job
+    Path inDir = new Path(tempDir, "input");
+    Path outDir = new Path(tempDir, "output");
+    JobHistoryParser parser = null;
+    RewindableInputStream ris = null;
+    ArrayList<String> seenEvents = new ArrayList<String>(10);
+    
+    try {
+      JobConf jConf = mrCluster.createJobConf();
+      // construct a job with 1 map and 1 reduce task.
+      Job job = MapReduceTestUtil.createJob(jConf, inDir, outDir, 1, 1);
+      // disable setup/cleanup
+      job.setJobSetupCleanupNeeded(false);
+      // set the output format to take care of the _temporary folder
+      job.setOutputFormatClass(MyOutputFormat.class);
+      // wait for the job to complete
+      job.waitForCompletion(false);
+      
+      assertTrue("Job failed", job.isSuccessful());
+
+      JobID id = job.getJobID();
+      JobClient jc = new JobClient(jConf);
+      String user = jc.getAllJobs()[0].getUsername();
+
+      // get the jobhistory filepath
+      Path jhPath = 
+        new Path(mrCluster.getJobTrackerRunner().getJobTracker()
+                          .getJobHistoryDir());
+      Path inputPath = JobHistory.getJobHistoryFile(jhPath, id, user);
+      // wait for 10 secs for the jobhistory file to move into the done folder
+      for (int i = 0; i < 100; ++i) {
+        if (lfs.exists(inputPath)) {
+          break;
+        }
+        TimeUnit.MILLISECONDS.wait(100);
+      }
+    
+      assertTrue("Missing job history file", lfs.exists(inputPath));
+    
+      InputDemuxer inputDemuxer = new DefaultInputDemuxer();
+      inputDemuxer.bindTo(inputPath, conf);
+    
+      Pair<String, InputStream> filePair = inputDemuxer.getNext();
+    
+      assertNotNull(filePair);
+    
+      ris = new RewindableInputStream(filePair.second());
+
+      // Test if the JobHistoryParserFactory can detect the parser correctly
+      parser = JobHistoryParserFactory.getParser(ris);
+        
+      HistoryEvent e;
+      while ((e = parser.nextEvent()) != null) {
+        String eventString = e.getEventType().toString();
+        System.out.println(eventString);
+        seenEvents.add(eventString);
+      }
+    } finally {
+      // stop the MR cluster
+      mrCluster.shutdown();
+      
+      if (ris != null) {
+          ris.close();
+      }
+      if (parser != null) {
+        parser.close();
+      }
+      
+      // cleanup the filesystem
+      lfs.delete(tempDir, true);
+    }
+
+    // Check against the gold standard
+    System.out.println("testCurrentJHParser validating using gold std ");
+    String[] goldLines = new String[] {"JOB_SUBMITTED", "JOB_PRIORITY_CHANGED",
+        "JOB_INITED", "JOB_STATUS_CHANGED", "TASK_STARTED", 
+        "MAP_ATTEMPT_STARTED", "MAP_ATTEMPT_FINISHED", "TASK_FINISHED", 
+        "TASK_STARTED", "REDUCE_ATTEMPT_STARTED", "REDUCE_ATTEMPT_FINISHED", 
+        "TASK_FINISHED", "JOB_FINISHED"};
+    
+    // Check the output with gold std
+    assertEquals("Size mismatch", goldLines.length, seenEvents.size());
+    
+    int index = 0;
+    for (String goldLine : goldLines) {
+      assertEquals("Content mismatch", goldLine, seenEvents.get(index++));
+    }
+  }
+  
   @Test
   public void testJobConfigurationParser() throws Exception {
     String[] list1 =
