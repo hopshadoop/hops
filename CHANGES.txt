@@ -358,6 +358,9 @@ Release 0.21.0 - Unreleased
 
   IMPROVEMENTS
 
+    MAPREDUCE-1896. [Herriot] New property for multi user list. (Vinay Thota
+    via cos)
+
     MAPREDUCE-1812. New properties for suspend and resume process. (Vinay
     Thota via cos)
 
