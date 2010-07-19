@@ -64,4 +64,11 @@ public class TestStreamJob {
     assertEquals(StreamInputFormat.class, job.getInputFormat().getClass());
   }
   
+  @Test
+  public void testOptions() throws Exception {
+    StreamJob streamJob = new StreamJob();
+    assertEquals(1, streamJob.run(new String[0]));
+    assertEquals(0, streamJob.run(new String[] {"-help"}));
+    assertEquals(0, streamJob.run(new String[] {"-info"}));
+  }
 }

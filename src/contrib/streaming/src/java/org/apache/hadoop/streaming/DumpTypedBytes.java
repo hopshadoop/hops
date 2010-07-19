@@ -68,6 +68,11 @@ public class DumpTypedBytes implements Tool {
    * The main driver for <code>DumpTypedBytes</code>.
    */
   public int run(String[] args) throws Exception {
+    if (args.length == 0) {
+      System.err.println("Too few arguments!");
+      printUsage();
+      return 1;
+    }
     Path pattern = new Path(args[0]);
     FileSystem fs = pattern.getFileSystem(getConf());
     fs.setVerifyChecksum(true);
@@ -83,6 +88,14 @@ public class DumpTypedBytes implements Tool {
       return dumpTypedBytes(inputFiles);
     }
     return -1;
+  }
+
+  private void printUsage() {
+    System.out.println("Usage: $HADOOP_HOME/bin/hadoop jar hadoop-streaming.jar"
+        + " dumptb <glob-pattern>");
+    System.out.println("  Dumps all files that match the given pattern to " +
+        "standard output as typed bytes.");
+    System.out.println("  The files can be text or sequence files");
   }
 
   /**

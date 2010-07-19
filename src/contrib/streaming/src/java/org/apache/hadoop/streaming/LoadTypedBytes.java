@@ -57,6 +57,11 @@ public class LoadTypedBytes implements Tool {
    * The main driver for <code>LoadTypedBytes</code>.
    */
   public int run(String[] args) throws Exception {
+    if (args.length == 0) {
+      System.err.println("Too few arguments!");
+      printUsage();
+      return 1;
+    }
     Path path = new Path(args[0]);
     FileSystem fs = path.getFileSystem(getConf());
     if (fs.exists(path)) {
@@ -81,6 +86,14 @@ public class LoadTypedBytes implements Tool {
       writer.close();
     }
     return 0;
+  }
+
+  private void printUsage() {
+    System.out.println("Usage: $HADOOP_HOME/bin/hadoop jar hadoop-streaming.jar"
+        + " loadtb <path>");
+    System.out.println("  Reads typed bytes from standard input" +
+    " and stores them in a sequence file in");
+    System.out.println("  the specified path");
   }
 
   public static void main(String[] args) throws Exception {

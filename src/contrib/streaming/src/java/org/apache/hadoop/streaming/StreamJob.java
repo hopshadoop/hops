@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -34,13 +33,9 @@ import java.util.TreeSet;
 import org.apache.commons.cli.BasicParser;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
-import org.apache.commons.cli.GnuParser;
-import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.OptionBuilder;
-import org.apache.commons.cli.OptionGroup;
 import org.apache.commons.cli.Options;
-import org.apache.commons.cli.Parser;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -119,10 +114,14 @@ public class StreamJob implements Tool {
   
       preProcessArgs();
       parseArgv();
+      if (printUsage) {
+        printUsage(detailedUsage_);
+        return 0;
+      }
       postProcessArgs();
   
       setJobConf();
-    }catch (IllegalArgumentException ex) {
+    } catch (IllegalArgumentException ex) {
       //ignore, since log will already be printed
       // print the log in debug mode.
       LOG.debug("Error in streaming job", ex);
@@ -240,18 +239,22 @@ public class StreamJob implements Tool {
     return cmd;
   }
 
-  void parseArgv(){
-    CommandLine cmdLine = null; 
-    try{
+  void parseArgv() {
+    CommandLine cmdLine = null;
+    try {
       cmdLine = parser.parse(allOptions, argv_);
-    }catch(Exception oe){
+    } catch(Exception oe) {
       LOG.error(oe.getMessage());
       exitUsage(argv_.length > 0 && "-info".equals(argv_[0]));
     }
     
-    if (cmdLine != null){
-      verbose_ =  cmdLine.hasOption("verbose");
+    if (cmdLine != null) {
       detailedUsage_ = cmdLine.hasOption("info");
+      if (cmdLine.hasOption("help") || detailedUsage_) {
+        printUsage = true;
+        return;
+      }
+      verbose_ =  cmdLine.hasOption("verbose");
       debug_ = cmdLine.hasOption("debug")? debug_ + 1 : debug_;
       
       String[] values = cmdLine.getOptionValues("input");
@@ -335,7 +338,7 @@ public class StreamJob implements Tool {
           addTaskEnvironment_ += s;
         }
       }
-    }else {
+    } else {
       exitUsage(argv_.length > 0 && "-info".equals(argv_[0]));
     }
   }
@@ -373,15 +376,17 @@ public class StreamJob implements Tool {
   
   private void setupOptions(){
 
+    // input and output are not required for -info and -help options,
+    // though they are required for streaming job to be run.
     Option input   = createOption("input", 
                                   "DFS input file(s) for the Map step", 
                                   "path", 
                                   Integer.MAX_VALUE, 
-                                  true);  
+                                  false); 
     
     Option output  = createOption("output", 
                                   "DFS output directory for the Reduce step", 
-                                  "path", 1, true); 
+                                  "path", 1, false); 
     Option mapper  = createOption("mapper", 
                                   "The streaming command to run", "cmd", 1, false);
     Option combiner = createOption("combiner", 
@@ -394,8 +399,6 @@ public class StreamJob implements Tool {
                                "file", Integer.MAX_VALUE, false); 
     Option dfs = createOption("dfs", 
                               "Optional. Override DFS configuration", "<h:p>|local", 1, false); 
-    Option jt = createOption("jt", 
-                             "Optional. Override JobTracker configuration", "<h:p>|local", 1, false);
     Option additionalconfspec = createOption("additionalconfspec", 
                                              "Optional.", "spec", 1, false);
     Option inputformat = createOption("inputformat", 
@@ -443,7 +446,6 @@ public class StreamJob implements Tool {
       addOption(reducer).
       addOption(file).
       addOption(dfs).
-      addOption(jt).
       addOption(additionalconfspec).
       addOption(inputformat).
       addOption(outputformat).
@@ -465,70 +467,101 @@ public class StreamJob implements Tool {
   }
 
   public void exitUsage(boolean detailed) {
-    //         1         2         3         4         5         6         7
-    //1234567890123456789012345678901234567890123456789012345678901234567890123456789
-    
-    System.out.println("Usage: $HADOOP_HOME/bin/hadoop jar \\");
-    System.out.println("          $HADOOP_HOME/hadoop-streaming.jar [options]");
+    printUsage(detailed);
+    fail("");
+  }
+
+  private void printUsage(boolean detailed) {
+    System.out.println("Usage: $HADOOP_HOME/bin/hadoop jar hadoop-streaming.jar"
+        + " [options]");
     System.out.println("Options:");
-    System.out.println("  -input    <path>     DFS input file(s) for the Map step");
-    System.out.println("  -output   <path>     DFS output directory for the Reduce step");
-    System.out.println("  -mapper   <cmd|JavaClassName>      The streaming command to run");
-    System.out.println("  -combiner <cmd|JavaClassName>" + 
-                       " The streaming command to run");
-    System.out.println("  -reducer  <cmd|JavaClassName>      The streaming command to run");
-    System.out.println("  -file     <file>     File/dir to be shipped in the" +
-    		" Job jar file.\n Deprecated. Use generic option \"-files\" instead");
-    System.out.println("  -inputformat TextInputFormat(default)|SequenceFileAsTextInputFormat|JavaClassName Optional.");
-    System.out.println("  -outputformat TextOutputFormat(default)|JavaClassName  Optional.");
-    System.out.println("  -partitioner JavaClassName  Optional.");
-    System.out.println("  -numReduceTasks <num>  Optional.");
-    System.out.println("  -inputreader <spec>  Optional.");
-    System.out.println("  -cmdenv   <n>=<v>    Optional. Pass env.var to streaming commands");
-    System.out.println("  -mapdebug <path>  Optional. " +
-    "To run this script when a map task fails ");
-    System.out.println("  -reducedebug <path>  Optional." +
-    " To run this script when a reduce task fails ");
-    System.out.println("  -io <identifier>  Optional.");
-    System.out.println("  -lazyOutput Optional. Lazily create Output");
-    System.out.println("  -verbose");
+    System.out.println("  -input          <path> DFS input file(s) for the Map" 
+        + " step.");
+    System.out.println("  -output         <path> DFS output directory for the" 
+        + " Reduce step.");
+    System.out.println("  -mapper         <cmd|JavaClassName> Optional. Command"
+        + " to be run as mapper.");
+    System.out.println("  -combiner       <cmd|JavaClassName> Optional. Command"
+        + " to be run as combiner.");
+    System.out.println("  -reducer        <cmd|JavaClassName> Optional. Command"
+        + " to be run as reducer.");
+    System.out.println("  -file           <file> Optional. File/dir to be "
+        + "shipped in the Job jar file.\n" + 
+        "                  Deprecated. Use generic option \"-files\" instead.");
+    System.out.println("  -inputformat    <TextInputFormat(default)"
+        + "|SequenceFileAsTextInputFormat|JavaClassName>\n"
+        + "                  Optional. The input format class.");
+    System.out.println("  -outputformat   <TextOutputFormat(default)"
+        + "|JavaClassName>\n"
+        + "                  Optional. The output format class.");
+    System.out.println("  -partitioner    <JavaClassName>  Optional. The"
+        + " partitioner class.");
+    System.out.println("  -numReduceTasks <num> Optional. Number of reduce "
+        + "tasks.");
+    System.out.println("  -inputreader    <spec> Optional. Input recordreader"
+        + " spec.");
+    System.out.println("  -cmdenv         <n>=<v> Optional. Pass env.var to"
+        + " streaming commands.");
+    System.out.println("  -mapdebug       <cmd> Optional. "
+        + "To run this script when a map task fails.");
+    System.out.println("  -reducedebug    <cmd> Optional."
+        + " To run this script when a reduce task fails.");
+    System.out.println("  -io             <identifier> Optional. Format to use"
+        + " for input to and output");
+    System.out.println("                  from mapper/reducer commands");
+    System.out.println("  -lazyOutput     Optional. Lazily create Output.");
+    System.out.println("  -verbose        Optional. Print verbose output.");
+    System.out.println("  -info           Optional. Print detailed usage.");
+    System.out.println("  -help           Optional. Print help message.");
     System.out.println();
     GenericOptionsParser.printGenericCommandUsage(System.out);
 
     if (!detailed) {
       System.out.println();      
       System.out.println("For more details about these options:");
-      System.out.println("Use $HADOOP_HOME/bin/hadoop jar build/hadoop-streaming.jar -info");
-      fail("");
+      System.out.println("Use " +
+          "$HADOOP_HOME/bin/hadoop jar hadoop-streaming.jar -info");
+      return;
     }
     System.out.println();
-    System.out.println("In -input: globbing on <path> is supported and can have multiple -input");
-    System.out.println("Default Map input format: a line is a record in UTF-8");
-    System.out.println("  the key part ends at first TAB, the rest of the line is the value");
-    System.out.println("Custom input format: -inputformat package.MyInputFormat ");
-    System.out.println("Map output format, reduce input/output format:");
-    System.out.println("  Format defined by what the mapper command outputs. Line-oriented");
+    System.out.println("Usage tips:");
+    System.out.println("In -input: globbing on <path> is supported and can "
+        + "have multiple -input");
     System.out.println();
-    System.out.println("The files with extensions .class and .jar/.zip, ");
-    System.out.println("  specified for the -file argument[s], end up in ");
-    System.out.println("  \"classes\" and \"lib\" directories respectively" +
-    		" inside the");
-    System.out.println("  working directory when the mapper and reducer are run.");
-    System.out.println("  All other files specified for the -file argument[s]" +
-    		" end up in the");
-    System.out.println("  working directory when the mapper and reducer are run.");
-    System.out.println("  The location of this working directory is unspecified.");
+    System.out.println("Default Map input format: a line is a record in UTF-8 "
+        + "the key part ends at first");
+    System.out.println("  TAB, the rest of the line is the value");
     System.out.println();
-    System.out.println("To set the number of reduce tasks (num. of output files):");
-    System.out.println("  -D " + MRJobConfig.NUM_REDUCES + "=10");
+    System.out.println("To pass a Custom input format:");
+    System.out.println("  -inputformat package.MyInputFormat");
+    System.out.println();
+    System.out.println("Similarly, to pass a custom output format:");
+    System.out.println("  -outputformat package.MyOutputFormat");
+    System.out.println();
+    System.out.println("The files with extensions .class and .jar/.zip," +
+        " specified for the -file");
+    System.out.println("  argument[s], end up in \"classes\" and \"lib\" " +
+        "directories respectively inside");
+    System.out.println("  the working directory when the mapper and reducer are"
+        + " run. All other files");
+    System.out.println("  specified for the -file argument[s]" +
+        " end up in the working directory when the");
+    System.out.println("  mapper and reducer are run. The location of this " +
+        "working directory is");
+    System.out.println("  unspecified.");
+    System.out.println();
+    System.out.println("To set the number of reduce tasks (num. of output " +
+        "files) as, say 10:");
+    System.out.println("  Use -numReduceTasks 10");
     System.out.println("To skip the sort/combine/shuffle/sort/reduce step:");
     System.out.println("  Use -numReduceTasks 0");
-    System.out
-      .println("  A Task's Map output then becomes a 'side-effect output' rather than a reduce input");
-    System.out
-      .println("  This speeds up processing, This also feels more like \"in-place\" processing");
-    System.out.println("  because the input filename and the map input order are preserved");
-    System.out.println("  This equivalent -reducer NONE");
+    System.out.println("  Map output then becomes a 'side-effect " +
+        "output' rather than a reduce input.");
+    System.out.println("  This speeds up processing. This also feels " +
+        "more like \"in-place\" processing");
+    System.out.println("  because the input filename and the map " +
+        "input order are preserved.");
+    System.out.println("  This is equivalent to -reducer NONE");
     System.out.println();
     System.out.println("To speed up the last maps:");
     System.out.println("  -D " + MRJobConfig.MAP_SPECULATIVE + "=true");
@@ -539,35 +572,42 @@ public class StreamJob implements Tool {
     System.out.println("To change the local temp directory:");
     System.out.println("  -D dfs.data.dir=/tmp/dfs");
     System.out.println("  -D stream.tmpdir=/tmp/streaming");
-    System.out.println("Additional local temp directories with -cluster local:");
+    System.out.println("Additional local temp directories with -jt local:");
     System.out.println("  -D " + MRConfig.LOCAL_DIR + "=/tmp/local");
     System.out.println("  -D " + JTConfig.JT_SYSTEM_DIR + "=/tmp/system");
     System.out.println("  -D " + MRConfig.TEMP_DIR + "=/tmp/temp");
     System.out.println("To treat tasks with non-zero exit status as SUCCEDED:");    
     System.out.println("  -D stream.non.zero.exit.is.failure=false");
-    System.out.println("Use a custom hadoopStreaming build along a standard hadoop install:");
-    System.out.println("  $HADOOP_HOME/bin/hadoop jar /path/my-hadoop-streaming.jar [...]\\");
-    System.out
-      .println("    [...] -D stream.shipped.hadoopstreaming=/path/my-hadoop-streaming.jar");
+    System.out.println("Use a custom hadoop streaming build along with standard"
+        + " hadoop install:");
+    System.out.println("  $HADOOP_HOME/bin/hadoop jar " +
+        "/path/my-hadoop-streaming.jar [...]\\");
+    System.out.println("    [...] -D stream.shipped.hadoopstreaming=" +
+        "/path/my-hadoop-streaming.jar");
     System.out.println("For more details about jobconf parameters see:");
     System.out.println("  http://wiki.apache.org/hadoop/JobConfFile");
-    System.out.println("To set an environement variable in a streaming command:");
+    System.out.println("To set an environement variable in a streaming " +
+        "command:");
     System.out.println("   -cmdenv EXAMPLE_DIR=/home/example/dictionaries/");
     System.out.println();
     System.out.println("Shortcut:");
-    System.out
-      .println("   setenv HSTREAMING \"$HADOOP_HOME/bin/hadoop jar $HADOOP_HOME/hadoop-streaming.jar\"");
+    System.out.println("   setenv HSTREAMING \"$HADOOP_HOME/bin/hadoop jar " +
+        "hadoop-streaming.jar\"");
     System.out.println();
-    System.out.println("Example: $HSTREAMING -mapper \"/usr/local/bin/perl5 filter.pl\"");
-    System.out.println("           -file /local/filter.pl -input \"/logs/0604*/*\" [...]");
-    System.out.println("  Ships a script, invokes the non-shipped perl interpreter");
-    System.out.println("  Shipped files go to the working directory so filter.pl is found by perl");
-    System.out.println("  Input files are all the daily logs for days in month 2006-04");
-    fail("");
+    System.out.println("Example: $HSTREAMING -mapper " +
+        "\"/usr/local/bin/perl5 filter.pl\"");
+    System.out.println("           -file /local/filter.pl -input " +
+        "\"/logs/0604*/*\" [...]");
+    System.out.println("  Ships a script, invokes the non-shipped perl " +
+        "interpreter. Shipped files go to");
+    System.out.println("  the working directory so filter.pl is found by perl. "
+        + "Input files are all the");
+    System.out.println("  daily logs for days in month 2006-04");
   }
 
   public void fail(String message) {    
     System.err.println(message);
+    System.err.println("Try -help for more information");
     throw new IllegalArgumentException(message);
   }
 
@@ -987,6 +1027,7 @@ public class StreamJob implements Tool {
   protected String[] argv_;
   protected boolean verbose_;
   protected boolean detailedUsage_;
+  protected boolean printUsage = false;
   protected int debug_;
 
   protected Environment env_;

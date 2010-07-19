@@ -22,15 +22,15 @@ import java.util.Arrays;
 
 import org.apache.hadoop.util.ToolRunner;
 
-/** The main entrypoint. Usually invoked with the script bin/hadoopStreaming
- * or bin/hadoop har hadoop-streaming.jar args.
- * It passes all the args to StreamJob which handles all the arguments.
+/** The main entry point. Usually invoked with the script 
+ *  bin/hadoop jar hadoop-streaming.jar args.
  */
 public class HadoopStreaming {
 
   public static void main(String[] args) throws Exception {
     if (args.length < 1) {
       System.err.println("No Arguments Given!");
+      printUsage();
       System.exit(1);
     }
     int returnStatus = 0;
@@ -53,5 +53,20 @@ public class HadoopStreaming {
       System.err.println("Streaming Command Failed!");
       System.exit(returnStatus);
     }
+  }
+  
+  private static void printUsage() {
+    System.out.println("Usage: $HADOOP_HOME/bin/hadoop jar hadoop-streaming.jar"
+        + " [options]");
+    System.out.println("Options:");
+    System.out.println("  dumptb <glob-pattern> Dumps all files that match the" 
+        + " given pattern to ");
+    System.out.println("                        standard output as typed " +
+    		"bytes.");
+    System.out.println("  loadtb <path> Reads typed bytes from standard input" +
+        " and stores them in");
+    System.out.println("                a sequence file in the specified path");
+    System.out.println("  [streamjob] <args> Runs streaming job with given" +
+        " arguments");
   }
 }

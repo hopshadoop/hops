@@ -173,6 +173,8 @@ Trunk (unreleased changes)
     MAPREDUCE-1621. Fixes NPE in TextOutputReader.getLastOutput if it has never
     read any output. (amareshwari)
 
+    MAPREDUCE-1911. Fixes errors in -info message in streaming. (amareshwari) 
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
