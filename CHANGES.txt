@@ -175,6 +175,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-1911. Fixes errors in -info message in streaming. (amareshwari) 
 
+    MAPREDUCE-1772. Corrects errors in streaming documentation in forrest.
+    (amareshwari)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

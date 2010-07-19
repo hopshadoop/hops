@@ -34,11 +34,11 @@ Hadoop streaming is a utility that comes with the Hadoop distribution. The utili
 script as the mapper and/or the reducer. For example:
 </p>
 <source>
-$HADOOP_HOME/bin/hadoop  jar $HADOOP_HOME/hadoop-streaming.jar \
+$HADOOP_HOME/bin/hadoop jar hadoop-streaming.jar \
     -input myInputDirs \
     -output myOutputDir \
-    -mapper /bin/cat \
-    -reducer /bin/wc
+    -mapper cat \
+    -reducer wc
 </source>
 </section>
 
@@ -65,16 +65,6 @@ prefix of a line up to the first tab character is the key and the rest of the li
 <p>
 This is the basis for the communication protocol between the MapReduce framework and the streaming mapper/reducer.
 </p>
-<p>
-You can supply a Java class as the mapper and/or the reducer. The above example is equivalent to:
-</p>
-<source>
-$HADOOP_HOME/bin/hadoop  jar $HADOOP_HOME/hadoop-streaming.jar \
-    -input myInputDirs \
-    -output myOutputDir \
-    -mapper org.apache.hadoop.mapred.lib.IdentityMapper \
-    -reducer /bin/wc
-</source>
 <p>User can specify <code>stream.non.zero.exit.is.failure</code> as 
 <code>true</code> or <code>false</code> to make a streaming task that exits 
 with a non-zero status to be <code>Failure</code> 
@@ -91,42 +81,40 @@ with non-zero status are considered to be failed tasks.</p>
 The general command line syntax is shown below. </p>
 <p><strong>Note:</strong> Be sure to place the generic options before the streaming options, otherwise the command will fail. 
 For an example, see <a href="streaming.html#Making+Archives+Available+to+Tasks">Making Archives Available to Tasks</a>.</p>
-<source>bin/hadoop command [genericOptions] [streamingOptions]</source>
+<source>$HADOOP_HOME/bin/hadoop command [genericOptions] [streamingOptions]</source>
 
 <p>The Hadoop streaming command options are listed here:</p>
 <table>
 <tr><th>Parameter</th><th>Optional/Required </th><th>Description </th></tr>
 <tr><td> -input directoryname or filename</td><td> Required </td><td> Input location for mapper</td></tr>
 <tr><td> -output directoryname </td><td> Required </td><td> Output location for reducer</td></tr>
-<tr><td> -mapper executable or JavaClassName </td><td> Required </td><td> Mapper executable</td></tr>
-<tr><td> -reducer executable or JavaClassName</td><td> Required </td><td> Reducer executable</td></tr>
-<tr><td> -file filename</td><td> Optional </td><td> Make the mapper, reducer, or combiner executable available locally on the compute nodes</td></tr>
+<tr><td> -mapper executable or JavaClassName </td><td> Optional </td><td> Mapper executable</td></tr>
+<tr><td> -reducer executable or JavaClassName</td><td> Optional </td><td> Reducer executable</td></tr>
+<tr><td> -file filename</td><td> Optional </td><td> File/dir to be shipped in the Job jar file. Deprecated, use generic option -files instead.</td></tr>
 <tr><td> -inputformat JavaClassName</td><td> Optional </td><td> Class you supply should return key/value pairs of Text class. If not specified, TextInputFormat is used as the default</td></tr>
 <tr><td> -outputformat JavaClassName</td><td> Optional </td><td> Class you supply should take key/value pairs of Text class. If not specified, TextOutputformat is used as the default</td></tr>
 <tr><td> -partitioner JavaClassName</td><td> Optional </td><td> Class that determines which reduce a key is sent to</td></tr>
 <tr><td> -combiner streamingCommand or JavaClassName</td><td> Optional </td><td> Combiner executable for map output</td></tr>
 <tr><td> -cmdenv name=value</td><td> Optional </td><td> Pass environment variable to streaming commands</td></tr>
-<tr><td> -inputreader</td><td> Optional </td><td> For backwards-compatibility: specifies a record reader class (instead of an input format class)</td></tr>
+<tr><td> -inputreader spec</td><td> Optional </td><td> Specifies a record reader class (instead of an input format class)</td></tr>
 <tr><td> -verbose</td><td> Optional </td><td> Verbose output</td></tr>
 <tr><td> -lazyOutput</td><td> Optional </td><td> Create output lazily. For example, if the output format is based on FileOutputFormat, the output file is created only on the first call to output.collect (or Context.write)</td></tr>
-<tr><td> -numReduceTasks</td><td> Optional </td><td> Specify the number of reducers</td></tr>
-<tr><td> -mapdebug </td><td> Optional </td><td> Script to call when map task fails </td></tr>
-<tr><td> -reducedebug </td><td> Optional </td><td> Script to call when reduce task fails </td></tr>
-<tr><td> -io </td><td> Optional </td><td> Format to use for input to and output from client processes. </td></tr>
+<tr><td> -numReduceTasks num</td><td> Optional </td><td> Specify the number of reducers</td></tr>
+<tr><td> -mapdebug cmd</td><td> Optional </td><td> Script to be called when map task fails </td></tr>
+<tr><td> -reducedebug cmd</td><td> Optional </td><td> Script to be called when reduce task fails </td></tr>
+<tr><td> -io identifier</td><td> Optional </td><td> Format to use for input to and output from client processes. </td></tr>
 </table>
 
 <section>
 <title>Specifying a Java Class as the Mapper/Reducer</title>
 <p>You can supply a Java class as the mapper and/or the reducer. </p>
 <source>
-$HADOOP_HOME/bin/hadoop  jar $HADOOP_HOME/hadoop-streaming.jar \
+$HADOOP_HOME/bin/hadoop jar hadoop-streaming.jar \
     -input myInputDirs \
     -output myOutputDir \
     -mapper org.apache.hadoop.mapred.lib.IdentityMapper \
-    -reducer /bin/wc
+    -reducer org.apache.hadoop.mapred.lib.IdentityReducer
 </source>
-<p>You can specify <code>stream.non.zero.exit.is.failure</code> as <code>true</code> or <code>false</code> to make a streaming task that exits with a non-zero 
-status to be <code>Failure</code> or <code>Success</code> respectively. By default, streaming tasks exiting with non-zero status are considered to be failed tasks.</p>
 </section>
 
 <section>
@@ -135,11 +123,11 @@ status to be <code>Failure</code> or <code>Success</code> respectively. By defau
 You can specify any executable as the mapper and/or the reducer. The executables do not need to pre-exist on the machines in the cluster; however, if they don't, you will need to use "-file" option to tell the framework to pack your executable files as a part of job submission. For example:
 </p>
 <source>
-$HADOOP_HOME/bin/hadoop  jar $HADOOP_HOME/hadoop-streaming.jar \
+$HADOOP_HOME/bin/hadoop jar hadoop-streaming.jar \
     -input myInputDirs \
     -output myOutputDir \
     -mapper myPythonScript.py \
-    -reducer /bin/wc \
+    -reducer wc \
     -file myPythonScript.py
 </source>
 <p>
@@ -149,13 +137,13 @@ The above example specifies a user defined Python executable as the mapper. The 
 In addition to executable files, you can also package other auxiliary files (such as dictionaries, configuration files, etc) that may be used by the mapper and/or the reducer. For example:
 </p>
 <source>
-$HADOOP_HOME/bin/hadoop  jar $HADOOP_HOME/hadoop-streaming.jar \
+$HADOOP_HOME/bin/hadoop jar hadoop-streaming.jar \
     -input myInputDirs \
     -output myOutputDir \
     -mapper myPythonScript.py \
-    -reducer /bin/wc \
+    -reducer wc \
     -file myPythonScript.py \
-    -file myDictionary.txt \
+    -file myDictionary.txt
 </source>
 <p>
 If files with extension .class are added using -file option, they are packaged
@@ -226,7 +214,7 @@ where <code>[identifier]</code> can be <code>text</code>, <code>rawbytes</code> 
 The general command line syntax is shown below. </p>
 <p><strong>Note:</strong> Be sure to place the generic options before the streaming options, otherwise the command will fail. 
 For an example, see <a href="streaming.html#Making+Archives+Available+to+Tasks">Making Archives Available to Tasks</a>.</p>
-<source>bin/hadoop command [genericOptions] [streamingOptions]</source>
+<source>$HADOOP_HOME/bin/hadoop command [genericOptions] [streamingOptions]</source>
 
 <p>The Hadoop generic command options you can use with streaming are listed here:</p>
 <table>
@@ -268,9 +256,15 @@ To specify additional local temp directories use:
 <section>
 <title>Specifying Map-Only Jobs </title>
 <p>
-Often, you may want to process input data using a map function only. To do this, simply set mapreduce.job.reduces to zero. 
-The MapReduce framework will not create any reducer tasks. Rather, the outputs of the mapper tasks will be the final output of the job.
+Often, you may want to process input data using a map function only. To do this,
+you can pass the option -numReduceTasks as zero or simply set 
+mapreduce.job.reduces to zero. The MapReduce framework will not create any 
+reduce task. Rather, the outputs of the mapper tasks will be the final output 
+of the job.
 </p>
+<source>
+    -numReduceTasks 0
+</source>
 <source>
     -D mapreduce.job.reduces=0
 </source>
@@ -282,16 +276,20 @@ To be backward compatible, Hadoop Streaming also supports the "-reduce NONE" opt
 <section>
 <title>Specifying the Number of Reducers</title>
 <p>
-To specify the number of reducers, for example two, use:
+To specify the number of reducers, for example two, you can pass the option 
+-numReduceTasks as two or simply set mapreduce.job.reduces to two.
 </p>
 <source>
-$HADOOP_HOME/bin/hadoop  jar $HADOOP_HOME/hadoop-streaming.jar \
-    -D mapreduce.job.reduces=2 \
+$HADOOP_HOME/bin/hadoop jar hadoop-streaming.jar \
+    -numReduceTasks 2 \
     -input myInputDirs \
     -output myOutputDir \
-    -mapper org.apache.hadoop.mapred.lib.IdentityMapper \
-    -reducer /bin/wc 
+    -mapper cat \
+    -reducer wc 
 </source>
+<p>Note : If both -numReduceTasks and generic option -Dmapreduce.job.reduces are
+specified, -numReduceTasks value will override the value specified by 
+-Dmapreduce.job.reduces.</p>
 </section>
 
 <section>
@@ -307,13 +305,13 @@ For example:
 </p>
 
 <source>
-$HADOOP_HOME/bin/hadoop  jar $HADOOP_HOME/hadoop-streaming.jar \
+$HADOOP_HOME/bin/hadoop jar hadoop-streaming.jar \
     -D stream.map.output.field.separator=. \
     -D stream.num.map.output.key.fields=4 \
     -input myInputDirs \
     -output myOutputDir \
-    -mapper org.apache.hadoop.mapred.lib.IdentityMapper \
-    -reducer org.apache.hadoop.mapred.lib.IdentityReducer 
+    -mapper cat \
+    -reducer cat 
 </source>
 <p>
 In the above example, "-D stream.map.output.field.separator=." specifies "." as the field separator for the map outputs, 
@@ -403,11 +401,11 @@ In this example, the input.txt file has two lines specifying the names of the tw
 "cachedir.jar" is a symlink to the archived directory, which has the files "cache.txt" and "cache2.txt". 
 </p>
 <source>
-$HADOOP_HOME/bin/hadoop  jar $HADOOP_HOME/hadoop-streaming.jar \
+$HADOOP_HOME/bin/hadoop jar hadoop-streaming.jar \
                   -archives 'hdfs://hadoop-nn1.example.com/user/me/samples/cachefile/cachedir.jar' \  
                   -D mapreduce.job.maps=1 \
-                  -D mapreduce.job.reduces=1 \ 
                   -D mapreduce.job.name="Experiment" \
+                  -numReduceTasks 1 \ 
                   -input "/user/me/samples/cachefile/input.txt"  \
                   -output "/user/me/samples/cachefile/out" \  
                   -mapper "xargs cat"  \
@@ -460,16 +458,16 @@ framework to partition the map outputs based on certain key fields, not
 the whole keys. For example:
 </p>
 <source>
-$HADOOP_HOME/bin/hadoop  jar $HADOOP_HOME/hadoop-streaming.jar \
+$HADOOP_HOME/bin/hadoop jar hadoop-streaming.jar \
     -D stream.map.output.field.separator=. \
     -D stream.num.map.output.key.fields=4 \
     -D mapreduce.map.output.key.field.separator=. \
     -D mapreduce.partition.keypartitioner.options=-k1,2 \
-    -D mapreduce.job.reduces=12 \
+    -numReduceTasks 12 \
     -input myInputDirs \
     -output myOutputDir \
-    -mapper org.apache.hadoop.mapred.lib.IdentityMapper \
-    -reducer org.apache.hadoop.mapred.lib.IdentityReducer \
+    -mapper cat \
+    -reducer cat \
     -partitioner org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner 
 </source>
 <p>
@@ -523,17 +521,17 @@ that is useful for many applications. This class provides a subset of features
 provided by the Unix/GNU Sort. For example:
 </p>
 <source>
-$HADOOP_HOME/bin/hadoop  jar $HADOOP_HOME/hadoop-streaming.jar \
+$HADOOP_HOME/bin/hadoop jar hadoop-streaming.jar \
     -D mapreduce.job.output.key.comparator.class=org.apache.hadoop.mapred.lib.KeyFieldBasedComparator \
     -D stream.map.output.field.separator=. \
     -D stream.num.map.output.key.fields=4 \
     -D mapreduce.map.output.key.field.separator=. \
     -D mapreduce.partition.keycomparator.options=-k2,2nr \
-    -D mapreduce.job.reduces=12 \
+    -numReduceTasks 12 \
     -input myInputDirs \
     -output myOutputDir \
-    -mapper org.apache.hadoop.mapred.lib.IdentityMapper \
-    -reducer org.apache.hadoop.mapred.lib.IdentityReducer 
+    -mapper cat \
+    -reducer cat 
 </source>
 <p>
 The map output keys of the above MapReduce job normally have four fields
@@ -579,8 +577,8 @@ aggregatable items by invoking the appropriate aggregators.
 To use Aggregate, simply specify "-reducer aggregate":
 </p>
 <source>
-$HADOOP_HOME/bin/hadoop  jar $HADOOP_HOME/hadoop-streaming.jar \
-    -D mapreduce.job.reduces=12 \
+$HADOOP_HOME/bin/hadoop jar hadoop-streaming.jar \
+    -numReduceTasks 12 \
     -input myInputDirs \
     -output myOutputDir \
     -mapper myAggregatorForKeyCount.py \
@@ -623,13 +621,13 @@ Similarly, the reduce function defined in the class treats each input key/value 
 You can select an arbitrary list of fields as the reduce output key, and an arbitrary list of fields as the reduce output value. For example:
 </p>
 <source>
-$HADOOP_HOME/bin/hadoop  jar $HADOOP_HOME/hadoop-streaming.jar \
-    -D map.output.key.field.separa=. \
+$HADOOP_HOME/bin/hadoop jar hadoop-streaming.jar \
+    -D mapreduce.map.output.key.field.separator=. \
     -D mapreduce.partition.keypartitioner.options=-k1,2 \
     -D mapreduce.fieldsel.data.field.separator=. \
     -D mapreduce.fieldsel.map.output.key.value.fields.spec=6,5,1-3:0- \
     -D mapreduce.fieldsel.reduce.output.key.value.fields.spec=0-2:5- \
-    -D mapreduce.job.reduces=12 \
+    -numReduceTasks 12 \
     -input myInputDirs \
     -output myOutputDir \
     -mapper org.apache.hadoop.mapred.lib.FieldSelectionMapReduce \
@@ -707,7 +705,7 @@ from field 5 (corresponding to all the original fields).
     <td> org.apache.hadoop.streaming.io.IdentifierResolver.class </td>
     <td> The class to resolve iospec passed via option -io. </td></tr>
 <tr><td> stream.recordreader.class </td><td> - </td><td> RecordReader class 
-    passed via -inputReader option. </td></tr>
+    passed via -inputreader option. </td></tr>
 <tr><td> stream.recordreader.* </td><td> - </td><td> Configuration properties
     for record reader passed via stream.recordreader.class. </td></tr>
 <tr><td> stream.shipped.hadoopstreaming </td><td> - </td><td> Custom streaming
@@ -717,8 +715,9 @@ from field 5 (corresponding to all the original fields).
     or not. </td></tr>
 <tr><td> stream.tmpdir </td><td> - </td><td> Temporary directory used for jar
     packaging</td></tr>
-<tr><td> stream.joindelay.milli </td><td> 0 </td><td> Timeout in milliseconds
-    for joining the error and output threads at the end of mapper/reducer. A
+<tr><td> stream.joindelay.milli </td><td> 0 </td><td> Expert: Timeout in 
+    milliseconds for joining the error and output threads at the end of 
+    mapper/reducer, after the streaming process exits. A
     timeout of "0" means to wait forever. </td></tr>
 <tr><td> stream.minRecWrittenToEnableSkip_ </td><td> - </td><td> Minimum number 
     of input records written to skip map failure </td></tr>
@@ -734,7 +733,7 @@ from field 5 (corresponding to all the original fields).
 
 <!-- QUESTION -->
 <section>
-<title>How do I use Hadoop Streaming to run an arbitrary set of (semi) independent tasks? </title>
+<title>How do I run an arbitrary set of (semi) independent tasks? </title>
 <p>
 Often you do not need the full power of Map Reduce, but only need to run multiple instances of the 
 same program - either on different parts of the data, or on the same data, but with different parameters. 
@@ -803,11 +802,11 @@ bruce   70
 charlie 80
 dan     75
 
-$ c2='cut -f2'; $HADOOP_HOME/bin/hadoop jar $HADOOP_HOME/hadoop-streaming.jar \
+$ c2='cut -f2'; $HADOOP_HOME/bin/hadoop jar hadoop-streaming.jar \
     -D mapreduce.job.name='Experiment'
     -input /user/me/samples/student_marks 
     -output /user/me/samples/student_out 
-    -mapper \"$c2\" -reducer 'cat'  
+    -mapper "$c2" -reducer 'cat'  
     
 $ hadoop dfs -ls samples/student_out
 Found 1 items/user/me/samples/student_out/part-00000    &lt;r 3&gt;   16
@@ -872,7 +871,8 @@ Instead of plain text files, you can generate gzip files as your generated outpu
 <section>
 <title>How do I provide my own input/output format with streaming? </title>
 <p>
-At least as late as version 0.14, Hadoop does not support multiple jar files. So, when specifying your own custom classes you will have to pack them along with the streaming jar and use the custom jar instead of the default hadoop streaming jar. 
+You can pass them using -inputformat and -outputformat options. You can pass
+your custom jar using -libjars option.
 </p>
 </section>
 
@@ -884,10 +884,13 @@ At least as late as version 0.14, Hadoop does not support multiple jar files. So
 You can use the record reader StreamXmlRecordReader to process XML documents. 
 </p>
 <source>
-hadoop jar hadoop-streaming.jar -inputreader "StreamXmlRecordReader,begin=BEGIN_STRING,end=END_STRING" ..... (rest of the command)
+hadoop jar hadoop-streaming.jar \
+-inputreader "StreamXmlRecordReader,begin=BEGIN_STRING,end=END_STRING" \
+..... (rest of the command)
 </source>
 <p>
-Anything found between BEGIN_STRING and END_STRING would be treated as one record for map tasks.
+Anything found between BEGIN_STRING and END_STRING would be treated as one 
+record for map tasks.
 </p>
 </section>
 
@@ -921,11 +924,17 @@ default it is <code>reporter:</code>.
 
 <!-- QUESTION -->
 <section>
-<title>How do I get the JobConf variables in a streaming job's mapper/reducer?</title>
+<title>How do I get the JobConf variables in a streaming job's mapper/reducer?
+</title>
 <p>
-See the <a href="mapred_tutorial.html#Configured+Parameters">Configured Parameters</a>. 
-During the execution of a streaming job, the names of the "mapred" parameters are transformed. The dots ( . ) become underscores ( _ ).
-For example, mapreduce.job.id becomes mapreduce.job.id and mapreduce.job.jar becomes mapreduce.job.jar. In your code, use the parameter names with the underscores.
+See the
+<a href="mapred_tutorial.html#Configured+Parameters">Configured Parameters</a>. 
+The configuration parameters can be accessed as environment variables in your
+mapper/reducer. But during the execution of a streaming job, the names of the
+configuration parameters are transformed. The dots ( . ) become underscores 
+( _ ). For example, mapreduce.job.id becomes mapreduce_job_id and 
+mapreduce.job.jar becomes mapreduce_job_jar. In your code, access them as 
+environment variables and use the parameter names with the underscores.
 </p>
 </section>
 
