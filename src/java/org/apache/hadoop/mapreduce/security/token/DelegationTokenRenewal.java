@@ -20,16 +20,13 @@ package org.apache.hadoop.mapreduce.security.token;
 
 import java.io.IOException;
 import java.net.URI;
-import org.apache.hadoop.security.AccessControlException;
-import org.apache.hadoop.security.UserGroupInformation;
-
 import java.security.PrivilegedExceptionAction;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
+import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -43,10 +40,12 @@ import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.JobID;
+import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.Credentials;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
-import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 
 
 @InterfaceAudience.Private
@@ -106,13 +105,10 @@ public class DelegationTokenRenewal {
   
   //managing the list of tokens using Map
   // jobId=>List<tokens>
-  private static List<DelegationTokenToRenew> delegationTokens = 
-    Collections.synchronizedList(new ArrayList<DelegationTokenToRenew>());
+  private static Set<DelegationTokenToRenew> delegationTokens = 
+    Collections.synchronizedSet(new HashSet<DelegationTokenToRenew>());
   //adding token
   private static void addTokenToList(DelegationTokenToRenew t) {
-    //check to see if the token already exists in the list
-    if (delegationTokens.contains(t))
-      return;
     delegationTokens.add(t);
   }
   

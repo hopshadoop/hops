@@ -83,6 +83,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1848. Put number of speculative, data local, rack local 
     tasks in JobTracker metrics. (Scott Chen via dhruba)
 
+    MAPREDUCE-1935. Makes the Distcp to work in a secure environment.
+    (Boris Shkolnik via ddas)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and

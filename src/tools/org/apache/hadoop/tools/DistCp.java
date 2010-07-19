@@ -34,28 +34,25 @@ import java.util.Random;
 import java.util.Stack;
 import java.util.StringTokenizer;
 
-import javax.security.auth.login.LoginException;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.FsShell;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.hdfs.HftpFileSystem;
 import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
-import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.mapred.FileOutputFormat;
@@ -65,16 +62,15 @@ import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.InvalidInputException;
 import org.apache.hadoop.mapred.JobClient;
 import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapred.JobTracker;
 import org.apache.hadoop.mapred.Mapper;
 import org.apache.hadoop.mapred.OutputCollector;
 import org.apache.hadoop.mapred.RecordReader;
 import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.mapred.SequenceFileRecordReader;
-import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobSubmissionFiles;
 import org.apache.hadoop.mapreduce.security.TokenCache;
 import org.apache.hadoop.security.AccessControlException;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
@@ -739,19 +735,22 @@ public class DistCp implements Tool {
   }
 
   /** Sanity check for srcPath */
-  private static void checkSrcPath(Configuration conf, List<Path> srcPaths,
-      JobConf jobConf) throws IOException {
+  private static void checkSrcPath(JobConf jobConf, List<Path> srcPaths) 
+  throws IOException {
     List<IOException> rslt = new ArrayList<IOException>();
     List<Path> unglobbed = new LinkedList<Path>();
     
     // get tokens for all the required FileSystems..
+    // also set the renewer as the JobTracker for the hftp case
+    jobConf.set(HftpFileSystem.HFTP_RENEWER, 
+        jobConf.get(JobTracker.JT_USER_NAME, ""));
     Path[] ps = new Path[srcPaths.size()];
     ps = srcPaths.toArray(ps);
-    TokenCache.obtainTokensForNamenodes(jobConf.getCredentials(), ps, conf);
+    TokenCache.obtainTokensForNamenodes(jobConf.getCredentials(), ps, jobConf);
     
     
     for (Path p : srcPaths) {
-      FileSystem fs = p.getFileSystem(conf);
+      FileSystem fs = p.getFileSystem(jobConf);
       FileStatus[] inputs = fs.globStatus(p);
       
       if(inputs != null && inputs.length > 0) {
@@ -782,7 +781,7 @@ public class DistCp implements Tool {
 
     JobConf job = createJobConf(conf);
     
-    checkSrcPath(conf, args.srcs, job);
+    checkSrcPath(job, args.srcs);
     if (args.preservedAttributes != null) {
       job.set(PRESERVE_STATUS_LABEL, args.preservedAttributes);
     }
