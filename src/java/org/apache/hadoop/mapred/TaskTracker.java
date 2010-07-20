@@ -95,6 +95,7 @@ import org.apache.hadoop.metrics.MetricsUtil;
 import org.apache.hadoop.metrics.Updater;
 import org.apache.hadoop.net.DNS;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.PolicyProvider;
 import org.apache.hadoop.security.authorize.ServiceAuthorizationManager;
@@ -583,15 +584,10 @@ public class TaskTracker
    * close().
    */
   synchronized void initialize() throws IOException, InterruptedException {
-    String keytabFilename = fConf.get(TTConfig.TT_KEYTAB_FILE);
     UserGroupInformation.setConfiguration(fConf);
-    if (keytabFilename != null) {
-      String desiredUser = fConf.get(TTConfig.TT_USER_NAME,
-                                    System.getProperty("user.name"));
-      UserGroupInformation.loginUserFromKeytab(desiredUser, 
-                                               keytabFilename);
+    SecurityUtil.login(fConf, TTConfig.TT_KEYTAB_FILE, TTConfig.TT_USER_NAME);
+    if (UserGroupInformation.isLoginKeytabBased()) {
       mrOwner = UserGroupInformation.getLoginUser();
-      
     } else {
       mrOwner = UserGroupInformation.getCurrentUser();
     }

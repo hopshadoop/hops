@@ -39,6 +39,7 @@ import org.apache.hadoop.mapreduce.security.token.JobTokenIdentifier;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.Credentials;
+import org.apache.hadoop.security.KerberosName;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
@@ -87,7 +88,9 @@ public class TokenCache {
   static void obtainTokensForNamenodesInternal(Credentials credentials,
       Path[] ps, Configuration conf) throws IOException {
     // get jobtracker principal id (for the renewer)
-    Text jtCreds = new Text(conf.get(JTConfig.JT_USER_NAME, ""));
+    KerberosName jtKrbName = new KerberosName(conf.get(JTConfig.JT_USER_NAME,
+        ""));
+    Text delegTokenRenewer = new Text(jtKrbName.getShortName());
     
     for(Path p: ps) {
       FileSystem fs = FileSystem.get(p.toUri(), conf);
@@ -104,7 +107,7 @@ public class TokenCache {
           continue;
         }
         // get the token
-        token = dfs.getDelegationToken(jtCreds);
+        token = dfs.getDelegationToken(delegTokenRenewer);
         if(token==null) 
           throw new IOException("Token from " + fs_addr + " is null");
 

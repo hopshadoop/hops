@@ -102,6 +102,7 @@ import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.Groups;
 import org.apache.hadoop.security.RefreshUserMappingsProtocol;
 import org.apache.hadoop.security.Credentials;
+import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.authorize.AuthorizationException;
@@ -1372,15 +1373,14 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
 
   JobTracker(final JobConf conf, Clock newClock, String jobtrackerIndentifier) 
   throws IOException, InterruptedException {
-    // find the owner of the process
-    // get the desired principal to load
-    String keytabFilename = conf.get(JTConfig.JT_KEYTAB_FILE);
+    // Set ports, start RPC servers, setup security policy etc.
+    InetSocketAddress addr = getAddress(conf);
+    this.localMachine = addr.getHostName();
+    this.port = addr.getPort();
     UserGroupInformation.setConfiguration(conf);
-    if (keytabFilename != null) {
-      String desiredUser = conf.get(JTConfig.JT_USER_NAME,
-                                    System.getProperty("user.name"));
-      UserGroupInformation.loginUserFromKeytab(desiredUser, 
-                                               keytabFilename);
+    SecurityUtil.login(conf, JTConfig.JT_KEYTAB_FILE, JTConfig.JT_USER_NAME,
+        localMachine);
+    if (UserGroupInformation.isLoginKeytabBased()) {
       mrOwner = UserGroupInformation.getLoginUser();
     } else {
       mrOwner = UserGroupInformation.getCurrentUser();
@@ -1454,11 +1454,6 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
           JobQueueTaskScheduler.class, TaskScheduler.class);
     taskScheduler = (TaskScheduler) ReflectionUtils.newInstance(schedulerClass, conf);
                                            
-    // Set ports, start RPC servers, setup security policy etc.
-    InetSocketAddress addr = getAddress(conf);
-    this.localMachine = addr.getHostName();
-    this.port = addr.getPort();
-    
     // Set service-level authorization security policy
     if (conf.getBoolean(
           ServiceAuthorizationManager.SERVICE_AUTHORIZATION_CONFIG, false)) {
@@ -4589,13 +4584,14 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     NUM_HEARTBEATS_IN_SECOND = 
         conf.getInt("mapred.heartbeats.in.second", 100);
     
-    // get the desired principal to load
-    String keytabFilename = conf.get(JTConfig.JT_KEYTAB_FILE);
-    if (keytabFilename != null) {
-      String desiredUser = conf.get(JTConfig.JT_USER_NAME,
-                                    System.getProperty("user.name"));
-      UserGroupInformation.loginUserFromKeytab(desiredUser, 
-                                               keytabFilename);
+    // Set ports, start RPC servers, setup security policy etc.
+    InetSocketAddress addr = getAddress(conf);
+    this.localMachine = addr.getHostName();
+    this.port = addr.getPort();
+    UserGroupInformation.setConfiguration(conf);
+    SecurityUtil.login(conf, JTConfig.JT_KEYTAB_FILE, JTConfig.JT_USER_NAME,
+        localMachine);
+    if (UserGroupInformation.isLoginKeytabBased()) {
       mrOwner = UserGroupInformation.getLoginUser();
     } else {
       mrOwner = UserGroupInformation.getCurrentUser();
@@ -4616,11 +4612,6 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
           JobQueueTaskScheduler.class, TaskScheduler.class);
     taskScheduler = 
       (TaskScheduler)ReflectionUtils.newInstance(schedulerClass, conf);
-    
-    // Set ports, start RPC servers, setup security policy etc.
-    InetSocketAddress addr = getAddress(conf);
-    this.localMachine = addr.getHostName();
-    this.port = addr.getPort();
 
     // Create the jetty server
     InetSocketAddress infoSocAddr = NetUtils.createSocketAddr(

@@ -86,6 +86,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1935. Makes the Distcp to work in a secure environment.
     (Boris Shkolnik via ddas)
 
+    MAPREDUCE-1945. The MapReduce component for HADOOP-6632.
+    (Kan Zhang & Jitendra Pandey via ddas)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and
