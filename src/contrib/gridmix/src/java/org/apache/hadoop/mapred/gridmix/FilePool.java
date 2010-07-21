@@ -18,6 +18,7 @@
 package org.apache.hadoop.mapred.gridmix;
 
 import java.io.IOException;
+
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -38,6 +39,7 @@ import org.apache.hadoop.fs.Path;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.mapred.gridmix.RandomAlgorithms.Selector;
 
 /**
  * Class for caching a pool of input data to be used by synthetic jobs for
@@ -135,69 +137,6 @@ class FilePool {
         throws IOException;
   }
 
-  interface IndexMapper {
-    int get(int pos);
-    void swap(int a, int b);
-  }
-
-  /**
-   * A sparse index mapping table - useful when we want to
-   * non-destructively permute a small fraction of a large array.
-   */
-  static class SparseIndexMapper implements IndexMapper {
-    Map<Integer, Integer> mapping = new HashMap<Integer, Integer>();
-
-    public int get(int pos) {
-      Integer mapped = mapping.get(pos);
-      if (mapped == null) return pos;
-      return mapped;
-    }
-
-    public void swap(int a, int b) {
-      int valA = get(a);
-      int valB = get(b);
-      if (b == valA) {
-        mapping.remove(b);
-      } else {
-        mapping.put(b, valA);
-      }
-      if (a == valB) {
-        mapping.remove(a);
-      } else {
-        mapping.put(a, valB);
-      }
-    }
-  }
-
-  /**
-   * A dense index mapping table - useful when we want to
-   * non-destructively permute a large fraction of an array.
-   */
-  static class DenseIndexMapper implements IndexMapper {
-    int[] mapping;
-
-    DenseIndexMapper(int size) {
-      mapping = new int[size];
-      for (int i=0; i<size; ++i) {
-        mapping[i] = i;
-      }
-    }
-
-    public int get(int pos) {
-      if ( (pos < 0) || (pos>=mapping.length) ) {
-        throw new IndexOutOfBoundsException();
-      }
-      return mapping[pos];
-    }
-
-    public void swap(int a, int b) {
-      int valA = get(a);
-      int valB = get(b);
-      mapping[a]=valB;
-      mapping[b]=valA;
-    }
-  }
-
   /**
    * Files in current directory of this Node.
    */
@@ -223,22 +162,15 @@ class FilePool {
         return getSize();
       }
 
-      IndexMapper mapping;
-      if ((curdir.size() < 200) || ((double) targetSize / getSize() > 0.5)) {
-        mapping = new DenseIndexMapper(curdir.size());
-      } else {
-        mapping = new SparseIndexMapper();
-      }
-
+      Selector selector = new Selector(curdir.size(), (double) targetSize
+          / getSize(), rand);
+      
       ArrayList<Integer> selected = new ArrayList<Integer>();
       long ret = 0L;
-      int poolSize = curdir.size();
       do {
-        int pos = rand.nextInt(poolSize);
-        int index = mapping.get(pos);
+        int index = selector.next();
         selected.add(index);
         ret += curdir.get(index).getLen();
-        mapping.swap(pos, --poolSize);
       } while (ret < targetSize);
 
       for (Integer i : selected) {

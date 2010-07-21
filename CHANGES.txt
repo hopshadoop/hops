@@ -89,6 +89,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1945. The MapReduce component for HADOOP-6632.
     (Kan Zhang & Jitendra Pandey via ddas)
 
+    MAPREDUCE-1936. Modify Gridmix3 to support more tunable parameters for
+    stress submission and sleep jobs. (Hong Tang via cdouglas)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and
