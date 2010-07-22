@@ -32,6 +32,11 @@
 #include <strings.h>
 #include <sys/socket.h>
 #include <pthread.h>
+#include <iostream>
+#include <fstream>
+
+#include <openssl/hmac.h>
+#include <openssl/buffer.h>
 
 using std::map;
 using std::string;
@@ -290,9 +295,9 @@ namespace HadoopPipes {
 
   enum MESSAGE_TYPE {START_MESSAGE, SET_JOB_CONF, SET_INPUT_TYPES, RUN_MAP, 
                      MAP_ITEM, RUN_REDUCE, REDUCE_KEY, REDUCE_VALUE, 
-                     CLOSE, ABORT, 
+                     CLOSE, ABORT, AUTHENTICATION_REQ,
                      OUTPUT=50, PARTITIONED_OUTPUT, STATUS, PROGRESS, DONE,
-                     REGISTER_COUNTER, INCREMENT_COUNTER};
+                     REGISTER_COUNTER, INCREMENT_COUNTER, AUTHENTICATION_RESP};
 
   class BinaryUpwardProtocol: public UpwardProtocol {
   private:
@@ -301,6 +306,12 @@ namespace HadoopPipes {
     BinaryUpwardProtocol(FILE* _stream) {
       stream = new FileOutStream();
       HADOOP_ASSERT(stream->open(_stream), "problem opening stream");
+    }
+
+    virtual void authenticate(const string &responseDigest) {
+      serializeInt(AUTHENTICATION_RESP, *stream);
+      serializeString(responseDigest, *stream);
+      stream->flush();
     }
 
     virtual void output(const string& key, const string& value) {
@@ -359,6 +370,82 @@ namespace HadoopPipes {
     BinaryUpwardProtocol * uplink;
     string key;
     string value;
+    string password;
+    bool authDone;
+    void getPassword(string &password) {
+      const char *passwordFile = getenv("hadoop.pipes.shared.secret.location");
+      if (passwordFile == NULL) {
+        return;
+      }
+      std::ifstream fstr(passwordFile, std::fstream::binary);
+      if (fstr.fail()) {
+        std::cerr << "Could not open the password file" << std::endl;
+        return;
+      } 
+      unsigned char * passBuff = new unsigned char [512];
+      fstr.read((char *)passBuff, 512);
+      int passwordLength = fstr.gcount();
+      fstr.close();
+      passBuff[passwordLength] = 0;
+      password.replace(0, passwordLength, (const char *) passBuff, passwordLength);
+      delete [] passBuff;
+      return; 
+    }
+
+    void verifyDigestAndRespond(string& digest, string& challenge) {
+      if (password.empty()) {
+        //password can be empty if process is running in debug mode from
+        //command file.
+        authDone = true;
+        return;
+      }
+
+      if (!verifyDigest(password, digest, challenge)) {
+        std::cerr << "Server failed to authenticate. Exiting" << std::endl;
+        exit(-1);
+      }
+      authDone = true;
+      string responseDigest = createDigest(password, digest);
+      uplink->authenticate(responseDigest);
+    }
+
+    bool verifyDigest(string &password, string& digest, string& challenge) {
+      string expectedDigest = createDigest(password, challenge);
+      if (digest == expectedDigest) {
+        return true;
+      } else {
+        return false;
+      }
+    }
+
+    string createDigest(string &password, string& msg) {
+      HMAC_CTX ctx;
+      unsigned char digest[EVP_MAX_MD_SIZE];
+      HMAC_Init(&ctx, (const unsigned char *)password.c_str(), 
+          password.length(), EVP_sha1());
+      HMAC_Update(&ctx, (const unsigned char *)msg.c_str(), msg.length());
+      unsigned int digestLen;
+      HMAC_Final(&ctx, digest, &digestLen);
+      HMAC_cleanup(&ctx);
+
+      //now apply base64 encoding
+      BIO *bmem, *b64;
+      BUF_MEM *bptr;
+
+      b64 = BIO_new(BIO_f_base64());
+      bmem = BIO_new(BIO_s_mem());
+      b64 = BIO_push(b64, bmem);
+      BIO_write(b64, digest, digestLen);
+      BIO_flush(b64);
+      BIO_get_mem_ptr(b64, &bptr);
+
+      char digestBuffer[bptr->length];
+      memcpy(digestBuffer, bptr->data, bptr->length-1);
+      digestBuffer[bptr->length-1] = 0;
+      BIO_free_all(b64);
+
+      return string(digestBuffer);
+    }
 
   public:
     BinaryProtocol(FILE* down, DownwardProtocol* _handler, FILE* up) {
@@ -366,6 +453,8 @@ namespace HadoopPipes {
       downStream->open(down);
       uplink = new BinaryUpwardProtocol(up);
       handler = _handler;
+      authDone = false;
+      getPassword(password);
     }
 
     UpwardProtocol* getUplink() {
@@ -375,7 +464,22 @@ namespace HadoopPipes {
     virtual void nextEvent() {
       int32_t cmd;
       cmd = deserializeInt(*downStream);
+      if (!authDone && cmd != AUTHENTICATION_REQ) {
+        //Authentication request must be the first message if
+        //authentication is not complete
+        std::cerr << "Command:" << cmd << "received before authentication. " 
+            << "Exiting.." << std::endl;
+        exit(-1);
+      }
       switch (cmd) {
+      case AUTHENTICATION_REQ: {
+        string digest;
+        string challenge;
+        deserializeString(digest, *downStream);
+        deserializeString(challenge, *downStream);
+        verifyDigestAndRespond(digest, challenge);
+        break;
+      }
       case START_MESSAGE: {
         int32_t prot;
         prot = deserializeInt(*downStream);
@@ -1022,7 +1126,6 @@ namespace HadoopPipes {
         setbuf = setvbuf(outStream, bufout, _IOFBF, bufsize);
         HADOOP_ASSERT(setbuf == 0, string("problem with setvbuf for outStream: ")
                                      + strerror(errno));
-
         connection = new BinaryProtocol(stream, context, outStream);
       } else if (getenv("mapreduce.pipes.commandfile")) {
         char* filename = getenv("mapreduce.pipes.commandfile");

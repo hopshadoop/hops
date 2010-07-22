@@ -16,12 +16,12 @@
 </property>
 
 <property>
-  <name>mapreduce.pipes.java.recordreader</name>
+  <name>mapreduce.pipes.isjavarecordreader</name>
   <value>true</value>
 </property>
 
 <property>
-  <name>mapreduce.pipes.java.recordwriter</name>
+  <name>mapreduce.pipes.isjavarecordwriter</name>
   <value>true</value>
 </property>
 
