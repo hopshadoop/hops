@@ -33,7 +33,7 @@ public interface InputDemuxer extends Closeable {
    * Bind the {@link InputDemuxer} to a particular file.
    * 
    * @param path
-   *          The path to the find it should bind to.
+   *          The path to the file it should bind to.
    * @param conf
    *          Configuration
    * @throws IOException

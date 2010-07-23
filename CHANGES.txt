@@ -193,6 +193,8 @@ Trunk (unreleased changes)
     MAPREDUCE-1772. Corrects errors in streaming documentation in forrest.
     (amareshwari)
 
+    MAPREDUCE-1925. Fix failing TestRumenJobTraces. (Ravi Gummadi via cdouglas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

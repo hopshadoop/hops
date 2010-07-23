@@ -62,11 +62,14 @@ class PossiblyDecompressedInputStream extends InputStream {
 
   @Override
   public void close() throws IOException {
+    // coreInputStream.close() is called before returning of decompressor to the
+    // pool because coreInputStream.close() could(though currently it doesn't)
+    // access the decompressor.
+    coreInputStream.close();
+
     if (decompressor != null) {
       CodecPool.returnDecompressor(decompressor);
     }
-
-    coreInputStream.close();
   }
 
 }
