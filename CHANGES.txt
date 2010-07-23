@@ -378,12 +378,6 @@ Release 0.21.0 - Unreleased
 
   IMPROVEMENTS
 
-    MAPREDUCE-1896. [Herriot] New property for multi user list. (Vinay Thota
-    via cos)
-
-    MAPREDUCE-1812. New properties for suspend and resume process. (Vinay
-    Thota via cos)
-
     MAPREDUCE-463. Makes job setup and cleanup tasks as optional.
     (Amareshwari Sriramadasu via sharad)
 
@@ -874,6 +868,12 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-1018. Document changes to the memory management and scheduling
     model. (Hemanth Yamijala via vinodkv)
 
+    MAPREDUCE-1896. [Herriot] New property for multi user list. (Vinay Thota
+    via cos)
+
+    MAPREDUCE-1812. New properties for suspend and resume process. (Vinay
+    Thota via cos)
+
   OPTIMIZATIONS
 
     MAPREDUCE-270. Fix the tasktracker to optionally send an out-of-band
@@ -900,12 +900,6 @@ Release 0.21.0 - Unreleased
     (Torsten Curdt via amareshwari)
 
   BUG FIXES
-
-    MAPREDUCE-1942. 'compile-fault-inject' should never be called directly.
-    (Konstantin Boudnik)
-
-    MAPREDUCE-1791. Remote cluster control functionality needs JavaDocs
-    improvement (Konstantin Boudnik)
 
     MAPREDUCE-878. Rename fair scheduler design doc to 
     fair-scheduler-design-doc.tex and add Apache license header (matei)
@@ -1683,3 +1677,9 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1870. Harmonize MapReduce JAR library versions with Common and
     HDFS. (tomwhite)
+
+    MAPREDUCE-1791. Remote cluster control functionality needs JavaDocs
+    improvement (Konstantin Boudnik)
+
+    MAPREDUCE-1942. 'compile-fault-inject' should never be called directly.
+    (Konstantin Boudnik)
