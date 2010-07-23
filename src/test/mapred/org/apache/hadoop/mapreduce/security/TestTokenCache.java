@@ -22,9 +22,12 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.mockito.Mockito.mock;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.security.NoSuchAlgorithmException;
 import java.util.Collection;
 import java.util.HashMap;
@@ -37,8 +40,11 @@ import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.HftpFileSystem;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
+import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenSecretManager;
+import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.JobConf;
@@ -46,18 +52,20 @@ import org.apache.hadoop.mapred.MiniMRCluster;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.SleepJob;
-import org.apache.hadoop.mapreduce.Mapper.Context;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.security.Credentials;
+import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
-import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.ToolRunner;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.junit.AfterClass;
+import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.junit.Assert;
+import org.mockito.Mockito;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 
 public class TestTokenCache {
   private static final int NUM_OF_KEYS = 10;
@@ -79,7 +87,7 @@ public class TestTokenCache {
         dts_size = dts.size();
       
       
-      if(dts.size() != 2) { // one job token and one delegation token
+      if(dts_size != 2) { // one job token and one delegation token
         throw new RuntimeException("tokens are not available"); // fail the test
       }
       
@@ -270,7 +278,8 @@ public class TestTokenCache {
         p2 }, jConf);
 
     // this token is keyed by hostname:port key.
-    String fs_addr = TokenCache.buildDTServiceName(p1.toUri());
+    String fs_addr = 
+      SecurityUtil.buildDTServiceName(p1.toUri(), NameNode.DEFAULT_PORT);
     Token<DelegationTokenIdentifier> nnt = TokenCache.getDelegationToken(
         credentials, fs_addr);
     System.out.println("dt for " + p1 + "(" + fs_addr + ")" + " = " +  nnt);
@@ -289,4 +298,63 @@ public class TestTokenCache {
       assertTrue("didn't find token for " + p1 ,found);
     }
   }
+  
+  @Test
+  public void testGetTokensForHftpFS() throws IOException, URISyntaxException {
+    HftpFileSystem hfs = mock(HftpFileSystem.class);
+
+    DelegationTokenSecretManager dtSecretManager = 
+      dfsCluster.getNamesystem().getDelegationTokenSecretManager();
+    DelegationTokenIdentifier dtId = 
+      new DelegationTokenIdentifier(new Text("user"), new Text("renewer"), null);
+    final Token<DelegationTokenIdentifier> t = 
+      new Token<DelegationTokenIdentifier>(dtId, dtSecretManager);
+
+    final URI uri = new URI("hftp://host:2222/file1");
+    String fs_addr = 
+      SecurityUtil.buildDTServiceName(uri, NameNode.DEFAULT_PORT);
+    t.setService(new Text(fs_addr));
+
+    //when(hfs.getUri()).thenReturn(uri);
+    Mockito.doAnswer(new Answer<URI>(){
+      @Override
+      public URI answer(InvocationOnMock invocation)
+      throws Throwable {
+        return uri;
+      }}).when(hfs).getUri();
+
+    //when(hfs.getDelegationToken()).thenReturn((Token<? extends TokenIdentifier>) t);
+    Mockito.doAnswer(new Answer<Token<DelegationTokenIdentifier>>(){
+      @Override
+      public Token<DelegationTokenIdentifier>  answer(InvocationOnMock invocation)
+      throws Throwable {
+        return t;
+      }}).when(hfs).getDelegationToken();
+
+
+    Credentials credentials = new Credentials();
+    Path p = new Path(uri.toString());
+    System.out.println("Path for hftp="+ p + "; fs_addr="+fs_addr);
+    TokenCache.obtainTokensForNamenodesInternal(hfs, credentials, jConf);
+
+    Collection<Token<? extends TokenIdentifier>> tns = credentials.getAllTokens();
+    assertEquals("number of tokens is not 1", 1, tns.size());
+
+    boolean found = false;
+    for(Token<? extends TokenIdentifier> tt: tns) {
+      System.out.println("token="+tt);
+      if(tt.getKind().equals(DelegationTokenIdentifier.HDFS_DELEGATION_KIND) &&
+          tt.getService().equals(new Text(fs_addr))) {
+        found = true;
+        assertEquals("different token", tt, t);
+      }
+      assertTrue("didn't find token for " + p, found);
+    }
+    // also check the conf value
+    String key = HftpFileSystem.HFTP_SERVICE_NAME_KEY + fs_addr;
+    String confKey = jConf.get(key);
+    assertEquals("jconf key for HFTP DT is not correct", confKey,
+        t.getService().toString());
+  }
+
 }
