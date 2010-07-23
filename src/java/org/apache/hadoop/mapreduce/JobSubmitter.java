@@ -340,6 +340,13 @@ class JobSubmitter {
       TokenCache.obtainTokensForNamenodes(job.getCredentials(),
           new Path[] { submitJobDir }, conf);
       
+      // load the binary file, if the user has one
+      String binaryTokenFilename = conf.get("mapreduce.job.credentials.binary");
+      if (binaryTokenFilename != null) {
+        job.getCredentials().readTokenStorageFile(
+            new Path("file:///" + binaryTokenFilename), conf);
+      }
+
       copyAndConfigureFiles(job, submitJobDir);
       Path submitJobFile = JobSubmissionFiles.getJobConfPath(submitJobDir);
 
@@ -368,7 +375,9 @@ class JobSubmitter {
     } finally {
       if (status == null) {
         LOG.info("Cleaning up the staging area " + submitJobDir);
-        jtFs.delete(submitJobDir, true);
+        if (jtFs != null && submitJobDir != null)
+          jtFs.delete(submitJobDir, true);
+
       }
     }
   }
@@ -490,7 +499,7 @@ class JobSubmitter {
   private void populateTokenCache(Configuration conf, Credentials credentials)
       throws IOException {
     // create TokenStorage object with user secretKeys
-    String tokensFileName = conf.get("tokenCacheFile");
+    String tokensFileName = conf.get("mapreduce.job.credentials.json");
     if(tokensFileName != null) {
       LOG.info("loading user's secret keys from " + tokensFileName);
       String localFileName = new Path(tokensFileName).toUri().getPath();

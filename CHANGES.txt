@@ -94,6 +94,10 @@ Trunk (unreleased changes)
 
     MAPREDUCE-1733. Makes pipes applications secure. (Jitendra Pandey via ddas)
 
+    MAPREDUCE-1566. Adds a configuration attribute using which job clients can
+    specify a credentials file. The tokens from there will be passed to the job.
+    (Jitendra Pandey and Owen O'Malley via ddas)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and

@@ -26,7 +26,6 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
@@ -91,8 +90,10 @@ public class TokenCache {
     KerberosName jtKrbName = new KerberosName(conf.get(JTConfig.JT_USER_NAME,
         ""));
     Text delegTokenRenewer = new Text(jtKrbName.getShortName());
-    
+    boolean notReadFile = true;
     for(Path p: ps) {
+      // TODO: Connecting to the namenode is not required in the case,
+      // where we already have the credentials in the file
       FileSystem fs = FileSystem.get(p.toUri(), conf);
       if(fs instanceof DistributedFileSystem) {
         DistributedFileSystem dfs = (DistributedFileSystem)fs;
@@ -105,6 +106,21 @@ public class TokenCache {
         if(token != null) {
           LOG.debug("DT for " + token.getService()  + " is already present");
           continue;
+        }
+        if (notReadFile) { //read the file only once
+          String binaryTokenFilename =
+            conf.get("mapreduce.job.credentials.binary");
+          if (binaryTokenFilename != null) {
+            credentials.readTokenStorageFile(new Path("file:///" +  
+                binaryTokenFilename), conf);
+          }
+          notReadFile = false;
+          token = 
+            TokenCache.getDelegationToken(credentials, fs_addr); 
+          if(token != null) {
+            LOG.debug("DT for " + token.getService()  + " is already present");
+            continue;
+          }
         }
         // get the token
         token = dfs.getDelegationToken(delegTokenRenewer);
@@ -179,18 +195,16 @@ public class TokenCache {
   @InterfaceAudience.Private
   public static Credentials loadTokens(String jobTokenFile, JobConf conf) 
   throws IOException {
-    Path localJobTokenFile = new Path (jobTokenFile);
-    FileSystem localFS = FileSystem.getLocal(conf);
-    FSDataInputStream in = localFS.open(localJobTokenFile);
+    Path localJobTokenFile = new Path ("file:///" + jobTokenFile);
     
     Credentials ts = new Credentials();
-    ts.readFields(in);
+    ts.readTokenStorageFile(localJobTokenFile, conf);
 
     if(LOG.isDebugEnabled()) {
       LOG.debug("Task: Loaded jobTokenFile from: "+localJobTokenFile.toUri().getPath() 
-        +"; num of sec keys  = " + ts.numberOfSecretKeys());
+        +"; num of sec keys  = " + ts.numberOfSecretKeys() + " Number of tokens " + 
+        ts.numberOfTokens());
     }
-    in.close();
     return ts;
   }
   /**

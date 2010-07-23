@@ -19,26 +19,19 @@ package org.apache.hadoop.mapreduce.security;
 
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import java.io.File;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
-import java.security.NoSuchAlgorithmException;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
 
-import javax.crypto.KeyGenerator;
-import javax.crypto.spec.SecretKeySpec;
-
-import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.JobConf;
@@ -46,23 +39,20 @@ import org.apache.hadoop.mapred.MiniMRCluster;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.SleepJob;
-import org.apache.hadoop.mapreduce.Mapper.Context;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
-import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.ToolRunner;
-import org.codehaus.jackson.map.ObjectMapper;
 import org.junit.AfterClass;
+import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.junit.Assert;
 
-public class TestTokenCache {
-  private static final int NUM_OF_KEYS = 10;
+@SuppressWarnings("deprecation")
+public class TestBinaryTokenFile {
 
-  // my sleep class - adds check for tokenCache
+  // my sleep class
   static class MySleepMapper extends SleepJob.SleepMapper {
     /**
      * attempts to access tokenCache as from client
@@ -72,21 +62,29 @@ public class TestTokenCache {
     throws IOException, InterruptedException {
       // get token storage and a key
       Credentials ts = context.getCredentials();
-      byte[] key1 = ts.getSecretKey(new Text("alias1"));
       Collection<Token<? extends TokenIdentifier>> dts = ts.getAllTokens();
-      int dts_size = 0;
-      if(dts != null)
-        dts_size = dts.size();
       
       
       if(dts.size() != 2) { // one job token and one delegation token
         throw new RuntimeException("tokens are not available"); // fail the test
       }
       
+      Token<? extends TokenIdentifier> dt = ts.getToken(new Text("Hdfs"));
       
-      if(key1 == null || ts == null || ts.numberOfSecretKeys() != NUM_OF_KEYS) {
-        throw new RuntimeException("secret keys are not available"); // fail the test
-      } 
+      //Verify that dt is same as the token in the file
+      String tokenFile = context.getConfiguration().get(
+          "mapreduce.job.credentials.binary");
+      Credentials cred = new Credentials();
+      cred.readTokenStorageStream(new DataInputStream(new FileInputStream(
+          tokenFile)));
+      for (Token<? extends TokenIdentifier> t : cred.getAllTokens()) {
+        if (!dt.equals(t)) {
+          throw new RuntimeException(
+              "Delegation token in job is not same as the token passed in file."
+                  + " tokenInFile=" + t + ", dt=" + dt);
+        }
+      }
+      
       super.map(key, value, context);
     }
   }
@@ -103,24 +101,28 @@ public class TestTokenCache {
       
       job.setMapperClass(MySleepMapper.class);
       //Populate tokens here because security is disabled.
-      populateTokens(job);
+      setupBinaryTokenFile(job);
       return job;
     }
     
-    private void populateTokens(Job job) {
+    private void setupBinaryTokenFile(Job job) {
     // Credentials in the job will not have delegation tokens
     // because security is disabled. Fetch delegation tokens
-    // and populate the credential in the job.
+    // and store in binary token file.
       try {
-        Credentials ts = job.getCredentials();
-        Path p1 = new Path("file1");
-        p1 = p1.getFileSystem(job.getConfiguration()).makeQualified(p1);
-        Credentials cred = new Credentials();
-        TokenCache.obtainTokensForNamenodesInternal(cred, new Path[] { p1 },
+        Credentials cred1 = new Credentials();
+        Credentials cred2 = new Credentials();
+        TokenCache.obtainTokensForNamenodesInternal(cred1, new Path[] { p1 },
             job.getConfiguration());
-        for (Token<? extends TokenIdentifier> t : cred.getAllTokens()) {
-          ts.addToken(new Text("Hdfs"), t);
+        for (Token<? extends TokenIdentifier> t : cred1.getAllTokens()) {
+          cred2.addToken(new Text("Hdfs"), t);
         }
+        DataOutputStream os = new DataOutputStream(new FileOutputStream(
+            binaryTokenFileName.toString()));
+        cred2.writeTokenStorageToStream(os);
+        os.close();
+        job.getConfiguration().set("mapreduce.job.credentials.binary",
+            binaryTokenFileName.toString());
       } catch (IOException e) {
         Assert.fail("Exception " + e);
       }
@@ -130,13 +132,11 @@ public class TestTokenCache {
   private static MiniMRCluster mrCluster;
   private static MiniDFSCluster dfsCluster;
   private static final Path TEST_DIR = 
-    new Path(System.getProperty("test.build.data","/tmp"), "sleepTest");
-  private static final Path tokenFileName = new Path(TEST_DIR, "tokenFile.json");
+    new Path(System.getProperty("test.build.data","/tmp"));
+  private static final Path binaryTokenFileName = new Path(TEST_DIR, "tokenFile.binary");
   private static int numSlaves = 1;
   private static JobConf jConf;
-  private static ObjectMapper mapper = new ObjectMapper();
   private static Path p1;
-  private static Path p2;
   
   @BeforeClass
   public static void setUp() throws Exception {
@@ -146,15 +146,11 @@ public class TestTokenCache {
     mrCluster = new MiniMRCluster(0, 0, numSlaves, 
         dfsCluster.getFileSystem().getUri().toString(), 1, null, null, null, 
         jConf);
-    
-    createTokenFileJson();
-    verifySecretKeysInJSONFile();
+
     dfsCluster.getNamesystem().getDelegationTokenSecretManager().startThreads();
     FileSystem fs = dfsCluster.getFileSystem();
     
     p1 = new Path("file1");
-    p2 = new Path("file2");
-    
     p1 = fs.makeQualified(p1);
   }
 
@@ -167,47 +163,13 @@ public class TestTokenCache {
       dfsCluster.shutdown();
     dfsCluster = null;
   }
-
-  // create jason file and put some keys into it..
-  private static void createTokenFileJson() throws IOException {
-    Map<String, String> map = new HashMap<String, String>();
-    
-    try {
-      KeyGenerator kg = KeyGenerator.getInstance("HmacSHA1");
-      for(int i=0; i<NUM_OF_KEYS; i++) {
-        SecretKeySpec key = (SecretKeySpec) kg.generateKey();
-        byte [] enc_key = key.getEncoded();
-        map.put("alias"+i, new String(Base64.encodeBase64(enc_key)));
-
-      }
-    } catch (NoSuchAlgorithmException e) {
-      throw new IOException(e);
-    }
-    
-    try {
-      File p  = new File(tokenFileName.getParent().toString());
-      p.mkdirs();
-      // convert to JSON and save to the file
-      mapper.writeValue(new File(tokenFileName.toString()), map);
-
-    } catch (Exception e) {
-      System.out.println("failed with :" + e.getLocalizedMessage());
-    }
-  }
-  
-  @SuppressWarnings("unchecked")
-  private static void verifySecretKeysInJSONFile() throws IOException {
-    Map<String, String> map;
-    map = mapper.readValue(new File(tokenFileName.toString()), Map.class);
-    assertEquals("didn't read JSON correctly", map.size(), NUM_OF_KEYS);
-  }
   
   /**
    * run a distributed job and verify that TokenCache is available
    * @throws IOException
    */
   @Test
-  public void testTokenCache() throws IOException {
+  public void testBinaryTokenFile() throws IOException {
     
     System.out.println("running dist job");
     
@@ -221,8 +183,7 @@ public class TestTokenCache {
     jConf.set(JTConfig.JT_USER_NAME, "jt_id");
     
     // using argument to pass the file name
-    String[] args = {
-       "-tokenCacheFile", tokenFileName.toString(), 
+    String[] args = { 
         "-m", "1", "-r", "1", "-mt", "1", "-rt", "1"
         };
      
@@ -235,58 +196,5 @@ public class TestTokenCache {
       fail("Job failed");
     }
     assertEquals("dist job res is not 0", res, 0);
-  }
-  
-  /**
-   * run a local job and verify that TokenCache is available
-   * @throws NoSuchAlgorithmException
-   * @throws IOException
-   */
-  @Test
-  public void testLocalJobTokenCache() throws NoSuchAlgorithmException, IOException {
-    
-    System.out.println("running local job");
-    // this is local job
-    String[] args = {"-m", "1", "-r", "1", "-mt", "1", "-rt", "1"}; 
-    jConf.set("mapreduce.job.credentials.json", tokenFileName.toString());
-    
-    int res = -1;
-    try {
-      res = ToolRunner.run(jConf, new MySleepJob(), args);
-    } catch (Exception e) {
-      System.out.println("Job failed with" + e.getLocalizedMessage());
-      e.printStackTrace(System.out);
-      fail("local Job failed");
-    }
-    assertEquals("local job res is not 0", res, 0);
-  }
-  
-  @Test
-  public void testGetTokensForNamenodes() throws IOException {
-    FileSystem fs = dfsCluster.getFileSystem();
-    
-    Credentials credentials = new Credentials();
-    TokenCache.obtainTokensForNamenodesInternal(credentials, new Path[] { p1,
-        p2 }, jConf);
-
-    // this token is keyed by hostname:port key.
-    String fs_addr = TokenCache.buildDTServiceName(p1.toUri());
-    Token<DelegationTokenIdentifier> nnt = TokenCache.getDelegationToken(
-        credentials, fs_addr);
-    System.out.println("dt for " + p1 + "(" + fs_addr + ")" + " = " +  nnt);
-    assertNotNull("Token for nn is null", nnt);
-    
-    // verify the size
-    Collection<Token<? extends TokenIdentifier>> tns = credentials.getAllTokens();
-    assertEquals("number of tokens is not 1", 1, tns.size());
-    
-    boolean found = false;
-    for(Token<? extends TokenIdentifier> t: tns) {
-      if(t.getKind().equals(DelegationTokenIdentifier.HDFS_DELEGATION_KIND) &&
-          t.getService().equals(new Text(fs_addr))) {
-        found = true;
-      }
-      assertTrue("didn't find token for " + p1 ,found);
-    }
   }
 }
