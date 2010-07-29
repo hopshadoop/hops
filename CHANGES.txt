@@ -4,6 +4,9 @@ Trunk (unreleased changes)
 
   INCOMPATIBLE CHANGES
 
+    MAPREDUCE-1866. Removes deprecated class
+    org.apache.hadoop.streaming.UTF8ByteArrayUtils. (amareshwari)
+
   NEW FEATURES
 
     MAPREDUCE-1804. Stress-test tool for HDFS introduced in HDFS-708.
