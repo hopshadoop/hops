@@ -199,6 +199,9 @@ Trunk (unreleased changes)
     mapping that the tasks use at runtime for looking up delegation tokens.
     (Boris Shkolnik via ddas)
 
+    MAPREDUCE-1701. Fixes a problem to do with exception handling in 
+    delegation-token renewals. (Boris Shkolnik via ddas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
