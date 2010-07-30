@@ -55,13 +55,19 @@ public class StreamUtil {
    * (repeat for -reducer, -combiner) </pre>
    */
   public static Class goodClassOrNull(Configuration conf, String className, String defaultPackage) {
-    if (className.indexOf('.') == -1 && defaultPackage != null) {
-      className = defaultPackage + "." + className;
-    }
     Class clazz = null;
     try {
       clazz = conf.getClassByName(className);
     } catch (ClassNotFoundException cnf) {
+    }
+    if (clazz == null) {
+      if (className.indexOf('.') == -1 && defaultPackage != null) {
+        className = defaultPackage + "." + className;
+        try {
+          clazz = conf.getClassByName(className);
+        } catch (ClassNotFoundException cnf) {
+        }
+      }
     }
     return clazz;
   }

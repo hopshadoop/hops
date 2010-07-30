@@ -205,6 +205,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1701. Fixes a problem to do with exception handling in 
     delegation-token renewals. (Boris Shkolnik via ddas)
 
+    MAPREDUCE-1686. Fixes StreamUtil.goodClassOrNull to find classes without
+    package names. (Paul Burkhardt via amareshwari)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
