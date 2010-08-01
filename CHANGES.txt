@@ -101,6 +101,10 @@ Trunk (unreleased changes)
     specify a credentials file. The tokens from there will be passed to the job.
     (Jitendra Pandey and Owen O'Malley via ddas)
 
+    MAPREDUCE-1624. Documents the job credentials and associated details to do 
+    with delegation tokens (on the client side). 
+    (Jitendra Pandey and Devaraj Das via ddas)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and
