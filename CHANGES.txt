@@ -212,6 +212,10 @@ Trunk (unreleased changes)
     MAPREDUCE-1686. Fixes StreamUtil.goodClassOrNull to find classes without
     package names. (Paul Burkhardt via amareshwari)
 
+    MAPREDUCE-1288. Fixes TrackerDistributedCacheManager to take into account
+    the owner of the localized file in the mapping from cache URIs to
+    CacheStatus objects. (ddas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

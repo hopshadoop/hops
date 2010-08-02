@@ -283,7 +283,8 @@ public class DistributedCache {
       throw new IOException("TimeStamp of the uri couldnot be found");
     }
     new TrackerDistributedCacheManager(conf, new DefaultTaskController())
-        .releaseCache(cache, conf, Long.parseLong(timestamp));
+           .releaseCache(cache, conf, Long.parseLong(timestamp),
+            TrackerDistributedCacheManager.getLocalizedCacheOwner(false));
   }
   
   /**
