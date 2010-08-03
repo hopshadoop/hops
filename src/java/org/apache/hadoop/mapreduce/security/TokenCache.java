@@ -106,74 +106,40 @@ public class TokenCache {
     // get jobtracker principal id (for the renewer)
     KerberosName jtKrbName = 
       new KerberosName(conf.get(JTConfig.JT_USER_NAME,""));
-    Text delegTokenRenewer = new Text(jtKrbName.getShortName());
+    
+    String delegTokenRenewer = jtKrbName.getShortName();
+    boolean readFile = true;
 
-    boolean notReadFile = true;
-
-    // TODO: Connecting to the namenode is not required in the case,
-    // where we already have the credentials in the file
-    if(fs instanceof DistributedFileSystem) {
-      DistributedFileSystem dfs = (DistributedFileSystem)fs;
-      URI uri = dfs.getUri();
-      String fs_addr = SecurityUtil.buildDTServiceName(uri, NameNode.DEFAULT_PORT);
-
-      // see if we already have the token
-      Token<DelegationTokenIdentifier> token = 
-        TokenCache.getDelegationToken(credentials, fs_addr); 
-      if(token != null) {
-        LOG.debug("DT for " + token.getService()  + " is already present");
-        return;
-      }
-      if (notReadFile) { //read the file only once
+    String fsName = fs.getCanonicalServiceName();
+    if (TokenCache.getDelegationToken(credentials, fsName) == null) {
+      //TODO: Need to come up with a better place to put
+      //this block of code to do with reading the file
+      if (readFile) {
+        readFile = false;
         String binaryTokenFilename =
           conf.get("mapreduce.job.credentials.binary");
         if (binaryTokenFilename != null) {
-          credentials.readTokenStorageFile(new Path("file:///" +  
-              binaryTokenFilename), conf);
+          Credentials binary;
+          try {
+            binary = Credentials.readTokenStorageFile(
+                new Path("file:///" +  binaryTokenFilename), conf);
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+          credentials.addAll(binary);
         }
-        notReadFile = false;
-        token = 
-          TokenCache.getDelegationToken(credentials, fs_addr); 
-        if(token != null) {
-          LOG.debug("DT for " + token.getService()  + " is already present");
+        if (TokenCache.getDelegationToken(credentials, fsName) != null) {
+          LOG.debug("DT for " + fsName  + " is already present");
           return;
         }
       }
-      // get the token
-      token = dfs.getDelegationToken(delegTokenRenewer);
-      if(token==null) 
-        throw new IOException("Token from " + fs_addr + " is null");
-
-      token.setService(new Text(fs_addr));
-      credentials.addToken(new Text(fs_addr), token);
-      LOG.info("Got dt for " + uri + ";uri="+ fs_addr + 
-          ";t.service="+token.getService());
-    } else if (fs instanceof HftpFileSystem) {
-      HftpFileSystem hfs = (HftpFileSystem)fs;
-      URI uri = hfs.getUri();
-      String fs_addr = SecurityUtil.buildDTServiceName(uri, NameNode.DEFAULT_PORT);
-      Token<DelegationTokenIdentifier> token = 
-        TokenCache.getDelegationToken(credentials, fs_addr); 
-      if(token != null) {
-        LOG.debug("DT for " + token.getService()  + " is already present");
-        return;
-      }
-      //the initialize method of hftp, called via FileSystem.get() done
-      //earlier gets a delegation token
-
-      Token<? extends TokenIdentifier> t = hfs.getDelegationToken();
-      if (t != null) {
-        credentials.addToken(new Text(fs_addr), t);
-
-        // in this case port in fs_addr is port for hftp request, but
-        // token's port is for RPC
-        // to find the correct DT we need to know the mapping between Hftp port 
-        // and RPC one. hence this new setting in the conf.
-        String key = HftpFileSystem.HFTP_SERVICE_NAME_KEY+fs_addr;
-        conf.set(key, t.getService().toString());
-        LOG.info("GOT dt for " + uri + " and stored in conf as " + key + "=" 
-            + t.getService());
-
+      Token<?> token = fs.getDelegationToken(delegTokenRenewer);
+      if (token != null) {
+        Text fsNameText = new Text(fsName);
+        token.setService(fsNameText);
+        credentials.addToken(fsNameText, token);
+        LOG.info("Got dt for " + fs.getUri() + ";uri="+ fsName + 
+            ";t.service="+token.getService());
       }
     }
   }
@@ -213,14 +179,14 @@ public class TokenCache {
   public static Credentials loadTokens(String jobTokenFile, JobConf conf) 
   throws IOException {
     Path localJobTokenFile = new Path ("file:///" + jobTokenFile);
-    
-    Credentials ts = new Credentials();
-    ts.readTokenStorageFile(localJobTokenFile, conf);
+
+    Credentials ts = Credentials.readTokenStorageFile(localJobTokenFile, conf);
 
     if(LOG.isDebugEnabled()) {
-      LOG.debug("Task: Loaded jobTokenFile from: "+localJobTokenFile.toUri().getPath() 
-        +"; num of sec keys  = " + ts.numberOfSecretKeys() + " Number of tokens " + 
-        ts.numberOfTokens());
+      LOG.debug("Task: Loaded jobTokenFile from: "+
+          localJobTokenFile.toUri().getPath() 
+          +"; num of sec keys  = " + ts.numberOfSecretKeys() +
+          " Number of tokens " +  ts.numberOfTokens());
     }
     return ts;
   }

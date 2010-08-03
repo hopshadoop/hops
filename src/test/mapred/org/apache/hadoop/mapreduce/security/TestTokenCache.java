@@ -271,7 +271,6 @@ public class TestTokenCache {
   
   @Test
   public void testGetTokensForNamenodes() throws IOException {
-    FileSystem fs = dfsCluster.getFileSystem();
     
     Credentials credentials = new Credentials();
     TokenCache.obtainTokensForNamenodesInternal(credentials, new Path[] { p1,
@@ -305,13 +304,15 @@ public class TestTokenCache {
 
     DelegationTokenSecretManager dtSecretManager = 
       dfsCluster.getNamesystem().getDelegationTokenSecretManager();
+    String renewer = "renewer";
+    jConf.set(JTConfig.JT_USER_NAME,renewer);
     DelegationTokenIdentifier dtId = 
-      new DelegationTokenIdentifier(new Text("user"), new Text("renewer"), null);
+      new DelegationTokenIdentifier(new Text("user"), new Text(renewer), null);
     final Token<DelegationTokenIdentifier> t = 
       new Token<DelegationTokenIdentifier>(dtId, dtSecretManager);
 
     final URI uri = new URI("hftp://host:2222/file1");
-    String fs_addr = 
+    final String fs_addr = 
       SecurityUtil.buildDTServiceName(uri, NameNode.DEFAULT_PORT);
     t.setService(new Text(fs_addr));
 
@@ -329,12 +330,19 @@ public class TestTokenCache {
       public Token<DelegationTokenIdentifier>  answer(InvocationOnMock invocation)
       throws Throwable {
         return t;
-      }}).when(hfs).getDelegationToken();
-
-
+      }}).when(hfs).getDelegationToken(renewer);
+    
+    //when(hfs.getCanonicalServiceName).thenReturn(fs_addr);
+    Mockito.doAnswer(new Answer<String>(){
+      @Override
+      public String answer(InvocationOnMock invocation)
+      throws Throwable {
+        return fs_addr;
+      }}).when(hfs).getCanonicalServiceName();
+    
     Credentials credentials = new Credentials();
     Path p = new Path(uri.toString());
-    System.out.println("Path for hftp="+ p + "; fs_addr="+fs_addr);
+    System.out.println("Path for hftp="+ p + "; fs_addr="+fs_addr + "; rn=" + renewer);
     TokenCache.obtainTokensForNamenodesInternal(hfs, credentials, jConf);
 
     Collection<Token<? extends TokenIdentifier>> tns = credentials.getAllTokens();
@@ -350,11 +358,6 @@ public class TestTokenCache {
       }
       assertTrue("didn't find token for " + p, found);
     }
-    // also check the conf value
-    String key = HftpFileSystem.HFTP_SERVICE_NAME_KEY + fs_addr;
-    String confKey = jConf.get(key);
-    assertEquals("jconf key for HFTP DT is not correct", confKey,
-        t.getService().toString());
   }
 
 }

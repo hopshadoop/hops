@@ -223,6 +223,9 @@ Trunk (unreleased changes)
     of configuration properties "mapreduce.job.name" and "mapred.job.name".
     (Ravi Gummadi via amareshwari)
 
+    MAPREDUCE-1958. The MapReduce part corresponding to the HADOOP-6873.
+    (Boris Shkolnik & Owen O'Malley via ddas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

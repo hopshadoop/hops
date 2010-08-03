@@ -740,10 +740,6 @@ public class DistCp implements Tool {
     List<IOException> rslt = new ArrayList<IOException>();
     List<Path> unglobbed = new LinkedList<Path>();
     
-    // get tokens for all the required FileSystems..
-    // also set the renewer as the JobTracker for the hftp case
-    jobConf.set(HftpFileSystem.HFTP_RENEWER, 
-        jobConf.get(JobTracker.JT_USER_NAME, ""));
     Path[] ps = new Path[srcPaths.size()];
     ps = srcPaths.toArray(ps);
     TokenCache.obtainTokensForNamenodes(jobConf.getCredentials(), ps, jobConf);
