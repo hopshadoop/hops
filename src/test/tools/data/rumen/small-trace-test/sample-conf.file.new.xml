@@ -1,3 +1,5 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!--
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -15,24 +17,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.tools.rumen;
-
-import org.apache.hadoop.mapreduce.MRJobConfig;
-
-public enum JobConfPropertyNames {
-  QUEUE_NAMES("mapred.job.queue.name", MRJobConfig.QUEUE_NAME),
-  JOB_NAMES("mapred.job.name", MRJobConfig.JOB_NAME),
-  TASK_JAVA_OPTS_S("mapred.child.java.opts"),
-  MAP_JAVA_OPTS_S("mapred.child.java.opts", MRJobConfig.MAP_JAVA_OPTS),
-  REDUCE_JAVA_OPTS_S("mapred.child.java.opts", MRJobConfig.REDUCE_JAVA_OPTS);
-
-  private String[] candidates;
-
-  JobConfPropertyNames(String... candidates) {
-    this.candidates = candidates;
-  }
-
-  public String[] getCandidates() {
-    return candidates;
-  }
-}
+-->
+<configuration>
+<!--
+New mapreduce config properties
+-->
+   <property>
+      <name>mapreduce.job.queuename</name><value>TheQueue</value>
+   </property>
+   <property>
+      <name>mapreduce.job.name</name><value>MyMRJob</value>
+   </property>
+   <property>
+      <name>maproduce.uninteresting.property</name><value>abcdef</value>
+   </property>
+   <property><name>mapreduce.map.java.opts</name><value>-server -Xmx640m -Djava.net.preferIPv4Stack=true</value></property>
+   <property><name>mapreduce.reduce.java.opts</name><value>-server -Xmx650m -Djava.net.preferIPv4Stack=true</value></property>
+</configuration>

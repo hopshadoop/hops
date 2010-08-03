@@ -34,6 +34,7 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.MiniMRCluster;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobID;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.MapReduceTestUtil;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskID;
@@ -380,15 +381,34 @@ public class TestRumenJobTraces {
       lfs.delete(tempDir, true);
     }
   }
-  
+
   @Test
   public void testJobConfigurationParser() throws Exception {
-    String[] list1 =
-        { "mapred.job.queue.name", "mapreduce.job.name",
-            "mapred.child.java.opts" };
 
-    String[] list2 = { "mapred.job.queue.name", "mapred.child.java.opts" };
+    // Validate parser with old mapred config properties from
+    // sample-conf-file.xml
+    String[] oldProps1 = { "mapred.job.queue.name", "mapred.job.name",
+        "mapred.child.java.opts" };
 
+    String[] oldProps2 = { "mapred.job.queue.name", "mapred.child.java.opts" };
+
+    validateJobConfParser(oldProps1, oldProps2, "sample-conf.file.xml", false);
+
+    // Validate parser with new mapreduce config properties from
+    // sample-conf-file.new.xml
+    String[] newProps1 = { MRJobConfig.QUEUE_NAME, MRJobConfig.JOB_NAME,
+        MRJobConfig.MAP_JAVA_OPTS, MRJobConfig.REDUCE_JAVA_OPTS };
+
+    String[] newProps2 = { MRJobConfig.QUEUE_NAME,
+        MRJobConfig.MAP_JAVA_OPTS, MRJobConfig.REDUCE_JAVA_OPTS };
+
+    validateJobConfParser(newProps1, newProps2,
+        "sample-conf.file.new.xml", true);
+  }
+
+  private void validateJobConfParser(String[] list1, String[] list2,
+      String confFile, boolean newConfig)
+      throws Exception {
     List<String> interested1 = new ArrayList<String>();
     for (String interested : list1) {
       interested1.add(interested);
@@ -412,7 +432,7 @@ public class TestRumenJobTraces {
 
     final Path rootInputPath = new Path(rootInputDir, "rumen/small-trace-test");
 
-    final Path inputPath = new Path(rootInputPath, "sample-conf.file.xml");
+    final Path inputPath = new Path(rootInputPath, confFile);
 
     InputStream inputConfStream =
         new PossiblyDecompressedInputStream(inputPath, conf);
@@ -424,25 +444,79 @@ public class TestRumenJobTraces {
       inputConfStream = new PossiblyDecompressedInputStream(inputPath, conf);
       Properties props2 = jcp2.parse(inputConfStream);
 
-      assertEquals("testJobConfigurationParser: wrong number of properties", 3,
-          props1.size());
-      assertEquals("testJobConfigurationParser: wrong number of properties", 2,
-          props2.size());
+      assertEquals("testJobConfigurationParser: wrong number of properties",
+          list1.length, props1.size());
+      assertEquals("testJobConfigurationParser: wrong number of properties",
+          list2.length, props2.size());
 
-      assertEquals("prop test 1", "TheQueue", props1
-          .get("mapred.job.queue.name"));
-      assertEquals("prop test 2", "job_0001", props1.get("mapreduce.job.name"));
-      assertEquals("prop test 3",
-          "-server -Xmx640m -Djava.net.preferIPv4Stack=true", props1
-              .get("mapred.child.java.opts"));
-      assertEquals("prop test 4", "TheQueue", props2
-          .get("mapred.job.queue.name"));
-      assertEquals("prop test 5",
-          "-server -Xmx640m -Djava.net.preferIPv4Stack=true", props2
-              .get("mapred.child.java.opts"));
+      // Make sure that parser puts the interested properties into props1 and
+      // props2 as defined by list1 and list2.
+      String oldOrNew = newConfig ? "New" : "Old";
+      assertEquals(oldOrNew + " config property for job queue name is not "
+          + " extracted properly.", "TheQueue",
+          JobBuilder.extract(props1, JobConfPropertyNames.QUEUE_NAMES
+          .getCandidates(), null));
+      assertEquals(oldOrNew + " config property for job name is not "
+          + " extracted properly.", "MyMRJob",
+          JobBuilder.extract(props1, JobConfPropertyNames.JOB_NAMES
+          .getCandidates(), null));
+
+      assertEquals(oldOrNew + " config property for job queue name is not "
+          + " extracted properly.", "TheQueue",
+          JobBuilder.extract(props2, JobConfPropertyNames.QUEUE_NAMES
+          .getCandidates(), null));
+      
+      // This config property is not interested for props2. So props should not
+      // contain this.
+      assertNull("Uninterested " + oldOrNew + " config property for job name "
+          + " is extracted.",
+          JobBuilder.extract(props2, JobConfPropertyNames.JOB_NAMES
+          .getCandidates(), null));
+
+      validateChildJavaOpts(newConfig, props1);
+      validateChildJavaOpts(newConfig, props2);
 
     } finally {
       inputConfStream.close();
+    }
+  }
+
+  // Validate child java opts in properties.
+  // newConfigProperties: boolean that specifies if the config properties to be
+  // validated are new OR old.
+  private void validateChildJavaOpts(boolean newConfigProperties,
+      Properties props) {
+    if (newConfigProperties) {
+      assertEquals("New config property " + MRJobConfig.MAP_JAVA_OPTS
+          + " is not extracted properly.",
+          "-server -Xmx640m -Djava.net.preferIPv4Stack=true",
+          JobBuilder.extract(props, JobConfPropertyNames.MAP_JAVA_OPTS_S
+          .getCandidates(), null));
+      assertEquals("New config property " + MRJobConfig.REDUCE_JAVA_OPTS
+          + " is not extracted properly.",
+          "-server -Xmx650m -Djava.net.preferIPv4Stack=true",
+          JobBuilder.extract(props, JobConfPropertyNames.REDUCE_JAVA_OPTS_S
+          .getCandidates(), null));
+    }
+    else {
+      // if old property mapred.child.java.opts is set, then extraction of all
+      // the following 3 properties should give that value.
+      assertEquals("mapred.child.java.opts is not extracted properly.",
+          "-server -Xmx640m -Djava.net.preferIPv4Stack=true",
+          JobBuilder.extract(props, JobConfPropertyNames.TASK_JAVA_OPTS_S
+          .getCandidates(), null));
+      assertEquals("New config property " + MRJobConfig.MAP_JAVA_OPTS
+          + " is not extracted properly when the old config property "
+          + "mapred.child.java.opts is set.",
+          "-server -Xmx640m -Djava.net.preferIPv4Stack=true",
+          JobBuilder.extract(props, JobConfPropertyNames.MAP_JAVA_OPTS_S
+          .getCandidates(), null));
+      assertEquals("New config property " + MRJobConfig.REDUCE_JAVA_OPTS
+              + " is not extracted properly when the old config property "
+              + "mapred.child.java.opts is set.",
+          "-server -Xmx640m -Djava.net.preferIPv4Stack=true",
+          JobBuilder.extract(props, JobConfPropertyNames.REDUCE_JAVA_OPTS_S
+          .getCandidates(), null));
     }
   }
 

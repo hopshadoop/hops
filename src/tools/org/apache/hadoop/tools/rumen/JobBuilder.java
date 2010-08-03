@@ -164,7 +164,7 @@ public class JobBuilder {
           "JobBuilder.process(HistoryEvent): unknown event type");
   }
 
-  private String extract(Properties conf, String[] names, String defaultValue) {
+  static String extract(Properties conf, String[] names, String defaultValue) {
     for (String name : names) {
       String result = conf.getProperty(name);
 

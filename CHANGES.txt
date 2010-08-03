@@ -216,6 +216,10 @@ Trunk (unreleased changes)
     the owner of the localized file in the mapping from cache URIs to
     CacheStatus objects. (ddas)
 
+    MAPREDUCE-1982. Fixes Rumen's TraceBuilder to extract job name from either 
+    of configuration properties "mapreduce.job.name" and "mapred.job.name".
+    (Ravi Gummadi via amareshwari)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
