@@ -21,6 +21,7 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 // HashSet and HashMap do not guarantee that the oder of iteration is 
 // determinstic. We need the latter for the deterministic replay of 
@@ -41,5 +42,9 @@ public privileged aspect DeterministicCollectionAspects {
 
   HashMap around() : call(HashMap.new()) {
     return new LinkedHashMap();
+  }
+
+  ConcurrentHashMap around() : call(ConcurrentHashMap.new()) {
+    return new FakeConcurrentHashMap();
   }
 }

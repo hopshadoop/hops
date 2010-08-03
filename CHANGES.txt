@@ -105,6 +105,9 @@ Trunk (unreleased changes)
     with delegation tokens (on the client side). 
     (Jitendra Pandey and Devaraj Das via ddas)
 
+    MAPREDUCE-1834. TestSimulatorDeterministicReplay timesout on trunk.
+    (Hong Tang via mahadev)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and
