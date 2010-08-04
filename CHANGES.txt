@@ -230,6 +230,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1958. The MapReduce part corresponding to the HADOOP-6873.
     (Boris Shkolnik & Owen O'Malley via ddas)
 
+    MAPREDUCE-1900. TaskTracker and JobTracker closes FileSystems, opened on
+    behalf of users that it no longer requires. (Kan Zhang and ddas via ddas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

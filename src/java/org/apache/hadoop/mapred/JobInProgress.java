@@ -392,105 +392,112 @@ public class JobInProgress {
                        JobInfo jobInfo,
                        Credentials ts
                       ) throws IOException, InterruptedException {
-    this.restartCount = rCount;
-    this.jobId = JobID.downgrade(jobInfo.getJobID());
-    String url = "http://" + jobtracker.getJobTrackerMachine() + ":" 
-        + jobtracker.getInfoPort() + "/jobdetails.jsp?jobid=" + this.jobId;
-    this.jobtracker = jobtracker;
-    this.jobHistory = jobtracker.getJobHistory();
-    this.startTime = System.currentTimeMillis();
-    
-    this.localFs = jobtracker.getLocalFileSystem();
-    this.tokenStorage = ts;
-    // use the user supplied token to add user credentials to the conf
-    jobSubmitDir = jobInfo.getJobSubmitDir();
-    user = jobInfo.getUser().toString();
+    try {
+      this.restartCount = rCount;
+      this.jobId = JobID.downgrade(jobInfo.getJobID());
+      String url = "http://" + jobtracker.getJobTrackerMachine() + ":"
+          + jobtracker.getInfoPort() + "/jobdetails.jsp?jobid=" + this.jobId;
+      this.jobtracker = jobtracker;
+      this.jobHistory = jobtracker.getJobHistory();
+      this.startTime = System.currentTimeMillis();
 
-    UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
-    if (ts != null) {
-      for (Token<? extends TokenIdentifier> token : ts.getAllTokens()) {
-        ugi.addToken(token);
+      this.localFs = jobtracker.getLocalFileSystem();
+      this.tokenStorage = ts;
+      // use the user supplied token to add user credentials to the conf
+      jobSubmitDir = jobInfo.getJobSubmitDir();
+      user = jobInfo.getUser().toString();
+
+      UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
+      if (ts != null) {
+        for (Token<? extends TokenIdentifier> token : ts.getAllTokens()) {
+          ugi.addToken(token);
+        }
       }
+
+      fs = ugi.doAs(new PrivilegedExceptionAction<FileSystem>() {
+        public FileSystem run() throws IOException {
+          return jobSubmitDir.getFileSystem(default_conf);
+        }
+      });
+      this.localJobFile = default_conf.getLocalPath(JobTracker.SUBDIR + "/"
+          + this.jobId + ".xml");
+
+      jobFile = JobSubmissionFiles.getJobConfPath(jobSubmitDir);
+      fs.copyToLocalFile(jobFile, localJobFile);
+      conf = new JobConf(localJobFile);
+      if (conf.getUser() == null) {
+        this.conf.setUser(user);
+      }
+      if (!conf.getUser().equals(user)) {
+        String desc = "The username " + conf.getUser() + " obtained from the "
+            + "conf doesn't match the username " + user + " the user "
+            + "authenticated as";
+        AuditLogger.logFailure(user, Queue.QueueOperation.SUBMIT_JOB.name(),
+            conf.getUser(), jobId.toString(), desc);
+        throw new IOException(desc);
+      }
+      this.priority = conf.getJobPriority();
+      this.profile = new JobProfile(conf.getUser(), this.jobId, jobFile
+          .toString(), url, conf.getJobName(), conf.getQueueName());
+      this.status = new JobStatus(this.jobId, 0.0f, 0.0f, JobStatus.PREP,
+          profile.getUser(), profile.getJobName(), profile.getJobFile(),
+          profile.getURL().toString());
+      this.jobtracker.getInstrumentation().addPrepJob(conf, this.jobId);
+      status.setStartTime(startTime);
+      this.status.setJobPriority(this.priority);
+
+      this.numMapTasks = conf.getNumMapTasks();
+      this.numReduceTasks = conf.getNumReduceTasks();
+
+      this.memoryPerMap = conf.getMemoryForMapTask();
+      this.memoryPerReduce = conf.getMemoryForReduceTask();
+
+      this.taskCompletionEvents = new ArrayList<TaskCompletionEvent>(
+          numMapTasks + numReduceTasks + 10);
+      JobContext jobContext = new JobContextImpl(conf, jobId);
+      this.jobSetupCleanupNeeded = jobContext.getJobSetupCleanupNeeded();
+
+      // Construct the jobACLs
+      status.setJobACLs(jobtracker.getJobACLsManager().constructJobACLs(conf));
+
+      this.mapFailuresPercent = conf.getMaxMapTaskFailuresPercent();
+      this.reduceFailuresPercent = conf.getMaxReduceTaskFailuresPercent();
+
+      this.maxTaskFailuresPerTracker = conf.getMaxTaskFailuresPerTracker();
+
+      hasSpeculativeMaps = conf.getMapSpeculativeExecution();
+      hasSpeculativeReduces = conf.getReduceSpeculativeExecution();
+      this.maxLevel = jobtracker.getNumTaskCacheLevels();
+      this.anyCacheLevel = this.maxLevel + 1;
+      this.nonLocalMaps = new LinkedList<TaskInProgress>();
+      this.nonLocalRunningMaps = new LinkedHashSet<TaskInProgress>();
+      this.runningMapCache = new IdentityHashMap<Node, Set<TaskInProgress>>();
+      this.nonRunningReduces = new LinkedList<TaskInProgress>();
+      this.runningReduces = new LinkedHashSet<TaskInProgress>();
+      this.resourceEstimator = new ResourceEstimator(this);
+      this.submitHostName = conf.getJobSubmitHostName();
+      this.submitHostAddress = conf.getJobSubmitHostAddress();
+
+      this.nonLocalMaps = new LinkedList<TaskInProgress>();
+      this.nonLocalRunningMaps = new LinkedHashSet<TaskInProgress>();
+      this.runningMapCache = new IdentityHashMap<Node, Set<TaskInProgress>>();
+      this.nonRunningReduces = new LinkedList<TaskInProgress>();
+      this.runningReduces = new LinkedHashSet<TaskInProgress>();
+      this.slowTaskThreshold = Math.max(0.0f, conf.getFloat(
+          MRJobConfig.SPECULATIVE_SLOWTASK_THRESHOLD, 1.0f));
+      this.speculativeCap = conf.getFloat(MRJobConfig.SPECULATIVECAP, 0.1f);
+      this.slowNodeThreshold = conf.getFloat(
+          MRJobConfig.SPECULATIVE_SLOWNODE_THRESHOLD, 1.0f);
+      // register job's tokens for renewal
+      DelegationTokenRenewal.registerDelegationTokensForRenewal(jobInfo
+          .getJobID(), ts, jobtracker.getConf());
+    } finally {
+      // close all FileSystems that was created above for the current user
+      // At this point, this constructor is called in the context of an RPC, and
+      // hence the "current user" is actually referring to the kerberos
+      // authenticated user (if security is ON).
+      FileSystem.closeAllForUGI(UserGroupInformation.getCurrentUser());
     }
-
-    fs = ugi.doAs(new PrivilegedExceptionAction<FileSystem>() {
-      public FileSystem run() throws IOException {
-        return jobSubmitDir.getFileSystem(default_conf);
-      }});
-    this.localJobFile = 
-      default_conf.getLocalPath(JobTracker.SUBDIR + "/" + this.jobId + ".xml");
-    
-    jobFile = JobSubmissionFiles.getJobConfPath(jobSubmitDir);
-    fs.copyToLocalFile(jobFile, localJobFile);
-    conf = new JobConf(localJobFile);
-    if (conf.getUser() == null) {
-      this.conf.setUser(user);
-    }
-    if (!conf.getUser().equals(user)) {
-      String desc = "The username " + conf.getUser() + " obtained from the " +
-                     "conf doesn't match the username " + user + " the user " +
-                                     "authenticated as";
-      AuditLogger.logFailure(user, Queue.QueueOperation.SUBMIT_JOB.name(),
-                             conf.getUser(), jobId.toString(), desc);
-      throw new IOException(desc);
-    }
-    this.priority = conf.getJobPriority();
-    this.profile = new JobProfile(conf.getUser(), this.jobId, 
-                                  jobFile.toString(), url, 
-                                  conf.getJobName(), conf.getQueueName());
-    this.status = new JobStatus(this.jobId, 0.0f, 0.0f, JobStatus.PREP, 
-        profile.getUser(), profile.getJobName(), profile.getJobFile(), 
-        profile.getURL().toString());
-    this.jobtracker.getInstrumentation().addPrepJob(conf, this.jobId);
-    status.setStartTime(startTime);
-    this.status.setJobPriority(this.priority);
-
-    this.numMapTasks = conf.getNumMapTasks();
-    this.numReduceTasks = conf.getNumReduceTasks();
-
-    this.memoryPerMap = conf.getMemoryForMapTask();
-    this.memoryPerReduce = conf.getMemoryForReduceTask();
-
-    this.taskCompletionEvents = new ArrayList<TaskCompletionEvent>
-       (numMapTasks + numReduceTasks + 10);
-    JobContext jobContext = new JobContextImpl(conf, jobId);
-    this.jobSetupCleanupNeeded = jobContext.getJobSetupCleanupNeeded();
-
-    // Construct the jobACLs
-    status.setJobACLs(jobtracker.getJobACLsManager().constructJobACLs(conf));
-
-    this.mapFailuresPercent = conf.getMaxMapTaskFailuresPercent();
-    this.reduceFailuresPercent = conf.getMaxReduceTaskFailuresPercent();
-
-    this.maxTaskFailuresPerTracker = conf.getMaxTaskFailuresPerTracker();
-        
-    hasSpeculativeMaps = conf.getMapSpeculativeExecution();
-    hasSpeculativeReduces = conf.getReduceSpeculativeExecution();
-    this.maxLevel = jobtracker.getNumTaskCacheLevels();
-    this.anyCacheLevel = this.maxLevel+1;
-    this.nonLocalMaps = new LinkedList<TaskInProgress>();
-    this.nonLocalRunningMaps = new LinkedHashSet<TaskInProgress>();
-    this.runningMapCache = new IdentityHashMap<Node, Set<TaskInProgress>>();
-    this.nonRunningReduces = new LinkedList<TaskInProgress>();    
-    this.runningReduces = new LinkedHashSet<TaskInProgress>();
-    this.resourceEstimator = new ResourceEstimator(this);
-    this.submitHostName = conf.getJobSubmitHostName();
-    this.submitHostAddress = conf.getJobSubmitHostAddress();
-    
-    this.nonLocalMaps = new LinkedList<TaskInProgress>();
-    this.nonLocalRunningMaps = new LinkedHashSet<TaskInProgress>();
-    this.runningMapCache = new IdentityHashMap<Node, Set<TaskInProgress>>();
-    this.nonRunningReduces = new LinkedList<TaskInProgress>();    
-    this.runningReduces = new LinkedHashSet<TaskInProgress>();
-    this.slowTaskThreshold = Math.max(0.0f,
-        conf.getFloat(MRJobConfig.SPECULATIVE_SLOWTASK_THRESHOLD,1.0f));
-    this.speculativeCap = conf.getFloat(
-        MRJobConfig.SPECULATIVECAP,0.1f);
-    this.slowNodeThreshold = conf.getFloat(
-        MRJobConfig.SPECULATIVE_SLOWNODE_THRESHOLD,1.0f); 
-    // register job's tokens for renewal
-    DelegationTokenRenewal.registerDelegationTokensForRenewal(
-        jobInfo.getJobID(), ts, this.conf);
   }
     
   private void printCache (Map<Node, List<TaskInProgress>> cache) {
@@ -3702,7 +3709,7 @@ public class JobInProgress {
     TokenCache.setJobToken(token, tokenStorage);
     
     // write TokenStorage out
-    tokenStorage.writeTokenStorageFile(keysFile, conf);
+    tokenStorage.writeTokenStorageFile(keysFile, jobtracker.getConf());
     LOG.info("jobToken generated and stored with users keys in "
         + keysFile.toUri().getPath());
   }
