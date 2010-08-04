@@ -233,6 +233,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1900. TaskTracker and JobTracker closes FileSystems, opened on
     behalf of users that it no longer requires. (Kan Zhang and ddas via ddas)
 
+    MAPREDUCE-1992. Fixes a problem to do with bringing up the JobTracker in
+    unsecure mode. (Kan Zhang via ddas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

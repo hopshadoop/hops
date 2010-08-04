@@ -586,11 +586,7 @@ public class TaskTracker
   synchronized void initialize() throws IOException, InterruptedException {
     UserGroupInformation.setConfiguration(fConf);
     SecurityUtil.login(fConf, TTConfig.TT_KEYTAB_FILE, TTConfig.TT_USER_NAME);
-    if (UserGroupInformation.isLoginKeytabBased()) {
-      mrOwner = UserGroupInformation.getLoginUser();
-    } else {
-      mrOwner = UserGroupInformation.getCurrentUser();
-    }
+    mrOwner = UserGroupInformation.getCurrentUser();
 
     supergroup = fConf.get(MRConfig.MR_SUPERGROUP, "supergroup");
     LOG.info("Starting tasktracker with owner as " + mrOwner.getShortUserName()

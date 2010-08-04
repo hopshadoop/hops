@@ -1382,11 +1382,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     UserGroupInformation.setConfiguration(conf);
     SecurityUtil.login(conf, JTConfig.JT_KEYTAB_FILE, JTConfig.JT_USER_NAME,
         localMachine);
-    if (UserGroupInformation.isLoginKeytabBased()) {
-      mrOwner = UserGroupInformation.getLoginUser();
-    } else {
-      mrOwner = UserGroupInformation.getCurrentUser();
-    }
+    mrOwner = UserGroupInformation.getCurrentUser();
     
     supergroup = conf.get(MR_SUPERGROUP, "supergroup");
     LOG.info("Starting jobtracker with owner as " + mrOwner.getShortUserName() 
@@ -4601,11 +4597,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     UserGroupInformation.setConfiguration(conf);
     SecurityUtil.login(conf, JTConfig.JT_KEYTAB_FILE, JTConfig.JT_USER_NAME,
         localMachine);
-    if (UserGroupInformation.isLoginKeytabBased()) {
-      mrOwner = UserGroupInformation.getLoginUser();
-    } else {
-      mrOwner = UserGroupInformation.getCurrentUser();
-    }
+    mrOwner = UserGroupInformation.getCurrentUser();
     supergroup = conf.get(MRConfig.MR_SUPERGROUP, "supergroup");
     
     secretManager = null;
