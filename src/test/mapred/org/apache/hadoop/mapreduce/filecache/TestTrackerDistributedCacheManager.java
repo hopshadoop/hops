@@ -307,6 +307,9 @@ public class TestTrackerDistributedCacheManager extends TestCase {
   
   public void testPrivateCacheForMultipleUsers() 
   throws IOException, LoginException, InterruptedException{
+    if (!canRun()) {
+      return;
+    }
     // Try to initialize the distributed cache for the same file on the
     // HDFS, for two different users.
     // First initialize as the user running the test, then as some other user.

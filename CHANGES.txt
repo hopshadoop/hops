@@ -108,6 +108,10 @@ Trunk (unreleased changes)
     MAPREDUCE-1834. TestSimulatorDeterministicReplay timesout on trunk.
     (Hong Tang via mahadev)
 
+    MAPREDUCE-1993. Fixes test failure
+    TestTrackerDistributedCacheManagerWithLinuxTaskController. (Devaraj Das
+    via amareshwari)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and
