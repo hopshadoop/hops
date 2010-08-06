@@ -168,9 +168,6 @@ Trunk (unreleased changes)
     MAPREDUCE-1887. MRAsyncDiskService now properly absolutizes volume root
     paths. (Aaron Kimball via zshao)
 
-    MAPREDUCE-1876. Fixes TaskAttemptStartedEvent to correctly log event type
-    for all task types. (Amar Kamat via amareshwari)
-
     MAPREDUCE-1863. Fix NPE in Rumen when processing null CDF for failed task
     attempts. (Amar Kamat via cdouglas)
 
@@ -1726,3 +1723,6 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1942. 'compile-fault-inject' should never be called directly.
     (Konstantin Boudnik)
+
+    MAPREDUCE-1876. Fixes TaskAttemptStartedEvent to correctly log event type
+    for all task types. (Amar Kamat via amareshwari)
