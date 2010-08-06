@@ -865,8 +865,9 @@
   <!-- ================================================================== -->
   
   <target name="docs" depends="forrest.check" description="Generate forrest-based documentation. To use, specify -Dforrest.home=&lt;base of Apache Forrest installation&gt; on the command line." if="forrest.home">
+  	<!-- The template file may not exist if building from a tarball -->
   	<copy file="${conf.dir}/mapred-queues.xml.template"
-  	      tofile="${build.docs}/mapred-queues.xml"/>
+  	      tofile="${build.docs}/mapred-queues.xml" failonerror="false"/>
     <exec dir="${docs.src}" executable="${forrest.home}/bin/forrest"
 	  failonerror="true">
       <env key="JAVA_HOME" value="${java5.home}"/>
@@ -1139,6 +1140,7 @@
     </copy>
 
     <copy todir="${dist.dir}/" file="build.xml"/>
+    <copy todir="${dist.dir}/" file="build-utils.xml"/>
 
     <chmod perm="ugo+x" type="file" parallel="false">
         <fileset dir="${dist.dir}/bin"/>
