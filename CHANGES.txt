@@ -233,6 +233,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1992. Fixes a problem to do with bringing up the JobTracker in
     unsecure mode. (Kan Zhang via ddas)
 
+    MAPREDUCE-1999. Fixes ClientProtocol to use the correct 
+    DelegationTokenSelector. (Jitendra Pandey via ddas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
