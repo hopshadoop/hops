@@ -172,7 +172,7 @@ function print_usage(){
   echo "Usage: $script [--config dir] trace.json topology.json"
 }
 
-if [ $# != 2 ]; then
+if [ $# <= 2 ]; then
   print_usage
   exit
 fi

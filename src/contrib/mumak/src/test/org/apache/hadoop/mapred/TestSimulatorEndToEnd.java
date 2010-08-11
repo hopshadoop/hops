@@ -56,8 +56,10 @@ public class TestSimulatorEndToEnd {
     
     MockSimulatorEngine mockMumak = new MockSimulatorEngine(numJobs, nTrackers);
 
+    Configuration mumakConf = new Configuration();
+    mumakConf.set("mapred.jobtracker.taskScheduler", JobQueueTaskScheduler.class.getName());
     String[] args = { traceFile.toString(), topologyFile.toString() };
-    int res = ToolRunner.run(conf, mockMumak, args);
+    int res = ToolRunner.run(mumakConf, mockMumak, args);
     Assert.assertEquals(res, 0);
   }
   

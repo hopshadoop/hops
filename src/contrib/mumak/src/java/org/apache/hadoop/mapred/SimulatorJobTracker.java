@@ -197,6 +197,24 @@ public class SimulatorJobTracker extends JobTracker {
     SimulatorJobInProgress job = new SimulatorJobInProgress(jobId, jobSubmitDir, this,
                                                             this.conf, 
                                                             jobStory);
+    // Check whether the queue information provided is valid
+    try {
+      checkQueueValidity(job);
+    } catch(IOException ioe) {
+      LOG.warn("Queue given for job " + job.getJobID() + " is not valid:"
+        + ioe);
+      throw ioe;
+    }
+    
+    // Check the job if it cannot run in the cluster because of invalid memory
+    // requirements.
+    try {
+      checkMemoryRequirements(job);
+    } catch (IOException ioe) {
+      LOG.warn("Exception in checking Memory requirements of jobId: " + jobId
+               + ioe);
+      //throw ioe;
+    }
     return addJob(jobId, job);
   }
   
@@ -457,7 +475,10 @@ public class SimulatorJobTracker extends JobTracker {
           }
           SimulatorLaunchTaskAction newlaunchTask = 
         	  new SimulatorLaunchTaskAction(task, taskAttemptInfo);
-          
+          if (loggingEnabled) {
+            LOG.debug("Job " + jobID + " launched taskattempt " +
+                             taskAttemptID + " at " + getClock().getTime());
+          }
           actions.add(newlaunchTask);
         }
       }

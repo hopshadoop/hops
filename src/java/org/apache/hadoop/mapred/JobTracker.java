@@ -3049,14 +3049,11 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
         new JobInProgress(this, this.conf, restartCount, jobInfo, ts);
 
     synchronized (this) {
-      String queue = job.getProfile().getQueueName();
-      if (!(queueManager.getLeafQueueNames().contains(queue))) {
-        throw new IOException("Queue \"" + queue + "\" does not exist");
-      }
-
-      // check if queue is RUNNING
-      if (!queueManager.isRunning(queue)) {
-        throw new IOException("Queue \"" + queue + "\" is not running");
+      try {
+        checkQueueValidity(job);
+      } catch(IOException ioe) {
+        LOG.error("Queue given for job " + job.getJobID() + " is not valid: " + ioe);
+        throw ioe;
       }
       try {
         checkAccess(job, ugi, Queue.QueueOperation.SUBMIT_JOB, null);
@@ -3125,6 +3122,24 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   boolean isJobLevelAuthorizationEnabled() {
     return conf.getBoolean(
         MRConfig.JOB_LEVEL_AUTHORIZATION_ENABLING_FLAG, false);
+  }
+
+  /**
+   * For a JobInProgress that is being submitted, check whether 
+   * queue that the job has been submitted to exists and is RUNNING.
+   * @param job The JobInProgress object being submitted.
+   * @throws IOException
+   */
+  public void checkQueueValidity(JobInProgress job) throws IOException {
+    String queue = job.getProfile().getQueueName();
+    if (!(queueManager.getLeafQueueNames().contains(queue))) {
+        throw new IOException("Queue \"" + queue + "\" does not exist");
+    }
+
+    // check if queue is RUNNING
+    if (!queueManager.isRunning(queue)) {
+        throw new IOException("Queue \"" + queue + "\" is not running");
+    }
   }
 
   /**
@@ -4480,7 +4495,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
    * @param job
    * @throws IOException 
    */
-  private void checkMemoryRequirements(JobInProgress job)
+  void checkMemoryRequirements(JobInProgress job)
       throws IOException {
     if (!perTaskMemoryConfigurationSetOnJT()) {
       if (LOG.isDebugEnabled()) {

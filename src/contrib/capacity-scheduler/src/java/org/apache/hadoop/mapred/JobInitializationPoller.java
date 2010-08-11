@@ -634,4 +634,12 @@ public class JobInitializationPoller extends Thread {
   Set<JobID> getInitializedJobList() {
     return initializedJobs.keySet();
   }
+
+  public HashMap<String, JobInitializationThread> getThreadsToQueueMap() {
+    return threadsToQueueMap;
+  }
+  
+  public long getSleepInterval(){
+    return sleepInterval;
+  }
 }

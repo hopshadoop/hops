@@ -40,8 +40,7 @@ public class MockSimulatorEngine extends SimulatorEngine {
 
   public static final Log LOG = LogFactory.getLog(MockSimulatorEngine.class);
   
-  public MockSimulatorEngine(int nJobs,
-      @SuppressWarnings("unused") int nTrackers) {
+  public MockSimulatorEngine(int nJobs, int nTrackers) {
     super();
     fixedJobs = nJobs;
     jobs = new HashMap<JobID, JobStory>();
@@ -52,7 +51,11 @@ public class MockSimulatorEngine extends SimulatorEngine {
   @Override
   public void run() throws IOException, InterruptedException {
     startTime = System.currentTimeMillis();
-    init();
+    JobConf jobConf = createMumakConf();
+    // Adding the default queue since the example trace is from queue-less hadoop
+    jobConf.set("mapred.queue.names",JobConf.DEFAULT_QUEUE_NAME);
+    
+    init(jobConf);
     validateInitialization();
     SimulatorEvent nextEvent;
     while ((nextEvent = queue.get()) != null && nextEvent.getTimeStamp() < terminateTime

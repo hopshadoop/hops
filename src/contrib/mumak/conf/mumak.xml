@@ -34,4 +34,11 @@
   node-local</description>
 </property>
 
+<property>
+  <name>mumak.job-submission.policy</name>
+  <value>REPLAY</value>
+  <description>Job submission policy
+  </description>
+</property>
+
 </configuration>

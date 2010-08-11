@@ -57,6 +57,7 @@ public class TestSimulatorJobTracker {
     jtConf.set("mapred.system.dir", jtConf.get("hadoop.tmp.dir", "/tmp/hadoop-"
         + jtConf.getUser())
         + "/mapred/system");
+    jtConf.set("mapred.queue.names",JobConf.DEFAULT_QUEUE_NAME);
     System.out.println("Created JobConf");
     return jtConf;
   }

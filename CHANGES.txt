@@ -112,6 +112,9 @@ Trunk (unreleased changes)
     TestTrackerDistributedCacheManagerWithLinuxTaskController. (Devaraj Das
     via amareshwari)
 
+    MAPREDUCE-1523. Making Mumak work with Capacity-Scheduler (Anirban Das
+    via mahadev)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and

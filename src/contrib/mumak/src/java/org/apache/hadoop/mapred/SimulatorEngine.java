@@ -21,10 +21,15 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.Map;
 import java.util.Iterator;
 import java.util.Random;
 import java.util.regex.Pattern;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
@@ -68,6 +73,13 @@ public class SimulatorEngine extends Configured implements Tool {
   boolean shutdown = false;
   long terminateTime = Long.MAX_VALUE;
   long currentTime;
+  /** The HashSet for storing all the simulated threads useful for 
+   * job initialization for capacity scheduler.
+   */
+  HashSet<SimulatorCSJobInitializationThread> threadSet;
+  /** The log object to send our messages to; only used for debugging. */
+  private static final Log LOG = LogFactory.getLog(SimulatorEngine.class);
+  
   /** 
    * Master random seed read from the configuration file, if present.
    * It is (only) used for creating sub seeds for all the random number 
@@ -137,13 +149,13 @@ public class SimulatorEngine extends Configured implements Tool {
   }
    
   /**
-   * Initiate components in the simulation.
-   * @throws InterruptedException
-   * @throws IOException if trace or topology files cannot be open
+   * Creates the configuration for mumak simulation. This is kept modular mostly for 
+   * testing purposes. so that the standard configuration can be modified before passing
+   * it to the init() function.
+   * @return JobConf: the configuration for the SimulatorJobTracker 
    */
-  @SuppressWarnings("deprecation")
-  void init() throws InterruptedException, IOException {
     
+  JobConf createMumakConf() {
     JobConf jobConf = new JobConf(getConf());
     jobConf.setClass("topology.node.switch.mapping.impl",
         StaticMapping.class, DNSToSwitchMapping.class);
@@ -157,7 +169,30 @@ public class SimulatorEngine extends Configured implements Tool {
     jobConf.setUser("mumak");
     jobConf.set("mapred.system.dir", 
         jobConf.get("hadoop.log.dir", "/tmp/hadoop-"+jobConf.getUser()) + "/mapred/system");
-    jobConf.set("mapred.jobtracker.taskScheduler", JobQueueTaskScheduler.class.getName());
+    
+    return jobConf;
+  }
+
+  /**
+   * Initialize components in the simulation.
+   * @throws InterruptedException
+   * @throws IOException if trace or topology files cannot be opened.
+   */
+  void init() throws InterruptedException, IOException {
+    
+    JobConf jobConf = createMumakConf();
+    init(jobConf);
+  }
+    
+  /**
+   * Initiate components in the simulation. The JobConf is
+   * create separately and passed to the init().
+   * @param JobConf: The configuration for the jobtracker.
+   * @throws InterruptedException
+   * @throws IOException if trace or topology files cannot be opened.
+   */
+  @SuppressWarnings("deprecation")
+  void init(JobConf jobConf) throws InterruptedException, IOException {
     
     FileSystem lfs = FileSystem.getLocal(getConf());
     Path logPath =
@@ -212,8 +247,37 @@ public class SimulatorEngine extends Configured implements Tool {
     jc = new SimulatorJobClient(jt, jobStoryProducer, submissionPolicy);
     queue.addAll(jc.init(firstJobStartTime));
 
+    //if the taskScheduler is CapacityTaskScheduler start off the JobInitialization
+    //threads too
+    if (jobConf.get("mapred.jobtracker.taskScheduler").equals
+       (CapacityTaskScheduler.class.getName())) {
+      LOG.info("CapacityScheduler used: starting simulatorThreads");
+      startSimulatorThreadsCapSched(now);
+    }
     terminateTime = getTimeProperty(jobConf, "mumak.terminate.time",
                                     Long.MAX_VALUE);
+  }
+  
+  /**
+   * In this function, we collect the set of leaf queues from JobTracker, and 
+   * for each of them creates a simulated thread that performs the same
+   * check as JobInitializationPoller.JobInitializationThread in Capacity Scheduler.  
+   * @param now
+   * @throws IOException
+   */
+  private void startSimulatorThreadsCapSched(long now) throws IOException {
+    
+    Set<String> queueNames = jt.getQueueManager().getLeafQueueNames();
+    TaskScheduler taskScheduler = jt.getTaskScheduler();
+    threadSet = new HashSet<SimulatorCSJobInitializationThread>();
+    // We create a different thread for each queue and hold a 
+    //reference to  each of them 
+    for (String jobQueue: queueNames) {
+      SimulatorCSJobInitializationThread capThread = 
+        new SimulatorCSJobInitializationThread(taskScheduler,jobQueue);   
+      threadSet.add(capThread);
+      queue.addAll(capThread.init(now));
+    }
   }
   
   /**

@@ -745,6 +745,10 @@ public class ZombieJob implements JobStory {
       // any locality, so this group should count as "distance=2".
       // However, setup/cleanup tasks are also counted in the 4th group.
       // These tasks do not make sense.
+      if(cdfList==null) {
+    	  runtime = -1;
+    	  return runtime;
+      }
       try {
         runtime = makeUpRuntime(cdfList.get(locality));
       } catch (NoValueToMakeUpRuntime e) {
@@ -767,6 +771,9 @@ public class ZombieJob implements JobStory {
    */
   private long makeUpRuntime(List<LoggedDiscreteCDF> mapAttemptCDFs) {
     int total = 0;
+    if(mapAttemptCDFs == null) {
+    	return -1;
+    }
     for (LoggedDiscreteCDF cdf : mapAttemptCDFs) {
       total += cdf.getNumberValues();
     }
@@ -862,6 +869,11 @@ public class ZombieJob implements JobStory {
   }
 
   private State makeUpState(int taskAttemptNumber, double[] numAttempts) {
+	  
+  // if numAttempts == null we are returning FAILED.
+  if(numAttempts == null) {
+    return State.FAILED;
+  }
     if (taskAttemptNumber >= numAttempts.length - 1) {
       // always succeed
       return State.SUCCEEDED;
