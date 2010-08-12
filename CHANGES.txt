@@ -126,9 +126,6 @@ Trunk (unreleased changes)
     MAPREDUCE-1829. JobInProgress.findSpeculativeTask should use min() to
     find the candidate instead of sort(). (Scott Chen via vinodkv)
 
-    MAPREDUCE-1961. Fix ConcurrentModificationException in Gridmix during
-    shutdown. (Hong Tang via cdouglas)
-
   BUG FIXES
 
     MAPREDUCE-1845. FairScheduler.tasksToPreempt() can return negative number.
@@ -247,6 +244,12 @@ Trunk (unreleased changes)
 
     MAPREDUCE-1780. AccessControlList.toString() is used for serialization of
     ACL in JobStatus.java. (Ravi Gummadi via vinodkv)
+
+    MAPREDUCE-1961. Fix ConcurrentModificationException in Gridmix during
+    shutdown. (Hong Tang via cdouglas)
+
+    MAPREDUCE-2000. Fix parsing of JobHistory lines in Rumen when quotes are
+    escaped. (Hong Tang via cdouglas)
 
 Release 0.21.0 - Unreleased
 
