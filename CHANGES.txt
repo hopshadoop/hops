@@ -242,6 +242,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1999. Fixes ClientProtocol to use the correct 
     DelegationTokenSelector. (Jitendra Pandey via ddas)
 
+    MAPREDUCE-1780. AccessControlList.toString() is used for serialization of
+    ACL in JobStatus.java. (Ravi Gummadi via vinodkv)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
