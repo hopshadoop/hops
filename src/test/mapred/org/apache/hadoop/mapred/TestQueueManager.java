@@ -26,24 +26,18 @@ import static org.junit.Assert.*;
 
 import org.apache.hadoop.mapreduce.QueueState;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.authorize.AccessControlList;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.junit.After;
 import org.junit.Test;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
-import org.w3c.dom.Node;
-
 import java.io.File;
 import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.Map.Entry;
 
 
 public class TestQueueManager {
@@ -596,7 +590,7 @@ public class TestQueueManager {
     assertEquals("35", q1_properties.get("maxCapacity").getValue());
     
     // check for acls
-    assertEquals("u1", childQueues.get("p1:p12").getAcl_submit_job());
-    assertEquals("u2", childQueues.get("p1:p12").getAcl_administer_jobs());
+    assertEquals("u1 ", childQueues.get("p1:p12").getAcl_submit_job());
+    assertEquals("u2 ", childQueues.get("p1:p12").getAcl_administer_jobs());
   }
 }

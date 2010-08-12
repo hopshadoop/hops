@@ -690,18 +690,17 @@ class QueueManager {
           queue.getAcls().get(QueueManager.toFullPropertyName(queue.getName(),
               Queue.QueueOperation.ADMINISTER_JOBS.getAclName()));
       }
-      StringBuilder aclsSubmitJobValue = new StringBuilder();
+      String aclsSubmitJobValue = " ";
       if (submitJobList != null ) {
-        aclsSubmitJobValue = getAclsInfo(submitJobList);
+        aclsSubmitJobValue = submitJobList.getAclString();
       }
-      dumpGenerator.writeStringField("acl_submit_job",
-          aclsSubmitJobValue.toString());
-      StringBuilder aclsAdministerValue = new StringBuilder();
+      dumpGenerator.writeStringField("acl_submit_job", aclsSubmitJobValue);
+      String aclsAdministerValue = " ";
       if (administerJobsList != null) {
-        aclsAdministerValue = getAclsInfo(administerJobsList);
+        aclsAdministerValue = administerJobsList.getAclString();
       }
       dumpGenerator.writeStringField("acl_administer_jobs",
-          aclsAdministerValue.toString());
+          aclsAdministerValue);
       dumpGenerator.writeFieldName("properties");
       dumpGenerator.writeStartArray();
       if (queue.getProperties() != null) {
@@ -725,7 +724,4 @@ class QueueManager {
     }
   }
 
-  private static StringBuilder getAclsInfo(AccessControlList accessControlList){
-    return new StringBuilder(accessControlList.toString());
-  }
 }

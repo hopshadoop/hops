@@ -350,7 +350,7 @@ public class JobStatus implements Writable, Cloneable {
     out.writeInt(jobACLs.size());
     for (Entry<JobACL, AccessControlList> entry : jobACLs.entrySet()) {
       WritableUtils.writeEnum(out, entry.getKey());
-      Text.writeString(out, entry.getValue().toString());
+      entry.getValue().write(out);
     }
   }
 
@@ -377,8 +377,9 @@ public class JobStatus implements Writable, Cloneable {
     int numACLs = in.readInt();
     for (int i = 0; i < numACLs; i++) {
       JobACL aclType = WritableUtils.readEnum(in, JobACL.class);
-      String acl = Text.readString(in);
-      this.jobACLs.put(aclType, new AccessControlList(acl));
+      AccessControlList acl = new AccessControlList(" ");
+      acl.readFields(in);
+      this.jobACLs.put(aclType, acl);
     }
   }
 

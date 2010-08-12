@@ -45,6 +45,7 @@ import org.apache.hadoop.mapreduce.Cluster;
 import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.JobACL;
 import org.apache.hadoop.mapreduce.JobID;
+import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskID;
 import org.apache.hadoop.mapreduce.TaskType;
@@ -585,6 +586,21 @@ public class TestJobHistory extends TestCase {
     validateJobLevelKeyValues(mr, job, jobInfo, conf);
     validateTaskLevelKeyValues(mr, job, jobInfo);
     validateTaskAttemptLevelKeyValues(mr, job, jobInfo);
+    
+    // Also JobACLs should be correct
+    if (mr.getJobTrackerRunner().getJobTracker()
+        .isJobLevelAuthorizationEnabled()) {
+      AccessControlList acl = new AccessControlList(
+          conf.get(JobACL.VIEW_JOB.getAclName(), " "));
+      assertTrue("VIEW_JOB ACL is not properly logged to history file.",
+          acl.toString().equals(
+          jobInfo.getJobACLs().get(JobACL.VIEW_JOB).toString()));
+      acl = new AccessControlList(
+          conf.get(JobACL.MODIFY_JOB.getAclName(), " "));
+      assertTrue("MODIFY_JOB ACL is not properly logged to history file.",
+          acl.toString().equals(
+          jobInfo.getJobACLs().get(JobACL.MODIFY_JOB).toString()));
+    }
   }
 
   public void testDoneFolderOnHDFS() throws IOException, InterruptedException {
@@ -721,7 +737,10 @@ public class TestJobHistory extends TestCase {
       //set the done folder location
       String doneFolder = TEST_ROOT_DIR + "history_done";
       conf.set(JTConfig.JT_JOBHISTORY_COMPLETED_LOCATION, doneFolder);
-      
+
+      // Enable ACLs so that they are logged to history
+      conf.setBoolean(MRConfig.JOB_LEVEL_AUTHORIZATION_ENABLING_FLAG, true);
+
       mr = new MiniMRCluster(2, "file:///", 3, null, null, conf);
 
       // run the TCs
@@ -736,6 +755,10 @@ public class TestJobHistory extends TestCase {
 
       //Disable speculative execution
       conf.setSpeculativeExecution(false);
+
+      // set the job acls
+      conf.set(JobACL.VIEW_JOB.getAclName(), "user1,user2 group1,group2");
+      conf.set(JobACL.MODIFY_JOB.getAclName(), "user3,user4 group3,group4");
 
       // Make sure that the job is not removed from memory until we do finish
       // the validation of history file content
