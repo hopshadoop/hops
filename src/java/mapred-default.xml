@@ -755,7 +755,7 @@
 
   <property>
     <name>mapreduce.jobtracker.persist.jobstatus.active</name>
-    <value>false</value>
+    <value>true</value>
     <description>Indicates if persistency of job status information is
       active or not.
     </description>
@@ -763,7 +763,7 @@
 
   <property>
   <name>mapreduce.jobtracker.persist.jobstatus.hours</name>
-  <value>0</value>
+  <value>1</value>
   <description>The number of hours job status information is persisted in DFS.
     The job status information will be available after it drops of the memory
     queue and between jobtracker restarts. With a zero value the job status

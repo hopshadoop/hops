@@ -539,7 +539,8 @@ public class Job extends JobContextImpl implements JobContext {
   }
 
   /**
-   * Gets the counters for this job.
+   * Gets the counters for this job. May return null if the job has been
+   * retired and the job is no longer in the completed job store.
    * 
    * @return the counters for this job.
    * @throws IOException

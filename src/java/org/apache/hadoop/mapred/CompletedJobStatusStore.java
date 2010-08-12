@@ -65,11 +65,11 @@ class CompletedJobStatusStore implements Runnable {
   CompletedJobStatusStore(JobACLsManager aclsManager, Configuration conf)
       throws IOException {
     active =
-      conf.getBoolean(JTConfig.JT_PERSIST_JOBSTATUS, false);
+      conf.getBoolean(JTConfig.JT_PERSIST_JOBSTATUS, true);
 
     if (active) {
       retainTime =
-        conf.getInt(JTConfig.JT_PERSIST_JOBSTATUS_HOURS, 0) * HOUR;
+        conf.getInt(JTConfig.JT_PERSIST_JOBSTATUS_HOURS, 1) * HOUR;
 
       jobInfoDir =
         conf.get(JTConfig.JT_PERSIST_JOBSTATUS_DIR, JOB_INFO_STORE_DIR);

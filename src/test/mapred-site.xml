@@ -44,4 +44,8 @@
   <name>mapred.child.java.opts</name>
   <value>-Xmx200m -Djava.net.preferIPv4Stack=true</value>
 </property>
+<property>
+  <name>mapreduce.jobtracker.persist.jobstatus.active</name>
+  <value>false</value>
+</property>
 </configuration>

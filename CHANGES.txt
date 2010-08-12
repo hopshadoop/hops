@@ -115,6 +115,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1523. Making Mumak work with Capacity-Scheduler (Anirban Das
     via mahadev)
 
+    MAPREDUCE-1920. Enables completed jobstatus store by default. (Tom White
+    via amareshwari)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and
