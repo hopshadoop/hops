@@ -126,6 +126,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1829. JobInProgress.findSpeculativeTask should use min() to
     find the candidate instead of sort(). (Scott Chen via vinodkv)
 
+    MAPREDUCE-1961. Fix ConcurrentModificationException in Gridmix during
+    shutdown. (Hong Tang via cdouglas)
+
   BUG FIXES
 
     MAPREDUCE-1845. FairScheduler.tasksToPreempt() can return negative number.
