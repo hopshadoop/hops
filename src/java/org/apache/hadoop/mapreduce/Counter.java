@@ -120,7 +120,7 @@ public class Counter implements Writable {
 
   /**
    * Set this counter by the given value
-   * @param the value to set
+   * @param value the value to set
    */
   public synchronized void setValue(long value) {
     this.value = value;
