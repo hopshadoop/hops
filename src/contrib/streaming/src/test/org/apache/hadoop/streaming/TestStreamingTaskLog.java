@@ -26,6 +26,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.MiniMRCluster;
 import org.apache.hadoop.mapreduce.MapReduceTestUtil;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.util.Shell;
 
 import org.junit.Test;
@@ -71,7 +72,7 @@ public class TestStreamingTaskLog {
   public void testStreamingTaskLogWithHadoopCmd() {
     try {
       final int numSlaves = 1;
-      Configuration conf = new Configuration();
+      JobConf conf = new JobConf();
 
       fs = FileSystem.getLocal(conf);
       Path testDir = new Path(System.getProperty("test.build.data","/tmp"));
@@ -81,8 +82,9 @@ public class TestStreamingTaskLog {
       fs.mkdirs(testDir);
       File scriptFile = createScript(
           testDir.toString() + "/testTaskLog.sh");
-      mr = new MiniMRCluster(numSlaves, fs.getUri().toString(), 1);
-      
+      conf.setBoolean(JTConfig.JT_PERSIST_JOBSTATUS, false);
+      mr = new MiniMRCluster(numSlaves, fs.getUri().toString(), 1, null, null, conf);
+
       writeInputFile(fs, inputPath);
       map = scriptFile.getAbsolutePath();
       

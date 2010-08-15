@@ -43,6 +43,7 @@ public class TestCapacitySchedulerWithJobTracker extends
     clusterProps.put(TTConfig.TT_MAP_SLOTS, String.valueOf(1));
     clusterProps.put(TTConfig.TT_REDUCE_SLOTS, String.valueOf(1));
     clusterProps.put(JTConfig.JT_TASKS_PER_JOB, String.valueOf(1));
+    clusterProps.put(JTConfig.JT_PERSIST_JOBSTATUS, "false");
     // cluster capacity 1 maps, 1 reduces
     startCluster(1, clusterProps, schedulerProps);
     CapacityTaskScheduler scheduler = (CapacityTaskScheduler) getJobTracker()
@@ -87,6 +88,7 @@ public class TestCapacitySchedulerWithJobTracker extends
     clusterProps.put(TTConfig.TT_MAP_SLOTS, String.valueOf(2));
     clusterProps.put(TTConfig.TT_REDUCE_SLOTS, String.valueOf(2));
     clusterProps.put("mapred.queue.names", queues[0] + "," + queues[1]);
+    clusterProps.put(JTConfig.JT_PERSIST_JOBSTATUS, "false");
     startCluster(2, clusterProps, schedulerProps);
     CapacityTaskScheduler scheduler = (CapacityTaskScheduler) getJobTracker()
       .getTaskScheduler();

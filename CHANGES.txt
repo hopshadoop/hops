@@ -1748,3 +1748,5 @@ Release 0.21.0 - Unreleased
     MAPREDUCE-1926. MapReduce distribution is missing build-utils.xml.
     (tomwhite)
 
+    MAPREDUCE-2012. Some contrib tests fail in branch 0.21 and trunk.
+    (Amareshwari Sriramadasu via tomwhite)

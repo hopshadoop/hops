@@ -71,6 +71,7 @@ public class TestStreamingBadRecords extends ClusterMapReduceTestCase
   protected void setUp() throws Exception {
     Properties props = new Properties();
     props.setProperty(JTConfig.JT_RETIREJOBS, "false");
+    props.setProperty(JTConfig.JT_PERSIST_JOBSTATUS, "false");
     startCluster(true, props);
   }
 

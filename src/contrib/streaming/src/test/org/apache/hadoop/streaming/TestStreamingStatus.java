@@ -103,6 +103,7 @@ public class TestStreamingStatus {
   public void setUp() throws IOException {
     conf = new JobConf();
     conf.setBoolean(JTConfig.JT_RETIREJOBS, false);
+    conf.setBoolean(JTConfig.JT_PERSIST_JOBSTATUS, false);
 
     mr = new MiniMRCluster(1, "file:///", 3, null , null, conf);
 

@@ -24,6 +24,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.hadoop.util.Shell.ShellCommandExecutor;
 
@@ -102,6 +103,7 @@ public class TestSimulatorDeterministicReplay {
     conf.set("hadoop.log.dir", hadoopLogDir.toString());
     conf.set("mapred.job.tracker.http.address",
              "0.0.0.0:" + jobTrackerHttpPort);
+    conf.setBoolean(JTConfig.JT_PERSIST_JOBSTATUS, false);
     String[] args = { traceFile.toString(), topologyFile.toString() };
     int res = ToolRunner.run(conf, new SimulatorEngine(), args);
     Assert.assertEquals(0, res);

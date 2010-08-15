@@ -27,6 +27,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.MockSimulatorEngine;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.tools.rumen.ZombieCluster;
 import org.apache.hadoop.tools.rumen.ZombieJobProducer;
 import org.apache.hadoop.util.ToolRunner;
@@ -58,6 +59,7 @@ public class TestSimulatorEndToEnd {
 
     Configuration mumakConf = new Configuration();
     mumakConf.set("mapred.jobtracker.taskScheduler", JobQueueTaskScheduler.class.getName());
+    mumakConf.setBoolean(JTConfig.JT_PERSIST_JOBSTATUS, false);
     String[] args = { traceFile.toString(), topologyFile.toString() };
     int res = ToolRunner.run(mumakConf, mockMumak, args);
     Assert.assertEquals(res, 0);
