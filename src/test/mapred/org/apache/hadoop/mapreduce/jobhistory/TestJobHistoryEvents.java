@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.mapreduce.jobhistory;
 
+import org.apache.hadoop.mapred.TaskStatus;
+import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskType;
 
@@ -27,38 +29,124 @@ import junit.framework.TestCase;
  */
 public class TestJobHistoryEvents extends TestCase {
   /**
-   * Test TaskAttemptStartedEvent.
+   * Test {@link TaskAttemptStartedEvent} for various task types.
+   */
+  private static void testAttemptStartedEventForTypes(EventType expected, 
+                                                      TaskAttemptID id,
+                                                      TaskType[] types) {
+    for (TaskType t : types) {
+      TaskAttemptStartedEvent tase = 
+        new TaskAttemptStartedEvent(id, t, 0L, "", 0);
+      assertEquals(expected, tase.getEventType());
+    }
+  }
+  
+  /**
+   * Test {@link TaskAttemptStartedEvent}.
    */
   public void testTaskAttemptStartedEvent() {
     EventType expected = EventType.MAP_ATTEMPT_STARTED;
     TaskAttemptID fakeId = new TaskAttemptID("1234", 1, TaskType.MAP, 1, 1);
     
-    // check jobsetup type
-    TaskAttemptStartedEvent tase = 
-      new TaskAttemptStartedEvent(fakeId, TaskType.JOB_SETUP, 0L, "", 0);
-    assertEquals(expected, tase.getEventType());
-    
-    // check jobcleanup type
-    tase = new TaskAttemptStartedEvent(fakeId, TaskType.JOB_CLEANUP, 0L, "", 0);
-    assertEquals(expected, tase.getEventType());
-    
-    // check map type
-    tase = new TaskAttemptStartedEvent(fakeId, TaskType.MAP, 0L, "", 0);
-    assertEquals(expected, tase.getEventType());
+    // check the events for job-setup, job-cleanup and map task-types
+    testAttemptStartedEventForTypes(expected, fakeId,
+                                    new TaskType[] {TaskType.JOB_SETUP, 
+                                                    TaskType.JOB_CLEANUP, 
+                                                    TaskType.MAP});
     
     expected = EventType.REDUCE_ATTEMPT_STARTED;
     fakeId = new TaskAttemptID("1234", 1, TaskType.REDUCE, 1, 1);
     
-    // check jobsetup type
-    tase = new TaskAttemptStartedEvent(fakeId, TaskType.JOB_SETUP, 0L, "", 0);
-    assertEquals(expected, tase.getEventType());
+    // check the events for job-setup, job-cleanup and reduce task-types
+    testAttemptStartedEventForTypes(expected, fakeId,
+                                    new TaskType[] {TaskType.JOB_SETUP, 
+                                                    TaskType.JOB_CLEANUP, 
+                                                    TaskType.REDUCE});
+  }
+  
+  /**
+   * Test {@link TaskAttemptUnsuccessfulCompletionEvent} for various task types.
+   */
+  private static void testFailedKilledEventsForTypes(EventType expected, 
+                                                     TaskAttemptID id,
+                                                     TaskType[] types,
+                                                     String state) {
+    for (TaskType t : types) {
+      TaskAttemptUnsuccessfulCompletionEvent tauce = 
+        new TaskAttemptUnsuccessfulCompletionEvent(id, t, state, 0L, "", "");
+      assertEquals(expected, tauce.getEventType());
+    }
+  }
+  
+  /**
+   * Test {@link TaskAttemptUnsuccessfulCompletionEvent} for killed/failed task.
+   */
+  public void testTaskAttemptUnsuccessfulCompletionEvent() {
+    TaskAttemptID fakeId = new TaskAttemptID("1234", 1, TaskType.MAP, 1, 1);
     
-    // check jobcleanup type
-    tase = new TaskAttemptStartedEvent(fakeId, TaskType.JOB_CLEANUP, 0L, "", 0);
-    assertEquals(expected, tase.getEventType());
+    // check killed events for job-setup, job-cleanup and map task-types
+    testFailedKilledEventsForTypes(EventType.MAP_ATTEMPT_KILLED, fakeId,
+                                   new TaskType[] {TaskType.JOB_SETUP, 
+                                                   TaskType.JOB_CLEANUP, 
+                                                   TaskType.MAP},
+                                   TaskStatus.State.KILLED.toString());
+    // check failed events for job-setup, job-cleanup and map task-types
+    testFailedKilledEventsForTypes(EventType.MAP_ATTEMPT_FAILED, fakeId,
+                                   new TaskType[] {TaskType.JOB_SETUP, 
+                                                   TaskType.JOB_CLEANUP, 
+                                                   TaskType.MAP},
+                                   TaskStatus.State.FAILED.toString());
     
-    // check reduce type
-    tase = new TaskAttemptStartedEvent(fakeId, TaskType.REDUCE, 0L, "", 0);
-    assertEquals(expected, tase.getEventType());
+    fakeId = new TaskAttemptID("1234", 1, TaskType.REDUCE, 1, 1);
+    
+    // check killed events for job-setup, job-cleanup and reduce task-types
+    testFailedKilledEventsForTypes(EventType.REDUCE_ATTEMPT_KILLED, fakeId,
+                                   new TaskType[] {TaskType.JOB_SETUP, 
+                                                   TaskType.JOB_CLEANUP, 
+                                                   TaskType.REDUCE},
+                                   TaskStatus.State.KILLED.toString());
+    // check failed events for job-setup, job-cleanup and reduce task-types
+    testFailedKilledEventsForTypes(EventType.REDUCE_ATTEMPT_FAILED, fakeId,
+                                   new TaskType[] {TaskType.JOB_SETUP, 
+                                                   TaskType.JOB_CLEANUP, 
+                                                   TaskType.REDUCE},
+                                   TaskStatus.State.FAILED.toString());
+  }
+  
+  /**
+   * Test {@link TaskAttemptFinishedEvent} for various task types.
+   */
+  private static void testFinishedEventsForTypes(EventType expected, 
+                                                 TaskAttemptID id,
+                                                 TaskType[] types) {
+    for (TaskType t : types) {
+      TaskAttemptFinishedEvent tafe = 
+        new TaskAttemptFinishedEvent(id, t, 
+            TaskStatus.State.SUCCEEDED.toString(), 0L, "", "", new Counters());
+      assertEquals(expected, tafe.getEventType());
+    }
+  }
+  
+  /**
+   * Test {@link TaskAttemptFinishedEvent} for finished task.
+   */
+  public void testTaskAttemptFinishedEvent() {
+    EventType expected = EventType.MAP_ATTEMPT_FINISHED;
+    TaskAttemptID fakeId = new TaskAttemptID("1234", 1, TaskType.MAP, 1, 1);
+    
+    // check the events for job-setup, job-cleanup and map task-types
+    testFinishedEventsForTypes(expected, fakeId,
+                               new TaskType[] {TaskType.JOB_SETUP, 
+                                               TaskType.JOB_CLEANUP, 
+                                               TaskType.MAP});
+    
+    expected = EventType.REDUCE_ATTEMPT_FINISHED;
+    fakeId = new TaskAttemptID("1234", 1, TaskType.REDUCE, 1, 1);
+    
+    // check the events for job-setup, job-cleanup and reduce task-types
+    testFinishedEventsForTypes(expected, fakeId,
+                               new TaskType[] {TaskType.JOB_SETUP, 
+                                               TaskType.JOB_CLEANUP, 
+                                               TaskType.REDUCE});
   }
 }

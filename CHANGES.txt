@@ -1750,3 +1750,8 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-2012. Some contrib tests fail in branch 0.21 and trunk.
     (Amareshwari Sriramadasu via tomwhite)
+
+    MAPREDUCE-1980. Fixes TaskAttemptUnsuccessfulCompletionEvent and
+    TaskAttemptFinishedEvent to correctly log event type for all task types.
+    (Amar Kamat via amareshwari)
+

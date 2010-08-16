@@ -92,7 +92,11 @@ public class TaskAttemptFinishedEvent  implements HistoryEvent {
   Counters getCounters() { return EventReader.fromAvro(datum.counters); }
   /** Get the event type */
   public EventType getEventType() {
-    return EventType.MAP_ATTEMPT_FINISHED;
+    // Note that the task type can be setup/map/reduce/cleanup but the 
+    // attempt-type can only be map/reduce.
+    return getTaskId().getTaskType() == TaskType.MAP 
+           ? EventType.MAP_ATTEMPT_FINISHED
+           : EventType.REDUCE_ATTEMPT_FINISHED;
   }
 
 }
