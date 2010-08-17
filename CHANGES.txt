@@ -1755,3 +1755,6 @@ Release 0.21.0 - Unreleased
     TaskAttemptFinishedEvent to correctly log event type for all task types.
     (Amar Kamat via amareshwari)
 
+    MAPREDUCE-1856. Extract a subset of tests for smoke (DOA) validation (cos)
+
+

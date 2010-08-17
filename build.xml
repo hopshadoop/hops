@@ -120,6 +120,7 @@
 
   <property name="test.mapred.build.classes" value="${test.build.dir}/mapred/classes"/>
   <property name="test.mapred.commit.tests.file" value="${test.src.dir}/commit-tests" />
+  <property name="test.mapred.smoke.tests.file" value="${test.src.dir}/smoke-tests" />
   <property name="test.mapred.all.tests.file" value="${test.src.dir}/all-tests" />
 
   <property name="librecordio.test.dir" value="${test.build.dir}/librecordio"/>
@@ -622,6 +623,14 @@
          </manifest>
     </jar>
   </target>
+  <!-- ================================================================== -->
+  <!-- Define exclude lists for different kinds of testing                -->
+  <!-- ================================================================== -->
+  <patternset id="empty.exclude.list.id" />
+  <patternset id="commit.smoke.exclude.list.id">
+    <excludesfile name="${test.mapred.commit.tests.file}"/>
+    <excludesfile name="${test.mapred.smoke.tests.file}"/>
+  </patternset>
 
   <macrodef name="macro-test-runner">
     <attribute name="test.file" />
@@ -630,6 +639,7 @@
     <attribute name="test.dir" />
     <attribute name="fileset.dir" />
     <attribute name="hadoop.conf.dir.deployed" default="" />
+    <attribute name="exclude.list.id" default="empty.exclude.list.id" />
     <sequential>
       <delete dir="@{test.dir}/data"/>
       <mkdir dir="@{test.dir}/data"/>
@@ -683,6 +693,7 @@
             <patternset>
               <includesfile name="@{test.file}"/>
             </patternset>
+            <patternset refid="@{exclude.list.id}"/>
           </fileset>
         </batchtest>
         <batchtest todir="@{test.dir}" if="testcase">
@@ -713,20 +724,53 @@
     </sequential>
   </macrodef>
 
-  <target name="run-test-mapred" depends="compile-mapred-test" description="Run mapred functional and system tests">
-    <macro-test-runner test.file="${test.mapred.all.tests.file}" suite.type="mapred"
+  <target name="run-test-mapred" depends="run-commit-test, run-smoke-test,
+    run-test-mapred-excluding-commit-and-smoke, run-test-mapred-all-withtestcaseonly"
+    description="Run mapred functional and system tests">
+  </target>
+
+  <target name="run-test-mapred-all-withtestcaseonly"
+    depends="compile-mapred-test" if="testcase">
+    <macro-test-runner
+      test.file="${test.mapred.all.tests.file}"
+      suite.type="mapred"
       classpath="${test.classpath.id}"
       test.dir="${test.build.dir}"
       fileset.dir="${test.src.dir}"/>
-  </target> 
+  </target>
 
-   <target name="run-commit-test" depends="compile-mapred-test" description="Run approximate 10-minute set of unit tests prior to commiting">
+  <target name="run-test-mapred-excluding-commit-and-smoke"
+    depends="compile-mapred-test" unless="testcase">
+    <macro-test-runner
+      test.file="${test.mapred.all.tests.file}"
+      suite.type="mapred"
+      classpath="${test.classpath.id}"
+      test.dir="${test.build.dir}"
+      fileset.dir="${test.src.dir}"
+      exclude.list.id="commit.smoke.exclude.list.id"
+    />
+   </target>
+
+   <target name="run-commit-test" depends="compile-mapred-test"
+     description="Run approximate 10-minute set of unit tests prior to commiting"
+     unless="testcase">
      <macro-test-runner test.file="${test.mapred.commit.tests.file}" suite.type="mapred"
       classpath="${test.classpath.id}"
       test.dir="${test.build.dir}"
       fileset.dir="${test.src.dir}"/>
    </target>
  
+   <target name="run-smoke-test" depends="compile-mapred-test"
+     description="Run approximate 30-minute set of functional tests to guarantee viability of the MapReduce"
+     unless="testcase">
+     <macro-test-runner
+       test.file="${test.mapred.smoke.tests.file}"
+       suite.type="mapred"
+       classpath="${test.classpath.id}"
+       test.dir="${test.build.dir}"
+       fileset.dir="${test.src.dir}"/>
+   </target>
+
    <target name="run-test-unit" depends="compile-mapred-test" description="Run unit tests">
      <macro-test-runner test.file="${test.mapred.all.tests.file}" suite.type="unit"
       classpath="${test.classpath.id}"
