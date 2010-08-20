@@ -251,6 +251,8 @@ Trunk (unreleased changes)
     MAPREDUCE-2000. Fix parsing of JobHistory lines in Rumen when quotes are
     escaped. (Hong Tang via cdouglas)
 
+    MAPREDUCE-2022. Fixes compilation errors in TestSubmitJob. (amareshwari)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

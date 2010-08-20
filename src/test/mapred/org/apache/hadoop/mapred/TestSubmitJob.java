@@ -265,7 +265,7 @@ public class TestSubmitJob extends TestCase {
         LOG.info("Try listing the mapred-system-dir as the user (" 
                  + user2.getUserName() + ")");
         client.getListing(
-            path.toString(), HdfsFileStatus.EMPTY_NAME);
+            path.toString(), HdfsFileStatus.EMPTY_NAME, false);
       } catch (IOException ioe) {
         failed = true;
       }
@@ -279,7 +279,7 @@ public class TestSubmitJob extends TestCase {
         LOG.info("Try accessing the job folder for job " + id + " as the user (" 
                  + user2.getUserName() + ")");
         client.getListing(
-            jobSubmitDirpath.toString(), HdfsFileStatus.EMPTY_NAME);
+            jobSubmitDirpath.toString(), HdfsFileStatus.EMPTY_NAME, false);
       } catch (IOException ioe) {
         failed = true;
       }
