@@ -121,6 +121,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1920. Enables completed jobstatus store by default. (Tom White
     via amareshwari)
 
+    MAPREDUCE-1881. Improve TaskTrackerInstrumentation to enable collection of
+    advanced metrics. (Matei Zaharia via acmurthy)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and
