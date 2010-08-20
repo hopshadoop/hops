@@ -59,6 +59,8 @@ import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.lib.reduce.WrappedReducer;
 import org.apache.hadoop.mapreduce.task.ReduceContextImpl;
+import org.apache.hadoop.mapreduce.util.ResourceCalculatorPlugin;
+import org.apache.hadoop.mapreduce.util.ResourceCalculatorPlugin.*;
 import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.Credentials;
@@ -77,7 +79,6 @@ abstract public class Task implements Writable, Configurable {
     LogFactory.getLog(Task.class);
 
   public static String MERGED_OUTPUT_PREFIX = ".merged";
-  
 
   /**
    * Counters to measure the usage of the different file systems.
@@ -133,7 +134,10 @@ abstract public class Task implements Writable, Configurable {
   private volatile long currentRecStartIndex; 
   private Iterator<Long> currentRecIndexIterator = 
     skipRanges.skipRangeIterator();
-  
+
+  private ResourceCalculatorPlugin resourceCalculator = null;
+  private long initCpuCumulativeTime = 0;
+
   protected JobConf conf;
   protected MapOutputFile mapOutputFile = new MapOutputFile();
   protected LocalDirAllocator lDirAlloc;
@@ -503,6 +507,16 @@ abstract public class Task implements Writable, Configurable {
       }
     }
     committer.setupTask(taskContext);
+    Class<? extends ResourceCalculatorPlugin> clazz =
+        conf.getClass(TTConfig.TT_RESOURCE_CALCULATOR_PLUGIN,
+            null, ResourceCalculatorPlugin.class);
+    resourceCalculator = ResourceCalculatorPlugin
+            .getResourceCalculatorPlugin(clazz, conf);
+    LOG.info(" Using ResourceCalculatorPlugin : " + resourceCalculator);
+    if (resourceCalculator != null) {
+      initCpuCumulativeTime =
+        resourceCalculator.getProcResourceValues().getCumulativeCpuTime();
+    }
   }
   
   @InterfaceAudience.Private
@@ -701,6 +715,24 @@ abstract public class Task implements Writable, Configurable {
   }
 
   /**
+   * Update resource information counters
+   */
+  void updateResourceCounters() {
+    if (resourceCalculator == null) {
+      return;
+    }
+    ProcResourceValues res = resourceCalculator.getProcResourceValues();
+    long cpuTime = res.getCumulativeCpuTime();
+    long pMem = res.getPhysicalMemorySize();
+    long vMem = res.getVirtualMemorySize();
+    // Remove the CPU time consumed previously by JVM reuse
+    cpuTime -= initCpuCumulativeTime;
+    counters.findCounter(TaskCounter.CPU_MILLISECONDS).setValue(cpuTime);
+    counters.findCounter(TaskCounter.PHYSICAL_MEMORY_BYTES).setValue(pMem);
+    counters.findCounter(TaskCounter.VIRTUAL_MEMORY_BYTES).setValue(vMem);
+  }
+
+  /**
    * An updater that tracks the amount of time this task has spent in GC.
    */
   class GcTimeUpdater {
@@ -799,6 +831,7 @@ abstract public class Task implements Writable, Configurable {
     }
 
     gcUpdater.incrementGcCounter();
+    updateResourceCounters();
   }
 
   public void done(TaskUmbilicalProtocol umbilical,

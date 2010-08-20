@@ -12,6 +12,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1804. Stress-test tool for HDFS introduced in HDFS-708.
     (Joshua Harlow via shv)
 
+    MAPREDUCE-220. Collect cpu and memory statistics per task. (Scott Chen via
+    acmurthy)
+
   IMPROVEMENTS
 
     MAPREDUCE-1546. Redirect all job pages to corresponding history page

@@ -50,6 +50,15 @@ public class DummyResourceCalculatorPlugin extends ResourceCalculatorPlugin {
   /** CPU usage percentage for testing */
   public static final String CPU_USAGE =
       "mapred.tasktracker.cpuusage.testing";
+  /** process cumulative CPU usage time for testing */
+  public static final String PROC_CUMULATIVE_CPU_TIME =
+      "mapred.tasktracker.proccumulativecputime.testing";
+  /** process pmem for testing*/
+  public static final String PROC_PMEM_TESTING_PROPERTY =
+      "mapred.tasktracker.procpmem.testing";
+  /** process vmem for testing*/
+  public static final String PROC_VMEM_TESTING_PROPERTY =
+      "mapred.tasktracker.procvmem.testing";
 
   /** {@inheritDoc} */
   @Override
@@ -97,5 +106,13 @@ public class DummyResourceCalculatorPlugin extends ResourceCalculatorPlugin {
   @Override
   public float getCpuUsage() {
     return getConf().getFloat(CPU_USAGE, -1);
+  }
+
+  @Override
+  public ProcResourceValues getProcResourceValues() {
+    long cpuTime = getConf().getLong(PROC_CUMULATIVE_CPU_TIME, -1);
+    long pMem = getConf().getLong(PROC_PMEM_TESTING_PROPERTY, -1);
+    long vMem = getConf().getLong(PROC_VMEM_TESTING_PROPERTY, -1);
+    return new ProcResourceValues(cpuTime, pMem, vMem);
   }
 }
