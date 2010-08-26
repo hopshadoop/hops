@@ -218,6 +218,9 @@ Trunk (unreleased changes)
 
     HDFS-1349. Remove empty java files. (Eli Collins)
 
+    HDFS-1340.A null delegation token is appended to the url if security
+     is disabled when browsing filesystem. (boryas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
