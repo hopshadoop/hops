@@ -116,6 +116,9 @@ Trunk (unreleased changes)
     HDFS-1318. Add JMX interface for read access to namenode and datanode
     web UI information. (Tanping Wang via suresh).
 
+    HDFS-1356.  Provide information as to whether or not security is 
+    enabled on web interface for NameNode (boryas)
+
   OPTIMIZATIONS
 
     HDFS-1140. Speedup INode.getPathComponents. (Dmytro Molkov via shv)
