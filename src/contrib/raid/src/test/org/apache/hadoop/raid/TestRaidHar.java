@@ -199,13 +199,15 @@ public class TestRaidHar extends TestCase {
     mySetup(srcPath, targetReplication, metaReplication, stripeLength);
     RaidShell shell = null;
     Path dir = new Path("/user/test/raidtest/subdir/");
-    Path file1 = new Path(dir + "/file" + iter);
     RaidNode cnode = null;
     try {
       Path destPath = new Path("/destraid/user/test/raidtest/subdir");
       fileSys.delete(dir, true);
       fileSys.delete(destPath, true);
-      TestRaidNode.createOldFile(fileSys, file1, 1, numBlock, blockSize);
+      for (int i = 0; i < 10; i++) {
+        Path file = new Path(dir + "/file" + i);
+        TestRaidNode.createOldFile(fileSys, file, 1, numBlock, blockSize);
+      }
       LOG.info("doTestHar created test files for iteration " + iter);
 
       // create an instance of the RaidNode
@@ -226,15 +228,28 @@ public class TestRaidHar extends TestCase {
       LOG.info("doTestHar created RaidShell.");
       FileStatus[] listPaths = null;
 
+      int maxFilesFound = 0;
       // wait till file is raided
       while (true) {
         try {
           listPaths = fileSys.listStatus(destPath);
           int count = 0;
+          int filesFound = 0;
           if (listPaths != null) {
             for (FileStatus s : listPaths) {
               LOG.info("doTestHar found path " + s.getPath());
+
+              if (!s.isDir())
+                filesFound++;
+              if (filesFound > maxFilesFound)
+                maxFilesFound = filesFound;
+
               if (s.getPath().toString().endsWith(".har")) {
+                // If a HAR directory is found, ensure that we have seen
+                // 10 parity files. We have to keep track of the max # of
+                // files since some parity files might get deleted by the
+                // purge thread.
+                assertEquals(10, maxFilesFound);
                 count++;
               }
             }
@@ -278,8 +293,6 @@ public class TestRaidHar extends TestCase {
     } finally {
       shell.close();
       if (cnode != null) { cnode.stop(); cnode.join(); }
-      LOG.info("doTestHar delete file " + file1);
-      fileSys.delete(file1, true);
     }
     LOG.info("doTestHar completed:" + " blockSize=" + blockSize +
              " stripeLength=" + stripeLength);

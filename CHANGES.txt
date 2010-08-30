@@ -262,6 +262,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1670. RAID policies should not scan their own destination path.
     (Ramkumar Vadali via dhruba)
 
+    MAPREDUCE-1668. RaidNode Hars a directory only if all its parity files 
+    have been created. (Ramkumar Vadali via dhruba)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

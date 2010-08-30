@@ -1364,7 +1364,8 @@ public class RaidNode implements RaidProtocol {
                   if (stat != null) {
                     LOG.info("Haring parity files for policy " + 
                         info.getName() + " " + destPath);
-                    recurseHar(destFs, stat, cutoff, tmpHarPath);
+                    recurseHar(info, destFs, stat, destPref.toUri().getPath(),
+                        srcPath.getFileSystem(conf), cutoff, tmpHarPath);
                   }
                 }
               }
@@ -1380,7 +1381,8 @@ public class RaidNode implements RaidProtocol {
     return;
   }
   
-  private void recurseHar(FileSystem destFs, FileStatus dest, long cutoff, String tmpHarPath)
+  private void recurseHar(PolicyInfo info, FileSystem destFs, FileStatus dest,
+    String destPrefix, FileSystem srcFs, long cutoff, String tmpHarPath)
     throws IOException {
 
     if (dest.isFile()) {
@@ -1388,6 +1390,7 @@ public class RaidNode implements RaidProtocol {
     }
     
     Path destPath = dest.getPath(); // pathname, no host:port
+    String destStr = destPath.toUri().getPath();
 
     // Verify if it already contains a HAR directory
     if ( destFs.exists(new Path(destPath, destPath.getName()+HAR_SUFFIX)) ) {
@@ -1401,13 +1404,34 @@ public class RaidNode implements RaidProtocol {
       shouldHar = files.length > 0;
       for (FileStatus one: files) {
         if (one.isDirectory()){
-          recurseHar(destFs, one, cutoff, tmpHarPath);
+          recurseHar(info, destFs, one, destPrefix, srcFs, cutoff, tmpHarPath);
           shouldHar = false;
         } else if (one.getModificationTime() > cutoff ) {
           shouldHar = false;
         }
       }
+
+      if (shouldHar) {
+        String src = destStr.replaceFirst(destPrefix, "");
+        Path srcPath = new Path(src);
+        FileStatus[] statuses = srcFs.listStatus(srcPath);
+        Path destPathPrefix = new Path(destPrefix).makeQualified(destFs);
+        if (statuses != null) {
+          for (FileStatus status : statuses) {
+            if (getParityFile(destPathPrefix, 
+                              status.getPath().makeQualified(srcFs)) == null ) {
+              LOG.info("Cannot archive " + destPath + 
+                  " because it doesn't contain parity file for " +
+                  status.getPath().makeQualified(srcFs) + " on destination " +
+                  destPathPrefix);
+              shouldHar = false;
+              break;
+            }
+          }
+        }
+      }
     }
+
     if ( shouldHar ) {
       singleHar(destFs, dest, tmpHarPath);
     }
