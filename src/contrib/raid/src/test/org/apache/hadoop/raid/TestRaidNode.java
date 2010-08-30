@@ -450,6 +450,59 @@ public class TestRaidNode extends TestCase {
     LOG.info("Test testDistRaid completed.");
   }
   
+  /**
+   * Test the case where the source and destination paths conflict.
+   * @throws Exception
+   */
+  public void testConflictingPaths() throws Exception {
+    LOG.info("Test testConflictingPaths started");
+    long targetReplication = 2;
+    long metaReplication   = 2;
+    long stripeLength      = 3;
+    short srcReplication = 1;
+    long modTimePeriod = 0;
+    try {
+      createClusters(false);
+      mySetup("/user/d/raidtest", srcReplication, targetReplication,
+          metaReplication, stripeLength);
+      // We dont need this to run, just need the object.
+      RaidNode cnode = RaidNode.createRaidNode(null, conf);
+      cnode.stop();
+      cnode.join();
+
+      createOldFile(fileSys, new Path("/user/d/raidtest/f1"), 2, 7, 8192L);
+      LOG.info("Test testConflictingPaths created test files");
+
+      long now = System.currentTimeMillis();
+
+      // Test the regular case.
+      LOG.info("Test testConflictingPaths testing the regular case");
+      List<FileStatus> selected = cnode.selectFiles(conf,
+          new Path("/user/d/raidtest*"), "/raid",
+          modTimePeriod, srcReplication, now);
+      assertTrue(selected.size() > 0);
+
+      // Test the conflicting case: src under dest.
+      LOG.info("Test testConflictingPaths testing src under dest");
+      selected = cnode.selectFiles(conf,
+          new Path("/user/d/raidtest*"), "/user/d",
+          modTimePeriod, srcReplication, now);
+      assertEquals(0, selected.size());
+
+      // Test the conflicting case: dest under src.
+      LOG.info("Test testConflictingPaths testing dest under src");
+      selected = cnode.selectFiles(conf,
+          new Path("/user/d*"), "/user/d/raidtest",
+          modTimePeriod, srcReplication, now);
+      assertEquals(0, selected.size());
+
+      LOG.info("Test testConflictingPaths succeeded.");
+    } finally {
+      stopClusters();
+    }
+    LOG.info("Test testConflictingPaths completed.");
+  }
+
   //
   // simulate a corruption at specified offset and verify that eveyrthing is good
   //

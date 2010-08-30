@@ -259,6 +259,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-2022. Fixes compilation errors in TestSubmitJob. (amareshwari)
 
+    MAPREDUCE-1670. RAID policies should not scan their own destination path.
+    (Ramkumar Vadali via dhruba)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

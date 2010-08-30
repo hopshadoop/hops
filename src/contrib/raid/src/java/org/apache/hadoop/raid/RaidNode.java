@@ -561,7 +561,7 @@ public class RaidNode implements RaidProtocol {
  /**
   * Returns a list of pathnames that needs raiding.
   */
-  private List<FileStatus> selectFiles(Configuration conf, Path p, String destPrefix,
+  List<FileStatus> selectFiles(Configuration conf, Path p, String destPrefix,
                                        long modTimePeriod, short srcReplication, long now) throws IOException {
 
     List<FileStatus> returnSet = new LinkedList<FileStatus>();
@@ -571,11 +571,26 @@ public class RaidNode implements RaidProtocol {
     FileSystem fs = FileSystem.get(destp.toUri(), conf);
     destp = destp.makeQualified(fs);
 
+    // Expand destination prefix path.
+    String destpstr = destp.toString();
+    if (!destpstr.endsWith(Path.SEPARATOR)) {
+      destpstr += Path.SEPARATOR;
+    }
+
     fs = p.getFileSystem(conf);
     FileStatus[] gpaths = fs.globStatus(p);
-    if (gpaths != null){
+    if (gpaths != null) {
       for (FileStatus onepath: gpaths) {
-        recurse(fs, conf, destp, onepath, returnSet, modTimePeriod, srcReplication, now);
+        String pathstr = onepath.getPath().makeQualified(fs).toString();
+        if (!pathstr.endsWith(Path.SEPARATOR)) {
+          pathstr += Path.SEPARATOR;
+        }
+        if (pathstr.startsWith(destpstr) || destpstr.startsWith(pathstr)) {
+          LOG.info("Skipping source " + pathstr +
+                   " because it conflicts with raid directory " + destpstr);
+        } else {
+         recurse(fs, conf, destp, onepath, returnSet, modTimePeriod, srcReplication, now);
+        }
       }
     }
     return returnSet;
