@@ -1771,4 +1771,5 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1856. Extract a subset of tests for smoke (DOA) validation (cos)
 
+    MAPREDUCE-1897. trunk build broken on compile-mapred-test (cos)
 

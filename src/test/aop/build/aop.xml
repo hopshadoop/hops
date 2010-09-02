@@ -109,11 +109,11 @@
         <pathelement location="${hadoop.conf.dir.deployed}" />
         <pathelement location="${system-test-build-dir}/test/extraconf" />
         <pathelement location="${system-test-build-dir}/test/classes" />
-        <pathelement location="${build-fi.dir}/test/mapred/classes"/>
         <pathelement location="${system-test-build-dir}/classes" />
+        <pathelement location="${system-test-build-dir}/test/mapred/classes"/>
+        <pathelement location="${system-test-build-dir}/tools" />
+        <pathelement location="${system-test-build-dir}" />
         <pathelement location="${test.src.dir}" />
-        <pathelement location="${build-fi.dir}" />
-        <pathelement location="${build-fi.dir}/tools" />
         <pathelement path="${clover.jar}" />
         <fileset dir="${system-test-build-dir}">
            <include name="**/*.jar" />
@@ -126,10 +126,10 @@
         <pathelement location="${system-test-build-dir}/test/extraconf" />
         <pathelement location="${system-test-build-dir}/test/classes" />
         <pathelement location="${system-test-build-dir}/classes" />
-        <pathelement location="${build-fi.dir}/test/mapred/classes" />
-        <pathelement location="${build-fi.dir}/test/mapred/testjar" />
-        <pathelement location="${build-fi.dir}/tools" />
-        <pathelement location="${build-fi.dir}/examples" />
+        <pathelement location="${system-test-build-dir}/test/mapred/classes" />
+        <pathelement location="${system-test-build-dir}/test/mapred/testjar" />
+        <pathelement location="${system-test-build-dir}/tools" />
+        <pathelement location="${system-test-build-dir}/examples" />
         <path refid="ivy-system.classpath"/>
   </path>
 
@@ -208,10 +208,11 @@
     <attribute name="dest.dir" />
     <attribute name="src.dir" />
     <attribute name="aspects.jars"/>
+    <attribute name="base.build.dir" default="${build-fi.dir}"/>
     <sequential>
       <subant buildpath="build.xml" target="-compile-fault-inject"
         output="${compile-inject.output}">
-        <property name="build.dir" value="${build-fi.dir}" />
+        <property name="build.dir" value="@{base.build.dir}" />
         <property name="src.dir.path" value="@{src.dir}" />
         <property name="dest.dir" value="@{dest.dir}" />
         <property name="hadoop.instrumented.jars" value="@{aspects.jars}"/>
@@ -221,15 +222,15 @@
 
   <target name="inject-system-faults"
           description="Inject system faults">
-    <property name="build-fi.dir" value="${system-test-build-dir}" />
-    <mkdir dir="${build-fi.dir}"/>
+    <mkdir dir="${system-test-build-dir}"/>
     <delete file="${compile-inject.output}"/>
     <subant buildpath="build.xml" target="ivy-retrieve-system">
-      <property name="build.dir" value="${build-fi.dir}"/>
+      <property name="build.dir" value="${system-test-build-dir}"/>
     </subant>
     <weave-injectfault-aspects dest.dir="${system-test-build-dir}/classes"
                                src.dir="${test.src.dir}/system/java;${test.src.dir}/system/aop"
-      aspects.jars="${build-fi.dir}/ivy/lib/${ant.project.name}/system/hadoop-common-${herriot.suffix}-${project.version}.jar">
+      aspects.jars="${system-test-build-dir}/ivy/lib/${ant.project.name}/system/hadoop-common-${herriot.suffix}-${project.version}.jar"
+      base.build.dir="${system-test-build-dir}">
     </weave-injectfault-aspects>
   </target>
 
