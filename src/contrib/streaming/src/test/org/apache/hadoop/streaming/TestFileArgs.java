@@ -72,6 +72,10 @@ public class TestFileArgs extends TestStreaming
     DataOutputStream dos = localFs.create(new Path("sidefile"));
     dos.write("hello world\n".getBytes("UTF-8"));
     dos.close();
+
+    // Since ls doesn't read stdin, we don't want to write anything
+    // to it, or else we risk Broken Pipe exceptions.
+    input = "";
   }
 
   @After

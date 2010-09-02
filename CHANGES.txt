@@ -268,6 +268,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2021. Fixes duplicate hostnames in CombineFileInputFormat's
     split locations. (amareshwari)
 
+    MAPREDUCE-1375. Fixes flaky test TestFileArgs. (Todd Lipcon via
+    amareshwari)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
