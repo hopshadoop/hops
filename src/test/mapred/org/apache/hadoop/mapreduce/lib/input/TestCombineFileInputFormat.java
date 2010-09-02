@@ -69,6 +69,7 @@ public class TestCombineFileInputFormat extends TestCase {
   final Path dir2 = new Path(inDir, "/dir2");
   final Path dir3 = new Path(inDir, "/dir3");
   final Path dir4 = new Path(inDir, "/dir4");
+  final Path dir5 = new Path(inDir, "/dir5");
 
   static final int BLOCKSIZE = 1024;
   static final byte[] databuf = new byte[BLOCKSIZE];
@@ -245,16 +246,16 @@ public class TestCombineFileInputFormat extends TestCase {
     MiniDFSCluster dfs = null;
     FileSystem fileSys = null;
     try {
-      /* Start 3 datanodes, one each in rack r1, r2, r3. Create three files
-       * 1) file1, just after starting the datanode on r1, with 
+      /* Start 3 datanodes, one each in rack r1, r2, r3. Create five files
+       * 1) file1 and file5, just after starting the datanode on r1, with 
        *    a repl factor of 1, and,
        * 2) file2, just after starting the datanode on r2, with 
        *    a repl factor of 2, and,
-       * 3) file3 after starting the all three datanodes, with a repl 
+       * 3) file3, file4 after starting the all three datanodes, with a repl 
        *    factor of 3.
-       * At the end, file1 will be present on only datanode1, file2 will be
-       * present on datanode 1 and datanode2 and 
-       * file3 will be present on all datanodes. 
+       * At the end, file1, file5 will be present on only datanode1, file2 will 
+       * be present on datanode 1 and datanode2 and 
+       * file3, file4 will be present on all datanodes. 
        */
       Configuration conf = new Configuration();
       conf.setBoolean("dfs.replication.considerLoad", false);
@@ -267,6 +268,30 @@ public class TestCombineFileInputFormat extends TestCase {
       }
       Path file1 = new Path(dir1 + "/file1");
       writeFile(conf, file1, (short)1, 1);
+      // create another file on the same datanode
+      Path file5 = new Path(dir5 + "/file5");
+      writeFile(conf, file5, (short)1, 1);
+      // split it using a CombinedFile input format
+      DummyInputFormat inFormat = new DummyInputFormat();
+      Job job = Job.getInstance(conf);
+      FileInputFormat.setInputPaths(job, dir1 + "," + dir5);
+      List<InputSplit> splits = inFormat.getSplits(job);
+      System.out.println("Made splits(Test0): " + splits.size());
+      for (InputSplit split : splits) {
+        System.out.println("File split(Test0): " + split);
+      }
+      assertEquals(splits.size(), 1);
+      CombineFileSplit fileSplit = (CombineFileSplit) splits.get(0);
+      assertEquals(2, fileSplit.getNumPaths());
+      assertEquals(1, fileSplit.getLocations().length);
+      assertEquals(file1.getName(), fileSplit.getPath(0).getName());
+      assertEquals(0, fileSplit.getOffset(0));
+      assertEquals(BLOCKSIZE, fileSplit.getLength(0));
+      assertEquals(file5.getName(), fileSplit.getPath(1).getName());
+      assertEquals(0, fileSplit.getOffset(1));
+      assertEquals(BLOCKSIZE, fileSplit.getLength(1));
+      assertEquals(hosts1[0], fileSplit.getLocations()[0]);
+      
       dfs.startDataNodes(conf, 1, true, null, rack2, hosts2, null);
       dfs.waitActive();
 
@@ -275,11 +300,10 @@ public class TestCombineFileInputFormat extends TestCase {
       writeFile(conf, file2, (short)2, 2);
 
       // split it using a CombinedFile input format
-      DummyInputFormat inFormat = new DummyInputFormat();
-      Job job = Job.getInstance(conf);
+      inFormat = new DummyInputFormat();
       FileInputFormat.setInputPaths(job, dir1 + "," + dir2);
       inFormat.setMinSplitSizeRack(BLOCKSIZE);
-      List<InputSplit> splits = inFormat.getSplits(job);
+      splits = inFormat.getSplits(job);
       System.out.println("Made splits(Test1): " + splits.size());
 
       // make sure that each split has different locations
@@ -287,7 +311,7 @@ public class TestCombineFileInputFormat extends TestCase {
         System.out.println("File split(Test1): " + split);
       }
       assertEquals(splits.size(), 2);
-      CombineFileSplit fileSplit = (CombineFileSplit) splits.get(0);
+      fileSplit = (CombineFileSplit) splits.get(0);
       assertEquals(fileSplit.getNumPaths(), 2);
       assertEquals(fileSplit.getLocations().length, 1);
       assertEquals(fileSplit.getPath(0).getName(), file2.getName());

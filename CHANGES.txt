@@ -265,6 +265,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1668. RaidNode Hars a directory only if all its parity files 
     have been created. (Ramkumar Vadali via dhruba)
 
+    MAPREDUCE-2021. Fixes duplicate hostnames in CombineFileInputFormat's
+    split locations. (amareshwari)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

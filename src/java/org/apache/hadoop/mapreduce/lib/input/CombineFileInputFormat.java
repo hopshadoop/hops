@@ -20,6 +20,7 @@ package org.apache.hadoop.mapreduce.lib.input;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedList;
 import java.util.HashSet;
 import java.util.List;
@@ -272,7 +273,7 @@ public abstract class CombineFileInputFormat<K, V>
     }
 
     ArrayList<OneBlockInfo> validBlocks = new ArrayList<OneBlockInfo>();
-    ArrayList<String> nodes = new ArrayList<String>();
+    Set<String> nodes = new HashSet<String>();
     long curSplitSize = 0;
 
     // process all nodes and create splits that are local
@@ -326,7 +327,7 @@ public abstract class CombineFileInputFormat<K, V>
     // in 'overflow'. After the processing of all racks is complete, these 
     // overflow blocks will be combined into splits.
     ArrayList<OneBlockInfo> overflowBlocks = new ArrayList<OneBlockInfo>();
-    ArrayList<String> racks = new ArrayList<String>();
+    Set<String> racks = new HashSet<String>();
 
     // Process all racks over and over again until there is no more work to do.
     while (blockToNodes.size() > 0) {
@@ -431,7 +432,7 @@ public abstract class CombineFileInputFormat<K, V>
    * Add this new split into splitList.
    */
   private void addCreatedSplit(List<InputSplit> splitList, 
-                               List<String> locations, 
+                               Collection<String> locations, 
                                ArrayList<OneBlockInfo> validBlocks) {
     // create an input split
     Path[] fl = new Path[validBlocks.size()];
@@ -577,8 +578,8 @@ public abstract class CombineFileInputFormat<K, V>
     hosts.add(host);
   }
   
-  private List<String> getHosts(List<String> racks) {
-    List<String> hosts = new ArrayList<String>();
+  private Set<String> getHosts(Set<String> racks) {
+    Set<String> hosts = new HashSet<String>();
     for (String rack : racks) {
       hosts.addAll(rackToNodes.get(rack));
     }
