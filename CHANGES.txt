@@ -231,6 +231,9 @@ Trunk (unreleased changes)
 
     HDFS-1284. TestBlockToken fails.  (Kan Zhang via jghoman)
 
+    HDFS-1355. ant veryclean (clean-cache) doesn't clean enough. 
+    (Luke Lu via jghoman)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
