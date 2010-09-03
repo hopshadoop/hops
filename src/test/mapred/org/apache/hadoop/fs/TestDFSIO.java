@@ -397,9 +397,8 @@ public class TestDFSIO extends TestCase implements Tool {
       DataInputStream in = fs.open(new Path(getDataDir(getConf()), name));
       long actualSize = 0;
       try {
-        for(int curSize = bufferSize;
-                curSize == bufferSize && actualSize < totalSize;) {
-          curSize = in.read(buffer, 0, bufferSize);
+        while (actualSize < totalSize) {
+          int curSize = in.read(buffer, 0, bufferSize);
           if(curSize < 0) break;
           actualSize += curSize;
           reporter.setStatus("reading " + name + "@" + 

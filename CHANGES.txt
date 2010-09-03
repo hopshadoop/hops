@@ -271,6 +271,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1375. Fixes flaky test TestFileArgs. (Todd Lipcon via
     amareshwari)
 
+    MAPREDUCE-2023. TestDFSIO should not stop reading if curSize != bufferSize.
+    (Hong Tang via szetszwo)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
