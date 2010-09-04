@@ -24,7 +24,6 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.*;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.*;
-import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager;
 import org.apache.hadoop.hdfs.security.token.block.ExportedBlockKeys;
 import org.apache.hadoop.hdfs.server.common.GenerationStamp;
@@ -799,44 +798,32 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
     } else {
       final long n = inode.computeFileSize(false);
       final List<LocatedBlock> locatedblocks = blockManager.getBlockLocations(
-          blocks, offset, length, Integer.MAX_VALUE);
+          blocks, offset, length, Integer.MAX_VALUE, needBlockToken);
       final BlockInfo last = inode.getLastBlock();
       if (LOG.isDebugEnabled()) {
         LOG.debug("last = " + last);
       }
-
-      if(isBlockTokenEnabled && needBlockToken) {
-        setBlockTokens(locatedblocks);
-      }
-
+    
       if (last.isComplete()) {
         return new LocatedBlocks(n, inode.isUnderConstruction(), locatedblocks,
-            blockManager.getBlockLocation(last, n-last.getNumBytes()), true);
+          blockManager.getBlockLocation(last, n-last.getNumBytes(), needBlockToken), true);
       } else {
         return new LocatedBlocks(n, inode.isUnderConstruction(), locatedblocks,
-            blockManager.getBlockLocation(last, n), false);
+          blockManager.getBlockLocation(last, n, needBlockToken), false);
       }
     }
   }
 
-  /** Generate a combined block token for all the blocks to be returned. */
-  private void setBlockTokens(List<LocatedBlock> locatedBlocks) throws IOException {
-    long [] blockIds = new long[locatedBlocks.size()];
-    for(int i = 0; i < blockIds.length; i++) {
-      blockIds[i] = locatedBlocks.get(i).getBlock().getBlockId();
-    }
-    
-    Token<BlockTokenIdentifier> token = 
-      blockTokenSecretManager.generateToken(blockIds, 
-          EnumSet.of(BlockTokenSecretManager.AccessMode.READ));
-    
-    for(LocatedBlock l : locatedBlocks) l.setBlockToken(token);
-  }
-
-  /** Create a LocatedBlock. */
+  /** Create a LocatedBlock. 
+   * @param needBlockToken */
   LocatedBlock createLocatedBlock(final Block b, final DatanodeInfo[] locations,
-      final long offset, final boolean corrupt) throws IOException {
-    return new LocatedBlock(b, locations, offset, corrupt);
+      final long offset, final boolean corrupt, boolean needBlockToken) throws IOException {
+    final LocatedBlock lb = new LocatedBlock(b, locations, offset, corrupt);
+    if (isBlockTokenEnabled && needBlockToken) {
+      lb.setBlockToken(blockTokenSecretManager.generateToken(b,
+          EnumSet.of(BlockTokenSecretManager.AccessMode.READ)));
+    }
+    return lb;
   }
   
   /**

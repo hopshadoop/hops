@@ -68,9 +68,9 @@ public interface ClientProtocol extends VersionedProtocol {
    * Compared to the previous version the following changes have been introduced:
    * (Only the latest change is reflected.
    * The log of historical changes can be retrieved from the svn).
-   * 62: Allow iterative getListinng piggyback block locations.
+   * 63: remove getBlockLocations optimization
    */
-  public static final long versionID = 62L;
+  public static final long versionID = 63L;
   
   ///////////////////////////////////////
   // File contents

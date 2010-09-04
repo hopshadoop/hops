@@ -234,6 +234,8 @@ Trunk (unreleased changes)
     HDFS-1355. ant veryclean (clean-cache) doesn't clean enough. 
     (Luke Lu via jghoman)
 
+    HDFS-1353.  Remove most of getBlockLocation optimization. (jghoman)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

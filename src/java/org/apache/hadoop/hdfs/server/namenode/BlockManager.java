@@ -384,7 +384,7 @@ public class BlockManager {
   }
 
   List<LocatedBlock> getBlockLocations(BlockInfo[] blocks, long offset,
-      long length, int nrBlocksToReturn) throws IOException {
+      long length, int nrBlocksToReturn, boolean needBlockToken) throws IOException {
     int curBlk = 0;
     long curPos = 0, blkSize = 0;
     int nrBlocks = (blocks[0].getNumBytes() == 0) ? 0 : blocks.length;
@@ -403,7 +403,7 @@ public class BlockManager {
     long endOff = offset + length;
     List<LocatedBlock> results = new ArrayList<LocatedBlock>(blocks.length);
     do {
-      results.add(getBlockLocation(blocks[curBlk], curPos));
+      results.add(getBlockLocation(blocks[curBlk], curPos, needBlockToken));
       curPos += blocks[curBlk].getNumBytes();
       curBlk++;
     } while (curPos < endOff 
@@ -412,13 +412,14 @@ public class BlockManager {
     return results;
   }
 
-  /** @return a LocatedBlock for the given block */
-  LocatedBlock getBlockLocation(final BlockInfo blk, final long pos
+  /** @param needBlockToken 
+   * @return a LocatedBlock for the given block */
+  LocatedBlock getBlockLocation(final BlockInfo blk, final long pos, boolean needBlockToken
       ) throws IOException {
     if (!blk.isComplete()) {
       final BlockInfoUnderConstruction uc = (BlockInfoUnderConstruction)blk;
       final DatanodeDescriptor[] locations = uc.getExpectedLocations();
-      return namesystem.createLocatedBlock(uc, locations, pos, false);
+      return namesystem.createLocatedBlock(uc, locations, pos, false, needBlockToken);
     }
 
     // get block locations
@@ -444,7 +445,7 @@ public class BlockManager {
           machines[j++] = d;
       }
     }
-    return namesystem.createLocatedBlock(blk, machines, pos, isCorrupt);    
+    return namesystem.createLocatedBlock(blk, machines, pos, isCorrupt, needBlockToken);    
   }
 
   /**
