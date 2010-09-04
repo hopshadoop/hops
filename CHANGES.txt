@@ -27,7 +27,7 @@ Trunk (unreleased changes)
     HDFS-1150. Verify datanodes' identities to clients in secure clusters.
     (jghoman)
 
-    HDFS-1330. Make RPCs to DataNodes timeout. (hairong)
+    aHDFS-1330. Make RPCs to DataNodes timeout. (hairong)
 
     HDFS-202.  HDFS support of listLocatedStatus introduced in HADOOP-6870.
     HDFS piggyback block locations to each file status when listing a
@@ -115,6 +115,9 @@ Trunk (unreleased changes)
 
     HDFS-1356.  Provide information as to whether or not security is 
     enabled on web interface for NameNode (boryas)
+
+    HDFS-1205. FSDatasetAsyncDiskService should name its threads.
+    (Todd Lipcon via eli)
 
   OPTIMIZATIONS
 
