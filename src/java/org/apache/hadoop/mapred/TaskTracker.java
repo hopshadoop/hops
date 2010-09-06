@@ -379,7 +379,13 @@ public class TaskTracker
   public TaskTrackerInstrumentation getTaskTrackerInstrumentation() {
     return myInstrumentation;
   }
-  
+
+  // Currently used only in tests
+  void setTaskTrackerInstrumentation(
+      TaskTrackerInstrumentation trackerInstrumentation) {
+    myInstrumentation = trackerInstrumentation;
+  }
+
   /**
    * A list of tips that should be cleaned up.
    */

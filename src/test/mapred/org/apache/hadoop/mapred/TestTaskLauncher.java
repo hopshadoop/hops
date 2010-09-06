@@ -64,7 +64,11 @@ public class TestTaskLauncher {
     tt.setConf(ttConf);
     tt.setIndexCache(new IndexCache(ttConf));
     tt.setTaskMemoryManagerEnabledFlag(); 
-    
+
+    // Set up TaskTracker instrumentation
+    tt.setTaskTrackerInstrumentation(
+        TaskTracker.createInstrumentation(tt, tt.getJobConf()));
+
     // start map-task launcher with four slots
     TaskLauncher mapLauncher = tt.new TaskLauncher(TaskType.MAP, 4);
     mapLauncher.start();

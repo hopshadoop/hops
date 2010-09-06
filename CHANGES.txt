@@ -274,6 +274,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2023. TestDFSIO should not stop reading if curSize != bufferSize.
     (Hong Tang via szetszwo)
 
+    MAPREDUCE-2031. Fixes test failures TestTaskLauncher and
+    TestTaskTrackerLocalization. (Ravi Gummadi via amareshwari)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

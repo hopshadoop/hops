@@ -188,6 +188,10 @@ public class TestTaskTrackerLocalization extends TestCase {
     tracker.setAsyncDiskService(new MRAsyncDiskService(trackerFConf));
     tracker.getAsyncDiskService().cleanupAllVolumes();
 
+    // Set up TaskTracker instrumentation
+    tracker.setTaskTrackerInstrumentation(
+        TaskTracker.createInstrumentation(tracker, trackerFConf));
+
     // setup task controller
     taskController = createTaskController();
     taskController.setConf(trackerFConf);
