@@ -268,7 +268,8 @@ public abstract class CombineFileInputFormat<K, V>
     long totLength = 0;
     for (int i = 0; i < paths.length; i++) {
       files[i] = new OneFileInfo(paths[i], conf, 
-                                 rackToBlocks, blockToNodes, nodeToBlocks, rackToNodes);
+                                 rackToBlocks, blockToNodes, nodeToBlocks, rackToNodes,
+                                 maxSize);
       totLength += files[i].getLength();
     }
 
@@ -467,7 +468,8 @@ public abstract class CombineFileInputFormat<K, V>
                 HashMap<String, List<OneBlockInfo>> rackToBlocks,
                 HashMap<OneBlockInfo, String[]> blockToNodes,
                 HashMap<String, List<OneBlockInfo>> nodeToBlocks,
-                HashMap<String, Set<String>> rackToNodes)
+                HashMap<String, Set<String>> rackToNodes,
+                long maxSize)
                 throws IOException {
       this.fileSize = 0;
 
@@ -480,44 +482,69 @@ public abstract class CombineFileInputFormat<K, V>
       if (locations == null) {
         blocks = new OneBlockInfo[0];
       } else {
-        blocks = new OneBlockInfo[locations.length];
+        ArrayList<OneBlockInfo> blocksList = new ArrayList<OneBlockInfo>(locations.length);
         for (int i = 0; i < locations.length; i++) {
            
           fileSize += locations[i].getLength();
-          OneBlockInfo oneblock =  new OneBlockInfo(path, 
-                                       locations[i].getOffset(), 
-                                       locations[i].getLength(),
+
+          // each split can be a maximum of maxSize
+          long left = locations[i].getLength();
+          long myOffset = locations[i].getOffset();
+          long myLength = 0;
+          while (left > 0) {
+            if (maxSize == 0) {
+              myLength = left;
+            } else {
+              if (left > maxSize && left < 2 * maxSize) {
+                // if remainder is between max and 2*max - then 
+                // instead of creating splits of size max, left-max we
+                // create splits of size left/2 and left/2. This is
+                // a heuristic to avoid creating really really small
+                // splits.
+                myLength = left / 2;
+              } else {
+                myLength = Math.min(maxSize, left);
+              }
+            }
+            OneBlockInfo oneblock =  new OneBlockInfo(path, 
+                                       myOffset,
+                                       myLength,
                                        locations[i].getHosts(),
                                        locations[i].getTopologyPaths()); 
-          blocks[i] = oneblock;
+            left -= myLength;
+            myOffset += myLength;
 
-          // add this block to the block --> node locations map
-          blockToNodes.put(oneblock, oneblock.hosts);
+            blocksList.add(oneblock);
 
-          // add this block to the rack --> block map
-          for (int j = 0; j < oneblock.racks.length; j++) {
-            String rack = oneblock.racks[j];
-            List<OneBlockInfo> blklist = rackToBlocks.get(rack);
-            if (blklist == null) {
-              blklist = new ArrayList<OneBlockInfo>();
-              rackToBlocks.put(rack, blklist);
+            // add this block to the block --> node locations map
+            blockToNodes.put(oneblock, oneblock.hosts);
+
+            // add this block to the rack --> block map
+            for (int j = 0; j < oneblock.racks.length; j++) {
+              String rack = oneblock.racks[j];
+              List<OneBlockInfo> blklist = rackToBlocks.get(rack);
+              if (blklist == null) {
+                blklist = new ArrayList<OneBlockInfo>();
+                rackToBlocks.put(rack, blklist);
+              }
+              blklist.add(oneblock);
+              // Add this host to rackToNodes map
+              addHostToRack(rackToNodes, oneblock.racks[j], oneblock.hosts[j]);
+           }
+
+            // add this block to the node --> block map
+            for (int j = 0; j < oneblock.hosts.length; j++) {
+              String node = oneblock.hosts[j];
+              List<OneBlockInfo> blklist = nodeToBlocks.get(node);
+              if (blklist == null) {
+                blklist = new ArrayList<OneBlockInfo>();
+                nodeToBlocks.put(node, blklist);
+              }
+              blklist.add(oneblock);
             }
-            blklist.add(oneblock);
-            // Add this host to rackToNodes map
-            addHostToRack(rackToNodes, oneblock.racks[j], oneblock.hosts[j]);
-         }
-
-          // add this block to the node --> block map
-          for (int j = 0; j < oneblock.hosts.length; j++) {
-            String node = oneblock.hosts[j];
-            List<OneBlockInfo> blklist = nodeToBlocks.get(node);
-            if (blklist == null) {
-              blklist = new ArrayList<OneBlockInfo>();
-              nodeToBlocks.put(node, blklist);
-            }
-            blklist.add(oneblock);
           }
         }
+        blocks = blocksList.toArray(new OneBlockInfo[blocksList.size()]);
       }
     }
 

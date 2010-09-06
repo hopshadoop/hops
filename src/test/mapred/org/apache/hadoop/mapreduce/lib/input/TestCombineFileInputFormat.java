@@ -463,7 +463,7 @@ public class TestCombineFileInputFormat extends TestCase {
         dir1 + "," + dir2 + "," + dir3 + "," + dir4);
       splits = inFormat.getSplits(job);
       for (InputSplit split : splits) {
-        System.out.println("File split(Test1): " + split);
+        System.out.println("File split(Test5): " + split);
       }
       assertEquals(splits.size(), 4);
       fileSplit = (CombineFileSplit) splits.get(0);
@@ -514,7 +514,7 @@ public class TestCombineFileInputFormat extends TestCase {
       FileInputFormat.setInputPaths(job, dir1 + "," + dir2 + "," + dir3 + "," + dir4);
       splits = inFormat.getSplits(job);
       for (InputSplit split : splits) {
-        System.out.println("File split(Test1): " + split);
+        System.out.println("File split(Test6): " + split);
       }
       assertEquals(splits.size(), 3);
       fileSplit = (CombineFileSplit) splits.get(0);
@@ -562,7 +562,7 @@ public class TestCombineFileInputFormat extends TestCase {
         dir1 + "," + dir2 + "," + dir3 + "," + dir4);
       splits = inFormat.getSplits(job);
       for (InputSplit split : splits) {
-        System.out.println("File split(Test1): " + split);
+        System.out.println("File split(Test7): " + split);
       }
       assertEquals(splits.size(), 2);
       fileSplit = (CombineFileSplit) splits.get(0);
@@ -622,6 +622,18 @@ public class TestCombineFileInputFormat extends TestCase {
       System.out.println("Elapsed time for " + numPools + " pools " +
                          " and " + numFiles + " files is " + 
                          ((end - start)/1000) + " seconds.");
+
+      // This file has three whole blocks. If the maxsplit size is
+      // half the block size, then there should be six splits.
+      inFormat = new DummyInputFormat();
+      inFormat.setMaxSplitSize(BLOCKSIZE/2);
+      FileInputFormat.setInputPaths(job, dir3);
+      splits = inFormat.getSplits(job);
+      for (InputSplit split : splits) {
+        System.out.println("File split(Test8): " + split);
+      }
+      assertEquals(6, splits.size());
+
     } finally {
       if (dfs != null) {
         dfs.shutdown();
