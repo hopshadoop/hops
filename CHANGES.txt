@@ -239,6 +239,8 @@ Trunk (unreleased changes)
 
     HDFS-1353.  Remove most of getBlockLocation optimization. (jghoman)
 
+    HDFS-1369. Invalid javadoc reference in FSDatasetMBean.java (Eli Collins)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
