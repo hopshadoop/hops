@@ -280,6 +280,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2046. Fixes CombineFileInputFormat to allow splits with size
     less than DFS block size. (dhruba borthakur via amareshwari)
 
+    MAPREDUCE-1975. Fixes unnecessary InterruptedException log in gridmix.
+    (Ravi Gummadi via amareshwari)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
