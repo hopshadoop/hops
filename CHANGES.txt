@@ -27,11 +27,13 @@ Trunk (unreleased changes)
     HDFS-1150. Verify datanodes' identities to clients in secure clusters.
     (jghoman)
 
-    aHDFS-1330. Make RPCs to DataNodes timeout. (hairong)
+    HDFS-1330. Make RPCs to DataNodes timeout. (hairong)
 
     HDFS-202.  HDFS support of listLocatedStatus introduced in HADOOP-6870.
     HDFS piggyback block locations to each file status when listing a
     directory.  (hairong)
+
+    HDFS-1361. Add -fileStatus operation to NNThroughputBenchmark. (shv)
 
   IMPROVEMENTS
 
