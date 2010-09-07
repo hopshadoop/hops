@@ -244,6 +244,9 @@ Trunk (unreleased changes)
 
     HDFS-1369. Invalid javadoc reference in FSDatasetMBean.java (Eli Collins)
 
+    HDFS-829. hdfsJniHelper.c: #include <error.h> is not portable. 
+    (Allen Wittenauer via jghoman)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
