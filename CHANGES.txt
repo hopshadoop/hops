@@ -283,6 +283,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1975. Fixes unnecessary InterruptedException log in gridmix.
     (Ravi Gummadi via amareshwari)
 
+    MAPREDUCE-1597. Fixes CombineFileInputFormat to work with non-splittable
+    files. (amareshwari)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
