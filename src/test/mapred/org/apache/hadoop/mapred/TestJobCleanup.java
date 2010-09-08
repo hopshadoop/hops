@@ -77,6 +77,7 @@ public class TestJobCleanup extends TestCase {
       
       protected void tearDown() throws Exception {
         if (fileSys != null) {
+          fileSys.delete(new Path(TEST_ROOT_DIR), true);
           fileSys.close();
         }
         if (mr != null) {

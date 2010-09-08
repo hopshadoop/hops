@@ -286,6 +286,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1597. Fixes CombineFileInputFormat to work with non-splittable
     files. (amareshwari)
 
+    MAPREDUCE-2032. Fixes TestJobCleanup to cleanup test directory in
+    tearDown. (Dick King via amareshwari)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
