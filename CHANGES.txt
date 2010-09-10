@@ -249,6 +249,9 @@ Trunk (unreleased changes)
     HDFS-829. hdfsJniHelper.c: #include <error.h> is not portable. 
     (Allen Wittenauer via jghoman)
 
+    HDFS-1310. The ClientDatanodeProtocol proxy should be stopped in
+    DFSInputStream.readBlockLength(..).  (sam rash via szetszwo)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
