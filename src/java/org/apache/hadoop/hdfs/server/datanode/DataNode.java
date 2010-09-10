@@ -217,6 +217,7 @@ public class DataNode extends Configured
   private HttpServer infoServer = null;
   DataNodeMetrics myMetrics;
   private InetSocketAddress nameNodeAddr;
+  private InetSocketAddress nameNodeAddrForClient;
   private InetSocketAddress selfAddr;
   private static DataNode datanodeObject = null;
   private Thread dataNodeThread = null;
@@ -314,6 +315,7 @@ public class DataNode extends Configured
                                      conf.get("dfs.datanode.dns.nameserver","default"));
     }
     this.nameNodeAddr = NameNode.getServiceAddress(conf, true);
+    this.nameNodeAddrForClient = NameNode.getAddress(conf);
     
     this.socketTimeout =  conf.getInt(DFSConfigKeys.DFS_CLIENT_SOCKET_TIMEOUT_KEY,
                                       HdfsConstants.READ_TIMEOUT);
@@ -583,6 +585,10 @@ public class DataNode extends Configured
 
   public InetSocketAddress getNameNodeAddr() {
     return nameNodeAddr;
+  }
+  
+  public InetSocketAddress getNameNodeAddrForClient() {
+    return nameNodeAddrForClient;
   }
   
   public InetSocketAddress getSelfAddr() {

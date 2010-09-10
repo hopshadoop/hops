@@ -252,6 +252,9 @@ Trunk (unreleased changes)
     HDFS-1310. The ClientDatanodeProtocol proxy should be stopped in
     DFSInputStream.readBlockLength(..).  (sam rash via szetszwo)
 
+    HDFS-1357. HFTP traffic served by DataNode shouldn't use service port 
+    on NameNode. (Kan Zhang via jghoman)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
