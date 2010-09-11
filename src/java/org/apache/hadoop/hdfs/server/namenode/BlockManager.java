@@ -24,7 +24,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -1724,27 +1723,13 @@ public class BlockManager {
                                    Long startingBlockId) {
     return corruptReplicas.getCorruptReplicaBlockIds(numExpectedBlocks,
                                                      startingBlockId);
-  }  
-  
-  /**
-   * @return inodes of files with corrupt blocks, with a maximum of 
-   * MAX_CORRUPT_FILES_RETURNED inodes listed in total
-   */
-  INode[] getCorruptInodes() {
-    LinkedHashSet<INode> set = new LinkedHashSet<INode>();
-
-    for (Block blk : 
-            neededReplications.getQueue(
-                UnderReplicatedBlocks.QUEUE_WITH_CORRUPT_BLOCKS)){
-      INode inode = blocksMap.getINode(blk);
-      if (inode != null && countNodes(blk).liveReplicas() == 0) {
-        set.add(inode);
-        if (set.size() >= this.maxCorruptFilesReturned) {
-          break;  
-        }
-      } 
-    }
-    return set.toArray(new INode[set.size()]);
   }
-  
+
+  /**
+   * Return an iterator over the set of blocks for which there are no replicas.
+   */
+  BlockIterator getCorruptReplicaBlockIterator() {
+    return neededReplications
+        .iterator(UnderReplicatedBlocks.QUEUE_WITH_CORRUPT_BLOCKS);
+  }
 }

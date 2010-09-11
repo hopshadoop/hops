@@ -124,6 +124,8 @@ Trunk (unreleased changes)
     HDFS-1205. FSDatasetAsyncDiskService should name its threads.
     (Todd Lipcon via eli)
 
+    HDFS-1111. Introduce getCorruptFileBlocks() for fsck. (Sriram Rao via shv)
+
   OPTIMIZATIONS
 
     HDFS-1140. Speedup INode.getPathComponents. (Dmytro Molkov via shv)

@@ -52,6 +52,7 @@ import org.apache.hadoop.net.Node;
 import org.apache.hadoop.net.NodeBase;
 import org.apache.hadoop.net.ScriptBasedMapping;
 import org.apache.hadoop.hdfs.server.namenode.LeaseManager.Lease;
+import org.apache.hadoop.hdfs.server.namenode.UnderReplicatedBlocks.BlockIterator;
 import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
@@ -67,7 +68,6 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
-import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FsServerDefaults;
 import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.fs.ParentNotDirectoryException;
@@ -88,8 +88,8 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.io.DataOutputStream;
+import java.io.PrintWriter;
 import java.lang.management.ManagementFactory;
 import java.net.InetAddress;
 import java.net.URI;
@@ -162,6 +162,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
   public static final Log auditLog = LogFactory.getLog(
       FSNamesystem.class.getName() + ".audit");
 
+  static final int DEFAULT_MAX_CORRUPT_FILEBLOCKS_RETURNED = 100;
   static int BLOCK_DELETION_INCREMENT = 1000;
   private boolean isPermissionEnabled;
   private UserGroupInformation fsOwner;
@@ -4464,37 +4465,57 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
     return blockManager.getCorruptReplicaBlockIds(numExpectedBlocks,
                                                   startingBlockId);
   }
-
+  
+  static class CorruptFileBlockInfo {
+    String path;
+    Block block;
+    
+    public CorruptFileBlockInfo(String p, Block b) {
+      path = p;
+      block = b;
+    }
+    
+    public String toString() {
+      return block.getBlockName() + "\t" + path;
+    }
+  }
   /**
-   * @return Array of FileStatus objects representing files with 
-   * corrupted blocks.
+   * @param path Restrict corrupt files to this portion of namespace.
+   * @param startBlockAfter Support for continuation; the set of files we return
+   *  back is ordered by blockid; startBlockAfter tells where to start from
+   * @return a list in which each entry describes a corrupt file/block
    * @throws AccessControlException
    * @throws IOException
    */
-  synchronized FileStatus[] getCorruptFiles() 
-    throws AccessControlException, IOException {
-    
-    checkSuperuserPrivilege();
-    
-    INode[] inodes = blockManager.getCorruptInodes();
-    FileStatus[] ret = new FileStatus[inodes.length];
-    
-    int i = 0;
-    for (INode inode: inodes) {
-      String src = inode.getFullPathName();
-      ret[i++] = new FileStatus(inode.computeContentSummary().getLength(), 
-          inode.isDirectory(), 
-          ((INodeFile)inode).getReplication(), 
-          ((INodeFile)inode).getPreferredBlockSize(),
-          inode.getModificationTime(),
-          inode.getAccessTime(),
-          inode.getFsPermission(),
-          inode.getUserName(),
-          inode.getGroupName(),
-          new Path(src));
-    }
+  synchronized Collection<CorruptFileBlockInfo> listCorruptFileBlocks(String path,
+      String startBlockAfter) throws AccessControlException, IOException {
 
-    return ret;
+    checkSuperuserPrivilege();
+    long startBlockId = 0;
+    // print a limited # of corrupt files per call
+    int count = 0;
+    ArrayList<CorruptFileBlockInfo> corruptFiles = new ArrayList<CorruptFileBlockInfo>();
+    
+    if (startBlockAfter != null) {
+      startBlockId = Block.filename2id(startBlockAfter);
+    }
+    BlockIterator blkIterator = blockManager.getCorruptReplicaBlockIterator();
+    while (blkIterator.hasNext()) {
+      Block blk = blkIterator.next();
+      INode inode = blockManager.getINode(blk);
+      if (inode != null && blockManager.countNodes(blk).liveReplicas() == 0) {
+        String src = FSDirectory.getFullPathName(inode);
+        if (((startBlockAfter == null) || (blk.getBlockId() > startBlockId))
+            && (src.startsWith(path))) {
+          corruptFiles.add(new CorruptFileBlockInfo(src, blk));
+          count++;
+          if (count >= DEFAULT_MAX_CORRUPT_FILEBLOCKS_RETURNED)
+            break;
+        }
+      }
+    }
+    LOG.info("list corrupt file blocks returned: " + count);
+    return corruptFiles;
   }
   
   public synchronized ArrayList<DatanodeDescriptor> getDecommissioningNodes() {
