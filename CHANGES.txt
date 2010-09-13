@@ -293,6 +293,8 @@ Trunk (unreleased changes)
     when gridmix.output.directory is not defined. (Ravi Gummadi via
     amareshwari)
 
+    MAPREDUCE-1918. Adds documentation to Rumen. (Amar Kamat via amareshwari)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

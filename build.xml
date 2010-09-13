@@ -945,6 +945,7 @@
       >
         <packageset dir="${mapred.src.dir}"/>
     	<packageset dir="${examples.dir}"/>
+    	<packageset dir="${tools.src}"/>
 
        <packageset dir="src/contrib/data_join/src/java"/>
        <packageset dir="src/contrib/gridmix/src/java"/>
@@ -967,6 +968,7 @@
 
        <group title="Packages" packages="org.apache.*"/>
        <group title="Libraries" packages="org.apache.hadoop.mapred.lib*:org.apache.hadoop.mapreduce.lib*"/>
+       <group title="Tools" packages="org.apache.hadoop.tools"/>
        <group title="Examples" packages="org.apache.hadoop.examples*"/>
 
        <group title="contrib: DataJoin" packages="org.apache.hadoop.contrib.utils.join*"/>
@@ -1011,6 +1013,7 @@
        <packageset dir="src/contrib/gridmix/src/java"/>
        <packageset dir="src/contrib/index/src/java"/>
        <packageset dir="src/contrib/streaming/src/java"/>
+       <packageset dir="${tools.src}"/>
 	
         <link href="${javadoc.link.java}"/>
 
@@ -1027,6 +1030,7 @@
 
        <group title="Packages" packages="org.apache.*"/>
        <group title="Libraries" packages="org.apache.hadoop.mapred.lib*:org.apache.hadoop.mapreduce.lib*"/>
+       <group title="Tools" packages="org.apache.hadoop.tools"/>
        <group title="Examples" packages="org.apache.hadoop.examples*"/>
 
        <group title="contrib: DataJoin" packages="org.apache.hadoop.contrib.utils.join*"/>
@@ -1048,6 +1052,7 @@
        </doclet>
        <packageset dir="src/java"/>
        <packageset dir="src/tools"/>
+       <packageset dir="${tools.src}"/>
        <classpath >
          <path refid="classpath" />
          <path refid="jdiff-classpath" />
@@ -1081,6 +1086,7 @@
        </doclet>
        <packageset dir="src/java"/>
        <packageset dir="src/tools"/>
+       <packageset dir="${tools.src}"/>
        <classpath >
          <path refid="classpath" />
          <path refid="jdiff-classpath"/>
