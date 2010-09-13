@@ -289,6 +289,10 @@ Trunk (unreleased changes)
     MAPREDUCE-2032. Fixes TestJobCleanup to cleanup test directory in
     tearDown. (Dick King via amareshwari)
 
+    MAPREDUCE-1979. Fixes "Output directory already exists" error in gridmix
+    when gridmix.output.directory is not defined. (Ravi Gummadi via
+    amareshwari)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

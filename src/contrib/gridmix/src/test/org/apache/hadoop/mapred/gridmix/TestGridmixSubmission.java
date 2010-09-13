@@ -34,7 +34,6 @@ import org.apache.hadoop.mapred.Counters;
 import org.apache.hadoop.mapred.JobClient;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.JobID;
-import org.apache.hadoop.mapred.Task;
 import org.apache.hadoop.mapred.TaskReport;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.TaskType;
@@ -333,15 +332,21 @@ public class TestGridmixSubmission {
   public void testReplaySubmit() throws Exception {
     policy = GridmixJobSubmissionPolicy.REPLAY;
     System.out.println(" Replay started at " + System.currentTimeMillis());
-    doSubmission(false);
+    doSubmission(false, false);
     System.out.println(" Replay ended at " + System.currentTimeMillis());
+
+    System.out.println(" Replay started with default output path at time "
+        + System.currentTimeMillis());
+    doSubmission(false, true);
+    System.out.println(" Replay ended with default output path at time "
+        + System.currentTimeMillis());
   }
 
   @Test
   public void testStressSubmit() throws Exception {
     policy = GridmixJobSubmissionPolicy.STRESS;
     System.out.println(" Stress started at " + System.currentTimeMillis());
-    doSubmission(false);
+    doSubmission(false, false);
     System.out.println(" Stress ended at " + System.currentTimeMillis());
   }
 
@@ -350,7 +355,7 @@ public class TestGridmixSubmission {
     policy = GridmixJobSubmissionPolicy.STRESS;
     System.out.println(" Stress with default q started at " 
                        + System.currentTimeMillis());
-    doSubmission(true);
+    doSubmission(true, false);
     System.out.println(" Stress with default q ended at " 
                        + System.currentTimeMillis());
   }
@@ -359,26 +364,39 @@ public class TestGridmixSubmission {
   public void testSerialSubmit() throws Exception {
     policy = GridmixJobSubmissionPolicy.SERIAL;
     System.out.println("Serial started at " + System.currentTimeMillis());
-    doSubmission(false);
+    doSubmission(false, false);
     System.out.println("Serial ended at " + System.currentTimeMillis());
   }
 
-  private void doSubmission(boolean useDefaultQueue) throws Exception {
+  private void doSubmission(boolean useDefaultQueue,
+      boolean defaultOutputPath) throws Exception {
     final Path in = new Path("foo").makeQualified(GridmixTestUtils.dfs);
     final Path out = GridmixTestUtils.DEST.makeQualified(GridmixTestUtils.dfs);
     final Path root = new Path("/user");
     Configuration conf = null;
+
     try{
-    final String[] argv = {
-      "-D" + FilePool.GRIDMIX_MIN_FILE + "=0",
-      "-D" + Gridmix.GRIDMIX_OUT_DIR + "=" + out,
-      "-D" + Gridmix.GRIDMIX_USR_RSV + "=" + EchoUserResolver.class.getName(),
-      "-generate", String.valueOf(GENDATA) + "m",
-      in.toString(),
-      "-" // ignored by DebugGridmix
-    };
-    DebugGridmix client = new DebugGridmix();
-    conf = new Configuration();
+      ArrayList<String> argsList = new ArrayList<String>();
+
+      argsList.add("-D" + FilePool.GRIDMIX_MIN_FILE + "=0");
+      argsList.add("-D" + Gridmix.GRIDMIX_USR_RSV + "="
+          + EchoUserResolver.class.getName());
+
+      // Set the config property gridmix.output.directory only if
+      // defaultOutputPath is false. If defaultOutputPath is true, then
+      // let us allow gridmix to use the path foo/gridmix/ as output dir.
+      if (!defaultOutputPath) {
+        argsList.add("-D" + Gridmix.GRIDMIX_OUT_DIR + "=" + out);
+      }
+      argsList.add("-generate");
+      argsList.add(String.valueOf(GENDATA) + "m");
+      argsList.add(in.toString());
+      argsList.add("-"); // ignored by DebugGridmix
+
+      String[] argv = argsList.toArray(new String[argsList.size()]);
+
+      DebugGridmix client = new DebugGridmix();
+      conf = new Configuration();
       conf.setEnum(GridmixJobSubmissionPolicy.JOB_SUBMISSION_POLICY,policy);
       if (useDefaultQueue) {
         conf.setBoolean(GridmixJob.GRIDMIX_USE_QUEUE_IN_TRACE, false);
@@ -386,13 +404,13 @@ public class TestGridmixSubmission {
       } else {
         conf.setBoolean(GridmixJob.GRIDMIX_USE_QUEUE_IN_TRACE, true);
       }
-    conf = GridmixTestUtils.mrCluster.createJobConf(new JobConf(conf));
-    // allow synthetic users to create home directories
-    GridmixTestUtils.dfs.mkdirs(root, new FsPermission((short)0777));
-    GridmixTestUtils.dfs.setPermission(root, new FsPermission((short)0777));
-    int res = ToolRunner.run(conf, client, argv);
-    assertEquals("Client exited with nonzero status", 0, res);
-    client.checkMonitor();
+      conf = GridmixTestUtils.mrCluster.createJobConf(new JobConf(conf));
+      // allow synthetic users to create home directories
+      GridmixTestUtils.dfs.mkdirs(root, new FsPermission((short)0777));
+      GridmixTestUtils.dfs.setPermission(root, new FsPermission((short)0777));
+      int res = ToolRunner.run(conf, client, argv);
+      assertEquals("Client exited with nonzero status", 0, res);
+      client.checkMonitor();
     } catch (Exception e) {
       e.printStackTrace();
     } finally {

@@ -270,9 +270,7 @@ public class Gridmix extends Configured implements Tool {
     InputStream trace = null;
     try {
       Path scratchDir = new Path(ioPath, conf.get(GRIDMIX_OUT_DIR, "gridmix"));
-      final FileSystem scratchFs = scratchDir.getFileSystem(conf);
-      scratchFs.mkdirs(scratchDir, new FsPermission((short) 0777));
-      scratchFs.setPermission(scratchDir, new FsPermission((short) 0777));
+
       // add shutdown hook for SIGINT, etc.
       Runtime.getRuntime().addShutdownHook(sdh);
       CountDownLatch startFlag = new CountDownLatch(1);
@@ -286,6 +284,12 @@ public class Gridmix extends Configured implements Tool {
         }
         // scan input dir contents
         submitter.refreshFilePool();
+
+        // create scratch directory(output path of gridmix)
+        final FileSystem scratchFs = scratchDir.getFileSystem(conf);
+        FileSystem.mkdirs(scratchFs, scratchDir,
+            new FsPermission((short) 0777));
+
         factory.start();
         statistics.start();
       } catch (Throwable e) {
