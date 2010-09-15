@@ -349,19 +349,44 @@ public class BlockManager {
   }
 
   /**
-   * Convert the last block of the file to an under construction block.
+   * Convert the last block of the file to an under construction block.<p>
+   * The block is converted only if the file has blocks and the last one
+   * is a partial block (its size is less than the preferred block size).
+   * The converted block is returned to the client.
+   * The client uses the returned block locations to form the data pipeline
+   * for this block.<br>
+   * The methods returns null if there is no partial block at the end.
+   * The client is supposed to allocate a new block with the next call.
+   *
    * @param fileINode file
-   * @param targets data-nodes that will form the pipeline for this block
+   * @return the last block locations if the block is partial or null otherwise
    */
-  void convertLastBlockToUnderConstruction(
-      INodeFileUnderConstruction fileINode,
-      DatanodeDescriptor[] targets) throws IOException {
+  LocatedBlock convertLastBlockToUnderConstruction(
+      INodeFileUnderConstruction fileINode) throws IOException {
     BlockInfo oldBlock = fileINode.getLastBlock();
-    if(oldBlock == null)
-      return;
+    if(oldBlock == null ||
+        fileINode.getPreferredBlockSize() == oldBlock.getNumBytes())
+      return null;
+    assert oldBlock == getStoredBlock(oldBlock) :
+      "last block of the file is not in blocksMap";
+
+    DatanodeDescriptor[] targets = getNodes(oldBlock);
+
     BlockInfoUnderConstruction ucBlock =
       fileINode.setLastBlock(oldBlock, targets);
     blocksMap.replaceBlock(ucBlock);
+
+    // Remove block from replication queue.
+    updateNeededReplications(oldBlock, 0, 0);
+
+    // remove this block from the list of pending blocks to be deleted. 
+    for (DatanodeDescriptor dd : targets) {
+      String datanodeId = dd.getStorageID();
+      removeFromInvalidates(datanodeId, oldBlock);
+    }
+
+    long fileLength = fileINode.computeContentSummary().getLength();
+    return getBlockLocation(ucBlock, fileLength - ucBlock.getNumBytes());
   }
 
   /**
@@ -383,7 +408,7 @@ public class BlockManager {
   }
 
   List<LocatedBlock> getBlockLocations(BlockInfo[] blocks, long offset,
-      long length, int nrBlocksToReturn, boolean needBlockToken) throws IOException {
+      long length, int nrBlocksToReturn) throws IOException {
     int curBlk = 0;
     long curPos = 0, blkSize = 0;
     int nrBlocks = (blocks[0].getNumBytes() == 0) ? 0 : blocks.length;
@@ -402,7 +427,7 @@ public class BlockManager {
     long endOff = offset + length;
     List<LocatedBlock> results = new ArrayList<LocatedBlock>(blocks.length);
     do {
-      results.add(getBlockLocation(blocks[curBlk], curPos, needBlockToken));
+      results.add(getBlockLocation(blocks[curBlk], curPos));
       curPos += blocks[curBlk].getNumBytes();
       curBlk++;
     } while (curPos < endOff 
@@ -413,12 +438,12 @@ public class BlockManager {
 
   /** @param needBlockToken 
    * @return a LocatedBlock for the given block */
-  LocatedBlock getBlockLocation(final BlockInfo blk, final long pos, boolean needBlockToken
+  LocatedBlock getBlockLocation(final BlockInfo blk, final long pos
       ) throws IOException {
     if (!blk.isComplete()) {
       final BlockInfoUnderConstruction uc = (BlockInfoUnderConstruction)blk;
       final DatanodeDescriptor[] locations = uc.getExpectedLocations();
-      return namesystem.createLocatedBlock(uc, locations, pos, false, needBlockToken);
+      return new LocatedBlock(uc, locations, pos, false);
     }
 
     // get block locations
@@ -444,7 +469,7 @@ public class BlockManager {
           machines[j++] = d;
       }
     }
-    return namesystem.createLocatedBlock(blk, machines, pos, isCorrupt, needBlockToken);    
+    return new LocatedBlock(blk, machines, pos, isCorrupt);
   }
 
   /**
