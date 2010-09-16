@@ -129,7 +129,7 @@ Trunk (unreleased changes)
     HDFS-1395. Add @Override to FSDataset methods that implement
     FSDatasetInterface methods. (suresh)
 
-    HDFS-1320. Improve the error messages when using hftp://.  (szetszwo)
+    HDFS-1383. Improve the error messages when using hftp://.  (szetszwo)
 
   OPTIMIZATIONS
 
