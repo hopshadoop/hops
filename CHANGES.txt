@@ -131,6 +131,8 @@ Trunk (unreleased changes)
 
     HDFS-1383. Improve the error messages when using hftp://.  (szetszwo)
 
+    HDFS-1093. Change the FSNamesystem lock to a read/write lock. (dhruba)
+
   OPTIMIZATIONS
 
     HDFS-1140. Speedup INode.getPathComponents. (Dmytro Molkov via shv)

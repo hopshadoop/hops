@@ -745,7 +745,8 @@ public class BlockManager {
     for (int i = 0; i < UnderReplicatedBlocks.LEVEL; i++) {
       blocksToReplicate.add(new ArrayList<Block>());
     }
-    synchronized (namesystem) {
+    namesystem.writeLock();
+    try {
       synchronized (neededReplications) {
         if (neededReplications.size() == 0) {
           missingBlocksInCurIter = 0;
@@ -788,7 +789,9 @@ public class BlockManager {
           }
         } // end for
       } // end synchronized neededReplication
-    } // end synchronized namesystem
+    } finally {
+      namesystem.writeUnlock();
+    }
 
     return blocksToReplicate;
   }
@@ -806,7 +809,8 @@ public class BlockManager {
     INodeFile fileINode = null;
     int additionalReplRequired;
 
-    synchronized (namesystem) {
+    namesystem.writeLock();
+    try {
       synchronized (neededReplications) {
         // block should belong to a file
         fileINode = blocksMap.getINode(block);
@@ -853,6 +857,8 @@ public class BlockManager {
         }
 
       }
+    } finally {
+      namesystem.writeUnlock();
     }
 
     // choose replication targets: NOT HOLDING THE GLOBAL LOCK
@@ -864,7 +870,8 @@ public class BlockManager {
     if(targets.length == 0)
       return false;
 
-    synchronized (namesystem) {
+    namesystem.writeLock();
+    try {
       synchronized (neededReplications) {
         // Recheck since global lock was released
         // block should belong to a file
@@ -941,6 +948,8 @@ public class BlockManager {
           }
         }
       }
+    } finally {
+      namesystem.writeUnlock();
     }
 
     return true;
@@ -1022,7 +1031,8 @@ public class BlockManager {
   void processPendingReplications() {
     Block[] timedOutItems = pendingReplications.getTimedOutBlocks();
     if (timedOutItems != null) {
-      synchronized (namesystem) {
+      namesystem.writeLock();
+      try {
         for (int i = 0; i < timedOutItems.length; i++) {
           NumberReplicas num = countNodes(timedOutItems[i]);
           if (isNeededReplication(timedOutItems[i], getReplication(timedOutItems[i]),
@@ -1033,6 +1043,8 @@ public class BlockManager {
                                    getReplication(timedOutItems[i]));
           }
         }
+      } finally {
+        namesystem.writeUnlock();
       }
       /* If we know the target datanodes where the replication timedout,
        * we could invoke decBlocksScheduled() on it. Its ok for now.
@@ -1082,6 +1094,7 @@ public class BlockManager {
                                DatanodeDescriptor node,
                                DatanodeDescriptor delNodeHint)
   throws IOException {
+    assert (namesystem.hasWriteLock());
     BlockInfo storedBlock = blocksMap.getStoredBlock(block);
     if (storedBlock == null || storedBlock.getINode() == null) {
       // If this block does not belong to anyfile, then we are done.
@@ -1212,7 +1225,8 @@ public class BlockManager {
    */
   void processMisReplicatedBlocks() {
     long nrInvalid = 0, nrOverReplicated = 0, nrUnderReplicated = 0;
-    synchronized (namesystem) {
+    namesystem.writeLock();
+    try {
       neededReplications.clear();
       for (BlockInfo block : blocksMap.getBlocks()) {
         INodeFile fileINode = block.getINode();
@@ -1240,6 +1254,8 @@ public class BlockManager {
           processOverReplicatedBlock(block, expectedReplication, null, null);
         }
       }
+    } finally {
+      namesystem.writeUnlock();
     }
     FSNamesystem.LOG.info("Total number of blocks = " + blocksMap.size());
     FSNamesystem.LOG.info("Number of invalid blocks = " + nrInvalid);
@@ -1303,7 +1319,8 @@ public class BlockManager {
       NameNode.stateChangeLog.debug("BLOCK* NameSystem.removeStoredBlock: "
           + block + " from " + node.getName());
     }
-    synchronized (namesystem) {
+    assert (namesystem.hasWriteLock());
+    {
       if (!blocksMap.removeNode(block, node)) {
         if(NameNode.stateChangeLog.isDebugEnabled()) {
           NameNode.stateChangeLog.debug("BLOCK* NameSystem.removeStoredBlock: "
@@ -1535,7 +1552,8 @@ public class BlockManager {
   /* updates a block in under replication queue */
   void updateNeededReplications(Block block, int curReplicasDelta,
       int expectedReplicasDelta) {
-    synchronized (namesystem) {
+    namesystem.writeLock();
+    try {
       NumberReplicas repl = countNodes(block);
       int curExpectedReplicas = getReplication(block);
       if (isNeededReplication(block, curExpectedReplicas, repl.liveReplicas())) {
@@ -1548,6 +1566,8 @@ public class BlockManager {
         neededReplications.remove(block, oldReplicas, repl.decommissionedReplicas(),
                                   oldExpectedReplicas);
       }
+    } finally {
+      namesystem.writeUnlock();
     }
   }
 
@@ -1590,7 +1610,8 @@ public class BlockManager {
    * @return number of blocks scheduled for removal during this iteration.
    */
   private int invalidateWorkForOneNode(String nodeId) {
-    synchronized (namesystem) {
+    namesystem.writeLock();
+    try {
       // blocks should not be replicated or removed if safe mode is on
       if (namesystem.isInSafeMode())
         return 0;
@@ -1635,6 +1656,8 @@ public class BlockManager {
       }
       pendingDeletionBlocksCount -= blocksToInvalidate.size();
       return blocksToInvalidate.size();
+    } finally {
+      namesystem.writeUnlock();
     }
   }
   
@@ -1725,8 +1748,11 @@ public class BlockManager {
   }
 
   int getCapacity() {
-    synchronized(namesystem) {
+    namesystem.readLock();
+    try {
       return blocksMap.getCapacity();
+    } finally {
+      namesystem.readUnlock();
     }
   }
   
