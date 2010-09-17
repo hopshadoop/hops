@@ -20,7 +20,7 @@ package org.apache.hadoop.mapred;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.mapred.Queue.QueueOperation;
+import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.QueueState;
 import org.apache.hadoop.security.authorize.AccessControlList;
 import static org.apache.hadoop.mapred.QueueManager.toFullPropertyName;
@@ -72,11 +72,17 @@ class QueueConfigurationParser {
   static final String QUEUE_TAG = "queue";
   static final String ACL_SUBMIT_JOB_TAG = "acl-submit-job";
   static final String ACL_ADMINISTER_JOB_TAG = "acl-administer-jobs";
+
+  // The value read from queues config file for this tag is not used at all.
+  // To enable queue acls and job acls, mapreduce.cluster.acls.enabled is
+  // to be set in mapred-site.xml
+  @Deprecated
+  static final String ACLS_ENABLED_TAG = "aclsEnabled";
+
   static final String PROPERTIES_TAG = "properties";
   static final String STATE_TAG = "state";
   static final String QUEUE_NAME_TAG = "name";
   static final String QUEUES_TAG = "queues";
-  static final String ACLS_ENABLED_TAG = "aclsEnabled";
   static final String PROPERTY_TAG = "property";
   static final String KEY_TAG = "key";
   static final String VALUE_TAG = "value";
@@ -88,7 +94,8 @@ class QueueConfigurationParser {
     
   }
 
-  QueueConfigurationParser(String confFile) {
+  QueueConfigurationParser(String confFile, boolean areAclsEnabled) {
+    aclsEnabled = areAclsEnabled;
     File file = new File(confFile).getAbsoluteFile();
     if (!file.exists()) {
       throw new RuntimeException("Configuration file not found at " +
@@ -105,7 +112,8 @@ class QueueConfigurationParser {
     }
   }
 
-  QueueConfigurationParser(InputStream xmlInput) {
+  QueueConfigurationParser(InputStream xmlInput, boolean areAclsEnabled) {
+    aclsEnabled = areAclsEnabled;
     loadFrom(xmlInput);
   }
 
@@ -184,8 +192,14 @@ class QueueConfigurationParser {
       NamedNodeMap nmp = queuesNode.getAttributes();
       Node acls = nmp.getNamedItem(ACLS_ENABLED_TAG);
 
-      if (acls != null && acls.getTextContent().equalsIgnoreCase("true")) {
-        setAclsEnabled(true);
+      if (acls != null) {
+        LOG.warn("Configuring " + ACLS_ENABLED_TAG + " flag in " +
+            QueueManager.QUEUE_CONF_FILE_NAME + " is not valid. " +
+            "This tag is ignored. Configure " +
+            MRConfig.MR_ACLS_ENABLED + " in mapred-site.xml. See the " +
+            " documentation of " + MRConfig.MR_ACLS_ENABLED +
+            ", which is used for enabling job level authorization and " +
+            " queue level authorization.");
       }
 
       NodeList props = queuesNode.getChildNodes();
@@ -269,9 +283,9 @@ class QueueConfigurationParser {
         name += nameValue;
         newQueue.setName(name);
         submitKey = toFullPropertyName(name,
-            Queue.QueueOperation.SUBMIT_JOB.getAclName());
+            QueueACL.SUBMIT_JOB.getAclName());
         adminKey = toFullPropertyName(name,
-            Queue.QueueOperation.ADMINISTER_JOBS.getAclName());
+            QueueACL.ADMINISTER_JOBS.getAclName());
       }
 
       if (QUEUE_TAG.equals(field.getTagName()) && field.hasChildNodes()) {
@@ -299,11 +313,11 @@ class QueueConfigurationParser {
     }
     
     if (!acls.containsKey(submitKey)) {
-      acls.put(submitKey, new AccessControlList("*"));
+      acls.put(submitKey, new AccessControlList(" "));
     }
     
     if (!acls.containsKey(adminKey)) {
-      acls.put(adminKey, new AccessControlList("*"));
+      acls.put(adminKey, new AccessControlList(" "));
     }
     
     //Set acls

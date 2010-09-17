@@ -38,6 +38,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.mapreduce.QueueState;
 import org.apache.hadoop.mapreduce.server.jobtracker.TaskTracker;
@@ -48,16 +49,21 @@ import org.apache.hadoop.mapreduce.SleepJob;
 import org.apache.hadoop.security.UserGroupInformation;
 import static org.apache.hadoop.mapred.DeprecatedQueueConfigurationParser.*;
 import static org.apache.hadoop.mapred.QueueManagerTestUtils.*;
+import static org.apache.hadoop.mapred.QueueManager.toFullPropertyName;
 
 public class TestQueueManagerWithDeprecatedConf extends TestCase {
 
-  static final Log LOG = LogFactory.getLog(TestQueueManagerWithDeprecatedConf.class);
-  
+  static final Log LOG = LogFactory.getLog(
+      TestQueueManagerWithDeprecatedConf.class);
+
+  String submitAcl = QueueACL.SUBMIT_JOB.getAclName();
+  String adminAcl  = QueueACL.ADMINISTER_JOBS.getAclName();
 
   
   public void testMultipleQueues() {
     JobConf conf = new JobConf();
-    conf.set("mapred.queue.names", "q1,q2,Q3");
+    conf.set(DeprecatedQueueConfigurationParser.MAPRED_QUEUE_NAMES_KEY,
+        "q1,q2,Q3");
     QueueManager qMgr = new QueueManager(conf);
     Set<String> expQueues = new TreeSet<String>();
     expQueues.add("q1");
@@ -68,7 +74,8 @@ public class TestQueueManagerWithDeprecatedConf extends TestCase {
 
   public void testSchedulerInfo() {
     JobConf conf = new JobConf();
-    conf.set("mapred.queue.names", "qq1,qq2");
+    conf.set(DeprecatedQueueConfigurationParser.MAPRED_QUEUE_NAMES_KEY,
+        "qq1,qq2");
     QueueManager qMgr = new QueueManager(conf);
     qMgr.setSchedulerInfo("qq1", "queueInfoForqq1");
     qMgr.setSchedulerInfo("qq2", "queueInfoForqq2");
@@ -85,44 +92,50 @@ public class TestQueueManagerWithDeprecatedConf extends TestCase {
     try {
       // queue properties with which the cluster is started.
       Properties hadoopConfProps = new Properties();
-      hadoopConfProps.put("mapred.queue.names", "default,q1,q2");
-      hadoopConfProps.put("mapred.acls.enabled", "true");
-      UtilsForTests.setUpConfigFile(hadoopConfProps, hadoopConfigFile);
+      hadoopConfProps.put(DeprecatedQueueConfigurationParser.
+          MAPRED_QUEUE_NAMES_KEY, "default,q1,q2");
+      hadoopConfProps.put(MRConfig.MR_ACLS_ENABLED, "true");
 
-      //properties for mapred-queue-acls.xml
       UserGroupInformation ugi =
         UserGroupInformation.createRemoteUser("unknownUser");
-      hadoopConfProps.put("mapred.queue.default.acl-submit-job", ugi.getUserName());
-      hadoopConfProps.put("mapred.queue.q1.acl-submit-job", "u1");
-      hadoopConfProps.put("mapred.queue.q2.acl-submit-job", "*");
-      hadoopConfProps.put("mapred.queue.default.acl-administer-jobs", ugi.getUserName());
-      hadoopConfProps.put("mapred.queue.q1.acl-administer-jobs", "u1");
-      hadoopConfProps.put("mapred.queue.q2.acl-administer-jobs", "*");
+      hadoopConfProps.put(toFullPropertyName(
+          "default", submitAcl), ugi.getUserName());
+      hadoopConfProps.put(toFullPropertyName(
+          "q1", submitAcl), "u1");
+      hadoopConfProps.put(toFullPropertyName(
+          "q2", submitAcl), "*");
+      hadoopConfProps.put(toFullPropertyName(
+          "default", adminAcl), ugi.getUserName());
+      hadoopConfProps.put(toFullPropertyName(
+          "q1", adminAcl), "u2");
+      hadoopConfProps.put(toFullPropertyName(
+          "q2", adminAcl), "*");
 
       UtilsForTests.setUpConfigFile(hadoopConfProps, hadoopConfigFile);
 
       Configuration conf = new JobConf();
+      conf.setBoolean(MRConfig.MR_ACLS_ENABLED, true);
       QueueManager queueManager = new QueueManager(conf);
-      //Testing access to queue.
+      //Testing job submission access to queues.
       assertTrue("User Job Submission failed.",
-          queueManager.hasAccess("default", Queue.QueueOperation.
+          queueManager.hasAccess("default", QueueACL.
               SUBMIT_JOB, ugi));
       assertFalse("User Job Submission failed.",
-          queueManager.hasAccess("q1", Queue.QueueOperation.
+          queueManager.hasAccess("q1", QueueACL.
               SUBMIT_JOB, ugi));
       assertTrue("User Job Submission failed.",
-          queueManager.hasAccess("q2", Queue.QueueOperation.
+          queueManager.hasAccess("q2", QueueACL.
               SUBMIT_JOB, ugi));
-      //Testing the admin acls
+      //Testing the administer-jobs acls
       assertTrue("User Job Submission failed.",
-           queueManager.hasAccess("default", Queue.QueueOperation.ADMINISTER_JOBS, ugi));
-       assertFalse("User Job Submission failed.",
-           queueManager.hasAccess("q1", Queue.QueueOperation.
-               ADMINISTER_JOBS, ugi));
-       assertTrue("User Job Submission failed.",
-           queueManager.hasAccess("q2", Queue.QueueOperation.
-               ADMINISTER_JOBS, ugi));
-
+          queueManager.hasAccess("default",
+              QueueACL.ADMINISTER_JOBS, ugi));
+      assertFalse("User Job Submission failed.",
+          queueManager.hasAccess("q1", QueueACL.
+              ADMINISTER_JOBS, ugi));
+      assertTrue("User Job Submission failed.",
+          queueManager.hasAccess("q2", QueueACL.
+              ADMINISTER_JOBS, ugi));
  
     } finally {
       //Cleanup the configuration files in all cases

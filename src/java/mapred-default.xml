@@ -923,7 +923,7 @@
   <name>mapreduce.job.queuename</name>
   <value>default</value>
   <description> Queue to which a job is submitted. This must match one of the
-    queues defined in mapred.queue.names for the system. Also, the ACL setup
+    queues defined in mapred-queues.xml for the system. Also, the ACL setup
     for the queue must allow the current user to submit a job to the queue.
     Before specifying a queue, ensure that the system is configured with 
     the queue, and access is allowed for submitting jobs to the queue.
@@ -931,69 +931,85 @@
 </property>
 
 <property>
-  <name>mapreduce.cluster.job-authorization-enabled</name>
+  <name>mapreduce.cluster.acls.enabled</name>
   <value>false</value>
-  <description> Boolean flag that specifies if job-level authorization checks
-  should be enabled on the jobs submitted to the cluster.  Job-level
-  authorization is enabled if this flag is set to true or disabled otherwise.
-  It is disabled by default. If enabled, access control checks are made by
-  JobTracker and TaskTracker when requests are made by users for viewing the
-  job-details (See mapreduce.job.acl-view-job) or for modifying the job
-  (See mapreduce.job.acl-modify-job) using Map/Reduce APIs, RPCs or via the
-  console and web user interfaces.
+  <description> Specifies whether ACLs should be checked
+    for authorization of users for doing various queue and job level operations.
+    ACLs are disabled by default. If enabled, access control checks are made by
+    JobTracker and TaskTracker when requests are made by users for queue
+    operations like submit job to a queue and kill a job in the queue and job
+    operations like viewing the job-details (See mapreduce.job.acl-view-job)
+    or for modifying the job (See mapreduce.job.acl-modify-job) using
+    Map/Reduce APIs, RPCs or via the console and web user interfaces.
+    For enabling this flag(mapreduce.cluster.acls.enabled), this is to be set
+    to true in mapred-site.xml on JobTracker node and on all TaskTracker nodes.
   </description>
 </property>
 
 <property>
   <name>mapreduce.job.acl-modify-job</name>
-  <value></value>
+  <value> </value>
   <description> Job specific access-control list for 'modifying' the job. It
     is only used if authorization is enabled in Map/Reduce by setting the
-    configuration property mapreduce.cluster.job-authorization-enabled to true.
+    configuration property mapreduce.cluster.acls.enabled to true.
     This specifies the list of users and/or groups who can do modification
     operations on the job. For specifying a list of users and groups the
     format to use is "user1,user2 group1,group". If set to '*', it allows all
-    users/groups to modify this job. If set to '', it allows none. This
-    configuration is used to guard all the modifications with respect to this
-    job and takes care of all the following operations:
+    users/groups to modify this job. If set to ' '(i.e. space), it allows
+    none. This configuration is used to guard all the modifications with respect
+    to this job and takes care of all the following operations:
       o killing this job
       o killing a task of this job, failing a task of this job
       o setting the priority of this job
     Each of these operations are also protected by the per-queue level ACL
     "acl-administer-jobs" configured via mapred-queues.xml. So a caller should
-    have the authorization to satisfy both the queue-level ACL and the
+    have the authorization to satisfy either the queue-level ACL or the
     job-level ACL.
 
-    Irrespective of this ACL configuration, job-owner, superuser and members
-    of supergroup configured on JobTracker via 
-    "mapreduce.cluster.permissions.supergroup",
-    can do all the modification operations.
+    Irrespective of this ACL configuration, (a) job-owner, (b) the user who
+    started the cluster, (c) members of an admin configured supergroup
+    configured via mapreduce.cluster.permissions.supergroup and (d) queue
+    administrators of the queue to which this job was submitted to configured
+    via acl-administer-jobs for the specific queue in mapred-queues.xml can
+    do all the modification operations on a job.
 
-    By default, nobody else besides job-owner, superuser/supergroup can
-    perform modification operations on a job that they don't own.
+    By default, nobody else besides job-owner, the user who started the cluster,
+    members of supergroup and queue administrators can perform modification
+    operations on a job.
   </description>
 </property>
 
 <property>
   <name>mapreduce.job.acl-view-job</name>
-  <value></value>
+  <value> </value>
   <description> Job specific access-control list for 'viewing' the job. It is
     only used if authorization is enabled in Map/Reduce by setting the
-    configuration property mapreduce.cluster.job-authorization-enabled to true.
+    configuration property mapreduce.cluster.acls.enabled to true.
     This specifies the list of users and/or groups who can view private details
     about the job. For specifying a list of users and groups the
     format to use is "user1,user2 group1,group". If set to '*', it allows all
-    users/groups to modify this job. If set to '', it allows none. This
-    configuration is used to guard some of the job-views and at present only
-    protects APIs that can return possibly sensitive information of the
-    job-owner like
+    users/groups to modify this job. If set to ' '(i.e. space), it allows
+    none. This configuration is used to guard some of the job-views and at
+    present only protects APIs that can return possibly sensitive information
+    of the job-owner like
       o job-level counters
       o task-level counters
       o tasks' diagnostic information
       o task-logs displayed on the TaskTracker web-UI and
       o job.xml showed by the JobTracker's web-UI
-    Every other piece information of jobs is still accessible by any other
-    users, for e.g., JobStatus, JobProfile, list of jobs in the queue, etc.
+    Every other piece of information of jobs is still accessible by any other
+    user, for e.g., JobStatus, JobProfile, list of jobs in the queue, etc.
+
+    Irrespective of this ACL configuration, (a) job-owner, (b) the user who
+    started the cluster, (c) members of an admin configured supergroup
+    configured via mapreduce.cluster.permissions.supergroup and (d) queue
+    administrators of the queue to which this job was submitted to configured
+    via acl-administer-jobs for the specific queue in mapred-queues.xml can
+    do all the view operations on a job.
+
+    By default, nobody else besides job-owner, the user who started the
+    cluster, memebers of supergroup and queue administrators can perform
+    view operations on a job.
   </description>
 </property>
 

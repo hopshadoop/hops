@@ -41,6 +41,7 @@ import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.mapreduce.server.jobtracker.State;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.KerberosInfo;
+import org.apache.hadoop.security.authorize.AccessControlList;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenInfo;
 
@@ -108,8 +109,10 @@ public interface ClientProtocol extends VersionedProtocol {
    * Version 32: Added delegation tokens (add, renew, cancel)
    * Version 33: Added JobACLs to JobStatus as part of MAPREDUCE-1307
    * Version 34: Modified submitJob to use Credentials instead of TokenStorage.
+   * Version 35: Added the method getQueueAdmins(queueName) as part of
+   *             MAPREDUCE-1664.
    */
-  public static final long versionID = 34L;
+  public static final long versionID = 35L;
 
   /**
    * Allocate a name for the job.
@@ -144,6 +147,17 @@ public interface ClientProtocol extends VersionedProtocol {
   
   public long getTaskTrackerExpiryInterval() throws IOException,
                                                InterruptedException;
+  
+  /**
+   * Get the administrators of the given job-queue.
+   * This method is for hadoop internal use only.
+   * @param queueName
+   * @return Queue administrators ACL for the queue to which job is
+   *         submitted to
+   * @throws IOException
+   */
+  public AccessControlList getQueueAdmins(String queueName) throws IOException;
+
   /**
    * Kill the indicated job
    */

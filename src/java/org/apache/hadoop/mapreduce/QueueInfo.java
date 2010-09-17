@@ -60,7 +60,7 @@ public class QueueInfo implements Writable {
    */
   public QueueInfo() {
     // make it running by default.
-    this.queueState = queueState.RUNNING;
+    this.queueState = QueueState.RUNNING;
     children = new ArrayList<QueueInfo>();
     props = new Properties();
   }

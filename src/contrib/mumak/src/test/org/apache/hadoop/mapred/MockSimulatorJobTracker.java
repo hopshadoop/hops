@@ -37,6 +37,7 @@ import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.QueueAclsInfo;
 import org.apache.hadoop.mapreduce.QueueInfo;
 import org.apache.hadoop.security.Credentials;
+import org.apache.hadoop.security.authorize.AccessControlList;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskReport;
@@ -407,6 +408,11 @@ public class MockSimulatorJobTracker implements InterTrackerProtocol,
   public QueueInfo[] getRootQueues() throws IOException, InterruptedException {
     throw new UnsupportedOperationException();
 
+  }
+
+  @Override
+  public AccessControlList getQueueAdmins(String queueName) throws IOException {
+    throw new UnsupportedOperationException();
   }
 
   @Override

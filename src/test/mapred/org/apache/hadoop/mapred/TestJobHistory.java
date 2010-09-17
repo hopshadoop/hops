@@ -41,6 +41,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import static org.apache.hadoop.mapred.QueueManagerTestUtils.*;
 import org.apache.hadoop.mapreduce.Cluster;
 import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.JobACL;
@@ -589,7 +590,7 @@ public class TestJobHistory extends TestCase {
     
     // Also JobACLs should be correct
     if (mr.getJobTrackerRunner().getJobTracker()
-        .isJobLevelAuthorizationEnabled()) {
+        .areACLsEnabled()) {
       AccessControlList acl = new AccessControlList(
           conf.get(JobACL.VIEW_JOB.getAclName(), " "));
       assertTrue("VIEW_JOB ACL is not properly logged to history file.",
@@ -601,6 +602,9 @@ public class TestJobHistory extends TestCase {
           acl.toString().equals(
           jobInfo.getJobACLs().get(JobACL.MODIFY_JOB).toString()));
     }
+    
+    // Validate the job queue name
+    assertTrue(jobInfo.getJobQueueName().equals(conf.getQueueName()));
   }
 
   public void testDoneFolderOnHDFS() throws IOException, InterruptedException {
@@ -726,10 +730,11 @@ public class TestJobHistory extends TestCase {
   /** Run a job that will be succeeded and validate its history file format
    *  and its content.
    */
-  public void testJobHistoryFile() throws IOException {
+  public void testJobHistoryFile() throws Exception {
     MiniMRCluster mr = null;
     try {
       JobConf conf = new JobConf();
+
       // keep for less time
       conf.setLong("mapred.jobtracker.retirejob.check", 1000);
       conf.setLong("mapred.jobtracker.retirejob.interval", 1000);
@@ -739,7 +744,7 @@ public class TestJobHistory extends TestCase {
       conf.set(JTConfig.JT_JOBHISTORY_COMPLETED_LOCATION, doneFolder);
 
       // Enable ACLs so that they are logged to history
-      conf.setBoolean(MRConfig.JOB_LEVEL_AUTHORIZATION_ENABLING_FLAG, true);
+      conf.setBoolean(MRConfig.MR_ACLS_ENABLED, true);
 
       mr = new MiniMRCluster(2, "file:///", 3, null, null, conf);
 
@@ -966,7 +971,8 @@ public class TestJobHistory extends TestCase {
       Map<JobACL, AccessControlList> jobACLs =
           new HashMap<JobACL, AccessControlList>();
       JobSubmittedEvent jse =
-        new JobSubmittedEvent(jobId, "job", "user", 12345, "path", jobACLs);
+        new JobSubmittedEvent(jobId, "job", "user", 12345, "path", jobACLs,
+        "default");
       jh.logEvent(jse, jobId);
       jh.closeWriter(jobId);
 

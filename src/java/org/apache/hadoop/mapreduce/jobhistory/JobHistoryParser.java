@@ -314,6 +314,7 @@ public class JobHistoryParser {
     info.submitTime = event.getSubmitTime();
     info.jobConfPath = event.getJobConfPath();
     info.jobACLs = event.getJobAcls();
+    info.jobQueueName = event.getJobQueueName();
   }
 
   /**
@@ -325,6 +326,7 @@ public class JobHistoryParser {
     JobID jobid;
     String username;
     String jobname;
+    String jobQueueName;
     String jobConfPath;
     long launchTime;
     int totalMaps;
@@ -349,7 +351,7 @@ public class JobHistoryParser {
       submitTime = launchTime = finishTime = -1;
       totalMaps = totalReduces = failedMaps = failedReduces = 0;
       finishedMaps = finishedReduces = 0;
-      username = jobname = jobConfPath = "";
+      username = jobname = jobConfPath = jobQueueName = "";
       tasksMap = new HashMap<TaskID, TaskInfo>();
       jobACLs = new HashMap<JobACL, AccessControlList>();
     }
@@ -358,6 +360,7 @@ public class JobHistoryParser {
     public void printAll() {
       System.out.println("JOBNAME: " + jobname);
       System.out.println("USERNAME: " + username);
+      System.out.println("JOB_QUEUE_NAME: " + jobQueueName);
       System.out.println("SUBMIT_TIME" + submitTime);
       System.out.println("LAUNCH_TIME: " + launchTime);
       System.out.println("JOB_STATUS: " + jobStatus);
@@ -383,6 +386,8 @@ public class JobHistoryParser {
     public String getUsername() { return username; }
     /** Get the job name */
     public String getJobname() { return jobname; }
+    /** Get the job queue name */
+    public String getJobQueueName() { return jobQueueName; }
     /** Get the path for the job configuration file */
     public String getJobConfPath() { return jobConfPath; }
     /** Get the job launch time */

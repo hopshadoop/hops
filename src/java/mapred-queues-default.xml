@@ -17,13 +17,13 @@
 -->
 <!-- This is the default mapred-queues.xml file that is loaded in the case
      that the user does not have such a file on their classpath. -->
-<queues aclsEnabled="false">
+<queues>
   <queue>
     <name>default</name>
     <properties>
     </properties>
     <state>running</state>
-    <acl-submit-job>*</acl-submit-job>
-    <acl-administer-jobs>*</acl-administer-jobs>
+    <acl-submit-job> </acl-submit-job>
+    <acl-administer-jobs> </acl-administer-jobs>
   </queue>
 </queues>

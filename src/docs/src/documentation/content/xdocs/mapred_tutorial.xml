@@ -1762,12 +1762,14 @@
         
         <section>
           <title>Job Authorization</title>
-          <p>Job level authorization is enabled on the cluster, if the configuration
-          <code>mapreduce.cluster.job-authorization-enabled</code> is set to
-          true. When enabled, access control checks are done by the JobTracker
-          and the TaskTracker before allowing users to view
-          job details or to modify a job using Map/Reduce APIs,
-          CLI or web user interfaces.</p>
+          <p>Job level authorization and queue level authorization are enabled
+          on the cluster, if the configuration
+          <code>mapreduce.cluster.acls.enabled</code> is set to
+          true. When enabled, access control checks are done by (a) the
+          JobTracker before allowing users to submit jobs to queues and
+          administering these jobs and (b) by the JobTracker and the TaskTracker
+          before allowing users to view job details or to modify a job using
+          MapReduce APIs, CLI or web user interfaces.</p>
          
           <p>A job submitter can specify access control lists for viewing or
           modifying a job via the configuration properties
@@ -1775,11 +1777,13 @@
           <code>mapreduce.job.acl-modify-job</code> respectively. By default, 
           nobody is given access in these properties.</p> 
           
-          <p>However, irrespective of the ACLs configured, a job's owner,
-          the superuser and the members of an admin configured supergroup
-          (<code>mapreduce.cluster.permissions.supergroup</code>) always
-          have access to view and modify a job.</p>
-          
+          <p>However, irrespective of the job ACLs configured, a job's owner,
+          the user who started the cluster and members of an admin configured
+          supergroup (<code>mapreduce.cluster.permissions.supergroup</code>)
+          and queue administrators of the queue to which the job was submitted
+          to (<code>acl-administer-jobs</code>) always have access to view and
+          modify a job.</p>
+
           <p> A job view ACL authorizes users against the configured 
           <code>mapreduce.job.acl-view-job</code> before returning possibly 
           sensitive information about a job, like: </p>
@@ -1801,10 +1805,13 @@
             <li> killing/failing a task of a job </li>
             <li> setting the priority of a job </li>
           </ul>
-          <p>These operations are also protected by the queue level ACL,
-          "acl-administer-jobs", configured via mapred-queue-acls.xml. The caller
-          will be authorized against both queue level ACLs and job level ACLs,
-          depending on what is enabled.</p>
+          <p>These view and modify operations on jobs are also permitted by
+          the queue level ACL, "acl-administer-jobs", configured via
+          mapred-queue-acls.xml. The caller will be able to do the operation
+          if he/she is part of either queue admins ACL or job modification ACL
+          or the user who started the cluster or a member of an admin configured
+          supergroup (<code>mapreduce.cluster.permissions.supergroup</code>).
+          </p>
           
           <p>The format of a job level ACL is the same as the format for a
           queue level ACL as defined in the

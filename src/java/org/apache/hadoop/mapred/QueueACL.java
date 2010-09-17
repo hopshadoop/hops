@@ -15,36 +15,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.mapred;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.security.UserGroupInformation;
 
 /**
- * Manages the job ACLs and the operations on them at TaskTracker.
- *
+ * Enum representing an AccessControlList that drives set of operations that
+ * can be performed on a queue.
  */
 @InterfaceAudience.Private
-public class TaskTrackerJobACLsManager extends JobACLsManager {
+public enum QueueACL {
+  SUBMIT_JOB ("acl-submit-job"),
+  ADMINISTER_JOBS ("acl-administer-jobs");
+  // Currently this ACL acl-administer-jobs is checked for the operations
+  // FAIL_TASK, KILL_TASK, KILL_JOB, SET_JOB_PRIORITY and VIEW_JOB.
 
-  static final Log LOG = LogFactory.getLog(TaskTrackerJobACLsManager.class);
+  // TODO: Add ACL for LIST_JOBS when we have ability to authenticate
+  //       users in UI
+  // TODO: Add ACL for CHANGE_ACL when we have an admin tool for
+  //       configuring queues.
 
-  private TaskTracker taskTracker = null;
+  private final String aclName;
 
-  public TaskTrackerJobACLsManager(TaskTracker tracker) {
-    taskTracker = tracker;
+  QueueACL(String aclName) {
+    this.aclName = aclName;
   }
 
-  @Override
-  protected boolean isJobLevelAuthorizationEnabled() {
-    return taskTracker.isJobLevelAuthorizationEnabled();
-  }
-
-  @Override
-  protected boolean isSuperUserOrSuperGroup(UserGroupInformation callerUGI) {
-    return JobTracker.isSuperUserOrSuperGroup(callerUGI,
-        taskTracker.getMROwner(), taskTracker.getSuperGroup());
+  public final String getAclName() {
+    return aclName;
   }
 }

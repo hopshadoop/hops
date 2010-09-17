@@ -19,7 +19,6 @@ package org.apache.hadoop.mapred;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
@@ -34,7 +33,6 @@ import java.util.Vector;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.filecache.DistributedCache;
@@ -76,8 +74,6 @@ abstract class TaskRunner extends Thread {
 
   protected JobConf conf;
   JvmManager jvmManager;
-
-  static String jobACLsFile = "job-acl.xml";
 
   public TaskRunner(TaskTracker.TaskInProgress tip, TaskTracker tracker, 
       JobConf conf) {
@@ -286,32 +282,8 @@ abstract class TaskRunner extends Thread {
       Localizer.PermissionsHandler.setPermissions(logDir,
           Localizer.PermissionsHandler.sevenZeroZero);
     }
-    // write job acls into a file to know the access for task logs
-    writeJobACLs(logDir);
+
     return logFiles;
-  }
-
-  // Writes job-view-acls and user name into an xml file
-  private void writeJobACLs(File logDir) throws IOException {
-    File aclFile = new File(logDir, TaskRunner.jobACLsFile);
-    Configuration aclConf = new Configuration(false);
-
-    // set the job view acls in aclConf
-    String jobViewACLs = conf.get(MRJobConfig.JOB_ACL_VIEW_JOB);
-    if (jobViewACLs != null) {
-      aclConf.set(MRJobConfig.JOB_ACL_VIEW_JOB, jobViewACLs);
-    }
-    // set jobOwner as mapreduce.job.user.name in aclConf
-    String jobOwner = conf.getUser();
-    aclConf.set(MRJobConfig.USER_NAME, jobOwner);
-    FileOutputStream out = new FileOutputStream(aclFile);
-    try {
-      aclConf.writeXml(out);
-    } finally {
-      out.close();
-    }
-    Localizer.PermissionsHandler.setPermissions(aclFile,
-        Localizer.PermissionsHandler.sevenZeroZero);
   }
 
   /**

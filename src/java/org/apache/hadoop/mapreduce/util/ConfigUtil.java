@@ -54,6 +54,9 @@ public class ConfigUtil {
       new String[] {MRConfig.MAPMEMORY_MB});
     Configuration.addDeprecation("mapred.cluster.reduce.memory.mb", 
       new String[] {MRConfig.REDUCEMEMORY_MB});
+    Configuration.addDeprecation("mapred.acls.enabled", 
+        new String[] {MRConfig.MR_ACLS_ENABLED});
+
     Configuration.addDeprecation("mapred.cluster.max.map.memory.mb", 
       new String[] {JTConfig.JT_MAX_MAPMEMORY_MB});
     Configuration.addDeprecation("mapred.cluster.max.reduce.memory.mb", 

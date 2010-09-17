@@ -17,35 +17,29 @@
  */
 package org.apache.hadoop.mapred;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.mapreduce.JobACL;
 
 /**
- * Manages the job ACLs and the operations on them at JobTracker.
- *
+ * Generic operation that maps to the dependent set of ACLs that drive the
+ * authorization of the operation.
  */
 @InterfaceAudience.Private
-public class JobTrackerJobACLsManager extends JobACLsManager {
-
-  static final Log LOG = LogFactory.getLog(JobTrackerJobACLsManager.class);
-
-  private JobTracker jobTracker = null;
-
-  public JobTrackerJobACLsManager(JobTracker tracker) {
-    jobTracker = tracker;
+public enum Operation {
+  VIEW_JOB_COUNTERS(QueueACL.ADMINISTER_JOBS, JobACL.VIEW_JOB),
+  VIEW_JOB_DETAILS(QueueACL.ADMINISTER_JOBS, JobACL.VIEW_JOB),
+  VIEW_TASK_LOGS(QueueACL.ADMINISTER_JOBS, JobACL.VIEW_JOB),
+  KILL_JOB(QueueACL.ADMINISTER_JOBS, JobACL.MODIFY_JOB),
+  FAIL_TASK(QueueACL.ADMINISTER_JOBS, JobACL.MODIFY_JOB),
+  KILL_TASK(QueueACL.ADMINISTER_JOBS, JobACL.MODIFY_JOB),
+  SET_JOB_PRIORITY(QueueACL.ADMINISTER_JOBS, JobACL.MODIFY_JOB),
+  SUBMIT_JOB(QueueACL.SUBMIT_JOB, null);
+  
+  public QueueACL qACLNeeded;
+  public JobACL jobACLNeeded;
+  
+  Operation(QueueACL qACL, JobACL jobACL) {
+    this.qACLNeeded = qACL;
+    this.jobACLNeeded = jobACL;
   }
-
-  @Override
-  protected boolean isJobLevelAuthorizationEnabled() {
-    return jobTracker.isJobLevelAuthorizationEnabled();
-  }
-
-  @Override
-  protected boolean isSuperUserOrSuperGroup(UserGroupInformation callerUGI) {
-    return JobTracker.isSuperUserOrSuperGroup(callerUGI,
-        jobTracker.getMROwner(), jobTracker.getSuperGroup());
-  }
-
 }

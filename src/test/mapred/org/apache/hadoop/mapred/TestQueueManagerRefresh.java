@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.mapred;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -37,6 +36,8 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.mapreduce.QueueState;
 import org.apache.hadoop.mapreduce.server.jobtracker.TaskTracker;
+import static org.apache.hadoop.mapred.QueueManagerTestUtils.*;
+
 import org.junit.After;
 import org.junit.Test;
 
@@ -48,19 +49,12 @@ public class TestQueueManagerRefresh {
   private static final Log LOG =
       LogFactory.getLog(TestQueueManagerRefresh.class);
 
-  String queueConfigPath =
-      System.getProperty("test.build.extraconf", "build/test/extraconf");
-  File queueConfigFile =
-      new File(queueConfigPath, QueueManager.QUEUE_CONF_FILE_NAME);
-
   /**
    * Remove the configuration file after the test's done.
    */
   @After
   public void tearDown() {
-    if (queueConfigFile.exists()) {
-      queueConfigFile.delete();
-    }
+    deleteQueuesConfigFile();
   }
 
   /**
@@ -96,8 +90,8 @@ public class TestQueueManagerRefresh {
     JobQueueInfo[] queues = getSimpleQueueHierarchy();
 
     // write the configuration file
-    QueueManagerTestUtils.writeQueueConfigurationFile(
-        queueConfigFile.getAbsolutePath(), new JobQueueInfo[] { queues[0] });
+    writeQueueConfigurationFile(
+        QUEUES_CONFIG_FILE_PATH, new JobQueueInfo[] { queues[0] });
 
     QueueManager qManager = new QueueManager();
 
@@ -107,8 +101,8 @@ public class TestQueueManagerRefresh {
     queues[0].addChild(newQueue);
 
     // Rewrite the configuration file
-    QueueManagerTestUtils.writeQueueConfigurationFile(
-        queueConfigFile.getAbsolutePath(), new JobQueueInfo[] { queues[0] });
+    writeQueueConfigurationFile(
+        QUEUES_CONFIG_FILE_PATH, new JobQueueInfo[] { queues[0] });
 
     testRefreshFailureWithChangeOfHierarchy(qManager);
 
@@ -127,8 +121,8 @@ public class TestQueueManagerRefresh {
     JobQueueInfo[] queues = getSimpleQueueHierarchy();
 
     // write the configuration file
-    QueueManagerTestUtils.writeQueueConfigurationFile(
-        queueConfigFile.getAbsolutePath(), new JobQueueInfo[] { queues[0] });
+    writeQueueConfigurationFile(
+        QUEUES_CONFIG_FILE_PATH, new JobQueueInfo[] { queues[0] });
 
     QueueManager qManager = new QueueManager();
 
@@ -137,8 +131,8 @@ public class TestQueueManagerRefresh {
     queues[0].removeChild(q2);
 
     // Rewrite the configuration file
-    QueueManagerTestUtils.writeQueueConfigurationFile(
-        queueConfigFile.getAbsolutePath(), new JobQueueInfo[] { queues[0] });
+    writeQueueConfigurationFile(
+        QUEUES_CONFIG_FILE_PATH, new JobQueueInfo[] { queues[0] });
 
     testRefreshFailureWithChangeOfHierarchy(qManager);
   }
@@ -187,8 +181,8 @@ public class TestQueueManagerRefresh {
     JobQueueInfo[] queues = getSimpleQueueHierarchy();
 
     // write the configuration file
-    QueueManagerTestUtils.writeQueueConfigurationFile(
-        queueConfigFile.getAbsolutePath(), new JobQueueInfo[] { queues[0] });
+    writeQueueConfigurationFile(
+        QUEUES_CONFIG_FILE_PATH, new JobQueueInfo[] { queues[0] });
 
     QueueManager qManager = new QueueManager();
 
@@ -226,8 +220,8 @@ public class TestQueueManagerRefresh {
     }
 
     // write the configuration file
-    QueueManagerTestUtils.writeQueueConfigurationFile(
-        queueConfigFile.getAbsolutePath(), new JobQueueInfo[] { queues[0] });
+    writeQueueConfigurationFile(
+        QUEUES_CONFIG_FILE_PATH, new JobQueueInfo[] { queues[0] });
 
     QueueManager qManager = new QueueManager();
 
@@ -261,8 +255,8 @@ public class TestQueueManagerRefresh {
     JobQueueInfo[] queues = getSimpleQueueHierarchy();
 
     // write the configuration file
-    QueueManagerTestUtils.writeQueueConfigurationFile(
-        queueConfigFile.getAbsolutePath(), new JobQueueInfo[] { queues[0] });
+    writeQueueConfigurationFile(
+        QUEUES_CONFIG_FILE_PATH, new JobQueueInfo[] { queues[0] });
 
     QueueManager qManager = new QueueManager();
 

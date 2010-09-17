@@ -17,31 +17,31 @@
  */
 package org.apache.hadoop.mapred;
 
-import static org.apache.hadoop.mapred.QueueManagerTestUtils.CONFIG;
-import static org.apache.hadoop.mapred.QueueManagerTestUtils.checkForConfigFile;
+import static org.apache.hadoop.mapred.QueueManagerTestUtils.QUEUES_CONFIG_FILE_PATH;
 import static org.apache.hadoop.mapred.QueueManagerTestUtils.createDocument;
 import static org.apache.hadoop.mapred.QueueManagerTestUtils.createSimpleDocumentWithAcls;
 import static org.apache.hadoop.mapred.QueueManagerTestUtils.miniMRCluster;
-import static org.apache.hadoop.mapred.QueueManagerTestUtils.setUpCluster;
+import static org.apache.hadoop.mapred.QueueManagerTestUtils.deleteQueuesConfigFile;
 import static org.apache.hadoop.mapred.QueueManagerTestUtils.writeToFile;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
-import java.io.File;
-import java.io.IOException;
 import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.mapreduce.Cluster;
 import org.apache.hadoop.mapreduce.QueueInfo;
+import org.junit.After;
 import org.junit.Test;
 import org.w3c.dom.Document;
 
 public class TestJobQueueClient {
+
+  @After
+  public void tearDown() throws Exception {
+    deleteQueuesConfigFile();
+  }
+
   @Test
   public void testQueueOrdering() throws Exception {
     // create some sample queues in a hierarchy..
@@ -91,13 +91,15 @@ public class TestJobQueueClient {
   
   @Test
   public void testGetQueue() throws Exception {
-    checkForConfigFile();
+
+    deleteQueuesConfigFile();
     Document doc = createDocument();
-    createSimpleDocumentWithAcls(doc, "true");
-    writeToFile(doc, CONFIG);
-    Configuration conf = new Configuration();
-    conf.addResource(CONFIG);
-    setUpCluster(conf);
+    createSimpleDocumentWithAcls(doc);
+    writeToFile(doc, QUEUES_CONFIG_FILE_PATH);
+    JobConf jobConf = new JobConf();
+    String namenode = "file:///";
+    miniMRCluster = new MiniMRCluster(0, namenode, 3, null, null, jobConf);
+
     JobClient jc = new JobClient(miniMRCluster.createJobConf());
     // test for existing queue
     QueueInfo queueInfo = jc.getQueueInfo("q1");
@@ -105,7 +107,5 @@ public class TestJobQueueClient {
     // try getting a non-existing queue
     queueInfo = jc.getQueueInfo("queue");
     assertNull(queueInfo);
-
-    new File(CONFIG).delete();
   }
 }

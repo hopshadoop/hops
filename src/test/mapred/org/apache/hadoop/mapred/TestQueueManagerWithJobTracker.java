@@ -19,8 +19,8 @@
 package org.apache.hadoop.mapred;
 
 import static org.apache.hadoop.mapred.QueueConfigurationParser.NAME_SEPARATOR;
-import static org.apache.hadoop.mapred.QueueManagerTestUtils.CONFIG;
-import static org.apache.hadoop.mapred.QueueManagerTestUtils.checkForConfigFile;
+import static org.apache.hadoop.mapred.QueueManagerTestUtils.QUEUES_CONFIG_FILE_PATH;
+import static org.apache.hadoop.mapred.QueueManagerTestUtils.deleteQueuesConfigFile;
 import static org.apache.hadoop.mapred.QueueManagerTestUtils.createAcls;
 import static org.apache.hadoop.mapred.QueueManagerTestUtils.createDocument;
 import static org.apache.hadoop.mapred.QueueManagerTestUtils.createProperties;
@@ -29,7 +29,6 @@ import static org.apache.hadoop.mapred.QueueManagerTestUtils.createQueuesNode;
 import static org.apache.hadoop.mapred.QueueManagerTestUtils.createSimpleDocumentWithAcls;
 import static org.apache.hadoop.mapred.QueueManagerTestUtils.createState;
 import static org.apache.hadoop.mapred.QueueManagerTestUtils.miniMRCluster;
-import static org.apache.hadoop.mapred.QueueManagerTestUtils.setUpCluster;
 import static org.apache.hadoop.mapred.QueueManagerTestUtils.submitSleepJob;
 import static org.apache.hadoop.mapred.QueueManagerTestUtils.writeToFile;
 import static org.junit.Assert.assertEquals;
@@ -37,7 +36,6 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import java.io.File;
 import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
 import java.util.Properties;
@@ -47,11 +45,12 @@ import org.apache.hadoop.mapred.tools.MRAdmin;
 import org.apache.hadoop.mapreduce.Cluster;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobID;
+import org.apache.hadoop.mapreduce.MRConfig;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.QueueState;
 import org.apache.hadoop.mapreduce.JobStatus.State;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.AfterClass;
-import org.junit.BeforeClass;
 import org.junit.Test;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -60,21 +59,26 @@ public class TestQueueManagerWithJobTracker {
 
   private static Configuration conf;
 
-  @BeforeClass
-  public static void setUp() throws Exception {
-    checkForConfigFile();
-    Document doc = createDocument();
-    createSimpleDocumentWithAcls(doc, "true");
-    writeToFile(doc, CONFIG);
-    conf = new Configuration();
-    conf.addResource(CONFIG);
-    conf.set("mapred.committer.job.setup.cleanup.needed", "false");
-    setUpCluster(conf);
-  }
-
   @AfterClass
   public static void tearDown() throws Exception {
-    new File(CONFIG).delete();
+    deleteQueuesConfigFile();
+  }
+
+  private void startCluster(boolean aclsEnabled)
+      throws Exception {
+
+    deleteQueuesConfigFile();
+    Document doc = createDocument();
+    createSimpleDocumentWithAcls(doc);
+    writeToFile(doc, QUEUES_CONFIG_FILE_PATH);
+    conf = new Configuration();
+    conf.set(MRJobConfig.SETUP_CLEANUP_NEEDED, "false");
+    conf.setBoolean(MRConfig.MR_ACLS_ENABLED, aclsEnabled);
+
+    JobConf jobConf = new JobConf(conf);
+    String namenode = "file:///";
+    miniMRCluster = new MiniMRCluster(0, namenode, 3, null, null, jobConf);
+
   }
 
   /**
@@ -83,6 +87,8 @@ public class TestQueueManagerWithJobTracker {
    */
   @Test(expected = IOException.class)
   public void testSubmitJobForStoppedQueue() throws Exception {
+    startCluster(true);
+
     submitSleepJob(10, 10, 100, 100, false, null,
         "p1" + NAME_SEPARATOR + "p14", conf);
     fail("queue p1:p14 is in stopped state and should not accept jobs");
@@ -94,8 +100,10 @@ public class TestQueueManagerWithJobTracker {
    */
   @Test(expected = IOException.class)
   public void testSubmitJobForContainerQueue() throws Exception {
-      submitSleepJob(10, 10, 100, 100, false, null, "p1", conf);
-      fail("queue p1 is a container queue and cannot have jobs");
+    startCluster(true);
+
+    submitSleepJob(10, 10, 100, 100, false, null, "p1", conf);
+    fail("queue p1 is a container queue and cannot have jobs");
   }
 
   /**
@@ -104,12 +112,16 @@ public class TestQueueManagerWithJobTracker {
    */
   @Test
   public void testAclsForSubmitJob() throws Exception {
+    startCluster(true);
+
     Job job;
+    try {
     // submit job to queue p1:p13 with unspecified acls 
     job = submitSleepJob(0, 0, 0, 0, true, "u1,g1", "p1" + NAME_SEPARATOR
         + "p13", conf);
-    assertTrue("Job submission for u1 failed in queue : p1:p13.",
-        job.isSuccessful());
+    fail("user u1 cannot submit jobs to queue p1:p13");
+    } catch (Exception e) {
+    }
     // check for access to submit the job
     try {
       job = submitSleepJob(0, 0, 0, 0, false, "u2,g1", "p1" + NAME_SEPARATOR
@@ -117,10 +129,16 @@ public class TestQueueManagerWithJobTracker {
       fail("user u2 cannot submit jobs to queue p1:p11");
     } catch (Exception e) {
     }
-    // submit job to queue p1:p11 with acls-submit-job as u1
+    // submit job to queue p1:p11 with acl-submit-job as u1
     job = submitSleepJob(0, 0, 0, 0, true, "u1,g1", "p1"
         + NAME_SEPARATOR + "p11", conf);
     assertTrue("Job submission for u1 failed in queue : p1:p11.",
+        job.isSuccessful());
+    
+    // submit job to queue p1:p12 with acl-submit-job as *
+    job = submitSleepJob(0, 0, 0, 0, true, "u2,g1", "p1"
+        + NAME_SEPARATOR + "p12", conf);
+    assertTrue("Job submission for u2 failed in queue : p1:p12.",
         job.isSuccessful());
   }
 
@@ -130,6 +148,8 @@ public class TestQueueManagerWithJobTracker {
    */
   @Test
   public void testAccessToKillJob() throws Exception {
+    startCluster(true);
+
     Job job = submitSleepJob(1, 1, 100, 100, false, "u1,g1", "p1"
         + NAME_SEPARATOR + "p11", conf);
     final JobConf jobConf = miniMRCluster.createJobConf();
@@ -229,11 +249,13 @@ public class TestQueueManagerWithJobTracker {
    */
   @Test
   public void testSubmitJobsAfterRefresh() throws Exception {
+    startCluster(true);
+
     // test for refresh
-    checkForConfigFile();
+    deleteQueuesConfigFile();
     Document doc = createDocument();
     refreshDocument(doc);
-    writeToFile(doc, CONFIG);
+    writeToFile(doc, QUEUES_CONFIG_FILE_PATH);
     MRAdmin admin = new MRAdmin(miniMRCluster.createJobConf());
     admin.run(new String[] { "-refreshQueues" });
     try {
@@ -242,15 +264,15 @@ public class TestQueueManagerWithJobTracker {
       fail("user u1 is not in the submit jobs' list");
     } catch (Exception e) {
     }
-    checkForConfigFile();
+    deleteQueuesConfigFile();
     doc = createDocument();
-    createSimpleDocumentWithAcls(doc, "true");
-    writeToFile(doc, CONFIG);
+    createSimpleDocumentWithAcls(doc);
+    writeToFile(doc, QUEUES_CONFIG_FILE_PATH);
     admin.run(new String[] { "-refreshQueues" });
   }
 
   private void refreshDocument(Document doc) {
-    Element queues = createQueuesNode(doc, "true");
+    Element queues = createQueuesNode(doc);
 
     // Create parent level queue q1.
     Element q1 = createQueue(doc, "q1");
@@ -298,12 +320,7 @@ public class TestQueueManagerWithJobTracker {
    */
   @Test
   public void testAclsDisabled() throws Exception {
-    checkForConfigFile();
-    Document doc = createDocument();
-    createSimpleDocumentWithAcls(doc, "false");
-    writeToFile(doc, CONFIG);
-    MRAdmin admin = new MRAdmin(miniMRCluster.createJobConf());
-    admin.run(new String[] { "-refreshQueues" });
+    startCluster(false);
 
     // submit job to queue p1:p11 by any user not in acls-submit-job
     Job job = submitSleepJob(0, 0, 0, 0, true, "u2,g1", "p1" + NAME_SEPARATOR

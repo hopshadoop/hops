@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.tools.rumen;
 
-import java.text.ParseException;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -72,7 +71,11 @@ public class Job20LineHistoryEventEmitter extends HistoryEventEmitter {
       String submitTime = line.get("SUBMIT_TIME");
       String jobConf = line.get("JOBCONF");
       String user = line.get("USER");
+      if (user == null) {
+        user = "nulluser";
+      }
       String jobName = line.get("JOBNAME");
+      String jobQueueName = line.get("JOB_QUEUE");// could be null
 
       if (submitTime != null) {
         Job20LineHistoryEventEmitter that =
@@ -82,8 +85,8 @@ public class Job20LineHistoryEventEmitter extends HistoryEventEmitter {
 
         Map<JobACL, AccessControlList> jobACLs =
           new HashMap<JobACL, AccessControlList>();
-        return new JobSubmittedEvent(jobID, jobName, user == null ? "nulluser"
-            : user, that.originalSubmitTime, jobConf, jobACLs);
+        return new JobSubmittedEvent(jobID, jobName, user,
+            that.originalSubmitTime, jobConf, jobACLs, jobQueueName);
       }
 
       return null;

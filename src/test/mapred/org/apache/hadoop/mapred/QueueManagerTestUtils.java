@@ -22,7 +22,6 @@ package org.apache.hadoop.mapred;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.mapreduce.Cluster;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.QueueState;
@@ -31,15 +30,6 @@ import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
-import static org.apache.hadoop.mapred.Queue.*;
-import static org.apache.hadoop.mapred.QueueConfigurationParser.*;
-import static org.apache.hadoop.mapred.QueueManagerTestUtils.CONFIG;
-import static org.apache.hadoop.mapred.QueueManagerTestUtils.createAcls;
-import static org.apache.hadoop.mapred.QueueManagerTestUtils.createProperties;
-import static org.apache.hadoop.mapred.QueueManagerTestUtils.createQueue;
-import static org.apache.hadoop.mapred.QueueManagerTestUtils.createQueuesNode;
-import static org.apache.hadoop.mapred.QueueManagerTestUtils.createState;
-
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.transform.TransformerException;
 import javax.xml.transform.Transformer;
@@ -53,13 +43,18 @@ import java.util.Properties;
 import java.util.Set;
 import java.io.File;
 import java.io.IOException;
-import java.net.MalformedURLException;
-import java.net.URL;
 
 //@Private
 public class QueueManagerTestUtils {
-  final static String CONFIG = new File("test-mapred-queues.xml")
-      .getAbsolutePath();
+  /**
+   * Queue-configuration file for tests that start a cluster and wish to modify
+   * the queue configuration. This file is always in the unit tests classpath,
+   * so QueueManager started through JobTracker will automatically pick this up.
+   */
+  public static final String QUEUES_CONFIG_FILE_PATH = new File(System
+      .getProperty("test.build.extraconf", "build/test/extraconf"),
+      QueueManager.QUEUE_CONF_FILE_NAME).getAbsolutePath();
+
   private static final Log LOG = LogFactory.getLog(QueueManagerTestUtils.class);
 
   /**
@@ -76,7 +71,7 @@ public class QueueManagerTestUtils {
   }
 
   public static void createSimpleDocument(Document doc) throws Exception {
-    Element queues = createQueuesNode(doc, "true");
+    Element queues = createQueuesNode(doc);
 
     // Create parent level queue q1.
     Element q1 = createQueue(doc, "q1");
@@ -106,8 +101,8 @@ public class QueueManagerTestUtils {
     queues.appendChild(p1);
   }
 
-  static void createSimpleDocumentWithAcls(Document doc, String aclsEnabled) {
-    Element queues = createQueuesNode(doc, aclsEnabled);
+  static void createSimpleDocumentWithAcls(Document doc) {
+    Element queues = createQueuesNode(doc);
 
     // Create parent level queue q1.
     Element q1 = createQueue(doc, "q1");
@@ -150,8 +145,56 @@ public class QueueManagerTestUtils {
     queues.appendChild(p1);
   }
 
+  /**
+   * Creates all given queues as 1st level queues(no nesting)
+   * @param doc         the queues config document
+   * @param queueNames  the queues to be added to the queues config document
+   * @param submitAcls  acl-submit-job acls for each of the queues
+   * @param adminsAcls  acl-administer-jobs acls for each of the queues
+   * @throws Exception
+   */
+  public static void createSimpleDocument(Document doc, String[] queueNames,
+      String[] submitAcls, String[] adminsAcls) throws Exception {
+
+    Element queues = createQueuesNode(doc);
+
+    // Create all queues as 1st level queues(no nesting)
+    for (int i = 0; i < queueNames.length; i++) {
+      Element q = createQueue(doc, queueNames[i]);
+
+      q.appendChild(createState(doc, QueueState.RUNNING.getStateName()));
+      q.appendChild(createAcls(doc,
+          QueueConfigurationParser.ACL_SUBMIT_JOB_TAG, submitAcls[i]));
+      q.appendChild(createAcls(doc,
+          QueueConfigurationParser.ACL_ADMINISTER_JOB_TAG, adminsAcls[i]));
+      queues.appendChild(q);
+    }
+  }
+
+  /**
+   * Creates queues configuration file with given queues at 1st level(i.e.
+   * no nesting of queues) and with the given queue acls.
+   * @param queueNames        queue names which are to be configured
+   * @param submitAclStrings  acl-submit-job acls for each of the queues
+   * @param adminsAclStrings  acl-administer-jobs acls for each of the queues
+   * @return Configuration    the queues configuration
+   * @throws Exception
+   */
+  public static void createQueuesConfigFile(String[] queueNames,
+      String[] submitAclStrings, String[] adminsAclStrings)
+  throws Exception {
+    if (queueNames.length > submitAclStrings.length ||
+        queueNames.length > adminsAclStrings.length) {
+      LOG.error("Number of queues is more than acls given.");
+      return;
+    }
+    Document doc = createDocument();
+    createSimpleDocument(doc, queueNames, submitAclStrings, adminsAclStrings);
+    writeToFile(doc, QUEUES_CONFIG_FILE_PATH);
+  }
+
   public static void refreshSimpleDocument(Document doc) throws Exception {
-    Element queues = createQueuesNode(doc, "true");
+    Element queues = createQueuesNode(doc);
 
     // Create parent level queue q1.
     Element q1 = createQueue(doc, "q1");
@@ -189,10 +232,9 @@ public class QueueManagerTestUtils {
    * @param enable
    * @return the created element.
    */
-  public static Element createQueuesNode(Document doc, String enable) {
+  public static Element createQueuesNode(Document doc) {
     Element queues = doc.createElement("queues");
     doc.appendChild(queues);
-    queues.setAttribute("aclsEnabled", enable);
     return queues;
   }
 
@@ -240,9 +282,12 @@ public class QueueManagerTestUtils {
     return propsElement;
   }
 
-  public static void checkForConfigFile() {
-    if (new File(CONFIG).exists()) {
-      new File(CONFIG).delete();
+  /**
+   * Delete queues configuration file if exists
+   */
+  public static void deleteQueuesConfigFile() {
+    if (new File(QUEUES_CONFIG_FILE_PATH).exists()) {
+      new File(QUEUES_CONFIG_FILE_PATH).delete();
     }
   }
 
@@ -257,33 +302,12 @@ public class QueueManagerTestUtils {
   public static void writeQueueConfigurationFile(String filePath,
       JobQueueInfo[] rootQueues) throws Exception {
     Document doc = createDocument();
-    Element queueElements = createQueuesNode(doc, String.valueOf(true));
+    Element queueElements = createQueuesNode(doc);
     for (JobQueueInfo rootQ : rootQueues) {
       queueElements.appendChild(QueueConfigurationParser.getQueueElement(doc,
           rootQ));
     }
     writeToFile(doc, filePath);
-  }
-
-  static class QueueManagerConfigurationClassLoader extends ClassLoader {
-    @Override
-    public URL getResource(String name) {
-      if (!name.equals(QueueManager.QUEUE_CONF_FILE_NAME)) {
-        return super.getResource(name);
-      } else {
-        File resourceFile = new File(CONFIG);
-        if (!resourceFile.exists()) {
-          throw new IllegalStateException(
-              "Queue Manager configuration file not found");
-        }
-        try {
-          return resourceFile.toURL();
-        } catch (MalformedURLException e) {
-          LOG.fatal("Unable to form URL for the resource file : ");
-        }
-        return super.getResource(name);
-      }
-    }
   }
 
   static Job submitSleepJob(final int numMappers, final int numReducers, final long mapSleepTime,
@@ -329,12 +353,4 @@ public class QueueManagerTestUtils {
   }
 
   static MiniMRCluster miniMRCluster;
-
-  static void setUpCluster(Configuration conf) throws IOException {
-    JobConf jobConf = new JobConf(conf);
-    String namenode = "file:///";
-    Thread.currentThread().setContextClassLoader(
-        new QueueManagerTestUtils.QueueManagerConfigurationClassLoader());
-    miniMRCluster = new MiniMRCluster(0, namenode, 3, null, null, jobConf);
-  }
 }

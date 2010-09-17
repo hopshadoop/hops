@@ -40,18 +40,6 @@ public class JobSubmittedEvent implements HistoryEvent {
   private JobSubmitted datum = new JobSubmitted();
 
   /**
-   * @deprecated Use
-   *             {@link #JobSubmittedEvent(JobID, String, String, long, String, Map)}
-   *             instead.
-   */
-  @Deprecated
-  public JobSubmittedEvent(JobID id, String jobName, String userName,
-      long submitTime, String jobConfPath) {
-    this(id, jobName, userName, submitTime, jobConfPath,
-        new HashMap<JobACL, AccessControlList>());
-  }
-
-  /**
    * Create an event to record job submission
    * @param id The job Id of the job
    * @param jobName Name of the job
@@ -59,10 +47,11 @@ public class JobSubmittedEvent implements HistoryEvent {
    * @param submitTime Time of submission
    * @param jobConfPath Path of the Job Configuration file
    * @param jobACLs The configured acls for the job.
+   * @param jobQueueName The job-queue to which this job was submitted to
    */
   public JobSubmittedEvent(JobID id, String jobName, String userName,
       long submitTime, String jobConfPath,
-      Map<JobACL, AccessControlList> jobACLs) {
+      Map<JobACL, AccessControlList> jobACLs, String jobQueueName) {
     datum.jobid = new Utf8(id.toString());
     datum.jobName = new Utf8(jobName);
     datum.userName = new Utf8(userName);
@@ -74,6 +63,9 @@ public class JobSubmittedEvent implements HistoryEvent {
           entry.getValue().getAclString()));
     }
     datum.acls = jobAcls;
+    if (jobQueueName != null) {
+      datum.jobQueueName = new Utf8(jobQueueName);
+    }
   }
 
   JobSubmittedEvent() {}
@@ -87,6 +79,13 @@ public class JobSubmittedEvent implements HistoryEvent {
   public JobID getJobId() { return JobID.forName(datum.jobid.toString()); }
   /** Get the Job name */
   public String getJobName() { return datum.jobName.toString(); }
+  /** Get the Job queue name */
+  public String getJobQueueName() {
+    if (datum.jobQueueName != null) {
+      return datum.jobQueueName.toString();
+    }
+    return null;
+  }
   /** Get the user name */
   public String getUserName() { return datum.userName.toString(); }
   /** Get the submit time */

@@ -42,8 +42,7 @@ class Queue implements Comparable<Queue>{
   private String name = null;
 
   //acls list
-  private Map<String, 
-              org.apache.hadoop.security.authorize.AccessControlList> acls;
+  private Map<String, AccessControlList> acls;
 
   //Queue State
   private QueueState state = QueueState.RUNNING;
@@ -57,34 +56,6 @@ class Queue implements Comparable<Queue>{
   private Set<Queue> children;
 
   private Properties props;
-
-  /**
-   * Enum representing an operation that can be performed on a queue.
-   */
-  static enum QueueOperation {
-    SUBMIT_JOB ("acl-submit-job", false),
-    ADMINISTER_JOBS ("acl-administer-jobs", true);
-    // TODO: Add ACL for LIST_JOBS when we have ability to authenticate
-    //       users in UI
-    // TODO: Add ACL for CHANGE_ACL when we have an admin tool for
-    //       configuring queues.
-
-    private final String aclName;
-    private final boolean jobOwnerAllowed;
-
-    QueueOperation(String aclName, boolean jobOwnerAllowed) {
-      this.aclName = aclName;
-      this.jobOwnerAllowed = jobOwnerAllowed;
-    }
-
-    final String getAclName() {
-      return aclName;
-    }
-
-    final boolean isJobOwnerAllowed() {
-      return jobOwnerAllowed;
-    }
-  }
 
   /**
    * Default constructor is useful in creating the hierarchy.
@@ -133,7 +104,7 @@ class Queue implements Comparable<Queue>{
    * @return Map containing the operations that can be performed and
    *          who can perform the operations.
    */
-  Map<String, org.apache.hadoop.security.authorize.AccessControlList> getAcls() {
+  Map<String, AccessControlList> getAcls() {
     return acls;
   }
   

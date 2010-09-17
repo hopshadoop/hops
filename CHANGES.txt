@@ -7,6 +7,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1866. Removes deprecated class
     org.apache.hadoop.streaming.UTF8ByteArrayUtils. (amareshwari)
 
+    MAPREDUCE-1664. Changes the behaviour of the combination of job-acls
+    when they function together with queue-acls. (Ravi Gummadi via vinodkv)
+
   NEW FEATURES
 
     MAPREDUCE-1804. Stress-test tool for HDFS introduced in HDFS-708.

@@ -544,6 +544,8 @@ public class JobBuilder {
     result.setJobName(event.getJobName());
     result.setUser(event.getUserName());
     result.setSubmitTime(event.getSubmitTime());
+    // job queue name is set when conf file is processed.
+    // See JobBuilder.process(Properties) method for details.
   }
 
   private void processJobStatusChangedEvent(JobStatusChangedEvent event) {

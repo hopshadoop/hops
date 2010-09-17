@@ -18,8 +18,11 @@
 package org.apache.hadoop.mapred;
 
 import java.io.IOException;
-import javax.security.auth.login.LoginException;
 import junit.framework.TestCase;
+
+import org.apache.hadoop.mapreduce.MRConfig;
+
+import static org.apache.hadoop.mapred.QueueManagerTestUtils.*;
 import org.apache.hadoop.security.UserGroupInformation;
 
 /**
@@ -31,58 +34,38 @@ public class TestQueueAclsForCurrentUser extends TestCase {
   private QueueManager queueManager;
   private JobConf conf = null;
   UserGroupInformation currentUGI = null;
-  String submitAcl = Queue.QueueOperation.SUBMIT_JOB.getAclName();
-  String adminAcl  = Queue.QueueOperation.ADMINISTER_JOBS.getAclName();
+  String submitAcl = QueueACL.SUBMIT_JOB.getAclName();
+  String adminAcl  = QueueACL.ADMINISTER_JOBS.getAclName();
 
-  private void setupConfForNoAccess() throws IOException,LoginException {
+  @Override
+  protected void tearDown() {
+    deleteQueuesConfigFile();
+  }
+
+  // No access for queues for the user currentUGI
+  private void setupConfForNoAccess() throws Exception {
     currentUGI = UserGroupInformation.getLoginUser();
     String userName = currentUGI.getUserName();
+
+    String[] queueNames = {"qu1", "qu2"};
+    // Only user u1 has access for queue qu1
+    // Only group g2 has acls for the queue qu2
+    createQueuesConfigFile(
+        queueNames, new String[]{"u1", " g2"}, new String[]{"u1", " g2"});
+
     conf = new JobConf();
+    conf.setBoolean(MRConfig.MR_ACLS_ENABLED, true);
 
-    conf.setBoolean("mapred.acls.enabled",true);
-
-    conf.set("mapred.queue.names", "qu1,qu2");
-    //Only user u1 has access
-    conf.set("mapred.queue.qu1.acl-submit-job", "u1");
-    conf.set("mapred.queue.qu1.acl-administer-jobs", "u1");
-    //q2 only group g2 has acls for the queues
-    conf.set("mapred.queue.qu2.acl-submit-job", " g2");
-    conf.set("mapred.queue.qu2.acl-administer-jobs", " g2");
     queueManager = new QueueManager(conf);
-
   }
 
   /**
    *  sets up configuration for acls test.
    * @return
    */
-  private void setupConf(boolean aclSwitch) throws IOException,LoginException{
+  private void setupConf(boolean aclSwitch) throws Exception{
     currentUGI = UserGroupInformation.getLoginUser();
     String userName = currentUGI.getUserName();
-    conf = new JobConf();
-
-    conf.setBoolean("mapred.acls.enabled", aclSwitch);
-
-    conf.set("mapred.queue.names", "qu1,qu2,qu3,qu4,qu5,qu6,qu7");
-    //q1 Has acls for all the users, supports both submit and administer
-    conf.set("mapred.queue.qu1.acl-submit-job", "*");
-    conf.set("mapred.queue.qu1-acl-administer-jobs", "*");
-    //q2 only u2 has acls for the queues
-    conf.set("mapred.queue.qu2.acl-submit-job", "u2");
-    conf.set("mapred.queue.qu2.acl-administer-jobs", "u2");
-    //q3  Only u2 has submit operation access rest all have administer access
-    conf.set("mapred.queue.qu3.acl-submit-job", "u2");
-    conf.set("mapred.queue.qu3.acl-administer-jobs", "*");
-    //q4 Only u2 has administer access , anyone can do submit
-    conf.set("mapred.queue.qu4.acl-submit-job", "*");
-    conf.set("mapred.queue.qu4.acl-administer-jobs", "u2");
-    //qu6 only current user has submit access
-    conf.set("mapred.queue.qu6.acl-submit-job",userName);
-    conf.set("mapred.queue.qu6.acl-administrator-jobs","u2");
-    //qu7 only current user has administrator access
-    conf.set("mapred.queue.qu7.acl-submit-job","u2");
-    conf.set("mapred.queue.qu7.acl-administrator-jobs",userName);
-    //qu8 only current group has access
     StringBuilder groupNames = new StringBuilder("");
     String[] ugiGroupNames = currentUGI.getGroupNames();
     int max = ugiGroupNames.length-1;
@@ -92,22 +75,38 @@ public class TestQueueAclsForCurrentUser extends TestCase {
         groupNames.append(",");
       }
     }
-    conf.set("mapred.queue.qu5.acl-submit-job"," "+groupNames.toString());
-    conf.set("mapred.queue.qu5.acl-administrator-jobs"," "
-            +groupNames.toString());
+    String groupsAcl = " " + groupNames.toString();
+
+    //q1 Has acls for all the users, supports both submit and administer
+    //q2 only u2 has acls for the queues
+    //q3  Only u2 has submit operation access rest all have administer access
+    //q4 Only u2 has administer access , anyone can do submit
+    //qu5 only current user's groups has access
+    //qu6 only current user has submit access
+    //qu7 only current user has administrator access
+    String[] queueNames =
+        {"qu1", "qu2", "qu3", "qu4", "qu5", "qu6", "qu7"};
+    String[] submitAcls =
+        {"*", "u2", "u2", "*", groupsAcl, userName, "u2"};
+    String[] adminsAcls =
+        {"*", "u2", "*", "u2", groupsAcl, "u2", userName};
+    createQueuesConfigFile(queueNames, submitAcls, adminsAcls);
+
+    conf = new JobConf();
+    conf.setBoolean(MRConfig.MR_ACLS_ENABLED, aclSwitch);
 
     queueManager = new QueueManager(conf);
   }
 
-  public void testQueueAclsForCurrentuser() throws IOException,LoginException {
+  public void testQueueAclsForCurrentuser() throws Exception {
     setupConf(true);
     QueueAclsInfo[] queueAclsInfoList =
             queueManager.getQueueAcls(currentUGI);
     checkQueueAclsInfo(queueAclsInfoList);
   }
 
-  public void testQueueAclsForCurrentUserAclsDisabled() throws IOException,
-          LoginException {
+  // Acls are disabled on the mapreduce cluster
+  public void testQueueAclsForCurrentUserAclsDisabled() throws Exception {
     setupConf(false);
     //fetch the acls info for current user.
     QueueAclsInfo[] queueAclsInfoList = queueManager.
@@ -115,7 +114,7 @@ public class TestQueueAclsForCurrentUser extends TestCase {
     checkQueueAclsInfo(queueAclsInfoList);
   }
 
-  public void testQueueAclsForNoAccess() throws IOException,LoginException {
+  public void testQueueAclsForNoAccess() throws Exception {
     setupConfForNoAccess();
     QueueAclsInfo[] queueAclsInfoList = queueManager.
             getQueueAcls(currentUGI);
@@ -124,7 +123,7 @@ public class TestQueueAclsForCurrentUser extends TestCase {
 
   private void checkQueueAclsInfo(QueueAclsInfo[] queueAclsInfoList)
           throws IOException {
-    if (conf.get("mapred.acls.enabled").equalsIgnoreCase("true")) {
+    if (conf.get(MRConfig.MR_ACLS_ENABLED).equalsIgnoreCase("true")) {
       for (int i = 0; i < queueAclsInfoList.length; i++) {
         QueueAclsInfo acls = queueAclsInfoList[i];
         String queueName = acls.getQueueName();

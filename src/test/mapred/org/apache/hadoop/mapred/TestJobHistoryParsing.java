@@ -63,6 +63,7 @@ public class TestJobHistoryParsing  extends TestCase {
                     "~!@#$%^&*()_+QWERTYUIOP{}|ASDFGHJKL:\"'ZXCVBNM<>?" +
                     "\t\b\n\f\"\n in it";
 
+    String weirdJobQueueName = "my\njob\nQueue\\";
     conf.setUser(username);
 
     MiniMRCluster mr = null;
@@ -84,7 +85,7 @@ public class TestJobHistoryParsing  extends TestCase {
     jobACLs.put(JobACL.MODIFY_JOB, modifyJobACL);
     JobSubmittedEvent jse =
         new JobSubmittedEvent(jobId, weirdJob, username, 12345, weirdPath,
-            jobACLs);
+            jobACLs, weirdJobQueueName);
     jh.logEvent(jse, jobId);
 
     JobFinishedEvent jfe =
@@ -121,6 +122,7 @@ public class TestJobHistoryParsing  extends TestCase {
 
     assertTrue (jobInfo.getUsername().equals(username));
     assertTrue(jobInfo.getJobname().equals(weirdJob));
+    assertTrue(jobInfo.getJobQueueName().equals(weirdJobQueueName));
     assertTrue(jobInfo.getJobConfPath().equals(weirdPath));
     Map<JobACL, AccessControlList> parsedACLs = jobInfo.getJobACLs();
     assertEquals(2, parsedACLs.size());

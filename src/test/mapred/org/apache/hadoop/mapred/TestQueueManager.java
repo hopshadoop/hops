@@ -22,8 +22,11 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import static org.apache.hadoop.mapred.QueueManagerTestUtils.*;
 import static org.apache.hadoop.mapred.QueueConfigurationParser.*;
+import static org.apache.hadoop.mapred.QueueManager.toFullPropertyName;
 import static org.junit.Assert.*;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.QueueState;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.codehaus.jackson.map.ObjectMapper;
@@ -31,7 +34,6 @@ import org.junit.After;
 import org.junit.Test;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
-import java.io.File;
 import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -47,26 +49,32 @@ public class TestQueueManager {
 
   @After
   public void tearDown() throws Exception {
-    new File(CONFIG).delete();
+    deleteQueuesConfigFile();
+  }
+
+  // create UGI with the given user name and the fixed group name "myGroup"
+  private UserGroupInformation createUGI(String userName) {
+    return UserGroupInformation.createUserForTesting(
+        userName, new String[]{"myGroup"});
   }
 
   @Test
   public void testDefault() throws Exception {
+    deleteQueuesConfigFile();
     QueueManager qm = new QueueManager();
     Queue root = qm.getRoot();
     assertEquals(root.getChildren().size(), 1);
     assertEquals(root.getChildren().iterator().next().getName(), "default");
-    assertFalse(qm.isAclsEnabled());
     assertNull(root.getChildren().iterator().next().getChildren());
   }
 
   @Test
   public void testXMLParsing() throws Exception {
-    checkForConfigFile();
+    deleteQueuesConfigFile();
     Document doc = createDocument();
     createSimpleDocument(doc);
-    writeToFile(doc, CONFIG);
-    QueueManager qm = new QueueManager(CONFIG);
+    writeToFile(doc, QUEUES_CONFIG_FILE_PATH);
+    QueueManager qm = new QueueManager(QUEUES_CONFIG_FILE_PATH, true);
     Set<Queue> rootQueues = qm.getRoot().getChildren();
     List<String> names = new ArrayList<String>();
     for (Queue q : rootQueues) {
@@ -101,62 +109,63 @@ public class TestQueueManager {
 
     assertTrue(
       q.getAcls().get(
-        QueueManager.toFullPropertyName(
+          toFullPropertyName(
           q.getName(), ACL_SUBMIT_JOB_TAG)).isUserAllowed(
-        UserGroupInformation.createRemoteUser("u1")));
+              createUGI("u1")));
 
     assertTrue(
       q.getAcls().get(
-        QueueManager.toFullPropertyName(
+          toFullPropertyName(
           q.getName(),
           ACL_ADMINISTER_JOB_TAG))
-        .isUserAllowed(UserGroupInformation.createRemoteUser("u2")));
+        .isUserAllowed(createUGI("u2")));
     assertTrue(q.getState().equals(QueueState.STOPPED));
   }
 
   @Test
   public void testhasAccess() throws Exception {
-    checkForConfigFile();
+    deleteQueuesConfigFile();
     Document doc = createDocument();
-    createSimpleDocumentWithAcls(doc,"true");
-    writeToFile(doc, CONFIG);
-    QueueManager qm = new QueueManager(CONFIG);
+    createSimpleDocumentWithAcls(doc);
+    writeToFile(doc, QUEUES_CONFIG_FILE_PATH);
+    QueueManager qm = new QueueManager(QUEUES_CONFIG_FILE_PATH, true);
 
     UserGroupInformation ugi;
     // test for acls access when acls are set with *
-    ugi = UserGroupInformation.createRemoteUser("u1");
+    ugi = createUGI("u1");
     assertTrue(qm.hasAccess("p1" + NAME_SEPARATOR + "p12",
-        Queue.QueueOperation.SUBMIT_JOB, ugi));
-    ugi = UserGroupInformation.createRemoteUser("u2");
+        QueueACL.SUBMIT_JOB, ugi));
+    ugi = createUGI("u2");
     assertTrue(qm.hasAccess("p1" + NAME_SEPARATOR + "p12",
-        Queue.QueueOperation.ADMINISTER_JOBS, ugi));
+        QueueACL.ADMINISTER_JOBS, ugi));
     
     // test for acls access when acls are not set with *
-    ugi = UserGroupInformation.createRemoteUser("u1");
+    ugi = createUGI("u1");
     assertTrue(qm.hasAccess("p1" + NAME_SEPARATOR + "p11",
-        Queue.QueueOperation.SUBMIT_JOB, ugi));
-    ugi = UserGroupInformation.createRemoteUser("u2");
+        QueueACL.SUBMIT_JOB, ugi));
+    ugi = createUGI("u2");
     assertTrue(qm.hasAccess("p1" + NAME_SEPARATOR + "p11",
-        Queue.QueueOperation.ADMINISTER_JOBS, ugi));
+        QueueACL.ADMINISTER_JOBS, ugi));
     
-    // test for acls access when acls are not specified but acls is enabled
-    ugi = UserGroupInformation.createRemoteUser("u1");
-    assertTrue(qm.hasAccess("p1" + NAME_SEPARATOR + "p13",
-        Queue.QueueOperation.SUBMIT_JOB, ugi));
-    ugi = UserGroupInformation.createRemoteUser("u2");
-    assertTrue(qm.hasAccess("p1" + NAME_SEPARATOR + "p13",
-        Queue.QueueOperation.ADMINISTER_JOBS, ugi));
+    // Test for acls access when acls are not specified but acls are enabled.
+    // By default, the queue acls for any queue are empty.
+    ugi = createUGI("u1");
+    assertFalse(qm.hasAccess("p1" + NAME_SEPARATOR + "p13",
+        QueueACL.SUBMIT_JOB, ugi));
+    ugi = createUGI("u2");
+    assertFalse(qm.hasAccess("p1" + NAME_SEPARATOR + "p13",
+        QueueACL.ADMINISTER_JOBS, ugi));
     
     assertTrue(qm.isRunning("p1" + NAME_SEPARATOR + "p13"));
   }
   
   @Test
   public void testQueueView() throws Exception {
-    checkForConfigFile();
+    deleteQueuesConfigFile();
     Document doc = createDocument();
     createSimpleDocument(doc);
-    writeToFile(doc, CONFIG);
-    QueueManager qm = new QueueManager(CONFIG);
+    writeToFile(doc, QUEUES_CONFIG_FILE_PATH);
+    QueueManager qm = new QueueManager(QUEUES_CONFIG_FILE_PATH, true);
     
     for (Queue queue : qm.getRoot().getChildren()) {
       checkHierarchy(queue, qm);
@@ -176,25 +185,21 @@ public class TestQueueManager {
 
   @Test
   public void testhasAccessForParent() throws Exception {
-    checkForConfigFile();
+    deleteQueuesConfigFile();
     Document doc = createDocument();
     createSimpleDocument(doc);
-    writeToFile(doc, CONFIG);
-    QueueManager qm = new QueueManager(CONFIG);
+    writeToFile(doc, QUEUES_CONFIG_FILE_PATH);
+    QueueManager qm = new QueueManager(QUEUES_CONFIG_FILE_PATH, true);
 
-    UserGroupInformation ugi =
-      UserGroupInformation.createRemoteUser("u1");
-    assertFalse(
-      qm.hasAccess(
-        "p1",
-        Queue.QueueOperation.SUBMIT_JOB, ugi));
+    UserGroupInformation ugi = createUGI("u1");
+    assertFalse(qm.hasAccess("p1", QueueACL.SUBMIT_JOB, ugi));
   }
 
   @Test
   public void testValidation() throws Exception {
-    checkForConfigFile();
+    deleteQueuesConfigFile();
     Document doc = createDocument();
-    Element queues = createQueuesNode(doc, "false");
+    Element queues = createQueuesNode(doc);
     Element q1 = createQueue(doc, "q1");
 
     q1.appendChild(createAcls(doc, "acl-submit-job", "u1"));
@@ -203,9 +208,9 @@ public class TestQueueManager {
     q1.appendChild(createQueue(doc, "p16"));
 
     queues.appendChild(q1);
-    writeToFile(doc, CONFIG);
+    writeToFile(doc, QUEUES_CONFIG_FILE_PATH);
     try {
-      new QueueManager(CONFIG);
+      new QueueManager(QUEUES_CONFIG_FILE_PATH, false);
       fail("Should throw an exception as configuration is wrong ");
     } catch (RuntimeException re) {
       LOG.info(re.getMessage());
@@ -214,27 +219,27 @@ public class TestQueueManager {
 
   @Test
   public void testInvalidName() throws Exception {
-    checkForConfigFile();
+    deleteQueuesConfigFile();
     Document doc = createDocument();
-    Element queues = createQueuesNode(doc, "false");
+    Element queues = createQueuesNode(doc);
     Element q1 = createQueue(doc, "");
     queues.appendChild(q1);
-    writeToFile(doc, CONFIG);
+    writeToFile(doc, QUEUES_CONFIG_FILE_PATH);
     try {
-      new QueueManager(CONFIG);
+      new QueueManager(QUEUES_CONFIG_FILE_PATH, false);
       fail("Should throw an exception as configuration is wrong ");
     } catch (Exception re) {
       re.printStackTrace();
       LOG.info(re.getMessage());
     }
-    checkForConfigFile();
+    deleteQueuesConfigFile();
     doc = createDocument();
-    queues = createQueuesNode(doc, "false");
+    queues = createQueuesNode(doc);
     q1 = doc.createElement("queue");
     queues.appendChild(q1);
-    writeToFile(doc, CONFIG);
+    writeToFile(doc, QUEUES_CONFIG_FILE_PATH);
     try {
-      new QueueManager(CONFIG);
+      new QueueManager(QUEUES_CONFIG_FILE_PATH, true);
       fail("Should throw an exception as configuration is wrong ");
     } catch (RuntimeException re) {
       re.printStackTrace();
@@ -244,10 +249,10 @@ public class TestQueueManager {
 
   @Test
   public void testMissingConfigFile() throws Exception {
-    checkForConfigFile(); // deletes file
+    deleteQueuesConfigFile(); // deletes file
 
     try {
-      new QueueManager(CONFIG);
+      new QueueManager(QUEUES_CONFIG_FILE_PATH, true);
       fail("Should throw an exception for missing file when " +
            "explicitly passed.");
     } catch (RuntimeException re) {
@@ -266,9 +271,9 @@ public class TestQueueManager {
 
   @Test
   public void testEmptyProperties() throws Exception {
-    checkForConfigFile();
+    deleteQueuesConfigFile();
     Document doc = createDocument();
-    Element queues = createQueuesNode(doc, "false");
+    Element queues = createQueuesNode(doc);
     Element q1 = createQueue(doc, "q1");
     Element p = createProperties(doc, null);
     q1.appendChild(p);
@@ -277,11 +282,11 @@ public class TestQueueManager {
 
   @Test
   public void testEmptyFile() throws Exception {
-    checkForConfigFile();
+    deleteQueuesConfigFile();
     Document doc = createDocument();
-    writeToFile(doc, CONFIG);
+    writeToFile(doc, QUEUES_CONFIG_FILE_PATH);
     try {
-      new QueueManager(CONFIG);
+      new QueueManager(QUEUES_CONFIG_FILE_PATH, true);
       fail("Should throw an exception as configuration is wrong ");
     } catch (Exception re) {
       re.printStackTrace();
@@ -291,11 +296,11 @@ public class TestQueueManager {
 
   @Test
   public void testJobQueueInfoGeneration() throws Exception {
-    checkForConfigFile();
+    deleteQueuesConfigFile();
     Document doc = createDocument();
     createSimpleDocument(doc);
-    writeToFile(doc, CONFIG);
-    QueueManager qm = new QueueManager(CONFIG);
+    writeToFile(doc, QUEUES_CONFIG_FILE_PATH);
+    QueueManager qm = new QueueManager(QUEUES_CONFIG_FILE_PATH, true);
 
     List<JobQueueInfo> rootQueues =
       qm.getRoot().getJobQueueInfo().getChildren();
@@ -338,11 +343,11 @@ public class TestQueueManager {
    */
   @Test
   public void testRefresh() throws Exception {
-    checkForConfigFile();
+    deleteQueuesConfigFile();
     Document doc = createDocument();
     createSimpleDocument(doc);
-    writeToFile(doc, CONFIG);
-    QueueManager qm = new QueueManager(CONFIG);
+    writeToFile(doc, QUEUES_CONFIG_FILE_PATH);
+    QueueManager qm = new QueueManager(QUEUES_CONFIG_FILE_PATH, true);
     Queue beforeRefreshRoot = qm.getRoot();
     //remove the file and create new one.
     Set<Queue> rootQueues = beforeRefreshRoot.getChildren();
@@ -360,16 +365,16 @@ public class TestQueueManager {
             "p1" + NAME_SEPARATOR + "p12")) {
             assertTrue(
               child.getAcls().get(
-                QueueManager.toFullPropertyName(
+                  toFullPropertyName(
                   child.getName(), ACL_SUBMIT_JOB_TAG))
-                .isUserAllowed(UserGroupInformation.createRemoteUser("u1")));
+                .isUserAllowed(createUGI("u1")));
 
             assertTrue(
               child.getAcls().get(
-                QueueManager.toFullPropertyName(
+                  toFullPropertyName(
                   child.getName(),
                   ACL_ADMINISTER_JOB_TAG))
-                .isUserAllowed(UserGroupInformation.createRemoteUser("u2")));
+                .isUserAllowed(createUGI("u2")));
             assertTrue(child.getState().equals(QueueState.STOPPED));
           } else {
             assertTrue(child.getState().equals(QueueState.RUNNING));
@@ -377,11 +382,11 @@ public class TestQueueManager {
         }
       }
     }
-    checkForConfigFile();
+    deleteQueuesConfigFile();
     doc = createDocument();
     refreshSimpleDocument(doc);
-    writeToFile(doc, CONFIG);
-    QueueConfigurationParser cp = new QueueConfigurationParser(CONFIG);
+    writeToFile(doc, QUEUES_CONFIG_FILE_PATH);
+    QueueConfigurationParser cp = new QueueConfigurationParser(QUEUES_CONFIG_FILE_PATH, true);
     qm.getRoot().isHierarchySameAs(cp.getRoot());
     qm.setQueues(
       cp.getRoot().getChildren().toArray(
@@ -403,17 +408,17 @@ public class TestQueueManager {
             "p1" + NAME_SEPARATOR + "p12")) {
             assertTrue(
               child.getAcls().get(
-                QueueManager.toFullPropertyName(
+                  toFullPropertyName(
                   child.getName(),
                   ACL_SUBMIT_JOB_TAG))
-                .isUserAllowed(UserGroupInformation.createRemoteUser("u3")));
+                .isUserAllowed(createUGI("u3")));
 
             assertTrue(
               child.getAcls().get(
-                QueueManager.toFullPropertyName(
+                  toFullPropertyName(
                   child.getName(),
                   ACL_ADMINISTER_JOB_TAG))
-                .isUserAllowed(UserGroupInformation.createRemoteUser("u4")));
+                .isUserAllowed(createUGI("u4")));
             assertTrue(child.getState().equals(QueueState.RUNNING));
           } else {
             assertTrue(child.getState().equals(QueueState.STOPPED));
@@ -425,20 +430,20 @@ public class TestQueueManager {
 
   @Test
   public void testRefreshWithInvalidFile() throws Exception {
-    checkForConfigFile();
+    deleteQueuesConfigFile();
     Document doc = createDocument();
     createSimpleDocument(doc);
-    writeToFile(doc, CONFIG);
-    QueueManager qm = new QueueManager(CONFIG);
+    writeToFile(doc, QUEUES_CONFIG_FILE_PATH);
+    QueueManager qm = new QueueManager(QUEUES_CONFIG_FILE_PATH, false);
 
-    checkForConfigFile();
+    deleteQueuesConfigFile();
     doc = createDocument();
-    Element queues = createQueuesNode(doc, "false");
+    Element queues = createQueuesNode(doc);
     Element q1 = createQueue(doc, "");
     queues.appendChild(q1);
-    writeToFile(doc, CONFIG);
+    writeToFile(doc, QUEUES_CONFIG_FILE_PATH);
     try {
-      QueueConfigurationParser cp = new QueueConfigurationParser(CONFIG);
+      QueueConfigurationParser cp = new QueueConfigurationParser(QUEUES_CONFIG_FILE_PATH, false);
 
       fail("Should throw an exception as configuration is wrong ");
     } catch (Throwable re) {
@@ -548,19 +553,21 @@ public class TestQueueManager {
    */
   @Test
   public void testDumpConfiguration() throws Exception {
-    checkForConfigFile();
+    deleteQueuesConfigFile();
     Document doc = createDocument();
     createSimpleDocument(doc);    
-    writeToFile(doc, CONFIG);
+    writeToFile(doc, QUEUES_CONFIG_FILE_PATH);
+
     StringWriter out = new StringWriter();
-    QueueManager.dumpConfiguration(out,CONFIG,null);
+    Configuration conf = new Configuration(false);
+    conf.setBoolean(MRConfig.MR_ACLS_ENABLED, true);
+    QueueManager.dumpConfiguration(out, QUEUES_CONFIG_FILE_PATH, conf);
+
     ObjectMapper mapper = new ObjectMapper();
     // parse the Json dump
     JsonQueueTree queueTree =
       mapper.readValue(out.toString(), JsonQueueTree.class);
-    
-    // check if acls_enabled is correct
-    assertEquals(true, queueTree.isAcls_enabled());
+
     // check for the number of top-level queues
     assertEquals(2, queueTree.getQueues().length);
     

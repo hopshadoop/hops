@@ -32,6 +32,10 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.mapred.JobTracker.RecoveryManager;
+import org.apache.hadoop.mapreduce.MRConfig;
+
+import static org.apache.hadoop.mapred.QueueManagerTestUtils.createQueuesConfigFile;
+import static org.apache.hadoop.mapred.QueueManager.toFullPropertyName;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.security.UserGroupInformation;
 
@@ -156,11 +160,9 @@ public class TestRecoveryManager extends TestCase {
     // clean up
     FileSystem fs = FileSystem.get(new Configuration());
     fs.delete(TEST_DIR, true);
-    
+
     JobConf conf = new JobConf();
     conf.set(JTConfig.JT_JOBHISTORY_BLOCK_SIZE, "1024");
-    conf.set(
-      DeprecatedQueueConfigurationParser.MAPRED_QUEUE_NAMES_KEY, "default");
     
     MiniMRCluster mr = new MiniMRCluster(1, "file:///", 1, null, null, conf);
     JobTracker jobtracker = mr.getJobTrackerRunner().getJobTracker();
@@ -239,10 +241,11 @@ public class TestRecoveryManager extends TestCase {
                                       true);
     mr.getJobTrackerConf().setInt(JTConfig.JT_TASKS_PER_JOB, 25);
     
-    mr.getJobTrackerConf().setBoolean("mapred.acls.enabled" , true);
+    mr.getJobTrackerConf().setBoolean(MRConfig.MR_ACLS_ENABLED, true);
+
     UserGroupInformation ugi = UserGroupInformation.getLoginUser();
-    mr.getJobTrackerConf().set("mapred.queue.default.acl-submit-job", 
-                               ugi.getUserName());
+    mr.getJobTrackerConf().set(toFullPropertyName(
+        "default", QueueACL.SUBMIT_JOB.getAclName()), ugi.getUserName());
 
     // start the jobtracker
     LOG.info("Starting jobtracker");

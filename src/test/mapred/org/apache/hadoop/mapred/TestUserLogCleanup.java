@@ -55,6 +55,7 @@ public class TestUserLogCleanup {
     taskLogCleanupThread = new UserLogCleaner(conf);
     taskLogCleanupThread.setClock(myClock);
     tt = new TaskTracker();
+    tt.setConf(new JobConf(conf));
     tt.setLocalizer(localizer);
     tt.setTaskLogCleanupThread(taskLogCleanupThread);
   }
@@ -67,8 +68,9 @@ public class TestUserLogCleanup {
   private File localizeJob(JobID jobid) throws IOException {
     File jobUserlog = TaskLog.getJobDir(jobid);
 
+    JobConf conf = new JobConf();
     // localize job log directory
-    tt.initializeJobLogDir(jobid);
+    tt.initializeJobLogDir(jobid, conf);
     assertTrue(jobUserlog + " directory is not created.", jobUserlog.exists());
     return jobUserlog;
   }
