@@ -133,6 +133,9 @@ Trunk (unreleased changes)
 
     HDFS-1093. Change the FSNamesystem lock to a read/write lock. (dhruba)
 
+    HDFS-1407. Change DataTransferProtocol methods to use Block instead 
+    of individual elements of Block. (suresh)
+
   OPTIMIZATIONS
 
     HDFS-1140. Speedup INode.getPathComponents. (Dmytro Molkov via shv)

@@ -82,7 +82,6 @@ public class TestClientBlockVerification {
     int offset, int lenToRead) throws IOException {
     InetSocketAddress targetAddr = null;
     Socket s = null;
-    BlockReader blockReader = null;
     Block block = testBlock.getBlock();
     DatanodeInfo[] nodes = testBlock.getLocations();
     targetAddr = NetUtils.createSocketAddr(nodes[0].getName());
@@ -90,11 +89,11 @@ public class TestClientBlockVerification {
     s.connect(targetAddr, HdfsConstants.READ_TIMEOUT);
     s.setSoTimeout(HdfsConstants.READ_TIMEOUT);
 
-    return BlockReader.newBlockReader(
-      s, targetAddr.toString()+ ":" + block.getBlockId(), block.getBlockId(),
-      testBlock.getBlockToken(), block.getGenerationStamp(),
-      offset, lenToRead,
-      conf.getInt("io.file.buffer.size", 4096));
+    String file = BlockReader.getFileName(targetAddr,
+        block.getBlockId());
+    return BlockReader.newBlockReader(s, file, block,
+        testBlock.getBlockToken(), offset, lenToRead, conf.getInt(
+            "io.file.buffer.size", 4096));
   }
 
   /**
