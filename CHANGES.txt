@@ -796,6 +796,9 @@ Release 0.21.0 - Unreleased
 
     HDFS-806. Add new unit tests to the 10-mins 'run-commit-test' target (cos)
 
+    HDFS-1411. Correct backup node startup command in hdfs user guide.
+    (Ching-Shen Chen via shv) 
+
   OPTIMIZATIONS
 
     HDFS-946. NameNode should not return full path name when lisitng a
