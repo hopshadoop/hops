@@ -1009,6 +1009,9 @@ Release 0.21.0 - Unreleased
 
   BUG FIXES
 
+    MAPREDUCE-1280. Update Eclipse plugin to the new eclipse.jdt API.
+    (Alex Kozlov via szetszwo)
+
     MAPREDUCE-878. Rename fair scheduler design doc to 
     fair-scheduler-design-doc.tex and add Apache license header (matei)
 
