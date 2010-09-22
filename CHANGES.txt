@@ -298,6 +298,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-1918. Adds documentation to Rumen. (Amar Kamat via amareshwari)
 
+    MAPREDUCE-2078. Fixes TraceBuilder to generate traces when a globbed job
+    history path is given. (Amar Kamat via amareshwari)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

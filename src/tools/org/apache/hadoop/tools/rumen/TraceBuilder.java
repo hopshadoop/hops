@@ -81,11 +81,32 @@ public class TraceBuilder extends Configured implements Tool {
       topologyOutput = new Path(args[1 + switchTop]);
 
       for (int i = 2 + switchTop; i < args.length; ++i) {
-
-        Path thisPath = new Path(args[i]);
-
-        FileSystem fs = thisPath.getFileSystem(conf);
-        if (fs.getFileStatus(thisPath).isDirectory()) {
+        processInputArguments(args[i], conf);
+      }
+    }
+    
+    /** Processes the input file/folder arguments. If the input is a file then 
+     *  it is directly considered for further processing. If the input is a 
+     *  folder, then all the files in the input folder are considered for 
+     *  further processing.
+     *
+     *  NOTE: If the input represents a globbed path, then it is first flattened
+     *        and then the individual paths represented by the globbed input
+     *        path are processed.
+     */
+    private void processInputArguments(String input, Configuration conf) 
+    throws IOException {
+      Path inPath = new Path(input);
+      FileSystem fs = inPath.getFileSystem(conf);
+      FileStatus[] inStatuses = fs.globStatus(inPath);
+      
+      if (inStatuses == null || inStatuses.length == 0) {
+        return;
+      }
+      
+      for (FileStatus inStatus : inStatuses) {
+        Path thisPath = inStatus.getPath();
+        if (inStatus.isDirectory()) {
           FileStatus[] statuses = fs.listStatus(thisPath);
 
           List<String> dirNames = new ArrayList<String>();

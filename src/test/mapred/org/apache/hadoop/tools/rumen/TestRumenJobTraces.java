@@ -46,6 +46,7 @@ import org.apache.hadoop.mapreduce.jobhistory.TaskAttemptFinishedEvent;
 import org.apache.hadoop.mapreduce.jobhistory.TaskAttemptUnsuccessfulCompletionEvent;
 import org.apache.hadoop.mapreduce.jobhistory.TaskStartedEvent;
 import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
+import org.apache.hadoop.tools.rumen.TraceBuilder.MyOptions;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
@@ -289,6 +290,61 @@ public class TestRumenJobTraces {
                TraceBuilder.isJobConfXml(jhConfFilename.getName(), null));
   }
 
+  /**
+   * Test if {@link TraceBuilder} can process globbed input file paths.
+   */
+  @Test
+  public void testGlobbedInput() throws Exception {
+    final Configuration conf = new Configuration();
+    final FileSystem lfs = FileSystem.getLocal(conf);
+    
+    // define the test's root temporary directory
+    final Path rootTempDir =
+      new Path(System.getProperty("test.build.data", "/tmp"))
+            .makeQualified(lfs.getUri(), lfs.getWorkingDirectory());
+    // define the test's root input directory
+    Path testRootInputDir = new Path(rootTempDir, "TestGlobbedInputPath");
+    // define the nested input directory
+    Path nestedInputDir = new Path(testRootInputDir, "1/2/3/4");
+    // define the globbed version of the nested input directory
+    Path globbedInputNestedDir = 
+      lfs.makeQualified(new Path(testRootInputDir, "*/*/*/*/*"));
+    
+    // define a file in the nested test input directory
+    Path inputPath1 = new Path(nestedInputDir, "test.txt");
+    // define a sub-folder in the nested test input directory
+    Path inputPath2Parent = new Path(nestedInputDir, "test");
+    lfs.mkdirs(inputPath2Parent);
+    // define a file in the sub-folder within the nested test input directory
+    Path inputPath2 = new Path(inputPath2Parent, "test.txt");
+    
+    // create empty input files
+    lfs.createNewFile(inputPath1);
+    lfs.createNewFile(inputPath2);
+    
+    // define the output trace and topology files
+    Path outputTracePath = new Path(testRootInputDir, "test.json");
+    Path outputTopologyTracePath = new Path(testRootInputDir, "topology.json");
+    
+    String[] args = 
+      new String[] {outputTracePath.toString(), 
+                    outputTopologyTracePath.toString(), 
+                    globbedInputNestedDir.toString() };
+    
+    // invoke TraceBuilder's MyOptions command options parsing module/utility
+    MyOptions options = new TraceBuilder.MyOptions(args, conf);
+    
+    lfs.delete(testRootInputDir, true);
+    
+    assertEquals("Error in detecting globbed input FileSystem paths", 
+                 2, options.inputs.size());
+    
+    assertTrue("Missing input file " + inputPath1, 
+               options.inputs.contains(inputPath1));
+    assertTrue("Missing input file " + inputPath2, 
+               options.inputs.contains(inputPath2));
+  }
+  
   /**
    * Test if {@link CurrentJHParser} can read events from current JH files.
    */
