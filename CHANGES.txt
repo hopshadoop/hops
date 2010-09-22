@@ -37,6 +37,8 @@ Trunk (unreleased changes)
 
   IMPROVEMENTS
 
+    HDFS-1304. Add a new unit test for HftpFileSystem.open(..).  (szetszwo)
+
     HDFS-1096. fix for prev. commit. (boryas)
 
     HDFS-1096. allow dfsadmin/mradmin refresh of superuser proxy group
