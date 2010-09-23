@@ -1198,6 +1198,8 @@ Release 0.21.0 - Unreleased
 
     HDFS-1363. Eliminate second synchronized sections in appendFile(). (shv)
 
+    HDFS-1413. Fix broken links to HDFS Wiki. (shv)
+
 Release 0.20.3 - Unreleased
 
   IMPROVEMENTS
