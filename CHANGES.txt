@@ -269,6 +269,9 @@ Trunk (unreleased changes)
     HDFS-1357. HFTP traffic served by DataNode shouldn't use service port 
     on NameNode. (Kan Zhang via jghoman)
 
+    HDFS-96. HDFS supports blocks larger than 2 GB.
+    (Patrick Kling via dhruba)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
