@@ -23,7 +23,6 @@ import java.io.DataOutput;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
-import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -77,7 +76,7 @@ import org.apache.hadoop.util.ToolRunner;
  * Hadoop archives look at {@link HarFileSystem}.
  */
 public class HadoopArchives implements Tool {
-  public static final int VERSION = 2;
+  public static final int VERSION = 3;
   private static final Log LOG = LogFactory.getLog(HadoopArchives.class);
   
   private static final String NAME = "har"; 
@@ -643,6 +642,16 @@ public class HadoopArchives implements Tool {
       return URLEncoder.encode(s,"UTF-8");
     }
 
+    private static String encodeProperties( FileStatus fStatus )
+      throws UnsupportedEncodingException {
+      String propStr = encodeName(
+          fStatus.getModificationTime() + " "
+        + fStatus.getPermission().toShort() + " "
+        + encodeName(fStatus.getOwner()) + " "
+        + encodeName(fStatus.getGroup()));
+      return propStr;
+    }
+
     // read files from the split input 
     // and write it onto the part files.
     // also output hash(name) and string 
@@ -653,11 +662,15 @@ public class HadoopArchives implements Tool {
         Reporter reporter) throws IOException {
       Path relPath = new Path(value.path);
       int hash = HarFileSystem.getHarHash(relPath);
-      String towrite = encodeName(relPath.toString());
+      String towrite = null;
       Path srcPath = realPath(relPath, rootPath);
       long startPos = partStream.getPos();
+      FileSystem srcFs = srcPath.getFileSystem(conf);
+      FileStatus srcStatus = srcFs.getFileStatus(srcPath);
+      String propStr = encodeProperties(srcStatus);
       if (value.isDir()) { 
-        towrite += " dir none 0 0 ";
+        towrite = encodeName(relPath.toString())
+                  + " dir " + propStr + " 0 0 ";
         StringBuffer sbuff = new StringBuffer();
         sbuff.append(towrite);
         for (String child: value.children) {
@@ -668,14 +681,13 @@ public class HadoopArchives implements Tool {
         reporter.progress();
       }
       else {
-        FileSystem srcFs = srcPath.getFileSystem(conf);
-        FileStatus srcStatus = srcFs.getFileStatus(srcPath);
         FSDataInputStream input = srcFs.open(srcStatus.getPath());
         reporter.setStatus("Copying file " + srcStatus.getPath() + 
             " to archive.");
         copyData(srcStatus.getPath(), input, partStream, reporter);
-        towrite += " file " + partname + " " + startPos
-        + " " + srcStatus.getLen() + " ";
+        towrite = encodeName(relPath.toString())
+                  + " file " + partname + " " + startPos
+                  + " " + srcStatus.getLen() + " " + propStr + " ";
       }
       out.collect(new IntWritable(hash), new Text(towrite));
     }
@@ -842,7 +854,7 @@ public class HadoopArchives implements Tool {
         }
       }
       if (globPaths.isEmpty()) {
-        throw new IOException("The resolved paths is empty."
+        throw new IOException("The resolved paths set is empty."
             + "  Please check whether the srcPaths exist, where srcPaths = "
             + srcPaths);
       }

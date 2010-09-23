@@ -127,6 +127,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1881. Improve TaskTrackerInstrumentation to enable collection of
     advanced metrics. (Matei Zaharia via acmurthy)
 
+    MAPREDUCE-1548. Hadoop archives preserve times and other properties from 
+    original files. (Rodrigo Schmidt via dhruba)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and

@@ -135,6 +135,30 @@ public class TestHarFileSystem extends TestCase {
     assertTrue("strings are equal ", (b[0] == "c".getBytes()[0]));
   }
 
+  private void checkProperties(Path harPath, Configuration conf) throws IOException {
+    Path harFilea = new Path(harPath, "a");
+    Path harFileb = new Path(harPath, "b");
+    Path harFilec = new Path(harPath, "c c");
+    FileSystem harFs = harFilea.getFileSystem(conf);
+
+    Path nonharFilea = new Path(inputPath, "a");
+    Path nonharFileb = new Path(inputPath, "b");
+    Path nonharFilec = new Path(inputPath, "c c");
+    FileSystem nonharFs = nonharFilea.getFileSystem(conf);
+
+    assertEquals("Modification times do not match for a",
+        harFs.getFileStatus(harFilea).getModificationTime(),
+        nonharFs.getFileStatus(nonharFilea).getModificationTime());
+
+    assertEquals("Modification times do not match for b",
+        harFs.getFileStatus(harFileb).getModificationTime(),
+        nonharFs.getFileStatus(nonharFileb).getModificationTime());
+
+    assertEquals("Modification times do not match for c",
+        harFs.getFileStatus(harFilec).getModificationTime(),
+        nonharFs.getFileStatus(nonharFilec).getModificationTime());
+  }
+
   /**
    * check if the block size of the part files is what we had specified
    */
@@ -182,6 +206,7 @@ public class TestHarFileSystem extends TestCase {
       // fileb and filec
       assertTrue(ret == 0);
       checkBytes(harPath, conf);
+      checkProperties(harPath, conf);
       /* check block size for path files */
       checkBlockSize(fs, finalPath, 512 * 1024 * 1024l);
     }
@@ -220,6 +245,7 @@ public class TestHarFileSystem extends TestCase {
       // fileb and filec
       assertTrue(ret == 0);
       checkBytes(harPath, conf);
+      checkProperties(harPath, conf);
       checkBlockSize(fs, finalPath, 512);
     }
   }

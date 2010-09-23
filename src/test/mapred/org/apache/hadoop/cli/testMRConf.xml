@@ -104,7 +104,7 @@
       <comparators>
         <comparator>
           <type>SubstringComparator</type>
-          <expected-output>The resolved paths is empty.</expected-output>
+          <expected-output>The resolved paths set is empty.</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -407,7 +407,7 @@
       <comparators>
         <comparator>
           <type>SubstringComparator</type>
-          <expected-output>The resolved paths is empty.</expected-output>
+          <expected-output>The resolved paths set is empty.</expected-output>
          </comparator>
        </comparators>
     </test>

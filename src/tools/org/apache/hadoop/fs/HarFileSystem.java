@@ -49,7 +49,7 @@ import org.apache.hadoop.util.Progressable;
  */
 
 public class HarFileSystem extends FilterFileSystem {
-  public static final int VERSION = 2;
+  public static final int VERSION = 3;
   // uri representation of this Har filesystem
   private URI uri;
   // the version of this har filesystem
@@ -218,11 +218,16 @@ public class HarFileSystem extends FilterFileSystem {
     return tmp;
   }
   
+  private static String decodeString(String str)
+    throws UnsupportedEncodingException {
+    return URLDecoder.decode(str, "UTF-8");
+  }
+
   private String decodeFileName(String fname) 
     throws UnsupportedEncodingException {
     
-    if (version == 2){
-      return URLDecoder.decode(fname, "UTF-8");
+    if (version == 2 || version == 3){
+      return decodeString(fname);
     }
     return fname;
   }
@@ -515,14 +520,21 @@ public class HarFileSystem extends FilterFileSystem {
       }
     }
 
+    long modTime = 0;
+    if (version < 3) {
+      modTime = underlying.getModificationTime();
+    } else if (version == 3) {
+      modTime = h.getModificationTime();
+    }
+
     return new FileStatus(
         h.isDir()? 0L: h.getLength(),
         h.isDir(),
         underlying.getReplication(),
         underlying.getBlockSize(),
-        underlying.getModificationTime(),
+        modTime,
         underlying.getAccessTime(),
-        new FsPermission(underlying.getPermission()),
+        underlying.getPermission(),
         underlying.getOwner(),
         underlying.getGroup(),
         makeRelative(this.uri.toString(), new Path(h.name)));
@@ -540,6 +552,7 @@ public class HarFileSystem extends FilterFileSystem {
     String partName;
     long startIndex;
     long length;
+    long modificationTime = 0;
     public HarStatus(String harString) throws UnsupportedEncodingException {
       String[] splits = harString.split(" ");
       this.name = decodeFileName(splits[0]);
@@ -548,11 +561,36 @@ public class HarFileSystem extends FilterFileSystem {
       this.partName = splits[2];
       this.startIndex = Long.parseLong(splits[3]);
       this.length = Long.parseLong(splits[4]);
+
+      String[] propSplits = null;
+      // propSplits is used to retrieve the metainformation that Har versions
+      // 1 & 2 missed (modification time, permission, owner group).
+      // These fields are stored in an encoded string placed in different
+      // locations depending on whether it's a file or directory entry.
+      // If it's a directory, the string will be placed at the partName
+      // location (directories have no partName because they don't have data
+      // to be stored). This is done because the number of fields in a
+      // directory entry is unbounded (all children are listed at the end)
+      // If it's a file, the string will be the last field.
       if (isDir) {
+        if (version == 3){
+          propSplits = decodeString(this.partName).split(" ");
+        }
         children = new ArrayList<String>();
         for (int i = 5; i < splits.length; i++) {
           children.add(decodeFileName(splits[i]));
         }
+      } else if (version == 3) {
+        propSplits = decodeString(splits[5]).split(" ");
+      }
+
+      if (propSplits != null && propSplits.length >= 4) {
+        modificationTime = Long.parseLong(propSplits[0]);
+        // the fields below are stored in the file but are currently not used
+        // by HarFileSystem
+        // permission = new FsPermission(Short.parseShort(propSplits[1]));
+        // owner = decodeString(propSplits[2]);
+        // group = decodeString(propSplits[3]);
       }
     }
     public boolean isDir() {
@@ -577,6 +615,9 @@ public class HarFileSystem extends FilterFileSystem {
     }
     public long getLength() {
       return length;
+    }
+    public long getModificationTime() {
+      return modificationTime;
     }
   }
   
