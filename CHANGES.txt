@@ -138,6 +138,9 @@ Trunk (unreleased changes)
     HDFS-1407. Change DataTransferProtocol methods to use Block instead 
     of individual elements of Block. (suresh)
 
+    HDFS-1417. Add @Override to SimulatedFSDataset methods that implement
+    FSDatasetInterface methods. (suresh)
+
   OPTIMIZATIONS
 
     HDFS-1140. Speedup INode.getPathComponents. (Dmytro Molkov via shv)

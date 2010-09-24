@@ -65,7 +65,7 @@ public class SimulatedFSDataset  implements FSConstants, FSDatasetInterface, Con
                                     "dfs.datanode.simulateddatastorage";
   public static final String CONFIG_PROPERTY_CAPACITY =
                             "dfs.datanode.simulateddatastorage.capacity";
-  
+//  
   public static final long DEFAULT_CAPACITY = 2L<<40; // 1 terabyte
   public static final byte DEFAULT_DATABYTE = 9; // 1 terabyte
   byte simulatedDataByte = DEFAULT_DATABYTE;
@@ -302,9 +302,6 @@ public class SimulatedFSDataset  implements FSConstants, FSDatasetInterface, Con
     setConf(conf);
   }
   
-  private SimulatedFSDataset() { // real construction when setConf called.. Uggg
-  }
-  
   public Configuration getConf() {
     return conf;
   }
@@ -346,6 +343,7 @@ public class SimulatedFSDataset  implements FSConstants, FSDatasetInterface, Con
     }
   }
 
+  @Override
   public synchronized void finalizeBlock(Block b) throws IOException {
     BInfo binfo = blockMap.get(b);
     if (binfo == null) {
@@ -355,12 +353,14 @@ public class SimulatedFSDataset  implements FSConstants, FSDatasetInterface, Con
 
   }
 
+  @Override
   public synchronized void unfinalizeBlock(Block b) throws IOException {
     if (isBeingWritten(b)) {
       blockMap.remove(b);
     }
   }
 
+  @Override
   public synchronized BlockListAsLongs getBlockReport() {
     Block[] blockTable = new Block[blockMap.size()];
     int count = 0;
@@ -388,6 +388,7 @@ public class SimulatedFSDataset  implements FSConstants, FSDatasetInterface, Con
     return storage.getFree();
   }
 
+  @Override
   public synchronized long getLength(Block b) throws IOException {
     BInfo binfo = blockMap.get(b);
     if (binfo == null) {
@@ -402,7 +403,7 @@ public class SimulatedFSDataset  implements FSConstants, FSDatasetInterface, Con
     return blockMap.get(new Block(blockId));
   }
 
-  /** {@inheritDoc} */
+  @Override
   public Block getStoredBlock(long blkid) throws IOException {
     Block b = new Block(blkid);
     BInfo binfo = blockMap.get(b);
@@ -414,6 +415,7 @@ public class SimulatedFSDataset  implements FSConstants, FSDatasetInterface, Con
     return b;
   }
 
+  @Override
   public synchronized void invalidate(Block[] invalidBlks) throws IOException {
     boolean error = false;
     if (invalidBlks == null) {
@@ -437,6 +439,7 @@ public class SimulatedFSDataset  implements FSConstants, FSDatasetInterface, Con
       }
   }
 
+  @Override
   public synchronized boolean isValidBlock(Block b) {
     // return (blockMap.containsKey(b));
     BInfo binfo = blockMap.get(b);
@@ -544,6 +547,7 @@ public class SimulatedFSDataset  implements FSConstants, FSDatasetInterface, Con
     return binfo;
   }
 
+  @Override
   public synchronized InputStream getBlockInputStream(Block b)
                                             throws IOException {
     BInfo binfo = blockMap.get(b);
@@ -555,6 +559,7 @@ public class SimulatedFSDataset  implements FSConstants, FSDatasetInterface, Con
     return binfo.getIStream();
   }
   
+  @Override
   public synchronized InputStream getBlockInputStream(Block b, long seekOffset)
                               throws IOException {
     InputStream result = getBlockInputStream(b);
@@ -563,6 +568,7 @@ public class SimulatedFSDataset  implements FSConstants, FSDatasetInterface, Con
   }
 
   /** Not supported */
+  @Override
   public BlockInputStreams getTmpInputStreams(Block b, long blkoff, long ckoff
       ) throws IOException {
     throw new IOException("Not supported");
@@ -587,7 +593,8 @@ public class SimulatedFSDataset  implements FSConstants, FSDatasetInterface, Con
     }
     return binfo.getMetaIStream();
   }
-
+ 
+  @Override
   public synchronized long getMetaDataLength(Block b) throws IOException {
     BInfo binfo = blockMap.get(b);
     if (binfo == null) {
@@ -600,6 +607,7 @@ public class SimulatedFSDataset  implements FSConstants, FSDatasetInterface, Con
     return binfo.getMetaIStream().getLength();
   }
   
+  @Override
   public MetaDataInputStream getMetaDataInputStream(Block b)
   throws IOException {
 
@@ -607,6 +615,7 @@ public class SimulatedFSDataset  implements FSConstants, FSDatasetInterface, Con
                                                 getMetaDataLength(b));
   }
 
+  @Override
   public synchronized boolean metaFileExists(Block b) throws IOException {
     if (!isValidBlock(b)) {
           throw new IOException("Block " + b +
