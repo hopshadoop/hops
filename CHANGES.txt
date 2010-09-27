@@ -154,6 +154,8 @@ Trunk (unreleased changes)
     HDFS-1320. Add LOG.isDebugEnabled() guard for each LOG.debug(..).
     (Erik Steffl via szetszwo)
 
+    HDFS-1368. Add a block counter to DatanodeDescriptor. (hairong)
+
   BUG FIXES
 
     HDFS-1039. Adding test for  JspHelper.getUGI(jnp via boryas)

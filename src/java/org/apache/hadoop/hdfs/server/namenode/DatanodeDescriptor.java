@@ -100,6 +100,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
   }
 
   private volatile BlockInfo blockList = null;
+  private int numBlocks = 0;
   // isAlive == heartbeats.contains(this)
   // This is an optimization, because contains takes O(n) time on Arraylist
   protected boolean isAlive = false;
@@ -201,6 +202,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
       return false;
     // add to the head of the data-node list
     blockList = b.listInsert(blockList, this);
+    numBlocks++;
     return true;
   }
   
@@ -210,7 +212,12 @@ public class DatanodeDescriptor extends DatanodeInfo {
    */
   boolean removeBlock(BlockInfo b) {
     blockList = b.listRemove(blockList, this);
-    return b.removeNode(this);
+    if ( b.removeNode(this) ) {
+      numBlocks--;
+      return true;
+    } else {
+      return false;
+    }
   }
 
   /**
@@ -246,7 +253,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
   }
 
   public int numBlocks() {
-    return blockList == null ? 0 : blockList.listCount(this);
+    return numBlocks;
   }
 
   /**
