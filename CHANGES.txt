@@ -1815,3 +1815,5 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1897. trunk build broken on compile-mapred-test (cos)
 
+    MAPREDUCE-1984. herriot TestCluster fails because exclusion is not there
+    (Balaji Rajagopalan via cos)
