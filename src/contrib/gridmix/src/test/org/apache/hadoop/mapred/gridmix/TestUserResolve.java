@@ -28,29 +28,35 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
 
 public class TestUserResolve {
 
-  static Path userlist;
+  private static Path rootDir = null;
+  private static Configuration conf = null;
+  private static FileSystem fs = null;
 
   @BeforeClass
-  public static void writeUserList() throws IOException {
-    final Configuration conf = new Configuration();
-    final FileSystem fs = FileSystem.getLocal(conf);
-    final Path wd = 
-      new Path(new Path(System.getProperty("test.build.data", "/tmp"))
-                 .makeQualified(fs), 
-               "gridmixUserResolve");
-    userlist = new Path(wd, "users");
+  public static void createRootDir() throws IOException {
+    conf = new Configuration();
+    fs = FileSystem.getLocal(conf);
+    rootDir = new Path(new Path(System.getProperty("test.build.data", "/tmp"))
+                 .makeQualified(fs), "gridmixUserResolve");
+  }
+
+  /**
+   * Creates users file with the content as the String usersFileContent.
+   * @param usersFilePath    the path to the file that is to be created
+   * @param usersFileContent Content of users file
+   * @throws IOException
+   */
+  private static void writeUserList(Path usersFilePath, String usersFileContent)
+      throws IOException {
+
     FSDataOutputStream out = null;
     try {
-      out = fs.create(userlist, true);
-      out.writeBytes("user0,groupA,groupB,groupC\n");
-      out.writeBytes("user1,groupA,groupC\n");
-      out.writeBytes("user2,groupB\n");
-      out.writeBytes("user3,groupA,groupB,groupC\n");
+      out = fs.create(usersFilePath, true);
+      out.writeBytes(usersFileContent);
     } finally {
       if (out != null) {
         out.close();
@@ -58,20 +64,65 @@ public class TestUserResolve {
     }
   }
 
-  @Test
-  public void testRoundRobinResolver() throws Exception {
-    final Configuration conf = new Configuration();
-    final UserResolver rslv = new RoundRobinUserResolver();
-
+  /**
+   * Validate RoundRobinUserResolver's behavior for bad user resource file.
+   * RoundRobinUserResolver.setTargetUsers() should throw proper Exception for
+   * the cases like
+   * <li> non existent user resource file and
+   * <li> empty user resource file
+   * 
+   * @param rslv              The RoundRobinUserResolver object
+   * @param userRsrc          users file
+   * @param expectedErrorMsg  expected error message
+   */
+  private void validateBadUsersFile(UserResolver rslv, URI userRsrc,
+      String expectedErrorMsg) {
     boolean fail = false;
     try {
-      rslv.setTargetUsers(null, conf);
+      rslv.setTargetUsers(userRsrc, conf);
     } catch (IOException e) {
+      assertTrue("Exception message from RoundRobinUserResolver is wrong",
+          e.getMessage().equals(expectedErrorMsg));
       fail = true;
     }
     assertTrue("User list required for RoundRobinUserResolver", fail);
+  }
 
-    rslv.setTargetUsers(new URI(userlist.toString()), conf);
+  /**
+   * Validate the behavior of {@link RoundRobinUserResolver} for different
+   * user resource files like
+   * <li> Empty user resource file
+   * <li> Non existent user resource file
+   * <li> User resource file with valid content
+   * @throws Exception
+   */
+  @Test
+  public void testRoundRobinResolver() throws Exception {
+
+    final UserResolver rslv = new RoundRobinUserResolver();
+    Path usersFilePath = new Path(rootDir, "users");
+    URI userRsrc = new URI(usersFilePath.toString());
+
+    // Check if the error message is as expected for non existent
+    // user resource file.
+    fs.delete(usersFilePath, false);
+    String expectedErrorMsg = "File " + userRsrc + " does not exist.";
+    validateBadUsersFile(rslv, userRsrc, expectedErrorMsg);
+
+    // Check if the error message is as expected for empty user resource file
+    writeUserList(usersFilePath, "");// creates empty users file
+    expectedErrorMsg =
+        RoundRobinUserResolver.buildEmptyUsersErrorMsg(userRsrc);
+    validateBadUsersFile(rslv, userRsrc, expectedErrorMsg);
+
+    // Create user resource file with valid content
+    writeUserList(usersFilePath,
+        "user0,groupA,groupB,groupC\nuser1,groupA,groupC\n"
+        + "user2,groupB\nuser3,groupA,groupB,groupC\n");
+
+    // Validate RoundRobinUserResolver for the case of
+    // user resource file with valid content.
+    assertTrue(rslv.setTargetUsers(new URI(usersFilePath.toString()), conf));
     UserGroupInformation ugi1 = UserGroupInformation.createRemoteUser("hfre0");
     assertEquals("user0", rslv.getTargetUgi(ugi1).getUserName());
     assertEquals("user1", 
@@ -89,13 +140,9 @@ public class TestUserResolve {
 
   @Test
   public void testSubmitterResolver() throws Exception {
-    final Configuration conf = new Configuration();
     final UserResolver rslv = new SubmitterUserResolver();
-    rslv.setTargetUsers(null, conf);
+    assertFalse(rslv.needsTargetUsersList());
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     assertEquals(ugi, rslv.getTargetUgi((UserGroupInformation)null));
-    System.out.println(" Submitter current user " + ugi);
-    System.out.println(" Target ugi " 
-                       + rslv.getTargetUgi((UserGroupInformation) null));
   }
 }

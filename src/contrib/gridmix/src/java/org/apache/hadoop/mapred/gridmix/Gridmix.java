@@ -252,9 +252,22 @@ public class Gridmix extends Configured implements Tool {
           return 1;
         }
       }
-      if (!userResolver.setTargetUsers(userRsrc, conf)) {
-        LOG.warn("Resource " + userRsrc + " ignored");
+
+      if (userResolver.needsTargetUsersList()) {
+        if (userRsrc != null) {
+          if (!userResolver.setTargetUsers(userRsrc, conf)) {
+            LOG.warn("Ignoring the user resource '" + userRsrc + "'.");
+          }
+        } else {
+          System.err.println("\n\n" + userResolver.getClass()
+              + " needs target user list. Use -users option." + "\n\n");
+          printUsage(System.err);
+          return 1;
+        }
+      } else if (userRsrc != null) {
+        LOG.warn("Ignoring the user resource '" + userRsrc + "'.");
       }
+
       ioPath = new Path(argv[argv.length - 2]);
       traceIn = argv[argv.length - 1];
     } catch (Exception e) {

@@ -91,10 +91,15 @@ public class RoundRobinUserResolver implements UserResolver {
   throws IOException {
     users = parseUserList(userloc, conf);
     if (users.size() == 0) {
-      throw new IOException("Empty user list");
+      throw new IOException(buildEmptyUsersErrorMsg(userloc));
     }
     usercache.keySet().retainAll(users);
     return true;
+  }
+
+  static String buildEmptyUsersErrorMsg(URI userloc) {
+    return "Empty user list is not allowed for RoundRobinUserResolver. Provided"
+    + " user resource URI '" + userloc + "' resulted in an empty user list.";
   }
 
   @Override
@@ -114,5 +119,15 @@ public class RoundRobinUserResolver implements UserResolver {
       LOG.error("Error while creating the proxy user " ,e);
     }
     return val;
+  }
+
+  /**
+   * {@inheritDoc}
+   * <p>
+   * {@link RoundRobinUserResolver} needs to map the users in the
+   * trace to the provided list of target users. So user list is needed.
+   */
+  public boolean needsTargetUsersList() {
+    return true;
   }
 }

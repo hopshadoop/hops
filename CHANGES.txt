@@ -304,6 +304,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2078. Fixes TraceBuilder to generate traces when a globbed job
     history path is given. (Amar Kamat via amareshwari)
 
+    MAPREDUCE-1989. Fixes error message in gridmix when user resolver is set
+    and no user list is given. (Ravi Gummadi via amareshwari)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
