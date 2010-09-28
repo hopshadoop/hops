@@ -130,6 +130,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1548. Hadoop archives preserve times and other properties from 
     original files. (Rodrigo Schmidt via dhruba)
 
+    MAPREDUCE-1517. Supports streaming job to run in the background. (Bochun Bai
+    via amareshwari)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and

@@ -255,6 +255,7 @@ public class StreamJob implements Tool {
         return;
       }
       verbose_ =  cmdLine.hasOption("verbose");
+      background_ =  cmdLine.hasOption("background");
       debug_ = cmdLine.hasOption("debug")? debug_ + 1 : debug_;
       
       String[] values = cmdLine.getOptionValues("input");
@@ -432,6 +433,7 @@ public class StreamJob implements Tool {
     
     // boolean properties
     
+    Option background = createBoolOption("background", "Submit the job and don't wait till it completes."); 
     Option verbose = createBoolOption("verbose", "print verbose output"); 
     Option info = createBoolOption("info", "print verbose output"); 
     Option help = createBoolOption("help", "print this help message"); 
@@ -459,6 +461,7 @@ public class StreamJob implements Tool {
       addOption(cacheFile).
       addOption(cacheArchive).
       addOption(io).
+      addOption(background).
       addOption(verbose).
       addOption(info).
       addOption(debug).
@@ -510,6 +513,7 @@ public class StreamJob implements Tool {
         + " for input to and output");
     System.out.println("                  from mapper/reducer commands");
     System.out.println("  -lazyOutput     Optional. Lazily create Output.");
+    System.out.println("  -background     Optional. Submit the job and don't wait till it completes.");
     System.out.println("  -verbose        Optional. Print verbose output.");
     System.out.println("  -info           Optional. Print detailed usage.");
     System.out.println("  -help           Optional. Print help message.");
@@ -997,7 +1001,9 @@ public class StreamJob implements Tool {
       running_ = jc_.submitJob(jobConf_);
       jobId_ = running_.getID();
       jobInfo();
-      if (!jc_.monitorAndPrintJob(jobConf_, running_)) {
+      if (background_) {
+        LOG.info("Job is running in background.");
+      } else if (!jc_.monitorAndPrintJob(jobConf_, running_)) {
         LOG.error("Job not Successful!");
         return 1;
       }
@@ -1025,6 +1031,7 @@ public class StreamJob implements Tool {
   }
 
   protected String[] argv_;
+  protected boolean background_;
   protected boolean verbose_;
   protected boolean detailedUsage_;
   protected boolean printUsage = false;

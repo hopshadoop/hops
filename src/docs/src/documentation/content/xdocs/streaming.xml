@@ -97,6 +97,7 @@ For an example, see <a href="streaming.html#Making+Archives+Available+to+Tasks">
 <tr><td> -combiner streamingCommand or JavaClassName</td><td> Optional </td><td> Combiner executable for map output</td></tr>
 <tr><td> -cmdenv name=value</td><td> Optional </td><td> Pass environment variable to streaming commands</td></tr>
 <tr><td> -inputreader spec</td><td> Optional </td><td> Specifies a record reader class (instead of an input format class)</td></tr>
+<tr><td> -background</td><td> Optional </td><td> Submit the job and don't wait till it completes.</td></tr>
 <tr><td> -verbose</td><td> Optional </td><td> Verbose output</td></tr>
 <tr><td> -lazyOutput</td><td> Optional </td><td> Create output lazily. For example, if the output format is based on FileOutputFormat, the output file is created only on the first call to output.collect (or Context.write)</td></tr>
 <tr><td> -numReduceTasks num</td><td> Optional </td><td> Specify the number of reducers</td></tr>
