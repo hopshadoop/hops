@@ -141,6 +141,8 @@ Trunk (unreleased changes)
     HDFS-1417. Add @Override to SimulatedFSDataset methods that implement
     FSDatasetInterface methods. (suresh)
 
+    HDFS-1426. Remove unused method BlockInfo#listCount. (hairong)
+
   OPTIMIZATIONS
 
     HDFS-1140. Speedup INode.getPathComponents. (Dmytro Molkov via shv)
