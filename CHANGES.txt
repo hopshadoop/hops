@@ -277,6 +277,9 @@ Trunk (unreleased changes)
     HDFS-96. HDFS supports blocks larger than 2 GB.
     (Patrick Kling via dhruba)
 
+    HDFS-1364. Makes long running HFTP-based applications do relogins
+    if necessary. (Jitendra Pandey via ddas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
