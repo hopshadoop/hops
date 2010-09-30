@@ -58,6 +58,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -1451,12 +1452,6 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
       = conf.getClass(JT_TASK_SCHEDULER,
           JobQueueTaskScheduler.class, TaskScheduler.class);
     taskScheduler = (TaskScheduler) ReflectionUtils.newInstance(schedulerClass, conf);
-                                           
-    // Set service-level authorization security policy
-    if (conf.getBoolean(
-          ServiceAuthorizationManager.SERVICE_AUTHORIZATION_CONFIG, false)) {
-      ServiceAuthorizationManager.refresh(conf, new MapReducePolicyProvider());
-    }
     
     int handlerCount = conf.getInt(JT_IPC_HANDLER_COUNT, 10);
     this.interTrackerServer = RPC.getServer(ClientProtocol.class,
@@ -1464,6 +1459,13 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
                                             addr.getHostName(), 
                                             addr.getPort(), handlerCount, 
                                             false, conf, secretManager);
+
+    // Set service-level authorization security policy
+    if (conf.getBoolean(
+        CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION, false)) {
+      this.interTrackerServer.refreshServiceAcl(conf, new MapReducePolicyProvider());
+    }
+
     if (LOG.isDebugEnabled()) {
       Properties p = System.getProperties();
       for (Iterator it = p.keySet().iterator(); it.hasNext();) {
@@ -4353,10 +4355,10 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   @Override
   public void refreshServiceAcl() throws IOException {
     if (!conf.getBoolean(
-            ServiceAuthorizationManager.SERVICE_AUTHORIZATION_CONFIG, false)) {
+        CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION, false)) {
       throw new AuthorizationException("Service Level Authorization not enabled!");
     }
-    ServiceAuthorizationManager.refresh(conf, new MapReducePolicyProvider());
+    this.interTrackerServer.refreshServiceAcl(conf, new MapReducePolicyProvider());
   }
 
   @Override

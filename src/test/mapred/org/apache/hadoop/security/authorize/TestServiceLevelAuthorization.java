@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
+import java.util.Set;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -28,6 +29,7 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.HDFSPolicyProvider;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
 import org.apache.hadoop.hdfs.tools.DFSAdmin;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.mapred.JobConf;
@@ -55,10 +57,35 @@ public class TestServiceLevelAuthorization extends TestCase {
       
       // Start the mini clusters
       dfs = new MiniDFSCluster(conf, slaves, true, null);
+
+      // Ensure that the protocols authorized on the name node are only the HDFS protocols.
+      Set<Class<?>> protocolsWithAcls = NameNodeAdapter.getRpcServer(dfs.getNameNode())
+          .getServiceAuthorizationManager().getProtocolsWithAcls();
+      Service[] hdfsServices = new HDFSPolicyProvider().getServices();
+      for (Service service : hdfsServices) {
+        if (!protocolsWithAcls.contains(service.getProtocol()))
+          fail("service authorization manager has no entry for protocol " + service.getProtocol());
+      }
+      if (hdfsServices.length != protocolsWithAcls.size())
+        fail("there should be an entry for every HDFS service in the protocols with ACLs map");
+
       fileSys = dfs.getFileSystem();
       JobConf mrConf = new JobConf(conf);
       mr = new MiniMRCluster(slaves, fileSys.getUri().toString(), 1, 
                              null, null, mrConf);
+
+      // Ensure that the protocols configured for the name node did not change
+      // when the MR cluster was started.
+      protocolsWithAcls = NameNodeAdapter.getRpcServer(dfs.getNameNode())
+          .getServiceAuthorizationManager().getProtocolsWithAcls();
+      hdfsServices = new HDFSPolicyProvider().getServices();
+      for (Service service : hdfsServices) {
+        if (!protocolsWithAcls.contains(service.getProtocol()))
+          fail("service authorization manager has no entry for protocol " + service.getProtocol());
+      }
+      if (hdfsServices.length != protocolsWithAcls.size())
+        fail("there should be an entry for every HDFS service in the protocols with ACLs map");
+
       // make cleanup inline sothat validation of existence of these directories
       // can be done
       mr.setInlineCleanupThreads();

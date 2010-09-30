@@ -310,6 +310,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1989. Fixes error message in gridmix when user resolver is set
     and no user list is given. (Ravi Gummadi via amareshwari)
 
+    MAPREDUCE-2067.  Distinct minicluster services (e.g. NN and JT) overwrite
+    each other's service policies.  (Aaron T. Myers via tomwhite)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
