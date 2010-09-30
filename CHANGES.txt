@@ -313,6 +313,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2067.  Distinct minicluster services (e.g. NN and JT) overwrite
     each other's service policies.  (Aaron T. Myers via tomwhite)
 
+    MAPREDUCE-2029. DistributedRaidFileSystem removes itself from FileSystem
+    cache when it is closed. (Ramkumar Vadali via dhruba)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

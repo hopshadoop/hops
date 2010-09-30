@@ -131,6 +131,7 @@ public class DistributedRaidFileSystem extends FilterFileSystem {
         //this might already be closed, ignore
       }
     }
+    super.close();
   }
 
   /**
