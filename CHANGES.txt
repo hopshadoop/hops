@@ -316,6 +316,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2029. DistributedRaidFileSystem removes itself from FileSystem
     cache when it is closed. (Ramkumar Vadali via dhruba)
 
+    MAPREDUCE-1816. HAR files used for RAID parity-bite have configurable 
+    partfile size. (Ramkumar Vadali via dhruba)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES

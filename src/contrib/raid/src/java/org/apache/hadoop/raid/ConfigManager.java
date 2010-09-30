@@ -53,6 +53,8 @@ class ConfigManager {
 
   /** Time to wait between successive runs of all policies */
   public static final long RESCAN_INTERVAL = 3600 * 1000;
+
+  public static final long HAR_PARTFILE_SIZE = 10 * 1024 * 1024 * 1024l;
   
   /**
    * Time to wait after the config file has been modified before reloading it
@@ -68,6 +70,7 @@ class ConfigManager {
   private boolean lastReloadAttemptFailed = false;
   private long reloadInterval = RELOAD_INTERVAL;
   private long periodicity; // time between runs of all policies
+  private long harPartfileSize;
 
   // Reload the configuration
   private boolean doReload;
@@ -84,6 +87,7 @@ class ConfigManager {
     this.doReload = conf.getBoolean("raid.config.reload", true);
     this.reloadInterval = conf.getLong("raid.config.reload.interval", RELOAD_INTERVAL);
     this.periodicity = conf.getLong("raid.policy.rescan.interval",  RESCAN_INTERVAL);
+    this.harPartfileSize = conf.getLong("raid.har.partfile.size", HAR_PARTFILE_SIZE);
     if (configFileName == null) {
       String msg = "No raid.config.file given in conf - " +
                    "the Hadoop Raid utility cannot run. Aborting....";
@@ -296,6 +300,10 @@ class ConfigManager {
 
   public synchronized long getPeriodicity() {
     return periodicity;
+  }
+
+  public synchronized long getHarPartfileSize() {
+    return harPartfileSize;
   }
   
   /**

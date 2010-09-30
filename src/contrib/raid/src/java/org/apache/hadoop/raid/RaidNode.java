@@ -1446,6 +1446,8 @@ public class RaidNode implements RaidProtocol {
     String harFileDst = qualifiedPath.getName() + HAR_SUFFIX;
     String harFileSrc = qualifiedPath.getName() + "-" + 
                                 rand.nextLong() + "-" + HAR_SUFFIX;
+    // HadoopArchives.HAR_PARTFILE_LABEL is private, so hard-coding the label.
+    conf.setLong("har.partfile.size", configMgr.getHarPartfileSize());
     HadoopArchives har = new HadoopArchives(conf);
     String[] args = new String[6];
     args[0] = "-archiveName";

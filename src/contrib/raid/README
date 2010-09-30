@@ -94,6 +94,16 @@ The following properties can be set in hdfs-site.xml to further tune you configu
           </description>
         </property>
 
+    Specify the size of HAR part-files
+        <property>
+          <name>raid.har.partfile.size</name>
+          <value>4294967296</value>
+          <description>The size of HAR part files that store raid parity
+          files. The default is 4GB. The higher the number the fewer the
+          number of files used to store the HAR archive.
+          </description>
+        </property>
+
     Specify RaidNode to not use a map-reduce cluster for raiding files in parallel.
         <property>
           <name>fs.raidnode.local</name>
