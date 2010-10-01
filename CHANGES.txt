@@ -279,6 +279,8 @@ Trunk (unreleased changes)
     HDFS-96. HDFS supports blocks larger than 2 GB.
     (Patrick Kling via dhruba)
 
+    HDFS-1433. Fix test failures - TestPread and TestFileLimit. (suresh)
+
     HDFS-1364. Makes long running HFTP-based applications do relogins
     if necessary. (Jitendra Pandey via ddas)
 
