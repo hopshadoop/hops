@@ -319,6 +319,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1816. HAR files used for RAID parity-bite have configurable 
     partfile size. (Ramkumar Vadali via dhruba)
 
+    MAPREDUCE-2082. Fixes Pipes to create the jobtoken file in the right
+    place. (Jitendra Pandey via ddas)
+
 Release 0.21.0 - Unreleased
 
   INCOMPATIBLE CHANGES
