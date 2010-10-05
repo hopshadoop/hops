@@ -322,7 +322,21 @@ Trunk (unreleased changes)
     MAPREDUCE-2082. Fixes Pipes to create the jobtoken file in the right
     place. (Jitendra Pandey via ddas)
 
-Release 0.21.0 - Unreleased
+Release 0.21.1 - Unreleased
+
+  BUG FIXES
+
+    MAPREDUCE-1897. trunk build broken on compile-mapred-test (cos)
+
+    MAPREDUCE-1280. Update Eclipse plugin to the new eclipse.jdt API.
+    (Alex Kozlov via szetszwo)
+
+    MAPREDUCE-1984. herriot TestCluster fails because exclusion is not there
+    (Balaji Rajagopalan via cos)
+
+    MAPREDUCE-2090. Clover build doesn't generate per-test coverage. (cos)
+
+Release 0.21.0 - 2010-08-13
 
   INCOMPATIBLE CHANGES
 
@@ -1029,9 +1043,6 @@ Release 0.21.0 - Unreleased
     (Torsten Curdt via amareshwari)
 
   BUG FIXES
-
-    MAPREDUCE-1280. Update Eclipse plugin to the new eclipse.jdt API.
-    (Alex Kozlov via szetszwo)
 
     MAPREDUCE-878. Rename fair scheduler design doc to 
     fair-scheduler-design-doc.tex and add Apache license header (matei)
@@ -1831,9 +1842,3 @@ Release 0.21.0 - Unreleased
 
     MAPREDUCE-1856. Extract a subset of tests for smoke (DOA) validation (cos)
 
-    MAPREDUCE-1897. trunk build broken on compile-mapred-test (cos)
-
-    MAPREDUCE-1984. herriot TestCluster fails because exclusion is not there
-    (Balaji Rajagopalan via cos)
-
-    MAPREDUCE-2090. Clover build doesn't generate per-test coverage. (cos)
