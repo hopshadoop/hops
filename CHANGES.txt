@@ -292,7 +292,22 @@ Trunk (unreleased changes)
 
     HDFS-1440. Fix TestComputeInvalidateWork failure. (suresh)
 
-Release 0.21.0 - Unreleased
+Release 0.21.1 - Unreleased
+
+  IMPROVEMENTS
+
+    HDFS-1411. Correct backup node startup command in hdfs user guide.
+    (Ching-Shen Chen via shv)
+
+  BUG FIXES
+
+    HDFS-1363. Eliminate second synchronized sections in appendFile(). (shv)
+
+    HDFS-1413. Fix broken links to HDFS Wiki. (shv)
+
+    HDFS-1420. Clover build doesn't generate per-test coverage (cos)
+
+Release 0.21.0 - 2010-08-13
 
   INCOMPATIBLE CHANGES
 
@@ -824,9 +839,6 @@ Release 0.21.0 - Unreleased
 
     HDFS-806. Add new unit tests to the 10-mins 'run-commit-test' target (cos)
 
-    HDFS-1411. Correct backup node startup command in hdfs user guide.
-    (Ching-Shen Chen via shv) 
-
   OPTIMIZATIONS
 
     HDFS-946. NameNode should not return full path name when lisitng a
@@ -1218,12 +1230,6 @@ Release 0.21.0 - Unreleased
     same test case (Cos)
 
     HDFS-1267. fuse-dfs does not compile. (Devaraj Das via tomwhite)
-
-    HDFS-1363. Eliminate second synchronized sections in appendFile(). (shv)
-
-    HDFS-1413. Fix broken links to HDFS Wiki. (shv)
-
-    HDFS-1420. Clover build doesn't generate per-test coverage (cos)
 
 Release 0.20.3 - Unreleased
 
