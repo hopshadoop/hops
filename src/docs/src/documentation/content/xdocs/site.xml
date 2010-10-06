@@ -49,6 +49,7 @@ See http://forrest.apache.org/docs/linking.html for more info.
     <docs label="Schedulers">
         <cap_scheduler 		label="Capacity Scheduler"     href="capacity_scheduler.html"/>
 		<fair_scheduler 			label="Fair Scheduler"            href="fair_scheduler.html"/>
+		<dyn_scheduler 			label="Dynamic Priority Scheduler"            href="dynamic_scheduler.html"/>
     </docs>
    
    <docs label="Miscellaneous"> 

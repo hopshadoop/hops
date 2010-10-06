@@ -324,6 +324,11 @@ Trunk (unreleased changes)
 
 Release 0.21.1 - Unreleased
 
+  NEW FEATURES
+
+    MAPREDUCE-2040. Forrest Documentation for Dynamic Priority Scheduler.
+    (Thomas Sandholm via tomwhite)
+
   BUG FIXES
 
     MAPREDUCE-1897. trunk build broken on compile-mapred-test (cos)
