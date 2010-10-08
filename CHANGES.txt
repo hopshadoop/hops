@@ -307,6 +307,9 @@ Release 0.21.1 - Unreleased
 
     HDFS-1420. Clover build doesn't generate per-test coverage (cos)
 
+    HDFS-1444. Test related code of build.xml is error-prone and needs to be
+    re-aligned. (cos)
+
 Release 0.21.0 - 2010-08-13
 
   INCOMPATIBLE CHANGES
