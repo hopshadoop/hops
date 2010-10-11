@@ -39,6 +39,7 @@ import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
+import org.apache.hadoop.tools.rumen.JobStoryProducer;
 import org.apache.hadoop.tools.rumen.ZombieJobProducer;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -133,12 +134,23 @@ public class Gridmix extends Configured implements Tool {
     LOG.info("Done.");
   }
 
-  protected InputStream createInputStream(String in) throws IOException {
-    if ("-".equals(in)) {
-      return System.in;
+  /**
+   * Create an appropriate {@code JobStoryProducer} object for the
+   * given trace.
+   * 
+   * @param traceIn the path to the trace file. The special path
+   * &quot;-&quot; denotes the standard input stream.
+   *
+   * @param conf the configuration to be used.
+   *
+   * @throws IOException if there was an error.
+   */
+  protected JobStoryProducer createJobStoryProducer(String traceIn,
+      Configuration conf) throws IOException {
+    if ("-".equals(traceIn)) {
+      return new ZombieJobProducer(System.in, null);
     }
-    final Path pin = new Path(in);
-    return pin.getFileSystem(getConf()).open(pin);
+    return new ZombieJobProducer(new Path(traceIn), null, conf);
   }
 
   /**
@@ -202,9 +214,9 @@ public class Gridmix extends Configured implements Tool {
       throws IOException {
      return GridmixJobSubmissionPolicy.getPolicy(
        conf, GridmixJobSubmissionPolicy.STRESS).createJobFactory(
-       submitter, new ZombieJobProducer(
-         createInputStream(
-           traceIn), null), scratchDir, conf, startFlag, resolver);  }
+       submitter, createJobStoryProducer(traceIn, conf), scratchDir, conf,
+       startFlag, resolver);
+  }
 
   private static UserResolver userResolver;
 

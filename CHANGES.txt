@@ -322,6 +322,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2082. Fixes Pipes to create the jobtoken file in the right
     place. (Jitendra Pandey via ddas)
 
+    MAPREDUCE-2095. Fixes Gridmix to run from compressed traces. (Ranjit
+    Mathew via amareshwari)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES
