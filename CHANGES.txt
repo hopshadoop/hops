@@ -325,6 +325,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2095. Fixes Gridmix to run from compressed traces. (Ranjit
     Mathew via amareshwari)
 
+    MAPREDUCE-1980. DistributedRaidFileSystem now handles ChecksumException
+    correctly. (Ramkumar Vadali via schen)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES

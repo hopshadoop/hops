@@ -334,14 +334,18 @@ public class DistributedRaidFileSystem extends FilterFileSystem {
         while (alternates != null && nextLocation < alternates.length) {
           try {
             int idx = nextLocation++;
-            long corruptOffset = -1;
-            if (curexp instanceof BlockMissingException) {
-              corruptOffset = ((BlockMissingException)curexp).getOffset();
-            } else if (curexp instanceof ChecksumException) {
-              corruptOffset = ((ChecksumException)curexp).getPos();
-            }
-            Path npath = RaidNode.unRaid(conf, path, alternates[idx], stripeLength, 
-                                         corruptOffset);
+            long corruptOffset = underLyingStream.getPos();
+
+            // Make sure we use DFS and not DistributedRaidFileSystem for unRaid.
+            Configuration clientConf = new Configuration(conf);
+            Class<?> clazz = conf.getClass("fs.raid.underlyingfs.impl",
+                                                DistributedFileSystem.class);
+            clientConf.set("fs.hdfs.impl", clazz.getName());
+            // Disable caching so that a previously cached RaidDfs is not used.
+            clientConf.setBoolean("fs.hdfs.impl.disable.cache", true);
+            Path npath = RaidNode.unRaid(clientConf, path,
+                         alternates[idx], stripeLength,
+                         corruptOffset);
             FileSystem fs1 = getUnderlyingFileSystem(conf);
             fs1.initialize(npath.toUri(), conf);
             LOG.info("Opening alternate path " + npath + " at offset " + curpos);
