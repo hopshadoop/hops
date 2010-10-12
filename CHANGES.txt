@@ -312,6 +312,8 @@ Release 0.21.1 - Unreleased
 
     HDFS-1343. Instrumented build should be concentrated in one build area (cos)
 
+    HDFS-1452. ant compile-contrib is broken (cos)
+
 Release 0.21.0 - 2010-08-13
 
   INCOMPATIBLE CHANGES
