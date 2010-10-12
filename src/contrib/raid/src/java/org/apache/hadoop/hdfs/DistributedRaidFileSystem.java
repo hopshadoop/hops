@@ -35,7 +35,9 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.ReflectionUtils;
+import org.apache.hadoop.raid.Decoder;
 import org.apache.hadoop.raid.RaidNode;
+import org.apache.hadoop.raid.XORDecoder;
 import org.apache.hadoop.hdfs.BlockMissingException;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 
@@ -94,7 +96,7 @@ public class DistributedRaidFileSystem extends FilterFileSystem {
     }
 
     // find stripe length configured
-    stripeLength = conf.getInt("hdfs.raid.stripeLength", RaidNode.DEFAULT_STRIPE_LENGTH);
+    stripeLength = RaidNode.getStripeLength(conf);
     if (stripeLength == 0) {
       LOG.info("dfs.raid.stripeLength is incorrectly defined to be " + 
                stripeLength + " Ignoring...");
@@ -343,9 +345,10 @@ public class DistributedRaidFileSystem extends FilterFileSystem {
             clientConf.set("fs.hdfs.impl", clazz.getName());
             // Disable caching so that a previously cached RaidDfs is not used.
             clientConf.setBoolean("fs.hdfs.impl.disable.cache", true);
-            Path npath = RaidNode.unRaid(clientConf, path,
-                         alternates[idx], stripeLength,
-                         corruptOffset);
+            Decoder decoder =
+              new XORDecoder(clientConf, RaidNode.getStripeLength(clientConf));
+            Path npath = RaidNode.unRaid(clientConf, path, alternates[idx],
+                              decoder, stripeLength, corruptOffset);
             FileSystem fs1 = getUnderlyingFileSystem(conf);
             fs1.initialize(npath.toUri(), conf);
             LOG.info("Opening alternate path " + npath + " at offset " + curpos);

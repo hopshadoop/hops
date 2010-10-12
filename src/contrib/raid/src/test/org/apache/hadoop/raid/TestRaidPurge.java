@@ -195,7 +195,6 @@ public class TestRaidPurge extends TestCase {
     LOG.info("doTestPurge started---------------------------:" +  " iter " + iter +
              " blockSize=" + blockSize + " stripeLength=" + stripeLength);
     mySetup(srcPath, targetReplication, metaReplication, stripeLength);
-    RaidShell shell = null;
     Path dir = new Path("/user/dhruba/raidtest/");
     Path file1 = new Path(dir + "/file" + iter);
     RaidNode cnode = null;
@@ -207,21 +206,9 @@ public class TestRaidPurge extends TestCase {
       LOG.info("doTestPurge created test files for iteration " + iter);
 
       // create an instance of the RaidNode
-      cnode = RaidNode.createRaidNode(null, conf);
-      int times = 10;
-
-      while (times-- > 0) {
-        try {
-          shell = new RaidShell(conf, cnode.getListenerAddress());
-        } catch (Exception e) {
-          LOG.info("doTestPurge unable to connect to " + 
-              cnode.getListenerAddress() + " retrying....");
-          Thread.sleep(1000);
-          continue;
-        }
-        break;
-      }
-      LOG.info("doTestPurge created RaidShell.");
+      Configuration localConf = new Configuration(conf);
+      localConf.set(RaidNode.RAID_LOCATION_KEY, "/destraid");
+      cnode = RaidNode.createRaidNode(null, localConf);
       FileStatus[] listPaths = null;
 
       // wait till file is raided
@@ -266,7 +253,6 @@ public class TestRaidPurge extends TestCase {
                                           StringUtils.stringifyException(e));
       throw e;
     } finally {
-      shell.close();
       if (cnode != null) { cnode.stop(); cnode.join(); }
       LOG.info("doTestPurge delete file " + file1);
       fileSys.delete(file1, true);

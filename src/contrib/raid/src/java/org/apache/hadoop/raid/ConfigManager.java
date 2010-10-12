@@ -56,6 +56,10 @@ class ConfigManager {
 
   public static final long HAR_PARTFILE_SIZE = 10 * 1024 * 1024 * 1024l;
   
+  public static final int DISTRAID_MAX_JOBS = 10;
+
+  public static final int DISTRAID_MAX_FILES = 10000;
+
   /**
    * Time to wait after the config file has been modified before reloading it
    * (this is done to prevent loading a file that hasn't been fully written).
@@ -71,6 +75,9 @@ class ConfigManager {
   private long reloadInterval = RELOAD_INTERVAL;
   private long periodicity; // time between runs of all policies
   private long harPartfileSize;
+  private int maxJobsPerPolicy; // Max no. of jobs running simultaneously for
+                                // a job.
+  private int maxFilesPerJob; // Max no. of files raided by a job.
 
   // Reload the configuration
   private boolean doReload;
@@ -88,6 +95,10 @@ class ConfigManager {
     this.reloadInterval = conf.getLong("raid.config.reload.interval", RELOAD_INTERVAL);
     this.periodicity = conf.getLong("raid.policy.rescan.interval",  RESCAN_INTERVAL);
     this.harPartfileSize = conf.getLong("raid.har.partfile.size", HAR_PARTFILE_SIZE);
+    this.maxJobsPerPolicy = conf.getInt("raid.distraid.max.jobs",
+                                        DISTRAID_MAX_JOBS);
+    this.maxFilesPerJob = conf.getInt("raid.distraid.max.files",
+                                      DISTRAID_MAX_FILES);
     if (configFileName == null) {
       String msg = "No raid.config.file given in conf - " +
                    "the Hadoop Raid utility cannot run. Aborting....";
@@ -306,6 +317,14 @@ class ConfigManager {
     return harPartfileSize;
   }
   
+  public synchronized int getMaxJobsPerPolicy() {
+    return maxJobsPerPolicy;
+  }
+
+  public synchronized int getMaxFilesPerJob() {
+    return maxFilesPerJob;
+  }
+
   /**
    * Get a collection of all policies
    */

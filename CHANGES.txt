@@ -133,6 +133,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1517. Supports streaming job to run in the background. (Bochun Bai
     via amareshwari)
 
+    MAPREDUCE-1819. RaidNode is now smarter in submitting Raid jobs. (Ramkumar
+    Vadali via schen)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and
@@ -325,7 +328,7 @@ Trunk (unreleased changes)
     MAPREDUCE-2095. Fixes Gridmix to run from compressed traces. (Ranjit
     Mathew via amareshwari)
 
-    MAPREDUCE-1980. DistributedRaidFileSystem now handles ChecksumException
+    MAPREDUCE-1908. DistributedRaidFileSystem now handles ChecksumException
     correctly. (Ramkumar Vadali via schen)
 
 Release 0.21.1 - Unreleased

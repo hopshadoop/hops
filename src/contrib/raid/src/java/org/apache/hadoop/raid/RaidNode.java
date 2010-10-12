@@ -21,10 +21,12 @@ package org.apache.hadoop.raid;
 import java.io.IOException;
 import java.io.FileNotFoundException;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.LinkedList;
 import java.util.Iterator;
 import java.util.Arrays;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.HashSet;
@@ -73,7 +75,9 @@ public class RaidNode implements RaidProtocol {
   public static final long SLEEP_TIME = 10000L; // 10 seconds
   public static final int DEFAULT_PORT = 60000;
   public static final int DEFAULT_STRIPE_LENGTH = 5; // default value of stripe length
+  public static final String STRIPE_LENGTH_KEY = "hdfs.raid.stripeLength";
   public static final String DEFAULT_RAID_LOCATION = "/raid";
+  public static final String RAID_LOCATION_KEY = "hdfs.raid.locations";
   public static final String HAR_SUFFIX = "_raid.har";
   
   /** RPC server */
@@ -100,6 +104,10 @@ public class RaidNode implements RaidProtocol {
   
   /** Deamon thread to har raid directories */
   Daemon harThread = null;
+
+  /** Daemon thread to monitor distributed raid job progress */
+  JobMonitor jobMonitor = null;
+  Daemon jobMonitorThread = null;
 
   /** Do do distributed raiding */
   boolean isRaidLocal = false;
@@ -168,6 +176,7 @@ public class RaidNode implements RaidProtocol {
     try {
       initialize(conf);
     } catch (IOException e) {
+      LOG.error(StringUtils.stringifyException(e));
       this.stop();
       throw e;
     } catch (Exception e) {
@@ -193,6 +202,7 @@ public class RaidNode implements RaidProtocol {
     try {
       if (server != null) server.join();
       if (triggerThread != null) triggerThread.join();
+      if (jobMonitorThread != null) jobMonitorThread.join();
       if (purgeThread != null) purgeThread.join();
     } catch (InterruptedException ie) {
       // do nothing
@@ -210,6 +220,8 @@ public class RaidNode implements RaidProtocol {
     running = false;
     if (server != null) server.stop();
     if (triggerThread != null) triggerThread.interrupt();
+    if (jobMonitor != null) jobMonitor.running = false;
+    if (jobMonitorThread != null) jobMonitorThread.interrupt();
     if (purgeThread != null) purgeThread.interrupt();
   }
 
@@ -252,6 +264,10 @@ public class RaidNode implements RaidProtocol {
     running = true;
     this.server.start(); // start RPC server
 
+    this.jobMonitor = new JobMonitor(conf);
+    this.jobMonitorThread = new Daemon(this.jobMonitor);
+    this.jobMonitorThread.start();
+
     // start the deamon thread to fire polcies appropriately
     this.triggerThread = new Daemon(new TriggerMonitor());
     this.triggerThread.start();
@@ -282,22 +298,15 @@ public class RaidNode implements RaidProtocol {
     LOG.info("Recover File for " + inStr + " for corrupt offset " + corruptOffset);
     Path inputPath = new Path(inStr);
     Path srcPath = inputPath.makeQualified(inputPath.getFileSystem(conf));
-    PolicyInfo info = findMatchingPolicy(srcPath);
-    if (info != null) {
+    // find stripe length from config
+    int stripeLength = getStripeLength(conf);
 
-      // find stripe length from config
-      int stripeLength = getStripeLength(conf, info);
-
-      // create destination path prefix
-      String destPrefix = getDestinationPath(conf, info);
-      Path destPath = new Path(destPrefix.trim());
-      FileSystem fs = FileSystem.get(destPath.toUri(), conf);
-      destPath = destPath.makeQualified(fs);
-
-      Path unraided = unRaid(conf, srcPath, destPath, stripeLength, corruptOffset);
-      if (unraided != null) {
-        return unraided.toString();
-      }
+    Path destPref = getDestinationPath(conf);
+    Decoder decoder = new XORDecoder(conf, RaidNode.getStripeLength(conf));
+    Path unraided = unRaid(conf, srcPath, destPref, decoder,
+        stripeLength, corruptOffset);
+    if (unraided != null) {
+      return unraided.toString();
     }
     return null;
   }
@@ -306,6 +315,11 @@ public class RaidNode implements RaidProtocol {
    * Periodically checks to see which policies should be fired.
    */
   class TriggerMonitor implements Runnable {
+
+    private Map<String, Long> scanTimes = new HashMap<String, Long>();
+    private Map<String, DirectoryTraversal> scanState =
+      new HashMap<String, DirectoryTraversal>();
+
     /**
      */
     public void run() {
@@ -320,6 +334,109 @@ public class RaidNode implements RaidProtocol {
       }
     }
 
+    /**
+     * Should we select more files for a policy.
+     */
+    private boolean shouldSelectFiles(PolicyInfo info) {
+      String policyName = info.getName();
+      int runningJobsCount = jobMonitor.runningJobsCount(policyName);
+      // Is there a scan in progress for this policy?
+      if (scanState.containsKey(policyName)) {
+        int maxJobsPerPolicy = configMgr.getMaxJobsPerPolicy();
+
+        // If there is a scan in progress for this policy, we can have
+        // upto maxJobsPerPolicy running jobs.
+        return (runningJobsCount < maxJobsPerPolicy);
+      } else {
+        // If there isn't a scan in progress for this policy, we don't
+        // want to start a fresh scan if there is even one running job.
+        if (runningJobsCount >= 1) {
+          return false;
+        }
+        // Check the time of the last full traversal before starting a fresh
+        // traversal.
+        if (scanTimes.containsKey(policyName)) {
+          long lastScan = scanTimes.get(policyName);
+          return (now() > lastScan + configMgr.getPeriodicity());
+        } else {
+          return true;
+        }
+      }
+    }
+
+   /**
+    * Returns a list of pathnames that needs raiding.
+    * The list of paths could be obtained by resuming a previously suspended
+    * traversal.
+    * The number of paths returned is limited by raid.distraid.max.jobs.
+    */
+    private List<FileStatus> selectFiles(PolicyInfo info) throws IOException {
+      Path destPrefix = getDestinationPath(conf);
+      String policyName = info.getName();
+      Path srcPath = info.getSrcPath();
+      long modTimePeriod = 0;
+      String str = info.getProperty("modTimePeriod");
+      if (str != null) {
+         modTimePeriod = Long.parseLong(info.getProperty("modTimePeriod"));
+      }
+      short srcReplication = 0;
+      str = info.getProperty("srcReplication");
+      if (str != null) {
+        srcReplication = Short.parseShort(info.getProperty("srcReplication"));
+      }
+
+      // Max number of files returned.
+      int selectLimit = configMgr.getMaxFilesPerJob();
+      int targetRepl = Integer.parseInt(info.getProperty("targetReplication"));
+
+      // If we have a pending traversal, resume it.
+      if (scanState.containsKey(policyName)) {
+        DirectoryTraversal dt = scanState.get(policyName);
+        LOG.info("Resuming traversal for policy " + policyName);
+        List<FileStatus> returnSet = dt.selectFilesToRaid(
+            conf, targetRepl, destPrefix, modTimePeriod, selectLimit);
+        if (dt.doneTraversal()) {
+          scanState.remove(policyName);
+        }
+        return returnSet;
+      }
+
+      // Expand destination prefix path.
+      String destpstr = destPrefix.toString();
+      if (!destpstr.endsWith(Path.SEPARATOR)) {
+        destpstr += Path.SEPARATOR;
+      }
+
+      List<FileStatus> returnSet = new LinkedList<FileStatus>();
+
+      FileSystem fs = srcPath.getFileSystem(conf);
+      FileStatus[] gpaths = fs.globStatus(srcPath);
+      if (gpaths != null) {
+        List<FileStatus> selectedPaths = new LinkedList<FileStatus>();
+        for (FileStatus onepath: gpaths) {
+          String pathstr = onepath.getPath().makeQualified(fs).toString();
+          if (!pathstr.endsWith(Path.SEPARATOR)) {
+            pathstr += Path.SEPARATOR;
+          }
+          if (pathstr.startsWith(destpstr) || destpstr.startsWith(pathstr)) {
+            LOG.info("Skipping source " + pathstr +
+                     " because it conflicts with raid directory " + destpstr);
+          } else {
+            selectedPaths.add(onepath);
+          }
+        }
+
+        // Set the time for a new traversal.
+        scanTimes.put(policyName, now());
+        DirectoryTraversal dt = new DirectoryTraversal(fs, selectedPaths);
+        returnSet = dt.selectFilesToRaid(
+            conf, targetRepl, destPrefix, modTimePeriod, selectLimit);
+        if (!dt.doneTraversal()) {
+          scanState.put(policyName, dt);
+        }
+      }
+      return returnSet;
+    }
 
     /**
      * Keep processing policies.
@@ -328,18 +445,11 @@ public class RaidNode implements RaidProtocol {
     private void doProcess() throws IOException, InterruptedException {
       PolicyList.CompareByPath lexi = new PolicyList.CompareByPath();
 
-      long prevExec = 0;
-      DistRaid dr = null;
       while (running) {
+        Thread.sleep(SLEEP_TIME);
 
-        boolean reload = configMgr.reloadConfigsIfNecessary();
-        while(!reload && now() < prevExec + configMgr.getPeriodicity()){
-          Thread.sleep(SLEEP_TIME);
-          reload = configMgr.reloadConfigsIfNecessary();
-        }
+        configMgr.reloadConfigsIfNecessary();
 
-        prevExec = now();
-        
         // activate all categories
         Collection<PolicyList> all = configMgr.getAllPolicies();
         
@@ -348,35 +458,18 @@ public class RaidNode implements RaidProtocol {
         PolicyList[] sorted = all.toArray(new PolicyList[all.size()]);
         Arrays.sort(sorted, lexi);
 
-        if (!isRaidLocal) {
-          dr = new DistRaid(conf);
-        }
-        // paths we have processed so far
-        List<String> processed = new LinkedList<String>();
-        
         for (PolicyList category : sorted) {
           for (PolicyInfo info: category.getAll()) {
 
-            long modTimePeriod = 0;
-            short srcReplication = 0;
-            String str = info.getProperty("modTimePeriod");
-            if (str != null) {
-               modTimePeriod = Long.parseLong(info.getProperty("modTimePeriod")); 
-            }
-            str = info.getProperty("srcReplication");
-            if (str != null) {
-               srcReplication = Short.parseShort(info.getProperty("srcReplication")); 
+            if (!shouldSelectFiles(info)) {
+              continue;
             }
 
             LOG.info("Triggering Policy Filter " + info.getName() +
                      " " + info.getSrcPath());
             List<FileStatus> filteredPaths = null;
-            try { 
-              filteredPaths = selectFiles(conf, info.getSrcPath(), 
-                                          getDestinationPath(conf, info),
-                                          modTimePeriod,
-                                          srcReplication,
-                                          prevExec);
+            try {
+              filteredPaths = selectFiles(info);
             } catch (Exception e) {
               LOG.info("Exception while invoking filter on policy " + info.getName() +
                        " srcPath " + info.getSrcPath() + 
@@ -389,95 +482,41 @@ public class RaidNode implements RaidProtocol {
                continue;
             }
 
-            // If any of the filtered path has already been accepted 
-            // by a previous policy, then skip it.
-            for (Iterator<FileStatus> iter = filteredPaths.iterator(); iter.hasNext();) {
-              String fs = iter.next().getPath().toString() + "/";
-              for (String p : processed) {
-                if (p.startsWith(fs)) {
-                  iter.remove();
-                  break;
+            // Apply the action on accepted paths
+            LOG.info("Triggering Policy Action " + info.getName() +
+                     " " + info.getSrcPath());
+            try {
+              if (isRaidLocal){
+                doRaid(conf, info, filteredPaths);
+              }
+              else{
+                // We already checked that no job for this policy is running
+                // So we can start a new job.
+                DistRaid dr = new DistRaid(conf);
+                //add paths for distributed raiding
+                dr.addRaidPaths(info, filteredPaths);
+                boolean started = dr.startDistRaid();
+                if (started) {
+                  jobMonitor.monitorJob(info.getName(), dr);
                 }
               }
-            }
-
-            // Apply the action on accepted paths
-            LOG.info("Triggering Policy Action " + info.getName());
-            try {
-            	if (isRaidLocal){
-            	  doRaid(conf, info, filteredPaths);
-            	}
-            	else{
-            	  //add paths for distributed raiding
-            	  dr.addRaidPaths(info, filteredPaths);
-            	}
             } catch (Exception e) {
               LOG.info("Exception while invoking action on policy " + info.getName() +
                        " srcPath " + info.getSrcPath() + 
                        " exception " + StringUtils.stringifyException(e));
               continue;
             }
-
-            // add these paths to processed paths
-            for (Iterator<FileStatus> iter = filteredPaths.iterator(); iter.hasNext();) {
-              String p = iter.next().getPath().toString() + "/";
-              processed.add(p);
-            }
-          }
-        }
-        processed.clear(); // free up memory references before yielding
-
-        //do the distributed raiding
-        if (!isRaidLocal) {
-          dr.doDistRaid();
-        } 
-      }
-    }
-  }
-
-  /**
-   * Returns the policy that matches the specified path.
-   * The method below finds the first policy that matches an input path. Since different 
-   * policies with different purposes and destinations might be associated with the same input
-   * path, we should be skeptical about the places using the method and we should try to change
-   * the code to avoid it.
-   */
-  private PolicyInfo findMatchingPolicy(Path inpath) throws IOException {
-    PolicyList.CompareByPath lexi = new PolicyList.CompareByPath();
-    Collection<PolicyList> all = configMgr.getAllPolicies();
-        
-    // sort all policies by reverse lexicographical order. This is needed
-    // to make the nearest policy take precedence.
-    PolicyList[] sorted = all.toArray(new PolicyList[all.size()]);
-    Arrays.sort(sorted, lexi);
-
-    // loop through all categories of policies.
-    for (PolicyList category : sorted) {
-      PolicyInfo first = category.getAll().iterator().next();
-      if (first != null) {
-        Path[] srcPaths = first.getSrcPathExpanded(); // input src paths unglobbed
-        if (srcPaths == null) {
-          continue;
-        }
-
-        for (Path src: srcPaths) {
-          if (inpath.toString().startsWith(src.toString())) {
-            // if the srcpath is a prefix of the specified path
-            // we have a match! 
-            return first;
           }
         }
       }
     }
-    return null; // no matching policies
   }
 
-  
   static private Path getOriginalParityFile(Path destPathPrefix, Path srcPath) {
     return new Path(destPathPrefix, makeRelative(srcPath));
   }
   
-  private static class ParityFilePair {
+  static class ParityFilePair {
     private Path path;
     private FileSystem fs;
     
@@ -506,11 +545,19 @@ public class RaidNode implements RaidProtocol {
    * @return Path object representing the parity file of the source
    * @throws IOException
    */
-  static private ParityFilePair getParityFile(Path destPathPrefix, Path srcPath, Configuration conf) throws IOException {
+  static ParityFilePair getParityFile(Path destPathPrefix, Path srcPath, Configuration conf) throws IOException {
     Path srcParent = srcPath.getParent();
 
     FileSystem fsDest = destPathPrefix.getFileSystem(conf);
-
+    FileSystem fsSrc = srcPath.getFileSystem(conf);
+    
+    FileStatus srcStatus = null;
+    try {
+      srcStatus = fsSrc.getFileStatus(srcPath);
+    } catch (java.io.FileNotFoundException e) {
+      return null;
+    }
+    
     Path outDir = destPathPrefix;
     if (srcParent != null) {
       if (srcParent.getParent() == null) {
@@ -520,36 +567,36 @@ public class RaidNode implements RaidProtocol {
       }
     }
 
+    
+    //CASE 1: CHECK HAR - Must be checked first because har is created after
+    // parity file and returning the parity file could result in error while
+    // reading it.
+    Path outPath =  getOriginalParityFile(destPathPrefix, srcPath);
     String harDirName = srcParent.getName() + HAR_SUFFIX; 
     Path HarPath = new Path(outDir,harDirName);
-    Path outPath =  getOriginalParityFile(destPathPrefix, srcPath);
-
-    if (!fsDest.exists(HarPath)) {  // case 1: no HAR file
-      return new ParityFilePair(outPath,fsDest);
+    if (fsDest.exists(HarPath)) {  
+      URI HarPathUri = HarPath.toUri();
+      Path inHarPath = new Path("har://",HarPathUri.getPath()+"/"+outPath.toUri().getPath());
+      FileSystem fsHar = new HarFileSystem(fsDest);
+      fsHar.initialize(inHarPath.toUri(), conf);
+      if (fsHar.exists(inHarPath)) {
+        FileStatus inHar = fsHar.getFileStatus(inHarPath);
+        if (inHar.getModificationTime() == srcStatus.getModificationTime()) {
+          return new ParityFilePair(inHarPath,fsHar);
+        }
+      }
+    }
+    
+    //CASE 2: CHECK PARITY
+    try {
+      FileStatus outHar = fsDest.getFileStatus(outPath);
+      if (outHar.getModificationTime() == srcStatus.getModificationTime()) {
+        return new ParityFilePair(outPath,fsDest);
+      }
+    } catch (java.io.FileNotFoundException e) {
     }
 
-    URI HarPathUri = HarPath.toUri();
-    Path inHarPath = new Path("har://",HarPathUri.getPath()+"/"+outPath.toUri().getPath());
-    FileSystem fsHar = new HarFileSystem(fsDest);
-    fsHar.initialize(inHarPath.toUri(), conf);
-
-    if (!fsHar.exists(inHarPath)) { // case 2: no file inside HAR
-      return new ParityFilePair(outPath,fsDest);
-    }
-
-    if (! fsDest.exists(outPath)) { // case 3: only inside HAR
-      return new ParityFilePair(inHarPath,fsHar);
-    }
-
-    // both inside and outside HAR. Should return most recent
-    FileStatus inHar = fsHar.getFileStatus(inHarPath);
-    FileStatus outHar = fsDest.getFileStatus(outPath);
-
-    if (inHar.getModificationTime() >= outHar.getModificationTime()) {
-      return new ParityFilePair(inHarPath,fsHar);
-    }
-
-    return new ParityFilePair(outPath,fsDest);
+    return null; // NULL if no parity file
   }
   
   private ParityFilePair getParityFile(Path destPathPrefix, Path srcPath) throws IOException {
@@ -558,108 +605,6 @@ public class RaidNode implements RaidProtocol {
 	  
   }
   
- /**
-  * Returns a list of pathnames that needs raiding.
-  */
-  List<FileStatus> selectFiles(Configuration conf, Path p, String destPrefix,
-                                       long modTimePeriod, short srcReplication, long now) throws IOException {
-
-    List<FileStatus> returnSet = new LinkedList<FileStatus>();
-
-    // expand destination prefix path
-    Path destp = new Path(destPrefix.trim());
-    FileSystem fs = FileSystem.get(destp.toUri(), conf);
-    destp = destp.makeQualified(fs);
-
-    // Expand destination prefix path.
-    String destpstr = destp.toString();
-    if (!destpstr.endsWith(Path.SEPARATOR)) {
-      destpstr += Path.SEPARATOR;
-    }
-
-    fs = p.getFileSystem(conf);
-    FileStatus[] gpaths = fs.globStatus(p);
-    if (gpaths != null) {
-      for (FileStatus onepath: gpaths) {
-        String pathstr = onepath.getPath().makeQualified(fs).toString();
-        if (!pathstr.endsWith(Path.SEPARATOR)) {
-          pathstr += Path.SEPARATOR;
-        }
-        if (pathstr.startsWith(destpstr) || destpstr.startsWith(pathstr)) {
-          LOG.info("Skipping source " + pathstr +
-                   " because it conflicts with raid directory " + destpstr);
-        } else {
-         recurse(fs, conf, destp, onepath, returnSet, modTimePeriod, srcReplication, now);
-        }
-      }
-    }
-    return returnSet;
-  }
-
-  /**
-   * Pick files that need to be RAIDed.
-   */
-  private void recurse(FileSystem srcFs,
-                       Configuration conf,
-                       Path destPathPrefix,
-                       FileStatus src,
-                       List<FileStatus> accept,
-                       long modTimePeriod, 
-                       short srcReplication, 
-                       long now) throws IOException {
-    Path path = src.getPath();
-    FileStatus[] files = null;
-    try {
-      files = srcFs.listStatus(path);
-    } catch (java.io.FileNotFoundException e) {
-      // ignore error because the file could have been deleted by an user
-      LOG.info("FileNotFound " + path + " " + StringUtils.stringifyException(e));
-    } catch (IOException e) {
-      throw e;
-    }
-
-    // If the modTime of the raid file is later than the modtime of the
-    // src file and the src file has not been modified
-    // recently, then that file is a candidate for RAID.
-
-    if (src.isFile()) {
-
-      // if the source file has fewer than or equal to 2 blocks, then no need to RAID
-      long blockSize = src.getBlockSize();
-      if (2 * blockSize >= src.getLen()) {
-        return;
-      }
-
-      // check if destination path already exists. If it does and it's modification time
-      // does not match the modTime of the source file, then recalculate RAID
-      boolean add = false;
-      try {
-        ParityFilePair ppair = getParityFile(destPathPrefix, path);
-        Path outpath =  ppair.getPath();
-        FileSystem outFs = ppair.getFileSystem();
-        FileStatus ostat = outFs.getFileStatus(outpath);
-        if (ostat.getModificationTime() != src.getModificationTime() &&
-            src.getModificationTime() + modTimePeriod < now) {
-          add = true;
-         }
-      } catch (java.io.FileNotFoundException e) {
-        add = true; // destination file does not exist
-      }
-
-      if (add) {
-        accept.add(src);
-      }
-      return;
-
-    } else if (files != null) {
-      for (FileStatus one:files) {
-        if (!one.getPath().getName().endsWith(HAR_SUFFIX)){
-          recurse(srcFs, conf, destPathPrefix, one, accept, modTimePeriod, srcReplication, now);
-        }
-      }
-    }
-  }
-
 
   /**
    * RAID a list of files.
@@ -668,8 +613,8 @@ public class RaidNode implements RaidProtocol {
       throws IOException {
     int targetRepl = Integer.parseInt(info.getProperty("targetReplication"));
     int metaRepl = Integer.parseInt(info.getProperty("metaReplication"));
-    int stripeLength = getStripeLength(conf, info);
-    String destPrefix = getDestinationPath(conf, info);
+    int stripeLength = getStripeLength(conf);
+    Path destPref = getDestinationPath(conf);
     String simulate = info.getProperty("simulate");
     boolean doSimulate = simulate == null ? false : Boolean
         .parseBoolean(simulate);
@@ -677,13 +622,9 @@ public class RaidNode implements RaidProtocol {
     Statistics statistics = new Statistics();
     int count = 0;
 
-    Path p = new Path(destPrefix.trim());
-    FileSystem fs = FileSystem.get(p.toUri(), conf);
-    p = p.makeQualified(fs);
-
     for (FileStatus s : paths) {
-      doRaid(conf, s, p, statistics, null, doSimulate, targetRepl, metaRepl,
-          stripeLength);
+      doRaid(conf, s, destPref, statistics, Reporter.NULL, doSimulate, targetRepl,
+             metaRepl, stripeLength);
       if (count % 1000 == 0) {
         LOG.info("RAID statistics " + statistics.toString());
       }
@@ -701,23 +642,16 @@ public class RaidNode implements RaidProtocol {
       FileStatus src, Statistics statistics, Reporter reporter) throws IOException {
     int targetRepl = Integer.parseInt(info.getProperty("targetReplication"));
     int metaRepl = Integer.parseInt(info.getProperty("metaReplication"));
-    int stripeLength = getStripeLength(conf, info);
-    String destPrefix = getDestinationPath(conf, info);
+    int stripeLength = getStripeLength(conf);
+    Path destPref = getDestinationPath(conf);
     String simulate = info.getProperty("simulate");
     boolean doSimulate = simulate == null ? false : Boolean
         .parseBoolean(simulate);
 
-    int count = 0;
-
-    Path p = new Path(destPrefix.trim());
-    FileSystem fs = FileSystem.get(p.toUri(), conf);
-    p = p.makeQualified(fs);
-
-    doRaid(conf, src, p, statistics, reporter, doSimulate, targetRepl, metaRepl,
-        stripeLength);
+    doRaid(conf, src, destPref, statistics, reporter, doSimulate,
+           targetRepl, metaRepl, stripeLength);
   }
-  
-  
+
   /**
    * RAID an individual file
    */
@@ -784,25 +718,11 @@ public class RaidNode implements RaidProtocol {
                                   Path destPathPrefix, BlockLocation[] locations,
                                   int metaRepl, int stripeLength) throws IOException {
 
-    // two buffers for generating parity
-    Random rand = new Random();
-    int bufSize = 5 * 1024 * 1024; // 5 MB
-    byte[] bufs = new byte[bufSize];
-    byte[] xor = new byte[bufSize];
-
     Path inpath = stat.getPath();
-    long blockSize = stat.getBlockSize();
-    long fileSize = stat.getLen();
-
-    // create output tmp path
     Path outpath =  getOriginalParityFile(destPathPrefix, inpath);
     FileSystem outFs = outpath.getFileSystem(conf);
-   
-    Path tmppath =  new Path(conf.get("fs.raid.tmpdir", "/tmp/raid") + 
-                             outpath.toUri().getPath() + "." + 
-                             rand.nextLong() + ".tmp");
 
-    // if the parity file is already upto-date, then nothing to do
+    // If the parity file is already upto-date, then nothing to do
     try {
       FileStatus stmp = outFs.getFileStatus(outpath);
       if (stmp.getModificationTime() == stat.getModificationTime()) {
@@ -812,65 +732,10 @@ public class RaidNode implements RaidProtocol {
       }
     } catch (IOException e) {
       // ignore errors because the raid file might not exist yet.
-    } 
-
-    LOG.info("Parity file for " + inpath + "(" + locations.length + ") is " + outpath);
-    FSDataOutputStream out = outFs.create(tmppath, 
-                                          true, 
-                                          conf.getInt("io.file.buffer.size", 64 * 1024), 
-                                          (short)metaRepl, 
-                                          blockSize);
-
-    try {
-
-      // loop once for every stripe length
-      for (int startBlock = 0; startBlock < locations.length;) {
-
-        // report progress to Map-reduce framework
-        if (reporter != null) {
-          reporter.progress();
-        }
-        int blocksLeft = locations.length - startBlock;
-        int stripe = Math.min(stripeLength, blocksLeft);
-        LOG.info(" startBlock " + startBlock + " stripe " + stripe);
-
-        // open a new file descriptor for each block in this stripe.
-        // make each fd point to the beginning of each block in this stripe.
-        FSDataInputStream[] ins = new FSDataInputStream[stripe];
-        for (int i = 0; i < stripe; i++) {
-          ins[i] = inFs.open(inpath, bufSize);
-          ins[i].seek(blockSize * (startBlock + i));
-        }
-
-        generateParity(ins,out,blockSize,bufs,xor, reporter);
-        
-        // close input file handles
-        for (int i = 0; i < ins.length; i++) {
-          ins[i].close();
-        }
-
-        // increment startBlock to point to the first block to be processed
-        // in the next iteration
-        startBlock += stripe;
-      }
-      out.close();
-      out = null;
-
-      // delete destination if exists
-      if (outFs.exists(outpath)){
-        outFs.delete(outpath, false);
-      }
-      // rename tmppath to the real parity filename
-      outFs.mkdirs(outpath.getParent());
-      if (!outFs.rename(tmppath, outpath)) {
-        String msg = "Unable to rename tmp file " + tmppath + " to " + outpath;
-        LOG.warn(msg);
-        throw new IOException (msg);
-      }
-    } finally {
-      // remove the tmp file if it still exists
-      outFs.delete(tmppath, false);  
     }
+
+    XOREncoder encoder = new XOREncoder(conf, stripeLength);
+    encoder.encodeFile(inFs, inpath, outpath, (short)metaRepl, reporter);
 
     // set the modification time of the RAID file. This is done so that the modTime of the
     // RAID file reflects that contents of the source file that it has RAIDed. This should
@@ -880,255 +745,39 @@ public class RaidNode implements RaidProtocol {
     outFs.setTimes(outpath, stat.getModificationTime(), -1);
 
     FileStatus outstat = outFs.getFileStatus(outpath);
-    LOG.info("Source file " + inpath + " of size " + fileSize +
+    FileStatus inStat = inFs.getFileStatus(inpath);
+    LOG.info("Source file " + inpath + " of size " + inStat.getLen() +
              " Parity file " + outpath + " of size " + outstat.getLen() +
              " src mtime " + stat.getModificationTime()  +
              " parity mtime " + outstat.getModificationTime());
   }
 
-  private static int readInputUntilEnd(FSDataInputStream ins, byte[] bufs, int toRead) 
-      throws IOException {
-
-    int tread = 0;
-    
-    while (tread < toRead) {
-      int read = ins.read(bufs, tread, toRead - tread);
-      if (read == -1) {
-        return tread;
-      } else {
-        tread += read;
-      }
-    }
-    
-    return tread;
-  }
-  
-  private static void generateParity(FSDataInputStream[] ins, FSDataOutputStream fout, 
-      long parityBlockSize, byte[] bufs, byte[] xor, Reporter reporter) throws IOException {
-    
-    int bufSize;
-    if ((bufs == null) || (bufs.length == 0)){
-      bufSize = 5 * 1024 * 1024; // 5 MB
-      bufs = new byte[bufSize];
-    } else {
-      bufSize = bufs.length;
-    }
-    if ((xor == null) || (xor.length != bufs.length)){
-      xor = new byte[bufSize];
-    }
-
-    int xorlen = 0;
-      
-    // this loop processes all good blocks in selected stripe
-    long remaining = parityBlockSize;
-    
-    while (remaining > 0) {
-      int toRead = (int)Math.min(remaining, bufSize);
-
-      if (ins.length > 0) {
-        xorlen = readInputUntilEnd(ins[0], xor, toRead);
-      }
-
-      // read all remaining blocks and xor them into the buffer
-      for (int i = 1; i < ins.length; i++) {
-
-        // report progress to Map-reduce framework
-        if (reporter != null) {
-          reporter.progress();
-        }
-        
-        int actualRead = readInputUntilEnd(ins[i], bufs, toRead);
-        
-        int j;
-        int xorlimit = (int) Math.min(xorlen,actualRead);
-        for (j = 0; j < xorlimit; j++) {
-          xor[j] ^= bufs[j];
-        }
-        if ( actualRead > xorlen ){
-          for (; j < actualRead; j++) {
-            xor[j] = bufs[j];
-          }
-          xorlen = actualRead;
-        }
-        
-      }
-
-      if (xorlen < toRead) {
-        Arrays.fill(bufs, xorlen, toRead, (byte) 0);
-      }
-      
-      // write this to the tmp file
-      fout.write(xor, 0, toRead);
-      remaining -= toRead;
-    }
-  
-  }
-  
   /**
-   * Extract a good block from the parity block. This assumes that the corruption
-   * is in the main file and the parity file is always good.
+   * Extract a good block from the parity block. This assumes that the
+   * corruption is in the main file and the parity file is always good.
    */
-  public static Path unRaid(Configuration conf, Path srcPath, Path destPathPrefix, 
-                            int stripeLength, long corruptOffset) throws IOException {
+  public static Path unRaid(Configuration conf, Path srcPath,
+      Path destPathPrefix, Decoder decoder, int stripeLength,
+      long corruptOffset) throws IOException {
 
-    // extract block locations, size etc from source file
-    Random rand = new Random();
-    FileSystem srcFs = srcPath.getFileSystem(conf);
-    FileStatus srcStat = srcFs.getFileStatus(srcPath);
-    long blockSize = srcStat.getBlockSize();
-    long fileSize = srcStat.getLen();
-
-    // find the stripe number where the corrupted offset lies
-    long snum = corruptOffset / (stripeLength * blockSize);
-    long startOffset = snum * stripeLength * blockSize;
-    long corruptBlockInStripe = (corruptOffset - startOffset)/blockSize;
-    long corruptBlockSize = Math.min(blockSize, fileSize - startOffset);
-
-    LOG.info("Start offset of relevent stripe = " + startOffset +
-             " corruptBlockInStripe " + corruptBlockInStripe);
-
-    // open file descriptors to read all good blocks of the file
-    FSDataInputStream[] instmp = new FSDataInputStream[stripeLength];
-    int  numLength = 0;
-    for (int i = 0; i < stripeLength; i++) {
-      if (i == corruptBlockInStripe) {
-        continue;  // do not open corrupt block
-      }
-      if (startOffset + i * blockSize >= fileSize) {
-        LOG.info("Stop offset of relevent stripe = " + 
-                  startOffset + i * blockSize);
-        break;
-      }
-      instmp[numLength] = srcFs.open(srcPath);
-      instmp[numLength].seek(startOffset + i * blockSize);
-      numLength++;
+    // Test if parity file exists
+    ParityFilePair ppair = getParityFile(destPathPrefix, srcPath, conf);
+    if (ppair == null) {
+      return null;
     }
 
-    // create array of inputstream, allocate one extra slot for 
-    // parity file. numLength could be smaller than stripeLength
-    // if we are processing the last partial stripe on a file.
-    numLength += 1;
-    FSDataInputStream[] ins = new FSDataInputStream[numLength];
-    for (int i = 0; i < numLength-1; i++) {
-      ins[i] = instmp[i];
-    }
-    LOG.info("Decompose a total of " + numLength + " blocks.");
-
-    // open and seek to the appropriate offset in parity file.
-    ParityFilePair ppair = getParityFile(destPathPrefix, srcPath, conf); 
-    Path parityFile = ppair.getPath();
-    FileSystem parityFs = ppair.getFileSystem();
-    LOG.info("Parity file for " + srcPath + " is " + parityFile);
-    ins[numLength-1] = parityFs.open(parityFile);
-    ins[numLength-1].seek(snum * blockSize);
-    LOG.info("Parity file " + parityFile +
-             " seeking to relevent block at offset " + 
-             ins[numLength-1].getPos());
-
-    // create a temporary filename in the source filesystem
-    // do not overwrite an existing tmp file. Make it fail for now.
-    // We need to generate a unique name for this tmp file later on.
-    Path tmpFile = null;
-    FSDataOutputStream fout = null;
-    FileSystem destFs = destPathPrefix.getFileSystem(conf);
-    int retry = 5;
-    try {
-      tmpFile = new Path(conf.get("fs.raid.tmpdir", "/tmp/raid") + "/" + 
-          rand.nextInt());
-      fout = destFs.create(tmpFile, false);
-    } catch (IOException e) {
-      if (retry-- <= 0) {
-        LOG.info("Unable to create temporary file " + tmpFile +
-                 " Aborting....");
-        throw e; 
-      }
-      LOG.info("Unable to create temporary file " + tmpFile +
-               "Retrying....");
-    }
-    LOG.info("Created recovered block file " + tmpFile);
-
-    // buffers for generating parity bits
-    int bufSize = 5 * 1024 * 1024; // 5 MB
-    byte[] bufs = new byte[bufSize];
-    byte[] xor = new byte[bufSize];
-   
-    generateParity(ins,fout,corruptBlockSize,bufs,xor,null);
-    
-    // close all files
-    fout.close();
-    for (int i = 0; i < ins.length; i++) {
-      ins[i].close();
-    }
-
-    // Now, reopen the source file and the recovered block file
-    // and copy all relevant data to new file
     final Path recoveryDestination = 
       new Path(conf.get("fs.raid.tmpdir", "/tmp/raid"));
+    FileSystem destFs = recoveryDestination.getFileSystem(conf);
     final Path recoveredPrefix = 
       destFs.makeQualified(new Path(recoveryDestination, makeRelative(srcPath)));
     final Path recoveredPath = 
-      new Path(recoveredPrefix + "." + rand.nextLong() + ".recovered");
+      new Path(recoveredPrefix + "." + new Random().nextLong() + ".recovered");
     LOG.info("Creating recovered file " + recoveredPath);
 
-    FSDataInputStream sin = srcFs.open(srcPath);
-    FSDataOutputStream out = destFs.create(recoveredPath, false, 
-                                             conf.getInt("io.file.buffer.size", 64 * 1024),
-                                             srcStat.getReplication(), 
-                                             srcStat.getBlockSize());
-
-    FSDataInputStream bin = destFs.open(tmpFile);
-    long recoveredSize = 0;
-
-    // copy all the good blocks (upto the corruption)
-    // from source file to output file
-    long remaining = corruptOffset / blockSize * blockSize;
-    while (remaining > 0) {
-      int toRead = (int)Math.min(remaining, bufSize);
-      sin.readFully(bufs, 0, toRead);
-      out.write(bufs, 0, toRead);
-      remaining -= toRead;
-      recoveredSize += toRead;
-    }
-    LOG.info("Copied upto " + recoveredSize + " from src file. ");
-
-    // copy recovered block to output file
-    remaining = corruptBlockSize;
-    while (recoveredSize < fileSize &&
-           remaining > 0) {
-      int toRead = (int)Math.min(remaining, bufSize);
-      bin.readFully(bufs, 0, toRead);
-      out.write(bufs, 0, toRead);
-      remaining -= toRead;
-      recoveredSize += toRead;
-    }
-    LOG.info("Copied upto " + recoveredSize + " from recovered-block file. ");
-
-    // skip bad block in src file
-    if (recoveredSize < fileSize) {
-      sin.seek(sin.getPos() + corruptBlockSize); 
-    }
-
-    // copy remaining good data from src file to output file
-    while (recoveredSize < fileSize) {
-      int toRead = (int)Math.min(fileSize - recoveredSize, bufSize);
-      sin.readFully(bufs, 0, toRead);
-      out.write(bufs, 0, toRead);
-      recoveredSize += toRead;
-    }
-    out.close();
-    LOG.info("Completed writing " + recoveredSize + " bytes into " +
-             recoveredPath);
-              
-    sin.close();
-    bin.close();
-
-    // delete the temporary block file that was created.
-    destFs.delete(tmpFile, false);
-    LOG.info("Deleted temporary file " + tmpFile);
-
-    // copy the meta information from source path to the newly created
-    // recovered path
-    copyMetaInformation(destFs, srcStat, recoveredPath);
+    FileSystem srcFs = srcPath.getFileSystem(conf);
+    decoder.decodeFile(srcFs, srcPath, ppair.getFileSystem(),
+        ppair.getPath(), corruptOffset, recoveredPath);
 
     return recoveredPath;
   }
@@ -1179,34 +828,21 @@ public class RaidNode implements RaidProtocol {
         PolicyList[] sorted = all.toArray(new PolicyList[all.size()]);
         Arrays.sort(sorted, lexi);
 
-        // paths we have processed so far
-        Set<Path> processed = new HashSet<Path>();
-        
         for (PolicyList category : sorted) {
           for (PolicyInfo info: category.getAll()) {
 
             try {
               // expand destination prefix path
-              String destinationPrefix = getDestinationPath(conf, info);
-              Path destPref = new Path(destinationPrefix.trim());
-              FileSystem destFs = FileSystem.get(destPref.toUri(), conf);
-              destPref = destFs.makeQualified(destPref);
+              Path destPref = getDestinationPath(conf);
+              FileSystem destFs = destPref.getFileSystem(conf);
 
               //get srcPaths
               Path[] srcPaths = info.getSrcPathExpanded();
               
-              if ( srcPaths != null ){
+              if (srcPaths != null) {
                 for (Path srcPath: srcPaths) {
                   // expand destination prefix
                   Path destPath = getOriginalParityFile(destPref, srcPath);
-
-                  // if this destination path has already been processed as part
-                  // of another policy, then nothing more to do
-                  if (processed.contains(destPath)) {
-                    LOG.info("Obsolete parity files for policy " + 
-                            info.getName() + " has already been procesed.");
-                    continue;
-                  }
 
                   FileSystem srcFs = info.getSrcPath().getFileSystem(conf);
                   FileStatus stat = null;
@@ -1221,12 +857,8 @@ public class RaidNode implements RaidProtocol {
                     recursePurge(srcFs, destFs, destPref.toUri().getPath(), stat);
                   }
 
-                  // this destination path has already been processed
-                  processed.add(destPath);
-
                 }
               }
-
             } catch (Exception e) {
               LOG.warn("Ignoring Exception while processing policy " + 
                        info.getName() + " " + 
@@ -1342,10 +974,8 @@ public class RaidNode implements RaidProtocol {
             try {
               long cutoff = now() - ( Long.parseLong(str) * 24L * 3600000L );
 
-              String destinationPrefix = getDestinationPath(conf, info);
-              Path destPref = new Path(destinationPrefix.trim());
+              Path destPref = getDestinationPath(conf);
               FileSystem destFs = destPref.getFileSystem(conf); 
-              destPref = destFs.makeQualified(destPref);
 
               //get srcPaths
               Path[] srcPaths = info.getSrcPathExpanded();
@@ -1407,7 +1037,11 @@ public class RaidNode implements RaidProtocol {
           recurseHar(info, destFs, one, destPrefix, srcFs, cutoff, tmpHarPath);
           shouldHar = false;
         } else if (one.getModificationTime() > cutoff ) {
-          shouldHar = false;
+          if (shouldHar) {
+            LOG.info("Cannot archive " + destPath + 
+                   " because " + one.getPath() + " was modified after cutoff");
+            shouldHar = false;
+          }
         }
       }
 
@@ -1433,6 +1067,7 @@ public class RaidNode implements RaidProtocol {
     }
 
     if ( shouldHar ) {
+      LOG.info("Archiving " + dest.getPath() + " to " + tmpHarPath );
       singleHar(destFs, dest, tmpHarPath);
     }
   } 
@@ -1493,56 +1128,25 @@ public class RaidNode implements RaidProtocol {
       LOG.info("Leaving Har thread.");
     }
     
-
-  }  
-  
-  /**
-   * If the config file has an entry for hdfs.raid.locations, then that overrides
-   * destination path specified in the raid policy file
-   */
-  static private String getDestinationPath(Configuration conf, PolicyInfo info) {
-    String locs = conf.get("hdfs.raid.locations"); 
-    if (locs != null) {
-      return locs;
-    }
-    locs = info.getDestinationPath();
-    if (locs == null) {
-      return DEFAULT_RAID_LOCATION;
-    }
-    return locs;
   }
 
   /**
-   * If the config file has an entry for hdfs.raid.stripeLength, then use that
-   * specified in the raid policy file
+   * Return the path prefix that stores the parity files
    */
-  static private int getStripeLength(Configuration conf, PolicyInfo info)
-    throws IOException {
-    int len = conf.getInt("hdfs.raid.stripeLength", 0); 
-    if (len != 0) {
-      return len;
-    }
-    String str = info.getProperty("stripeLength");
-    if (str == null) {
-      String msg = "hdfs.raid.stripeLength is not defined." +
-                   " Using a default " + DEFAULT_STRIPE_LENGTH;
-      LOG.info(msg);
-      return DEFAULT_STRIPE_LENGTH;
-    }
-    return Integer.parseInt(str);
+  static Path getDestinationPath(Configuration conf)
+      throws IOException {
+    String loc = conf.get(RAID_LOCATION_KEY, DEFAULT_RAID_LOCATION);
+    Path p = new Path(loc.trim());
+    FileSystem fs = FileSystem.get(p.toUri(), conf);
+    p = p.makeQualified(fs);
+    return p;
   }
 
   /**
-   * Copy the file owner, modtime, etc from srcPath to the recovered Path.
-   * It is possiible that we might have to retrieve file persmissions,
-   * quotas, etc too in future.
+   * Obtain stripe length from configuration
    */
-  static private void copyMetaInformation(FileSystem fs, FileStatus stat, 
-                                          Path recoveredPath) 
-    throws IOException {
-    fs.setOwner(recoveredPath, stat.getOwner(), stat.getGroup());
-    fs.setPermission(recoveredPath, stat.getPermission());
-    fs.setTimes(recoveredPath, stat.getModificationTime(), stat.getAccessTime());
+  public static int getStripeLength(Configuration conf) {
+    return conf.getInt(STRIPE_LENGTH_KEY, DEFAULT_STRIPE_LENGTH);
   }
 
   /**

@@ -47,11 +47,14 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.hdfs.protocol.ClientProtocol;
+import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.DistributedRaidFileSystem;
 import org.apache.hadoop.raid.RaidNode;
+import org.apache.hadoop.raid.protocol.PolicyInfo;
 
 public class TestRaidDfs extends TestCase {
   final static String TEST_DIR = new File(System.getProperty("test.build.data",
@@ -59,8 +62,7 @@ public class TestRaidDfs extends TestCase {
   final static String CONFIG_FILE = new File(TEST_DIR, 
       "test-raid.xml").getAbsolutePath();
   final static long RELOAD_INTERVAL = 1000;
-  final static Log LOG = LogFactory.getLog("org.apache.hadoop.raid.TestRaidNode");
-  final Random rand = new Random();
+  final static Log LOG = LogFactory.getLog("org.apache.hadoop.raid.TestRaidDfs");
   final static int NUM_DATANODES = 3;
 
   Configuration conf;
@@ -82,6 +84,9 @@ public class TestRaidDfs extends TestCase {
 
     // scan all policies once every 5 second
     conf.setLong("raid.policy.rescan.interval", 5000);
+
+    // make all deletions not go through Trash
+    conf.set("fs.shell.delete.classname", "org.apache.hadoop.hdfs.DFSClient");
 
     // do not use map-reduce cluster for Raiding
     conf.setBoolean("fs.raidnode.local", true);
@@ -133,80 +138,148 @@ public class TestRaidDfs extends TestCase {
     if (cnode != null) { cnode.stop(); cnode.join(); }
     if (dfs != null) { dfs.shutdown(); }
   }
+  
+  private LocatedBlocks getBlockLocations(Path file, long length)
+    throws IOException {
+    DistributedFileSystem dfs = (DistributedFileSystem) fileSys;
+    return dfs.getClient().namenode.getBlockLocations(file.toString(), 0, length);
+  }
+
+  private LocatedBlocks getBlockLocations(Path file)
+    throws IOException {
+    FileStatus stat = fileSys.getFileStatus(file);
+    return getBlockLocations(file, stat.getLen());
+  }
+
+  private DistributedRaidFileSystem getRaidFS() throws IOException {
+    DistributedFileSystem dfs = (DistributedFileSystem)fileSys;
+    Configuration clientConf = new Configuration(conf);
+    clientConf.set("fs.hdfs.impl", "org.apache.hadoop.hdfs.DistributedRaidFileSystem");
+    clientConf.set("fs.raid.underlyingfs.impl", "org.apache.hadoop.hdfs.DistributedFileSystem");
+    clientConf.setBoolean("fs.hdfs.impl.disable.cache", true);
+    URI dfsUri = dfs.getUri();
+    return (DistributedRaidFileSystem)FileSystem.get(dfsUri, clientConf);
+  }
+
+  public static void waitForFileRaided(
+    Log logger, FileSystem fileSys, Path file, Path destPath)
+  throws IOException, InterruptedException {
+    FileStatus parityStat = null;
+    String fileName = file.getName().toString();
+    // wait till file is raided
+    while (parityStat == null) {
+      logger.info("Waiting for files to be raided.");
+      try {
+        FileStatus[] listPaths = fileSys.listStatus(destPath);
+        if (listPaths != null) {
+          for (FileStatus f : listPaths) {
+            logger.info("File raided so far : " + f.getPath());
+            String found = f.getPath().getName().toString();
+            if (fileName.equals(found)) {
+              parityStat = f;
+              break;
+            }
+          }
+        }
+      } catch (FileNotFoundException e) {
+        //ignore
+      }
+      Thread.sleep(1000);                  // keep waiting
+    }
+
+    while (true) {
+      LocatedBlocks locations = null;
+      DistributedFileSystem dfs = (DistributedFileSystem) fileSys;
+      locations = dfs.getClient().namenode.getBlockLocations(
+                    file.toString(), 0, parityStat.getLen());
+      if (!locations.isUnderConstruction()) {
+        break;
+      }
+      Thread.sleep(1000);
+    }
+
+    while (true) {
+      FileStatus stat = fileSys.getFileStatus(file);
+      if (stat.getReplication() == 1) break;
+      Thread.sleep(1000);
+    }
+  }
+
+  private void corruptBlockAndValidate(Path srcFile, Path destPath,
+    int[] listBlockNumToCorrupt, long blockSize, int numBlocks)
+  throws IOException, InterruptedException {
+    int repl = 1;
+    long crc = createTestFilePartialLastBlock(fileSys, srcFile, repl,
+                  numBlocks, blockSize);
+    long length = fileSys.getFileStatus(srcFile).getLen();
+
+    waitForFileRaided(LOG, fileSys, srcFile, destPath);
+
+    // Delete first block of file
+    for (int blockNumToCorrupt : listBlockNumToCorrupt) {
+      LOG.info("Corrupt block " + blockNumToCorrupt + " of file " + srcFile);
+      LocatedBlocks locations = getBlockLocations(srcFile);
+      corruptBlock(srcFile, locations.get(blockNumToCorrupt).getBlock(),
+            NUM_DATANODES, true);
+    }
+
+    // Validate
+    DistributedRaidFileSystem raidfs = getRaidFS();
+    assertTrue(validateFile(raidfs, srcFile, length, crc));
+  }
 
   /**
-   * Test DFS Raid
+   * Create a file, corrupt a block in it and ensure that the file can be
+   * read through DistributedRaidFileSystem.
    */
   public void testRaidDfs() throws Exception {
     LOG.info("Test testRaidDfs started.");
+
     long blockSize = 8192L;
-    int stripeLength = 3;
+    int numBlocks = 8;
+    int repl = 1;
     mySetup();
-    Path file1 = new Path("/user/dhruba/raidtest/file1");
+
+    // Create an instance of the RaidNode
+    Configuration localConf = new Configuration(conf);
+    localConf.set(RaidNode.RAID_LOCATION_KEY, "/destraid");
+    cnode = RaidNode.createRaidNode(null, localConf);
+
+    Path file = new Path("/user/dhruba/raidtest/file");
     Path destPath = new Path("/destraid/user/dhruba/raidtest");
-    long crc1 = createOldFile(fileSys, file1, 1, 7, blockSize);
-    LOG.info("Test testPathFilter created test files");
-
-    // create an instance of the RaidNode
-    cnode = RaidNode.createRaidNode(null, conf);
-    
+    int[][] corrupt = {{0}, {4}, {7}}; // first, last and middle block
     try {
-      FileStatus[] listPaths = null;
+      long crc = createTestFilePartialLastBlock(fileSys, file, repl,
+                  numBlocks, blockSize);
+      long length = fileSys.getFileStatus(file).getLen();
+      waitForFileRaided(LOG, fileSys, file, destPath);
+      LocatedBlocks locations = getBlockLocations(file);
 
-      // wait till file is raided
-      while (listPaths == null || listPaths.length != 1) {
-        LOG.info("Test testPathFilter waiting for files to be raided.");
-        try {
-          listPaths = fileSys.listStatus(destPath);
-        } catch (FileNotFoundException e) {
-          //ignore
-        }
-        Thread.sleep(1000);                  // keep waiting
+      for (int i = 0; i < corrupt.length; i++) {
+        int blockNumToCorrupt = corrupt[i][0];
+        LOG.info("Corrupt block " + blockNumToCorrupt + " of file");
+        corruptBlock(file, locations.get(blockNumToCorrupt).getBlock(),
+          NUM_DATANODES, false);
+        validateFile(getRaidFS(), file, length, crc);
       }
-      assertEquals(listPaths.length, 1); // all files raided
-      LOG.info("Files raided so far : " + listPaths[0].getPath());
-
-      // extract block locations from File system. Wait till file is closed.
-      LocatedBlocks locations = null;
-      DistributedFileSystem dfs = (DistributedFileSystem) fileSys;
-      while (true) {
-        locations = dfs.getClient().getNamenode().getBlockLocations(file1.toString(),
-                                                               0, listPaths[0].getLen());
-        if (!locations.isUnderConstruction()) {
-          break;
-        }
-        Thread.sleep(1000);
-      }
-
-      // filter all filesystem calls from client
-      Configuration clientConf = new Configuration(conf);
-      clientConf.set("fs.hdfs.impl", "org.apache.hadoop.hdfs.DistributedRaidFileSystem");
-      clientConf.set("fs.raid.underlyingfs.impl", "org.apache.hadoop.hdfs.DistributedFileSystem");
-      URI dfsUri = dfs.getUri();
-      FileSystem.closeAll();
-      FileSystem raidfs = FileSystem.get(dfsUri, clientConf);
-      
-      assertTrue("raidfs not an instance of DistributedRaidFileSystem",raidfs instanceof DistributedRaidFileSystem);
-      
-      LOG.info("Corrupt first block of file");
-      corruptBlock(file1, locations.get(0).getBlock(), NUM_DATANODES, false);
-      validateFile(raidfs, file1, file1, crc1);
 
       // Corrupt one more block. This is expected to fail.
-      LOG.info("Corrupt second block of file");
-      corruptBlock(file1, locations.get(1).getBlock(), NUM_DATANODES, false);
+      LOG.info("Corrupt one more block of file");
+      corruptBlock(file, locations.get(1).getBlock(), NUM_DATANODES, false);
       try {
-        validateFile(raidfs, file1, file1, crc1);
+        validateFile(getRaidFS(), file, length, crc);
         fail("Expected exception ChecksumException not thrown!");
       } catch (org.apache.hadoop.fs.ChecksumException e) {
       }
     } catch (Exception e) {
-      LOG.info("testPathFilter Exception " + e + StringUtils.stringifyException(e));
+      LOG.info("testRaidDfs Exception " + e +
+                StringUtils.stringifyException(e));
       throw e;
     } finally {
+      if (cnode != null) { cnode.stop(); cnode.join(); }
       myTearDown();
     }
-    LOG.info("Test testPathFilter completed.");
+    LOG.info("Test testRaidDfs completed.");
   }
 
   /**
@@ -217,7 +290,7 @@ public class TestRaidDfs extends TestCase {
 
     try {
       Path file = new Path("/user/raid/raidtest/file1");
-      createOldFile(fileSys, file, 1, 7, 8192L);
+      createTestFile(fileSys, file, 1, 7, 8192L);
 
       // filter all filesystem calls from client
       Configuration clientConf = new Configuration(conf);
@@ -242,13 +315,15 @@ public class TestRaidDfs extends TestCase {
       myTearDown();
     }
   }
-  
+
   //
   // creates a file and populate it with random data. Returns its crc.
   //
-  private long createOldFile(FileSystem fileSys, Path name, int repl, int numBlocks, long blocksize)
+  public static long createTestFile(FileSystem fileSys, Path name, int repl,
+                        int numBlocks, long blocksize)
     throws IOException {
     CRC32 crc = new CRC32();
+    Random rand = new Random();
     FSDataOutputStream stm = fileSys.create(name, true,
                                             fileSys.getConf().getInt("io.file.buffer.size", 4096),
                                             (short)repl, blocksize);
@@ -264,19 +339,43 @@ public class TestRaidDfs extends TestCase {
   }
 
   //
+  // Creates a file with partially full last block. Populate it with random
+  // data. Returns its crc.
+  //
+  public static long createTestFilePartialLastBlock(
+      FileSystem fileSys, Path name, int repl, int numBlocks, long blocksize)
+    throws IOException {
+    CRC32 crc = new CRC32();
+    Random rand = new Random();
+    FSDataOutputStream stm = fileSys.create(name, true,
+                                            fileSys.getConf().getInt("io.file.buffer.size", 4096),
+                                            (short)repl, blocksize);
+    // Write whole blocks.
+    byte[] b = new byte[(int)blocksize];
+    for (int i = 1; i < numBlocks; i++) {
+      rand.nextBytes(b);
+      stm.write(b);
+      crc.update(b);
+    }
+    // Write partial block.
+    b = new byte[(int)blocksize/2 - 1];
+    rand.nextBytes(b);
+    stm.write(b);
+    crc.update(b);
+
+    stm.close();
+    return crc.getValue();
+  }
+  //
   // validates that file matches the crc.
   //
-  private void validateFile(FileSystem fileSys, Path name1, Path name2, long crc) 
+  public static boolean validateFile(FileSystem fileSys, Path name, long length,
+                                  long crc) 
     throws IOException {
 
-    FileStatus stat1 = fileSys.getFileStatus(name1);
-    FileStatus stat2 = fileSys.getFileStatus(name2);
-    assertTrue(" Length of file " + name1 + " is " + stat1.getLen() + 
-               " is different from length of file " + name1 + " " + stat2.getLen(),
-               stat1.getLen() == stat2.getLen());
-
+    long numRead = 0;
     CRC32 newcrc = new CRC32();
-    FSDataInputStream stm = fileSys.open(name2);
+    FSDataInputStream stm = fileSys.open(name);
     final byte[] b = new byte[4192];
     int num = 0;
     while (num >= 0) {
@@ -284,19 +383,28 @@ public class TestRaidDfs extends TestCase {
       if (num < 0) {
         break;
       }
+      numRead += num;
       newcrc.update(b, 0, num);
     }
     stm.close();
+
+    if (numRead != length) {
+      LOG.info("Number of bytes read " + numRead +
+               " does not match file size " + length);
+      return false;
+    }
+
     LOG.info(" Newcrc " + newcrc.getValue() + " old crc " + crc);
     if (newcrc.getValue() != crc) {
-      fail("CRC mismatch of files " + name1 + " with file " + name2);
+      LOG.info("CRC mismatch of file " + name + ": " + newcrc + " vs. " + crc);
     }
+    return true;
   }
 
   /*
    * The Data directories for a datanode
    */
-  static private File[] getDataNodeDirs(int i) throws IOException {
+  private static File[] getDataNodeDirs(int i) throws IOException {
     File base_dir = new File(System.getProperty("test.build.data"), "dfs/");
     File data_dir = new File(base_dir, "data");
     File dir1 = new File(data_dir, "data"+(2*i+1));
@@ -353,10 +461,32 @@ public class TestRaidDfs extends TestCase {
               (numCorrupted + numDeleted) > 0);
   }
 
-  //
-  // Corrupt specified block of file
-  //
-  void corruptBlock(Path file, Block blockNum) throws IOException {
-    corruptBlock(file, blockNum, NUM_DATANODES, true);
+  public static void corruptBlock(Path file, Block blockNum,
+                    int numDataNodes, long offset) throws IOException {
+    long id = blockNum.getBlockId();
+
+    // Now deliberately remove/truncate data blocks from the block.
+    //
+    for (int i = 0; i < numDataNodes; i++) {
+      File[] dirs = getDataNodeDirs(i);
+      
+      for (int j = 0; j < dirs.length; j++) {
+        File[] blocks = dirs[j].listFiles();
+        assertTrue("Blocks do not exist in data-dir", (blocks != null) && (blocks.length >= 0));
+        for (int idx = 0; idx < blocks.length; idx++) {
+          if (blocks[idx].getName().startsWith("blk_" + id) &&
+              !blocks[idx].getName().endsWith(".meta")) {
+            // Corrupt
+            File f = blocks[idx];
+            RandomAccessFile raf = new RandomAccessFile(f, "rw");
+            raf.seek(offset);
+            int data = raf.readInt();
+            raf.seek(offset);
+            raf.writeInt(data+1);
+            LOG.info("Corrupted block " + blocks[idx]);
+          }
+        }
+      }
+    }
   }
 }

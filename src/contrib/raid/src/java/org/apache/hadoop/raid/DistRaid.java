@@ -34,17 +34,21 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.WritableComparable;
+import org.apache.hadoop.mapred.Counters;
 import org.apache.hadoop.mapred.FileOutputFormat;
 import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobClient;
 import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapred.JobID;
 import org.apache.hadoop.mapred.Mapper;
 import org.apache.hadoop.mapred.OutputCollector;
 import org.apache.hadoop.mapred.RecordReader;
 import org.apache.hadoop.mapred.Reporter;
+import org.apache.hadoop.mapred.RunningJob;
 import org.apache.hadoop.mapred.SequenceFileRecordReader;
+import org.apache.hadoop.mapred.TaskCompletionEvent;
 import org.apache.hadoop.raid.RaidNode.Statistics;
 import org.apache.hadoop.raid.protocol.PolicyInfo;
 import org.apache.hadoop.util.StringUtils;
@@ -110,6 +114,11 @@ public class DistRaid {
   }
 
   List<RaidPolicyPathPair> raidPolicyPathPairList = new ArrayList<RaidPolicyPathPair>();
+
+  private JobClient jobClient;
+  private RunningJob runningJob;
+  private int jobEventCounter = 0;
+  private String lastReport = null;
 
   /** Responsible for generating splits of the src file list. */
   static class DistRaidInputFormat implements InputFormat<Text, PolicyInfo> {
@@ -184,6 +193,7 @@ public class DistRaid {
     private int failcount = 0;
     private int succeedcount = 0;
     private Statistics st = null;
+    private Reporter reporter = null;
 
     private String getCountString() {
       return "Succeeded: " + succeedcount + " Failed: " + failcount;
@@ -200,6 +210,7 @@ public class DistRaid {
     public void map(Text key, PolicyInfo policy,
         OutputCollector<WritableComparable, Text> out, Reporter reporter)
         throws IOException {
+      this.reporter = reporter;
       try {
         LOG.info("Raiding file=" + key.toString() + " policy=" + policy);
         Path p = new Path(key.toString());
@@ -268,29 +279,70 @@ public class DistRaid {
   private static int getMapCount(int srcCount, int numNodes) {
     int numMaps = (int) (srcCount / OP_PER_MAP);
     numMaps = Math.min(numMaps, numNodes * MAX_MAPS_PER_NODE);
-    return Math.max(numMaps, 1);
+    return Math.max(numMaps, MAX_MAPS_PER_NODE);
   }
 
-  /** invokes mapred job do parallel raiding */
-  public void doDistRaid() throws IOException {
-    if (raidPolicyPathPairList.size() == 0) {
-      LOG.info("DistRaid has no paths to raid.");
-      return;
+  /** Invokes a map-reduce job do parallel raiding.
+   *  @return true if the job was started, false otherwise
+   */
+  public boolean startDistRaid() throws IOException {
+    assert(raidPolicyPathPairList.size() > 0);
+    if (setup()) {
+      this.jobClient = new JobClient(jobconf);
+      this.runningJob = this.jobClient.submitJob(jobconf);
+      LOG.info("Job Started: " + runningJob.getID());
+      return true;
     }
-    try {
-      if (setup()) {
-        JobClient.runJob(jobconf);
-      }
-    } finally {
-      // delete job directory
-      final String jobdir = jobconf.get(JOB_DIR_LABEL);
-      if (jobdir != null) {
-        final Path jobpath = new Path(jobdir);
-        jobpath.getFileSystem(jobconf).delete(jobpath, true);
-      }
-    }
-    raidPolicyPathPairList.clear();
+    return false;
   }
+
+   /** Checks if the map-reduce job has completed.
+    *
+    * @return true if the job completed, false otherwise.
+    * @throws IOException
+    */
+   public boolean checkComplete() throws IOException {
+     JobID jobID = runningJob.getID();
+     if (runningJob.isComplete()) {
+       // delete job directory
+       final String jobdir = jobconf.get(JOB_DIR_LABEL);
+       if (jobdir != null) {
+         final Path jobpath = new Path(jobdir);
+         jobpath.getFileSystem(jobconf).delete(jobpath, true);
+       }
+       if (runningJob.isSuccessful()) {
+         LOG.info("Job Complete(Succeeded): " + jobID);
+       } else {
+         LOG.info("Job Complete(Failed): " + jobID);
+       }
+       raidPolicyPathPairList.clear();
+       Counters ctrs = runningJob.getCounters();
+       long filesRaided = ctrs.findCounter(Counter.FILES_SUCCEEDED).getValue();
+       long filesFailed = ctrs.findCounter(Counter.FILES_FAILED).getValue();
+       return true;
+     } else {
+       String report =  (" job " + jobID +
+         " map " + StringUtils.formatPercent(runningJob.mapProgress(), 0)+
+         " reduce " + StringUtils.formatPercent(runningJob.reduceProgress(), 0));
+       if (!report.equals(lastReport)) {
+         LOG.info(report);
+         lastReport = report;
+       }
+       TaskCompletionEvent[] events =
+         runningJob.getTaskCompletionEvents(jobEventCounter);
+       jobEventCounter += events.length;
+       for(TaskCompletionEvent event : events) {
+         if (event.getTaskStatus() ==  TaskCompletionEvent.Status.FAILED) {
+           LOG.info(" Job " + jobID + " " + event.toString());
+         }
+       }
+       return false;
+     }
+   }
+
+   public boolean successful() throws IOException {
+     return runningJob.isSuccessful();
+   }
 
   /**
    * set up input file which has the list of input files.
