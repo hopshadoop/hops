@@ -75,7 +75,7 @@ public class TestInterDatanodeProtocol {
     MiniDFSCluster cluster = null;
 
     try {
-      cluster = new MiniDFSCluster(conf, 3, true, null);
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
       cluster.waitActive();
 
       //create a file
@@ -215,7 +215,7 @@ public class TestInterDatanodeProtocol {
     MiniDFSCluster cluster = null;
 
     try {
-      cluster = new MiniDFSCluster(conf, 3, true, null);
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
       cluster.waitActive();
 
       //create a file

@@ -191,7 +191,7 @@ public class TestDataTransferProtocol extends TestCase {
     int numDataNodes = 1;
     Configuration conf = new HdfsConfiguration();
     conf.setBoolean("dfs.support.append", true);
-    MiniDFSCluster cluster = new MiniDFSCluster(conf, numDataNodes, true, null);
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(numDataNodes).build();
     try {
       cluster.waitActive();
       datanode = cluster.getDataNodes().get(0).dnRegistration;
@@ -322,7 +322,7 @@ public class TestDataTransferProtocol extends TestCase {
     
     Configuration conf = new HdfsConfiguration();
     conf.setInt("dfs.replication", numDataNodes); 
-    MiniDFSCluster cluster = new MiniDFSCluster(conf, numDataNodes, true, null);
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(numDataNodes).build();
     try {
     cluster.waitActive();
     DFSClient dfsClient = new DFSClient(

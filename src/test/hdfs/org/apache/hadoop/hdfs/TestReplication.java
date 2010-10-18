@@ -151,7 +151,7 @@ public class TestReplication extends TestCase {
     DFSClient dfsClient = null;
     LocatedBlocks blocks = null;
     int replicaCount = 0;
-    MiniDFSCluster cluster = new MiniDFSCluster(conf, 2, true, null);
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
     cluster.waitActive();
     fs = cluster.getFileSystem();
     dfsClient = new DFSClient(new InetSocketAddress("localhost",
@@ -196,7 +196,9 @@ public class TestReplication extends TestCase {
     if (simulated) {
       conf.setBoolean(SimulatedFSDataset.CONFIG_PROPERTY_SIMULATED, true);
     }
-    MiniDFSCluster cluster = new MiniDFSCluster(conf, numDatanodes, true, racks);
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
+                                               .numDataNodes(numDatanodes)
+                                               .racks(racks).build();
     cluster.waitActive();
     
     InetSocketAddress addr = new InetSocketAddress("localhost",
@@ -310,8 +312,7 @@ public class TestReplication extends TestCase {
       Configuration conf = new HdfsConfiguration();
       conf.set("dfs.replication", Integer.toString(numDataNodes));
       //first time format
-      cluster = new MiniDFSCluster(0, conf, numDataNodes, true,
-                                   true, null, null);
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(numDataNodes).build();
       cluster.waitActive();
       DFSClient dfsClient = new DFSClient(new InetSocketAddress("localhost",
                                             cluster.getNameNodePort()),
@@ -379,8 +380,10 @@ public class TestReplication extends TestCase {
       conf.set("dfs.datanode.block.write.timeout.sec", Integer.toString(5));
       conf.set(DFSConfigKeys.DFS_NAMENODE_SAFEMODE_THRESHOLD_PCT_KEY, "0.75f"); // only 3 copies exist
       
-      cluster = new MiniDFSCluster(0, conf, numDataNodes*2, false,
-                                   true, null, null);
+      cluster = new MiniDFSCluster.Builder(conf)
+                                  .numDataNodes(numDataNodes * 2)
+                                  .format(false)
+                                  .build();
       cluster.waitActive();
       
       dfsClient = new DFSClient(new InetSocketAddress("localhost",
@@ -401,7 +404,7 @@ public class TestReplication extends TestCase {
    * @throws Exception
    */
   public void testReplicateLenMismatchedBlock() throws Exception {
-    MiniDFSCluster cluster = new MiniDFSCluster(new HdfsConfiguration(), 2, true, null);
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(new HdfsConfiguration()).numDataNodes(2).build();
     try {
       cluster.waitActive();
       // test truncated block

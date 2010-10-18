@@ -182,7 +182,7 @@ public class TestBlockTokenWithDFS extends TestCase {
     Configuration conf = getConf(numDataNodes);
 
     try {
-      cluster = new MiniDFSCluster(conf, numDataNodes, true, null);
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(numDataNodes).build();
       cluster.waitActive();
       assertEquals(numDataNodes, cluster.getDataNodes().size());
       // set a short token lifetime (1 second)
@@ -238,7 +238,7 @@ public class TestBlockTokenWithDFS extends TestCase {
     Configuration conf = getConf(numDataNodes);
 
     try {
-      cluster = new MiniDFSCluster(conf, numDataNodes, true, null);
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(numDataNodes).build();
       cluster.waitActive();
       assertEquals(numDataNodes, cluster.getDataNodes().size());
       // set a short token lifetime (1 second)
@@ -286,7 +286,7 @@ public class TestBlockTokenWithDFS extends TestCase {
     Configuration conf = getConf(numDataNodes);
 
     try {
-      cluster = new MiniDFSCluster(conf, numDataNodes, true, null);
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(numDataNodes).build();
       cluster.waitActive();
       assertEquals(numDataNodes, cluster.getDataNodes().size());
       // set a short token lifetime (1 second) initially

@@ -71,7 +71,7 @@ public class TestLeaseRecovery extends junit.framework.TestCase {
     MiniDFSCluster cluster = null;
 
     try {
-      cluster = new MiniDFSCluster(conf, 5, true, null);
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(5).build();
       cluster.waitActive();
 
       //create a file
