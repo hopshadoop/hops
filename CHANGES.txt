@@ -20,6 +20,8 @@ Trunk (unreleased changes)
 
   IMPROVEMENTS
 
+    MAPREDUCE-2140. Regenerate fair scheduler design doc PDF. (matei)
+
     MAPREDUCE-1546. Redirect all job pages to corresponding history page
     if job is not in JT memory. (Scott Chen via sharad)
 
