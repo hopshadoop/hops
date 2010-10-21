@@ -1106,7 +1106,7 @@
       <fileset dir="${test.src.dir}/system/conf/"/>
     </copy>
     <copy tofile="${system-test-build-dir}/${final.name}/lib/hadoop-common-${version}.jar"
-      file="${build-fi.dir}/ivy/lib/${ant.project.name}/system/hadoop-common-${herriot.suffix}-${version}.jar"
+      file="${system-test-build-dir}/ivy/lib/${ant.project.name}/system/hadoop-common-${herriot.suffix}-${version}.jar"
       overwrite="true"/>
     <copy tofile="${system-test-build-dir}/${final.name}/${final.name}.jar"
       file="${system-test-build-dir}/${instrumented.final.name}.jar" overwrite="true"/>

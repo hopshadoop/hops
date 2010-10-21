@@ -317,6 +317,8 @@ Release 0.21.1 - Unreleased
 
     HDFS-1452. ant compile-contrib is broken (cos)
 
+    HDFS-1474. ant binary-system is broken (cos)
+
 Release 0.21.0 - 2010-08-13
 
   INCOMPATIBLE CHANGES
