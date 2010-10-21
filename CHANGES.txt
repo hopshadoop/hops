@@ -354,6 +354,8 @@ Release 0.21.1 - Unreleased
 
     MAPREDUCE-2090. Clover build doesn't generate per-test coverage. (cos)
 
+    MAPREDUCE-2134. ant binary-system is broken in mapreduce project. (cos)
+
 Release 0.21.0 - 2010-08-13
 
   INCOMPATIBLE CHANGES
