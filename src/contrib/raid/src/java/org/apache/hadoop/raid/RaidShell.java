@@ -48,9 +48,13 @@ import org.apache.hadoop.raid.protocol.RaidProtocol;
  * A {@link RaidShell} that allows browsing configured raid policies.
  */
 public class RaidShell extends Configured implements Tool {
+  static {
+    Configuration.addDefaultResource("hdfs-default.xml");
+    Configuration.addDefaultResource("hdfs-site.xml");
+  }
   public static final Log LOG = LogFactory.getLog( "org.apache.hadoop.RaidShell");
   public RaidProtocol raidnode;
-  final RaidProtocol rpcRaidnode;
+  RaidProtocol rpcRaidnode;
   private UserGroupInformation ugi;
   volatile boolean clientRunning = true;
   private Configuration conf;
@@ -62,28 +66,21 @@ public class RaidShell extends Configured implements Tool {
    * configuration options.
    * @throws IOException
    */
-  public RaidShell() throws IOException {
-    this(new Configuration());
-  }
-
-  /**
-   * The RaidShell connects to the specified RaidNode and performs basic
-   * configuration options.
-   * @param conf The Hadoop configuration
-   * @throws IOException
-   */
   public RaidShell(Configuration conf) throws IOException {
-    this(conf, RaidNode.getAddress(conf));
+    super(conf);
+    this.conf = conf;
   }
 
-  public RaidShell(Configuration conf, InetSocketAddress address) throws IOException {
-    super(conf);
+  void initializeRpc(Configuration conf, InetSocketAddress address) throws IOException {
     this.ugi = UserGroupInformation.getCurrentUser();
-
     this.rpcRaidnode = createRPCRaidnode(address, conf, ugi);
     this.raidnode = createRaidnode(rpcRaidnode);
   }
-  
+
+  void initializeLocal(Configuration conf) throws IOException {
+    this.ugi = UserGroupInformation.getCurrentUser();
+  }
+
   public static RaidProtocol createRaidnode(Configuration conf) throws IOException {
     return createRaidnode(RaidNode.getAddress(conf), conf);
   }
@@ -92,7 +89,6 @@ public class RaidShell extends Configured implements Tool {
       Configuration conf) throws IOException {
     return createRaidnode(createRPCRaidnode(raidNodeAddr, conf,
       UserGroupInformation.getCurrentUser()));
-
   }
 
   private static RaidProtocol createRPCRaidnode(InetSocketAddress raidNodeAddr,
@@ -153,13 +149,17 @@ public class RaidShell extends Configured implements Tool {
       System.err.println("Usage: java RaidShell" + 
                          " [-showConfig]"); 
     } else if ("-recover".equals(cmd)) {
-      System.err.println("Usage: java CronShell" +
+      System.err.println("Usage: java RaidShell" +
                          " [-recover srcPath1 corruptOffset]");
+    } else if ("-recoverBlocks".equals(cmd)) {
+      System.err.println("Usage: java RaidShell" +
+                         " [-recoverBlocks path1 path2...]");
     } else {
       System.err.println("Usage: java RaidShell");
       System.err.println("           [-showConfig ]");
       System.err.println("           [-help [cmd]]");
       System.err.println("           [-recover srcPath1 corruptOffset]");
+      System.err.println("           [-recoverBlocks path1 path2...]");
       System.err.println();
       ToolRunner.printGenericCommandUsage(System.err);
     }
@@ -195,9 +195,15 @@ public class RaidShell extends Configured implements Tool {
 
     try {
       if ("-showConfig".equals(cmd)) {
+        initializeRpc(conf, RaidNode.getAddress(conf));
         exitCode = showConfig(cmd, argv, i);
       } else if ("-recover".equals(cmd)) {
+        initializeRpc(conf, RaidNode.getAddress(conf));
         exitCode = recoverAndPrint(cmd, argv, i);
+      } else if ("-recoverBlocks".equals(cmd)) {
+        initializeLocal(conf);
+        recoverBlocks(argv, i);
+        exitCode = 0;
       } else {
         exitCode = -1;
         System.err.println(cmd.substring(1) + ": Unknown command");
@@ -278,29 +284,37 @@ public class RaidShell extends Configured implements Tool {
     }
     return exitCode;
   }
-  
+
+  public void recoverBlocks(String[] args, int startIndex)
+    throws IOException {
+    LOG.info("Recovering blocks for " + (args.length - startIndex) + " files");
+    BlockFixer fixer = new BlockFixer(conf);
+    for (int i = startIndex; i < args.length; i++) {
+      String path = args[i];
+      fixer.fixFile(new Path(path));
+    }
+  }
+
   /**
    * main() has some simple utility methods
    */
   public static void main(String argv[]) throws Exception {
     RaidShell shell = null;
     try {
-      shell = new RaidShell();
+      shell = new RaidShell(new Configuration());
+      int res = ToolRunner.run(shell, argv);
+      System.exit(res);
     } catch (RPC.VersionMismatch v) {
       System.err.println("Version Mismatch between client and server" +
                          "... command aborted.");
       System.exit(-1);
     } catch (IOException e) {
-      System.err.println("Bad connection to RaidNode. command aborted.");
+      System.err.
+        println("Bad connection to RaidNode or NameNode. command aborted.");
+      System.err.println(e.getMessage());
       System.exit(-1);
-    }
-
-    int res;
-    try {
-      res = ToolRunner.run(shell, argv);
     } finally {
       shell.close();
     }
-    System.exit(res);
   }
 }

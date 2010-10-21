@@ -30,6 +30,8 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.HashSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.lang.Thread;
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -79,6 +81,9 @@ public class RaidNode implements RaidProtocol {
   public static final String DEFAULT_RAID_LOCATION = "/raid";
   public static final String RAID_LOCATION_KEY = "hdfs.raid.locations";
   public static final String HAR_SUFFIX = "_raid.har";
+  public static final Pattern PARITY_HAR_PARTFILE_PATTERN =
+    Pattern.compile(".*" + HAR_SUFFIX + "/part-.*");
+
   
   /** RPC server */
   private Server server;
@@ -1147,6 +1152,11 @@ public class RaidNode implements RaidProtocol {
    */
   public static int getStripeLength(Configuration conf) {
     return conf.getInt(STRIPE_LENGTH_KEY, DEFAULT_STRIPE_LENGTH);
+  }
+
+  static boolean isParityHarPartFile(Path p) {
+    Matcher m = PARITY_HAR_PARTFILE_PATTERN.matcher(p.toUri().getPath());
+    return m.matches();
   }
 
   /**

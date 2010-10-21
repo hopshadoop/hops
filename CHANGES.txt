@@ -138,6 +138,8 @@ Trunk (unreleased changes)
     MAPREDUCE-1819. RaidNode is now smarter in submitting Raid jobs. (Ramkumar
     Vadali via schen)
 
+    MAPREDUCE-2132. A command line option in RaidShell to fix blocks using raid
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and

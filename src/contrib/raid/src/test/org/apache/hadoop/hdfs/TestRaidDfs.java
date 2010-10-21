@@ -142,7 +142,8 @@ public class TestRaidDfs extends TestCase {
   private LocatedBlocks getBlockLocations(Path file, long length)
     throws IOException {
     DistributedFileSystem dfs = (DistributedFileSystem) fileSys;
-    return dfs.getClient().namenode.getBlockLocations(file.toString(), 0, length);
+    return RaidDFSUtil.getBlockLocations(
+      dfs, file.toUri().getPath(), 0, length);
   }
 
   private LocatedBlocks getBlockLocations(Path file)
@@ -190,8 +191,8 @@ public class TestRaidDfs extends TestCase {
     while (true) {
       LocatedBlocks locations = null;
       DistributedFileSystem dfs = (DistributedFileSystem) fileSys;
-      locations = dfs.getClient().namenode.getBlockLocations(
-                    file.toString(), 0, parityStat.getLen());
+      locations = RaidDFSUtil.getBlockLocations(
+        dfs, file.toUri().getPath(), 0, parityStat.getLen());
       if (!locations.isUnderConstruction()) {
         break;
       }

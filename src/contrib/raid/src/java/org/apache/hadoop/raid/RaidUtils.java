@@ -22,12 +22,32 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
+import java.util.regex.Pattern;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PositionedReadable;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.io.IOUtils;
 
 public class RaidUtils {
+  /**
+   * Removes files matching the trash file pattern.
+   */
+  public static void filterTrash(Configuration conf, List<Path> files) {
+    // Remove files under Trash.
+    String trashPattern = conf.get("raid.blockfixer.trash.pattern",
+                                   "^/user/.*/\\.Trash.*");
+    for (Iterator<Path> it = files.iterator(); it.hasNext(); ) {
+      String pathStr = it.next().toString();
+      if (Pattern.matches(trashPattern, pathStr)) {
+        it.remove();
+      }
+    }
+  }
+
   public static void readTillEnd(InputStream in, byte[] buf, boolean eofOK)
     throws IOException {
     int toRead = buf.length;

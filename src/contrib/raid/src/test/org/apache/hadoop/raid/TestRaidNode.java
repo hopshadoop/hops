@@ -278,18 +278,6 @@ public class TestRaidNode extends TestCase {
       cnode = RaidNode.createRaidNode(null, conf);
       int times = 10;
 
-      while (times-- > 0) {
-        try {
-          shell = new RaidShell(conf, cnode.getListenerAddress());
-        } catch (Exception e) {
-          LOG.info("doTestPathFilter unable to connect to " + 
-              cnode.getListenerAddress() + " retrying....");
-          Thread.sleep(1000);
-          continue;
-        }
-        break;
-      }
-      LOG.info("doTestPathFilter created RaidShell.");
       FileStatus[] listPaths = null;
 
       // wait till file is raided
@@ -322,6 +310,8 @@ public class TestRaidNode extends TestCase {
       Thread.sleep(20000); // Without this wait, unit test crashes
 
       // check for error at beginning of file
+      shell = new RaidShell(conf);
+      shell.initializeRpc(conf, cnode.getListenerAddress());
       if (numBlock >= 1) {
         LOG.info("doTestPathFilter Check error at beginning of file.");
         simulateError(shell, fileSys, file1, crc1, 0);
