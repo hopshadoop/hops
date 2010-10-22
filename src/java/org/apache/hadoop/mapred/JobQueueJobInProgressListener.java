@@ -29,7 +29,7 @@ import org.apache.hadoop.mapred.JobStatusChangeEvent.EventType;
  * A {@link JobInProgressListener} that maintains the jobs being managed in
  * a queue. By default the queue is FIFO, but it is possible to use custom
  * queue ordering by using the
- * {@link #JobQueueJobInProgressListener(Collection)} constructor.
+ * {@link #JobQueueJobInProgressListener(Map)} constructor.
  */
 class JobQueueJobInProgressListener extends JobInProgressListener {
 

@@ -338,6 +338,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1908. DistributedRaidFileSystem now handles ChecksumException
     correctly. (Ramkumar Vadali via schen)
 
+    MAPREDUCE-2126. JobQueueJobInProgressListener's javadoc is inconsistent
+    with source code. (Jingguo Yao via tomwhite)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES
