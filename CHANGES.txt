@@ -140,6 +140,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-2132. A command line option in RaidShell to fix blocks using raid
 
+    MAPREDUCE-2147. Remove redundant lines in JobInProgress ctor.
+    (Harsh J Chouraria via cutting)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and
