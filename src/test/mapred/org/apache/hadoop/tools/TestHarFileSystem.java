@@ -367,4 +367,26 @@ public class TestHarFileSystem extends TestCase {
     assertTrue("number of bytes left should be -1", reduceIn.read(b) == -1);
     reduceIn.close();
   }
+
+  public void testSpaces() throws Exception {
+     fs.delete(archivePath, true);
+     Configuration conf = mapred.createJobConf();
+     HadoopArchives har = new HadoopArchives(conf);
+     String[] args = new String[6];
+     args[0] = "-archiveName";
+     args[1] = "foo bar.har";
+     args[2] = "-p";
+     args[3] = fs.getHomeDirectory().toString();
+     args[4] = "test";
+     args[5] = archivePath.toString();
+     int ret = ToolRunner.run(har, args);
+     assertTrue("failed test", ret == 0);
+     Path finalPath = new Path(archivePath, "foo bar.har");
+     Path fsPath = new Path(inputPath.toUri().getPath());
+     Path filePath = new Path(finalPath, "test");
+     // make it a har path
+     Path harPath = new Path("har://" + filePath.toUri().getPath());
+     FileSystem harFs = harPath.getFileSystem(conf);
+     FileStatus[] statuses = harFs.listStatus(finalPath);
+  }
 }

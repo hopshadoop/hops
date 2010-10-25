@@ -100,7 +100,8 @@ public class HarFileSystem extends FilterFileSystem {
     underLyingURI = decodeHarURI(name, conf);
     //  we got the right har Path- now check if this is 
     //truly a har filesystem
-    Path harPath = archivePath(new Path(name.toString()));
+    Path harPath = archivePath(
+      new Path(name.getScheme(), name.getAuthority(), name.getPath()));
     if (harPath == null) { 
       throw new IOException("Invalid path for the Har Filesystem. " + 
                            name.toString());
@@ -302,16 +303,19 @@ public class HarFileSystem extends FilterFileSystem {
   // string manipulation is not good - so
   // just use the path api to do it.
   private Path makeRelative(String initial, Path p) {
+    String scheme = this.uri.getScheme();
+    String authority = this.uri.getAuthority();
     Path root = new Path(Path.SEPARATOR);
     if (root.compareTo(p) == 0)
-      return new Path(initial);
+      return new Path(scheme, authority, initial);
     Path retPath = new Path(p.getName());
     Path parent = p.getParent();
     for (int i=0; i < p.depth()-1; i++) {
       retPath = new Path(parent.getName(), retPath);
       parent = parent.getParent();
     }
-    return new Path(initial, retPath.toString());
+    return new Path(new Path(scheme, authority, initial),
+      retPath.toString());
   }
   
   /* this makes a path qualified in the har filesystem
@@ -537,7 +541,7 @@ public class HarFileSystem extends FilterFileSystem {
         underlying.getPermission(),
         underlying.getOwner(),
         underlying.getGroup(),
-        makeRelative(this.uri.toString(), new Path(h.name)));
+        makeRelative(this.uri.getPath(), new Path(h.name)));
   }
 
   // a single line parser for hadoop archives status 
