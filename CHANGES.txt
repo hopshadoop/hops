@@ -347,6 +347,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2143.  HarFileSystem is able to handle spaces in pathnames.
     (Ramkumar Vadali via dhruba)
 
+    MAPREDUCE-1867.  Remove unused methods in
+    org.apache.hadoop.streaming.StreamUtil.  (amareshwari via tomwhite)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES

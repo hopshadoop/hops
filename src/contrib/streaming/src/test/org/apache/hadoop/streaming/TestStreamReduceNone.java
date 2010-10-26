@@ -40,7 +40,7 @@ public class TestStreamReduceNone
   protected File OUTPUT_DIR = new File("stream_reduce_none_out");
   protected String input = "roses.are.red\nviolets.are.blue\nbunnies.are.pink\n";
   // map parses input lines and generates count entries for each word.
-  protected String map = StreamUtil.makeJavaCommand(TrApp.class, new String[]{".", "\\n"});
+  protected String map = UtilTest.makeJavaCommand(TrApp.class, new String[]{".", "\\n"});
   protected String outputExpect = "roses\t\nare\t\nred\t\nviolets\t\nare\t\nblue\t\nbunnies\t\nare\t\npink\t\n";
 
   private StreamJob job;

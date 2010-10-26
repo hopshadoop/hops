@@ -36,7 +36,7 @@ public class TestStreamAggregate
   protected File OUTPUT_DIR = new File("stream_aggregate_out");
   protected String input = "roses are red\nviolets are blue\nbunnies are pink\n";
   // map parses input lines and generates count entries for each word.
-  protected String map = StreamUtil.makeJavaCommand(StreamAggregate.class, new String[]{".", "\\n"});
+  protected String map = UtilTest.makeJavaCommand(StreamAggregate.class, new String[]{".", "\\n"});
   // Use the aggregate combine, reducei to aggregate the counts
   protected String outputExpect = "are\t3\nblue\t1\nbunnies\t1\npink\t1\nred\t1\nroses\t1\nviolets\t1\n";
 

@@ -41,7 +41,7 @@ public class TestStreamDataProtocol
   protected File OUTPUT_DIR = new File("out_for_data_protocol_test");
   protected String input = "roses.smell.good\nroses.look.good\nroses.need.care\nroses.attract.bees\nroses.are.red\nroses.are.not.blue\nbunnies.are.pink\nbunnies.run.fast\nbunnies.have.short.tail\nbunnies.have.long.ears\n";
   // map behaves like "/usr/bin/cat"; 
-  protected String map = StreamUtil.makeJavaCommand(TrApp.class, new String[]{".", "."});
+  protected String map = UtilTest.makeJavaCommand(TrApp.class, new String[]{".", "."});
   // reduce counts the number of values for each key
   protected String reduce = "org.apache.hadoop.streaming.ValueCountReduce";
   protected String outputExpect = "bunnies.are\t1\nbunnies.have\t2\nbunnies.run\t1\nroses.are\t2\nroses.attract\t1\nroses.look\t1\nroses.need\t1\nroses.smell\t1\n";

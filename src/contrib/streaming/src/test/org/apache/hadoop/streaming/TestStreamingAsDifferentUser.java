@@ -45,9 +45,9 @@ public class TestStreamingAsDifferentUser extends
   private Path outputPath = new Path("output");
   private String input = "roses.are.red\nviolets.are.blue\nbunnies.are.pink\n";
   private String map =
-      StreamUtil.makeJavaCommand(TrApp.class, new String[] { ".", "\\n" });
+      UtilTest.makeJavaCommand(TrApp.class, new String[] { ".", "\\n" });
   private String reduce =
-      StreamUtil.makeJavaCommand(UniqApp.class, new String[] { "R" });
+      UtilTest.makeJavaCommand(UniqApp.class, new String[] { "R" });
 
   public void testStreaming()
       throws Exception {

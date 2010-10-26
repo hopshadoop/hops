@@ -40,8 +40,8 @@ public class TestStreamingExitStatus
   protected File INPUT_FILE = new File(TEST_DIR, "input.txt");
   protected File OUTPUT_DIR = new File(TEST_DIR, "out");
 
-  protected String failingTask = StreamUtil.makeJavaCommand(FailApp.class, new String[]{"true"});
-  protected String echoTask = StreamUtil.makeJavaCommand(FailApp.class, new String[]{"false"});
+  protected String failingTask = UtilTest.makeJavaCommand(FailApp.class, new String[]{"true"});
+  protected String echoTask = UtilTest.makeJavaCommand(FailApp.class, new String[]{"false"});
 
   public TestStreamingExitStatus() throws IOException {
     UtilTest utilTest = new UtilTest(getClass().getName());

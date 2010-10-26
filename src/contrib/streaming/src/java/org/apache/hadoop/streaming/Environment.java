@@ -22,13 +22,18 @@ import java.io.*;
 import java.net.InetAddress;
 import java.util.*;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+
 /**
  * This is a class used to get the current environment
  * on the host machines running the map/reduce. This class
  * assumes that setting the environment in streaming is 
  * allowed on windows/ix/linuz/freebsd/sunos/solaris/hp-ux
  */
+@InterfaceAudience.Private
 public class Environment extends Properties {
+
+  private static final long serialVersionUID = 1L;
 
   public Environment() throws IOException {
     // Extend this code to fit all operating
@@ -78,7 +83,7 @@ public class Environment extends Properties {
   // to be used with Runtime.exec(String[] cmdarray, String[] envp) 
   String[] toArray() {
     String[] arr = new String[super.size()];
-    Enumeration it = super.keys();
+    Enumeration<Object> it = super.keys();
     int i = -1;
     while (it.hasMoreElements()) {
       String key = (String) it.nextElement();

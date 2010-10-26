@@ -78,7 +78,7 @@ public class TestUlimit {
    */
   @Test
   public void testCommandLine() {
-    if (StreamUtil.isCygwin()) {
+    if (UtilTest.isCygwin()) {
       return;
     }
     try {
@@ -89,7 +89,7 @@ public class TestUlimit {
       
       mr = new MiniMRCluster(numSlaves, fs.getUri().toString(), 1);
       writeInputFile(fs, inputPath);
-      map = StreamUtil.makeJavaCommand(UlimitApp.class, new String[]{});  
+      map = UtilTest.makeJavaCommand(UlimitApp.class, new String[]{});  
       runProgram(SET_MEMORY_LIMIT);
       fs.delete(outputPath, true);
       assertFalse("output not cleaned up", fs.exists(outputPath));

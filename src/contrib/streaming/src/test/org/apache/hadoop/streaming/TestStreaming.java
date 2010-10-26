@@ -46,10 +46,10 @@ public class TestStreaming
   protected String outDir;
   protected String input = "roses.are.red\nviolets.are.blue\nbunnies.are.pink\n";
   // map behaves like "/usr/bin/tr . \\n"; (split words into lines)
-  protected String map = StreamUtil.makeJavaCommand(TrApp.class, new String[]{".", "\\n"});
+  protected String map = UtilTest.makeJavaCommand(TrApp.class, new String[]{".", "\\n"});
   // reduce behave like /usr/bin/uniq. But also prepend lines with R.
   // command-line combiner does not have any effect any more.
-  protected String reduce = StreamUtil.makeJavaCommand(UniqApp.class, new String[]{"R"});
+  protected String reduce = UtilTest.makeJavaCommand(UniqApp.class, new String[]{"R"});
   protected String outputExpect = "Rare\t\nRblue\t\nRbunnies\t\nRpink\t\nRred\t\nRroses\t\nRviolets\t\n";
 
   protected ArrayList<String> args = new ArrayList<String>();

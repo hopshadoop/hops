@@ -34,8 +34,8 @@ public class TestRawBytesStreaming {
   protected File INPUT_FILE = new File("input.txt");
   protected File OUTPUT_DIR = new File("out");
   protected String input = "roses.are.red\nviolets.are.blue\nbunnies.are.pink\n";
-  protected String map = StreamUtil.makeJavaCommand(RawBytesMapApp.class, new String[]{"."});
-  protected String reduce = StreamUtil.makeJavaCommand(RawBytesReduceApp.class, new String[0]);
+  protected String map = UtilTest.makeJavaCommand(RawBytesMapApp.class, new String[]{"."});
+  protected String reduce = UtilTest.makeJavaCommand(RawBytesReduceApp.class, new String[0]);
   protected String outputExpect = "are\t3\nblue\t1\nbunnies\t1\npink\t1\nred\t1\nroses\t1\nviolets\t1\n";
   
   public TestRawBytesStreaming() throws IOException {

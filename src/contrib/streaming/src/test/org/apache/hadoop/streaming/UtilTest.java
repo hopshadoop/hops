@@ -22,6 +22,9 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -80,6 +83,43 @@ class UtilTest {
       System.setOut(out);
       System.setErr(out);
     }
+  }
+
+  public static String collate(List<String> args, String sep) {
+    StringBuffer buf = new StringBuffer();
+    Iterator<String> it = args.iterator();
+    while (it.hasNext()) {
+      if (buf.length() > 0) {
+        buf.append(" ");
+      }
+      buf.append(it.next());
+    }
+    return buf.toString();
+  }
+
+  public static String makeJavaCommand(Class<?> main, String[] argv) {
+    ArrayList<String> vargs = new ArrayList<String>();
+    File javaHomeBin = new File(System.getProperty("java.home"), "bin");
+    File jvm = new File(javaHomeBin, "java");
+    vargs.add(jvm.toString());
+    // copy parent classpath
+    vargs.add("-classpath");
+    vargs.add("\"" + System.getProperty("java.class.path") + "\"");
+  
+    // add heap-size limit
+    vargs.add("-Xmx" + Runtime.getRuntime().maxMemory());
+  
+    // Add main class and its arguments
+    vargs.add(main.getName());
+    for (int i = 0; i < argv.length; i++) {
+      vargs.add(argv[i]);
+    }
+    return collate(vargs, " ");
+  }
+
+  public static boolean isCygwin() {
+    String OS = System.getProperty("os.name");
+    return (OS.indexOf("Windows") > -1);
   }
 
   /**

@@ -27,7 +27,7 @@ import static org.junit.Assert.*;
 
 public class TestStreamingCombiner extends TestStreaming {
 
-  protected String combine = StreamUtil.makeJavaCommand(
+  protected String combine = UtilTest.makeJavaCommand(
       UniqApp.class, new String[]{""});
   
   public TestStreamingCombiner() throws IOException {

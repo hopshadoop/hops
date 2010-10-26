@@ -18,15 +18,15 @@
 
 package org.apache.hadoop.streaming;
 
-import org.junit.Test;
-import org.junit.Before;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
-import java.io.*;
-import java.util.*;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+
+import org.junit.Before;
+import org.junit.Test;
 
 /**
  * This class tests if hadoopStreaming background works fine. A DelayEchoApp
@@ -38,7 +38,7 @@ public class TestStreamingBackground {
   protected File INPUT_FILE = new File(TEST_DIR, "input.txt");
   protected File OUTPUT_DIR = new File(TEST_DIR, "out");
 
-  protected String tenSecondsTask = StreamUtil.makeJavaCommand(
+  protected String tenSecondsTask = UtilTest.makeJavaCommand(
       DelayEchoApp.class, new String[] { "10" });
 
   public TestStreamingBackground() throws IOException {

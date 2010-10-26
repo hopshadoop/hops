@@ -36,8 +36,8 @@ public class TestTypedBytesStreaming {
   protected File INPUT_FILE = new File("input.txt");
   protected File OUTPUT_DIR = new File("out");
   protected String input = "roses.are.red\nviolets.are.blue\nbunnies.are.pink\n";
-  protected String map = StreamUtil.makeJavaCommand(TypedBytesMapApp.class, new String[]{"."});
-  protected String reduce = StreamUtil.makeJavaCommand(TypedBytesReduceApp.class, new String[0]);
+  protected String map = UtilTest.makeJavaCommand(TypedBytesMapApp.class, new String[]{"."});
+  protected String reduce = UtilTest.makeJavaCommand(TypedBytesReduceApp.class, new String[0]);
   protected String outputExpect = "are\t3\nred\t1\nblue\t1\npink\t1\nroses\t1\nbunnies\t1\nviolets\t1\n";
   
   public TestTypedBytesStreaming() throws IOException {

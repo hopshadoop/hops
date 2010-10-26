@@ -44,7 +44,7 @@ public class TestStreamingStderr
     return new String[] {
       "-input", input.getAbsolutePath(),
       "-output", output.getAbsolutePath(),
-      "-mapper", StreamUtil.makeJavaCommand(StderrApp.class,
+      "-mapper", UtilTest.makeJavaCommand(StderrApp.class,
                                             new String[]{Integer.toString(preLines),
                                                          Integer.toString(duringLines),
                                                          Integer.toString(postLines)}),

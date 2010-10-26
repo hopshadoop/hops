@@ -56,9 +56,9 @@ public class TestStreamingBadRecords extends ClusterMapReduceTestCase
     Arrays.asList("hey001","hey018");
   
   private static final String badMapper = 
-    StreamUtil.makeJavaCommand(BadApp.class, new String[]{});
+    UtilTest.makeJavaCommand(BadApp.class, new String[]{});
   private static final String badReducer = 
-    StreamUtil.makeJavaCommand(BadApp.class, new String[]{"true"});
+    UtilTest.makeJavaCommand(BadApp.class, new String[]{"true"});
   private static final int INPUTSIZE=100;
   
   public TestStreamingBadRecords() throws IOException

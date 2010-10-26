@@ -233,7 +233,6 @@ public abstract class PipeMapRed {
       LOG.info("JobConf set minRecWrittenToEnableSkip_ ="
           + minRecWrittenToEnableSkip_);
     }
-    taskId_ = StreamUtil.getTaskInfo(job_);
   }
 
   void addJobConfToEnvironment(JobConf conf, Properties env) {
@@ -611,7 +610,6 @@ public abstract class PipeMapRed {
 
   // set in PipeMapper/PipeReducer subclasses
   int numExceptions_;
-  StreamUtil.TaskId taskId_;
 
   protected volatile Throwable outerrThreadsThrowable;
 

@@ -42,11 +42,11 @@ public class TestStreamingSeparator
   // mapreduce.input.keyvaluelinerecordreader.key.value.separator reads 1 as separator
   // stream.map.input.field.separator uses 2 as separator
   // map behaves like "/usr/bin/tr 2 3"; (translate 2 to 3)
-  protected String map = StreamUtil.makeJavaCommand(TrApp.class, new String[]{"2", "3"});
+  protected String map = UtilTest.makeJavaCommand(TrApp.class, new String[]{"2", "3"});
   // stream.map.output.field.separator recognize 3 as separator
   // stream.reduce.input.field.separator recognize 3 as separator
   // reduce behaves like "/usr/bin/tr 3 4"; (translate 3 to 4)
-  protected String reduce = StreamUtil.makeJavaCommand(TrAppReduce.class, new String[]{"3", "4"});
+  protected String reduce = UtilTest.makeJavaCommand(TrAppReduce.class, new String[]{"3", "4"});
   // stream.reduce.output.field.separator recognize 4 as separator
   // mapreduce.output.textoutputformat.separator outputs 5 as separator
   protected String outputExpect = "bunnies5are.pink\nroses5are.red\nviolets5are.blue\n";

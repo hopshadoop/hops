@@ -66,6 +66,7 @@ import org.apache.hadoop.streaming.io.InputWriter;
 import org.apache.hadoop.streaming.io.OutputReader;
 import org.apache.hadoop.util.GenericOptionsParser;
 import org.apache.hadoop.util.ReflectionUtils;
+import org.apache.hadoop.util.RunJar;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Tool;
 
@@ -991,7 +992,7 @@ public class StreamJob implements Tool {
     if (jar_ != null && isLocalHadoop()) {
       // getAbs became required when shell and subvm have different working dirs...
       File wd = new File(".").getAbsoluteFile();
-      StreamUtil.unJar(new File(jar_), wd);
+      RunJar.unJar(new File(jar_), wd);
     }
 
     // if jobConf_ changes must recreate a JobClient
