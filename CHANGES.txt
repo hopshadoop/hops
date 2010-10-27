@@ -18,6 +18,9 @@ Trunk (unreleased changes)
     MAPREDUCE-220. Collect cpu and memory statistics per task. (Scott Chen via
     acmurthy)
 
+    MAPREDUCE-1970.  Reed-Solomon code implementation for HDFS RAID.
+    (Scott Chen via dhruba)
+
   IMPROVEMENTS
 
     MAPREDUCE-2140. Regenerate fair scheduler design doc PDF. (matei)
