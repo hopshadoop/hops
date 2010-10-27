@@ -317,6 +317,40 @@ public class TestRaidDfs extends TestCase {
     }
   }
 
+  /**
+   * Test that access time and mtime of a source file do not change after
+   * raiding.
+   */
+  public void testAccessTime() throws Exception {
+    LOG.info("Test testAccessTime started.");
+
+    long blockSize = 8192L;
+    int numBlocks = 8;
+    int repl = 1;
+    mySetup();
+
+    Path file = new Path("/user/dhruba/raidtest/file");
+    Path destPath = new Path("/destraid/user/dhruba/raidtest");
+    createTestFilePartialLastBlock(fileSys, file, repl, numBlocks, blockSize);
+    FileStatus stat = fileSys.getFileStatus(file);
+
+    int[][] corrupt = {{0}, {4}, {7}}; // first, last and middle block
+    try {
+      // Create an instance of the RaidNode
+      Configuration localConf = new Configuration(conf);
+      localConf.set(RaidNode.RAID_LOCATION_KEY, "/destraid");
+      cnode = RaidNode.createRaidNode(null, localConf);
+
+      waitForFileRaided(LOG, fileSys, file, destPath);
+      FileStatus newStat = fileSys.getFileStatus(file);
+
+      assertEquals(stat.getModificationTime(), newStat.getModificationTime());
+      assertEquals(stat.getAccessTime(), newStat.getAccessTime());
+    } finally {
+      myTearDown();
+    }
+  }
+
   //
   // creates a file and populate it with random data. Returns its crc.
   //

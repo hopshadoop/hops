@@ -748,6 +748,7 @@ public class RaidNode implements RaidProtocol {
     // on the destination namenode may not be synchronised with the timestamp of the 
     // source namenode.
     outFs.setTimes(outpath, stat.getModificationTime(), -1);
+    inFs.setTimes(inpath, stat.getModificationTime(), stat.getAccessTime());
 
     FileStatus outstat = outFs.getFileStatus(outpath);
     FileStatus inStat = inFs.getFileStatus(inpath);

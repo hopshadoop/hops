@@ -350,6 +350,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1867.  Remove unused methods in
     org.apache.hadoop.streaming.StreamUtil.  (amareshwari via tomwhite)
 
+    MAPREDUCE-2146.  Raid does not affect access time of a source file.
+    (Ramkumar Vadali via dhruba)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES
