@@ -359,6 +359,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2150.  RaidNode periodically fixes corrupt blocks. (Ramkumar Vadali via
     schen)
 
+    MAPREDUCE-2099.  RaidNode recreates outdated parity HARs. (Ramkumar Vadali
+    via schen)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES

@@ -105,6 +105,7 @@ public class RaidNode implements RaidProtocol {
   Daemon triggerThread = null;
 
   /** Deamon thread to delete obsolete parity files */
+  PurgeMonitor purgeMonitor = null;
   Daemon purgeThread = null;
   
   /** Deamon thread to har raid directories */
@@ -289,7 +290,8 @@ public class RaidNode implements RaidProtocol {
     this.triggerThread.start();
 
     // start the thread that deletes obsolete parity files
-    this.purgeThread = new Daemon(new PurgeMonitor());
+    this.purgeMonitor = new PurgeMonitor();
+    this.purgeThread = new Daemon(purgeMonitor);
     this.purgeThread.start();
 
     // start the thread that creates HAR files
@@ -899,12 +901,22 @@ public class RaidNode implements RaidProtocol {
       LOG.debug("Checking " + destPath + " prefix " + destPrefix);
 
       // Verify if it is a har file
-      if (destStr.endsWith(HAR_SUFFIX)) {
-        String destParentStr = destPath.getParent().toUri().getPath();
-        String src = destParentStr.replaceFirst(destPrefix, "");
-        Path srcPath = new Path(src);
-        if (!srcFs.exists(srcPath)) {
-          destFs.delete(destPath, true);
+      if (dest.isDirectory() && destStr.endsWith(HAR_SUFFIX)) {
+        try {
+          int harUsedPercent =
+            usefulHar(srcFs, destFs, destPath, destPrefix, conf);
+          LOG.info("Useful percentage of " + destStr + " " + harUsedPercent);
+          // Delete the har if its usefulness reaches a threshold.
+          if (harUsedPercent <= conf.getInt("raid.har.usage.threshold", 0)) {
+            LOG.info("Purging " + destStr + " at usage " + harUsedPercent);
+            boolean done = destFs.delete(destPath, true);
+            if (!done) {
+              LOG.error("Could not purge " + destPath);
+            }
+          }
+        } catch (IOException e) {
+          LOG.warn("Error during purging " + destStr + " " +
+              StringUtils.stringifyException(e));
         }
         return;
       }
@@ -919,14 +931,9 @@ public class RaidNode implements RaidProtocol {
       if (dest.isDirectory()) {
         FileStatus[] files = null;
         files = destFs.listStatus(destPath);
-        if (files != null) {
-          for (FileStatus one:files) {
-            recursePurge(srcFs, destFs, destPrefix, one);
-          }
-        }
-        files = destFs.listStatus(destPath);
         if (files == null || files.length == 0){
-          boolean done = destFs.delete(destPath,false);
+          boolean done = destFs.delete(destPath,true); // ideal is false, but
+                  // DFSClient only deletes directories if it is recursive
           if (done) {
             LOG.info("Purged directory " + destPath );
           }
@@ -934,6 +941,13 @@ public class RaidNode implements RaidProtocol {
             LOG.info("Unable to purge directory " + destPath);
           }
         }
+        if (files != null) {
+          for (FileStatus one:files) {
+            recursePurge(srcFs, destFs, destPrefix, one);
+          }
+        }
+        // If the directory is empty now, it will be purged the next time this
+        // thread runs.
         return; // the code below does the file checking
       }
       
@@ -955,7 +969,53 @@ public class RaidNode implements RaidProtocol {
     } 
   }
 
-  
+  //
+  // Returns the number of up-to-date files in the har as a percentage of the
+  // total number of files in the har.
+  //
+  protected static int usefulHar(
+    FileSystem srcFs, FileSystem destFs,
+    Path harPath, String destPrefix, Configuration conf) throws IOException {
+
+    FileSystem fsHar = new HarFileSystem(destFs);
+    String harURIPath = harPath.toUri().getPath();
+    Path qualifiedPath = new Path("har://", harURIPath +
+      Path.SEPARATOR + harPath.getParent().toUri().getPath());
+    fsHar.initialize(qualifiedPath.toUri(), conf);
+    FileStatus[] filesInHar = fsHar.listStatus(qualifiedPath);
+    if (filesInHar.length == 0) {
+      return 0;
+    }
+    int numUseless = 0;
+    for (FileStatus one: filesInHar) {
+      Path parityPath = one.getPath();
+      String parityStr = parityPath.toUri().getPath();
+      if (parityStr.startsWith("har:/")) {
+        LOG.error("Unexpected prefix har:/ for " + parityStr);
+        continue;
+      }
+      String prefixToReplace = harURIPath + destPrefix;
+      if (!parityStr.startsWith(prefixToReplace)) {
+        continue;
+      }
+      String src = parityStr.substring(prefixToReplace.length());
+      try {
+        FileStatus srcStatus = srcFs.getFileStatus(new Path(src));
+        if (srcStatus == null) {
+          numUseless++;
+        } else if (one.getModificationTime() !=
+                  srcStatus.getModificationTime()) {
+          numUseless++;
+        }
+      } catch (FileNotFoundException e) {
+        LOG.info("File not found: " + e);
+        numUseless++;
+      }
+    }
+    int uselessPercent = numUseless * 100 / filesInHar.length;
+    return 100 - uselessPercent;
+  }
+
   private void doHar() throws IOException, InterruptedException {
     
     PolicyList.CompareByPath lexi = new PolicyList.CompareByPath();

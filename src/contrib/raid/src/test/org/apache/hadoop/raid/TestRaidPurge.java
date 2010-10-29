@@ -47,6 +47,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.mapred.MiniMRCluster;
 import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.hdfs.TestRaidDfs;
 import org.apache.hadoop.raid.protocol.PolicyInfo;
 import org.apache.hadoop.raid.protocol.PolicyList;
 
@@ -107,7 +108,14 @@ public class TestRaidPurge extends TestCase {
    * create raid.xml file for RaidNode
    */
   private void mySetup(String srcPath, long targetReplication,
-                long metaReplication, long stripeLength) throws Exception {
+                long metaReplication, long stripeLength)
+    throws Exception {
+    mySetup(srcPath, targetReplication, metaReplication, stripeLength, 1);
+  }
+
+  private void mySetup(String srcPath, long targetReplication,
+                long metaReplication, long stripeLength, int harDelay)
+    throws Exception {
     FileWriter fileWriter = new FileWriter(CONFIG_FILE);
     fileWriter.write("<?xml version=\"1.0\"?>\n");
     String str = "<configuration> " +
@@ -138,6 +146,12 @@ public class TestRaidPurge extends TestCase {
                           "<description> time (milliseconds) after a file is modified to make it " +
                                          "a candidate for RAIDing " +
                           "</description> " + 
+                        "</property> " +
+                        "<property> " +
+                          "<name>time_before_har</name> " +
+                          "<value> " + harDelay + "</value> " +
+                          "<description> time before har'ing parity files" +
+                          "</description> " +
                         "</property> " +
                      "</policy>" +
                    "</srcPath>" +
@@ -259,5 +273,75 @@ public class TestRaidPurge extends TestCase {
     }
     LOG.info("doTestPurge completed:" + " blockSize=" + blockSize +
              " stripeLength=" + stripeLength);
+  }
+
+  /**
+   * Create a file, wait for parity file to get HARed. Then modify the file,
+   * wait for the HAR to get purged.
+   */
+  public void testPurgeHar() throws Exception {
+    LOG.info("testPurgeHar started");
+    int harDelay = 0;
+    createClusters(true);
+    mySetup("/user/dhruba/raidtest", 1, 1, 5, harDelay);
+    Path dir = new Path("/user/dhruba/raidtest/");
+    Path destPath = new Path("/destraid/user/dhruba/raidtest");
+    Path file1 = new Path(dir + "/file");
+    RaidNode cnode = null;
+    try {
+      TestRaidNode.createOldFile(fileSys, file1, 1, 8, 8192L);
+      LOG.info("testPurgeHar created test files");
+
+      // create an instance of the RaidNode
+      Configuration localConf = new Configuration(conf);
+      localConf.set(RaidNode.RAID_LOCATION_KEY, "/destraid");
+      cnode = RaidNode.createRaidNode(null, localConf);
+
+      // Wait till har is created.
+      while (true) {
+        try {
+          FileStatus[] listPaths = listPaths = fileSys.listStatus(destPath);
+          if (listPaths != null && listPaths.length == 1) {
+            FileStatus s = listPaths[0];
+            LOG.info("testPurgeHar found path " + s.getPath());
+            if (s.getPath().toString().endsWith(".har")) {
+              break;
+            }
+          }
+        } catch (FileNotFoundException e) {
+          //ignore
+        }
+        Thread.sleep(1000);                  // keep waiting
+      }
+
+      // Set an old timestamp.
+      fileSys.setTimes(file1, 0, 0);
+
+      boolean found = false;
+      FileStatus[] listPaths = null;
+      while (!found || listPaths == null || listPaths.length > 1) {
+        listPaths = fileSys.listStatus(destPath);
+        if (listPaths != null) {
+          for (FileStatus s: listPaths) {
+            LOG.info("testPurgeHar waiting for parity file to be recreated" +
+              " and har to be deleted found " + s.getPath());
+            if (s.getPath().toString().endsWith("file") &&
+                s.getModificationTime() == 0) {
+              found = true;
+            }
+          }
+        }
+        Thread.sleep(1000);
+      }
+    } catch (Exception e) {
+      LOG.info("testPurgeHar Exception " + e +
+          StringUtils.stringifyException(e));
+      throw e;
+    } finally {
+      if (cnode != null) { cnode.stop(); cnode.join(); }
+      fileSys.delete(dir, true);
+      fileSys.delete(destPath, true);
+      stopClusters();
+    }
   }
 }
