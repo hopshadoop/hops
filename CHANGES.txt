@@ -160,6 +160,8 @@ Trunk (unreleased changes)
     HDFS-1462. Refactor edit log loading to a separate class from edit log writing.
     (Todd Lipcon via eli)
 
+    HDFS-1485. Fix typo in BlockPlacementPolicy. (Jingguo Yao via shv)
+
   OPTIMIZATIONS
 
     HDFS-1140. Speedup INode.getPathComponents. (Dmytro Molkov via shv)
