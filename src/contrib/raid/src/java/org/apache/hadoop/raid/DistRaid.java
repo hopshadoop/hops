@@ -249,16 +249,35 @@ public class DistRaid {
   }
 
   /**
+   * Set options specified in raid.scheduleroption.
+   * The string should be formatted as key:value[,key:value]*
+   */
+  static void setSchedulerOption(Configuration conf) {
+    String schedulerOption = conf.get("raid.scheduleroption");
+    if (schedulerOption != null) {
+      // Parse the scheduler option to get key:value pairs.
+      String[] keyValues = schedulerOption.trim().split(",");
+      for (String keyValue: keyValues) {
+        String[] fields = keyValue.trim().split(":");
+        String key = fields[0].trim();
+        String value = fields[1].trim();
+        conf.set(key, value);
+      }
+    }
+  }
+
+  /**
    * create new job conf based on configuration passed.
    * 
    * @param conf
    * @return
    */
-  private static JobConf createJobConf(Configuration conf) {
+  static JobConf createJobConf(Configuration conf) {
     JobConf jobconf = new JobConf(conf, DistRaid.class);
     jobName = NAME + " " + dateForm.format(new Date(RaidNode.now()));
     jobconf.setJobName(jobName);
     jobconf.setMapSpeculativeExecution(false);
+    setSchedulerOption(jobconf);
 
     jobconf.setJarByClass(DistRaid.class);
     jobconf.setInputFormat(DistRaidInputFormat.class);
