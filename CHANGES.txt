@@ -157,6 +157,9 @@ Trunk (unreleased changes)
     HDFS-259. Remove intentionally corrupt 0.13 directory layout creation.
     (Todd Lipcon via eli)
 
+    HDFS-1462. Refactor edit log loading to a separate class from edit log writing.
+    (Todd Lipcon via eli)
+
   OPTIMIZATIONS
 
     HDFS-1140. Speedup INode.getPathComponents. (Dmytro Molkov via shv)

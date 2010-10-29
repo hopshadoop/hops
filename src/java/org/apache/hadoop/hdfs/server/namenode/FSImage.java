@@ -1142,7 +1142,7 @@ public class FSImage extends Storage {
         long blockSize = 0;
         pathComponents = readPathComponents(in);
         replication = in.readShort();
-        replication = editLog.adjustReplication(replication);
+        replication = fsNamesys.adjustReplication(replication);
         modificationTime = in.readLong();
         if (imgVersion <= -17) {
           atime = in.readLong();
@@ -1283,17 +1283,19 @@ public class FSImage extends Storage {
    * @throws IOException
    */
   int loadFSEdits(StorageDirectory sd) throws IOException {
+    FSEditLogLoader loader = new FSEditLogLoader(namesystem);
+    
     int numEdits = 0;
     EditLogFileInputStream edits = 
       new EditLogFileInputStream(getImageFile(sd, NameNodeFile.EDITS));
     
-    numEdits = editLog.loadFSEdits(edits);
+    numEdits = loader.loadFSEdits(edits);
     edits.close();
     File editsNew = getImageFile(sd, NameNodeFile.EDITS_NEW);
     
     if (editsNew.exists() && editsNew.length() > 0) {
       edits = new EditLogFileInputStream(editsNew);
-      numEdits += editLog.loadFSEdits(edits);
+      numEdits += loader.loadFSEdits(edits);
       edits.close();
     }
     
