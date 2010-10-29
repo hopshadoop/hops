@@ -61,7 +61,7 @@ public class BackupStorage extends FSImage {
   }
 
   @Override
-  public boolean isPreUpgradableLayout(StorageDirectory sd) throws IOException {
+  public boolean isConversionNeeded(StorageDirectory sd) {
     return false;
   }
 

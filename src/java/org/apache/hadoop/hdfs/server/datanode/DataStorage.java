@@ -190,8 +190,7 @@ public class DataStorage extends Storage {
       storageID = ssid;
   }
 
-  @Override
-  public boolean isPreUpgradableLayout(StorageDirectory sd) throws IOException {
+  public boolean isConversionNeeded(StorageDirectory sd) throws IOException {
     File oldF = new File(sd.getRoot(), "storage");
     if (!oldF.exists())
       return false;
@@ -461,6 +460,22 @@ public class DataStorage extends Storage {
     for(int i = 0; i < blockNames.length; i++)
       linkBlocks(new File(from, blockNames[i]), 
                  new File(to, blockNames[i]), oldLV);
+  }
+
+  protected void corruptPreUpgradeStorage(File rootDir) throws IOException {
+    File oldF = new File(rootDir, "storage");
+    if (oldF.exists())
+      return;
+    // recreate old storage file to let pre-upgrade versions fail
+    if (!oldF.createNewFile())
+      throw new IOException("Cannot create file " + oldF);
+    RandomAccessFile oldFile = new RandomAccessFile(oldF, "rws");
+    // write new version into old storage file
+    try {
+      writeCorruptedData(oldFile);
+    } finally {
+      oldFile.close();
+    }
   }
 
   private void verifyDistributedUpgradeProgress(
