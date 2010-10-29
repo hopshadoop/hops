@@ -102,7 +102,7 @@ public class HarIndex {
       long startIndex = Long.parseLong(splits[3]);
       long length = Long.parseLong(splits[4]);
       String[] newsplits = URLDecoder.decode(splits[5],"UTF-8").split(" ");
-      if (newsplits != null && newsplits.length >= 5) {
+      if (newsplits != null && newsplits.length >= 4) {
         long mtime = Long.parseLong(newsplits[0]);
         IndexEntry entry = new IndexEntry(
           name, startIndex, length, mtime, partName);

@@ -110,6 +110,10 @@ public class RaidNode implements RaidProtocol {
   /** Deamon thread to har raid directories */
   Daemon harThread = null;
 
+  /** Daemon thread to fix corrupt files */
+  BlockFixer blockFixer = null;
+  Daemon blockFixerThread = null;
+
   /** Daemon thread to monitor distributed raid job progress */
   JobMonitor jobMonitor = null;
   Daemon jobMonitorThread = null;
@@ -207,6 +211,7 @@ public class RaidNode implements RaidProtocol {
     try {
       if (server != null) server.join();
       if (triggerThread != null) triggerThread.join();
+      if (blockFixerThread != null) blockFixerThread.join();
       if (jobMonitorThread != null) jobMonitorThread.join();
       if (purgeThread != null) purgeThread.join();
     } catch (InterruptedException ie) {
@@ -225,6 +230,8 @@ public class RaidNode implements RaidProtocol {
     running = false;
     if (server != null) server.stop();
     if (triggerThread != null) triggerThread.interrupt();
+    if (blockFixer != null) blockFixer.running = false;
+    if (blockFixerThread != null) blockFixerThread.interrupt();
     if (jobMonitor != null) jobMonitor.running = false;
     if (jobMonitorThread != null) jobMonitorThread.interrupt();
     if (purgeThread != null) purgeThread.interrupt();
@@ -268,6 +275,10 @@ public class RaidNode implements RaidProtocol {
     initialized = true;
     running = true;
     this.server.start(); // start RPC server
+
+    this.blockFixer = new BlockFixer(conf);
+    this.blockFixerThread = new Daemon(this.blockFixer);
+    this.blockFixerThread.start();
 
     this.jobMonitor = new JobMonitor(conf);
     this.jobMonitorThread = new Daemon(this.jobMonitor);
@@ -1074,29 +1085,33 @@ public class RaidNode implements RaidProtocol {
 
     if ( shouldHar ) {
       LOG.info("Archiving " + dest.getPath() + " to " + tmpHarPath );
-      singleHar(destFs, dest, tmpHarPath);
+      singleHar(info, destFs, dest, tmpHarPath);
     }
   } 
 
   
-  private void singleHar(FileSystem destFs, FileStatus dest, String tmpHarPath) throws IOException {
-    
+  private void singleHar(PolicyInfo info, FileSystem destFs, FileStatus dest,
+    String tmpHarPath) throws IOException {
+
     Random rand = new Random();
     Path root = new Path("/");
     Path qualifiedPath = dest.getPath().makeQualified(destFs);
     String harFileDst = qualifiedPath.getName() + HAR_SUFFIX;
     String harFileSrc = qualifiedPath.getName() + "-" + 
                                 rand.nextLong() + "-" + HAR_SUFFIX;
+    short metaReplication =
+      (short) Integer.parseInt(info.getProperty("metaReplication"));
     // HadoopArchives.HAR_PARTFILE_LABEL is private, so hard-coding the label.
     conf.setLong("har.partfile.size", configMgr.getHarPartfileSize());
     HadoopArchives har = new HadoopArchives(conf);
-    String[] args = new String[6];
-    args[0] = "-archiveName";
-    args[1] = harFileSrc;
-    args[2] = "-p"; 
-    args[3] = root.makeQualified(destFs).toString();
-    args[4] = qualifiedPath.toUri().getPath().substring(1);
-    args[5] = tmpHarPath.toString();
+    String[] args = new String[7];
+    args[0] = "-Ddfs.replication=" + metaReplication;
+    args[1] = "-archiveName";
+    args[2] = harFileSrc;
+    args[3] = "-p"; 
+    args[4] = root.makeQualified(destFs).toString();
+    args[5] = qualifiedPath.toUri().getPath().substring(1);
+    args[6] = tmpHarPath.toString();
     int ret = 0;
     try {
       ret = ToolRunner.run(har, args);

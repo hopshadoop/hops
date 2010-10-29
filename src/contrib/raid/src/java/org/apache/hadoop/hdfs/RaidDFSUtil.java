@@ -19,11 +19,21 @@
 package org.apache.hadoop.hdfs;
 
 import java.io.IOException;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.PrintStream;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
+import org.apache.hadoop.hdfs.tools.DFSck;
+import org.apache.hadoop.util.ToolRunner;
 
 public abstract class RaidDFSUtil {
   /**
@@ -48,5 +58,31 @@ public abstract class RaidDFSUtil {
     DistributedFileSystem dfs, String path, long offset, long length)
     throws IOException {
     return dfs.getClient().namenode.getBlockLocations(path, offset, length);
+  }
+
+  public static String[] getCorruptFiles(Configuration conf)
+    throws IOException {
+    ByteArrayOutputStream baseOut = new ByteArrayOutputStream();
+    PrintStream out = new PrintStream(baseOut, true);
+    DFSck fsck = new DFSck(conf, out);
+    String[] args = new String[]{"-list-corruptfileblocks"};
+    try {
+      ToolRunner.run(fsck, args);
+    } catch (Exception e) {
+      throw new IOException("DFSck.run exception ", e);
+    }
+    byte[] output = baseOut.toByteArray();
+    BufferedReader in = new BufferedReader(new InputStreamReader(
+      new ByteArrayInputStream(output)));
+    String line;
+    Set<String> corruptFiles = new HashSet<String>();
+    while ((line = in.readLine()) != null) {
+      // The interesting lines are of the form: blkid<tab>path
+      int separatorPos = line.indexOf('\t');
+      if (separatorPos != -1) {
+        corruptFiles.add(line.substring(separatorPos + 1));
+      }
+    }
+    return corruptFiles.toArray(new String[corruptFiles.size()]);
   }
 }

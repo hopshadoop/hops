@@ -356,6 +356,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2146.  Raid does not affect access time of a source file.
     (Ramkumar Vadali via dhruba)
 
+    MAPREDUCE-2150.  RaidNode periodically fixes corrupt blocks. (Ramkumar Vadali via
+    schen)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES

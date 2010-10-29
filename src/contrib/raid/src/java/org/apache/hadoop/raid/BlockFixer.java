@@ -79,7 +79,7 @@ import org.apache.hadoop.raid.RaidUtils;
  * and figures out the location of the bad block by reading through
  * the corrupt file.
  */
-public class BlockFixer {
+public class BlockFixer implements Runnable {
   public static final Log LOG = LogFactory.getLog(
                                   "org.apache.hadoop.raid.BlockFixer");
   private java.util.HashMap<String, java.util.Date> history;
@@ -89,6 +89,8 @@ public class BlockFixer {
   private String xorPrefix;
   private XOREncoder xorEncoder;
   private XORDecoder xorDecoder;
+
+  boolean running = true;
 
   public BlockFixer(Configuration conf) throws IOException {
     this.conf = conf;
@@ -101,9 +103,55 @@ public class BlockFixer {
     xorDecoder = new XORDecoder(conf, stripeLength);
   }
 
+  public void run() {
+    while (running) {
+      try {
+        LOG.info("BlockFixer continuing to run...");
+        doFix();
+      } catch (Exception e) {
+        LOG.error(StringUtils.stringifyException(e));
+      } catch (Error err) {
+        LOG.error("Exiting after encountering " +
+                    StringUtils.stringifyException(err));
+        throw err;
+      }
+    }
+  }
+
   public long filesFixed() {
     return numFilesFixed;
   }
+
+  void doFix() throws InterruptedException, IOException {
+    while (running) {
+      // Sleep before proceeding to fix files.
+      Thread.sleep(blockFixInterval);
+
+      // Purge history older than the history interval.
+      purgeHistory();
+
+      List<Path> corruptFiles = getCorruptFiles();
+      if (corruptFiles.isEmpty()) {
+        // If there are no corrupt files, retry after some time.
+        continue;
+      }
+      LOG.info("Found " + corruptFiles.size() + " corrupt files.");
+
+      sortCorruptFiles(corruptFiles);
+
+      for (Path srcPath: corruptFiles) {
+        if (!running) break;
+        try {
+          fixFile(srcPath);
+        } catch (IOException ie) {
+          LOG.error("Hit error while processing " + srcPath +
+            ": " + StringUtils.stringifyException(ie));
+          // Do nothing, move on to the next file.
+        }
+      }
+    }
+  }
+
 
   void fixFile(Path srcPath) throws IOException {
     if (RaidNode.isParityHarPartFile(srcPath)) {
@@ -169,14 +217,11 @@ public class BlockFixer {
   List<Path> getCorruptFiles() throws IOException {
     DistributedFileSystem dfs = getDFS(new Path("/"));
 
-    // TODO: need an RPC here.
-    // FileStatus[] files =  dfs.getClient().namenode.getCorruptFiles();
-    FileStatus[] files = new FileStatus[0];
+    String[] nnCorruptFiles = RaidDFSUtil.getCorruptFiles(conf);
     List<Path> corruptFiles = new LinkedList<Path>();
-    for (FileStatus f: files) {
-      Path p = f.getPath();
-      if (!history.containsKey(p.toString())) {
-        corruptFiles.add(p);
+    for (String file: nnCorruptFiles) {
+      if (!history.containsKey(file)) {
+        corruptFiles.add(new Path(file));
       }
     }
     RaidUtils.filterTrash(conf, corruptFiles);
