@@ -152,6 +152,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1818. RaidNode can specify scheduling parameters. (Ramkumar
     Vadali via schen)
 
+    MAPREDUCE-2051. Contribute a fair scheduler preemption system test.
+    (Todd Lipcon via tomwhite)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and
