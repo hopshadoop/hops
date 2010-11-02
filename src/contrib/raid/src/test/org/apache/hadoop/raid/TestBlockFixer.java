@@ -239,18 +239,16 @@ public class TestBlockFixer extends TestCase {
       corruptBlock(locs.get(0).getBlock().getBlockName());
       reportCorruptBlocks(dfs, file1, new int[]{0}, blockSize);
 
-      // This should fail.
-      boolean caughtChecksumException = false;
       try {
         Thread.sleep(5*1000);
       } catch (InterruptedException ignore) {
       }
       try {
         TestRaidDfs.validateFile(dfs, file1, file1Len, crc1);
+        fail("Expected exception not thrown");
       } catch (org.apache.hadoop.fs.ChecksumException ce) {
-        caughtChecksumException = true;
+      } catch (org.apache.hadoop.hdfs.BlockMissingException bme) {
       }
-      assertTrue(caughtChecksumException);
     } catch (Exception e) {
       LOG.info("Test testGeneratedBlock Exception " + e + StringUtils.stringifyException(e));
       throw e;

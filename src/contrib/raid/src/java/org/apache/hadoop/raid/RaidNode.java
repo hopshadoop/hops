@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.io.FileNotFoundException;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.LinkedList;
 import java.util.Iterator;
@@ -334,9 +335,19 @@ public class RaidNode implements RaidProtocol {
    */
   class TriggerMonitor implements Runnable {
 
-    private Map<String, Long> scanTimes = new HashMap<String, Long>();
-    private Map<String, DirectoryTraversal> scanState =
-      new HashMap<String, DirectoryTraversal>();
+    class ScanState {
+      long fullScanStartTime;
+      DirectoryTraversal pendingTraversal;
+      RaidFilter.Statistics stats;
+      ScanState() {
+        fullScanStartTime = 0;
+        pendingTraversal = null;
+        stats = new RaidFilter.Statistics();
+      }
+    }
+
+    private Map<String, ScanState> scanStateMap =
+      new HashMap<String, ScanState>();
 
     /**
      */
@@ -357,9 +368,10 @@ public class RaidNode implements RaidProtocol {
      */
     private boolean shouldSelectFiles(PolicyInfo info) {
       String policyName = info.getName();
+      ScanState scanState = scanStateMap.get(policyName);
       int runningJobsCount = jobMonitor.runningJobsCount(policyName);
       // Is there a scan in progress for this policy?
-      if (scanState.containsKey(policyName)) {
+      if (scanState.pendingTraversal != null) {
         int maxJobsPerPolicy = configMgr.getMaxJobsPerPolicy();
 
         // If there is a scan in progress for this policy, we can have
@@ -373,12 +385,8 @@ public class RaidNode implements RaidProtocol {
         }
         // Check the time of the last full traversal before starting a fresh
         // traversal.
-        if (scanTimes.containsKey(policyName)) {
-          long lastScan = scanTimes.get(policyName);
-          return (now() > lastScan + configMgr.getPeriodicity());
-        } else {
-          return true;
-        }
+        long lastScan = scanState.fullScanStartTime;
+        return (now() > lastScan + configMgr.getPeriodicity());
       }
     }
 
@@ -388,33 +396,29 @@ public class RaidNode implements RaidProtocol {
     * traversal.
     * The number of paths returned is limited by raid.distraid.max.jobs.
     */
-    private List<FileStatus> selectFiles(PolicyInfo info) throws IOException {
+    private List<FileStatus> selectFiles(
+      PolicyInfo info, ArrayList<PolicyInfo> allPolicies) throws IOException {
       Path destPrefix = getDestinationPath(conf);
       String policyName = info.getName();
       Path srcPath = info.getSrcPath();
-      long modTimePeriod = 0;
-      String str = info.getProperty("modTimePeriod");
-      if (str != null) {
-         modTimePeriod = Long.parseLong(info.getProperty("modTimePeriod"));
-      }
-      short srcReplication = 0;
-      str = info.getProperty("srcReplication");
-      if (str != null) {
-        srcReplication = Short.parseShort(info.getProperty("srcReplication"));
-      }
+      long modTimePeriod = Long.parseLong(info.getProperty("modTimePeriod"));
 
       // Max number of files returned.
       int selectLimit = configMgr.getMaxFilesPerJob();
       int targetRepl = Integer.parseInt(info.getProperty("targetReplication"));
 
+      long selectStartTime = System.currentTimeMillis();
+
+      ScanState scanState = scanStateMap.get(policyName);
       // If we have a pending traversal, resume it.
-      if (scanState.containsKey(policyName)) {
-        DirectoryTraversal dt = scanState.get(policyName);
+      if (scanState.pendingTraversal != null) {
+        DirectoryTraversal dt = scanState.pendingTraversal;
         LOG.info("Resuming traversal for policy " + policyName);
-        List<FileStatus> returnSet = dt.selectFilesToRaid(
-            conf, targetRepl, destPrefix, modTimePeriod, selectLimit);
+        DirectoryTraversal.FileFilter filter =
+          filterForPolicy(selectStartTime, info, allPolicies, scanState.stats);
+        List<FileStatus> returnSet = dt.getFilteredFiles(filter, selectLimit);
         if (dt.doneTraversal()) {
-          scanState.remove(policyName);
+          scanState.pendingTraversal = null;
         }
         return returnSet;
       }
@@ -445,12 +449,13 @@ public class RaidNode implements RaidProtocol {
         }
 
         // Set the time for a new traversal.
-        scanTimes.put(policyName, now());
+        scanState.fullScanStartTime = now();
         DirectoryTraversal dt = new DirectoryTraversal(fs, selectedPaths);
-        returnSet = dt.selectFilesToRaid(
-            conf, targetRepl, destPrefix, modTimePeriod, selectLimit);
+        DirectoryTraversal.FileFilter filter =
+          filterForPolicy(selectStartTime, info, allPolicies, scanState.stats);
+        returnSet = dt.getFilteredFiles(filter, selectLimit);
         if (!dt.doneTraversal()) {
-          scanState.put(policyName, dt);
+          scanState.pendingTraversal = dt;
         }
       }
       return returnSet;
@@ -461,72 +466,85 @@ public class RaidNode implements RaidProtocol {
      * If the config file has changed, then reload config file and start afresh.
      */
     private void doProcess() throws IOException, InterruptedException {
-      PolicyList.CompareByPath lexi = new PolicyList.CompareByPath();
-
+      ArrayList<PolicyInfo> allPolicies = new ArrayList<PolicyInfo>();
+      for (PolicyList category : configMgr.getAllPolicies()) {
+        for (PolicyInfo info: category.getAll()) {
+          allPolicies.add(info);
+        }
+      }
       while (running) {
         Thread.sleep(SLEEP_TIME);
 
-        configMgr.reloadConfigsIfNecessary();
-
-        // activate all categories
-        Collection<PolicyList> all = configMgr.getAllPolicies();
-        
-        // sort all policies by reverse lexicographical order. This is needed
-        // to make the nearest policy take precedence.
-        PolicyList[] sorted = all.toArray(new PolicyList[all.size()]);
-        Arrays.sort(sorted, lexi);
-
-        for (PolicyList category : sorted) {
-          for (PolicyInfo info: category.getAll()) {
-
-            if (!shouldSelectFiles(info)) {
-              continue;
-            }
-
-            LOG.info("Triggering Policy Filter " + info.getName() +
-                     " " + info.getSrcPath());
-            List<FileStatus> filteredPaths = null;
-            try {
-              filteredPaths = selectFiles(info);
-            } catch (Exception e) {
-              LOG.info("Exception while invoking filter on policy " + info.getName() +
-                       " srcPath " + info.getSrcPath() + 
-                       " exception " + StringUtils.stringifyException(e));
-              continue;
-            }
-
-            if (filteredPaths == null || filteredPaths.size() == 0) {
-              LOG.info("No filtered paths for policy " + info.getName());
-               continue;
-            }
-
-            // Apply the action on accepted paths
-            LOG.info("Triggering Policy Action " + info.getName() +
-                     " " + info.getSrcPath());
-            try {
-              if (isRaidLocal){
-                doRaid(conf, info, filteredPaths);
-              }
-              else{
-                // We already checked that no job for this policy is running
-                // So we can start a new job.
-                DistRaid dr = new DistRaid(conf);
-                //add paths for distributed raiding
-                dr.addRaidPaths(info, filteredPaths);
-                boolean started = dr.startDistRaid();
-                if (started) {
-                  jobMonitor.monitorJob(info.getName(), dr);
-                }
-              }
-            } catch (Exception e) {
-              LOG.info("Exception while invoking action on policy " + info.getName() +
-                       " srcPath " + info.getSrcPath() + 
-                       " exception " + StringUtils.stringifyException(e));
-              continue;
+        boolean reloaded = configMgr.reloadConfigsIfNecessary();
+        if (reloaded) {
+          allPolicies.clear();
+          for (PolicyList category : configMgr.getAllPolicies()) {
+            for (PolicyInfo info: category.getAll()) {
+              allPolicies.add(info);
             }
           }
         }
+
+        for (PolicyInfo info: allPolicies) {
+          if (!scanStateMap.containsKey(info.getName())) {
+            scanStateMap.put(info.getName(), new ScanState());
+          }
+
+          if (!shouldSelectFiles(info)) {
+            continue;
+          }
+
+          LOG.info("Triggering Policy Filter " + info.getName() +
+                   " " + info.getSrcPath());
+          List<FileStatus> filteredPaths = null;
+          try {
+            filteredPaths = selectFiles(info, allPolicies);
+          } catch (Exception e) {
+            LOG.info("Exception while invoking filter on policy " + info.getName() +
+                     " srcPath " + info.getSrcPath() + 
+                     " exception " + StringUtils.stringifyException(e));
+            continue;
+          }
+
+          if (filteredPaths == null || filteredPaths.size() == 0) {
+            LOG.info("No filtered paths for policy " + info.getName());
+             continue;
+          }
+
+          // Apply the action on accepted paths
+          LOG.info("Triggering Policy Action " + info.getName() +
+                   " " + info.getSrcPath());
+          try {
+            if (isRaidLocal){
+              doRaid(conf, info, filteredPaths);
+            }
+            else{
+              // We already checked that no job for this policy is running
+              // So we can start a new job.
+              DistRaid dr = new DistRaid(conf);
+              //add paths for distributed raiding
+              dr.addRaidPaths(info, filteredPaths);
+              boolean started = dr.startDistRaid();
+              if (started) {
+                jobMonitor.monitorJob(info.getName(), dr);
+              }
+            }
+          } catch (Exception e) {
+            LOG.info("Exception while invoking action on policy " + info.getName() +
+                     " srcPath " + info.getSrcPath() + 
+                     " exception " + StringUtils.stringifyException(e));
+            continue;
+          }
+        }
       }
+    }
+
+    DirectoryTraversal.FileFilter filterForPolicy(
+      long startTime, PolicyInfo info, List<PolicyInfo> allPolicies,
+      RaidFilter.Statistics stats)
+      throws IOException {
+      return new RaidFilter.TimeBasedFilter(conf, getDestinationPath(conf),
+        info, allPolicies, startTime, stats);
     }
   }
 
@@ -618,9 +636,9 @@ public class RaidNode implements RaidProtocol {
   }
   
   private ParityFilePair getParityFile(Path destPathPrefix, Path srcPath) throws IOException {
-	  
-	  return getParityFile(destPathPrefix, srcPath, conf);
-	  
+    
+    return getParityFile(destPathPrefix, srcPath, conf);
+    
   }
   
 
@@ -825,8 +843,6 @@ public class RaidNode implements RaidProtocol {
      * destination directories.
      */
     private void doPurge() throws IOException, InterruptedException {
-      PolicyList.CompareByPath lexi = new PolicyList.CompareByPath();
-
       long prevExec = 0;
       while (running) {
 
@@ -838,16 +854,8 @@ public class RaidNode implements RaidProtocol {
 
         LOG.info("Started purge scan");
         prevExec = now();
-        
-        // fetch all categories
-        Collection<PolicyList> all = configMgr.getAllPolicies();
-        
-        // sort all policies by reverse lexicographical order. This is 
-        // needed to make the nearest policy take precedence.
-        PolicyList[] sorted = all.toArray(new PolicyList[all.size()]);
-        Arrays.sort(sorted, lexi);
 
-        for (PolicyList category : sorted) {
+        for (PolicyList category : configMgr.getAllPolicies()) {
           for (PolicyInfo info: category.getAll()) {
 
             try {
@@ -857,7 +865,7 @@ public class RaidNode implements RaidProtocol {
 
               //get srcPaths
               Path[] srcPaths = info.getSrcPathExpanded();
-              
+
               if (srcPaths != null) {
                 for (Path srcPath: srcPaths) {
                   // expand destination prefix
@@ -1017,9 +1025,6 @@ public class RaidNode implements RaidProtocol {
   }
 
   private void doHar() throws IOException, InterruptedException {
-    
-    PolicyList.CompareByPath lexi = new PolicyList.CompareByPath();
-
     long prevExec = 0;
     while (running) {
 
@@ -1031,16 +1036,8 @@ public class RaidNode implements RaidProtocol {
 
       LOG.info("Started archive scan");
       prevExec = now();
-      
-      // fetch all categories
-      Collection<PolicyList> all = configMgr.getAllPolicies();
-            
-      // sort all policies by reverse lexicographical order. This is 
-      // needed to make the nearest policy take precedence.
-      PolicyList[] sorted = all.toArray(new PolicyList[all.size()]);
-      Arrays.sort(sorted, lexi);
 
-      for (PolicyList category : sorted) {
+      for (PolicyList category : configMgr.getAllPolicies()) {
         for (PolicyInfo info: category.getAll()) {
           String str = info.getProperty("time_before_har");
           String tmpHarPath = info.getProperty("har_tmp_dir");

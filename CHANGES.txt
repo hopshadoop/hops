@@ -155,6 +155,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2051. Contribute a fair scheduler preemption system test.
     (Todd Lipcon via tomwhite)
 
+    MAPREDUCE-1892. RaidNode can allow layered policies more efficiently.
+    (Ramkumar Vadali via schen)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and

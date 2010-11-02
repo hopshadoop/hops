@@ -31,6 +31,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.util.StringUtils;
 
 /**
  * Implements depth-first traversal using a Stack object. The traversal
@@ -44,6 +45,16 @@ public class DirectoryTraversal {
   private List<FileStatus> paths;
   private int pathIdx = 0;  // Next path to process.
   private Stack<Node> stack = new Stack<Node>();
+
+  /**
+   * A FileFilter object can be used to choose files during directory traversal.
+   */
+  public interface FileFilter {
+    /**
+     * @return a boolean value indicating if the file passes the filter.
+     */
+    boolean check(FileStatus f) throws IOException;
+  }
 
   /**
    * Represents a directory node in directory traversal.
@@ -82,62 +93,21 @@ public class DirectoryTraversal {
     pathIdx = 0;
   }
 
-  /**
-   * Choose some files to RAID.
-   * @param conf Configuration to use.
-   * @param raidDestPrefix Prefix of the path to RAID to.
-   * @param modTimePeriod Time gap before RAIDing.
-   * @param limit Limit on the number of files to choose.
-   * @return list of files to RAID.
-   * @throws IOException
-   */
-  public List<FileStatus> selectFilesToRaid(
-      Configuration conf, int targetRepl, Path raidDestPrefix,
-      long modTimePeriod, int limit) throws IOException {
-    List<FileStatus> selected = new LinkedList<FileStatus>();
-    int numSelected = 0;
-
-    long now = System.currentTimeMillis();
-    while (numSelected < limit) {
+  public List<FileStatus> getFilteredFiles(FileFilter filter, int limit)
+      throws IOException {
+    List<FileStatus> filtered = new LinkedList<FileStatus>();
+    int num = 0;
+    while (num < limit) {
       FileStatus next = getNextFile();
       if (next == null) {
         break;
       }
-      // We have the next file, do we want to select it?
-      // If the source file has fewer than or equal to 2 blocks, then skip it.
-      long blockSize = next.getBlockSize();
-      if (2 * blockSize >= next.getLen()) {
-        continue;
-      }
-
-      boolean select = false;
-      try {
-        Object ppair = RaidNode.getParityFile(
-            raidDestPrefix, next.getPath(), conf);
-        // Is there is a valid parity file?
-        if (ppair != null) {
-          // Is the source at the target replication?
-          if (next.getReplication() != targetRepl) {
-            // Select the file so that its replication can be set.
-            select = true;
-          } else {
-            // Nothing to do, don't select the file.
-            select = false;
-          }
-        } else if (next.getModificationTime() + modTimePeriod < now) {
-          // If there isn't a valid parity file, check if the file is too new.
-          select = true;
-        }
-      } catch (java.io.FileNotFoundException e) {
-        select = true; // destination file does not exist
-      }
-      if (select) {
-        selected.add(next);
-        numSelected++;
+      if (filter.check(next)) {
+        num++;
+        filtered.add(next);
       }
     }
-
-    return selected;
+    return filtered;
   }
 
   /**

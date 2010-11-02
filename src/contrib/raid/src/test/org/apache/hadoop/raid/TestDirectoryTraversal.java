@@ -32,6 +32,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.raid.protocol.PolicyInfo;
 
 public class TestDirectoryTraversal extends TestCase {
   final static Log LOG = LogFactory.getLog(
@@ -104,14 +105,16 @@ public class TestDirectoryTraversal extends TestCase {
       int limit = 2;
       short targetRepl = 1;
       Path raid = new Path("/raid");
-      List<FileStatus> selected = dt.selectFilesToRaid(conf, targetRepl, raid,
-                                                        0, limit);
+      DirectoryTraversal.FileFilter filter =
+        new RaidFilter.TimeBasedFilter(conf,
+          RaidNode.getDestinationPath(conf), 1, System.currentTimeMillis(), 0);
+      List<FileStatus> selected = dt.getFilteredFiles(filter, limit);
       for (FileStatus f: selected) {
         LOG.info(f.getPath());
       }
       assertEquals(limit, selected.size());
 
-      selected = dt.selectFilesToRaid(conf, targetRepl, raid, 0, limit);
+      selected = dt.getFilteredFiles(filter, limit);
       for (FileStatus f: selected) {
         LOG.info(f.getPath());
       }

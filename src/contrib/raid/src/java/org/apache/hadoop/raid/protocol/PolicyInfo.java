@@ -137,7 +137,7 @@ public class PolicyInfo implements Writable {
   /**
    * Get the srcPath
    */
-  public Path getSrcPath() throws IOException {
+  public Path getSrcPath() {
     return srcPath;
   }
 
