@@ -28,6 +28,7 @@ import javax.servlet.http.HttpServletRequest;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.hdfs.protocol.FSConstants;
 import org.apache.hadoop.hdfs.DFSUtil.ErrorSimulator;
+import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.security.UserGroupInformation;
 
 
@@ -44,6 +45,7 @@ class TransferFsImage implements FSConstants {
   private int remoteport;
   private String machineName;
   private CheckpointSignature token;
+  private MD5Hash newChecksum = null;
   
   /**
    * File downloader.
@@ -76,6 +78,8 @@ class TransferFsImage implements FSConstants {
         machineName = pmap.get("machine")[0];
       } else if (key.equals("token")) { 
         token = new CheckpointSignature(pmap.get("token")[0]);
+      } else if (key.equals("newChecksum")) {
+        newChecksum = new MD5Hash(pmap.get("newChecksum")[0]);
       }
     }
 
@@ -101,6 +105,14 @@ class TransferFsImage implements FSConstants {
     return token;
   }
 
+  /**
+   * Get the MD5 digest of the new image
+   * @return the MD5 digest of the new image
+   */
+  MD5Hash getNewChecksum() {
+    return newChecksum;
+  }
+  
   String getInfoServer() throws IOException{
     if (machineName == null || remoteport == 0) {
       throw new IOException ("MachineName and port undefined");

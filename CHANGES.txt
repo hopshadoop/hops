@@ -37,6 +37,8 @@ Trunk (unreleased changes)
 
     HDFS-1435. Provide an option to store fsimage compressed. (hairong)
 
+    HDFS-903.  Support fsimage validation through MD5 checksum. (hairong)
+
   IMPROVEMENTS
 
     HDFS-1304. Add a new unit test for HftpFileSystem.open(..).  (szetszwo)

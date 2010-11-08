@@ -94,13 +94,16 @@ public class TestSaveNamespace {
     // Replace the FSImage with a spy
     FSImage originalImage = fsn.dir.fsImage;
     FSImage spyImage = spy(originalImage);
+    spyImage.setStorageDirectories(
+        FSNamesystem.getNamespaceDirs(conf), 
+        FSNamesystem.getNamespaceEditsDirs(conf));
     fsn.dir.fsImage = spyImage;
 
     // inject fault
     switch(fault) {
     case SAVE_FSIMAGE:
       // The spy throws a RuntimeException when writing to the second directory
-      doAnswer(new FaultySaveImage(originalImage)).
+      doAnswer(new FaultySaveImage(spyImage)).
         when(spyImage).saveFSImage((File)anyObject());
       break;
     case MOVE_CURRENT:
@@ -127,7 +130,8 @@ public class TestSaveNamespace {
       }
 
       // Now shut down and restart the namesystem
-      fsn.close();
+      originalImage.close();
+      fsn.close();      
       fsn = null;
 
       // Start a new namesystem, which should be able to recover
@@ -168,6 +172,9 @@ public class TestSaveNamespace {
     // Replace the FSImage with a spy
     final FSImage originalImage = fsn.dir.fsImage;
     FSImage spyImage = spy(originalImage);
+    spyImage.setStorageDirectories(
+        FSNamesystem.getNamespaceDirs(conf), 
+        FSNamesystem.getNamespaceEditsDirs(conf));
     fsn.dir.fsImage = spyImage;
 
     try {
@@ -182,6 +189,7 @@ public class TestSaveNamespace {
       fsn.saveNamespace();
 
       // Now shut down and restart the NN
+      originalImage.close();
       fsn.close();
       fsn = null;
 

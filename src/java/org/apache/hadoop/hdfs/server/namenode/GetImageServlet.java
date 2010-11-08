@@ -87,6 +87,7 @@ public class GetImageServlet extends HttpServlet {
           } else if (ff.putImage()) {
             // issue a HTTP get request to download the new fsimage 
             nnImage.validateCheckpointUpload(ff.getToken());
+            nnImage.newImageDigest = ff.getNewChecksum();
             reloginIfNecessary().doAs(new PrivilegedExceptionAction<Void>() {
                 @Override
                 public Void run() throws Exception {
