@@ -371,6 +371,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2099.  RaidNode recreates outdated parity HARs. (Ramkumar Vadali
     via schen)
 
+    MAPREDUCE-2173.  Fix race condition in TestBlockFixer that was
+    causing  intermittent failure (Ramkumar Vadali via dhruba)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES

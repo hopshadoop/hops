@@ -532,6 +532,7 @@ public class TestBlockFixer extends TestCase {
         in.readFully(new byte[(int)blockSize]);
         fail("Expected exception not thrown for " + file + ":" + offset);
       } catch (org.apache.hadoop.fs.ChecksumException e) {
+      } catch (org.apache.hadoop.hdfs.BlockMissingException bme) {
       }
     }
   }
