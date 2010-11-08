@@ -91,7 +91,11 @@ public class TestRaidNode extends TestCase {
     conf.set("fs.shell.delete.classname", "org.apache.hadoop.hdfs.DFSClient");
 
     // the RaidNode does the raiding inline (instead of submitting to map/reduce)
-    conf.setBoolean("fs.raidnode.local", local);
+    if (local) {
+      conf.set("raid.classname", "org.apache.hadoop.raid.LocalRaidNode");
+    } else {
+      conf.set("raid.classname", "org.apache.hadoop.raid.DistRaidNode");
+    }
 
     conf.set("raid.server.address", "localhost:0");
 
@@ -514,18 +518,22 @@ public class TestRaidNode extends TestCase {
 
       long start = System.currentTimeMillis();
       final int MAX_WAITTIME = 300000;
-      while (cnode.jobMonitor.jobsMonitored() < 2 &&
+      
+      assertTrue("cnode is not DistRaidNode", cnode instanceof DistRaidNode);
+      DistRaidNode dcnode = (DistRaidNode) cnode;
+
+      while (dcnode.jobMonitor.jobsMonitored() < 2 &&
              System.currentTimeMillis() - start < MAX_WAITTIME) {
         Thread.sleep(1000);
       }
-      this.assertEquals(cnode.jobMonitor.jobsMonitored(), 2);
+      this.assertEquals(dcnode.jobMonitor.jobsMonitored(), 2);
 
       start = System.currentTimeMillis();
-      while (cnode.jobMonitor.jobsSucceeded() < 2 &&
+      while (dcnode.jobMonitor.jobsSucceeded() < 2 &&
              System.currentTimeMillis() - start < MAX_WAITTIME) {
         Thread.sleep(1000);
       }
-      this.assertEquals(cnode.jobMonitor.jobsSucceeded(), 2);
+      this.assertEquals(dcnode.jobMonitor.jobsSucceeded(), 2);
 
       LOG.info("Test testDistRaid successful.");
       
@@ -636,13 +644,16 @@ public class TestRaidNode extends TestCase {
       long start = System.currentTimeMillis();
       final int MAX_WAITTIME = 300000;
 
+      assertTrue("cnode is not DistRaidNode", cnode instanceof DistRaidNode);
+      DistRaidNode dcnode = (DistRaidNode) cnode;
+
       start = System.currentTimeMillis();
-      while (cnode.jobMonitor.jobsSucceeded() < numJobsExpected &&
+      while (dcnode.jobMonitor.jobsSucceeded() < numJobsExpected &&
              System.currentTimeMillis() - start < MAX_WAITTIME) {
         Thread.sleep(1000);
       }
-      this.assertEquals(cnode.jobMonitor.jobsMonitored(), numJobsExpected);
-      this.assertEquals(cnode.jobMonitor.jobsSucceeded(), numJobsExpected);
+      this.assertEquals(dcnode.jobMonitor.jobsMonitored(), numJobsExpected);
+      this.assertEquals(dcnode.jobMonitor.jobsSucceeded(), numJobsExpected);
 
       LOG.info("Test testSuspendTraversal successful.");
 

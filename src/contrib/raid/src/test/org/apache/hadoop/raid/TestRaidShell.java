@@ -100,7 +100,7 @@ public class TestRaidShell extends TestCase {
     localConf.set(RaidNode.RAID_LOCATION_KEY, "/destraid");
     localConf.setInt("raid.blockfix.interval", 1000);
     // the RaidNode does the raiding inline (instead of submitting to map/reduce)
-    conf.setBoolean("fs.raidnode.local", true);
+    conf.set("raid.classname", "org.apache.hadoop.raid.LocalRaidNode");
     cnode = RaidNode.createRaidNode(null, localConf);
 
     try {
@@ -220,7 +220,7 @@ public class TestRaidShell extends TestCase {
     conf.set("fs.shell.delete.classname", "org.apache.hadoop.hdfs.DFSClient");
 
     // do not use map-reduce cluster for Raiding
-    conf.setBoolean("fs.raidnode.local", true);
+    conf.set("raid.classname", "org.apache.hadoop.raid.LocalRaidNode");
     conf.set("raid.server.address", "localhost:0");
     conf.setInt("hdfs.raid.stripeLength", stripeLength);
     conf.set("hdfs.raid.locations", "/destraid");

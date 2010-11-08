@@ -36,6 +36,8 @@ import java.util.regex.Pattern;
 import java.lang.Thread;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 
 import org.xml.sax.SAXException;
 import javax.xml.parsers.ParserConfigurationException;
@@ -56,16 +58,18 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.mapred.Reporter;
+import org.apache.hadoop.util.Progressable;
 
 import org.apache.hadoop.raid.protocol.PolicyInfo;
 import org.apache.hadoop.raid.protocol.PolicyList;
 import org.apache.hadoop.raid.protocol.RaidProtocol;
 
 /**
- * A {@link RaidNode} that implements 
+ * A base class that implements {@link RaidProtocol}.
+ *
+ * use raid.classname to specify which implementation to use
  */
-public class RaidNode implements RaidProtocol {
+public abstract class RaidNode implements RaidProtocol {
 
   static{
     Configuration.addDefaultResource("hdfs-default.xml");
@@ -84,20 +88,21 @@ public class RaidNode implements RaidProtocol {
   public static final String HAR_SUFFIX = "_raid.har";
   public static final Pattern PARITY_HAR_PARTFILE_PATTERN =
     Pattern.compile(".*" + HAR_SUFFIX + "/part-.*");
-
   
+  public static final String RAIDNODE_CLASSNAME_KEY = "raid.classname";  
+
   /** RPC server */
   private Server server;
   /** RPC server address */
   private InetSocketAddress serverAddress = null;
   /** only used for testing purposes  */
-  private boolean stopRequested = false;
+  protected boolean stopRequested = false;
 
   /** Configuration Manager */
   private ConfigManager configMgr;
 
   /** hadoop configuration */
-  private Configuration conf;
+  protected Configuration conf;
 
   protected boolean initialized;  // Are we initialized?
   protected volatile boolean running; // Are we running?
@@ -116,13 +121,6 @@ public class RaidNode implements RaidProtocol {
   BlockFixer blockFixer = null;
   Daemon blockFixerThread = null;
 
-  /** Daemon thread to monitor distributed raid job progress */
-  JobMonitor jobMonitor = null;
-  Daemon jobMonitorThread = null;
-
-  /** Do do distributed raiding */
-  boolean isRaidLocal = false;
-  
   // statistics about RAW hdfs blocks. This counts all replicas of a block.
   public static class Statistics {
     long numProcessedBlocks; // total blocks encountered in namespace
@@ -214,7 +212,6 @@ public class RaidNode implements RaidProtocol {
       if (server != null) server.join();
       if (triggerThread != null) triggerThread.join();
       if (blockFixerThread != null) blockFixerThread.join();
-      if (jobMonitorThread != null) jobMonitorThread.join();
       if (purgeThread != null) purgeThread.join();
     } catch (InterruptedException ie) {
       // do nothing
@@ -234,8 +231,6 @@ public class RaidNode implements RaidProtocol {
     if (triggerThread != null) triggerThread.interrupt();
     if (blockFixer != null) blockFixer.running = false;
     if (blockFixerThread != null) blockFixerThread.interrupt();
-    if (jobMonitor != null) jobMonitor.running = false;
-    if (jobMonitorThread != null) jobMonitorThread.interrupt();
     if (purgeThread != null) purgeThread.interrupt();
   }
 
@@ -262,7 +257,6 @@ public class RaidNode implements RaidProtocol {
     InetSocketAddress socAddr = RaidNode.getAddress(conf);
     int handlerCount = conf.getInt("fs.raidnode.handler.count", 10);
 
-    isRaidLocal = conf.getBoolean("fs.raidnode.local", false);
     // read in the configuration
     configMgr = new ConfigManager(conf);
 
@@ -281,10 +275,6 @@ public class RaidNode implements RaidProtocol {
     this.blockFixer = new BlockFixer(conf);
     this.blockFixerThread = new Daemon(this.blockFixer);
     this.blockFixerThread.start();
-
-    this.jobMonitor = new JobMonitor(conf);
-    this.jobMonitorThread = new Daemon(this.jobMonitor);
-    this.jobMonitorThread.start();
 
     // start the deamon thread to fire polcies appropriately
     this.triggerThread = new Daemon(new TriggerMonitor());
@@ -331,6 +321,11 @@ public class RaidNode implements RaidProtocol {
   }
 
   /**
+   * returns the number of raid jobs running for a particular policy
+   */
+  abstract int getRunningJobsForPolicy(String policyName);
+
+  /**
    * Periodically checks to see which policies should be fired.
    */
   class TriggerMonitor implements Runnable {
@@ -369,7 +364,7 @@ public class RaidNode implements RaidProtocol {
     private boolean shouldSelectFiles(PolicyInfo info) {
       String policyName = info.getName();
       ScanState scanState = scanStateMap.get(policyName);
-      int runningJobsCount = jobMonitor.runningJobsCount(policyName);
+      int runningJobsCount = getRunningJobsForPolicy(policyName);
       // Is there a scan in progress for this policy?
       if (scanState.pendingTraversal != null) {
         int maxJobsPerPolicy = configMgr.getMaxJobsPerPolicy();
@@ -515,20 +510,7 @@ public class RaidNode implements RaidProtocol {
           LOG.info("Triggering Policy Action " + info.getName() +
                    " " + info.getSrcPath());
           try {
-            if (isRaidLocal){
-              doRaid(conf, info, filteredPaths);
-            }
-            else{
-              // We already checked that no job for this policy is running
-              // So we can start a new job.
-              DistRaid dr = new DistRaid(conf);
-              //add paths for distributed raiding
-              dr.addRaidPaths(info, filteredPaths);
-              boolean started = dr.startDistRaid();
-              if (started) {
-                jobMonitor.monitorJob(info.getName(), dr);
-              }
-            }
+            raidFiles(info, filteredPaths);
           } catch (Exception e) {
             LOG.info("Exception while invoking action on policy " + info.getName() +
                      " srcPath " + info.getSrcPath() + 
@@ -547,6 +529,12 @@ public class RaidNode implements RaidProtocol {
         info, allPolicies, startTime, stats);
     }
   }
+
+  /**
+   * raid a list of files, this will be overridden by subclasses of RaidNode
+   */
+  abstract void raidFiles(PolicyInfo info, List<FileStatus> paths) 
+    throws IOException;
 
   static private Path getOriginalParityFile(Path destPathPrefix, Path srcPath) {
     return new Path(destPathPrefix, makeRelative(srcPath));
@@ -659,8 +647,8 @@ public class RaidNode implements RaidProtocol {
     int count = 0;
 
     for (FileStatus s : paths) {
-      doRaid(conf, s, destPref, statistics, Reporter.NULL, doSimulate, targetRepl,
-             metaRepl, stripeLength);
+      doRaid(conf, s, destPref, statistics, new RaidUtils.DummyProgressable(),
+             doSimulate, targetRepl, metaRepl, stripeLength);
       if (count % 1000 == 0) {
         LOG.info("RAID statistics " + statistics.toString());
       }
@@ -675,7 +663,7 @@ public class RaidNode implements RaidProtocol {
    */
 
   static public void doRaid(Configuration conf, PolicyInfo info,
-      FileStatus src, Statistics statistics, Reporter reporter) throws IOException {
+      FileStatus src, Statistics statistics, Progressable reporter) throws IOException {
     int targetRepl = Integer.parseInt(info.getProperty("targetReplication"));
     int metaRepl = Integer.parseInt(info.getProperty("metaReplication"));
     int stripeLength = getStripeLength(conf);
@@ -692,7 +680,7 @@ public class RaidNode implements RaidProtocol {
    * RAID an individual file
    */
   static private void doRaid(Configuration conf, FileStatus stat, Path destPath,
-                      Statistics statistics, Reporter reporter, boolean doSimulate,
+                      Statistics statistics, Progressable reporter, boolean doSimulate,
                       int targetRepl, int metaRepl, int stripeLength) 
     throws IOException {
     Path p = stat.getPath();
@@ -749,7 +737,7 @@ public class RaidNode implements RaidProtocol {
    * Create the parity file.
    */
   static private void generateParityFile(Configuration conf, FileStatus stat,
-                                  Reporter reporter,
+                                  Progressable reporter,
                                   FileSystem inFs,
                                   Path destPathPrefix, BlockLocation[] locations,
                                   int metaRepl, int stripeLength) throws IOException {
@@ -1273,10 +1261,36 @@ public class RaidNode implements RaidProtocol {
   }
 
   /**
+   * Create an instance of the appropriate subclass of RaidNode 
+   */
+  public static RaidNode createRaidNode(Configuration conf)
+    throws ClassNotFoundException {
+    try {
+      // default to distributed raid node
+      Class<?> raidNodeClass =
+        conf.getClass(RAIDNODE_CLASSNAME_KEY, DistRaidNode.class);
+      if (!RaidNode.class.isAssignableFrom(raidNodeClass)) {
+        throw new ClassNotFoundException("not an implementation of RaidNode");
+      }
+      Constructor<?> constructor =
+        raidNodeClass.getConstructor(new Class[] {Configuration.class} );
+      return (RaidNode) constructor.newInstance(conf);
+    } catch (NoSuchMethodException e) {
+      throw new ClassNotFoundException("cannot construct blockfixer", e);
+    } catch (InstantiationException e) {
+      throw new ClassNotFoundException("cannot construct blockfixer", e);
+    } catch (IllegalAccessException e) {
+      throw new ClassNotFoundException("cannot construct blockfixer", e);
+    } catch (InvocationTargetException e) {
+      throw new ClassNotFoundException("cannot construct blockfixer", e);
+    }
+  }
+
+  /**
    * Create an instance of the RaidNode 
    */
-  public static RaidNode createRaidNode(String argv[],
-                                        Configuration conf) throws IOException {
+  public static RaidNode createRaidNode(String argv[], Configuration conf)
+    throws IOException, ClassNotFoundException {
     if (conf == null) {
       conf = new Configuration();
     }
@@ -1286,7 +1300,7 @@ public class RaidNode implements RaidProtocol {
       return null;
     }
     setStartupOption(conf, startOpt);
-    RaidNode node = new RaidNode(conf);
+    RaidNode node = createRaidNode(conf);
     return node;
   }
 

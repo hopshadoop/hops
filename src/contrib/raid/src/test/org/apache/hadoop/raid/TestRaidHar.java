@@ -79,7 +79,11 @@ public class TestRaidHar extends TestCase {
     conf.set("fs.shell.delete.classname", "org.apache.hadoop.hdfs.DFSClient");
 
     // the RaidNode does the raiding inline (instead of submitting to map/reduce)
-    conf.setBoolean("fs.raidnode.local", local);
+    if (local) {
+      conf.set("raid.classname", "org.apache.hadoop.raid.LocalRaidNode");
+    } else {
+      conf.set("raid.classname", "org.apache.hadoop.raid.DistRaidNode");
+    }
 
     conf.set("raid.server.address", "localhost:0");
     conf.set(RaidNode.RAID_LOCATION_KEY, "/destraid");

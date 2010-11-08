@@ -372,7 +372,10 @@ Trunk (unreleased changes)
     via schen)
 
     MAPREDUCE-2173.  Fix race condition in TestBlockFixer that was
-    causing  intermittent failure (Ramkumar Vadali via dhruba)
+    causing  intermittent failure (Patrick Kling via dhruba)
+
+    MAPREDUCE-2142.  Refactor RaidNode so that the map-reduce component is
+    clearly separated out. (Patrick Kling via dhruba)
 
 Release 0.21.1 - Unreleased
 

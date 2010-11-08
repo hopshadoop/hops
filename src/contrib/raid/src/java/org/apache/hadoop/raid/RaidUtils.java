@@ -31,8 +31,24 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PositionedReadable;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.util.Progressable;
 
 public class RaidUtils {
+  /**
+   * A {@link Progressable} that does nothing.
+   *
+   * We could have used Reporter.NULL here but that would introduce
+   * a dependency on mapreduce.
+   */ 
+  public static class DummyProgressable implements Progressable {
+    /**
+     * Do nothing.
+     */
+    @Override
+    public void progress() {
+    }
+  }
+
   /**
    * Removes files matching the trash file pattern.
    */

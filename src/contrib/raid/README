@@ -104,14 +104,12 @@ The following properties can be set in hdfs-site.xml to further tune you configu
           </description>
         </property>
 
-    Specify RaidNode to not use a map-reduce cluster for raiding files in parallel.
+    Specify which implementation of RaidNode to use.
         <property>
-          <name>fs.raidnode.local</name>
-          <value>true</value>
-          <description>If you do not want to use your map-reduce cluster to
-          raid files in parallel, then specify "true". By default, this
-          value is false, which means that the RaidNode uses the default
-          map-reduce cluster to generate parity blocks.
+          <name>raid.classname</name>
+          <value>org.apache.hadoop.raid.DistRaidNode</value>
+          <description>Specify which implementation of RaidNode to use
+	  (class name).
           </description>
         </property>
 

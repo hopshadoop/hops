@@ -34,7 +34,6 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Progressable;
 
@@ -226,7 +225,8 @@ public abstract class Encoder {
     LOG.info("Starting recovery by using source stripe " +
               srcFile + ":" + stripeStart);
     // Read the data from the blocks and write to the parity file.
-    encodeStripe(blocks, stripeStart, blockSize, outs, Reporter.NULL);
+    encodeStripe(blocks, stripeStart, blockSize, outs, 
+                 new RaidUtils.DummyProgressable());
   }
 
   /**
