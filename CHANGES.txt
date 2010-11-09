@@ -158,7 +158,8 @@ Trunk (unreleased changes)
     MAPREDUCE-1892. RaidNode can allow layered policies more efficiently.
     (Ramkumar Vadali via schen)
 
-    MAPREDUCE-1592. Generate Eclipse's .classpath file from Ivy config. (nigel)
+    MAPREDUCE-1592. Generate Eclipse's .classpath file from Ivy config. 
+    (tomwhite via nigel)
 
   OPTIMIZATIONS
 
