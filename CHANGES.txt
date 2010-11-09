@@ -164,6 +164,8 @@ Trunk (unreleased changes)
 
     HDFS-1485. Fix typo in BlockPlacementPolicy. (Jingguo Yao via shv)
 
+    HDFS-1035. Generate Eclipse's .classpath file from Ivy config. (nigel)
+
   OPTIMIZATIONS
 
     HDFS-1140. Speedup INode.getPathComponents. (Dmytro Molkov via shv)
