@@ -380,6 +380,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2142.  Refactor RaidNode so that the map-reduce component is
     clearly separated out. (Patrick Kling via dhruba)
 
+    MAPREDUCE-2179. Fix RaidBlockSender compilation failure. (Ramkumar Vadali
+    via schen)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES

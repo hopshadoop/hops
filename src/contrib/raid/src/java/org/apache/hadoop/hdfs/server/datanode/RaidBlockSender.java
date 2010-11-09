@@ -68,7 +68,6 @@ public class RaidBlockSender implements java.io.Closeable, FSConstants {
   private boolean transferToAllowed = true;
   private boolean blockReadFully; //set when the whole block is read
   private boolean verifyChecksum; //if true, check is verified while reading
-  private BlockTransferThrottler throttler;
   private final String clientTraceFmt; // format of client trace log message
 
   /**
@@ -353,10 +352,6 @@ public class RaidBlockSender implements java.io.Closeable, FSConstants {
       throw ioeToSocketException(e);
     }
 
-    if (throttler != null) { // rebalancing so throttle
-      throttler.throttle(packetLen);
-    }
-
     return len;
   }
 
@@ -370,15 +365,13 @@ public class RaidBlockSender implements java.io.Closeable, FSConstants {
    *        sending the data, e.g. 
    *        {@link SocketOutputStream#transferToFully(FileChannel, 
    *        long, int)}.
-   * @param throttler for sending data.
    * @return total bytes reads, including crc.
    */
-  public long sendBlock(DataOutputStream out, OutputStream baseStream, 
-                 BlockTransferThrottler throttler) throws IOException {
+  public long sendBlock(DataOutputStream out, OutputStream baseStream)
+      throws IOException {
     if( out == null ) {
       throw new IOException( "out stream is null" );
     }
-    this.throttler = throttler;
 
     long initialOffset = offset;
     long totalRead = 0;

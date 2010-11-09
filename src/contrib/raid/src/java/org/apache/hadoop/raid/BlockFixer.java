@@ -677,7 +677,7 @@ public class BlockFixer implements Runnable {
         out, block.getBlock(), 1,
         DataTransferProtocol.BlockConstructionStage.PIPELINE_SETUP_CREATE,
         0, blockSize, 0, "", null, nodes, block.getBlockToken());
-      blockSender.sendBlock(out, baseStream, null);
+      blockSender.sendBlock(out, baseStream);
 
       LOG.info("Sent block " + block.getBlock() + " to " + datanode.name);
     } finally {
