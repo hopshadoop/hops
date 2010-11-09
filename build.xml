@@ -221,6 +221,15 @@
   <property name="jdiff.home" value="${build.ivy.lib.dir}/${ant.project.name}/jdiff"/>
   <property name="jdiff.jar" value="${jdiff.home}/jdiff-${jdiff.version}.jar"/>
   <property name="xerces.jar" value="${jdiff.home}/xerces-${xerces.version}.jar"/>
+	
+  <!-- Eclipse properties -->
+  <property name="build.dir.eclipse" value="${build.dir}/eclipse"/>
+  <property name="build.dir.eclipse-main-classes" value="${build.dir.eclipse}/classes-main"/>
+  <property name="build.dir.eclipse-main-generated-classes" value="${build.dir.eclipse}/classes-main-generated"/>
+  <property name="build.dir.eclipse-test-classes" value="${build.dir.eclipse}/classes-test"/>
+  <property name="build.dir.eclipse-example-classes" value="${build.dir.eclipse}/classes-example"/>
+  <property name="build.dir.eclipse-tools-classes" value="${build.dir.eclipse}/classes-tools"/>
+  <property name="build.dir.eclipse-contrib-classes" value="${build.dir.eclipse}/classes-contrib"/>
 
   <property name="clover.jar" location="${clover.home}/lib/clover.jar"/>
   <available property="clover.present" file="${clover.jar}" />
@@ -1776,15 +1785,106 @@
   </exec>
 </target>
 	
-  <target name="eclipse-files" depends="init"
-          description="Generate files for Eclipse">
-    <pathconvert property="eclipse.project">
-      <path path="${basedir}"/>
-      <regexpmapper from="^.*/([^/]+)$$" to="\1" handledirsep="yes"/>
-    </pathconvert>
+  <condition property="ant-eclipse.jar.exists">
+    <available file="${build.dir}/lib/ant-eclipse-1.0-jvm1.2.jar"/>
+  </condition>
+
+  <target name="ant-eclipse-download" unless="ant-eclipse.jar.exists"
+          description="Downloads the ant-eclipse binary.">
+    <get src="http://downloads.sourceforge.net/project/ant-eclipse/ant-eclipse/1.0/ant-eclipse-1.0.bin.tar.bz2"
+         dest="${build.dir}/ant-eclipse-1.0.bin.tar.bz2" usetimestamp="false" />
+
+    <untar src="${build.dir}/ant-eclipse-1.0.bin.tar.bz2"
+           dest="${build.dir}" compression="bzip2">
+      <patternset>
+        <include name="lib/ant-eclipse-1.0-jvm1.2.jar"/>
+      </patternset>
+    </untar>
+    <delete file="${build.dir}/java/ant-eclipse-1.0.bin.tar.bz2" />
+  </target>
+
+  <target name="eclipse" 
+          depends="init,ant-eclipse-download,ivy-retrieve-common,ivy-retrieve-test"
+          description="Create eclipse project files">
+       <pathconvert property="eclipse.project">
+         <path path="${basedir}"/>
+         <regexpmapper from="^.*/([^/]+)$$" to="\1" handledirsep="yes"/>
+       </pathconvert>
+    <taskdef name="eclipse"
+             classname="prantl.ant.eclipse.EclipseTask"
+             classpath="${build.dir}/lib/ant-eclipse-1.0-jvm1.2.jar" />
+    <eclipse updatealways="true">
+      <project name="${eclipse.project}" />
+      <classpath>
+        <source path="${java.src.dir}"
+                output="${build.dir.eclipse-main-classes}" />
+        <source path="${build.src}"
+                output="${build.dir.eclipse-main-generated-classes}" />
+        <source path="${test.src.dir}/mapred"
+                output="${build.dir.eclipse-test-classes}" />
+        <source path="${test.src.dir}/aop"
+                output="${build.dir.eclipse-test-classes}" />
+        <source path="${test.src.dir}/unit"
+                output="${build.dir.eclipse-test-classes}" />
+        <source path="${examples.dir}"
+                output="${build.dir.eclipse-example-classes}" />
+        <source path="${tools.src}"
+                output="${build.dir.eclipse-tools-classes}" />
+        <source path="${contrib.dir}/block_forensics/src/java"
+                output="${build.dir.eclipse-contrib-classes}/block_forensics/main" />
+        <source path="${contrib.dir}/capacity-scheduler/src/java"
+                output="${build.dir.eclipse-contrib-classes}/capacity-scheduler/main" />
+        <source path="${contrib.dir}/capacity-scheduler/src/test"
+                output="${build.dir.eclipse-contrib-classes}/capacity-scheduler/test" />
+        <source path="${contrib.dir}/data_join/src/java"
+                output="${build.dir.eclipse-contrib-classes}/data_join/main" />
+        <source path="${contrib.dir}/data_join/src/examples"
+                output="${build.dir.eclipse-contrib-classes}/data_join/examples" />
+        <source path="${contrib.dir}/data_join/src/test"
+                output="${build.dir.eclipse-contrib-classes}/data_join/test" />
+        <source path="${contrib.dir}/dynamic-scheduler/src/java"
+                output="${build.dir.eclipse-contrib-classes}/dynamic-scheduler/main" />
+        <source path="${contrib.dir}/dynamic-scheduler/src/test"
+                output="${build.dir.eclipse-contrib-classes}/dynamic-scheduler/test" />
+        <source path="${contrib.dir}/fairscheduler/src/java"
+                output="${build.dir.eclipse-contrib-classes}/fairscheduler/main" />
+        <source path="${contrib.dir}/fairscheduler/src/test"
+                output="${build.dir.eclipse-contrib-classes}/fairscheduler/test" />
+        <source path="${contrib.dir}/gridmix/src/java"
+                output="${build.dir.eclipse-contrib-classes}/gridmix/main" />
+        <source path="${contrib.dir}/gridmix/src/test"
+                output="${build.dir.eclipse-contrib-classes}/gridmix/test" />
+        <source path="${contrib.dir}/mrunit/src/java"
+                output="${build.dir.eclipse-contrib-classes}/mrunit/main" />
+        <source path="${contrib.dir}/mrunit/src/test"
+                output="${build.dir.eclipse-contrib-classes}/mrunit/test" />
+        <source path="${contrib.dir}/mumak/src/java"
+                output="${build.dir.eclipse-contrib-classes}/mumak/main" />
+        <source path="${contrib.dir}/mumak/src/test"
+                output="${build.dir.eclipse-contrib-classes}/mumak/test" />
+        <source path="${contrib.dir}/raid/src/java"
+                output="${build.dir.eclipse-contrib-classes}/raid/main" />
+        <source path="${contrib.dir}/raid/src/test"
+                output="${build.dir.eclipse-contrib-classes}/raid/test" />
+        <source path="${contrib.dir}/streaming/src/java"
+                output="${build.dir.eclipse-contrib-classes}/streaming/main" />
+        <source path="${contrib.dir}/streaming/src/test"
+                output="${build.dir.eclipse-contrib-classes}/streaming/test" />
+        <source path="${contrib.dir}/vaidya/src/java"
+                output="${build.dir.eclipse-contrib-classes}/vaidya/main" />
+        <source path="${contrib.dir}/vertica/src/java"
+                output="${build.dir.eclipse-contrib-classes}/vertica/main" />
+        <source path="${contrib.dir}/vertica/src/test"
+                output="${build.dir.eclipse-contrib-classes}/vertica/test" />
+        <output path="${build.dir.eclipse-main-classes}" />
+        <library pathref="ivy-common.classpath" exported="true" />
+        <library pathref="ivy-test.classpath" exported="false" />
+        <library path="${conf.dir}" exported="false" />
+      </classpath>
+    </eclipse>
     <copy todir="." overwrite="true">
       <fileset dir=".eclipse.templates">
-      	<exclude name="**/README.txt"/>
+        <exclude name="**/README.txt"/>
       </fileset>
       <filterset>
         <filter token="PROJECT" value="${eclipse.project}"/>
