@@ -51,6 +51,7 @@ import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.server.common.GenerationStamp;
+import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.StringUtils;
 
@@ -102,7 +103,7 @@ class DataBlockScanner implements Runnable {
   
   Random random = new Random();
   
-  BlockTransferThrottler throttler = null;
+  DataTransferThrottler throttler = null;
   
   // Reconciles blocks on disk to blocks in memory
   DirectoryScanner dirScanner;
@@ -251,7 +252,7 @@ class DataBlockScanner implements Runnable {
     }
     
     synchronized (this) {
-      throttler = new BlockTransferThrottler(200, MAX_SCAN_RATE);
+      throttler = new DataTransferThrottler(200, MAX_SCAN_RATE);
     }
   }
 

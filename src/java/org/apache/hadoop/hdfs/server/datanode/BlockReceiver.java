@@ -43,6 +43,7 @@ import org.apache.hadoop.hdfs.protocol.DataTransferProtocol.BlockConstructionSta
 import org.apache.hadoop.hdfs.protocol.DataTransferProtocol.PipelineAck;
 import org.apache.hadoop.hdfs.protocol.DataTransferProtocol.PacketHeader;
 import org.apache.hadoop.hdfs.protocol.DataTransferProtocol.Status;
+import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.DataChecksum;
@@ -72,7 +73,7 @@ class BlockReceiver implements java.io.Closeable, FSConstants {
   private String mirrorAddr;
   private DataOutputStream mirrorOut;
   private Daemon responder = null;
-  private BlockTransferThrottler throttler;
+  private DataTransferThrottler throttler;
   private FSDataset.BlockWriteStreams streams;
   private String clientName;
   DatanodeInfo srcDataNode = null;
@@ -602,7 +603,7 @@ class BlockReceiver implements java.io.Closeable, FSConstants {
       DataOutputStream mirrOut, // output to next datanode
       DataInputStream mirrIn,   // input from next datanode
       DataOutputStream replyOut,  // output to previous datanode
-      String mirrAddr, BlockTransferThrottler throttlerArg,
+      String mirrAddr, DataTransferThrottler throttlerArg,
       int numTargets) throws IOException {
 
       boolean responderClosed = false;

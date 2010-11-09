@@ -39,6 +39,9 @@ Trunk (unreleased changes)
 
     HDFS-903.  Support fsimage validation through MD5 checksum. (hairong)
 
+    HDFS-1457. Provide an option to throttle image transmission between
+    pimary and secondary NameNodes. (Yifei Lu and hairong via hairong)
+
   IMPROVEMENTS
 
     HDFS-1304. Add a new unit test for HftpFileSystem.open(..).  (szetszwo)
