@@ -339,6 +339,9 @@ Release 0.21.1 - Unreleased
 
     HDFS-1474. ant binary-system is broken (cos)
 
+    HDFS-1292. Allow artifacts to be published to the staging Apache Nexus
+    Maven Repository.  (Giridharan Kesavan via tomwhite)
+
 Release 0.21.0 - 2010-08-13
 
   INCOMPATIBLE CHANGES
