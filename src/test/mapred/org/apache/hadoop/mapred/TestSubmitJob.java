@@ -259,31 +259,30 @@ public class TestSubmitJob extends TestCase {
         getDFSClient(conf_other, user2);
 
       // try accessing mapred.system.dir/jobid/*
-      boolean failed = false;
       try {
-        Path path = new Path(new URI(jt.getSystemDir()).getPath());
+        String path = new URI(jt.getSystemDir()).getPath();
         LOG.info("Try listing the mapred-system-dir as the user (" 
                  + user2.getUserName() + ")");
-        client.getListing(
-            path.toString(), HdfsFileStatus.EMPTY_NAME, false);
+        client.getListing(path, HdfsFileStatus.EMPTY_NAME, false);
+        fail("JobTracker system dir is accessible to others");
       } catch (IOException ioe) {
-        failed = true;
+        assertTrue(ioe.toString(),
+          ioe.toString().contains("Permission denied"));
       }
-      assertTrue("JobTracker system dir is accessible to others", failed);
       // try accessing ~/.staging/jobid/*
-      failed = false;
       JobInProgress jip = jt.getJob(id);
       Path jobSubmitDirpath = 
         new Path(jip.getJobConf().get("mapreduce.job.dir"));
       try {
         LOG.info("Try accessing the job folder for job " + id + " as the user (" 
                  + user2.getUserName() + ")");
-        client.getListing(
-            jobSubmitDirpath.toString(), HdfsFileStatus.EMPTY_NAME, false);
+        client.getListing(jobSubmitDirpath.toUri().getPath(),
+          HdfsFileStatus.EMPTY_NAME, false);
+        fail("User's staging folder is accessible to others");
       } catch (IOException ioe) {
-        failed = true;
+        assertTrue(ioe.toString(),
+          ioe.toString().contains("Permission denied"));
       }
-      assertTrue("User's staging folder is accessible to others", failed);
       UtilsForTests.signalTasks(dfs, fs, true, mapSignalFile.toString(), 
       reduceSignalFile.toString());
       // wait for job to be done

@@ -383,6 +383,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2179. Fix RaidBlockSender compilation failure. (Ramkumar Vadali
     via schen)
 
+    MAPREDUCE-2034. TestSubmitJob triggers NPE instead of permissions error.
+    (Todd Lipcon via tomwhite)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES
