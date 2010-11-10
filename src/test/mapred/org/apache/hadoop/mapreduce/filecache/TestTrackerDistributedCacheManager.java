@@ -87,6 +87,19 @@ public class TestTrackerDistributedCacheManager extends TestCase {
       TEST_ROOT.mkdirs();
     }
 
+    conf = new Configuration();
+    conf.set(FileSystem.FS_DEFAULT_NAME_KEY, "file:///");
+    fs = FileSystem.get(conf);
+
+    // This test suite will fail if any ancestor directory of the
+    // test directory is not world-searchable (ie +x).
+    // We prefer to fail the test in an obvious manner up front
+    // during setUp() rather than in a subtle way later.
+    assertTrue("Test root directory " + TEST_ROOT + " and all of its " +
+               "parent directories must have a+x permissions",
+               TrackerDistributedCacheManager.ancestorsHaveExecutePermissions(
+                 fs, new Path(TEST_ROOT.toString())));
+
     // Prepare the tests' mapred-local-dir
     ROOT_MAPRED_LOCAL_DIR = new File(TEST_ROOT_DIR, "mapred/local");
     ROOT_MAPRED_LOCAL_DIR.mkdirs();
@@ -98,10 +111,7 @@ public class TestTrackerDistributedCacheManager extends TestCase {
       localDir.mkdir();
     }
 
-    conf = new Configuration();
     conf.setStrings(MRConfig.LOCAL_DIR, localDirs);
-    conf.set(FileSystem.FS_DEFAULT_NAME_KEY, "file:///");
-    fs = FileSystem.get(conf);
     Class<? extends TaskController> taskControllerClass = conf.getClass(
         TTConfig.TT_TASK_CONTROLLER, DefaultTaskController.class,
         TaskController.class);

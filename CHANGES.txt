@@ -161,6 +161,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1592. Generate Eclipse's .classpath file from Ivy config. 
     (tomwhite via nigel)
 
+    MAPREDUCE-2073. TestTrackerDistributedCacheManager should be up-front
+    about requirements on build environment. (Todd Lipcon via tomwhite)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and
