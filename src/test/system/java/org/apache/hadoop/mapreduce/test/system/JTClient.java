@@ -45,6 +45,7 @@ import static org.junit.Assert.*;
 public class JTClient extends MRDaemonClient<JTProtocol> {
   static final Log LOG = LogFactory.getLog(JTClient.class);
   private JobClient client;
+  private static final String HADOOP_JT_OPTS_ENV = "HADOOP_JOBTRACKER_OPTS";
 
   /**
    * Create JobTracker client to talk to {@link JobTracker} specified in the
@@ -326,5 +327,22 @@ public class JTClient extends MRDaemonClient<JTProtocol> {
           + jobId + " not present " + "when job is completed", st);
     }
     LOG.info("Verified the job history for the jobId : " + jobId);
+  }
+
+  @Override
+  public String getHadoopOptsEnvName() {
+    return HADOOP_JT_OPTS_ENV;
+  }
+
+  /**
+   * Concrete implementation of abstract super class method
+   *
+   * @param attributeName name of the attribute to be retrieved
+   * @return Object value of the given attribute
+   * @throws IOException is thrown in case of communication errors
+   */
+  @Override
+  public Object getDaemonAttribute(String attributeName) throws IOException {
+    return getJmxAttribute("JobTracker", "JobTrackerInfo", attributeName);
   }
 }

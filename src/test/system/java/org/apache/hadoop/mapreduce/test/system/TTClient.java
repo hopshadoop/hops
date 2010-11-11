@@ -39,6 +39,7 @@ public class TTClient extends MRDaemonClient<TTProtocol> {
 
   TTProtocol proxy;
   private static final String SYSTEM_TEST_FILE = "system-test.xml";
+  private static final String HADOOP_TT_OPTS_ENV = "HADOOP_TASKTRACKER_OPTS";
 
   public TTClient(Configuration conf, RemoteProcess daemon) 
       throws IOException {
@@ -89,4 +90,20 @@ public class TTClient extends MRDaemonClient<TTProtocol> {
     return getProxy().getStatus();
   }
 
+  @Override
+  public String getHadoopOptsEnvName() {
+    return HADOOP_TT_OPTS_ENV;
+  }
+
+  /**
+   * Concrete implementation of abstract super class method
+   *
+   * @param attributeName name of the attribute to be retrieved
+   * @return Object value of the given attribute
+   * @throws IOException is thrown in case of communication errors
+   */
+  @Override
+  public Object getDaemonAttribute(String attributeName) throws IOException {
+    return getJmxAttribute("TaskTracker", "TaskTrackerInfo", attributeName);
+  }
 }

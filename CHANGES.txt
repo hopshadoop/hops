@@ -166,6 +166,8 @@ Trunk (unreleased changes)
     MAPREDUCE-2073. TestTrackerDistributedCacheManager should be up-front
     about requirements on build environment. (Todd Lipcon via tomwhite)
 
+    MAPREDUCE-2093. Herriot JT and TT clients should vend statistics. (cos)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and
