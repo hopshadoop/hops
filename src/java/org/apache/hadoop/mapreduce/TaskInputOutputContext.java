@@ -65,22 +65,6 @@ public interface TaskInputOutputContext<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
       throws IOException, InterruptedException;
 
   /**
-   * Get the {@link Counter} for the given <code>counterName</code>.
-   * @param counterName counter name
-   * @return the <code>Counter</code> for the given <code>counterName</code>
-   */
-  public Counter getCounter(Enum<?> counterName);
-
-  /**
-   * Get the {@link Counter} for the given <code>groupName</code> and 
-   * <code>counterName</code>.
-   * @param counterName counter name
-   * @return the <code>Counter</code> for the given <code>groupName</code> and 
-   *         <code>counterName</code>
-   */
-  public Counter getCounter(String groupName, String counterName);
-
-  /**
    * Get the {@link OutputCommitter} for the task-attempt.
    * @return the <code>OutputCommitter</code> for the task-attempt
    */

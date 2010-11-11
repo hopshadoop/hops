@@ -45,4 +45,20 @@ public interface TaskAttemptContext extends JobContext, Progressable {
    */
   public String getStatus();
 
+  /**
+   * Get the {@link Counter} for the given <code>counterName</code>.
+   * @param counterName counter name
+   * @return the <code>Counter</code> for the given <code>counterName</code>
+   */
+  public Counter getCounter(Enum<?> counterName);
+
+  /**
+   * Get the {@link Counter} for the given <code>groupName</code> and 
+   * <code>counterName</code>.
+   * @param counterName counter name
+   * @return the <code>Counter</code> for the given <code>groupName</code> and 
+   *         <code>counterName</code>
+   */
+  public Counter getCounter(String groupName, String counterName);
+
 }

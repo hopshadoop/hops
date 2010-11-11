@@ -23,7 +23,6 @@ import java.io.IOException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.mapreduce.Counter;
 import org.apache.hadoop.mapreduce.OutputCommitter;
 import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.StatusReporter;
@@ -46,16 +45,14 @@ public abstract class TaskInputOutputContextImpl<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
        extends TaskAttemptContextImpl 
        implements TaskInputOutputContext<KEYIN, VALUEIN, KEYOUT, VALUEOUT> {
   private RecordWriter<KEYOUT,VALUEOUT> output;
-  private StatusReporter reporter;
   private OutputCommitter committer;
 
   public TaskInputOutputContextImpl(Configuration conf, TaskAttemptID taskid,
                                     RecordWriter<KEYOUT,VALUEOUT> output,
                                     OutputCommitter committer,
                                     StatusReporter reporter) {
-    super(conf, taskid);
+    super(conf, taskid, reporter);
     this.output = output;
-    this.reporter = reporter;
     this.committer = committer;
   }
 
@@ -90,14 +87,6 @@ public abstract class TaskInputOutputContextImpl<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
   public void write(KEYOUT key, VALUEOUT value
                     ) throws IOException, InterruptedException {
     output.write(key, value);
-  }
-
-  public Counter getCounter(Enum<?> counterName) {
-    return reporter.getCounter(counterName);
-  }
-
-  public Counter getCounter(String groupName, String counterName) {
-    return reporter.getCounter(groupName, counterName);
   }
 
   public OutputCommitter getOutputCommitter() {

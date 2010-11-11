@@ -412,6 +412,9 @@ Release 0.21.1 - Unreleased
 
     MAPREDUCE-2134. ant binary-system is broken in mapreduce project. (cos)
 
+    MAPREDUCE-1905. Fixes Context.setStatus() and progress() apis.
+    (amareshwari)
+
 Release 0.21.0 - 2010-08-13
 
   INCOMPATIBLE CHANGES

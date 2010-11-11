@@ -386,7 +386,8 @@ public class MultipleOutputs<KEYOUT, VALUEOUT> {
     checkBaseOutputPath(baseOutputPath);
     TaskAttemptContext taskContext = 
       new TaskAttemptContextImpl(context.getConfiguration(), 
-                                 context.getTaskAttemptID());
+                                 context.getTaskAttemptID(),
+                                 new WrappedStatusReporter(context));
     getRecordWriter(taskContext, baseOutputPath).write(key, value);
   }
 
@@ -440,15 +441,43 @@ public class MultipleOutputs<KEYOUT, VALUEOUT> {
     job.setOutputFormatClass(getNamedOutputFormatClass(context, nameOutput));
     job.setOutputKeyClass(getNamedOutputKeyClass(context, nameOutput));
     job.setOutputValueClass(getNamedOutputValueClass(context, nameOutput));
-    taskContext = 
-      new TaskAttemptContextImpl(job.getConfiguration(), 
-                                 context.getTaskAttemptID());
+    taskContext = new TaskAttemptContextImpl(job.getConfiguration(), context
+        .getTaskAttemptID(), new WrappedStatusReporter(context));
 
     taskContexts.put(nameOutput, taskContext);
 
     return taskContext;
   }
-  
+
+  private static class WrappedStatusReporter extends StatusReporter {
+
+    TaskAttemptContext context;
+
+    public WrappedStatusReporter(TaskAttemptContext context) {
+      this.context = context;
+    }
+
+    @Override
+    public Counter getCounter(Enum<?> name) {
+      return context.getCounter(name);
+    }
+
+    @Override
+    public Counter getCounter(String group, String name) {
+      return context.getCounter(group, name);
+    }
+
+    @Override
+    public void progress() {
+      context.progress();
+    }
+
+    @Override
+    public void setStatus(String status) {
+      context.setStatus(status);
+    }
+  }
+
   /**
    * Closes all the opened outputs.
    * 

@@ -36,12 +36,14 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.WritableComparator;
+import org.apache.hadoop.mapreduce.Counter;
 import org.apache.hadoop.mapreduce.InputFormat;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.RecordReader;
+import org.apache.hadoop.mapreduce.StatusReporter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
@@ -343,8 +345,8 @@ public abstract static class Node extends ComposableInputFormat {
         Configuration conf = getConf(taskContext.getConfiguration());
         TaskAttemptContext context = 
           new TaskAttemptContextImpl(conf, 
-                                     TaskAttemptID.forName(
-                                         conf.get(MRJobConfig.TASK_ATTEMPT_ID)));
+              TaskAttemptID.forName(conf.get(MRJobConfig.TASK_ATTEMPT_ID)), 
+              new WrappedStatusReporter(taskContext));
         return rrCstrMap.get(ident).newInstance(id,
             inf.createRecordReader(split, context), cmpcl);
       } catch (IllegalAccessException e) {
@@ -358,6 +360,34 @@ public abstract static class Node extends ComposableInputFormat {
 
     public String toString() {
       return ident + "(" + inf.getClass().getName() + ",\"" + indir + "\")";
+    }
+  }
+
+  private static class WrappedStatusReporter extends StatusReporter {
+
+    TaskAttemptContext context;
+    
+    public WrappedStatusReporter(TaskAttemptContext context) {
+      this.context = context; 
+    }
+    @Override
+    public Counter getCounter(Enum<?> name) {
+      return context.getCounter(name);
+    }
+
+    @Override
+    public Counter getCounter(String group, String name) {
+      return context.getCounter(group, name);
+    }
+
+    @Override
+    public void progress() {
+      context.progress();
+    }
+
+    @Override
+    public void setStatus(String status) {
+      context.setStatus(status);
     }
   }
 
