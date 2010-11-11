@@ -23,6 +23,8 @@ Trunk (unreleased changes)
 
   IMPROVEMENTS
 
+    MAPREDUCE-2141. Add an "extra data" field to Task for use by Mesos. (matei)
+
     MAPREDUCE-2140. Regenerate fair scheduler design doc PDF. (matei)
 
     MAPREDUCE-1546. Redirect all job pages to corresponding history page

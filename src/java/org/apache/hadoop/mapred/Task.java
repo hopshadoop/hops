@@ -44,6 +44,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.FileSystem.Statistics;
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.RawComparator;
 import org.apache.hadoop.io.Text;
@@ -124,6 +125,11 @@ abstract public class Task implements Writable, Configurable {
   protected boolean jobCleanup = false;
   protected boolean jobSetup = false;
   protected boolean taskCleanup = false;
+ 
+  // An opaque data field used to attach extra data to each task. This is used
+  // by the Hadoop scheduler for Mesos to associate a Mesos task ID with each
+  // task and recover these IDs on the TaskTracker.
+  protected BytesWritable extraData = new BytesWritable(); 
   
   //skip ranges based on failed ranges from previous attempts
   private SortedRanges skipRanges = new SortedRanges();
@@ -409,6 +415,7 @@ abstract public class Task implements Writable, Configurable {
     out.writeBoolean(writeSkipRecs);
     out.writeBoolean(taskCleanup);
     Text.writeString(out, user);
+    extraData.write(out);
   }
   
   public void readFields(DataInput in) throws IOException {
@@ -433,6 +440,7 @@ abstract public class Task implements Writable, Configurable {
       setPhase(TaskStatus.Phase.CLEANUP);
     }
     user = Text.readString(in);
+    extraData.readFields(in);
   }
 
   @Override
@@ -1471,5 +1479,13 @@ abstract public class Task implements Writable, Configurable {
                                                 valueClass);
       reducer.run(reducerContext);
     } 
+  }
+
+  BytesWritable getExtraData() {
+    return extraData;
+  }
+
+  void setExtraData(BytesWritable extraData) {
+    this.extraData = extraData;
   }
 }
