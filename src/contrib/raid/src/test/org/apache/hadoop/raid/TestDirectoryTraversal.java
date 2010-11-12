@@ -58,7 +58,7 @@ public class TestDirectoryTraversal extends TestCase {
       LOG.info("Enumerating files");
       List<FileStatus> startPaths = new LinkedList<FileStatus>();
       startPaths.add(fs.getFileStatus(topDir));
-      DirectoryTraversal dt = new DirectoryTraversal(fs, startPaths);
+      DirectoryTraversal dt = new DirectoryTraversal(fs, startPaths, 2);
 
       List<FileStatus> selected = new LinkedList<FileStatus>();
       while (true) {

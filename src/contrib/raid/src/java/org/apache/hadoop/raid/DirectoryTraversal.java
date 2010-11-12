@@ -20,9 +20,16 @@ package org.apache.hadoop.raid;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Stack;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Semaphore;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -45,6 +52,9 @@ public class DirectoryTraversal {
   private List<FileStatus> paths;
   private int pathIdx = 0;  // Next path to process.
   private Stack<Node> stack = new Stack<Node>();
+  private ExecutorService executor;
+
+  private int numThreads;
 
   /**
    * A FileFilter object can be used to choose files during directory traversal.
@@ -88,26 +98,96 @@ public class DirectoryTraversal {
    * @param startPaths A list of paths that need to be traversed
    */
   public DirectoryTraversal(FileSystem fs, List<FileStatus> startPaths) {
+    this(fs, startPaths, 1);
+  }
+
+  public DirectoryTraversal(
+    FileSystem fs, List<FileStatus> startPaths, int numThreads) {
     this.fs = fs;
     paths = startPaths;
     pathIdx = 0;
+    this.numThreads = numThreads;
+    executor = Executors.newFixedThreadPool(numThreads);
   }
 
-  public List<FileStatus> getFilteredFiles(FileFilter filter, int limit)
-      throws IOException {
-    List<FileStatus> filtered = new LinkedList<FileStatus>();
-    int num = 0;
-    while (num < limit) {
-      FileStatus next = getNextFile();
-      if (next == null) {
+  public List<FileStatus> getFilteredFiles(FileFilter filter, int limit) {
+    List<FileStatus> filtered = new ArrayList<FileStatus>();
+
+    // We need this semaphore to block when the number of running workitems
+    // is equal to the number of threads. FixedThreadPool limits the number
+    // of threads, but not the queue size. This way we will limit the memory
+    // usage.
+    Semaphore slots = new Semaphore(numThreads);
+
+    while (true) {
+      synchronized(filtered) {
+        if (filtered.size() >= limit) break;
+      }
+      FilterFileWorkItem work = null;
+      try {
+        Node next = getNextDirectoryNode();
+        if (next == null) {
+          break;
+        }
+        work = new FilterFileWorkItem(filter, next, filtered, slots);
+        slots.acquire();
+      } catch (InterruptedException ie) {
+        break;
+      } catch (IOException e) {
         break;
       }
-      if (filter.check(next)) {
-        num++;
-        filtered.add(next);
+      executor.execute(work);
+    }
+
+    try {
+      // Wait for all submitted items to finish.
+      slots.acquire(numThreads);
+      // If this traversal is finished, shutdown the executor.
+      if (doneTraversal()) {
+        executor.shutdown();
+        executor.awaitTermination(1, TimeUnit.HOURS);
+      }
+    } catch (InterruptedException ie) {
+    }
+
+    return filtered;
+  }
+
+  class FilterFileWorkItem implements Runnable {
+    FileFilter filter;
+    Node dir;
+    List<FileStatus> filtered;
+    Semaphore slots;
+
+    FilterFileWorkItem(FileFilter filter, Node dir, List<FileStatus> filtered,
+      Semaphore slots) {
+      this.slots = slots;
+      this.filter = filter;
+      this.dir = dir;
+      this.filtered = filtered;
+    }
+
+    @SuppressWarnings("deprecation")
+    public void run() {
+      try {
+        LOG.info("Initiating file filtering for " + dir.path.getPath());
+        for (FileStatus f: dir.elements) {
+          if (!f.isFile()) {
+            continue;
+          }
+          if (filter.check(f)) {
+            synchronized(filtered) {
+              filtered.add(f);
+            }
+          }
+        }
+      } catch (Exception e) {
+        LOG.error("Error in directory traversal: " 
+          + StringUtils.stringifyException(e));
+      } finally {
+        slots.release();
       }
     }
-    return filtered;
   }
 
   /**
@@ -168,6 +248,15 @@ public class DirectoryTraversal {
    * @throws IOException
    */
   public FileStatus getNextDirectory() throws IOException {
+    Node dirNode = getNextDirectoryNode();
+    if (dirNode != null) {
+      return dirNode.path;
+    }
+    return null;
+  }
+
+  private Node getNextDirectoryNode() throws IOException {
+
     // Check if traversal is done.
     while (!doneTraversal()) {
       // If traversal is not done, check if the stack is not empty.
@@ -190,7 +279,7 @@ public class DirectoryTraversal {
           }
         } else {
           stack.pop();
-          return node.path;
+          return node;
         }
       }
       // If the stack is empty, do we have more paths?
@@ -215,7 +304,6 @@ public class DirectoryTraversal {
       return;
     }
     Path p = stat.getPath();
-    LOG.info("Traversing to directory " + p);
     FileStatus[] elements = fs.listStatus(p);
     Node newNode = new Node(stat, (elements == null? new FileStatus[0]: elements));
     stack.push(newNode);

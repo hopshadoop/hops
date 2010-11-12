@@ -445,7 +445,8 @@ public abstract class RaidNode implements RaidProtocol {
 
         // Set the time for a new traversal.
         scanState.fullScanStartTime = now();
-        DirectoryTraversal dt = new DirectoryTraversal(fs, selectedPaths);
+        DirectoryTraversal dt = new DirectoryTraversal(fs, selectedPaths,
+          conf.getInt("raid.directorytraversal.threads", 4));
         DirectoryTraversal.FileFilter filter =
           filterForPolicy(selectStartTime, info, allPolicies, scanState.stats);
         returnSet = dt.getFilteredFiles(filter, selectLimit);

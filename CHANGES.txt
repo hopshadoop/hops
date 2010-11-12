@@ -168,6 +168,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-2093. Herriot JT and TT clients should vend statistics. (cos)
 
+    MAPREDUCE-2167. Faster directory traversal for raid node. (Ramkumar Vadali
+    via schen)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and

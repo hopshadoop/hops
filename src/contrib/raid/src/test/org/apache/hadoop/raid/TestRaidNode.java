@@ -632,13 +632,25 @@ public class TestRaidNode extends TestCase {
 
     RaidNode cnode = null;
     try {
-      createTestFiles("/user/dhruba/raidtest/", "/destraid/user/dhruba/raidtest");
+      createTestFiles(
+        "/user/dhruba/raidtest/1/", "/destraid/user/dhruba/raidtest/1");
+      createTestFiles(
+        "/user/dhruba/raidtest/2/", "/destraid/user/dhruba/raidtest/2");
+      createTestFiles(
+        "/user/dhruba/raidtest/3/", "/destraid/user/dhruba/raidtest/3");
+      createTestFiles(
+        "/user/dhruba/raidtest/4/", "/destraid/user/dhruba/raidtest/4");
       LOG.info("Test testSuspendTraversal created test files");
 
       Configuration localConf = new Configuration(conf);
       localConf.set(RaidNode.RAID_LOCATION_KEY, "/destraid");
       localConf.setInt("raid.distraid.max.files", 3);
-      final int numJobsExpected = 4; // 10 test files: 4 jobs with 3 files each.
+      localConf.setInt("raid.directorytraversal.threads", 1);
+      // This is too dependent on the implementation of getFilteredFiles().
+      // It relies on the threading behavior where two directories are traversed
+      // before returning because the list of files is modified in a separate
+      // thread from the one that decides if there are enough files.
+      final int numJobsExpected = 2;
       cnode = RaidNode.createRaidNode(null, localConf);
 
       long start = System.currentTimeMillis();
