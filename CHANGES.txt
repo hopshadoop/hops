@@ -170,6 +170,8 @@ Trunk (unreleased changes)
 
     HDFS-1408. Herriot NN and DN clients should vend statistics. (cos)
 
+    HDFS-1160. Improve some FSDataset warnings and comments. (eli)
+
   OPTIMIZATIONS
 
     HDFS-1140. Speedup INode.getPathComponents. (Dmytro Molkov via shv)

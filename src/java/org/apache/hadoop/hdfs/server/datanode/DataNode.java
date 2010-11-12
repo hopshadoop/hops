@@ -848,30 +848,28 @@ public class DataNode extends Configured
   }
   
   private void handleDiskError(String errMsgr) {
-    boolean hasEnoughResource = data.hasEnoughResource();
-    LOG.warn("DataNode.handleDiskError: Keep Running: " + hasEnoughResource);
+    final boolean hasEnoughResources = data.hasEnoughResource();
+    LOG.warn("DataNode.handleDiskError: Keep Running: " + hasEnoughResources);
+
+    // If we have enough active valid volumes then we do not want to 
+    // shutdown the DN completely.
+    int dpError = hasEnoughResources ? DatanodeProtocol.DISK_ERROR  
+                                     : DatanodeProtocol.FATAL_DISK_ERROR;  
     
-    //if hasEnoughtResource = true - more volumes are available, so we don't want 
-    // to shutdown DN completely and don't want NN to remove it.
-    int dp_error = DatanodeProtocol.DISK_ERROR;
-    if(hasEnoughResource == false) {
-      // DN will be shutdown and NN should remove it
-      dp_error = DatanodeProtocol.FATAL_DISK_ERROR;
-    }
-    //inform NameNode
     try {
-      namenode.errorReport(
-                           dnRegistration, dp_error, errMsgr);
-    } catch(IOException ignored) {              
+      namenode.errorReport(dnRegistration, dpError, errMsgr);
+    } catch (IOException e) {
+      LOG.warn("Error reporting disk failure to NameNode: " + 
+          StringUtils.stringifyException(e));
     }
     
     
-    if(hasEnoughResource) {
+    if (hasEnoughResources) {
       scheduleBlockReport(0);
       return; // do not shutdown
     }
     
-    LOG.warn("DataNode is shutting down.\n" + errMsgr);
+    LOG.warn("DataNode is shutting down: " + errMsgr);
     shouldRun = false; 
   }
     
@@ -916,7 +914,6 @@ public class DataNode extends Configured
                                                        xmitsInProgress.get(),
                                                        getXceiverCount());
           myMetrics.heartbeats.inc(now() - startTime);
-          //LOG.info("Just sent heartbeat, with name " + localName);
           if (!processCommand(cmds))
             continue;
         }
