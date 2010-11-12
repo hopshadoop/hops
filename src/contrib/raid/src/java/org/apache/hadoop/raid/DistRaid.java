@@ -335,9 +335,6 @@ public class DistRaid {
          LOG.info("Job Complete(Failed): " + jobID);
        }
        raidPolicyPathPairList.clear();
-       Counters ctrs = runningJob.getCounters();
-       long filesRaided = ctrs.findCounter(Counter.FILES_SUCCEEDED).getValue();
-       long filesFailed = ctrs.findCounter(Counter.FILES_FAILED).getValue();
        return true;
      } else {
        String report =  (" job " + jobID +

@@ -48,6 +48,7 @@ import org.apache.hadoop.mapred.MiniMRCluster;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.raid.protocol.PolicyInfo;
 import org.apache.hadoop.raid.protocol.PolicyList;
+import org.apache.hadoop.raid.protocol.PolicyInfo.ErasureCodeType;
 
 /**
   * Test the generation of parity blocks for files with different block
@@ -122,12 +123,22 @@ public class TestRaidNode extends TestCase {
       policies = new java.util.ArrayList<String>();
     }
 
+    public void addPolicy(String name, String path, String parent) {
+      String str =
+        "<srcPath prefix=\"" + path + "\"> " +
+          "<policy name = \"" + name + "\"> " +
+             "<parentPolicy>" + parent + "</parentPolicy>" +
+          "</policy>" +
+        "</srcPath>";
+      policies.add(str);
+    }
+
     public void addPolicy(String name, short srcReplication,
                           long targetReplication, long metaReplication, long stripeLength) {
       String str =
         "<srcPath prefix=\"/user/dhruba/raidtest\"> " +
           "<policy name = \"" + name + "\"> " +
-             "<destPath> /destraid</destPath> " +
+             "<erasureCode>xor</erasureCode> " +
              "<property> " +
                "<name>srcReplication</name> " +
                "<value>" + srcReplication + "</value> " +
@@ -169,7 +180,7 @@ public class TestRaidNode extends TestCase {
       String str =
         "<srcPath prefix=\"" + path + "\"> " +
           "<policy name = \"" + name + "\"> " +
-             "<destPath> /destraid</destPath> " +
+             "<erasureCode>xor</erasureCode> " +
              "<property> " +
                "<name>srcReplication</name> " +
                "<value>" + srcReplication + "</value> " +
@@ -280,7 +291,6 @@ public class TestRaidNode extends TestCase {
 
       // create an instance of the RaidNode
       cnode = RaidNode.createRaidNode(null, conf);
-      int times = 10;
 
       FileStatus[] listPaths = null;
 
@@ -345,7 +355,7 @@ public class TestRaidNode extends TestCase {
                                           StringUtils.stringifyException(e));
       throw e;
     } finally {
-      shell.close();
+      if (shell != null) shell.close();
       if (cnode != null) { cnode.stop(); cnode.join(); }
       LOG.info("doTestPathFilter delete file " + file1);
       fileSys.delete(file1, true);
@@ -388,8 +398,14 @@ public class TestRaidNode extends TestCase {
       long firstmodtime = 0;
       // wait till file is raided
       while (true) {
-        Thread.sleep(20000L);                  // waiting
-        listPaths = fileSys.listStatus(destPath);
+        Thread.sleep(1000);                  // waiting
+        try {
+          listPaths = fileSys.listStatus(destPath);
+        } catch (FileNotFoundException e) {
+          LOG.warn("File not found " + destPath);
+          // The directory have been deleted by the purge thread.
+          continue;
+        }
         int count = 0;
         if (listPaths != null && listPaths.length == 1) {
           for (FileStatus s : listPaths) {
@@ -554,7 +570,7 @@ public class TestRaidNode extends TestCase {
                      long crc, long corruptOffset) throws IOException {
     // recover the file assuming that we encountered a corruption at offset 0
     String[] args = new String[3];
-    args[0] = "recover";
+    args[0] = "-recover";
     args[1] = file1.toString();
     args[2] = Long.toString(corruptOffset);
     Path recover1 = shell.recover(args[0], args, 1)[0];

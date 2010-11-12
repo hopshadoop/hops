@@ -22,9 +22,9 @@ public class ReedSolomonCode implements ErasureCode {
 
   private final int stripeSize;
   private final int paritySize;
-  private final int[] generatingRoots;
   private final int[] generatingPolynomial;
   private final int PRIMITIVE_ROOT = 2;
+  private final int[] primitivePower;
   private final GaloisField GF = new GaloisField();
   private int[] errSignature;
   private final int[] paritySymbolLocations;
@@ -40,14 +40,17 @@ public class ReedSolomonCode implements ErasureCode {
     for (int i = 0; i < paritySize; i++) {
       paritySymbolLocations[i] = i;
     }
-    this.generatingRoots = new int[paritySize];
-    
+
+    this.primitivePower = new int[stripeSize + paritySize];
+    // compute powers of the primitive root
+    for (int i = 0; i < stripeSize + paritySize; i++) {
+      primitivePower[i] = GF.power(PRIMITIVE_ROOT, i);
+    }
     // compute generating polynomial
     int[] gen = {1};
     int[] poly = new int[2];
     for (int i = 0; i < paritySize; i++) {
-      generatingRoots[i] = GF.power(PRIMITIVE_ROOT, i);
-      poly[0] = generatingRoots[i];
+      poly[0] = primitivePower[i];
       poly[1] = 1;
       gen = GF.multiply(gen, poly);
     }
@@ -80,8 +83,8 @@ public class ReedSolomonCode implements ErasureCode {
       data[erasedLocation[i]] = 0;
     }
     for (int i = 0; i < erasedLocation.length; i++) {
-      errSignature[i] = GF.power(PRIMITIVE_ROOT, erasedLocation[i]);
-      erasedValue[i] = GF.substitute(data, generatingRoots[i]);
+      errSignature[i] = primitivePower[erasedLocation[i]];
+      erasedValue[i] = GF.substitute(data, primitivePower[i]);
     }
     GF.solveVandermondeSystem(errSignature, erasedValue, erasedLocation.length);
   }

@@ -55,4 +55,9 @@ public class XOREncoder extends Encoder {
       parityIn.close();
     }
   }
+
+  @Override
+  public Path getParityTempPath() {
+    return new Path(RaidNode.unraidTmpDirectory(conf));
+  }
 }

@@ -107,7 +107,8 @@ public abstract class Encoder {
    * @param srcFile The source file.
    * @param parityFile The parity file to be generated.
    */
-  public void encodeFile(FileSystem fs, Path srcFile, Path parityFile,
+  public void encodeFile(
+    FileSystem fs, Path srcFile, FileSystem parityFs, Path parityFile,
     short parityRepl, Progressable reporter) throws IOException {
     FileStatus srcStat = fs.getFileStatus(srcFile);
     long srcSize = srcStat.getLen();
@@ -116,10 +117,13 @@ public abstract class Encoder {
     configureBuffers(blockSize);
 
     // Create a tmp file to which we will write first.
-    Path parityTmp = new Path(conf.get("fs.raid.tmpdir", "/tmp/raid") +
-                              parityFile.toUri().getPath() +
-                              "." + rand.nextLong() + ".tmp");
-    FSDataOutputStream out = fs.create(
+    Path tmpDir = getParityTempPath();
+    if (!parityFs.mkdirs(tmpDir)) {
+      throw new IOException("Could not create tmp dir " + tmpDir);
+    }
+    Path parityTmp = new Path(tmpDir,
+                            parityFile.getName() + rand.nextLong());
+    FSDataOutputStream out = parityFs.create(
                                parityTmp,
                                true,
                                conf.getInt("io.file.buffer.size", 64 * 1024),
@@ -133,11 +137,11 @@ public abstract class Encoder {
       LOG.info("Wrote temp parity file " + parityTmp);
 
       // delete destination if exists
-      if (fs.exists(parityFile)){
-        fs.delete(parityFile, false);
+      if (parityFs.exists(parityFile)){
+        parityFs.delete(parityFile, false);
       }
-      fs.mkdirs(parityFile.getParent());
-      if (!fs.rename(parityTmp, parityFile)) {
+      parityFs.mkdirs(parityFile.getParent());
+      if (!parityFs.rename(parityTmp, parityFile)) {
         String msg = "Unable to rename file " + parityTmp + " to " + parityFile;
         throw new IOException (msg);
       }
@@ -146,7 +150,7 @@ public abstract class Encoder {
       if (out != null) {
         out.close();
       }
-      fs.delete(parityTmp, false);
+      parityFs.delete(parityTmp, false);
     }
   }
 
@@ -225,7 +229,7 @@ public abstract class Encoder {
     LOG.info("Starting recovery by using source stripe " +
               srcFile + ":" + stripeStart);
     // Read the data from the blocks and write to the parity file.
-    encodeStripe(blocks, stripeStart, blockSize, outs, 
+    encodeStripe(blocks, stripeStart, blockSize, outs,
                  new RaidUtils.DummyProgressable());
   }
 
@@ -339,4 +343,9 @@ public abstract class Encoder {
     long blockSize,
     OutputStream[] outs,
     Progressable reporter) throws IOException;
+
+  /**
+   * Return the temp path for the parity file
+   */
+  protected abstract Path getParityTempPath();
 }

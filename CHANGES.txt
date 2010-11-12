@@ -21,6 +21,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1970.  Reed-Solomon code implementation for HDFS RAID.
     (Scott Chen via dhruba)
 
+    MAPREDUCE-2169. Integrated Reed-Solomon code with RaidNode. (Ramkumar
+    Vadali via schen)
+
   IMPROVEMENTS
 
     MAPREDUCE-2141. Add an "extra data" field to Task for use by Mesos. (matei)

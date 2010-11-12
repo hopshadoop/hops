@@ -32,6 +32,8 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.mapred.Reporter;
+
 import org.apache.hadoop.raid.protocol.PolicyInfo;
 
 public class TestDirectoryTraversal extends TestCase {
@@ -89,6 +91,7 @@ public class TestDirectoryTraversal extends TestCase {
   }
 
   public void testSuspension() throws IOException {
+    LOG.info("Starting testSuspension");
     mySetup();
 
     try {
@@ -107,7 +110,7 @@ public class TestDirectoryTraversal extends TestCase {
       Path raid = new Path("/raid");
       DirectoryTraversal.FileFilter filter =
         new RaidFilter.TimeBasedFilter(conf,
-          RaidNode.getDestinationPath(conf), 1, System.currentTimeMillis(), 0);
+          RaidNode.xorDestinationPath(conf), 1, System.currentTimeMillis(), 0);
       List<FileStatus> selected = dt.getFilteredFiles(filter, limit);
       for (FileStatus f: selected) {
         LOG.info(f.getPath());
@@ -119,6 +122,50 @@ public class TestDirectoryTraversal extends TestCase {
         LOG.info(f.getPath());
       }
       assertEquals(limit, selected.size());
+    } finally {
+      myTearDown();
+    }
+  }
+
+  public void testFileFilter() throws IOException {
+    mySetup();
+
+    try {
+      Path topDir = new Path(TEST_DIR + "/testFileFilter");
+      int targetRepl = 1;
+      createTestTree(topDir);
+      Path file = new Path(topDir.toString() + "/a/f1");
+      FileStatus stat = fs.getFileStatus(file);
+      PolicyInfo info = new PolicyInfo("testFileFilter", conf);
+      info.setSrcPath(topDir.toString());
+      info.setErasureCode("rs");
+      info.setDescription("test policy");
+      info.setProperty("targetReplication", "1");
+      info.setProperty("metaReplication", "1");
+
+      DirectoryTraversal.FileFilter timeBasedXORFilter =
+        new RaidFilter.TimeBasedFilter(conf,
+          RaidNode.xorDestinationPath(conf), targetRepl,
+            System.currentTimeMillis(), 0);
+      DirectoryTraversal.FileFilter timeBasedRSFilter =
+        new RaidFilter.TimeBasedFilter(conf,
+          RaidNode.rsDestinationPath(conf), targetRepl,
+            System.currentTimeMillis(), 0);
+      DirectoryTraversal.FileFilter preferenceForRSFilter =
+        new RaidFilter.PreferenceFilter(
+          conf, RaidNode.rsDestinationPath(conf),
+          RaidNode.xorDestinationPath(conf), 1, System.currentTimeMillis(), 0);
+
+      assertTrue(timeBasedXORFilter.check(stat));
+      assertTrue(timeBasedRSFilter.check(stat));
+      assertTrue(preferenceForRSFilter.check(stat));
+
+      RaidNode.doRaid(
+        conf, info, stat, new RaidNode.Statistics(), Reporter.NULL);
+
+      assertTrue(timeBasedXORFilter.check(stat));
+      assertFalse(timeBasedRSFilter.check(stat));
+      assertFalse(preferenceForRSFilter.check(stat));
     } finally {
       myTearDown();
     }

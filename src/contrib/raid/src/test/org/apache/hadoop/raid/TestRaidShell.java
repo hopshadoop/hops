@@ -58,6 +58,7 @@ import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.DistributedRaidFileSystem;
 import org.apache.hadoop.hdfs.TestRaidDfs;
 import org.apache.hadoop.hdfs.RaidDFSUtil;
+import org.apache.hadoop.hdfs.TestDatanodeBlockScanner;
 import org.apache.hadoop.raid.RaidNode;
 
 
@@ -120,16 +121,10 @@ public class TestRaidShell extends TestCase {
       int[] corruptBlockIdxs = new int[]{0, 4, 6};
       for (int idx: corruptBlockIdxs) {
         LOG.info("Corrupting block " + locations.get(idx).getBlock());
-        TestRaidDfs.corruptBlock(file1, locations.get(idx).getBlock(),
-                                  NUM_DATANODES, false); // corrupt block
-        long offset = idx * blockSize;
-        try {
-          readAndDiscard(fileSys, file1, offset, blockSize);
-          fail("Expected checksumexception not thrown");
-        } catch (ChecksumException e) {
-          LOG.info("Block at offset " + offset + " got expected exception");
-        }
+        corruptBlock(locations.get(idx).getBlock().getBlockName());
       }
+      TestBlockFixer.reportCorruptBlocks(fileSys, file1, corruptBlockIdxs,
+        srcStat.getBlockSize());
 
       String fileUriPath = file1.toUri().getPath();
       waitForCorruptBlocks(corruptBlockIdxs.length, dfs, file1);
@@ -150,14 +145,9 @@ public class TestRaidShell extends TestCase {
       long parityCrc = getCRC(fileSys, parityFile);
       locations = RaidDFSUtil.getBlockLocations(
         dfs, parityFile.toUri().getPath(), 0, parityStat.getLen());
-      TestRaidDfs.corruptBlock(parityFile, locations.get(0).getBlock(),
-                                NUM_DATANODES, false); // corrupt block
-      try {
-        readAndDiscard(fileSys, parityFile, 0, blockSize);
-        fail("Expected checksumexception not thrown");
-      } catch (ChecksumException e) {
-        LOG.info("Parity Block at offset 0 got expected exception");
-      }
+      corruptBlock(locations.get(0).getBlock().getBlockName());
+      TestBlockFixer.reportCorruptBlocks(fileSys, parityFile, new int[]{0},
+        srcStat.getBlockSize());
       waitForCorruptBlocks(1, dfs, parityFile);
 
       args[1] = parityFile.toUri().getPath();
@@ -294,14 +284,11 @@ public class TestRaidShell extends TestCase {
     return crc.getValue();
   }
 
-  private static void readAndDiscard(
-    FileSystem fs, Path p, long offset, long length) throws IOException {
-    FSDataInputStream in = fs.open(p);
-    in.seek(offset);
-    long count = 0;
-    for (int b = 0; b >= 0 && count < length; count++) {
-      b = in.read();
+  void corruptBlock(String blockName) throws IOException {
+    boolean corrupted = false;
+    for (int i = 0; i < NUM_DATANODES; i++) {
+      corrupted |= TestDatanodeBlockScanner.corruptReplica(blockName, i);
     }
+    assertTrue(corrupted);
   }
 }
-

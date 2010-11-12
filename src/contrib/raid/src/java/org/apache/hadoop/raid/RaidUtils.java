@@ -39,7 +39,7 @@ public class RaidUtils {
    *
    * We could have used Reporter.NULL here but that would introduce
    * a dependency on mapreduce.
-   */ 
+   */
   public static class DummyProgressable implements Progressable {
     /**
      * Do nothing.

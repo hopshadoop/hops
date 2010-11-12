@@ -113,7 +113,7 @@ public class TestRaidHar extends TestCase {
     String str = "<configuration> " +
                    "<srcPath prefix=\"/user/test/raidtest\"> " +
                      "<policy name = \"RaidTest1\"> " +
-                        "<destPath> /destraid</destPath> " +
+                        "<erasureCode>xor</erasureCode> " +
                         "<property> " +
                           "<name>targetReplication</name> " +
                           "<value>" + targetReplication + "</value> " +
@@ -247,6 +247,9 @@ public class TestRaidHar extends TestCase {
             }
           }
           if (count == 1  && listPaths.length == 1) {
+            Path partfile = new Path(harPath, "part-0");
+            assertEquals(fileSys.getFileStatus(partfile).getReplication(),
+              targetReplication);
             break;
           }
         } catch (FileNotFoundException e) {

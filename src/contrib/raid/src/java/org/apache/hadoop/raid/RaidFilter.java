@@ -218,4 +218,42 @@ public class RaidFilter {
       return len;
     }
   }
+
+  static class PreferenceFilter extends Configured
+    implements DirectoryTraversal.FileFilter {
+    Path firstChoicePrefix;
+    DirectoryTraversal.FileFilter secondChoiceFilter;
+
+    PreferenceFilter(Configuration conf,
+      Path firstChoicePrefix, Path secondChoicePrefix,
+      int targetRepl, long startTime, long modTimePeriod) {
+      super(conf);
+      this.firstChoicePrefix = firstChoicePrefix;
+      this.secondChoiceFilter = new TimeBasedFilter(conf,
+        secondChoicePrefix, targetRepl, startTime, modTimePeriod);
+    }
+
+    PreferenceFilter(Configuration conf,
+      Path firstChoicePrefix, Path secondChoicePrefix,
+      PolicyInfo info, List<PolicyInfo> allPolicies, long startTime,
+        Statistics stats) {
+      super(conf);
+      this.firstChoicePrefix = firstChoicePrefix;
+      this.secondChoiceFilter = new TimeBasedFilter(
+        conf, secondChoicePrefix, info, allPolicies, startTime, stats);
+    }
+
+    public boolean check(FileStatus f) throws IOException {
+      Object firstChoicePPair =
+        RaidNode.getParityFile(firstChoicePrefix, f.getPath(), getConf());
+      if (firstChoicePPair == null) {
+        // The decision is upto the the second choice filter.
+        return secondChoiceFilter.check(f);
+      } else {
+        // There is already a parity file under the first choice path.
+        // We dont want to choose this file.
+        return false;
+      }
+    }
+  }
 }

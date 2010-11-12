@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.raid;
 
-import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -60,6 +59,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.ChecksumException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.FileStatus;
@@ -71,36 +71,73 @@ import org.apache.hadoop.net.NetUtils;
 
 import org.apache.hadoop.raid.RaidNode;
 import org.apache.hadoop.raid.RaidUtils;
+import org.apache.hadoop.raid.protocol.PolicyInfo.ErasureCodeType;
+
 
 /**
- * This class fixes source file blocks using the parity file,
- * and parity file blocks using the source file.
- * It periodically fetches the list of corrupt files from the namenode,
- * and figures out the location of the bad block by reading through
- * the corrupt file.
+ * contains the core functionality of the block fixer
+ *
+ * raid.blockfix.interval          - interval between checks for corrupt files
+ *
+ * raid.blockfix.history.interval  - interval before fixing same file again
+ *
+ * raid.blockfix.read.timeout      - read time out
+ *
+ * raid.blockfix.write.timeout     - write time out
  */
-public class BlockFixer implements Runnable {
+public class BlockFixer extends Configured implements Runnable {
   public static final Log LOG = LogFactory.getLog(
                                   "org.apache.hadoop.raid.BlockFixer");
-  private java.util.HashMap<String, java.util.Date> history;
-  private int blockFixInterval = 60*1000; // 1min
-  private long numFilesFixed = 0;
-  private Configuration conf;
-  private String xorPrefix;
-  private XOREncoder xorEncoder;
-  private XORDecoder xorDecoder;
 
-  boolean running = true;
+  public static final String BLOCKFIX_INTERVAL = "raid.blockfix.interval";
+  public static final String BLOCKFIX_HISTORY_INTERVAL =
+    "raid.blockfix.history.interval";
+  public static final String BLOCKFIX_READ_TIMEOUT =
+    "raid.blockfix.read.timeout";
+  public static final String BLOCKFIX_WRITE_TIMEOUT =
+    "raid.blockfix.write.timeout";
+
+  public static final long DEFAULT_BLOCKFIX_INTERVAL = 60 * 1000; // 1 min
+  public static final long DEFAULT_BLOCKFIX_HISTORY_INTERVAL =
+    60 * 60 * 1000; // 60 mins
+
+  private java.util.HashMap<String, java.util.Date> history;
+  private long numFilesFixed = 0;
+  private String xorPrefix;
+  private String rsPrefix;
+  private Encoder xorEncoder;
+  private Decoder xorDecoder;
+  private Encoder rsEncoder;
+  private Decoder rsDecoder;
+
+  // interval between checks for corrupt files
+  protected long blockFixInterval = DEFAULT_BLOCKFIX_INTERVAL;
+
+  // interval before fixing same file again
+  protected long historyInterval = DEFAULT_BLOCKFIX_HISTORY_INTERVAL;
+
+  public volatile boolean running = true;
+
 
   public BlockFixer(Configuration conf) throws IOException {
-    this.conf = conf;
+    super(conf);
     history = new java.util.HashMap<String, java.util.Date>();
-    blockFixInterval = conf.getInt("raid.blockfix.interval",
-                                   blockFixInterval);
-    xorPrefix = RaidNode.getDestinationPath(conf).toUri().getPath();
-    int stripeLength = RaidNode.getStripeLength(conf);
-    xorEncoder = new XOREncoder(conf, stripeLength);
-    xorDecoder = new XORDecoder(conf, stripeLength);
+    blockFixInterval = getConf().getInt(BLOCKFIX_INTERVAL,
+                                   (int) blockFixInterval);
+    xorPrefix = RaidNode.xorDestinationPath(getConf()).toUri().getPath();
+    if (!xorPrefix.endsWith(Path.SEPARATOR)) {
+      xorPrefix += Path.SEPARATOR;
+    }
+    int stripeLength = RaidNode.getStripeLength(getConf());
+    xorEncoder = new XOREncoder(getConf(), stripeLength);
+    xorDecoder = new XORDecoder(getConf(), stripeLength);
+    rsPrefix = RaidNode.rsDestinationPath(getConf()).toUri().getPath();
+    if (!rsPrefix.endsWith(Path.SEPARATOR)) {
+      rsPrefix += Path.SEPARATOR;
+    }
+    int parityLength = RaidNode.rsParityLength(getConf());
+    rsEncoder = new ReedSolomonEncoder(getConf(), stripeLength, parityLength);
+    rsDecoder = new ReedSolomonDecoder(getConf(), stripeLength, parityLength);
   }
 
   public void run() {
@@ -154,6 +191,7 @@ public class BlockFixer implements Runnable {
 
 
   void fixFile(Path srcPath) throws IOException {
+
     if (RaidNode.isParityHarPartFile(srcPath)) {
       processCorruptParityHarPartFile(srcPath);
       return;
@@ -165,24 +203,30 @@ public class BlockFixer implements Runnable {
       return;
     }
 
-    // The corrupted file is a source file
-
-    // Do we have a parity file for this file?
-    RaidNode.ParityFilePair ppair = null;
-    Decoder decoder = null;
-    Path destPath = null;
-    try {
-      destPath = RaidNode.getDestinationPath(conf);
-      ppair = RaidNode.getParityFile(destPath, srcPath, conf);
-      if (ppair != null) {
-        decoder = xorDecoder;
-      }
-    } catch (FileNotFoundException e) {
+    // The corrupted file is a ReedSolomon parity file
+    if (isRsParityFile(srcPath)) {
+      processCorruptParityFile(srcPath, rsEncoder);
+      return;
     }
+
+    // The corrupted file is a source file
+    RaidNode.ParityFilePair ppair =
+      RaidNode.xorParityForSource(srcPath, getConf());
+    Decoder decoder = null;
+    if (ppair != null) {
+      decoder = xorDecoder;
+    } else  {
+      ppair = RaidNode.rsParityForSource(srcPath, getConf());
+      if (ppair != null) {
+        decoder = rsDecoder;
+      }
+    }
+
     // If we have a parity file, process the file and fix it.
     if (ppair != null) {
-      processCorruptFile(srcPath, destPath, decoder);
+      processCorruptFile(srcPath, ppair, decoder);
     }
+
   }
 
   /**
@@ -193,8 +237,8 @@ public class BlockFixer implements Runnable {
    */
   void purgeHistory() {
     // Default history interval is 1 hour.
-    long historyInterval = conf.getLong(
-                             "raid.blockfix.history.interval", 3600*1000);
+    long historyInterval = getConf().getLong(
+                             BLOCKFIX_HISTORY_INTERVAL, 3600*1000);
     java.util.Date cutOff = new java.util.Date(
                                    System.currentTimeMillis()-historyInterval);
     List<String> toRemove = new java.util.ArrayList<String>();
@@ -217,14 +261,14 @@ public class BlockFixer implements Runnable {
   List<Path> getCorruptFiles() throws IOException {
     DistributedFileSystem dfs = getDFS(new Path("/"));
 
-    String[] nnCorruptFiles = RaidDFSUtil.getCorruptFiles(conf);
+    String[] nnCorruptFiles = RaidDFSUtil.getCorruptFiles(getConf());
     List<Path> corruptFiles = new LinkedList<Path>();
     for (String file: nnCorruptFiles) {
       if (!history.containsKey(file)) {
         corruptFiles.add(new Path(file));
       }
     }
-    RaidUtils.filterTrash(conf, corruptFiles);
+    RaidUtils.filterTrash(getConf(), corruptFiles);
     return corruptFiles;
   }
 
@@ -235,11 +279,11 @@ public class BlockFixer implements Runnable {
     // TODO: We should first fix the files that lose more blocks
     Comparator<Path> comp = new Comparator<Path>() {
       public int compare(Path p1, Path p2) {
-        if (isXorParityFile(p2)) {
+        if (isXorParityFile(p2) || isRsParityFile(p2)) {
           // If p2 is a parity file, p1 is smaller.
           return -1;
         }
-        if (isXorParityFile(p1)) {
+        if (isXorParityFile(p1) || isRsParityFile(p1)) {
           // If p1 is a parity file, p2 is smaller.
           return 1;
         }
@@ -250,21 +294,13 @@ public class BlockFixer implements Runnable {
     Collections.sort(files, comp);
   }
 
-
-  /**
-   * Returns a DistributedFileSystem hosting the path supplied.
-   */
-  private DistributedFileSystem getDFS(Path p) throws IOException {
-    return (DistributedFileSystem) p.getFileSystem(conf);
-  }
-
   /**
    * Reads through a corrupt source file fixing corrupt blocks on the way.
    * @param srcPath Path identifying the corrupt file.
    * @throws IOException
    */
-  void processCorruptFile(Path srcPath, Path destPath, Decoder decoder)
-      throws IOException {
+  void processCorruptFile(Path srcPath, RaidNode.ParityFilePair parityPair,
+      Decoder decoder) throws IOException {
     LOG.info("Processing corrupt file " + srcPath);
 
     DistributedFileSystem srcFs = getDFS(srcPath);
@@ -290,9 +326,6 @@ public class BlockFixer implements Runnable {
       localBlockFile.deleteOnExit();
 
       try {
-        RaidNode.ParityFilePair parityPair = RaidNode.getParityFile(
-            destPath, srcPath, conf);
-
         decoder.recoverBlockToFile(srcFs, srcPath, parityPair.getFileSystem(),
           parityPair.getPath(), blockSize, corruptOffset, localBlockFile,
           blockContentsSize);
@@ -313,6 +346,9 @@ public class BlockFixer implements Runnable {
     numFilesFixed++;
   }
 
+  /**
+   * checks whether file is xor parity file
+   */
   boolean isXorParityFile(Path p) {
     String pathStr = p.toUri().getPath();
     if (pathStr.contains(RaidNode.HAR_SUFFIX)) {
@@ -322,7 +358,25 @@ public class BlockFixer implements Runnable {
   }
 
   /**
-   * Reads through a parity file, fixing corrupt blocks on the way.
+   * checks whether file is rs parity file
+   */
+  boolean isRsParityFile(Path p) {
+    String pathStr = p.toUri().getPath();
+    if (pathStr.contains(RaidNode.HAR_SUFFIX)) {
+      return false;
+    }
+    return pathStr.startsWith(rsPrefix);
+  }
+
+  /**
+   * Returns a DistributedFileSystem hosting the path supplied.
+   */
+  protected DistributedFileSystem getDFS(Path p) throws IOException {
+    return (DistributedFileSystem) p.getFileSystem(getConf());
+  }
+
+  /**
+   * Fixes corrupt blocks in a parity file.
    * This function uses the corresponding source file to regenerate parity
    * file blocks.
    */
@@ -469,6 +523,8 @@ public class BlockFixer implements Runnable {
         Encoder encoder;
         if (isXorParityFile(parityFile)) {
           encoder = xorEncoder;
+        } else if (isRsParityFile(parityFile)) {
+          encoder = rsEncoder;
         } else {
           String msg = "Could not figure out parity file correctly";
           LOG.warn(msg);
@@ -605,7 +661,7 @@ public class BlockFixer implements Runnable {
     DataInputStream blockMetadata = null;
     try {
       blockContents = new FileInputStream(localBlockFile);
-      blockMetadata = computeMetadata(conf, blockContents);
+      blockMetadata = computeMetadata(getConf(), blockContents);
       blockContents.close();
       // Reopen
       blockContents = new FileInputStream(localBlockFile);
@@ -638,13 +694,13 @@ public class BlockFixer implements Runnable {
     InetSocketAddress target = NetUtils.createSocketAddr(datanode.name);
     Socket sock = SocketChannel.open().socket();
 
-    int readTimeout =  conf.getInt(
-        "raid.blockfix.read.timeout", HdfsConstants.READ_TIMEOUT);
+    int readTimeout = getConf().getInt(BLOCKFIX_READ_TIMEOUT,
+      HdfsConstants.READ_TIMEOUT);
     NetUtils.connect(sock, target, readTimeout);
     sock.setSoTimeout(readTimeout);
 
-    int writeTimeout = conf.getInt(
-        "raid.blockfix.write.timeout", HdfsConstants.WRITE_TIMEOUT);
+    int writeTimeout = getConf().getInt(BLOCKFIX_WRITE_TIMEOUT,
+      HdfsConstants.WRITE_TIMEOUT);
 
     OutputStream baseStream = NetUtils.getOutputStream(sock, writeTimeout);
     DataOutputStream out = new DataOutputStream(
@@ -685,11 +741,18 @@ public class BlockFixer implements Runnable {
     }
   }
 
+  /**
+   * returns the source file corresponding to a parity file
+   */
   Path sourcePathFromParityPath(Path parityPath) {
     String parityPathStr = parityPath.toUri().getPath();
     if (parityPathStr.startsWith(xorPrefix)) {
       // Remove the prefix to get the source file.
-      String src = parityPathStr.replaceFirst(xorPrefix, "");
+      String src = parityPathStr.replaceFirst(xorPrefix, "/");
+      return new Path(src);
+    } else if (parityPathStr.startsWith(rsPrefix)) {
+      // Remove the prefix to get the source file.
+      String src = parityPathStr.replaceFirst(rsPrefix, "/");
       return new Path(src);
     }
     return null;

@@ -20,26 +20,33 @@ package org.apache.hadoop.hdfs;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.DataInput;
+import java.io.PrintStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.ChecksumException;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FilterFileSystem;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSInputStream;
+import org.apache.hadoop.hdfs.BlockMissingException;
+import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.raid.Decoder;
 import org.apache.hadoop.raid.RaidNode;
+import org.apache.hadoop.raid.ReedSolomonDecoder;
 import org.apache.hadoop.raid.XORDecoder;
-import org.apache.hadoop.hdfs.BlockMissingException;
-import org.apache.hadoop.hdfs.DistributedFileSystem;
+import org.apache.hadoop.raid.protocol.PolicyInfo.ErasureCodeType;
 
 /**
  * This is an implementation of the Hadoop  RAID Filesystem. This FileSystem 
@@ -51,7 +58,7 @@ import org.apache.hadoop.hdfs.DistributedFileSystem;
 public class DistributedRaidFileSystem extends FilterFileSystem {
 
   // these are alternate locations that can be used for read-only access
-  Path[]     alternates;
+  DecodeInfo[] alternates;
   Configuration conf;
   int stripeLength;
 
@@ -62,6 +69,30 @@ public class DistributedRaidFileSystem extends FilterFileSystem {
     super(fs);
     alternates = null;
     stripeLength = 0;
+  }
+
+  // Information required for decoding a source file
+  static private class DecodeInfo {
+    final Path destPath;
+    final ErasureCodeType type;
+    final Configuration conf;
+    final int stripeLength;
+    private DecodeInfo(Configuration conf, ErasureCodeType type, Path destPath) {
+      this.conf = conf;
+      this.type = type;
+      this.destPath = destPath;
+      this.stripeLength = RaidNode.getStripeLength(conf);
+    }
+
+    Decoder createDecoder() {
+      if (this.type == ErasureCodeType.XOR) {
+        return new XORDecoder(conf, stripeLength);
+      } else if (this.type == ErasureCodeType.RS) {
+        return new ReedSolomonDecoder(conf, stripeLength,
+                              RaidNode.rsParityLength(conf));
+      }
+      return null;
+    }
   }
 
   /* Initialize a Raid FileSystem
@@ -78,23 +109,6 @@ public class DistributedRaidFileSystem extends FilterFileSystem {
     this.fs = (FileSystem)ReflectionUtils.newInstance(clazz, null); 
     super.initialize(name, conf);
     
-    String alt = conf.get("hdfs.raid.locations");
-    
-    // If no alternates are specified, then behave absolutely same as 
-    // the original file system.
-    if (alt == null || alt.length() == 0) {
-      LOG.info("hdfs.raid.locations not defined. Using defaults...");
-      alt = RaidNode.DEFAULT_RAID_LOCATION;
-    }
-
-    // fs.alternate.filesystem.prefix can be of the form:
-    // "hdfs://host:port/myPrefixPath, file:///localPrefix,hftp://host1:port1/"
-    String[] strs  = alt.split(",");
-    if (strs == null || strs.length == 0) {
-      LOG.info("hdfs.raid.locations badly defined. Ignoring...");
-      return;
-    }
-
     // find stripe length configured
     stripeLength = RaidNode.getStripeLength(conf);
     if (stripeLength == 0) {
@@ -103,12 +117,12 @@ public class DistributedRaidFileSystem extends FilterFileSystem {
       return;
     }
 
-    // create a reference to all underlying alternate path prefix
-    alternates = new Path[strs.length];
-    for (int i = 0; i < strs.length; i++) {
-      alternates[i] = new Path(strs[i].trim());
-      alternates[i] = alternates[i].makeQualified(fs);
-    }
+    // Put XOR and RS in alternates
+    alternates= new DecodeInfo[2];
+    Path xorPath = RaidNode.xorDestinationPath(conf, fs);
+    alternates[0] = new DecodeInfo(conf, ErasureCodeType.XOR, xorPath);
+    Path rsPath = RaidNode.rsDestinationPath(conf, fs);
+    alternates[1] = new DecodeInfo(conf, ErasureCodeType.RS, rsPath);
   }
 
   /*
@@ -153,13 +167,13 @@ public class DistributedRaidFileSystem extends FilterFileSystem {
       private int nextLocation;
       private DistributedRaidFileSystem lfs;
       private Path path;
-      private final Path[] alternates;
+      private final DecodeInfo[] alternates;
       private final int buffersize;
       private final Configuration conf;
       private final int stripeLength;
 
-      ExtFsInputStream(Configuration conf, DistributedRaidFileSystem lfs, Path[] alternates,
-                       Path path, int stripeLength, int buffersize)
+      ExtFsInputStream(Configuration conf, DistributedRaidFileSystem lfs,
+          DecodeInfo[] alternates, Path path, int stripeLength, int buffersize)
           throws IOException {
         this.underLyingStream = lfs.fs.open(path, buffersize);
         this.path = path;
@@ -345,10 +359,13 @@ public class DistributedRaidFileSystem extends FilterFileSystem {
             clientConf.set("fs.hdfs.impl", clazz.getName());
             // Disable caching so that a previously cached RaidDfs is not used.
             clientConf.setBoolean("fs.hdfs.impl.disable.cache", true);
-            Decoder decoder =
-              new XORDecoder(clientConf, RaidNode.getStripeLength(clientConf));
-            Path npath = RaidNode.unRaid(clientConf, path, alternates[idx],
-                              decoder, stripeLength, corruptOffset);
+            Path npath = RaidNode.unRaid(clientConf, path,
+                         alternates[idx].destPath,
+                         alternates[idx].createDecoder(),
+                         stripeLength, corruptOffset);
+            if (npath == null)
+              continue;
+
             FileSystem fs1 = getUnderlyingFileSystem(conf);
             fs1.initialize(npath.toUri(), conf);
             LOG.info("Opening alternate path " + npath + " at offset " + curpos);
@@ -392,7 +409,7 @@ public class DistributedRaidFileSystem extends FilterFileSystem {
      * @throws IOException
      */
     public ExtFSDataInputStream(Configuration conf, DistributedRaidFileSystem lfs,
-      Path[] alternates, Path  p, int stripeLength, int buffersize) throws IOException {
+      DecodeInfo[] alternates, Path  p, int stripeLength, int buffersize) throws IOException {
         super(new ExtFsInputStream(conf, lfs, alternates, p, stripeLength, buffersize));
     }
   }

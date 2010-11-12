@@ -48,6 +48,7 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.mapred.MiniMRCluster;
+import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.protocol.Block;
@@ -56,6 +57,7 @@ import org.apache.hadoop.hdfs.DistributedRaidFileSystem;
 import org.apache.hadoop.hdfs.RaidDFSUtil;
 import org.apache.hadoop.hdfs.TestDatanodeBlockScanner;
 import org.apache.hadoop.hdfs.TestRaidDfs;
+import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.raid.RaidNode;
 import org.apache.hadoop.raid.RaidUtils;
 
@@ -520,7 +522,7 @@ public class TestBlockFixer extends TestCase {
     assertTrue(corrupted);
   }
 
-  void reportCorruptBlocks(FileSystem fs, Path file, int[] idxs,
+  static void reportCorruptBlocks(FileSystem fs, Path file, int[] idxs,
     long blockSize) throws IOException {
 
     FSDataInputStream in = fs.open(file);

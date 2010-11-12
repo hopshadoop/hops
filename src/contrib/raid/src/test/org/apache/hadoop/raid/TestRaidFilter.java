@@ -65,6 +65,7 @@ public class TestRaidFilter extends TestCase {
 
     PolicyInfo info1 = new PolicyInfo("p1", conf);
     info1.setSrcPath(src1.toString());
+    info1.setErasureCode("xor");
     info1.setDescription("test policy");
     info1.setProperty("targetReplication", "1");
     info1.setProperty("metaReplication", "1");
@@ -72,6 +73,7 @@ public class TestRaidFilter extends TestCase {
 
     PolicyInfo info2 = new PolicyInfo("p2", conf);
     info2.setSrcPath(src2.toString());
+    info2.setErasureCode("xor");
     info2.setDescription("test policy");
     info2.setProperty("targetReplication", "1");
     info2.setProperty("metaReplication", "1");
@@ -103,7 +105,7 @@ public class TestRaidFilter extends TestCase {
 
       RaidFilter.Statistics stats = new RaidFilter.Statistics();
       RaidFilter.TimeBasedFilter filter = new RaidFilter.TimeBasedFilter(
-        conf, RaidNode.getDestinationPath(conf), info1, all,
+        conf, RaidNode.xorDestinationPath(conf), info1, all,
         System.currentTimeMillis(), stats);
       System.out.println("Stats " + stats);
 

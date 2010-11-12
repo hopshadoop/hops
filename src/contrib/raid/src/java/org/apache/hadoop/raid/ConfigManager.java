@@ -22,7 +22,9 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -146,8 +148,9 @@ class ConfigManager {
    * 
    <configuration>
     <srcPath prefix="hdfs://hadoop.myhost.com:9000/user/warehouse/u_full/*">
-      <destPath> hdfs://dfsarch.data.facebook.com:9000/archive/</destPath>
       <policy name = RaidScanWeekly>
+        <destPath> hdfs://dfsname.myhost.com:9000/archive/</destPath>
+        <parentPolicy> RaidScanMonthly</parentPolicy>
         <property>
           <name>targetReplication</name>
           <value>2</value>
@@ -220,6 +223,8 @@ class ConfigManager {
           "top-level element not <configuration>");
     NodeList elements = root.getChildNodes();
 
+    Map<String, PolicyInfo> existingPolicies =
+      new HashMap<String, PolicyInfo>();
     // loop through all the configured source paths.
     for (int i = 0; i < elements.getLength(); i++) {
       Node node = elements.item(i);
@@ -231,15 +236,15 @@ class ConfigManager {
       if ("srcPath".equalsIgnoreCase(elementTagName)) {
         String srcPathPrefix = element.getAttribute("prefix");
 
-        if (srcPathPrefix == null || srcPathPrefix.length() == 0) {
-          throw new RaidConfigurationException("Bad configuration file: " + 
-             "srcPathPrefix not set.");
+        PolicyList policyList = null;
+        if (srcPathPrefix != null && srcPathPrefix.length() != 0) {
+          // Empty srcPath will have no effect but policies will be processed
+          // This allow us to define some "abstract" policies
+          policyList = new PolicyList();
+          all.add(policyList);
+          policyList.setSrcPath(conf, srcPathPrefix);
         }
-        PolicyList policyList = new PolicyList();
-        all.add(policyList);
 
-        policyList.setSrcPath(conf, srcPathPrefix);
-        
         // loop through all the policies for this source path
         NodeList policies = element.getChildNodes();
         for (int j = 0; j < policies.getLength(); j++) {
@@ -253,12 +258,13 @@ class ConfigManager {
               "Expecting <policy> for srcPath " + srcPathPrefix);
           }
           String policyName = policy.getAttribute("name");
-          PolicyInfo pinfo = new PolicyInfo(policyName, conf);
-          pinfo.setSrcPath(srcPathPrefix);
-          policyList.add(pinfo);
-
+          PolicyInfo curr = new PolicyInfo(policyName, conf);
+          if (srcPathPrefix != null && srcPathPrefix.length() > 0) {
+            curr.setSrcPath(srcPathPrefix);
+          }
           // loop through all the properties of this policy
           NodeList properties = policy.getChildNodes();
+          PolicyInfo parent = null;
           for (int k = 0; k < properties.getLength(); k++) {
             Node node2 = properties.item(k);
             if (!(node2 instanceof Element)) {
@@ -266,13 +272,16 @@ class ConfigManager {
             }
             Element property = (Element)node2;
             String propertyName = property.getTagName();
-            if ("destPath".equalsIgnoreCase(propertyName)) {
+            if ("erasureCode".equalsIgnoreCase(propertyName)) {
               String text = ((Text)property.getFirstChild()).getData().trim();
-              LOG.info(policyName + ".destPath = " + text);
-              pinfo.setDestinationPath(text);
+              LOG.info(policyName + ".erasureCode = " + text);
+              curr.setErasureCode(text);
             } else if ("description".equalsIgnoreCase(propertyName)) {
               String text = ((Text)property.getFirstChild()).getData().trim();
-              pinfo.setDescription(text);
+              curr.setDescription(text);
+            } else if ("parentPolicy".equalsIgnoreCase(propertyName)) {
+              String text = ((Text)property.getFirstChild()).getData().trim();
+              parent = existingPolicies.get(text);
             } else if ("property".equalsIgnoreCase(propertyName)) {
               NodeList nl = property.getChildNodes();
               String pname=null,pvalue=null;
@@ -291,7 +300,7 @@ class ConfigManager {
               }
               if (pname != null && pvalue != null) {
                 LOG.info(policyName + "." + pname + " = " + pvalue);
-                pinfo.setProperty(pname,pvalue);
+                curr.setProperty(pname,pvalue);
               }
             } else {
               LOG.info("Found bad property " + propertyName +
@@ -300,6 +309,20 @@ class ConfigManager {
                        ". Ignoring."); 
             }
           }  // done with all properties of this policy
+
+          PolicyInfo pinfo;
+          if (parent != null) {
+            pinfo = new PolicyInfo(policyName, conf);
+            pinfo.copyFrom(parent);
+            pinfo.copyFrom(curr);
+          } else {
+            pinfo = curr;
+          }
+          if (policyList != null) {
+            policyList.add(pinfo);
+          }
+          existingPolicies.put(policyName, pinfo);
+
         }    // done with all policies for this srcpath
       } 
     }        // done with all srcPaths
