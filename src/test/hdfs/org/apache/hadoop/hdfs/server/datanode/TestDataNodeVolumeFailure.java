@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
-
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
@@ -26,8 +25,6 @@ import java.net.Socket;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import junit.framework.TestCase;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -44,10 +41,16 @@ import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.net.NetUtils;
+
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Test;
+import static org.junit.Assert.*;
 
-public class TestDataNodeVolumeFailure extends TestCase{
+/**
+ * Fine-grain testing of block files and locations after volume failure.
+ */
+public class TestDataNodeVolumeFailure {
   final private int block_size = 512;
   MiniDFSCluster cluster = null;
   int dn_num = 2;
@@ -67,7 +70,6 @@ public class TestDataNodeVolumeFailure extends TestCase{
 
   @Before
   public void setUp() throws Exception {
-    
     // bring up a cluster of 2
     Configuration conf = new HdfsConfiguration();
     conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, block_size);
@@ -76,9 +78,26 @@ public class TestDataNodeVolumeFailure extends TestCase{
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(dn_num).build();
     cluster.waitActive();
   }
+
+  @After
+  public void tearDown() throws Exception {
+    if(data_fail != null) {
+      data_fail.setWritable(true);
+    }
+    if(failedDir != null) {
+      failedDir.setWritable(true);
+    }
+    if(cluster != null) {
+      cluster.shutdown();
+    }
+  }
   
-  
-  
+  /*
+   * Verify the number of blocks and files are correct after volume failure,
+   * and that we can replicate to both datanodes even after a single volume
+   * failure if the configuration parameter allows this.
+   */
+  @Test
   public void testVolumeFailure() throws IOException {
     FileSystem fs = cluster.getFileSystem();
     dataDir = new File(cluster.getDataDirectory());
@@ -129,12 +148,10 @@ public class TestDataNodeVolumeFailure extends TestCase{
     Path fileName1 = new Path("/test1.txt");
     DFSTestUtil.createFile(fs, fileName1, filesize, repl, 1L);
     
-    
     // should be able to replicate to both nodes (2 DN, repl=2)
     DFSTestUtil.waitReplication(fs, fileName1, repl);
     System.out.println("file " + fileName1.getName() + 
         " is created and replicated");
-    
   }
   
   /**
@@ -161,10 +178,11 @@ public class TestDataNodeVolumeFailure extends TestCase{
       // System.out.println(bid + "->" + bl.num_files + "vs." + bl.num_locs);
       // number of physical files (1 or 2) should be same as number of datanodes
       // in the list of the block locations
-      assertEquals(bl.num_files, bl.num_locs);
+      assertEquals("Num files should match num locations",
+          bl.num_files, bl.num_locs);
     }
-    // verify we have the same number of physical blocks and stored in NN
-    assertEquals(totalReal, totalNN);
+    assertEquals("Num physical blocks should match num stored in the NN",
+        totalReal, totalNN);
 
     // now check the number of under-replicated blocks
     FSNamesystem fsn = cluster.getNamesystem();
@@ -181,7 +199,8 @@ public class TestDataNodeVolumeFailure extends TestCase{
         (totalReal + totalRepl) + " vs. all files blocks " + blocks_num*2);
 
     // together all the blocks should be equal to all real + all underreplicated
-    assertEquals(totalReal + totalRepl, blocks_num*repl);
+    assertEquals("Incorrect total block count",
+        totalReal + totalRepl, blocks_num * repl);
   }
   
   /**
@@ -192,13 +211,12 @@ public class TestDataNodeVolumeFailure extends TestCase{
    */
   private void triggerFailure(String path, long size) throws IOException {
     NameNode nn = cluster.getNameNode();
-    List<LocatedBlock> locatedBlocks = nn.getBlockLocations(path, 0, size).getLocatedBlocks();
-//    System.out.println("Number of blocks: " + locatedBlocks.size()); 
+    List<LocatedBlock> locatedBlocks =
+      nn.getBlockLocations(path, 0, size).getLocatedBlocks();
     
-    for(LocatedBlock lb : locatedBlocks) {
+    for (LocatedBlock lb : locatedBlocks) {
       DatanodeInfo dinfo = lb.getLocations()[1];
       Block b = lb.getBlock();
-    //  System.out.println(i++ + ". " + b.getBlockName());
       try {
         accessBlock(dinfo, lb);
       } catch (IOException e) {
@@ -215,7 +233,6 @@ public class TestDataNodeVolumeFailure extends TestCase{
    * @throws IOException
    */
   private boolean deteteBlocks(File dir) {
-    
     File [] fileList = dir.listFiles();
     for(File f : fileList) {
       if(f.getName().startsWith("blk_")) {
@@ -224,7 +241,6 @@ public class TestDataNodeVolumeFailure extends TestCase{
         
       }
     }
-    
     return true;
   }
   
@@ -296,7 +312,6 @@ public class TestDataNodeVolumeFailure extends TestCase{
    * @param map
    * @return
    */
-
   private int countRealBlocks(Map<String, BlockLocs> map) {
     int total = 0;
     for(int i=0; i<dn_num; i++) {
@@ -317,7 +332,7 @@ public class TestDataNodeVolumeFailure extends TestCase{
         //int ii = 0;
         for(String s: res) {
           // cut off "blk_-" at the beginning and ".meta" at the end
-          assertNotNull(s);
+          assertNotNull("Block file name should not be null", s);
           String bid = s.substring(s.indexOf("_")+1, s.lastIndexOf("_"));
           //System.out.println(ii++ + ". block " + s + "; id=" + bid);
           BlockLocs val = map.get(bid);
@@ -351,18 +366,4 @@ public class TestDataNodeVolumeFailure extends TestCase{
     );
     return res;
   }
-
-  @After
-  public void tearDown() throws Exception {
-    if(data_fail != null) {
-      data_fail.setWritable(true);
-    }
-    if(failedDir != null) {
-      failedDir.setWritable(true);
-    }
-    if(cluster != null) {
-      cluster.shutdown();
-    }
-  }
-
 }

@@ -856,13 +856,13 @@ public class DataNode extends Configured
     int dpError = hasEnoughResources ? DatanodeProtocol.DISK_ERROR  
                                      : DatanodeProtocol.FATAL_DISK_ERROR;  
     
+    myMetrics.volumesFailed.inc(1);
     try {
       namenode.errorReport(dnRegistration, dpError, errMsgr);
     } catch (IOException e) {
       LOG.warn("Error reporting disk failure to NameNode: " + 
           StringUtils.stringifyException(e));
     }
-    
     
     if (hasEnoughResources) {
       scheduleBlockReport(0);

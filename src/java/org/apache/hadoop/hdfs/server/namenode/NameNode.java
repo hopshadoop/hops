@@ -1273,6 +1273,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
       return;
     }
     verifyRequest(nodeReg);
+    namesystem.incVolumeFailure(nodeReg);
     if (errorCode == DatanodeProtocol.DISK_ERROR) {
       LOG.warn("Volume failed on " + dnName); 
     } else if (errorCode == DatanodeProtocol.FATAL_DISK_ERROR) {

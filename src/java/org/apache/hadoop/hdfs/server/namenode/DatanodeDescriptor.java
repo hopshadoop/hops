@@ -123,7 +123,8 @@ public class DatanodeDescriptor extends DatanodeInfo {
   private int prevApproxBlocksScheduled = 0;
   private long lastBlocksScheduledRollTime = 0;
   private static final int BLOCKS_SCHEDULED_ROLL_INTERVAL = 600*1000; //10min
-  
+  private int volumeFailures = 0;
+
   /** Default constructor */
   public DatanodeDescriptor() {}
   
@@ -657,5 +658,27 @@ public class DatanodeDescriptor extends DatanodeInfo {
       return startTime;
     }
   }  // End of class DecommissioningStatus
+
+  /**
+   * Increment the volume failure count.
+   */
+  public void incVolumeFailure() {
+    volumeFailures++;
+  }
   
+  /**
+   * @return number of failed volumes in the datanode.
+   */
+  public int getVolumeFailures() {
+    return volumeFailures;
+  }
+
+  /**
+   * Reset the volume failure count when a DN re-registers.
+   * @param nodeReg DatanodeID to update registration for.
+   */
+  public void updateRegInfo(DatanodeID nodeReg) {
+    super.updateRegInfo(nodeReg);
+    volumeFailures = 0;
+  }
 }
