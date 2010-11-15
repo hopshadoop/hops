@@ -47,6 +47,9 @@ Trunk (unreleased changes)
     HDFS-811. Add metrics, failure reporting and additional tests for HDFS-457.
     (eli)
 
+    HDFS-895. Allow hflush/sync to occur in parallel with new writes
+    to the file. (Todd Lipcon via hairong)
+
   IMPROVEMENTS
 
     HDFS-1304. Add a new unit test for HftpFileSystem.open(..).  (szetszwo)
