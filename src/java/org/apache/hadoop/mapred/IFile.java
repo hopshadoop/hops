@@ -42,6 +42,9 @@ import org.apache.hadoop.io.compress.Decompressor;
 import org.apache.hadoop.io.serializer.SerializationFactory;
 import org.apache.hadoop.io.serializer.Serializer;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 /**
  * <code>IFile</code> is the simple <key-len, value-len, key, value> format
  * for the intermediate map-outputs in Map-Reduce.
@@ -52,7 +55,7 @@ import org.apache.hadoop.io.serializer.Serializer;
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class IFile {
-
+  private static final Log LOG = LogFactory.getLog(IFile.class);
   public static final int EOF_MARKER = -1; // End of File Marker
   
   /**
@@ -107,13 +110,17 @@ public class IFile {
       this.checksumOut = new IFileOutputStream(out);
       this.rawOut = out;
       this.start = this.rawOut.getPos();
-      
       if (codec != null) {
         this.compressor = CodecPool.getCompressor(codec);
-        this.compressor.reset();
-        this.compressedOut = codec.createOutputStream(checksumOut, compressor);
-        this.out = new FSDataOutputStream(this.compressedOut,  null);
-        this.compressOutput = true;
+        if (this.compressor != null) {
+          this.compressor.reset();
+          this.compressedOut = codec.createOutputStream(checksumOut, compressor);
+          this.out = new FSDataOutputStream(this.compressedOut,  null);
+          this.compressOutput = true;
+        } else {
+          LOG.warn("Could not obtain compressor from CodecPool");
+          this.out = new FSDataOutputStream(checksumOut,null);
+        }
       } else {
         this.out = new FSDataOutputStream(checksumOut,null);
       }
@@ -335,7 +342,12 @@ public class IFile {
       checksumIn = new IFileInputStream(in,length);
       if (codec != null) {
         decompressor = CodecPool.getDecompressor(codec);
-        this.in = codec.createInputStream(checksumIn, decompressor);
+        if (decompressor != null) {
+          this.in = codec.createInputStream(checksumIn, decompressor);
+        } else {
+          LOG.warn("Could not obtain decompressor from CodecPool");
+          this.in = checksumIn;
+        }
       } else {
         this.in = checksumIn;
       }
