@@ -42,9 +42,7 @@ import org.apache.hadoop.hdfs.server.common.JspHelper;
 import org.apache.hadoop.hdfs.server.common.Storage;
 import org.apache.hadoop.hdfs.server.common.UpgradeStatusReport;
 import org.apache.hadoop.hdfs.server.common.Storage.StorageDirectory;
-import org.apache.hadoop.hdfs.server.datanode.DatanodeJspHelper;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.ServletUtil;
@@ -480,7 +478,8 @@ class NamenodeJspHelper {
               100) + "<td align=\"right\" class=\"pcremaining`\">"
           + percentRemaining + "<td title=" + "\"blocks scheduled : "
           + d.getBlocksScheduled() + "\" class=\"blocks\">" + d.numBlocks()
-          + "\n");
+          + "<td align=\"right\" class=\"volfails\">"
+          + d.getVolumeFailures() + "\n");
     }
 
     void generateNodesList(JspWriter out, NameNode nn,
@@ -558,7 +557,8 @@ class NamenodeJspHelper {
                 + "> Used <br>(%) <th " + nodeHeaderStr("pcused")
                 + "> Used <br>(%) <th " + nodeHeaderStr("pcremaining")
                 + "> Remaining <br>(%) <th " + nodeHeaderStr("blocks")
-                + "> Blocks\n");
+                + "> Blocks <th " + nodeHeaderStr("volfails")
+                +"> Failed Volumes\n");
 
             JspHelper.sortNodeList(live, sorterField, sorterOrder);
             for (int i = 0; i < live.size(); i++) {
