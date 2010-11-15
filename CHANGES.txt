@@ -180,6 +180,8 @@ Trunk (unreleased changes)
 
     HDFS-556. Provide info on failed volumes in the web ui. (eli)
 
+    HDFS-697. Enable asserts for tests by default. (eli)
+
   OPTIMIZATIONS
 
     HDFS-1140. Speedup INode.getPathComponents. (Dmytro Molkov via shv)
