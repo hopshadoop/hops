@@ -334,6 +334,8 @@ Trunk (unreleased changes)
     HDFS-1498. FSDirectory#unprotectedConcat calls setModificationTime 
     on a file. (eli)
 
+    HDFS-1466. TestFcHdfsSymlink relies on /tmp/test not existing. (eli)
+
 Release 0.21.1 - Unreleased
 
   IMPROVEMENTS
