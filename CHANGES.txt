@@ -330,6 +330,9 @@ Trunk (unreleased changes)
     other's service policies.  (Aaron T. Myers via tomwhite)
 
     HDFS-1440. Fix TestComputeInvalidateWork failure. (suresh)
+ 
+    HDFS-1498. FSDirectory#unprotectedConcat calls setModificationTime 
+    on a file. (eli)
 
 Release 0.21.1 - Unreleased
 
