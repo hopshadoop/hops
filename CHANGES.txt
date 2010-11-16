@@ -197,6 +197,9 @@ Trunk (unreleased changes)
 
     HDFS-1387. Update HDFS permissions guide for security. (Todd Lipcon via eli)
 
+    HDFS-455. Make NN and DN handle in a intuitive way comma-separated 
+    configuration strings. (Michele Catasta via eli)
+
   OPTIMIZATIONS
 
     HDFS-1140. Speedup INode.getPathComponents. (Dmytro Molkov via shv)
