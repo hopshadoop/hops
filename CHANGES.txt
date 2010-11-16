@@ -345,6 +345,9 @@ Trunk (unreleased changes)
 
     HDFS-1466. TestFcHdfsSymlink relies on /tmp/test not existing. (eli)
 
+    HDFS-874. TestHDFSFileContextMainOperations fails on weirdly 
+    configured DNS hosts. (Todd Lipcon via eli)
+
 Release 0.21.1 - Unreleased
 
   IMPROVEMENTS

@@ -448,13 +448,7 @@ public class MiniDFSCluster {
     startDataNodes(conf, numDataNodes, manageDataDfsDirs, 
                     operation, racks, hosts, simulatedCapacities);
     waitClusterUp();
-    String myUriStr = "hdfs://localhost:"+ Integer.toString(this.getNameNodePort());
-    try {
-      this.myUri = new URI(myUriStr);
-    } catch (URISyntaxException e) {
-      NameNode.LOG.warn("unexpected URISyntaxException: " + e );
-    }
-    
+
     //make sure ProxyUsers uses the latest conf
     ProxyUsers.refreshSuperUserGroupsConfiguration(conf);
   }
@@ -534,11 +528,15 @@ public class MiniDFSCluster {
     if (nameNode != null) { // set conf from the name node
       InetSocketAddress nnAddr = nameNode.getNameNodeAddress(); 
       int nameNodePort = nnAddr.getPort(); 
-      FileSystem.setDefaultUri(conf, 
-                               "hdfs://"+ nnAddr.getHostName() +
-                               ":" + Integer.toString(nameNodePort));
+      try {
+	  myUri = new URI("hdfs://"+ nnAddr.getHostName() + ":" +
+			  Integer.toString(nameNodePort));
+      } catch (URISyntaxException e) {
+	  throw new IOException("Couldn't parse own URI", e);
+      }
+      FileSystem.setDefaultUri(conf, myUri);
     }
-    
+
     if (racks != null && numDataNodes > racks.length ) {
       throw new IllegalArgumentException( "The length of racks [" + racks.length
           + "] is less than the number of datanodes [" + numDataNodes + "].");
