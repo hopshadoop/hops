@@ -200,6 +200,9 @@ Trunk (unreleased changes)
     HDFS-455. Make NN and DN handle in a intuitive way comma-separated 
     configuration strings. (Michele Catasta via eli)
 
+    HDFS-1071. savenamespace should write the fsimage to all configured 
+    fs.name.dir in parallel (Dmytro Molkov via jghoman)
+
   OPTIMIZATIONS
 
     HDFS-1140. Speedup INode.getPathComponents. (Dmytro Molkov via shv)
