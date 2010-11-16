@@ -191,6 +191,8 @@ Trunk (unreleased changes)
     HDFS-1187. Modify fetchdt to allow renewing and canceling token.
     (Owen O'Malley and Kan Zhang via jghoman)
 
+    HDFS-1387. Update HDFS permissions guide for security. (Todd Lipcon via eli)
+
   OPTIMIZATIONS
 
     HDFS-1140. Speedup INode.getPathComponents. (Dmytro Molkov via shv)
