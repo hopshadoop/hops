@@ -188,6 +188,9 @@ Trunk (unreleased changes)
 
     HDFS-697. Enable asserts for tests by default. (eli)
 
+    HDFS-1187. Modify fetchdt to allow renewing and canceling token.
+    (Owen O'Malley and Kan Zhang via jghoman)
+
   OPTIMIZATIONS
 
     HDFS-1140. Speedup INode.getPathComponents. (Dmytro Molkov via shv)
