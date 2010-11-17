@@ -202,6 +202,9 @@ Trunk (unreleased changes)
 
     HDFS-1071. savenamespace should write the fsimage to all configured 
     fs.name.dir in parallel (Dmytro Molkov via jghoman)
+ 
+    HDFS-1055. Improve thread naming for DataXceivers. 
+    (Todd Lipcon and Ramkumar Vadali via eli).
 
   OPTIMIZATIONS
 
