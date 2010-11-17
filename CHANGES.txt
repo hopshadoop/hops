@@ -206,6 +206,9 @@ Trunk (unreleased changes)
     HDFS-1055. Improve thread naming for DataXceivers. 
     (Todd Lipcon and Ramkumar Vadali via eli).
 
+    HDFS-718. Configuration parameter to prevent accidental formatting of 
+    HDFS filesystem. (Andrew Ryan via jghoman)
+
   OPTIMIZATIONS
 
     HDFS-1140. Speedup INode.getPathComponents. (Dmytro Molkov via shv)
