@@ -64,7 +64,7 @@ public abstract class Storage extends StorageInfo {
 
   // Constants
   
-  // last layout version that did not suppot upgrades
+  // last layout version that did not support upgrades
   protected static final int LAST_PRE_UPGRADE_LAYOUT_VERSION = -3;
   
   // this corresponds to Hadoop-0.14.
@@ -80,7 +80,7 @@ public abstract class Storage extends StorageInfo {
   
   private   static final String STORAGE_FILE_LOCK     = "in_use.lock";
   protected static final String STORAGE_FILE_VERSION  = "VERSION";
-  public static final String STORAGE_DIR_CURRENT   = "current";
+  public    static final String STORAGE_DIR_CURRENT   = "current";
   private   static final String STORAGE_DIR_PREVIOUS  = "previous";
   private   static final String STORAGE_TMP_REMOVED   = "removed.tmp";
   private   static final String STORAGE_TMP_PREVIOUS  = "previous.tmp";
@@ -256,7 +256,6 @@ public abstract class Storage extends StorageInfo {
      * @throws IOException
      */
     public void write() throws IOException {
-      corruptPreUpgradeStorage(root);
       write(getVersionFile());
     }
 
@@ -472,8 +471,7 @@ public abstract class Storage extends StorageInfo {
       if (startOpt == HdfsConstants.StartupOption.FORMAT)
         return StorageState.NOT_FORMATTED;
       if (startOpt != HdfsConstants.StartupOption.IMPORT) {
-        //make sure no conversion is required
-        checkConversionNeeded(this);
+        checkOldLayoutStorage(this);
       }
 
       // check whether current directory is valid
@@ -686,16 +684,22 @@ public abstract class Storage extends StorageInfo {
   protected void addStorageDir(StorageDirectory sd) {
     storageDirs.add(sd);
   }
-  
-  public abstract boolean isConversionNeeded(StorageDirectory sd) throws IOException;
 
-  /*
-   * Coversion is no longer supported. So this should throw exception if
-   * conversion is needed.
+  /**
+   * Return true if the layout of the given storage directory is from a version
+   * of Hadoop prior to the introduction of the "current" and "previous"
+   * directories which allow upgrade and rollback.
    */
-  private void checkConversionNeeded(StorageDirectory sd) throws IOException {
-    if (isConversionNeeded(sd)) {
-      //throw an exception
+  public abstract boolean isPreUpgradableLayout(StorageDirectory sd)
+  throws IOException;
+
+  /**
+   * Check if the given storage directory comes from a version of Hadoop
+   * prior to when the directory layout changed (ie 0.13). If this is
+   * the case, this method throws an IOException.
+   */
+  private void checkOldLayoutStorage(StorageDirectory sd) throws IOException {
+    if (isPreUpgradableLayout(sd)) {
       checkVersionUpgradable(0);
     }
   }
@@ -850,21 +854,5 @@ public abstract class Storage extends StorageInfo {
     return "NS-" + Integer.toString(storage.getNamespaceID())
       + "-" + Integer.toString(storage.getLayoutVersion())
       + "-" + Long.toString(storage.getCTime());
-  }
-
-  // Pre-upgrade version compatibility
-  protected abstract void corruptPreUpgradeStorage(File rootDir) throws IOException;
-
-  protected void writeCorruptedData(RandomAccessFile file) throws IOException {
-    final String messageForPreUpgradeVersion =
-      "\nThis file is INTENTIONALLY CORRUPTED so that versions\n"
-      + "of Hadoop prior to 0.13 (which are incompatible\n"
-      + "with this directory layout) will fail to start.\n";
-  
-    file.seek(0);
-    file.writeInt(FSConstants.LAYOUT_VERSION);
-    org.apache.hadoop.hdfs.DeprecatedUTF8.writeString(file, "");
-    file.writeBytes(messageForPreUpgradeVersion);
-    file.getFD().sync();
   }
 }
