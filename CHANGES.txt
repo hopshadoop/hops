@@ -386,6 +386,9 @@ Release 0.22.0 - Unreleased
 
     HDFS-1507. TestAbandonBlock should abandon a block. (eli)
 
+    HDFS-1487. FSDirectory.removeBlock() should update diskspace count 
+    of the block owner node (Zhong Wang via eli).
+
 Release 0.21.1 - Unreleased
 
   IMPROVEMENTS
