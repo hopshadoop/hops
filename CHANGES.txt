@@ -384,6 +384,8 @@ Release 0.22.0 - Unreleased
     HDFS-874. TestHDFSFileContextMainOperations fails on weirdly 
     configured DNS hosts. (Todd Lipcon via eli)
 
+    HDFS-1507. TestAbandonBlock should abandon a block. (eli)
+
 Release 0.21.1 - Unreleased
 
   IMPROVEMENTS

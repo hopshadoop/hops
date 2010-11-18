@@ -25,47 +25,55 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
-import org.apache.hadoop.hdfs.server.namenode.NameNode;
-import org.apache.hadoop.util.StringUtils;
 
-public class TestAbandonBlock extends junit.framework.TestCase {
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+
+/**
+ * Test abandoning blocks, which clients do on pipeline creation failure.
+ */
+public class TestAbandonBlock {
   public static final Log LOG = LogFactory.getLog(TestAbandonBlock.class);
   
   private static final Configuration CONF = new HdfsConfiguration();
   static final String FILE_NAME_PREFIX
       = "/" + TestAbandonBlock.class.getSimpleName() + "_"; 
+  private MiniDFSCluster cluster;
+  private FileSystem fs;
 
+  @Before
+  public void setUp() throws Exception {
+    cluster = new MiniDFSCluster.Builder(CONF).numDataNodes(2).build();
+    fs = cluster.getFileSystem();
+    cluster.waitActive();
+  }
+
+  @After
+  public void tearDown() throws Exception {
+    fs.close();
+    cluster.shutdown();
+  }
+
+  @Test
+  /** Abandon a block while creating a file */
   public void testAbandonBlock() throws IOException {
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(CONF).numDataNodes(2).build();
-    FileSystem fs = cluster.getFileSystem();
-
     String src = FILE_NAME_PREFIX + "foo";
-    FSDataOutputStream fout = null;
-    try {
-      //start writing a a file but not close it
-      fout = fs.create(new Path(src), true, 4096, (short)1, 512L);
-      for(int i = 0; i < 1024; i++) {
-        fout.write(123);
-      }
-      fout.hflush();
-  
-      //try reading the block by someone
-      final DFSClient dfsclient = new DFSClient(NameNode.getAddress(CONF), CONF);
-      LocatedBlocks blocks = dfsclient.getNamenode().getBlockLocations(src, 0, 1);
-      LocatedBlock b = blocks.get(0); 
-      try {
-        dfsclient.getNamenode().abandonBlock(b.getBlock(), src, "someone");
-        //previous line should throw an exception.
-        assertTrue(false);
-      }
-      catch(IOException ioe) {
-        LOG.info("GREAT! " + StringUtils.stringifyException(ioe));
-      }
+
+    // Start writing a file but do not close it
+    FSDataOutputStream fout = fs.create(new Path(src), true, 4096, (short)1, 512L);
+    for (int i = 0; i < 1024; i++) {
+      fout.write(123);
     }
-    finally {
-      try{fout.close();} catch(Exception e) {}
-      try{fs.close();} catch(Exception e) {}
-      try{cluster.shutdown();} catch(Exception e) {}
-    }
+    fout.hflush();
+
+    // Now abandon the last block
+    DFSClient dfsclient = ((DistributedFileSystem)fs).getClient();
+    LocatedBlocks blocks = dfsclient.getNamenode().getBlockLocations(src, 0, 1);
+    LocatedBlock b = blocks.getLastLocatedBlock();
+    dfsclient.getNamenode().abandonBlock(b.getBlock(), src, dfsclient.clientName);
+
+    // And close the file
+    fout.close();
   }
 }
