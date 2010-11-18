@@ -186,6 +186,8 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2167. Faster directory traversal for raid node. (Ramkumar Vadali
     via schen)
 
+    MAPREDUCE-1931. Gridmix forrest documentation . (Ranjit Mathew via vinodkv).
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and
