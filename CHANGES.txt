@@ -62,6 +62,9 @@ Release 0.22.0 - Unreleased
     HDFS-895. Allow hflush/sync to occur in parallel with new writes
     to the file. (Todd Lipcon via hairong)
 
+    HDFS-528. Add ability for safemode to wait for a minimum number of 
+    live datanodes (Todd Lipcon via eli)
+
   IMPROVEMENTS
 
     HDFS-1304. Add a new unit test for HftpFileSystem.open(..).  (szetszwo)
