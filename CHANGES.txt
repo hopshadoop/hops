@@ -393,6 +393,9 @@ Release 0.22.0 - Unreleased
     HDFS-1001. DataXceiver and BlockReader disagree on when to send/recv
     CHECKSUM_OK. (bc Wong via eli)
 
+    HDFS-1167. New property for local conf directory in system-test-hdfs.xml
+    file. (Vinay Thota via cos)
+
 Release 0.21.1 - Unreleased
 
   IMPROVEMENTS
