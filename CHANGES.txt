@@ -8,6 +8,8 @@ Trunk (unreleased changes)
 
   IMPROVEMENTS
 
+    HDFS-1510. Added test-patch.properties required by test-patch.sh (nigel)
+
   OPTIMIZATIONS
 
   BUG FIXES
