@@ -415,6 +415,9 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2034. TestSubmitJob triggers NPE instead of permissions error.
     (Todd Lipcon via tomwhite)
 
+    MAPREDUCE-2195. New property for local conf directory in
+    system-test-mapreduce.xml file. (cos)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES
