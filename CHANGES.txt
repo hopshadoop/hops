@@ -390,6 +390,9 @@ Release 0.22.0 - Unreleased
     HDFS-1487. FSDirectory.removeBlock() should update diskspace count 
     of the block owner node (Zhong Wang via eli).
 
+    HDFS-1001. DataXceiver and BlockReader disagree on when to send/recv
+    CHECKSUM_OK. (bc Wong via eli)
+
 Release 0.21.1 - Unreleased
 
   IMPROVEMENTS
