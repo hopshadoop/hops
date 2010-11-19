@@ -73,7 +73,6 @@ Release 0.22.0 - Unreleased
 
     HDFS-1096. fix for prev. commit. (boryas)
 
-
     HDFS-1096. allow dfsadmin/mradmin refresh of superuser proxy group
      mappings (boryas)
 
@@ -222,9 +221,6 @@ Release 0.22.0 - Unreleased
 
     HDFS-1500. TestOfflineImageViewer failing on trunk. (Todd Lipcon
     via hairong)
-
-    HDFS-1467. Append pipeline construction not succeeds with more than
-    one replica. (Todd Lipcon via hairong)
 
     HDFS-1483. DFSClient.getBlockLocations should indicate if corresponding
     blocks are corrupt. (Patrick Kling via hairong)
