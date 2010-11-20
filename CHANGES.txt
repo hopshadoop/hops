@@ -396,6 +396,9 @@ Release 0.22.0 - Unreleased
     HDFS-1167. New property for local conf directory in system-test-hdfs.xml
     file. (Vinay Thota via cos)
 
+    HDFS-1467. Append pipeline never succeeds with more than one replica.
+    (Todd Lipcon via eli)
+
 Release 0.21.1 - Unreleased
 
   IMPROVEMENTS
