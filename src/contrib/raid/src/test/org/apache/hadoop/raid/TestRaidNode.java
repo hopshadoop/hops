@@ -21,14 +21,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.GregorianCalendar;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Properties;
 import java.util.Random;
 import java.util.zip.CRC32;
 
@@ -45,7 +38,6 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.mapred.MiniMRCluster;
-import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.raid.protocol.PolicyInfo;
 import org.apache.hadoop.raid.protocol.PolicyList;
 import org.apache.hadoop.raid.protocol.PolicyInfo.ErasureCodeType;
@@ -101,13 +93,15 @@ public class TestRaidNode extends TestCase {
     conf.set("raid.server.address", "localhost:0");
 
     // create a dfs and map-reduce cluster
-    final int taskTrackers = 4;
-    final int jobTrackerPort = 60050;
-
-    dfs = new MiniDFSCluster(conf, 6, true, null);
+    MiniDFSCluster.Builder builder = new MiniDFSCluster.Builder(conf);
+    builder.numDataNodes(6);
+    builder.format(true);
+    dfs = builder.build();
     dfs.waitActive();
     fileSys = dfs.getFileSystem();
+    
     namenode = fileSys.getUri().toString();
+    final int taskTrackers = 4;
     mr = new MiniMRCluster(taskTrackers, namenode, 3);
     jobTrackerName = "localhost:" + mr.getJobTrackerPort();
     hftp = "hftp://localhost.localdomain:" + dfs.getNameNodePort();
@@ -291,7 +285,6 @@ public class TestRaidNode extends TestCase {
 
       // create an instance of the RaidNode
       cnode = RaidNode.createRaidNode(null, conf);
-
       FileStatus[] listPaths = null;
 
       // wait till file is raided
@@ -368,14 +361,15 @@ public class TestRaidNode extends TestCase {
   // greater than or equal to the specified value
   private void doCheckPolicy() throws Exception {
     LOG.info("doCheckPolicy started---------------------------:"); 
-    short srcReplication = 3;
+    short srcReplication = 1;
     long targetReplication = 2;
     long metaReplication = 1;
     long stripeLength = 2;
     long blockSize = 1024;
     int numBlock = 3;
     ConfigBuilder cb = new ConfigBuilder();
-    cb.addPolicy("policy1", "/user/dhruba/policytest", (short)1, targetReplication, metaReplication, stripeLength);
+    cb.addPolicy("policy1", "/user/dhruba/policytest", srcReplication,
+        targetReplication, metaReplication, stripeLength);
     cb.persist();
     Path dir = new Path("/user/dhruba/policytest/");
     Path file1 = new Path(dir + "/file1");
@@ -392,7 +386,7 @@ public class TestRaidNode extends TestCase {
       cnode = RaidNode.createRaidNode(null, localConf);
 
       // this file should be picked up RaidNode
-      long crc2 = createOldFile(fileSys, file2, 2, numBlock, blockSize);
+      createOldFile(fileSys, file2, 2, numBlock, blockSize);
       FileStatus[] listPaths = null;
 
       long firstmodtime = 0;
@@ -429,7 +423,7 @@ public class TestRaidNode extends TestCase {
       LOG.info("doCheckPolicy all files found in Raid the first time.");
 
       LOG.info("doCheckPolicy: recreating source file");
-      crc2 = createOldFile(fileSys, file2, 2, numBlock, blockSize);
+      createOldFile(fileSys, file2, 2, numBlock, blockSize);
 
       FileStatus st = fileSys.getFileStatus(file2);
       assertTrue(st.getModificationTime() > firstmodtime);
@@ -497,8 +491,10 @@ public class TestRaidNode extends TestCase {
 
     createClusters(false);
     ConfigBuilder cb = new ConfigBuilder();
-    cb.addPolicy("policy1", "/user/dhruba/raidtest", (short)1, targetReplication, metaReplication, stripeLength);
-    cb.addPolicy("policy2", "/user/dhruba/raidtest2", (short)1, targetReplication, metaReplication, stripeLength);
+    cb.addPolicy("policy1", "/user/dhruba/raidtest",
+        srcReplication, targetReplication, metaReplication, stripeLength);
+    cb.addPolicy("policy2", "/user/dhruba/raidtest2",
+        srcReplication, targetReplication, metaReplication, stripeLength);
     cb.persist();
 
     RaidNode cnode = null;
@@ -515,13 +511,15 @@ public class TestRaidNode extends TestCase {
         for (PolicyInfo p : policyList.getAll()) {
           if (p.getName().equals("policy1")) {
             Path srcPath = new Path("/user/dhruba/raidtest");
+            FileSystem fs = srcPath.getFileSystem(conf);
             assertTrue(p.getSrcPath().equals(
-                srcPath.makeQualified(srcPath.getFileSystem(conf))));
+                srcPath.makeQualified(fs.getUri(), fs.getWorkingDirectory())));
           } else {
             assertTrue(p.getName().equals("policy2"));
             Path srcPath = new Path("/user/dhruba/raidtest2");
+            FileSystem fs = srcPath.getFileSystem(conf);
             assertTrue(p.getSrcPath().equals(
-                srcPath.makeQualified(srcPath.getFileSystem(conf))));
+                srcPath.makeQualified(fs.getUri(), fs.getWorkingDirectory())));
           }
           assertEquals(targetReplication,
                        Integer.parseInt(p.getProperty("targetReplication")));
@@ -542,14 +540,14 @@ public class TestRaidNode extends TestCase {
              System.currentTimeMillis() - start < MAX_WAITTIME) {
         Thread.sleep(1000);
       }
-      this.assertEquals(dcnode.jobMonitor.jobsMonitored(), 2);
+      assertEquals(dcnode.jobMonitor.jobsMonitored(), 2);
 
       start = System.currentTimeMillis();
       while (dcnode.jobMonitor.jobsSucceeded() < 2 &&
              System.currentTimeMillis() - start < MAX_WAITTIME) {
         Thread.sleep(1000);
       }
-      this.assertEquals(dcnode.jobMonitor.jobsSucceeded(), 2);
+      assertEquals(dcnode.jobMonitor.jobsSucceeded(), 2);
 
       LOG.info("Test testDistRaid successful.");
       
@@ -643,7 +641,8 @@ public class TestRaidNode extends TestCase {
 
     createClusters(false);
     ConfigBuilder cb = new ConfigBuilder();
-    cb.addPolicy("policy1", "/user/dhruba/raidtest", (short)1, targetReplication, metaReplication, stripeLength);
+    cb.addPolicy("policy1", "/user/dhruba/raidtest",
+        srcReplication, targetReplication, metaReplication, stripeLength);
     cb.persist();
 
     RaidNode cnode = null;
@@ -680,8 +679,8 @@ public class TestRaidNode extends TestCase {
              System.currentTimeMillis() - start < MAX_WAITTIME) {
         Thread.sleep(1000);
       }
-      this.assertEquals(dcnode.jobMonitor.jobsMonitored(), numJobsExpected);
-      this.assertEquals(dcnode.jobMonitor.jobsSucceeded(), numJobsExpected);
+      assertEquals(dcnode.jobMonitor.jobsMonitored(), numJobsExpected);
+      assertEquals(dcnode.jobMonitor.jobsSucceeded(), numJobsExpected);
 
       LOG.info("Test testSuspendTraversal successful.");
 
@@ -695,11 +694,12 @@ public class TestRaidNode extends TestCase {
     LOG.info("Test testSuspendTraversal completed.");
   }
 
-  public void testSchedulerOption() {
+  public void testSchedulerOption() throws IOException {
     Configuration conf = new Configuration();
     conf.set("raid.scheduleroption",
       "mapred.fairscheduler.pool:dummy,foo:bar");
-    org.apache.hadoop.mapred.JobConf jobConf = DistRaid.createJobConf(conf);
+    org.apache.hadoop.mapreduce.Job job = DistRaid.createJob(conf);
+    Configuration jobConf = job.getConfiguration();
     assertEquals("dummy", jobConf.get("mapred.fairscheduler.pool"));
     assertEquals("bar", jobConf.get("foo"));
   }

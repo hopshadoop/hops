@@ -190,6 +190,9 @@ Release 0.22.0 - Unreleased
 
     MAPREDUCE-1931. Gridmix forrest documentation . (Ranjit Mathew via vinodkv).
 
+    MAPREDUCE-2184. Port DistRaid.java to new mapreduce API. (Ramkumar Vadali
+    via schen)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and
