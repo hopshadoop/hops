@@ -32,6 +32,7 @@ import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.ParentNotDirectoryException;
 import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.fs.UnresolvedLinkException;
+import org.apache.hadoop.fs.CorruptFileBlocks;
 import org.apache.hadoop.fs.Options.Rename;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
@@ -67,9 +68,9 @@ public interface ClientProtocol extends VersionedProtocol {
    * Compared to the previous version the following changes have been introduced:
    * (Only the latest change is reflected.
    * The log of historical changes can be retrieved from the svn).
-   * 64: Remove ClientProtocol changes related to -list-corruptfiles
+   * 65: Add listCorruptFileBlocks to ClientProtocol
    */
-  public static final long versionID = 64L;
+  public static final long versionID = 65L;
   
   ///////////////////////////////////////
   // File contents
@@ -657,6 +658,20 @@ public interface ClientProtocol extends VersionedProtocol {
   public UpgradeStatusReport distributedUpgradeProgress(UpgradeAction action) 
       throws IOException;
 
+  /**
+   * @return CorruptFileBlocks, containing a list of corrupt files (with
+   *         duplicates if there is more than one corrupt block in a file)
+   *         and a cookie
+   * @throws IOException
+   *
+   * Each call returns a subset of the corrupt files in the system. To obtain
+   * all corrupt files, call this method repeatedly and each time pass in the
+   * cookie returned from the previous call.
+   */
+  public CorruptFileBlocks
+    listCorruptFileBlocks(String path, String cookie)
+    throws IOException;
+  
   /**
    * Dumps namenode data structures into specified file. If the file
    * already exists, then append.

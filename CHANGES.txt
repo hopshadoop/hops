@@ -6,9 +6,14 @@ Trunk (unreleased changes)
 
   NEW FEATURES
 
+    HDFS-1482. Add listCorruptFileBlocks to DistributedFileSystem.
+    (Patrick Kling via hairong)
+
   IMPROVEMENTS
 
     HDFS-1510. Added test-patch.properties required by test-patch.sh (nigel)
+
+    HDFS-1481. NameNode should validate fsimage before rolling. (hairong)
 
   OPTIMIZATIONS
 
@@ -229,8 +234,6 @@ Release 0.22.0 - Unreleased
     (Todd Lipcon via eli)
 
     HDFS-1513. Fix a number of warnings. (eli)
-
-    HDFS-1481. NameNode should validate fsimage before rolling. (hairong)
 
   OPTIMIZATIONS
 
