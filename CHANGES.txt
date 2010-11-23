@@ -226,7 +226,9 @@ Release 0.22.0 - Unreleased
     blocks are corrupt. (Patrick Kling via hairong)
 
     HDFS-259. Remove intentionally corrupt 0.13 directory layout creation.
-    (Todd Lipcon via eli).
+    (Todd Lipcon via eli)
+
+    HDFS-1513. Fix a number of warnings. (eli)
 
   OPTIMIZATIONS
 
