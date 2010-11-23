@@ -230,6 +230,8 @@ Release 0.22.0 - Unreleased
 
     HDFS-1513. Fix a number of warnings. (eli)
 
+    HDFS-1481. NameNode should validate fsimage before rolling. (hairong)
+
   OPTIMIZATIONS
 
     HDFS-1140. Speedup INode.getPathComponents. (Dmytro Molkov via shv)
