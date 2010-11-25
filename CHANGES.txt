@@ -16,6 +16,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-2199. build is broken 0.22 branch creation. (cos)
 
+    MAPREDUCE-2200. TestUmbilicalProtocolWithJobToken is failing without Krb
+    evironment: needs to be conditional. (cos)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES
