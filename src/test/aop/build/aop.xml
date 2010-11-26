@@ -139,6 +139,14 @@
   <target name="test-system" depends="ivy-retrieve-common, ivy-retrieve-system"
     description="Run system tests">
     <subant buildpath="build.xml" target="jar-test-system"/>
+    <subant target="test-system-contrib">
+        <property name="hadoop.home" value="${hadoop.home}"/>
+       <property name="hadoop.conf.dir" value="${hadoop.conf.dir}"/>
+       <property name="version" value="${version}"/>
+       <property name="hadoop.conf.dir.deployed" 
+            value="${hadoop.conf.dir.deployed}"/>
+       <fileset file="${contrib.dir}/build.xml"/>
+    </subant>
     <macro-test-runner test.file="${test.mapred.all.tests.file}"
                        suite.type="system/test"
                        classpath="test.system.classpath"
