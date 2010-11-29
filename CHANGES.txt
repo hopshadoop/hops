@@ -15,6 +15,9 @@ Trunk (unreleased changes)
 
     HDFS-1481. NameNode should validate fsimage before rolling. (hairong)
 
+    HDFS-1518. Wrong description in FSNamesystem's javadoc. 
+    (Jingguo Yao via eli)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
