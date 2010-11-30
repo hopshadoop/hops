@@ -336,24 +336,74 @@ public class HarFileSystem extends FilterFileSystem {
     //change this to Har uri 
     return new Path(uri.getScheme(), harAuth, tmpURI.getPath());
   }
+
+  /**
+   * Fix offset and length of block locations.
+   * Note that this method modifies the original array.
+   * @param locations block locations of har part file
+   * @param start the start of the desired range in the contained file
+   * @param len the length of the desired range
+   * @param fileOffsetInHar the offset of the desired file in the har part file
+   * @return block locations with fixed offset and length
+   */  
+  static BlockLocation[] fixBlockLocations(BlockLocation[] locations,
+                                          long start,
+                                          long len,
+                                          long fileOffsetInHar) {
+    // offset 1 past last byte of desired range
+    long end = start + len;
+
+    for (BlockLocation location : locations) {
+      // offset of part block relative to beginning of desired file
+      // (may be negative if file starts in this part block)
+      long harBlockStart = location.getOffset() - fileOffsetInHar;
+      // offset 1 past last byte of har block relative to beginning of
+      // desired file
+      long harBlockEnd = harBlockStart + location.getLength();
+      
+      if (start > harBlockStart) {
+        // desired range starts after beginning of this har block
+        // fix offset to beginning of relevant range (relative to desired file)
+        location.setOffset(start);
+        // fix length to relevant portion of har block
+        location.setLength(location.getLength() - (start - harBlockStart));
+      } else {
+        // desired range includes beginning of this har block
+        location.setOffset(harBlockStart);
+      }
+      
+      if (harBlockEnd > end) {
+        // range ends before end of this har block
+        // fix length to remove irrelevant portion at the end
+        location.setLength(location.getLength() - (harBlockEnd - end));
+      }
+    }
+    
+    return locations;
+  }
   
   /**
-   * get block locations from the underlying fs
+   * Get block locations from the underlying fs and fix their
+   * offsets and lengths.
    * @param file the input filestatus to get block locations
-   * @param start the start in the file
-   * @param len the length in the file
+   * @param start the start of the desired range in the contained file
+   * @param len the length of the desired range
    * @return block locations for this segment of file
    * @throws IOException
    */
   @Override
   public BlockLocation[] getFileBlockLocations(FileStatus file, long start,
-      long len) throws IOException {
-    // just fake block locations
-    // its fast and simpler
-    // doing various block location manipulation
-    // with part files adds a lot of overhead because 
-    // of the look ups of filestatus in index files
-    return new BlockLocation[]{ new BlockLocation() };
+                                               long len) throws IOException {
+    HarStatus hstatus = getFileHarStatus(file.getPath());
+    Path partPath = new Path(archivePath, hstatus.getPartName());
+    FileStatus partStatus = fs.getFileStatus(partPath);
+
+    // get all part blocks that overlap with the desired file blocks
+    BlockLocation[] locations = 
+      fs.getFileBlockLocations(partStatus,
+                               hstatus.getStartIndex() + start, len);
+
+    return fixBlockLocations(locations, start, len, hstatus.getStartIndex());
   }
   
   /**
@@ -636,6 +686,11 @@ public class HarFileSystem extends FilterFileSystem {
    */
   @Override
   public FileStatus getFileStatus(Path f) throws IOException {
+    HarStatus hstatus = getFileHarStatus(f);
+    return toFileStatus(hstatus, null);
+  }
+
+  private HarStatus getFileHarStatus(Path f) throws IOException {
     // get the fs DataInputStream for the underlying file
     // look up the index.
     Path p = makeQualified(f);
@@ -647,11 +702,8 @@ public class HarFileSystem extends FilterFileSystem {
     if (readStr == null) {
       throw new FileNotFoundException("File: " +  f + " does not exist in " + uri);
     }
-    HarStatus hstatus = null;
-    hstatus = new HarStatus(readStr);
-    return toFileStatus(hstatus, null);
+    return new HarStatus(readStr);
   }
-
   /**
    * @return null since no checksum algorithm is implemented.
    */
@@ -667,17 +719,7 @@ public class HarFileSystem extends FilterFileSystem {
   @Override
   public FSDataInputStream open(Path f, int bufferSize) throws IOException {
     // get the fs DataInputStream for the underlying file
-    // look up the index.
-    Path p = makeQualified(f);
-    Path harPath = getPathInHar(p);
-    if (harPath == null) {
-      throw new IOException("Invalid file name: " + f + " in " + uri);
-    }
-    String readStr = fileStatusInIndex(harPath);
-    if (readStr == null) {
-      throw new FileNotFoundException(f + ": not found in " + archivePath);
-    }
-    HarStatus hstatus = new HarStatus(readStr); 
+    HarStatus hstatus = getFileHarStatus(f);
     // we got it.. woo hooo!!! 
     if (hstatus.isDir()) {
       throw new FileNotFoundException(f + " : not a file in " +
