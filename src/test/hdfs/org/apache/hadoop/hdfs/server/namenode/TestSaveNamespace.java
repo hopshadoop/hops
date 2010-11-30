@@ -59,13 +59,8 @@ public class TestSaveNamespace {
 
   private static class FaultySaveImage implements Answer<Void> {
     int count = 0;
-    FSImage origImage;
 
-    public FaultySaveImage(FSImage origImage) {
-      this.origImage = origImage;
-    }
-
-    public Void answer(InvocationOnMock invocation) throws Exception {
+    public Void answer(InvocationOnMock invocation) throws Throwable {
       Object[] args = invocation.getArguments();
       File f = (File)args[0];
 
@@ -74,8 +69,7 @@ public class TestSaveNamespace {
         throw new RuntimeException("Injected fault: saveFSImage second time");
       }
       LOG.info("Not injecting fault for file: " + f);
-      origImage.saveFSImage(f);
-      return null;
+      return (Void)invocation.callRealMethod();
     }
   }
 
@@ -103,7 +97,7 @@ public class TestSaveNamespace {
     switch(fault) {
     case SAVE_FSIMAGE:
       // The spy throws a RuntimeException when writing to the second directory
-      doAnswer(new FaultySaveImage(spyImage)).
+      doAnswer(new FaultySaveImage()).
         when(spyImage).saveFSImage((File)anyObject());
       break;
     case MOVE_CURRENT:

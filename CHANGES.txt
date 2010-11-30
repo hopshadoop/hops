@@ -27,6 +27,8 @@ Trunk (unreleased changes)
 
     HDFS-1516. mvn-install is broken after 0.22 branch creation. (cos)
 
+    HDFS-1503. TestSaveNamespace fails. (Todd Lipcon via cos)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES
