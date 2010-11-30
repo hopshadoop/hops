@@ -85,7 +85,7 @@ public class TestReedSolomonDecoder extends TestCase {
 
       // Ensure there are no corrupt files yet.
       DistributedFileSystem dfs = (DistributedFileSystem)fileSys;
-      String[] corruptFiles = RaidDFSUtil.getCorruptFiles(conf);
+      String[] corruptFiles = RaidDFSUtil.getCorruptFiles(dfs);
       assertEquals(corruptFiles.length, 0);
 
       // Now corrupt the file.
@@ -99,7 +99,7 @@ public class TestReedSolomonDecoder extends TestCase {
           srcStat.getBlockSize());
 
       // Ensure file is corrupted.
-      corruptFiles = RaidDFSUtil.getCorruptFiles(conf);
+      corruptFiles = RaidDFSUtil.getCorruptFiles(dfs);
       assertEquals(corruptFiles.length, 1);
       assertEquals(corruptFiles[0], file1.toString());
 

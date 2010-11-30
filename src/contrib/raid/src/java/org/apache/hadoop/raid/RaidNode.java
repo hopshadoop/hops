@@ -289,7 +289,7 @@ public abstract class RaidNode implements RaidProtocol {
     running = true;
     this.server.start(); // start RPC server
 
-    this.blockFixer = new BlockFixer(conf);
+    this.blockFixer = BlockFixer.createBlockFixer(conf);
     this.blockFixerThread = new Daemon(this.blockFixer);
     this.blockFixerThread.start();
 

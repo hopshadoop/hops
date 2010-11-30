@@ -288,7 +288,7 @@ public class RaidShell extends Configured implements Tool {
   public void recoverBlocks(String[] args, int startIndex)
     throws IOException {
     LOG.info("Recovering blocks for " + (args.length - startIndex) + " files");
-    BlockFixer fixer = new BlockFixer(conf);
+    BlockFixer.BlockFixerHelper fixer = new BlockFixer.BlockFixerHelper(conf);
     for (int i = startIndex; i < args.length; i++) {
       String path = args[i];
       fixer.fixFile(new Path(path));

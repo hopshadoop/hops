@@ -30,6 +30,7 @@ import java.util.HashSet;
 import java.util.Set;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.CorruptFileBlocks;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.tools.DFSck;
@@ -60,29 +61,24 @@ public abstract class RaidDFSUtil {
     return dfs.getClient().namenode.getBlockLocations(path, offset, length);
   }
 
-  public static String[] getCorruptFiles(Configuration conf)
+  /**
+   * Make successive calls to listCorruptFiles to obtain all 
+   * corrupt files.
+   */ 
+  public static String[] getCorruptFiles(DistributedFileSystem dfs)
     throws IOException {
-    ByteArrayOutputStream baseOut = new ByteArrayOutputStream();
-    PrintStream out = new PrintStream(baseOut, true);
-    DFSck fsck = new DFSck(conf, out);
-    String[] args = new String[]{"-list-corruptfileblocks"};
-    try {
-      ToolRunner.run(fsck, args);
-    } catch (Exception e) {
-      throw new IOException("DFSck.run exception ", e);
-    }
-    byte[] output = baseOut.toByteArray();
-    BufferedReader in = new BufferedReader(new InputStreamReader(
-      new ByteArrayInputStream(output)));
-    String line;
     Set<String> corruptFiles = new HashSet<String>();
-    while ((line = in.readLine()) != null) {
-      // The interesting lines are of the form: blkid<tab>path
-      int separatorPos = line.indexOf('\t');
-      if (separatorPos != -1) {
-        corruptFiles.add(line.substring(separatorPos + 1));
+    
+    String cookie = null;
+    for (CorruptFileBlocks fbs = dfs.listCorruptFileBlocks("/", cookie);
+         fbs.getFiles().length > 0;
+         fbs = dfs.listCorruptFileBlocks("/", cookie)) {
+      for (String path : fbs.getFiles()) {
+        corruptFiles.add(path);
       }
+      cookie = fbs.getCookie();
     }
+
     return corruptFiles.toArray(new String[corruptFiles.size()]);
   }
 }

@@ -22,6 +22,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1752. Implement getFileBlockLocations in HarFilesystem.
     (Patrick Kling via dhruba)
 
+    MAPREDUCE-2155. RaidNode should optionally use the mapreduce jobs to 
+    fix missing blocks.  (Patrick Kling via dhruba)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES

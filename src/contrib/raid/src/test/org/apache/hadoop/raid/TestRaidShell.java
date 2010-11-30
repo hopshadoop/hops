@@ -102,6 +102,8 @@ public class TestRaidShell extends TestCase {
     localConf.setInt("raid.blockfix.interval", 1000);
     // the RaidNode does the raiding inline (instead of submitting to map/reduce)
     conf.set("raid.classname", "org.apache.hadoop.raid.LocalRaidNode");
+    conf.set("raid.blockfix.classname",
+             "org.apache.hadoop.raid.LocalBlockFixer");
     cnode = RaidNode.createRaidNode(null, localConf);
 
     try {
