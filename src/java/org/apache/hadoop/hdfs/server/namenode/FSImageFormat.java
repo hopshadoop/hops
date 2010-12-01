@@ -273,6 +273,9 @@ public abstract class FSImageFormat {
 
         this.loadSecretManagerState(in, targetNamesystem);
 
+        // make sure to read to the end of file
+        int eof = in.read();
+        assert eof == -1 : "Should have reached the end of image file " + curFile;
       } finally {
         in.close();
       }
