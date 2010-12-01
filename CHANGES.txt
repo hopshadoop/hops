@@ -432,6 +432,9 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2195. New property for local conf directory in
     system-test-mapreduce.xml file. (cos)
 
+    MAPREDUCE-1783. FairScheduler initializes tasks only when the job can be
+    run. (Ramkumar Vadali via schen)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES

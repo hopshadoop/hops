@@ -28,6 +28,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -82,8 +85,8 @@ public class FairScheduler extends TaskScheduler {
   protected boolean preemptionEnabled;
   protected boolean onlyLogPreemption; // Only log when tasks should be killed
   private Clock clock;
-  private EagerTaskInitializationListener eagerInitListener;
   private JobListener jobListener;
+  private JobInitializer jobInitializer;
   private boolean mockMode; // Used for unit tests; disables background updates
                             // and scheduler event log
   private FairSchedulerEventLog eventLog;
@@ -98,6 +101,8 @@ public class FairScheduler extends TaskScheduler {
    */
   static class JobInfo {
     boolean runnable = false;   // Can the job run given user/pool limits?
+    // Does this job need to be initialized?
+    volatile boolean needsInitializing = true;
     public JobSchedulable mapSchedulable;
     public JobSchedulable reduceSchedulable;
     // Variables used for delay scheduling
@@ -141,13 +146,8 @@ public class FairScheduler extends TaskScheduler {
         eventLog.init(conf, hostname);
       }
       // Initialize other pieces of the scheduler
+      jobInitializer = new JobInitializer(conf, taskTrackerManager);
       taskTrackerManager.addJobInProgressListener(jobListener);
-      if (!mockMode) {
-        eagerInitListener = new EagerTaskInitializationListener(conf);
-        eagerInitListener.setTaskTrackerManager(taskTrackerManager);
-        eagerInitListener.start();
-        taskTrackerManager.addJobInProgressListener(eagerInitListener);
-      }
       poolMgr = new PoolManager(this);
       poolMgr.initialize();
       loadMgr = (LoadManager) ReflectionUtils.newInstance(
@@ -231,15 +231,54 @@ public class FairScheduler extends TaskScheduler {
     if (eventLog != null)
       eventLog.log("SHUTDOWN");
     running = false;
+    jobInitializer.terminate();
     if (jobListener != null)
       taskTrackerManager.removeJobInProgressListener(jobListener);
-    if (eagerInitListener != null)
-      taskTrackerManager.removeJobInProgressListener(eagerInitListener);
     if (eventLog != null)
       eventLog.shutdown();
   }
-  
-  /**
+ 
+
+  private class JobInitializer {
+    private final int DEFAULT_NUM_THREADS = 1;
+    private ExecutorService threadPool;
+    private TaskTrackerManager ttm;
+    public JobInitializer(Configuration conf, TaskTrackerManager ttm) {
+      int numThreads = conf.getInt("mapred.jobinit.threads",
+          DEFAULT_NUM_THREADS);
+      threadPool = Executors.newFixedThreadPool(numThreads);
+      this.ttm = ttm;
+    }
+    public void initJob(JobInfo jobInfo, JobInProgress job) {
+      if (!mockMode) {
+        threadPool.execute(new InitJob(jobInfo, job));
+      } else {
+        new InitJob(jobInfo, job).run();
+      }
+    }
+    class InitJob implements Runnable {
+      private JobInfo jobInfo;
+      private JobInProgress job;
+      public InitJob(JobInfo jobInfo, JobInProgress job) {
+        this.jobInfo = jobInfo;
+        this.job = job;
+      }
+      public void run() {
+        ttm.initJob(job);
+      }
+    }
+    void terminate() {
+      LOG.info("Shutting down thread pool");
+      threadPool.shutdownNow();
+      try {
+        threadPool.awaitTermination(1, TimeUnit.MINUTES);
+      } catch (InterruptedException e) {
+        // Ignore, we are in shutdown anyway.
+      }
+    }
+  }
+
+/**
    * Used to listen for jobs added/removed by our {@link TaskTrackerManager}.
    */
   private class JobListener extends JobInProgressListener {
@@ -630,16 +669,27 @@ public class FairScheduler extends TaskScheduler {
     Map<String, Integer> userJobs = new HashMap<String, Integer>();
     Map<String, Integer> poolJobs = new HashMap<String, Integer>();
     for (JobInProgress job: jobs) {
-      if (job.getStatus().getRunState() == JobStatus.RUNNING) {
-        String user = job.getJobConf().getUser();
-        String pool = poolMgr.getPoolName(job);
-        int userCount = userJobs.containsKey(user) ? userJobs.get(user) : 0;
-        int poolCount = poolJobs.containsKey(pool) ? poolJobs.get(pool) : 0;
-        if (userCount < poolMgr.getUserMaxJobs(user) && 
-            poolCount < poolMgr.getPoolMaxJobs(pool)) {
-          infos.get(job).runnable = true;
+      String user = job.getJobConf().getUser();
+      String pool = poolMgr.getPoolName(job);
+      int userCount = userJobs.containsKey(user) ? userJobs.get(user) : 0;
+      int poolCount = poolJobs.containsKey(pool) ? poolJobs.get(pool) : 0;
+      if (userCount < poolMgr.getUserMaxJobs(user) &&
+          poolCount < poolMgr.getPoolMaxJobs(pool)) {
+        if (job.getStatus().getRunState() == JobStatus.RUNNING ||
+            job.getStatus().getRunState() == JobStatus.PREP) {
           userJobs.put(user, userCount + 1);
           poolJobs.put(pool, poolCount + 1);
+          JobInfo jobInfo = infos.get(job);
+          if (job.getStatus().getRunState() == JobStatus.RUNNING) {
+            jobInfo.runnable = true;
+          } else {
+            // The job is in the PREP state. Give it to the job initializer
+            // for initialization if we have not already done it.
+            if (jobInfo.needsInitializing) {
+              jobInfo.needsInitializing = false;
+              jobInitializer.initJob(jobInfo, job);
+            }
+          }
         }
       }
     }
