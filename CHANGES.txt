@@ -18,6 +18,8 @@ Trunk (unreleased changes)
     HDFS-1518. Wrong description in FSNamesystem's javadoc. 
     (Jingguo Yao via eli)
 
+    HDFS-1506. Refactor fsimage loading code. (hairong)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
