@@ -206,6 +206,8 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2184. Port DistRaid.java to new mapreduce API. (Ramkumar Vadali
     via schen)
 
+    MAPREDUCE-1878. Add MRUnit documentation. (Aaron Kimball via tomwhite)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and
