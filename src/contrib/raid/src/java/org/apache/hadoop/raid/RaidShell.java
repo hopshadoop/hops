@@ -19,9 +19,14 @@
 package org.apache.hadoop.raid;
 
 import java.io.IOException;
+import java.io.FileNotFoundException;
 import java.util.Collection;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.LinkedHashMap;
+import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.net.InetSocketAddress;
 import javax.security.auth.login.LoginException;
@@ -39,6 +44,14 @@ import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.BlockLocation;
+import org.apache.hadoop.fs.HarFileSystem;
+
+import org.apache.hadoop.hdfs.DistributedFileSystem;
+import org.apache.hadoop.hdfs.DistributedRaidFileSystem;
+import org.apache.hadoop.hdfs.RaidDFSUtil;
 
 import org.apache.hadoop.raid.protocol.PolicyInfo;
 import org.apache.hadoop.raid.protocol.PolicyList;
@@ -160,6 +173,7 @@ public class RaidShell extends Configured implements Tool {
       System.err.println("           [-help [cmd]]");
       System.err.println("           [-recover srcPath1 corruptOffset]");
       System.err.println("           [-recoverBlocks path1 path2...]");
+      System.err.println("           [-fsck [path]]");
       System.err.println();
       ToolRunner.printGenericCommandUsage(System.err);
     }
@@ -191,6 +205,11 @@ public class RaidShell extends Configured implements Tool {
         printUsage(cmd);
         return exitCode;
       }
+    } else if ("-fsck".equals(cmd)) {
+      if ((argv.length < 1) || (argv.length > 2)) {
+        printUsage(cmd);
+        return exitCode;
+      }
     }
 
     try {
@@ -204,6 +223,15 @@ public class RaidShell extends Configured implements Tool {
         initializeLocal(conf);
         recoverBlocks(argv, i);
         exitCode = 0;
+      } else if ("-fsck".equals(cmd)) {
+        if (argv.length == 1) {
+          // if there are no args, check the whole file system
+          exitCode = fsck("/");
+        } else {
+          // argv.length == 2
+          // otherwise, check the path passed
+          exitCode = fsck(argv[1]);
+        }
       } else {
         exitCode = -1;
         System.err.println(cmd.substring(1) + ": Unknown command");
@@ -293,6 +321,325 @@ public class RaidShell extends Configured implements Tool {
       String path = args[i];
       fixer.fixFile(new Path(path));
     }
+  }
+
+  /**
+   * checks whether a file has more than the allowable number of
+   * corrupt blocks and must therefore be considered corrupt
+   */
+  private boolean isFileCorrupt(final DistributedFileSystem dfs,
+                                final Path filePath)
+    throws IOException {
+    // corruptBlocksPerStripe:
+    // map stripe # -> # of corrupt blocks in that stripe (data + parity)
+    HashMap<Integer, Integer> corruptBlocksPerStripe =
+      new LinkedHashMap<Integer, Integer>();
+
+    // read conf
+    final int stripeBlocks = RaidNode.getStripeLength(conf);
+
+    // figure out which blocks are missing/corrupted
+    final FileStatus fileStatus = dfs.getFileStatus(filePath);
+    final long blockSize = fileStatus.getBlockSize();
+    final long fileLength = fileStatus.getLen();
+    final long fileLengthInBlocks = (fileLength / blockSize) +
+      (((fileLength % blockSize) == 0) ? 0L : 1L);
+    final long fileStripes = (fileLengthInBlocks / stripeBlocks) +
+      (((fileLengthInBlocks % stripeBlocks) == 0) ? 0L : 1L);
+    final BlockLocation[] fileBlocks =
+      dfs.getFileBlockLocations(fileStatus, 0, fileLength);
+
+    // figure out which stripes these corrupted blocks belong to
+    for (BlockLocation fileBlock: fileBlocks) {
+      int blockNo = (int) (fileBlock.getOffset() / blockSize);
+      final int stripe = (int) (blockNo / stripeBlocks);
+      if (fileBlock.isCorrupt() ||
+          (fileBlock.getNames().length == 0 && fileBlock.getLength() > 0)) {
+        if (corruptBlocksPerStripe.get(stripe) == null) {
+          corruptBlocksPerStripe.put(stripe, 1);
+        } else {
+          corruptBlocksPerStripe.put(stripe, corruptBlocksPerStripe.
+                                     get(stripe) + 1);
+        }
+        LOG.info("file " + filePath.toString() + " corrupt in block " +
+                 blockNo + "/" + fileLengthInBlocks + ", stripe " + stripe +
+                 "/" + fileStripes);
+      } else {
+        LOG.info("file " + filePath.toString() + " OK in block " + blockNo +
+                 "/" + fileLengthInBlocks + ", stripe " + stripe + "/" +
+                 fileStripes);
+      }
+    }
+
+    RaidInfo raidInfo = getFileRaidInfo(dfs, filePath);
+
+    // now check parity blocks
+    if (raidInfo.raidType != RaidType.NONE) {
+      checkParityBlocks(filePath, corruptBlocksPerStripe, blockSize,
+                        fileStripes, raidInfo);
+    }
+
+    final int maxCorruptBlocksPerStripe = raidInfo.parityBlocksPerStripe;
+
+    for (int corruptBlocksInStripe: corruptBlocksPerStripe.values()) {
+      if (corruptBlocksInStripe > maxCorruptBlocksPerStripe) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * holds the type of raid used for a particular file
+   */
+  private enum RaidType {
+    XOR,
+    RS,
+    NONE
+  }
+
+  /**
+   * holds raid type and parity file pair
+   */
+  private class RaidInfo {
+    public RaidInfo(final RaidType raidType,
+                    final RaidNode.ParityFilePair parityPair,
+                    final int parityBlocksPerStripe) {
+      this.raidType = raidType;
+      this.parityPair = parityPair;
+      this.parityBlocksPerStripe = parityBlocksPerStripe;
+    }
+    public final RaidType raidType;
+    public final RaidNode.ParityFilePair parityPair;
+    public final int parityBlocksPerStripe;
+  }
+
+  /**
+   * returns the raid for a given file
+   */
+  private RaidInfo getFileRaidInfo(final DistributedFileSystem dfs,
+                                   final Path filePath)
+    throws IOException {
+    // now look for the parity file
+    Path destPath = null;
+    RaidNode.ParityFilePair ppair = null;
+    try {
+      // look for xor parity file first
+      destPath = RaidNode.xorDestinationPath(conf);
+      ppair = RaidNode.getParityFile(destPath, filePath, conf);
+    } catch (FileNotFoundException ignore) {
+    }
+    if (ppair != null) {
+      return new RaidInfo(RaidType.XOR, ppair, 1);
+    } else {
+      // failing that, look for rs parity file
+      try {
+        destPath = RaidNode.rsDestinationPath(conf);
+        ppair = RaidNode.getParityFile(destPath, filePath, conf);
+      } catch (FileNotFoundException ignore) {
+      }
+      if (ppair != null) {
+        return new RaidInfo(RaidType.RS, ppair, RaidNode.rsParityLength(conf));
+      } else {
+        return new RaidInfo(RaidType.NONE, null, 0);
+      }
+    }
+  }
+
+  /**
+   * gets the parity blocks corresponding to file
+   * returns the parity blocks in case of DFS
+   * and the part blocks containing parity blocks
+   * in case of HAR FS
+   */
+  private BlockLocation[] getParityBlocks(final Path filePath,
+                                          final long blockSize,
+                                          final long fileStripes,
+                                          final RaidInfo raidInfo)
+    throws IOException {
+
+
+    final String parityPathStr = raidInfo.parityPair.getPath().toUri().
+      getPath();
+    FileSystem parityFS = raidInfo.parityPair.getFileSystem();
+
+    // get parity file metadata
+    FileStatus parityFileStatus = parityFS.
+      getFileStatus(new Path(parityPathStr));
+    long parityFileLength = parityFileStatus.getLen();
+
+    if (parityFileLength != fileStripes * raidInfo.parityBlocksPerStripe *
+        blockSize) {
+      throw new IOException("expected parity file of length" +
+                            (fileStripes * raidInfo.parityBlocksPerStripe *
+                             blockSize) +
+                            " but got parity file of length " +
+                            parityFileLength);
+    }
+
+    BlockLocation[] parityBlocks =
+      parityFS.getFileBlockLocations(parityFileStatus, 0L, parityFileLength);
+
+    if (parityFS instanceof DistributedFileSystem ||
+        parityFS instanceof DistributedRaidFileSystem) {
+      long parityBlockSize = parityFileStatus.getBlockSize();
+      if (parityBlockSize != blockSize) {
+        throw new IOException("file block size is " + blockSize +
+                              " but parity file block size is " +
+                              parityBlockSize);
+      }
+    } else if (parityFS instanceof HarFileSystem) {
+      LOG.info("HAR FS found");
+    } else {
+      LOG.warn("parity file system is not of a supported type");
+    }
+
+    return parityBlocks;
+  }
+
+  /**
+   * checks the parity blocks for a given file and modifies
+   * corruptBlocksPerStripe accordingly
+   */
+  private void checkParityBlocks(final Path filePath,
+                                 final HashMap<Integer, Integer>
+                                 corruptBlocksPerStripe,
+                                 final long blockSize,
+                                 final long fileStripes,
+                                 final RaidInfo raidInfo)
+    throws IOException {
+
+    // get the blocks of the parity file
+    // because of har, multiple blocks may be returned as one container block
+    BlockLocation[] containerBlocks = getParityBlocks(filePath, blockSize,
+                                                      fileStripes, raidInfo);
+
+    long parityStripeLength = blockSize *
+      ((long) raidInfo.parityBlocksPerStripe);
+
+    long parityFileLength = parityStripeLength * fileStripes;
+
+    long parityBlocksFound = 0L;
+
+    for (BlockLocation cb: containerBlocks) {
+      if (cb.getLength() % blockSize != 0) {
+        throw new IOException("container block size is not " +
+                              "multiple of parity block size");
+      }
+      int blocksInContainer = (int) (cb.getLength() / blockSize);
+      LOG.info("found container with offset " + cb.getOffset() +
+               ", length " + cb.getLength());
+
+      for (long offset = cb.getOffset();
+           offset < cb.getOffset() + cb.getLength();
+           offset += blockSize) {
+        long block = offset / blockSize;
+
+        int stripe = (int) (offset / parityStripeLength);
+
+        if (stripe < 0) {
+          // before the beginning of the parity file
+          continue;
+        }
+        if (stripe >= fileStripes) {
+          // past the end of the parity file
+          break;
+        }
+
+        parityBlocksFound++;
+
+        if (cb.isCorrupt() ||
+            (cb.getNames().length == 0 && cb.getLength() > 0)) {
+          LOG.info("parity file for " + filePath.toString() +
+                   " corrupt in block " + block +
+                   ", stripe " + stripe + "/" + fileStripes);
+
+          if (corruptBlocksPerStripe.get(stripe) == null) {
+            corruptBlocksPerStripe.put(stripe, 1);
+          } else {
+            corruptBlocksPerStripe.put(stripe,
+                                       corruptBlocksPerStripe.get(stripe) +
+                                       1);
+          }
+        } else {
+          LOG.info("parity file for " + filePath.toString() +
+                   " OK in block " + block +
+                   ", stripe " + stripe + "/" + fileStripes);
+        }
+      }
+    }
+
+    long parityBlocksExpected = raidInfo.parityBlocksPerStripe * fileStripes;
+    if (parityBlocksFound != parityBlocksExpected ) {
+      throw new IOException("expected " + parityBlocksExpected +
+                            " parity blocks but got " + parityBlocksFound);
+    }
+  }
+
+
+  /**
+   * checks the raided file system, prints a list of corrupt files to
+   * System.out and returns the number of corrupt files
+   */
+  public int fsck(final String path) throws IOException {
+
+    FileSystem fs = (new Path(path)).getFileSystem(conf);
+
+    // if we got a raid fs, get the underlying fs
+    if (fs instanceof DistributedRaidFileSystem) {
+      fs = ((DistributedRaidFileSystem) fs).getFileSystem();
+    }
+
+    // check that we have a distributed fs
+    if (!(fs instanceof DistributedFileSystem)) {
+      throw new IOException("expected DistributedFileSystem but got " +
+                fs.getClass().getName());
+    }
+    final DistributedFileSystem dfs = (DistributedFileSystem) fs;
+
+    // get conf settings
+    String xorPrefix = RaidNode.xorDestinationPath(conf).toUri().getPath();
+    String rsPrefix = RaidNode.rsDestinationPath(conf).toUri().getPath();
+    if (!xorPrefix.endsWith("/")) {
+      xorPrefix = xorPrefix + "/";
+    }
+    if (!rsPrefix.endsWith("/")) {
+      rsPrefix = rsPrefix + "/";
+    }
+    LOG.info("prefixes: " + xorPrefix + ", " + rsPrefix);
+
+    // get a list of corrupted files (not considering parity blocks just yet)
+    // from the name node
+    // these are the only files we need to consider:
+    // if a file has no corrupted data blocks, it is OK even if some
+    // of its parity blocks are corrupted, so no further checking is
+    // necessary
+    final String[] files = RaidDFSUtil.getCorruptFiles(dfs);
+    final List<Path> corruptFileCandidates = new LinkedList<Path>();
+    for (final String f: files) {
+      final Path p = new Path(f);
+      // if this file is a parity file
+      // or if it does not start with the specified path,
+      // ignore it
+      if (!p.toString().startsWith(xorPrefix) &&
+          !p.toString().startsWith(rsPrefix) &&
+          p.toString().startsWith(path)) {
+        corruptFileCandidates.add(p);
+      }
+    }
+    // filter files marked for deletion
+    RaidUtils.filterTrash(conf, corruptFileCandidates);
+
+    int numberOfCorruptFiles = 0;
+
+    for (final Path corruptFileCandidate: corruptFileCandidates) {
+      if (isFileCorrupt(dfs, corruptFileCandidate)) {
+        System.out.println(corruptFileCandidate.toString());
+        numberOfCorruptFiles++;
+      }
+    }
+
+    return numberOfCorruptFiles;
   }
 
   /**

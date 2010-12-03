@@ -10,6 +10,8 @@ Trunk (unreleased changes)
 
     MAPREDUCE-2172. Added test-patch.properties required by test-patch.sh (nigel)
 
+    MAPREDUCE-2156. Raid-aware FSCK. (Patrick Kling via dhruba)
+
   OPTIMIZATIONS
 
   BUG FIXES

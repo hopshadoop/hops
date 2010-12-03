@@ -165,8 +165,12 @@ start-mapred.sh in the JobTracker machine so that it automatically calls
 start-raidnode-remote.sh (and do the equivalent thing for stop-mapred.sh and 
 stop-raidnode-remote.sh).
 
-Run fsckraid periodically (being developed as part of another JIRA). This valudates parity
-blocsk of a file.
+To validate the integrity of a file system, run RaidFSCK as follows:
+$HADOOP_HOME/bin/hadoop org.apache.hadoop.raid.RaidShell -fsck [path]
+
+This will print a list of corrupt files (i.e., files which have lost too many
+blocks and can no longer be fixed by Raid).
+
 
 --------------------------------------------------------------------------------
 
