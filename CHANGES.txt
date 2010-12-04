@@ -424,8 +424,6 @@ Release 0.22.0 - Unreleased
     HDFS-1524. Image loader should make sure to read every byte in image file.
     (hairong)
 
-    HDFS-1534. TestLargeBlock is failing on trunk. (cos)
-
 Release 0.21.1 - Unreleased
 
   IMPROVEMENTS
