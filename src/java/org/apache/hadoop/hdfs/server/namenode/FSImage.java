@@ -1107,10 +1107,10 @@ public class FSImage extends Storage {
    * Save the contents of the FS image to the file.
    */
   void saveFSImage(File newFile) throws IOException {
-    FSImageFormat.Writer writer = new FSImageFormat.Writer();
+    FSImageFormat.Saver saver = new FSImageFormat.Saver();
     FSImageCompression compression = FSImageCompression.createCompression(conf);
-    writer.write(newFile, getFSNamesystem(), compression);
-    setImageDigest(writer.getWrittenDigest());
+    saver.save(newFile, getFSNamesystem(), compression);
+    setImageDigest(saver.getSavedDigest());
   }
 
   public void setImageDigest(MD5Hash digest) {

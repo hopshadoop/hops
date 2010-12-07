@@ -32,6 +32,8 @@ import java.security.MessageDigest;
 import java.util.Arrays;
 
 import org.apache.commons.logging.Log;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.PermissionStatus;
@@ -42,17 +44,22 @@ import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.io.Text;
 
 /**
- * Contains inner classes for reading or writing the on-disk format for FSImages
+ * Contains inner classes for reading or writing the on-disk format for FSImages.
  */
-public abstract class FSImageFormat {
+@InterfaceAudience.Private
+@InterfaceStability.Evolving
+class FSImageFormat {
   private static final Log LOG = FSImage.LOG;
+  
+  // Static-only class
+  private FSImageFormat() {}
   
   /**
    * A one-shot class responsible for loading an image. The load() function
    * should be called once, after which the getter methods may be used to retrieve
    * information about the image that was loaded, if loading was successful.
    */
-  public static class Loader {
+  static class Loader {
     private final Configuration conf;
     /** which namesystem this loader is working for */
     private final FSNamesystem namesystem;
@@ -67,7 +74,7 @@ public abstract class FSImageFormat {
     /** The MD5 sum of the loaded file */
     private MD5Hash imgDigest;
 
-    public Loader(Configuration conf, FSNamesystem namesystem) {
+    Loader(Configuration conf, FSNamesystem namesystem) {
       this.conf = conf;
       this.namesystem = namesystem;
     }
@@ -417,42 +424,42 @@ public abstract class FSImageFormat {
    * The write() function should be called once, after which the getter
    * functions may be used to retrieve information about the file that was written.
    */
-  static class Writer {
+  static class Saver {
     /** Set to true once an image has been written */
-    private boolean written = false;
+    private boolean saved = false;
     
     /** The MD5 checksum of the file that was written */
-    private MD5Hash writtenDigest;
+    private MD5Hash savedDigest;
 
     static private final byte[] PATH_SEPARATOR = DFSUtil.string2Bytes(Path.SEPARATOR);
 
-    /** @throws IllegalStateException if the instance has not yet written an image */
-    private void checkWritten() {
-      if (!written) {
-        throw new IllegalStateException("FSImageWriter has not written an image");
+    /** @throws IllegalStateException if the instance has not yet saved an image */
+    private void checkSaved() {
+      if (!saved) {
+        throw new IllegalStateException("FSImageSaver has not saved an image");
       }
     }
     
-    /** @throws IllegalStateException if the instance has already written an image */
-    private void checkNotWritten() {
-      if (written) {
-        throw new IllegalStateException("FSImageWriter has already written an image");
+    /** @throws IllegalStateException if the instance has already saved an image */
+    private void checkNotSaved() {
+      if (saved) {
+        throw new IllegalStateException("FSImageSaver has already saved an image");
       }
     }
 
     /**
      * Return the MD5 checksum of the image file that was saved.
      */
-    MD5Hash getWrittenDigest() {
-      checkWritten();
-      return writtenDigest;
+    MD5Hash getSavedDigest() {
+      checkSaved();
+      return savedDigest;
     }
 
-    void write(File newFile,
-               FSNamesystem sourceNamesystem,
-               FSImageCompression compression)
+    void save(File newFile,
+              FSNamesystem sourceNamesystem,
+              FSImageCompression compression)
       throws IOException {
-      checkNotWritten();
+      checkNotSaved();
 
       FSDirectory fsDir = sourceNamesystem.dir;
       long startTime = now();
@@ -491,9 +498,9 @@ public abstract class FSImageFormat {
         out.close();
       }
 
-      written = true;
+      saved = true;
       // set md5 of the saved image
-      writtenDigest = new MD5Hash(digester.digest());
+      savedDigest = new MD5Hash(digester.digest());
 
       LOG.info("Image file of size " + newFile.length() + " saved in " 
           + (now() - startTime)/1000 + " seconds.");
