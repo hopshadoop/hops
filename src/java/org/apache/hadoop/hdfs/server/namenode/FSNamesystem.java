@@ -5128,6 +5128,9 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
     try {
       ObjectName mxbeanName = new ObjectName("HadoopInfo:type=NameNodeInfo");
       mbs.registerMBean(this, mxbeanName);
+    } catch ( javax.management.InstanceAlreadyExistsException iaee ) {
+      // in unit tests, we may run and restart the NN within the same JVM
+      LOG.info("NameNode MXBean already registered");
     } catch ( javax.management.JMException e ) {
       LOG.warn("Failed to register NameNodeMXBean", e);
     }
