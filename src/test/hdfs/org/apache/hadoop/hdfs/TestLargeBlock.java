@@ -37,7 +37,6 @@ import org.apache.hadoop.hdfs.server.namenode.LeaseManager;
 
 import org.junit.Test;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assume.assumeTrue;
 
 /**
  * This class tests that blocks can be larger than 2GB
@@ -58,7 +57,6 @@ public class TestLargeBlock {
   static final boolean verifyData = true;
   static final byte[] pattern = { 'D', 'E', 'A', 'D', 'B', 'E', 'E', 'F'};
   static final boolean simulatedStorage = false;
-  private static final String ALLOWED_VM = "64";
 
   // creates a file 
   static FSDataOutputStream createFile(FileSystem fileSys, Path name, int repl,
@@ -167,7 +165,6 @@ public class TestLargeBlock {
    */
   @Test
   public void testLargeBlockSize() throws IOException {
-    assumeTrue(ALLOWED_VM.equals(System.getProperty("sun.arch.data.model")));
     final long blockSize = 2L * 1024L * 1024L * 1024L + 512L; // 2GB + 512B
     runTest(blockSize);
   }

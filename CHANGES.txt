@@ -431,6 +431,9 @@ Release 0.22.0 - Unreleased
     HDFS-1532. Exclude Findbugs warning in FSImageFormat$Saver. (Todd Lipcon
     via cos)
 
+    HDFS-1527. SocketOutputStream.transferToFully fails for blocks >= 2GB on
+    32 bit JVM. (Patrick Kling via cos)
+
 Release 0.21.1 - Unreleased
 
   IMPROVEMENTS
