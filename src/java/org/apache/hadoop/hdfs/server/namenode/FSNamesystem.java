@@ -4832,10 +4832,14 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
    * @throws IOException
    */
   Collection<CorruptFileBlockInfo> listCorruptFileBlocks(String path,
-      String startBlockAfter) throws AccessControlException, IOException {
+      String startBlockAfter) throws IOException {
 
     readLock();
     try {
+    if (isInSafeMode()) {
+      throw new IOException("Cannot run listCorruptFileBlocks because " +
+                            "replication queues have not been initialized.");
+    }
     checkSuperuserPrivilege();
     long startBlockId = 0;
     // print a limited # of corrupt files per call

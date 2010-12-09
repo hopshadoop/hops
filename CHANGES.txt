@@ -20,6 +20,9 @@ Trunk (unreleased changes)
 
     HDFS-1506. Refactor fsimage loading code. (hairong)
 
+    HDFS-1533. A more elegant FileSystem#listCorruptFileBlocks API
+    (HDFS portion) (Patrick Kling via hairong)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
