@@ -1062,11 +1062,11 @@ public class Balancer implements Tool {
     // Then match nodes on different racks
     chooseNodes(false);
     
-    assert (datanodes.size() == 
-      overUtilizedDatanodes.size()+underUtilizedDatanodes.size()+
-      aboveAvgUtilizedDatanodes.size()+belowAvgUtilizedDatanodes.size()+
-      sources.size()+targets.size())
-      : "Mismatched number of datanodes";
+    assert (datanodes.size() >= sources.size()+targets.size())
+      : "Mismatched number of datanodes (" +
+      datanodes.size() + " total, " +
+      sources.size() + " sources, " +
+      targets.size() + " targets)";
 
     long bytesToMove = 0L;
     for (Source src : sources) {

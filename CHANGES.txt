@@ -437,6 +437,9 @@ Release 0.22.0 - Unreleased
     HDFS-1531. Clean up stack traces due to duplicate MXBean registration.
     (Todd Lipcon via cos)
 
+    HDFS-613. TestBalancer and TestBlockTokenWithDFS fail Balancer assert.
+    (Todd Lipcon via cos)
+
 Release 0.21.1 - Unreleased
 
   IMPROVEMENTS
