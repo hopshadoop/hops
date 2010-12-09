@@ -12,6 +12,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-2156. Raid-aware FSCK. (Patrick Kling via dhruba)
 
+    MAPREDUCE-2215. A more elegant FileSystem#listCorruptFileBlocks API
+    (RAID changes) (Patrick Kling via hairong)
+
   OPTIMIZATIONS
 
   BUG FIXES

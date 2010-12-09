@@ -30,7 +30,8 @@ import java.util.HashSet;
 import java.util.Set;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.CorruptFileBlocks;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.tools.DFSck;
@@ -68,15 +69,9 @@ public abstract class RaidDFSUtil {
   public static String[] getCorruptFiles(DistributedFileSystem dfs)
     throws IOException {
     Set<String> corruptFiles = new HashSet<String>();
-    
-    String cookie = null;
-    for (CorruptFileBlocks fbs = dfs.listCorruptFileBlocks("/", cookie);
-         fbs.getFiles().length > 0;
-         fbs = dfs.listCorruptFileBlocks("/", cookie)) {
-      for (String path : fbs.getFiles()) {
-        corruptFiles.add(path);
-      }
-      cookie = fbs.getCookie();
+    RemoteIterator<Path> cfb = dfs.listCorruptFileBlocks(new Path("/"));
+    while (cfb.hasNext()) {
+      corruptFiles.add(cfb.next().toUri().getPath());
     }
 
     return corruptFiles.toArray(new String[corruptFiles.size()]);
