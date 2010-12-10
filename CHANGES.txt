@@ -1455,6 +1455,8 @@ Release 0.20.2 - Unreleased
     (Todd Lipcon via szetszwo)
 
     HDFS-464. Fix memory leaks in libhdfs. (Christian Kunz via suresh)
+    
+    HDFS-1377. Quota bug for partial blocks allows quotas to be violated. (eli)
 
 Release 0.20.1 - 2009-09-01
 
@@ -1474,5 +1476,3 @@ Release 0.20.1 - 2009-09-01
 
     HDFS-761. Fix failure to process rename operation from edits log due to 
     quota verification. (suresh)
-    
-    HDFS-1377. Quota bug for partial blocks allows quotas to be violated. (eli)
