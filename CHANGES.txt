@@ -1474,3 +1474,5 @@ Release 0.20.1 - 2009-09-01
 
     HDFS-761. Fix failure to process rename operation from edits log due to 
     quota verification. (suresh)
+    
+    HDFS-1377. Quota bug for partial blocks allows quotas to be violated. (eli)
