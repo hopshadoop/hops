@@ -1361,6 +1361,13 @@ public abstract class RaidNode implements RaidProtocol {
   /**
    * Return the temp path for XOR parity files
    */
+  public static String xorTempPrefix(Configuration conf) {
+    return conf.get(RAID_TMP_LOCATION_KEY, DEFAULT_RAID_TMP_LOCATION);
+  }
+
+  /**
+   * Return the temp path for XOR parity files
+   */
   public static String xorHarTempPrefix(Configuration conf) {
     return conf.get(RAID_HAR_TMP_LOCATION_KEY, DEFAULT_RAID_HAR_TMP_LOCATION);
   }

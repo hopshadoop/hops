@@ -15,6 +15,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2215. A more elegant FileSystem#listCorruptFileBlocks API
     (RAID changes) (Patrick Kling via hairong)
 
+    MAPREDUCE-1831. BlockPlacement policy for HDFS-RAID.
+    (Scott Chen via dhruba)
+
   OPTIMIZATIONS
 
   BUG FIXES
