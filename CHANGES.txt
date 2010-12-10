@@ -30,6 +30,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2155. RaidNode should optionally use the mapreduce jobs to 
     fix missing blocks.  (Patrick Kling via dhruba)
 
+    MAPREDUCE-1334. Fix TestIndexUpdater by ignoring _SUCCESS file in HDFS.
+    (Kay Kay via yhemanth)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES

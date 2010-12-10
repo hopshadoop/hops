@@ -78,6 +78,8 @@ public class TestIndexUpdater extends TestCase {
       System.setProperty("hadoop.log.dir", new Path(base).toString() + "/logs");
     }
     conf = new Configuration();
+    //See MAPREDUCE-947 for more details. Setting to false prevents the creation of _SUCCESS.
+    conf.setBoolean("mapreduce.fileoutputcommitter.marksuccessfuljobs", false);
   }
 
   protected void setUp() throws Exception {
