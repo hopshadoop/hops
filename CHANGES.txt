@@ -4,6 +4,9 @@ Trunk (unreleased changes)
 
   INCOMPATIBLE CHANGES
 
+    HDFS-1526. Dfs client name for a map/reduce task should be unique
+    among threads. (hairong)
+
   NEW FEATURES
 
     HDFS-1482. Add listCorruptFileBlocks to DistributedFileSystem.
