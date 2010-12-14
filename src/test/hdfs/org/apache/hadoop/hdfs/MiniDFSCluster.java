@@ -84,6 +84,8 @@ public class MiniDFSCluster {
     private String[] racks = null; 
     private String [] hosts = null;
     private long [] simulatedCapacities = null;
+    // wait until namenode has left safe mode?
+    private boolean waitSafeMode = true;
     
     public Builder(Configuration conf) {
       this.conf = conf;
@@ -160,6 +162,14 @@ public class MiniDFSCluster {
       this.simulatedCapacities = val;
       return this;
     }
+
+    /**
+     * Default: true
+     */
+    public Builder waitSafeMode(boolean val) {
+      this.waitSafeMode = val;
+      return this;
+    }
     
     /**
      * Construct the actual MiniDFSCluster
@@ -182,7 +192,8 @@ public class MiniDFSCluster {
                        builder.option,
                        builder.racks,
                        builder.hosts,
-                       builder.simulatedCapacities);
+                       builder.simulatedCapacities,
+                       builder.waitSafeMode);
   }
   
   public class DataNodeProperties {
@@ -206,6 +217,8 @@ public class MiniDFSCluster {
                          new ArrayList<DataNodeProperties>();
   private File base_dir;
   private File data_dir;
+
+  private boolean waitSafeMode = true;
   
   public final static String FINALIZED_DIR_NAME = "/current/finalized/";
   
@@ -377,16 +390,19 @@ public class MiniDFSCluster {
                         long[] simulatedCapacities) throws IOException {
     initMiniDFSCluster(nameNodePort, conf, numDataNodes, format,
         manageNameDfsDirs, manageDataDfsDirs, operation, racks, hosts,
-        simulatedCapacities);
+        simulatedCapacities, true);
   }
 
   private void initMiniDFSCluster(int nameNodePort, Configuration conf,
       int numDataNodes, boolean format, boolean manageNameDfsDirs,
       boolean manageDataDfsDirs, StartupOption operation, String[] racks,
-      String[] hosts, long[] simulatedCapacities) throws IOException {
+      String[] hosts, long[] simulatedCapacities, boolean waitSafeMode)
+    throws IOException {
     this.conf = conf;
     base_dir = new File(getBaseDirectory());
     data_dir = new File(base_dir, "data");
+
+    this.waitSafeMode = waitSafeMode;
     
     // use alternate RPC engine if spec'd
     String rpcEngineName = System.getProperty("hdfs.rpc.engine");
@@ -955,7 +971,8 @@ public class MiniDFSCluster {
   }
   
   /**
-   * Returns true if the NameNode is running and is out of Safe Mode.
+   * Returns true if the NameNode is running and is out of Safe Mode
+   * or if waiting for safe mode is disabled.
    */
   public boolean isClusterUp() {
     if (nameNode == null) {
@@ -964,7 +981,7 @@ public class MiniDFSCluster {
     long[] sizes = nameNode.getStats();
     boolean isUp = false;
     synchronized (this) {
-      isUp = (!nameNode.isInSafeMode() && sizes[0] != 0);
+      isUp = ((!nameNode.isInSafeMode() || !waitSafeMode) && sizes[0] != 0);
     }
     return isUp;
   }
