@@ -37,6 +37,8 @@ Trunk (unreleased changes)
   BUG FIXES
 
     HDFS-1516. mvn-install is broken after 0.22 branch creation. (cos)
+    HDFS-1360. TestBlockRecovery should bind ephemeral ports.
+    (Todd Lipcon via hairong)
 
 Release 0.22.0 - Unreleased
 
