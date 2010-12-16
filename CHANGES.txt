@@ -451,6 +451,8 @@ Release 0.22.0 - Unreleased
     HDFS-613. TestBalancer and TestBlockTokenWithDFS fail Balancer assert.
     (Todd Lipcon via cos)
 
+    HDFS-1206. TestFiHFlush fails intermittently. (cos)
+
 Release 0.21.1 - Unreleased
 
   IMPROVEMENTS
