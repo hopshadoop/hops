@@ -451,8 +451,6 @@ Release 0.22.0 - Unreleased
     HDFS-613. TestBalancer and TestBlockTokenWithDFS fail Balancer assert.
     (Todd Lipcon via cos)
 
-    HDFS-1206. TestFiHFlush fails intermittently. (cos)
-
 Release 0.21.1 - Unreleased
 
   IMPROVEMENTS
@@ -479,6 +477,8 @@ Release 0.21.1 - Unreleased
 
     HDFS-1292. Allow artifacts to be published to the staging Apache Nexus
     Maven Repository.  (Giridharan Kesavan via tomwhite)
+
+    HDFS-1206. TestFiHFlush fails intermittently. (cos)
 
 Release 0.21.0 - 2010-08-13
 
