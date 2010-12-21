@@ -1429,8 +1429,6 @@ Release 0.20.3 - Unreleased
     HDFS-132. Fix namenode to not report files deleted metrics for deletions
     done while replaying edits during startup. (suresh & shv)
 
-    HDFS-1406. TestCLI fails on Ubuntu with default /etc/hosts. (cos)
-
 Release 0.20.2 - Unreleased
 
   IMPROVEMENTS
