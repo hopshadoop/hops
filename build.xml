@@ -1204,6 +1204,9 @@
         <exclude name="src/test/checkstyle-noframes-sorted.xsl" />
         <exclude name="src/test/checkstyle.xml" />
         <exclude name="src/test/findbugsExcludeFile.xml" />
+        <exclude name="src/docs/**/*.odg" />
+        <exclude name="**/*.tgz" />
+        <exclude name="**/*.tar" />
       </fileset>
     </rat:report>
   </target>
