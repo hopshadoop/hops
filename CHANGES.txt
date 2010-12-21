@@ -41,9 +41,6 @@ Trunk (unreleased changes)
     HDFS-1360. TestBlockRecovery should bind ephemeral ports.
     (Todd Lipcon via hairong)
 
-    HDFS-1511. 98 Release Audit warnings on trunk and branch-0.22.
-    (jghoman)
-
 Release 0.22.0 - Unreleased
 
   NEW FEATURES
@@ -454,6 +451,9 @@ Release 0.22.0 - Unreleased
 
     HDFS-613. TestBalancer and TestBlockTokenWithDFS fail Balancer assert.
     (Todd Lipcon via cos)
+
+    HDFS-1511. 98 Release Audit warnings on trunk and branch-0.22.
+    (jghoman)
 
 Release 0.21.1 - Unreleased
 
