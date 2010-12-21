@@ -41,6 +41,8 @@ Trunk (unreleased changes)
     HDFS-1360. TestBlockRecovery should bind ephemeral ports.
     (Todd Lipcon via hairong)
 
+    HDFS-1551. Fix pom templates dependency list (gkesavan)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES
