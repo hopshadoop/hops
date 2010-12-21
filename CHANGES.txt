@@ -29,6 +29,8 @@ Trunk (unreleased changes)
     HDFS-1476. listCorruptFileBlocks should be functional while the
     name node is in safe mode. (Patrick Kling via hairong)
 
+    HDFS-1534. Fix some incorrect logs in FSDirectory. (eli)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
