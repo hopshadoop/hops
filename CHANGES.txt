@@ -475,6 +475,9 @@ Release 0.21.1 - Unreleased
     MAPREDUCE-1809. Ant build changes for Streaming system tests in contrib
     projects. (Vinay Kumar Thota via amareshwari)
 
+    MAPREDUCE-2223. TestMRCLI might fail on Ubuntu with default /etc/hosts
+    (cos)
+
 Release 0.21.0 - 2010-08-13
 
   INCOMPATIBLE CHANGES
