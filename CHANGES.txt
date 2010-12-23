@@ -488,6 +488,9 @@ Release 0.21.1 - Unreleased
 
     HDFS-1206. TestFiHFlush fails intermittently. (cos)
 
+    HDFS-1548. Fault-injection tests are executed multiple times if invoked
+    with run-test-hdfs-fault-inject target (cos)
+
 Release 0.21.0 - 2010-08-13
 
   INCOMPATIBLE CHANGES

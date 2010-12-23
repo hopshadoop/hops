@@ -482,9 +482,19 @@
   <target name="jar-test-fault-inject" depends="jar-hdfs-test-fault-inject"
           description="Make hadoop-test.jar files"/>
 
-  <target name="run-test-hdfs-fault-inject" depends="injectfaults" 
+  <target name="run-test-hdfs-fault-inject" depends="injectfaults,
+    -run-test-hdfs-fault-inject-all,
+    -run-test-hdfs-fault-inject-withtestcaseonly"
 	  description="Run full set of the unit tests with fault injection">
-    <macro-run-tests-fault-inject target.name="run-test-hdfs"
+  </target>
+  <target name="-run-test-hdfs-fault-inject-all" unless="testcase">
+    <macro-run-tests-fault-inject
+      target.name="run-test-hdfs-excluding-commit-and-smoke"
+      testcasesonly="false"/>
+  </target>
+  <target name="-run-test-hdfs-fault-inject-withtestcaseonly" if="testcase">
+    <macro-run-tests-fault-inject
+      target.name="run-test-hdfs-all-withtestcaseonly"
       testcasesonly="false"/>
   </target>
 
@@ -511,7 +521,8 @@
   <target name="run-fault-inject-with-testcaseonly" depends="injectfaults">
     <fail unless="testcase">Can't run this target without -Dtestcase setting!
     </fail>
-    <macro-run-tests-fault-inject target.name="run-test-hdfs" 
+    <macro-run-tests-fault-inject
+      target.name="run-test-hdfs-all-withtestcaseonly"
       testcasesonly="true"/>
   </target>
   <!-- ================================================================== -->
