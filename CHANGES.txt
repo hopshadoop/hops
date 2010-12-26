@@ -45,6 +45,9 @@ Trunk (unreleased changes)
 
     HDFS-1551. Fix pom templates dependency list (gkesavan)
 
+    HDFS-1559. Add missing UGM overrides to TestRefreshUserMappings
+    (Todd Lipcon via eli)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES
