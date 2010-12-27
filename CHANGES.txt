@@ -48,6 +48,9 @@ Trunk (unreleased changes)
     HDFS-1559. Add missing UGM overrides to TestRefreshUserMappings
     (Todd Lipcon via eli)
 
+    HDFS-1509. A savenamespace command writes the fsimage and edits into
+    all configured directories. (dhruba)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES
