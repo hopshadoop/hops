@@ -462,6 +462,9 @@ Release 0.22.0 - Unreleased
     HDFS-1511. 98 Release Audit warnings on trunk and branch-0.22.
     (jghoman)
 
+    HDFS-1560. dfs.data.dir permissions should default to 700. 
+    (Todd Lipcon via eli)
+
 Release 0.21.1 - Unreleased
 
   IMPROVEMENTS
