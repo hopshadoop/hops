@@ -451,6 +451,8 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-1783. FairScheduler initializes tasks only when the job can be
     run. (Ramkumar Vadali via schen)
 
+    MAPREDUCE-2224. Fix synchronization bugs in JvmManager. (todd)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES

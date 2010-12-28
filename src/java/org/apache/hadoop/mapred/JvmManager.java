@@ -87,10 +87,10 @@ class JvmManager {
    */
   void setPidToJvm(JVMId jvmId, String pid) {
     if (jvmId.isMapJVM()) {
-      mapJvmManager.jvmIdToPid.put(jvmId, pid);
+      mapJvmManager.setPidForJvm(jvmId, pid);
     }
     else {
-      reduceJvmManager.jvmIdToPid.put(jvmId, pid);
+      reduceJvmManager.setPidForJvm(jvmId, pid);
     }
   }
   
@@ -100,15 +100,9 @@ class JvmManager {
   String getPid(TaskRunner t) {
     if (t != null && t.getTask() != null) {
       if (t.getTask().isMapTask()) {
-        JVMId id = mapJvmManager.runningTaskToJvm.get(t);
-        if (id != null) {
-          return mapJvmManager.jvmIdToPid.get(id);
-        }
+        return mapJvmManager.getPidByRunningTask(t);
       } else {
-        JVMId id = reduceJvmManager.runningTaskToJvm.get(t);
-        if (id != null) {
-          return reduceJvmManager.jvmIdToPid.get(id);
-        }
+        return reduceJvmManager.getPidByRunningTask(t);
       }
     }
     return null;
@@ -188,9 +182,6 @@ class JvmManager {
     //Mapping from the JVM IDs to Reduce JVM processes
     Map <JVMId, JvmRunner> jvmIdToRunner = 
       new HashMap<JVMId, JvmRunner>();
-    //Mapping from the JVM IDs to process IDs
-    Map <JVMId, String> jvmIdToPid = 
-      new HashMap<JVMId, String>();
     
     int maxJvms;
     boolean isMap;
@@ -210,7 +201,7 @@ class JvmManager {
         TaskRunner t) {
       jvmToRunningTask.put(jvmId, t);
       runningTaskToJvm.put(t,jvmId);
-      jvmIdToRunner.get(jvmId).setBusy(true);
+      jvmIdToRunner.get(jvmId).setTaskRunner(t);
     }
     
     synchronized public TaskInProgress getTaskForJvm(JVMId jvmId)
@@ -245,6 +236,20 @@ class JvmManager {
         return taskRunner.getTaskInProgress();
       }
       return null;
+    }
+
+    synchronized String getPidByRunningTask(TaskRunner t) {
+      JVMId id = runningTaskToJvm.get(t);
+      if (id != null) {
+        return jvmIdToRunner.get(id).getPid();
+      }
+      return null;
+    }
+
+    synchronized void setPidForJvm(JVMId jvmId, String pid) {
+      JvmRunner runner = jvmIdToRunner.get(jvmId);
+      assert runner != null : "Task must have a runner to set a pid";
+      runner.setPid(pid);
     }
     
     synchronized public boolean isJvmknown(JVMId jvmId) {
@@ -282,13 +287,19 @@ class JvmManager {
       removeJvm(jvmRunner.jvmId);
     }
 
-    synchronized void dumpStack(TaskRunner tr) {
-      JVMId jvmId = runningTaskToJvm.get(tr);
-      if (null != jvmId) {
-        JvmRunner jvmRunner = jvmIdToRunner.get(jvmId);
-        if (null != jvmRunner) {
-          jvmRunner.dumpChildStacks();
+    void dumpStack(TaskRunner tr) {
+      JvmRunner jvmRunner = null;
+      synchronized (this) {
+        JVMId jvmId = runningTaskToJvm.get(tr);
+        if (null != jvmId) {
+          jvmRunner = jvmIdToRunner.get(jvmId);
         }
+      }
+
+      // Don't want to hold JvmManager lock while dumping stacks for one
+      // task.
+      if (null != jvmRunner) {
+        jvmRunner.dumpChildStacks();
       }
     }
 
@@ -307,7 +318,6 @@ class JvmManager {
     
     synchronized private void removeJvm(JVMId jvmId) {
       jvmIdToRunner.remove(jvmId);
-      jvmIdToPid.remove(jvmId);
     }
     private synchronized void reapJvm( 
         TaskRunner t, JvmEnv env) {
@@ -377,7 +387,7 @@ class JvmManager {
             " " + getDetails());
     }
     
-    private String getDetails() {
+    private synchronized String getDetails() {
       StringBuffer details = new StringBuffer();
       details.append("Number of active JVMs:").
               append(jvmIdToRunner.size());
@@ -390,14 +400,14 @@ class JvmManager {
           append(" #Tasks ran: "). 
           append(jvmIdToRunner.get(jvmId).numTasksRan).
           append(" Currently busy? ").
-          append(jvmIdToRunner.get(jvmId).busy).
+          append(jvmIdToRunner.get(jvmId).isBusy()).
           append(" Currently running: "). 
           append(jvmToRunningTask.get(jvmId).getTask().getTaskID().toString());
       }
       return details.toString();
     }
 
-    private void spawnNewJvm(JobID jobId, JvmEnv env,  
+    private synchronized void spawnNewJvm(JobID jobId, JvmEnv env,  
         TaskRunner t) {
       JvmRunner jvmRunner = new JvmRunner(env,jobId);
       jvmIdToRunner.put(jvmRunner.jvmId, jvmRunner);
@@ -433,7 +443,6 @@ class JvmManager {
       volatile int numTasksRan;
       final int numTasksToRun;
       JVMId jvmId;
-      volatile boolean busy = true;
       private ShellCommandExecutor shexec; // shell terminal for running the task
       //context used for starting JVM
       private TaskControllerContext initalContext;
@@ -442,6 +451,11 @@ class JvmManager {
         this.env = env;
         this.jvmId = new JVMId(jobId, isMap, rand.nextInt());
         this.numTasksToRun = env.conf.getNumTasksToExecutePerJvm();
+
+        this.initalContext = new TaskControllerContext();
+        initalContext.sleeptimeBeforeSigkill = tracker.getJobConf()
+          .getLong(TTConfig.TT_SLEEP_TIME_BEFORE_SIG_KILL,
+                   ProcessTree.DEFAULT_SLEEPTIME_BEFORE_SIGKILL);
         LOG.info("In JvmRunner constructed JVM ID: " + jvmId);
       }
       public void run() {
@@ -449,11 +463,9 @@ class JvmManager {
       }
 
       public void runChild(JvmEnv env) {
-        initalContext = new TaskControllerContext();
         try {
           env.vargs.add(Integer.toString(jvmId.getId()));
           //Launch the task controller to run task JVM
-          initalContext.task = jvmToRunningTask.get(jvmId).getTask();
           initalContext.env = env;
           tracker.getTaskController().launchTaskJVM(initalContext);
         } catch (IOException ioe) {
@@ -483,6 +495,19 @@ class JvmManager {
         }
       }
 
+      synchronized void setPid(String pid) {
+        assert initalContext != null;
+        initalContext.pid = pid;
+      }
+
+      synchronized String getPid() {
+        if (initalContext != null) {
+          return initalContext.pid;
+        } else {
+          return null;
+        }
+      }
+
       /** 
        * Kills the process. Also kills its subprocesses if the process(root of subtree
        * of processes) is created using setsid.
@@ -493,11 +518,6 @@ class JvmManager {
           // Check inital context before issuing a kill to prevent situations
           // where kill is issued before task is launched.
           if (initalContext != null && initalContext.env != null) {
-            initalContext.pid = jvmIdToPid.get(jvmId);
-            initalContext.sleeptimeBeforeSigkill = tracker.getJobConf()
-                .getLong(TTConfig.TT_SLEEP_TIME_BEFORE_SIG_KILL,
-                    ProcessTree.DEFAULT_SLEEPTIME_BEFORE_SIGKILL);
-
             // Destroy the task jvm
             controller.destroyTaskJVM(initalContext);
           } else {
@@ -518,11 +538,6 @@ class JvmManager {
           // Check inital context before issuing a signal to prevent situations
           // where signal is issued before task is launched.
           if (initalContext != null && initalContext.env != null) {
-            initalContext.pid = jvmIdToPid.get(jvmId);
-            initalContext.sleeptimeBeforeSigkill = tracker.getJobConf()
-                .getLong(TTConfig.TT_SLEEP_TIME_BEFORE_SIG_KILL,
-                    ProcessTree.DEFAULT_SLEEPTIME_BEFORE_SIGKILL);
-
             // signal the task jvm
             controller.dumpTaskStack(initalContext);
 
@@ -539,19 +554,20 @@ class JvmManager {
         }
       }
 
-      public void taskRan() {
-        busy = false;
+      public synchronized void taskRan() {
+        initalContext.task = null;
         numTasksRan++;
       }
       
       public boolean ranAll() {
         return(numTasksRan == numTasksToRun);
       }
-      public void setBusy(boolean busy) {
-        this.busy = busy;
+      public synchronized void setTaskRunner(TaskRunner runner) {
+        initalContext.task = runner.getTask();
+        assert initalContext.task != null;
       }
-      public boolean isBusy() {
-        return busy;
+      public synchronized boolean isBusy() {
+        return initalContext.task != null;
       }
     }
   }  

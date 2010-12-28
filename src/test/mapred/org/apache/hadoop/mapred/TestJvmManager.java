@@ -22,8 +22,15 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Vector;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.mapred.JvmManager.JvmManagerForType;
 import org.apache.hadoop.mapred.JvmManager.JvmManagerForType.JvmRunner;
@@ -36,10 +43,12 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class TestJvmManager {
+  static final Log LOG = LogFactory.getLog(TestJvmManager.class);
+
   private static File TEST_DIR = new File(System.getProperty("test.build.data",
       "/tmp"), TestJvmManager.class.getSimpleName());
-  private static int MAP_SLOTS = 1;
-  private static int REDUCE_SLOTS = 1;
+  private static int MAP_SLOTS = 10;
+  private static int REDUCE_SLOTS = 10;
   private TaskTracker tt;
   private JvmManager jvmManager;
   private JobConf ttConf;
@@ -98,7 +107,7 @@ public class TestJvmManager {
     // launch a jvm
     JobConf taskConf = new JobConf(ttConf);
     TaskAttemptID attemptID = new TaskAttemptID("test", 0, TaskType.MAP, 0, 0);
-    Task task = new MapTask(null, attemptID, 0, null, MAP_SLOTS);
+    Task task = new MapTask(null, attemptID, 0, null, 1);
     task.setConf(taskConf);
     TaskInProgress tip = tt.new TaskInProgress(task, taskConf);
     File pidFile = new File(TEST_DIR, "pid");
@@ -162,7 +171,7 @@ public class TestJvmManager {
 
     // launch another jvm and see it finishes properly
     attemptID = new TaskAttemptID("test", 0, TaskType.MAP, 0, 1);
-    task = new MapTask(null, attemptID, 0, null, MAP_SLOTS);
+    task = new MapTask(null, attemptID, 0, null, 1);
     task.setConf(taskConf);
     tip = tt.new TaskInProgress(task, taskConf);
     TaskRunner taskRunner2 = task.createRunner(tt, tip);
@@ -180,4 +189,139 @@ public class TestJvmManager {
     jvmRunner.join();
     launcher.join();
   }
+
+
+  /**
+   * Create a bunch of tasks and use a special hash map to detect
+   * racy access to the various internal data structures of JvmManager.
+   * (Regression test for MAPREDUCE-2224)
+   */
+  @Test
+  public void testForRaces() throws Exception {
+    JvmManagerForType mapJvmManager = jvmManager
+        .getJvmManagerForType(TaskType.MAP);
+
+    // Sub out the HashMaps for maps that will detect racy access.
+    mapJvmManager.jvmToRunningTask = new RaceHashMap<JVMId, TaskRunner>();
+    mapJvmManager.runningTaskToJvm = new RaceHashMap<TaskRunner, JVMId>();
+    mapJvmManager.jvmIdToRunner = new RaceHashMap<JVMId, JvmRunner>();
+
+    // Launch a bunch of JVMs, but only allow MAP_SLOTS to run at once.
+    final ExecutorService exec = Executors.newFixedThreadPool(MAP_SLOTS);
+    final AtomicReference<Throwable> failed =
+      new AtomicReference<Throwable>();
+
+    for (int i = 0; i < MAP_SLOTS*5; i++) {
+      JobConf taskConf = new JobConf(ttConf);
+      TaskAttemptID attemptID = new TaskAttemptID("test", 0, TaskType.MAP, i, 0);
+      Task task = new MapTask(null, attemptID, i, null, 1);
+      task.setConf(taskConf);
+      TaskInProgress tip = tt.new TaskInProgress(task, taskConf);
+      File pidFile = new File(TEST_DIR, "pid_" + i);
+      final TaskRunner taskRunner = task.createRunner(tt, tip);
+      // launch a jvm which sleeps for 60 seconds
+      final Vector<String> vargs = new Vector<String>(2);
+      vargs.add(writeScript("script_" + i, "echo hi\n", pidFile).getAbsolutePath());
+      final File workDir = new File(TEST_DIR, "work_" + i);
+      workDir.mkdir();
+      final File stdout = new File(TEST_DIR, "stdout_" + i);
+      final File stderr = new File(TEST_DIR, "stderr_" + i);
+  
+      // launch the process and wait in a thread, till it finishes
+      Runnable launcher = new Runnable() {
+        public void run() {
+          try {
+            taskRunner.launchJvmAndWait(null, vargs, stdout, stderr, 100,
+                workDir, null);
+          } catch (Throwable t) {
+            failed.compareAndSet(null, t);
+            exec.shutdownNow();
+            return;
+          }
+        }
+      };
+      exec.submit(launcher);
+    }
+
+    exec.shutdown();
+    exec.awaitTermination(3, TimeUnit.MINUTES);
+    if (failed.get() != null) {
+      throw new RuntimeException(failed.get());
+    }
+  }
+
+  /**
+   * HashMap which detects racy usage by sleeping during operations
+   * and checking that no other threads access the map while asleep.
+   */
+  static class RaceHashMap<K,V> extends HashMap<K,V> {
+    Object syncData = new Object();
+    RuntimeException userStack = null;
+    boolean raced = false;
+    
+    private void checkInUse() {
+      synchronized (syncData) {
+        RuntimeException thisStack = new RuntimeException(Thread.currentThread().toString());
+
+        if (userStack != null && raced == false) {
+          RuntimeException other = userStack;
+          raced = true;
+          LOG.fatal("Race between two threads.");
+          LOG.fatal("First", thisStack);
+          LOG.fatal("Second", other);
+          throw new RuntimeException("Raced");
+        } else {
+          userStack = thisStack;
+        }
+      }
+    }
+
+    private void sleepABit() {
+      try {
+        Thread.sleep(60);
+      } catch (InterruptedException ie) {
+        Thread.currentThread().interrupt();
+      }
+    }
+
+    private void done() {
+      synchronized (syncData) {
+        userStack = null;
+      }
+    }
+
+    @Override
+    public V get(Object key) {
+      checkInUse();
+      try {
+        sleepABit();
+        return super.get(key);
+      } finally {
+        done();
+      }
+    }
+
+    @Override
+    public boolean containsKey(Object key) {
+      checkInUse();
+      try {
+        sleepABit();
+        return super.containsKey(key);
+      } finally {
+        done();
+      }
+    }
+    
+    @Override
+    public V put(K key, V val) {
+      checkInUse();
+      try {
+        sleepABit();
+        return super.put(key, val);
+      } finally {
+        done();
+      }
+    }
+  }
+
 }
