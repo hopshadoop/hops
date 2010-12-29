@@ -453,6 +453,8 @@ Release 0.22.0 - Unreleased
 
     MAPREDUCE-2224. Fix synchronization bugs in JvmManager. (todd)
 
+    MAPREDUCE-714. JobConf.findContainingJar unescapes unnecessarily on linux (todd)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES
