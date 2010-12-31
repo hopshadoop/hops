@@ -159,6 +159,9 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   private float HEARTBEATS_SCALING_FACTOR;
   private final float MIN_HEARTBEATS_SCALING_FACTOR = 0.01f;
   private final float DEFAULT_HEARTBEATS_SCALING_FACTOR = 1.0f;
+
+  // Minimum interval for heartbeats regardless of cluster size.
+  private int HEARTBEAT_INTERVAL_MIN;
   
   @InterfaceAudience.Private
   @InterfaceStability.Unstable
@@ -1422,6 +1425,9 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
       HEARTBEATS_SCALING_FACTOR = DEFAULT_HEARTBEATS_SCALING_FACTOR;
     }
 
+    HEARTBEAT_INTERVAL_MIN = conf.getInt(JT_HEARTBEAT_INTERVAL_MIN,
+                                         JT_HEARTBEAT_INTERVAL_MIN_DEFAULT);
+
     //This configuration is there solely for tuning purposes and 
     //once this feature has been tested in real clusters and an appropriate
     //value for the threshold has been found, this config might be taken out.
@@ -2520,7 +2526,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     int clusterSize = getClusterStatus().getTaskTrackers();
     int heartbeatInterval =  Math.max(
                                 (int)(1000 * HEARTBEATS_SCALING_FACTOR *
-                                      Math.ceil((double)clusterSize / 
+                                      ((double)clusterSize / 
                                                 NUM_HEARTBEATS_IN_SECOND)),
                                 HEARTBEAT_INTERVAL_MIN) ;
     return heartbeatInterval;

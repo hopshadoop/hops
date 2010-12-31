@@ -43,7 +43,7 @@ public class TestMapredHeartbeat extends TestCase {
       while(jc.getClusterStatus().getTaskTrackers() != taskTrackers) {
         UtilsForTests.waitFor(100);
       }
-      assertEquals(MRConstants.HEARTBEAT_INTERVAL_MIN, 
+      assertEquals(JTConfig.JT_HEARTBEAT_INTERVAL_MIN_DEFAULT,
         mr.getJobTrackerRunner().getJobTracker().getNextHeartbeatInterval());
       mr.shutdown(); 
       
@@ -62,14 +62,14 @@ public class TestMapredHeartbeat extends TestCase {
       
       // test configured heartbeat interval is capped with min value
       taskTrackers = 5;
-      conf.setInt(JTConfig.JT_HEARTBEATS_IN_SECOND, 10);
+      conf.setInt(JTConfig.JT_HEARTBEATS_IN_SECOND, 100);
       mr = new MiniMRCluster(taskTrackers, "file:///", 3, 
           null, null, conf);
       jc = new JobClient(mr.createJobConf());
       while(jc.getClusterStatus().getTaskTrackers() != taskTrackers) {
         UtilsForTests.waitFor(100);
       }
-      assertEquals(MRConstants.HEARTBEAT_INTERVAL_MIN, 
+      assertEquals(JTConfig.JT_HEARTBEAT_INTERVAL_MIN_DEFAULT,
         mr.getJobTrackerRunner().getJobTracker().getNextHeartbeatInterval());
     } finally {
       if (mr != null) { mr.shutdown(); }

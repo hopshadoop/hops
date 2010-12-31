@@ -18,6 +18,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1831. BlockPlacement policy for HDFS-RAID.
     (Scott Chen via dhruba)
 
+    MAPREDUCE-1906. Lower minimum heartbeat interval for TaskTracker
+    (Scott Carey and Todd Lipcon via todd)
+
   OPTIMIZATIONS
 
   BUG FIXES

@@ -30,6 +30,7 @@ import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.mapred.FakeObjectUtilities.FakeJobHistory;
 import org.apache.hadoop.mapred.JobInProgress.KillInterruptedException;
 import org.apache.hadoop.mapred.JobStatusChangeEvent.EventType;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 
 public class TestParallelInitialization extends TestCase {
   
@@ -131,7 +132,7 @@ public class TestParallelInitialization extends TestCase {
     }
     
     public int getNextHeartbeatInterval() {
-      return MRConstants.HEARTBEAT_INTERVAL_MIN;
+      return JTConfig.JT_HEARTBEAT_INTERVAL_MIN_DEFAULT;
     }
 
     public void killJob(JobID jobid) {

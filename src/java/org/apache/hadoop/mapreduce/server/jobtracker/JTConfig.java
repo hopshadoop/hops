@@ -47,6 +47,9 @@ public interface JTConfig extends MRConfig {
     "mapreduce.jobtracker.heartbeats.in.second";
   public static final String JT_HEARTBEATS_SCALING_FACTOR = 
     "mapreduce.jobtracker.heartbeats.scaling.factor";
+  public static final String JT_HEARTBEAT_INTERVAL_MIN =
+    "mapreduce.jobtracker.heartbeat.interval.min";
+  public static final int JT_HEARTBEAT_INTERVAL_MIN_DEFAULT = 300;
   public static final String JT_PERSIST_JOBSTATUS = 
     "mapreduce.jobtracker.persist.jobstatus.active";
   public static final String JT_PERSIST_JOBSTATUS_HOURS = 

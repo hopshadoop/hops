@@ -26,6 +26,7 @@ import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 
 /**
  * The response sent by the {@link JobTracker} to the hearbeat sent
@@ -43,7 +44,7 @@ class HeartbeatResponse implements Writable, Configurable {
   HeartbeatResponse(short responseId, TaskTrackerAction[] actions) {
     this.responseId = responseId;
     this.actions = actions;
-    this.heartbeatInterval = MRConstants.HEARTBEAT_INTERVAL_MIN;
+    this.heartbeatInterval = JTConfig.JT_HEARTBEAT_INTERVAL_MIN_DEFAULT;
   }
   
   public void setResponseId(short responseId) {

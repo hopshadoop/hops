@@ -88,6 +88,7 @@ import org.apache.hadoop.mapreduce.security.TokenCache;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.mapreduce.security.token.JobTokenIdentifier;
 import org.apache.hadoop.mapreduce.security.token.JobTokenSecretManager;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
 import org.apache.hadoop.mapreduce.server.tasktracker.Localizer;
 import org.apache.hadoop.mapreduce.task.reduce.ShuffleHeader;
@@ -283,7 +284,8 @@ public class TaskTracker
   /**
    * the minimum interval between jobtracker polls
    */
-  private volatile int heartbeatInterval = HEARTBEAT_INTERVAL_MIN;
+  private volatile int heartbeatInterval =
+    JTConfig.JT_HEARTBEAT_INTERVAL_MIN_DEFAULT;
   /**
    * Number of maptask completion events locations to poll for at one time
    */  

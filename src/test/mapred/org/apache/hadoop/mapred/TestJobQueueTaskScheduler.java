@@ -29,6 +29,7 @@ import junit.framework.TestCase;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.mapred.JobStatusChangeEvent.EventType;
 import org.apache.hadoop.mapreduce.TaskType;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.mapreduce.server.jobtracker.TaskTracker;
 import org.apache.hadoop.mapreduce.split.JobSplit;
 
@@ -190,7 +191,7 @@ public class TestJobQueueTaskScheduler extends TestCase {
     
     @Override
     public int getNextHeartbeatInterval() {
-      return MRConstants.HEARTBEAT_INTERVAL_MIN;
+      return JTConfig.JT_HEARTBEAT_INTERVAL_MIN_DEFAULT;
     }
 
     @Override
