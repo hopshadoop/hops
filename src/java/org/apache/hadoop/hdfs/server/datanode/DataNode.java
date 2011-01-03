@@ -548,12 +548,12 @@ public class DataNode extends Configured
       try {
         nsInfo = namenode.versionRequest();
         break;
-      } catch(SocketTimeoutException e) {  // namenode is busy
-        LOG.info("Problem connecting to server: " + getNameNodeAddr());
-        try {
-          Thread.sleep(1000);
-        } catch (InterruptedException ie) {}
+      } catch(IOException e) {  // namenode cannot be contacted
+        LOG.info("Problem connecting to server: " + getNameNodeAddr(), e);
       }
+      try {
+        Thread.sleep(1000);
+      } catch (InterruptedException ie) {}
     }
     String errorMsg = null;
     // verify build version
@@ -683,12 +683,21 @@ public class DataNode extends Configured
         dnRegistration.name = machineName + ":" + dnRegistration.getPort();
         dnRegistration = namenode.registerDatanode(dnRegistration);
         break;
-      } catch(SocketTimeoutException e) {  // namenode is busy
-        LOG.info("Problem connecting to server: " + getNameNodeAddr());
-        try {
-          Thread.sleep(1000);
-        } catch (InterruptedException ie) {}
+      } catch(RemoteException re) {
+        IOException ue = re.unwrapRemoteException(
+                           UnregisteredNodeException.class,
+                           DisallowedDatanodeException.class,
+                           IncorrectVersionException.class);
+        if (ue != re) {
+          LOG.warn("DataNode is shutting down: ", re);
+          throw ue; 
+        }
+      } catch(IOException e) {  // namenode cannot be contacted
+        LOG.info("Problem connecting to server: " + getNameNodeAddr(), e);
       }
+      try {
+        Thread.sleep(1000);
+      } catch (InterruptedException ie) {}
     }
     assert ("".equals(storage.getStorageID()) 
             && !"".equals(dnRegistration.getStorageID()))

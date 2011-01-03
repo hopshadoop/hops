@@ -51,6 +51,9 @@ Trunk (unreleased changes)
     HDFS-1509. A savenamespace command writes the fsimage and edits into
     all configured directories. (dhruba)
 
+    HDFS-1540. Make Datanode handle errors from RPC calls to namenode
+    more elegantly. (dhruba)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES
