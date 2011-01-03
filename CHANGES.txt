@@ -471,6 +471,8 @@ Release 0.22.0 - Unreleased
     HDFS-1560. dfs.data.dir permissions should default to 700. 
     (Todd Lipcon via eli)
 
+    HDFS-1550. NPE when listing a file with no location. (hairong)
+
 Release 0.21.1 - Unreleased
 
   IMPROVEMENTS

@@ -19,6 +19,8 @@
 package org.apache.hadoop.hdfs;
 
 import org.junit.Test;
+
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.util.Arrays;
@@ -65,5 +67,9 @@ public class TestDFSUtil {
 
     assertTrue("expected 1 corrupt files but got " + corruptCount, 
                corruptCount == 1);
+    
+    // test an empty location
+    bs = DFSUtil.locatedBlocks2Locations(new LocatedBlocks());
+    assertEquals(0, bs.length);
   }
 }
