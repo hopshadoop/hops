@@ -505,7 +505,7 @@ Release 0.21.1 - Unreleased
     HDFS-1548. Fault-injection tests are executed multiple times if invoked
     with run-test-hdfs-fault-inject target (cos)
 
-Release 0.21.0 - 2010-08-13
+    HDFS-1552. Remove java5 dependencies from build. (cos) 
 
   INCOMPATIBLE CHANGES
 
