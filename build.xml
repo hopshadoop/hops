@@ -925,7 +925,6 @@
   	      tofile="${build.docs}/mapred-queues.xml" failonerror="false"/>
     <exec dir="${docs.src}" executable="${forrest.home}/bin/forrest"
 	  failonerror="true">
-      <env key="JAVA_HOME" value="${java5.home}"/>
     </exec>
     <copy todir="${build.docs}">
       <fileset dir="${docs.src}/build/site/" />
@@ -1759,7 +1758,6 @@
     <arg value="${findbugs.home}"/>
     <arg value="${forrest.home}"/>
     <arg value="${basedir}"/>
-    <arg value="${java5.home}"/>
   </exec>
 </target>
 
@@ -1781,7 +1779,6 @@
     <arg value="${python.home}"/>
     <arg value="${basedir}"/>
     <arg value="${jira.passwd}"/>
-    <arg value="${java5.home}"/>
     <arg value="${curl.cmd}"/>
     <arg value="${defect}"/>
   </exec>

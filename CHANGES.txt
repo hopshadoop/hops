@@ -488,6 +488,8 @@ Release 0.21.1 - Unreleased
     MAPREDUCE-2223. TestMRCLI might fail on Ubuntu with default /etc/hosts
     (cos)
 
+    MAPREDUCE-2228. Remove java5 dependencies from build. (cos)
+
 Release 0.21.0 - 2010-08-13
 
   INCOMPATIBLE CHANGES
