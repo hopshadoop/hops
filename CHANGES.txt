@@ -30,6 +30,9 @@ Trunk (unreleased changes)
     name node is in safe mode. (Patrick Kling via hairong)
 
     HDFS-1534. Fix some incorrect logs in FSDirectory. (eli)
+    
+    HDFS-1539. A config option for the datanode to fsycn a block file
+    when block is completely written. (dhruba)
 
   OPTIMIZATIONS
 
