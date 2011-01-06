@@ -827,6 +827,12 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
       }  else { // second attempt is with  write lock
         writeLock(); // writelock is needed to set accesstime
       }
+
+      // if the namenode is in safemode, then do not update access time
+      if (isInSafeMode()) {
+        doAccessTime = false;
+      }
+
       try {
         long now = now();
         INodeFile inode = dir.getFileINode(src);

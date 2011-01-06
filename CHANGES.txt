@@ -57,6 +57,8 @@ Trunk (unreleased changes)
     HDFS-1540. Make Datanode handle errors from RPC calls to namenode
     more elegantly. (dhruba)
 
+    HDFS-1463. Accesstime of a file is not updated in safeMode. (dhruba)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES
