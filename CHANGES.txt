@@ -478,6 +478,9 @@ Release 0.22.0 - Unreleased
 
     HDFS-1550. NPE when listing a file with no location. (hairong)
 
+    HDFS-1542. Add test for HADOOP-7082, a deadlock writing Configuration to
+    HDFS. (todd)
+
 Release 0.21.1 - Unreleased
 
   IMPROVEMENTS
