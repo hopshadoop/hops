@@ -365,13 +365,13 @@ public class Localizer {
    * 
    * @param jobId
    */
-  public void initializeJobLogDir(JobID jobId) {
+  public void initializeJobLogDir(JobID jobId) throws IOException {
     File jobUserLogDir = TaskLog.getJobDir(jobId);
     if (!jobUserLogDir.exists()) {
       boolean ret = jobUserLogDir.mkdirs();
       if (!ret) {
-        LOG.warn("Could not create job user log directory: " + jobUserLogDir);
-        return;
+        throw new IOException("Could not create job user log directory: " +
+            jobUserLogDir);
       }
     }
     Localizer.PermissionsHandler.setPermissions(jobUserLogDir,

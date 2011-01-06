@@ -460,6 +460,9 @@ Release 0.22.0 - Unreleased
 
     MAPREDUCE-2096. Secure local filesystem IO from symlink vulnerabilities (todd)
 
+    MAPREDUCE-2234. If Localizer can't create task log directory, it should fail
+    on the spot. (todd)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES
