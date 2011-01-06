@@ -458,6 +458,8 @@ Release 0.22.0 - Unreleased
 
     MAPREDUCE-714. JobConf.findContainingJar unescapes unnecessarily on linux (todd)
 
+    MAPREDUCE-2096. Secure local filesystem IO from symlink vulnerabilities (todd)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES

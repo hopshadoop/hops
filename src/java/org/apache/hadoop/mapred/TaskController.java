@@ -434,4 +434,11 @@ public abstract class TaskController implements Configurable {
    */
   abstract void enableJobForCleanup(PathDeletionContext context)
     throws IOException;
+
+  /**
+   * Returns the local unix user that a given job will run as.
+   */
+  String getRunAsUser(JobConf conf) {
+    return System.getProperty("user.name");
+  }
 }

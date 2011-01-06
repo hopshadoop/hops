@@ -28,6 +28,8 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.Path;
@@ -46,7 +48,10 @@ import org.apache.hadoop.util.StringUtils;
 @InterfaceStability.Unstable
 public class TaskLogServlet extends HttpServlet {
   private static final long serialVersionUID = -6615764817774487321L;
-  
+
+  private static final Log LOG =
+    LogFactory.getLog(TaskLog.class);
+
   private boolean haveTaskLog(TaskAttemptID taskId, boolean isCleanup,
       TaskLog.LogName type) {
     File f = TaskLog.getTaskLogFile(taskId, isCleanup, type);
@@ -105,11 +110,10 @@ public class TaskLogServlet extends HttpServlet {
         // do nothing
       }
       else {
-        response.sendError(HttpServletResponse.SC_GONE,
-                         "Failed to retrieve " + filter + " log for task: " + 
-                         taskId);
-        out.write(("TaskLogServlet exception:\n" + 
-                 StringUtils.stringifyException(ioe) + "\n").getBytes());
+        String msg = "Failed to retrieve " + filter + " log for task: " + 
+                     taskId;
+        LOG.warn(msg, ioe);
+        response.sendError(HttpServletResponse.SC_GONE, msg);
       }
     }
   }

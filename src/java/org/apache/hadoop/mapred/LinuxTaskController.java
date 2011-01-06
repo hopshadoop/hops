@@ -649,4 +649,9 @@ class LinuxTaskController extends TaskController {
   protected String getTaskControllerExecutablePath() {
     return taskControllerExe;
   }
+
+  @Override
+  String getRunAsUser(JobConf conf) {
+    return conf.getUser();
+  }
 }
