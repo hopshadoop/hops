@@ -159,6 +159,13 @@ public class TestTaskFail extends TestCase {
           + "&filter=STDERR&cleanup=true";
       assertEquals(HttpURLConnection.HTTP_OK, TestWebUIAuthorization
           .getHttpStatusCode(cleanupTasklogUrl, tip.getUser(), "GET"));
+      
+      // Task-cleanup task should not be scheduled on the node that the task just failed
+      if (jt.taskTrackers().size() >= 2) {
+        String trackerRanTask = tip.machineWhereTaskRan(attemptId);
+        String trackerRanCleanupTask = tip.machineWhereCleanupRan(attemptId);
+        assertFalse(trackerRanTask.equals(trackerRanCleanupTask));
+      }
     }
   }
 

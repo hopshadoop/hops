@@ -2897,6 +2897,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     int numReduces = taskTracker.countOccupiedReduceSlots();
     int numTaskTrackers = getClusterStatus().getTaskTrackers();
     int numUniqueHosts = getNumberOfUniqueHosts();
+    boolean hasFailedUncleanTask = hasFailedUncleanTask(taskTracker);
 
     Task t = null;
     synchronized (jobs) {
@@ -2910,12 +2911,15 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
             return Collections.singletonList(t);
           }
         }
-        for (Iterator<JobInProgress> it = jobs.values().iterator();
-             it.hasNext();) {
-          JobInProgress job = it.next();
-          t = job.obtainTaskCleanupTask(taskTracker, true);
-          if (t != null) {
-            return Collections.singletonList(t);
+        // Don't schedule task-cleanup task on the node that the task just failed.
+        if (!hasFailedUncleanTask) {
+          for (Iterator<JobInProgress> it = jobs.values().iterator();
+               it.hasNext();) {
+            JobInProgress job = it.next();
+            t = job.obtainTaskCleanupTask(taskTracker, true);
+            if (t != null) {
+              return Collections.singletonList(t);
+            }
           }
         }
         for (Iterator<JobInProgress> it = jobs.values().iterator();
@@ -2938,12 +2942,15 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
             return Collections.singletonList(t);
           }
         }
-        for (Iterator<JobInProgress> it = jobs.values().iterator();
-             it.hasNext();) {
-          JobInProgress job = it.next();
-          t = job.obtainTaskCleanupTask(taskTracker, false);
-          if (t != null) {
-            return Collections.singletonList(t);
+        // Don't schedule task-cleanup task on the node that the task just failed.
+        if (!hasFailedUncleanTask) {
+          for (Iterator<JobInProgress> it = jobs.values().iterator();
+               it.hasNext();) {
+            JobInProgress job = it.next();
+            t = job.obtainTaskCleanupTask(taskTracker, false);
+            if (t != null) {
+              return Collections.singletonList(t);
+            }
           }
         }
         for (Iterator<JobInProgress> it = jobs.values().iterator();
@@ -2960,6 +2967,18 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     return null;
   }
 
+  /**
+   * Whether this tracker has tasks with FAILED_UNCLEAN state.   
+   */
+  static boolean hasFailedUncleanTask(TaskTrackerStatus taskTracker) {
+    for (TaskStatus taskStatus : taskTracker.getTaskReports()) {
+      if (taskStatus.getRunState() == TaskStatus.State.FAILED_UNCLEAN) {
+        return true;
+      }
+    }
+    return false;
+  }
+  
   /**
    * Grab the local fs name
    */

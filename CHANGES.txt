@@ -466,6 +466,9 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2219. JobTracker should not try to remove mapred.system.dir
     during startup. (todd)
 
+    MAPREDUCE-2207. Task-cleanup task should not be scheduled on the node that
+    the task just failed. (Liyin Liang via schen)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES
