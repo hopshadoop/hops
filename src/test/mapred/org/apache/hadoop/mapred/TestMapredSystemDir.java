@@ -44,8 +44,10 @@ public class TestMapredSystemDir extends TestCase {
   // mapred ugi
   private static final UserGroupInformation MR_UGI = 
     TestMiniMRWithDFSWithDistinctUsers.createUGI("mr", false);
+  private static final FsPermission SYSTEM_DIR_PARENT_PERMISSION =
+    FsPermission.createImmutable((short) 0755); // rwxr-xr-x
   private static final FsPermission SYSTEM_DIR_PERMISSION =
-    FsPermission.createImmutable((short) 0733); // rwx-wx-wx
+    FsPermission.createImmutable((short) 0700); // rwx------
   
   public void testGarbledMapredSystemDir() throws Exception {
     Configuration conf = new Configuration();
@@ -60,17 +62,21 @@ public class TestMapredSystemDir extends TestCase {
         }
       });
       
-      // create Configs.SYSTEM_DIR's parent (the parent has to be given 
-      // permissions since the JT internally tries to delete the leaf of
-      // the directory structure
-      Path mapredSysDir = 
-        new Path(conf.get(JTConfig.JT_SYSTEM_DIR)).getParent();
+
+      // create Configs.SYSTEM_DIR's parent with restrictive permissions.
+      // So long as the JT has access to the system dir itself it should
+      // be able to start.
+      Path mapredSysDir = new Path(conf.get(JTConfig.JT_SYSTEM_DIR));
+      Path parentDir =  mapredSysDir.getParent();
+      fs.mkdirs(parentDir);
+      fs.setPermission(parentDir,
+                       new FsPermission(SYSTEM_DIR_PARENT_PERMISSION));
       fs.mkdirs(mapredSysDir);
       fs.setPermission(mapredSysDir, new FsPermission(SYSTEM_DIR_PERMISSION));
       fs.setOwner(mapredSysDir, "mr", "mrgroup");
 
       // start mr (i.e jobtracker)
-      Configuration mrConf = new Configuration();
+      Configuration mrConf = new Configuration(conf);
       mr = new MiniMRCluster(0, 0, 0, dfs.getFileSystem().getUri().toString(),
                              1, null, null, MR_UGI, new JobConf(mrConf));
       JobTracker jobtracker = mr.getJobTrackerRunner().getJobTracker();

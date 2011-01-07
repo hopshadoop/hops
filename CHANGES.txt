@@ -463,6 +463,9 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2234. If Localizer can't create task log directory, it should fail
     on the spot. (todd)
 
+    MAPREDUCE-2219. JobTracker should not try to remove mapred.system.dir
+    during startup. (todd)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES
