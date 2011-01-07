@@ -481,6 +481,8 @@ Release 0.22.0 - Unreleased
     HDFS-1542. Add test for HADOOP-7082, a deadlock writing Configuration to
     HDFS. (todd)
 
+    HDFS-1504. FSImageSaver should catch all exceptions, not just IOE. (todd)
+
 Release 0.21.1 - Unreleased
 
   IMPROVEMENTS

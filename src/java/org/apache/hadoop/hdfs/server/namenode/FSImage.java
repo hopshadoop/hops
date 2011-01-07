@@ -1139,9 +1139,9 @@ public class FSImage extends Storage {
     public void run() {
       try {
         saveCurrent(sd);
-      } catch (IOException ie) {
-        LOG.error("Unable to save image for " + sd.getRoot(), ie);
-        errorSDs.add(sd);              
+      } catch (Throwable t) {
+        LOG.error("Unable to save image for " + sd.getRoot(), t);
+        errorSDs.add(sd);
       }
     }
     
