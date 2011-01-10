@@ -4488,6 +4488,11 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
     return blockManager.underReplicatedBlocksCount;
   }
 
+  /** Return number of under-replicated but not missing blocks */
+  public long getUnderReplicatedNotMissingBlocks() {
+    return blockManager.getUnderReplicatedNotMissingBlocks();
+  }
+
   /** Returns number of blocks with corrupt replicas */
   public long getCorruptReplicaBlocks() {
     return blockManager.corruptReplicaBlocksCount;

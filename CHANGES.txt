@@ -7,6 +7,8 @@ Trunk (unreleased changes)
     HDFS-1526. Dfs client name for a map/reduce task should be unique
     among threads. (hairong)
 
+    HDFS-1536. Improve HDFS WebUI. (hairong)
+
   NEW FEATURES
 
     HDFS-1482. Add listCorruptFileBlocks to DistributedFileSystem.
