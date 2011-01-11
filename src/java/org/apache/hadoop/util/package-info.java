@@ -15,10 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/** 
- * <b>Deprecated.</b> Use {@link org.apache.hadoop.mapreduce.util} instead.
- */
-@Deprecated
+
 @InterfaceAudience.Private
 package org.apache.hadoop.util;
 import org.apache.hadoop.classification.InterfaceAudience;

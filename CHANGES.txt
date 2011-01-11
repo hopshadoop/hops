@@ -469,6 +469,10 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2207. Task-cleanup task should not be scheduled on the node that
     the task just failed. (Liyin Liang via schen)
 
+    MAPREDUCE-2084. Remove deprecate annotation for package file.  The package
+    classes themselves are already deprecated. This removes an Eclipse error.
+    (tomwhite via nigel)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES
