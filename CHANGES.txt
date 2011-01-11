@@ -505,6 +505,9 @@ Release 0.21.1 - Unreleased
 
     MAPREDUCE-2228. Remove java5 dependencies from build. (cos)
 
+    MAPREDUCE-1929. Allow artifacts to be published to the staging Apache Nexus
+    Maven Repository. (tomwhite)
+
 Release 0.21.0 - 2010-08-13
 
   INCOMPATIBLE CHANGES
