@@ -738,7 +738,7 @@ public abstract class RaidNode implements RaidProtocol {
   /**
    * RAID an individual file
    */
-  static private void doRaid(Configuration conf, FileStatus stat, Path destPath,
+  static public void doRaid(Configuration conf, FileStatus stat, Path destPath,
                       PolicyInfo.ErasureCodeType code, Statistics statistics,
                       Progressable reporter, boolean doSimulate,
                       int targetRepl, int metaRepl, int stripeLength)
@@ -868,6 +868,35 @@ public abstract class RaidNode implements RaidProtocol {
         ppair.getPath(), corruptOffset, recoveredPath);
 
     return recoveredPath;
+  }
+
+  public static Path unRaidCorruptBlock(Configuration conf, Path srcPath,
+    Path destPathPrefix, Decoder decoder, int stripeLength,
+      long corruptOffset) throws IOException {
+    // Test if parity file exists
+    ParityFilePair ppair = getParityFile(destPathPrefix, srcPath, conf);
+    if (ppair == null) {
+      LOG.error("Could not find parity file for " + srcPath);
+      return null;
+    }
+
+    final Path recoveryDestination = new Path(RaidNode.xorTempPrefix(conf));
+    FileSystem destFs = recoveryDestination.getFileSystem(conf);
+    final Path recoveredPrefix = 
+      destFs.makeQualified(new Path(recoveryDestination, makeRelative(srcPath)));
+    final Path recoveredBlock = 
+      new Path(recoveredPrefix + "." + new Random().nextLong() + ".recovered");
+    LOG.info("Creating recovered Block " + recoveredBlock);
+
+    FileSystem srcFs = srcPath.getFileSystem(conf);
+    FileStatus stat = srcFs.getFileStatus(srcPath);
+    long limit = Math.min(stat.getBlockSize(), stat.getLen() - corruptOffset);
+    java.io.OutputStream out = ppair.getFileSystem().create(recoveredBlock);
+    decoder.fixErasedBlock(srcFs, srcPath,
+        ppair.getFileSystem(), ppair.getPath(),
+        stat.getBlockSize(), corruptOffset, 0, limit, out);
+    out.close();
+    return recoveredBlock;
   }
 
   /**

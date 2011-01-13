@@ -473,6 +473,9 @@ Release 0.22.0 - Unreleased
     classes themselves are already deprecated. This removes an Eclipse error.
     (tomwhite via nigel)
 
+    MAPREDUCE-2248. DistributedRaidFileSystem should unraid only the corrupt
+    block (Ramkumar Vadali via schen)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES
