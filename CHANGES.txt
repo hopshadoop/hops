@@ -485,6 +485,9 @@ Release 0.22.0 - Unreleased
 
     HDFS-1504. FSImageSaver should catch all exceptions, not just IOE. (todd)
 
+    HDFS-884. DataNode throws IOException if all data directories are 
+    unavailable. (Steve Loughran and shv)
+
 Release 0.21.1 - Unreleased
 
   IMPROVEMENTS
