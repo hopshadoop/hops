@@ -36,6 +36,8 @@ Trunk (unreleased changes)
     HDFS-1539. A config option for the datanode to fsycn a block file
     when block is completely written. (dhruba)
 
+    HDFS-1547. Improve decommission mechanism. (suresh)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image

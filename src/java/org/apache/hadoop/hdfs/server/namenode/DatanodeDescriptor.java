@@ -124,6 +124,12 @@ public class DatanodeDescriptor extends DatanodeInfo {
   private long lastBlocksScheduledRollTime = 0;
   private static final int BLOCKS_SCHEDULED_ROLL_INTERVAL = 600*1000; //10min
   private int volumeFailures = 0;
+  
+  /** 
+   * When set to true, the node is not in include list and is not allowed
+   * to communicate with the namenode
+   */
+  private boolean disallowed = false;
 
   /** Default constructor */
   public DatanodeDescriptor() {}
@@ -680,5 +686,17 @@ public class DatanodeDescriptor extends DatanodeInfo {
   public void updateRegInfo(DatanodeID nodeReg) {
     super.updateRegInfo(nodeReg);
     volumeFailures = 0;
+  }
+  
+  /**
+   * Set the flag to indicate if this datanode is disallowed from communicating
+   * with the namenode.
+   */
+  void setDisallowed(boolean flag) {
+    disallowed = flag;
+  }
+  
+  boolean isDisallowed() {
+    return disallowed;
   }
 }

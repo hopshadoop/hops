@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdfs;
 
 import java.io.UnsupportedEncodingException;
+import java.util.Comparator;
 import java.util.StringTokenizer;
 
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -31,6 +32,20 @@ import org.apache.hadoop.net.NodeBase;
 
 @InterfaceAudience.Private
 public class DFSUtil {
+  /**
+   * Compartor for sorting DataNodeInfo[] based on decommissioned states.
+   * Decommissioned nodes are moved to the end of the array on sorting with
+   * this compartor.
+   */
+  public static final Comparator<DatanodeInfo> DECOM_COMPARATOR = 
+    new Comparator<DatanodeInfo>() {
+      @Override
+      public int compare(DatanodeInfo a, DatanodeInfo b) {
+        return a.isDecommissioned() == b.isDecommissioned() ? 0 : 
+          a.isDecommissioned() ? 1 : -1;
+      }
+    };
+  
   /**
    * Whether the pathname is valid.  Currently prohibits relative paths, 
    * and names which contain a ":" or "/" 
