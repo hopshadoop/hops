@@ -63,6 +63,8 @@ Trunk (unreleased changes)
 
     HDFS-1463. Accesstime of a file is not updated in safeMode. (dhruba)
 
+    HDFS-1585. Fix build after HDFS-1547 (todd)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES
