@@ -490,6 +490,9 @@ Release 0.22.0 - Unreleased
     HDFS-884. DataNode throws IOException if all data directories are 
     unavailable. (Steve Loughran and shv)
 
+    HDFS-1572. Checkpointer should trigger checkpoint with specified period.
+    (jghoman)
+
 Release 0.21.1 - Unreleased
 
   IMPROVEMENTS
