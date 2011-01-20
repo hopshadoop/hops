@@ -476,6 +476,9 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2248. DistributedRaidFileSystem should unraid only the corrupt
     block (Ramkumar Vadali via schen)
 
+    MAPREDUCE-1085. For tasks, "ulimit -v -1" is being run when user doesn't
+    specify a ulimit (todd)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES

@@ -313,8 +313,13 @@ abstract class TaskRunner extends Thread {
    * @return
    */
   private List<String> getVMSetupCmd() {
-    String[] ulimitCmd = Shell.getUlimitMemoryCommand(getChildUlimit(conf));
+
+    int ulimit = getChildUlimit(conf);
+    if (ulimit <= 0) {
+      return null;
+    }
     List<String> setup = null;
+    String[] ulimitCmd = Shell.getUlimitMemoryCommand(ulimit);
     if (ulimitCmd != null) {
       setup = new ArrayList<String>();
       for (String arg : ulimitCmd) {
