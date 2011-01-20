@@ -223,6 +223,8 @@ Release 0.22.0 - Unreleased
 
     MAPREDUCE-1878. Add MRUnit documentation. (Aaron Kimball via tomwhite)
 
+    MAPREDUCE-2180. Add coverage of fair scheduler servlet to system test (todd)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and
