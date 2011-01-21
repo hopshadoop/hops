@@ -28,6 +28,7 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.hdfs.TestHDFSServerPorts;
 import org.apache.hadoop.hdfs.server.common.HdfsConstants.StartupOption;
 import org.apache.hadoop.hdfs.server.namenode.FSImage.CheckpointStates;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
@@ -37,6 +38,8 @@ import junit.framework.TestCase;
 public class TestBackupNode extends TestCase {
   public static final Log LOG = LogFactory.getLog(TestBackupNode.class);
 
+  // reset default 0.0.0.0 addresses in order to avoid IPv6 problem
+  static final String THIS_HOST = TestHDFSServerPorts.getFullHostName();
   static final String BASE_DIR = MiniDFSCluster.getBaseDirectory();
 
   protected void setUp() throws Exception {
@@ -135,6 +138,10 @@ public class TestBackupNode extends TestCase {
       //
       // Take a checkpoint
       //
+      conf.set(DFSConfigKeys.DFS_NAMENODE_BACKUP_ADDRESS_KEY,
+          THIS_HOST + ":0");
+      conf.set(DFSConfigKeys.DFS_NAMENODE_BACKUP_HTTP_ADDRESS_KEY,
+          THIS_HOST + ":0");
       backup = startBackupNode(conf, op, 1);
       waitCheckpointDone(backup);
     } catch(IOException e) {
@@ -217,13 +224,17 @@ public class TestBackupNode extends TestCase {
     try {
       // start name-node and backup node 1
       cluster = new MiniDFSCluster.Builder(conf1).numDataNodes(0).build();
-      conf1.set(DFSConfigKeys.DFS_NAMENODE_BACKUP_ADDRESS_KEY, "0.0.0.0:7771");
-      conf1.set(DFSConfigKeys.DFS_NAMENODE_BACKUP_HTTP_ADDRESS_KEY, "0.0.0.0:7775");
+      conf1.set(DFSConfigKeys.DFS_NAMENODE_BACKUP_ADDRESS_KEY,
+                THIS_HOST + ":7771");
+      conf1.set(DFSConfigKeys.DFS_NAMENODE_BACKUP_HTTP_ADDRESS_KEY,
+                THIS_HOST + ":7775");
       backup1 = startBackupNode(conf1, StartupOption.BACKUP, 1);
       // try to start backup node 2
       conf2 = new HdfsConfiguration(conf1);
-      conf2.set(DFSConfigKeys.DFS_NAMENODE_BACKUP_ADDRESS_KEY, "0.0.0.0:7772");
-      conf2.set(DFSConfigKeys.DFS_NAMENODE_BACKUP_HTTP_ADDRESS_KEY, "0.0.0.0:7776");
+      conf2.set(DFSConfigKeys.DFS_NAMENODE_BACKUP_ADDRESS_KEY,
+                THIS_HOST + ":7772");
+      conf2.set(DFSConfigKeys.DFS_NAMENODE_BACKUP_HTTP_ADDRESS_KEY,
+                THIS_HOST + ":7776");
       try {
         backup2 = startBackupNode(conf2, StartupOption.BACKUP, 2);
         backup2.stop();

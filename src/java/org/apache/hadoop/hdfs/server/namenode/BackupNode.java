@@ -36,7 +36,6 @@ import org.apache.hadoop.hdfs.server.namenode.FSImage.CheckpointStates;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.net.DNS;
 import org.apache.hadoop.net.NetUtils;
 
 /**
@@ -79,9 +78,7 @@ public class BackupNode extends NameNode {
   @Override // NameNode
   protected InetSocketAddress getRpcServerAddress(Configuration conf) throws IOException {
     String addr = conf.get(BN_ADDRESS_NAME_KEY, BN_ADDRESS_DEFAULT);
-    int port = NetUtils.createSocketAddr(addr).getPort();
-    String hostName = DNS.getDefaultHost("default");
-    return new InetSocketAddress(hostName, port);
+    return NetUtils.createSocketAddr(addr);
   }
   
   @Override
@@ -90,9 +87,7 @@ public class BackupNode extends NameNode {
     if (addr == null || addr.isEmpty()) {
       return null;
     }
-    int port = NetUtils.createSocketAddr(addr).getPort();
-    String hostName = DNS.getDefaultHost("default");
-    return new InetSocketAddress(hostName, port);
+    return NetUtils.createSocketAddr(addr);
   }
 
   @Override // NameNode
@@ -107,14 +102,9 @@ public class BackupNode extends NameNode {
 
   @Override // NameNode
   protected InetSocketAddress getHttpServerAddress(Configuration conf) {
-    // It is necessary to resolve the hostname at this point in order
-    // to ensure that the server address that is sent to the namenode
-    // is correct.
     assert rpcAddress != null : "rpcAddress should be calculated first";
     String addr = conf.get(BN_HTTP_ADDRESS_NAME_KEY, BN_HTTP_ADDRESS_DEFAULT);
-    int port = NetUtils.createSocketAddr(addr).getPort();
-    String hostName = rpcAddress.getHostName();
-    return new InetSocketAddress(hostName, port);
+    return NetUtils.createSocketAddr(addr);
   }
 
   @Override // NameNode
