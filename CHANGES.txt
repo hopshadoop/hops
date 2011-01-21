@@ -38,6 +38,9 @@ Trunk (unreleased changes)
 
     HDFS-1547. Improve decommission mechanism. (suresh)
 
+    HDFS-1586. Add InterfaceAudience and InterfaceStability annotations to 
+    MiniDFSCluster. (suresh)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
