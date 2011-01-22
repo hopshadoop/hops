@@ -481,6 +481,9 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-1085. For tasks, "ulimit -v -1" is being run when user doesn't
     specify a ulimit (todd)
 
+    MAPREDUCE-2282. Fix TestMRServerPorts for the changes in
+    TestHDFSServerPorts.  (shv via szetszwo)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES
