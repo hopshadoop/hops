@@ -303,7 +303,7 @@ class ConfigManager {
                 curr.setProperty(pname,pvalue);
               }
             } else {
-              LOG.info("Found bad property " + propertyName +
+              LOG.warn("Found bad property " + propertyName +
                        " for srcPath" + srcPathPrefix +
                        " policy name " + policyName +
                        ". Ignoring."); 

@@ -228,6 +228,8 @@ Release 0.22.0 - Unreleased
 
     MAPREDUCE-2180. Add coverage of fair scheduler servlet to system test (todd)
 
+    MAPREDUCE-2250. Fix logging in raid code. (Ramkumar Vadali via schen)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and

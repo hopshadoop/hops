@@ -522,7 +522,7 @@ public abstract class RaidNode implements RaidProtocol {
           try {
             filteredPaths = selectFiles(info, allPolicies);
           } catch (Exception e) {
-            LOG.info("Exception while invoking filter on policy " + info.getName() +
+            LOG.error("Exception while invoking filter on policy " + info.getName() +
                      " srcPath " + info.getSrcPath() + 
                      " exception " + StringUtils.stringifyException(e));
             continue;
@@ -539,7 +539,7 @@ public abstract class RaidNode implements RaidProtocol {
           try {
             raidFiles(info, filteredPaths);
           } catch (Exception e) {
-            LOG.info("Exception while invoking action on policy " + info.getName() +
+            LOG.error("Exception while invoking action on policy " + info.getName() +
                      " srcPath " + info.getSrcPath() + 
                      " exception " + StringUtils.stringifyException(e));
             continue;
@@ -769,7 +769,7 @@ public abstract class RaidNode implements RaidProtocol {
     // reduce the replication factor of the source file
     if (!doSimulate) {
       if (srcFs.setReplication(p, (short)targetRepl) == false) {
-        LOG.info("Error in reducing relication factor of file " + p + " to " + targetRepl);
+        LOG.error("Error in reducing relication factor of file " + p + " to " + targetRepl);
         statistics.remainingSize += diskSpace;  // no change in disk space usage
         return;
       }
@@ -1048,7 +1048,7 @@ public abstract class RaidNode implements RaidProtocol {
             LOG.info("Purging " + destStr + " at usage " + harUsedPercent);
             boolean done = destFs.delete(destPath, true);
             if (!done) {
-              LOG.error("Could not purge " + destPath);
+              LOG.error("Unable to purge directory " + destPath);
             }
           }
         } catch (IOException e) {
@@ -1075,7 +1075,7 @@ public abstract class RaidNode implements RaidProtocol {
             LOG.info("Purged directory " + destPath );
           }
           else {
-            LOG.info("Unable to purge directory " + destPath);
+            LOG.error("Unable to purge directory " + destPath);
           }
         }
         if (files != null) {
@@ -1128,7 +1128,7 @@ public abstract class RaidNode implements RaidProtocol {
         if (done) {
           LOG.info("Purged file " + destPath );
         } else {
-          LOG.info("Unable to purge file " + destPath );
+          LOG.error("Unable to purge file " + destPath );
         }
       }
     } 
@@ -1339,7 +1339,7 @@ public abstract class RaidNode implements RaidProtocol {
       ret = ToolRunner.run(har, args);
       if (ret == 0 && !destFs.rename(new Path(tmpHarPath+"/"+harFileSrc), 
                                      new Path(qualifiedPath, harFileDst))) {
-        LOG.info("HAR rename didn't succeed from " + tmpHarPath+"/"+harFileSrc +
+        LOG.error("HAR rename didn't succeed from " + tmpHarPath+"/"+harFileSrc +
             " to " + qualifiedPath + "/" + harFileDst);
         ret = -2;
       }

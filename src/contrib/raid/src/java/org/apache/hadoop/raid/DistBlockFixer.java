@@ -224,7 +224,7 @@ public class DistBlockFixer extends BlockFixer {
    */
   private void failJob(Job job) throws IOException {
     // assume no files have been fixed
-    LOG.info("job " + job.getJobID() + "(" + job.getJobName() +
+    LOG.error("DistBlockFixer job " + job.getJobID() + "(" + job.getJobName() +
       ") finished (failed)");
     for (CorruptFileInfo fileInfo: jobIndex.get(job)) {
       fileInfo.fail();
@@ -237,7 +237,7 @@ public class DistBlockFixer extends BlockFixer {
    */ 
   private void succeedJob(Job job, long filesSucceeded, long filesFailed)
     throws IOException {
-    LOG.info("job " + job.getJobID() + "(" + job.getJobName() +
+    LOG.info("DistBlockFixer job " + job.getJobID() + "(" + job.getJobName() +
       ") finished (succeeded)");
 
     if (filesFailed == 0) {
@@ -381,6 +381,9 @@ public class DistBlockFixer extends BlockFixer {
     SequenceFileOutputFormat.setOutputPath(job, outDir);
 
     job.submit();
+    LOG.info("DistBlockFixer job " + job.getJobID() + "(" + job.getJobName() +
+          ") started");
+
     // submit the job before inserting it into the index
     // this way, if submit fails, we won't have added anything to the index
     insertJob(job, filesInJob);
@@ -511,7 +514,7 @@ public class DistBlockFixer extends BlockFixer {
         LOG.error("trying to remove file not in file index: " +
                   file.toString());
       } else {
-        LOG.info("fixing " + file.toString() + " failed");
+        LOG.error("fixing " + file.toString() + " failed");
       }
       pendingFiles--;
     }

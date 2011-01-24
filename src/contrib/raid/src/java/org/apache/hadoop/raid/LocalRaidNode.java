@@ -40,8 +40,6 @@ public class LocalRaidNode extends RaidNode {
 
   public LocalRaidNode(Configuration conf) throws IOException {
     super(conf);
-
-    LOG.info("created");
   }
 
   /**

@@ -107,7 +107,7 @@ public class RaidShell extends Configured implements Tool {
   private static RaidProtocol createRPCRaidnode(InetSocketAddress raidNodeAddr,
       Configuration conf, UserGroupInformation ugi)
     throws IOException {
-    LOG.info("RaidShell connecting to " + raidNodeAddr);
+    LOG.debug("RaidShell connecting to " + raidNodeAddr);
     return (RaidProtocol)RPC.getProxy(RaidProtocol.class,
         RaidProtocol.versionID, raidNodeAddr, ugi, conf,
         NetUtils.getSocketFactory(conf, RaidProtocol.class));
@@ -296,9 +296,9 @@ public class RaidShell extends Configured implements Tool {
     for (int i = startindex; i < argv.length; i = i + 2) {
       String path = argv[i];
       long corruptOffset = Long.parseLong(argv[i+1]);
-      LOG.info("RaidShell recoverFile for " + path + " corruptOffset " + corruptOffset);
+      LOG.debug("RaidShell recoverFile for " + path + " corruptOffset " + corruptOffset);
       paths[j] = new Path(raidnode.recoverFile(path, corruptOffset));
-      LOG.info("Raidshell created recovery file " + paths[j]);
+      LOG.debug("Raidshell created recovery file " + paths[j]);
       j++;
     }
     return paths;
@@ -315,7 +315,7 @@ public class RaidShell extends Configured implements Tool {
 
   public void recoverBlocks(String[] args, int startIndex)
     throws IOException {
-    LOG.info("Recovering blocks for " + (args.length - startIndex) + " files");
+    LOG.debug("Recovering blocks for " + (args.length - startIndex) + " files");
     BlockFixer.BlockFixerHelper fixer = new BlockFixer.BlockFixerHelper(conf);
     for (int i = startIndex; i < args.length; i++) {
       String path = args[i];
@@ -361,11 +361,11 @@ public class RaidShell extends Configured implements Tool {
           corruptBlocksPerStripe.put(stripe, corruptBlocksPerStripe.
                                      get(stripe) + 1);
         }
-        LOG.info("file " + filePath.toString() + " corrupt in block " +
+        LOG.debug("file " + filePath.toString() + " corrupt in block " +
                  blockNo + "/" + fileLengthInBlocks + ", stripe " + stripe +
                  "/" + fileStripes);
       } else {
-        LOG.info("file " + filePath.toString() + " OK in block " + blockNo +
+        LOG.debug("file " + filePath.toString() + " OK in block " + blockNo +
                  "/" + fileLengthInBlocks + ", stripe " + stripe + "/" +
                  fileStripes);
       }
@@ -489,7 +489,7 @@ public class RaidShell extends Configured implements Tool {
                               parityBlockSize);
       }
     } else if (parityFS instanceof HarFileSystem) {
-      LOG.info("HAR FS found");
+      LOG.debug("HAR FS found");
     } else {
       LOG.warn("parity file system is not of a supported type");
     }
@@ -527,7 +527,7 @@ public class RaidShell extends Configured implements Tool {
                               "multiple of parity block size");
       }
       int blocksInContainer = (int) (cb.getLength() / blockSize);
-      LOG.info("found container with offset " + cb.getOffset() +
+      LOG.debug("found container with offset " + cb.getOffset() +
                ", length " + cb.getLength());
 
       for (long offset = cb.getOffset();
@@ -550,7 +550,7 @@ public class RaidShell extends Configured implements Tool {
 
         if (cb.isCorrupt() ||
             (cb.getNames().length == 0 && cb.getLength() > 0)) {
-          LOG.info("parity file for " + filePath.toString() +
+          LOG.debug("parity file for " + filePath.toString() +
                    " corrupt in block " + block +
                    ", stripe " + stripe + "/" + fileStripes);
 
@@ -562,7 +562,7 @@ public class RaidShell extends Configured implements Tool {
                                        1);
           }
         } else {
-          LOG.info("parity file for " + filePath.toString() +
+          LOG.debug("parity file for " + filePath.toString() +
                    " OK in block " + block +
                    ", stripe " + stripe + "/" + fileStripes);
         }
@@ -606,7 +606,7 @@ public class RaidShell extends Configured implements Tool {
     if (!rsPrefix.endsWith("/")) {
       rsPrefix = rsPrefix + "/";
     }
-    LOG.info("prefixes: " + xorPrefix + ", " + rsPrefix);
+    LOG.debug("prefixes: " + xorPrefix + ", " + rsPrefix);
 
     // get a list of corrupted files (not considering parity blocks just yet)
     // from the name node

@@ -117,8 +117,8 @@ public class TestBlockPlacementPolicyRaid {
       FileStatus parityStat = fs.getFileStatus(new Path(parity));
       BlockLocation[] parityLoc =
           fs.getFileBlockLocations(parityStat, 0, parityStat.getLen());
-      int stripeLen = RaidNode.getStripeLength(conf);
-      for (int i = 0; i < numBlocks / stripeLen; i++) {
+      int parityLen = RaidNode.rsParityLength(conf);
+      for (int i = 0; i < numBlocks / parityLen; i++) {
         Set<String> locations = new HashSet<String>();
         for (int j = 0; j < srcLoc.length; j++) {
           String [] names = srcLoc[j].getNames();
@@ -127,8 +127,8 @@ public class TestBlockPlacementPolicyRaid {
             locations.add(names[k]);
           }
         }
-        for (int j = 0 ; j < stripeLen; j++) {
-          String[] names = parityLoc[j + i * stripeLen].getNames();
+        for (int j = 0 ; j < parityLen; j++) {
+          String[] names = parityLoc[j + i * parityLen].getNames();
           for (int k = 0; k < names.length; k++) {
             LOG.info("Parity block location: " + names[k]);
             Assert.assertTrue(locations.add(names[k]));

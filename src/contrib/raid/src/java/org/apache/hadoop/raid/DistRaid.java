@@ -188,7 +188,7 @@ public class DistRaid extends Configured {
         String s = "FAIL: " + policy + ", " + key + " "
             + StringUtils.stringifyException(e);
         context.write(new Text(key), new Text(s));
-        LOG.info(s);
+        LOG.error(s);
       } finally {
         context.setStatus(getCountString());
       }
@@ -289,7 +289,7 @@ public class DistRaid extends Configured {
          if (runningJob.isSuccessful()) {
            LOG.info("Job Complete(Succeeded): " + jobID);
          } else {
-           LOG.info("Job Complete(Failed): " + jobID);
+           LOG.error("Job Complete(Failed): " + jobID);
          }
          raidPolicyPathPairList.clear();
          return true;

@@ -135,10 +135,10 @@ public abstract class Decoder {
           LOG.info("Copied till " + out.getPos() + " from " + srcFile);
           continue;
         } catch (BlockMissingException e) {
-          LOG.info("Encountered BME at " + srcFile + ":" + offset);
+          LOG.warn("Encountered BME at " + srcFile + ":" + offset);
           bytesAlreadyCopied = out.getPos() - offset;
         } catch (ChecksumException e) {
-          LOG.info("Encountered CE at " + srcFile + ":" + offset);
+          LOG.warn("Encountered CE at " + srcFile + ":" + offset);
           bytesAlreadyCopied = out.getPos() - offset;
         }
       }
@@ -155,7 +155,7 @@ public abstract class Decoder {
       fs.setTimes(decodedFile, srcStat.getModificationTime(),
                   srcStat.getAccessTime());
     } catch (Exception exc) {
-      LOG.info("Didn't manage to copy meta information because of " + exc +
+      LOG.warn("Didn't manage to copy meta information because of " + exc +
                " Ignoring...");
     }
 

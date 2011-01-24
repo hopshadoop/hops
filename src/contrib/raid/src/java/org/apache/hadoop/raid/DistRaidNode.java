@@ -49,8 +49,6 @@ public class DistRaidNode extends RaidNode {
     this.jobMonitor = new JobMonitor(conf);
     this.jobMonitorThread = new Daemon(this.jobMonitor);
     this.jobMonitorThread.start();
-    
-    LOG.info("created");
   }
 
   /**
