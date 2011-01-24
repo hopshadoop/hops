@@ -21,6 +21,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1906. Lower minimum heartbeat interval for TaskTracker
     (Scott Carey and Todd Lipcon via todd)
 
+    MAPREDUCE-1382. MRAsyncDiscService should tolerate missing local.dir.
+    (Zheng Shao and tomwhite via tomwhite)
+
   OPTIMIZATIONS
 
   BUG FIXES

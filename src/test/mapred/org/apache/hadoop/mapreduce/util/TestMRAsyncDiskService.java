@@ -28,6 +28,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.mapreduce.util.MRAsyncDiskService;
 import org.junit.Test;
 
@@ -40,6 +41,11 @@ public class TestMRAsyncDiskService extends TestCase {
   
   private static String TEST_ROOT_DIR = new Path(System.getProperty(
       "test.build.data", "/tmp")).toString();
+  
+  @Override
+  protected void setUp() throws Exception {
+    FileUtil.fullyDelete(new File(TEST_ROOT_DIR));
+  }
 
   /**
    * Given 'pathname', compute an equivalent path relative to the cwd.
@@ -193,6 +199,8 @@ public class TestMRAsyncDiskService extends TestCase {
     assertFalse(fb.exists());
     assertFalse(fc.exists());
     
+    assertFalse(service.moveAndDeleteRelativePath(vols[1], "not_exists"));
+    
     // asyncDiskService is NOT able to delete files outside all volumes.
     IOException ee = null;
     try {
@@ -275,10 +283,11 @@ public class TestMRAsyncDiskService extends TestCase {
     String d = "d";
     
     // Create directories inside SUBDIR
-    File fa = new File(vols[0] + Path.SEPARATOR_CHAR + MRAsyncDiskService.TOBEDELETED, a);
-    File fb = new File(vols[1] + Path.SEPARATOR_CHAR + MRAsyncDiskService.TOBEDELETED, b);
-    File fc = new File(vols[1] + Path.SEPARATOR_CHAR + MRAsyncDiskService.TOBEDELETED, c);
-    File fd = new File(vols[1] + Path.SEPARATOR_CHAR + MRAsyncDiskService.TOBEDELETED, d);
+    String suffix = Path.SEPARATOR_CHAR + MRAsyncDiskService.TOBEDELETED;
+    File fa = new File(vols[0] + suffix, a);
+    File fb = new File(vols[1] + suffix, b);
+    File fc = new File(vols[1] + suffix, c);
+    File fd = new File(vols[1] + suffix, d);
     
     // Create the directories
     fa.mkdirs();
@@ -321,5 +330,20 @@ public class TestMRAsyncDiskService extends TestCase {
           content.length);
     }
   }
+  
+  @Test
+  public void testToleratesSomeUnwritableVolumes() throws Throwable {
+    FileSystem localFileSystem = FileSystem.getLocal(new Configuration());
+    String[] vols = new String[]{TEST_ROOT_DIR + "/0",
+        TEST_ROOT_DIR + "/1"};
     
+    assertTrue(new File(vols[0]).mkdirs());
+    assertEquals(0, FileUtil.chmod(vols[0], "400")); // read only
+    try {
+      new MRAsyncDiskService(localFileSystem, vols);
+    } finally {
+      FileUtil.chmod(vols[0], "755"); // make writable again
+    }
+  }
+  
 }
