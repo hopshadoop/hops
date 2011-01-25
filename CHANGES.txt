@@ -492,6 +492,9 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2238. Fix permissions handling to avoid leaving undeletable directories
     in local dirs. (todd)
 
+    MAPREDUCE-2277. TestCapacitySchedulerWithJobTracker needs to wait for jobs to
+    complete before testing status. (todd)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES

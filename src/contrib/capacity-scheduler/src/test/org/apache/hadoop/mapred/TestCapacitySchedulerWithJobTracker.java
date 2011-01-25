@@ -124,6 +124,7 @@ public class TestCapacitySchedulerWithJobTracker extends
     SleepJob sleepJob2 = new SleepJob();
     sleepJob2.setConf(conf2);
     jobs[1] = sleepJob2.createJob(3, 3, 5, 3, 5, 3);
+    jobs[0].waitForCompletion(false);
     jobs[1].waitForCompletion(false);
     assertTrue(
       "Sleep job submitted to queue 1 is not successful", jobs[0]
