@@ -489,6 +489,9 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2282. Fix TestMRServerPorts for the changes in
     TestHDFSServerPorts.  (shv via szetszwo)
 
+    MAPREDUCE-2238. Fix permissions handling to avoid leaving undeletable directories
+    in local dirs. (todd)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES

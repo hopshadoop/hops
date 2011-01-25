@@ -27,9 +27,9 @@ import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.mapred.CleanupQueue.PathDeletionContext;
 import org.apache.hadoop.mapred.JvmManager.JvmEnv;
-import org.apache.hadoop.mapreduce.server.tasktracker.Localizer;
 import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.util.DiskChecker;
 import org.apache.hadoop.util.StringUtils;
@@ -78,6 +78,8 @@ public abstract class TaskController implements Configurable {
    * </ul>
    */
   public void setup() throws IOException {
+    FileSystem localFs = FileSystem.getLocal(conf);
+
     for (String localDir : this.mapredLocalDirs) {
       // Set up the mapreduce.cluster.local.directories.
       File mapredlocalDir = new File(localDir);
@@ -85,8 +87,8 @@ public abstract class TaskController implements Configurable {
         LOG.warn("Unable to create mapreduce.cluster.local.directory : "
             + mapredlocalDir.getPath());
       } else {
-        Localizer.PermissionsHandler.setPermissions(mapredlocalDir,
-            Localizer.PermissionsHandler.sevenFiveFive);
+        localFs.setPermission(new Path(mapredlocalDir.getCanonicalPath()),
+                              new FsPermission((short)0755));
       }
     }
 
@@ -95,8 +97,8 @@ public abstract class TaskController implements Configurable {
     if (!taskLog.isDirectory() && !taskLog.mkdirs()) {
       LOG.warn("Unable to create taskLog directory : " + taskLog.getPath());
     } else {
-      Localizer.PermissionsHandler.setPermissions(taskLog,
-          Localizer.PermissionsHandler.sevenFiveFive);
+      localFs.setPermission(new Path(taskLog.getCanonicalPath()),
+                            new FsPermission((short)0755));
     }
     DiskChecker.checkDir(TaskLog.getUserLogDir());
   }

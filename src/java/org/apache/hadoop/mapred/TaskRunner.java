@@ -39,12 +39,12 @@ import org.apache.hadoop.mapreduce.filecache.DistributedCache;
 import org.apache.hadoop.mapreduce.filecache.TaskDistributedCacheManager;
 import org.apache.hadoop.mapreduce.filecache.TrackerDistributedCacheManager;
 import org.apache.hadoop.mapreduce.security.TokenCache;
-import org.apache.hadoop.mapreduce.server.tasktracker.Localizer;
 import org.apache.hadoop.fs.FSError;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.util.StringUtils;
@@ -279,8 +279,9 @@ abstract class TaskRunner extends Thread {
     if (!b) {
       LOG.warn("mkdirs failed. Ignoring");
     } else {
-      Localizer.PermissionsHandler.setPermissions(logDir,
-          Localizer.PermissionsHandler.sevenZeroZero);
+      FileSystem localFs = FileSystem.getLocal(conf);
+      localFs.setPermission(new Path(logDir.getCanonicalPath()),
+                            new FsPermission((short)0700));
     }
 
     return logFiles;

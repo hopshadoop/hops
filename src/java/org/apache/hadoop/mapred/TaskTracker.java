@@ -1160,7 +1160,7 @@ public class TaskTracker
 
     FileOutputStream out;
     try {
-      out = SecureIOUtils.createForWrite(aclFile, 0600);
+      out = SecureIOUtils.createForWrite(aclFile, 0700);
     } catch (SecureIOUtils.AlreadyExistsException aee) {
       LOG.warn("Job ACL file already exists at " + aclFile, aee);
       return;
@@ -1170,8 +1170,6 @@ public class TaskTracker
     } finally {
       out.close();
     }
-    Localizer.PermissionsHandler.setPermissions(aclFile,
-        Localizer.PermissionsHandler.sevenZeroZero);
   }
 
   /**
