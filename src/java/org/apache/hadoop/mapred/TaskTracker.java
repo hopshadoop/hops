@@ -3667,6 +3667,8 @@ public class TaskTracker
       int numMaps = 0;
       try {
         shuffleMetrics.serverHandlerBusy();
+        response.setContentType("application/octet-stream");
+
         outStream = new DataOutputStream(response.getOutputStream());
         //use the same buffersize as used for reading the data from disk
         response.setBufferSize(MAX_BYTES_TO_READ);

@@ -498,6 +498,8 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2277. TestCapacitySchedulerWithJobTracker needs to wait for jobs to
     complete before testing status. (todd)
 
+    MAPREDUCE-2253. Servlets should specify content type (todd)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES
