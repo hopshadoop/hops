@@ -45,6 +45,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2232. Add missing methods to TestMapredGroupMappingServiceRefresh.
     (Todd Lipcon via eli)
 
+    MAPREDUCE-2271. Fix TestSetupTaskScheduling failure on trunk.
+    (Liyin Liang via todd)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES

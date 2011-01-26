@@ -322,11 +322,6 @@ public class TestSetupTaskScheduling extends TestCase {
     List<TaskStatus> taskStatuses = new ArrayList<TaskStatus>();
     TaskTrackerStatus ttStatus =
       createTaskTrackerStatus(trackers[0], taskStatuses);//create dummy status
-    addNewTaskStatus(job, TaskType.TASK_CLEANUP, true, trackers[0],
-                     taskStatuses);// status of map task's cleanup task
-    addNewTaskStatus(job, TaskType.TASK_CLEANUP, false, trackers[0],
-                     taskStatuses);// status of reduce task's cleanup task
-    ttStatus = createTaskTrackerStatus(trackers[0], taskStatuses);
     
     // validate mapTaskCleanup task
     validateNumSlotsUsedForTaskCleanup(ttStatus);
