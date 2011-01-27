@@ -48,6 +48,8 @@ Trunk (unreleased changes)
     MAPREDUCE-2271. Fix TestSetupTaskScheduling failure on trunk.
     (Liyin Liang via todd)
 
+    MAPREDUCE-2283. Add timeout for Raid Tests (Ramkumar Vadali via schen)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES
