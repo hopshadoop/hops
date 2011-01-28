@@ -47,6 +47,8 @@ Trunk (unreleased changes)
     HDFS-1588. Remove hardcoded strings for configuration keys, "dfs.hosts"
     and "dfs.hosts.exlude". (Erik Steffl via suresh)
 
+    HDFS-1335. HDFS side change of HADDOP-6904: RPC compatibility. (hairong)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image

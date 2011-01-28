@@ -104,6 +104,7 @@ import org.apache.hadoop.hdfs.server.protocol.UpgradeCommand;
 import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand.RecoveringBlock;
 import org.apache.hadoop.http.HttpServer;
 import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.ipc.ProtocolSignature;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ipc.Server;
@@ -1759,6 +1760,13 @@ public class DataNode extends Configured
     }
     throw new IOException("Unknown protocol to " + getClass().getSimpleName()
         + ": " + protocol);
+  }
+
+  @Override
+  public ProtocolSignature getProtocolSignature(String protocol,
+      long clientVersion, int clientMethodsHash) throws IOException {
+    return ProtocolSignature.getProtocolSigature(
+        this, protocol, clientVersion, clientMethodsHash);
   }
 
   /** A convenient class used in block recovery */
