@@ -1464,7 +1464,10 @@ Release 0.21.1 - Unreleased
 
     HDFS-1267. fuse-dfs does not compile. (Devaraj Das via tomwhite)
 
-Release 0.20.3 - Unreleased
+    HDFS-1598.  Directory listing on hftp:// does not show .*.crc files.
+    (szetszwo)
+
+Release 0.20.3 - 2011-1-5
 
   IMPROVEMENTS
 
@@ -1487,7 +1490,7 @@ Release 0.20.3 - Unreleased
 
     HDFS-1406. TestCLI fails on Ubuntu with default /etc/hosts. (cos)
 
-Release 0.20.2 - Unreleased
+Release 0.20.2 - 2009-09-01
 
   IMPROVEMENTS
 
