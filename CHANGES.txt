@@ -24,6 +24,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1382. MRAsyncDiscService should tolerate missing local.dir.
     (Zheng Shao and tomwhite via tomwhite)
 
+    MAPREDUCE-2263. MapReduce side of HADOOP-6904: RPC compatibility.
+    (hairong)
+
   OPTIMIZATIONS
 
   BUG FIXES

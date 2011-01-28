@@ -41,6 +41,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.ipc.ProtocolSignature;
 import org.apache.hadoop.mapreduce.ClusterMetrics;
 import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.QueueInfo;
@@ -89,6 +90,13 @@ public class LocalJobRunner implements ClientProtocol {
     return ClientProtocol.versionID;
   }
 
+  @Override
+  public ProtocolSignature getProtocolSignature(String protocol,
+      long clientVersion, int clientMethodsHash) throws IOException {
+    return ProtocolSignature.getProtocolSigature(
+        this, protocol, clientVersion, clientMethodsHash);
+  }
+
   private class Job extends Thread implements TaskUmbilicalProtocol {
     // The job directory on the system: JobClient places job configurations here.
     // This is analogous to JobTracker's system directory.
@@ -122,6 +130,13 @@ public class LocalJobRunner implements ClientProtocol {
       return TaskUmbilicalProtocol.versionID;
     }
     
+    @Override
+    public ProtocolSignature getProtocolSignature(String protocol,
+        long clientVersion, int clientMethodsHash) throws IOException {
+      return ProtocolSignature.getProtocolSigature(
+          this, protocol, clientVersion, clientMethodsHash);
+    }
+
     public Job(JobID jobid, String jobSubmitDir) throws IOException {
       this.systemJobDir = new Path(jobSubmitDir);
       this.systemJobFile = new Path(systemJobDir, "job.xml");

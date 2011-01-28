@@ -220,6 +220,13 @@ public abstract class RaidNode implements RaidProtocol {
     }
   }
 
+  @Override
+  public ProtocolSignature getProtocolSignature(String protocol,
+      long clientVersion, int clientMethodsHash) throws IOException {
+    return ProtocolSignature.getProtocolSigature(
+        this, protocol, clientVersion, clientMethodsHash);
+  }
+
   /**
    * Wait for service to finish.
    * (Normally, it runs forever.)
