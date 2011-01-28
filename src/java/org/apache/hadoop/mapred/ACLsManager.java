@@ -19,6 +19,8 @@ package org.apache.hadoop.mapred;
 
 import java.io.IOException;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapred.AuditLogger.Constants;
@@ -36,10 +38,11 @@ import org.apache.hadoop.security.authorize.AccessControlList;
 @InterfaceAudience.Private
 class ACLsManager {
 
+  static Log LOG = LogFactory.getLog(ACLsManager.class);
   // MROwner(user who started this mapreduce cluster)'s ugi
   private final UserGroupInformation mrOwner;
-  // members of supergroup are mapreduce cluster administrators
-  private final String superGroup;
+  // mapreduce cluster administrators
+  private final AccessControlList adminAcl;
   
   private final JobACLsManager jobACLsManager;
   private final QueueManager queueManager;
@@ -50,8 +53,15 @@ class ACLsManager {
       QueueManager queueManager) throws IOException {
 
     mrOwner = UserGroupInformation.getCurrentUser();
-    superGroup = conf.get(MRConfig.MR_SUPERGROUP, "supergroup");
+    adminAcl = new AccessControlList(conf.get(MRConfig.MR_ADMINS, " "));
+    adminAcl.addUser(mrOwner.getShortUserName());
     
+    String deprecatedSuperGroup = conf.get(MRConfig.MR_SUPERGROUP);
+    if (deprecatedSuperGroup != null) {
+      LOG.warn(MRConfig.MR_SUPERGROUP + " is deprecated. Use " 
+          + MRConfig.MR_ADMINS + " instead");
+      adminAcl.addGroup(deprecatedSuperGroup);
+    }
     aclsEnabled = conf.getBoolean(MRConfig.MR_ACLS_ENABLED, false);
 
     this.jobACLsManager = jobACLsManager;
@@ -62,8 +72,8 @@ class ACLsManager {
     return mrOwner;
   }
 
-  String getSuperGroup() {
-    return superGroup;
+  AccessControlList getAdminsAcl() {
+    return adminAcl;
   }
 
   JobACLsManager getJobACLsManager() {
@@ -72,19 +82,12 @@ class ACLsManager {
 
   /**
    * Is the calling user an admin for the mapreduce cluster ?
-   * i.e. either cluster owner or member of the supergroup
-   *      mapreduce.cluster.permissions.supergroup.
+   * i.e. either cluster owner or cluster administrator
    * @return true, if user is an admin
    */
   boolean isMRAdmin(UserGroupInformation callerUGI) {
-    if (mrOwner.getShortUserName().equals(callerUGI.getShortUserName())) {
+    if (adminAcl.isUserAllowed(callerUGI)) {
       return true;
-    }
-    String[] groups = callerUGI.getGroupNames();
-    for(int i=0; i < groups.length; ++i) {
-      if (groups[i].equals(superGroup)) {
-        return true;
-      }
     }
     return false;
   }

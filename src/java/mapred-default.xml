@@ -967,14 +967,14 @@
     job-level ACL.
 
     Irrespective of this ACL configuration, (a) job-owner, (b) the user who
-    started the cluster, (c) members of an admin configured supergroup
-    configured via mapreduce.cluster.permissions.supergroup and (d) queue
+    started the cluster, (c) cluster administrators
+    configured via mapreduce.cluster.administrators and (d) queue
     administrators of the queue to which this job was submitted to configured
     via acl-administer-jobs for the specific queue in mapred-queues.xml can
     do all the modification operations on a job.
 
     By default, nobody else besides job-owner, the user who started the cluster,
-    members of supergroup and queue administrators can perform modification
+    cluster administrators and queue administrators can perform modification
     operations on a job.
   </description>
 </property>
@@ -1001,14 +1001,14 @@
     user, for e.g., JobStatus, JobProfile, list of jobs in the queue, etc.
 
     Irrespective of this ACL configuration, (a) job-owner, (b) the user who
-    started the cluster, (c) members of an admin configured supergroup
-    configured via mapreduce.cluster.permissions.supergroup and (d) queue
+    started the cluster, (c) cluster administrators
+    configured via mapreduce.cluster.administrators and (d) queue
     administrators of the queue to which this job was submitted to configured
     via acl-administer-jobs for the specific queue in mapred-queues.xml can
     do all the view operations on a job.
 
     By default, nobody else besides job-owner, the user who started the
-    cluster, memebers of supergroup and queue administrators can perform
+    cluster, cluster administrators and queue administrators can perform
     view operations on a job.
   </description>
 </property>

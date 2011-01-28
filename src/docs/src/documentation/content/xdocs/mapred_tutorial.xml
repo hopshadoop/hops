@@ -1778,8 +1778,8 @@
           nobody is given access in these properties.</p> 
           
           <p>However, irrespective of the job ACLs configured, a job's owner,
-          the user who started the cluster and members of an admin configured
-          supergroup (<code>mapreduce.cluster.permissions.supergroup</code>)
+          the user who started the cluster and cluster administrators
+          (<code>mapreduce.cluster.administrators</code>)
           and queue administrators of the queue to which the job was submitted
           to (<code>acl-administer-jobs</code>) always have access to view and
           modify a job.</p>
@@ -1809,8 +1809,8 @@
           the queue level ACL, "acl-administer-jobs", configured via
           mapred-queue-acls.xml. The caller will be able to do the operation
           if he/she is part of either queue admins ACL or job modification ACL
-          or the user who started the cluster or a member of an admin configured
-          supergroup (<code>mapreduce.cluster.permissions.supergroup</code>).
+          or the user who started the cluster or a cluster administrator
+          (<code>mapreduce.cluster.administrators</code>).
           </p>
           
           <p>The format of a job level ACL is the same as the format for a

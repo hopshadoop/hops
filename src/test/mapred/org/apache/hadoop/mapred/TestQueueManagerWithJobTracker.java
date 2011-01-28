@@ -64,6 +64,10 @@ public class TestQueueManagerWithJobTracker {
     deleteQueuesConfigFile();
   }
 
+  String adminUser = "adminUser";
+  String adminGroup = "adminGroup";
+  String deprecatedSuperGroup = "superGroup";
+
   private void startCluster(boolean aclsEnabled)
       throws Exception {
 
@@ -74,6 +78,8 @@ public class TestQueueManagerWithJobTracker {
     conf = new Configuration();
     conf.set(MRJobConfig.SETUP_CLEANUP_NEEDED, "false");
     conf.setBoolean(MRConfig.MR_ACLS_ENABLED, aclsEnabled);
+    conf.set(MRConfig.MR_SUPERGROUP, deprecatedSuperGroup);
+    conf.set(MRConfig.MR_ADMINS, adminUser + " " + adminGroup);
 
     JobConf jobConf = new JobConf(conf);
     String namenode = "file:///";
@@ -122,6 +128,21 @@ public class TestQueueManagerWithJobTracker {
     fail("user u1 cannot submit jobs to queue p1:p13");
     } catch (Exception e) {
     }
+
+    // check access to admins
+    job = submitSleepJob(0, 0, 0, 0, true, adminUser+ ",g1",
+        "p1" + NAME_SEPARATOR + "p13", conf);
+    assertTrue("Admin user cannot submit jobs to queue p1:p13",
+        job.isSuccessful());
+    job = submitSleepJob(0, 0, 0, 0, true, "u1,"+ adminGroup,
+        "p1" + NAME_SEPARATOR + "p13", conf);
+    assertTrue("Admin group member cannot submit jobs to queue p1:p13",
+        job.isSuccessful());
+    job = submitSleepJob(0, 0, 0, 0, true, "u1,"+ deprecatedSuperGroup,
+        "p1" + NAME_SEPARATOR + "p13", conf);
+    assertTrue("Deprecated super group member cannot submit jobs to queue" +
+        " p1:p13", job.isSuccessful());
+
     // check for access to submit the job
     try {
       job = submitSleepJob(0, 0, 0, 0, false, "u2,g1", "p1" + NAME_SEPARATOR
@@ -241,6 +262,41 @@ public class TestQueueManagerWithJobTracker {
       assertEquals("job submitted for u1 and queue p1:p11 is not killed.",
           cluster.getJob(jobID).getStatus().getState(), (State.KILLED));
     }
+    // check kill access to admins
+    ugi = 
+      UserGroupInformation.createUserForTesting("adminUser", new String[]{"g3"});
+    checkAccessToKill(tracker, jobConf, ugi);
+
+    ugi = 
+      UserGroupInformation.createUserForTesting("u3", new String[]{adminGroup});
+    checkAccessToKill(tracker, jobConf, ugi);
+
+    ugi = 
+      UserGroupInformation.createUserForTesting("u3", 
+          new String[]{deprecatedSuperGroup});
+    checkAccessToKill(tracker, jobConf, ugi);
+
+  }
+
+  private void checkAccessToKill(JobTracker tracker, final JobConf mrConf, 
+      UserGroupInformation killer) throws IOException, InterruptedException,
+      ClassNotFoundException {
+    Job job = submitSleepJob(1, 1, 100, 100, false, "u1,g1",
+        "p1" + NAME_SEPARATOR + "p11", conf);
+    JobID jobID = job.getStatus().getJobID();
+    //Ensure that the jobinprogress is initied before we issue a kill 
+    //signal to the job.
+    JobInProgress jip =  tracker.getJob(
+        org.apache.hadoop.mapred.JobID.downgrade(jobID));
+    tracker.initJob(jip);
+    Cluster cluster = killer.doAs(new PrivilegedExceptionAction<Cluster>() {
+      public Cluster run() throws IOException {
+        return new Cluster(mrConf);
+      }
+    });
+    cluster.getJob(jobID).killJob();
+    assertEquals("job not killed by " + killer,
+        cluster.getJob(jobID).getStatus().getState(), (State.KILLED));
   }
 
   /**

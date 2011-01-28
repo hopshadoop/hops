@@ -38,6 +38,9 @@ public interface MRConfig {
   public static final String REDUCEMEMORY_MB = 
     "mapreduce.cluster.reducememory.mb";
   public static final String MR_ACLS_ENABLED = "mapreduce.cluster.acls.enabled";
+  public static final String MR_ADMINS =
+    "mapreduce.cluster.administrators";
+  @Deprecated
   public static final String MR_SUPERGROUP =
     "mapreduce.cluster.permissions.supergroup";
 
