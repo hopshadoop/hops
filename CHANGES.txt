@@ -51,6 +51,8 @@ Trunk (unreleased changes)
     MAPREDUCE-2271. Fix TestSetupTaskScheduling failure on trunk.
     (Liyin Liang via todd)
 
+    MAPREDUCE-2290. Fix compilation error in TestTaskCommit. (eli)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES
