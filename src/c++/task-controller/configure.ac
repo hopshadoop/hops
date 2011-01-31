@@ -29,7 +29,9 @@ AC_PREFIX_DEFAULT(.)
 #add new argument called -with-confdir
 AC_ARG_WITH(confdir,[--with-confdir path to hadoop conf dir])
 AC_CONFIG_SRCDIR([task-controller.h])
-AC_CONFIG_HEADER([configuration.h])
+AC_CONFIG_AUX_DIR([config])
+AC_CONFIG_MACRO_DIR([../utils/m4])
+AM_INIT_AUTOMAKE([subdir-objects foreign no-dist])
 
 # Checks for programs.
 AC_PROG_CC
@@ -45,7 +47,7 @@ AC_CHECK_HEADERS([stdlib.h string.h unistd.h fcntl.h])
 
 if test "$with_confdir" != ""
 then
-AC_DEFINE_UNQUOTED(HADOOP_CONF_DIR,"$with_confdir")
+AC_DEFINE_UNQUOTED(HADOOP_CONF_DIR, ["$with_confdir"], [Location of Hadoop configuration])
 fi
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST

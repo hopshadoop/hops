@@ -20,6 +20,9 @@
 AC_PREREQ(2.59)
 AC_INIT(hadoop-utils, 0.13.0, omalley@apache.org)
 
+AC_CONFIG_AUX_DIR([config])
+AC_CONFIG_MACRO_DIR([m4])
+
 AM_INIT_AUTOMAKE([subdir-objects foreign no-dist])
 
 AC_CONFIG_SRCDIR([impl/SerialUtils.cc])

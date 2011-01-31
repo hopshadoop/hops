@@ -238,6 +238,8 @@ Release 0.22.0 - Unreleased
 
     MAPREDUCE-2250. Fix logging in raid code. (Ramkumar Vadali via schen)
 
+    MAPREDUCE-2260. Remove auto-generated native build files. (rvs via eli)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and

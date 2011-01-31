@@ -25,9 +25,6 @@
 #define INCREMENT_SIZE 1000
 #define MAX_SIZE 10
 
-//would be defined by the autoconfiguration tool
-#undef HADOOP_CONF_DIR
-
 struct confentry {
   const char *key;
   const char *value;

@@ -1656,20 +1656,63 @@
     </chmod>
   </target>
  
-  <target name="create-c++-configure" depends="init" if="compile.c++">
+  <target name="check-c++-configure" depends="init" if="compile.c++">
+    <condition property="need.c++.utils.configure">
+       <not> <available file="${c++.utils.src}/configure"/> </not>
+    </condition>
+    <condition property="need.c++.pipes.configure">
+       <not> <available file="${c++.pipes.src}/configure"/> </not>
+    </condition>
+    <condition property="need.c++.examples.pipes.configure">
+       <not> <available file="${c++.examples.pipes.src}/configure"/> </not>
+    </condition>
+    <condition property="need.c++.task-controller.configure">
+       <not> <available file="${c++.task-controller.src}/configure"/> </not>
+    </condition>
+  </target>
+
+  <target name="create-c++-utils-configure" depends="check-c++-configure" 
+                                            if="need.c++.utils.configure">
     <exec executable="autoreconf" dir="${c++.utils.src}" searchpath="yes" 
           failonerror="yes">
-       <arg value="-if"/>
+       <arg value="-i"/>
+       <arg value="-f"/>
     </exec>
+  </target>
+
+  <target name="create-c++-pipes-configure" depends="check-c++-configure" 
+                                            if="need.c++.pipes.configure">
     <exec executable="autoreconf" dir="${c++.pipes.src}" searchpath="yes" 
           failonerror="yes">
-       <arg value="-if"/>
+       <arg value="-i"/>
+       <arg value="-f"/>
     </exec>
+  </target>
+
+  <target name="create-c++-examples-pipes-configure" depends="check-c++-configure" 
+                                            if="need.c++.examples.pipes.configure">
     <exec executable="autoreconf" dir="${c++.examples.pipes.src}" 
           searchpath="yes" failonerror="yes">
-       <arg value="-if"/>
+       <arg value="-i"/>
+       <arg value="-f"/>
     </exec>
-   </target>
+  </target>
+
+  <target name="create-c++-task-controller-configure" depends="check-c++-configure" 
+                                            if="need.c++.task-controller.configure">
+    <exec executable="autoreconf" dir="${c++.task-controller.src}" 
+          searchpath="yes" failonerror="yes">
+       <arg value="-i"/>
+       <arg value="-f"/>
+    </exec>
+  </target>
+
+  <target name="create-c++-configure" depends="create-c++-utils-configure,
+                                               create-c++-pipes-configure,
+                                               create-c++-examples-pipes-configure,
+                                               create-c++-task-controller-configure" 
+                                      if="compile.c++">
+  </target>
    
   <target name="check-c++-makefiles" depends="init" if="compile.c++">
     <condition property="need.c++.utils.makefile">
@@ -1685,6 +1728,7 @@
 
   <target name="create-c++-utils-makefile" depends="check-c++-makefiles" 
                                            if="need.c++.utils.makefile">
+    <antcall target="create-c++-utils-configure"/>
     <mkdir dir="${build.c++.utils}"/>
     <chmod file="${c++.utils.src}/configure" perm="ugo+x"/>
     <exec executable="${c++.utils.src}/configure" dir="${build.c++.utils}"
@@ -1703,6 +1747,7 @@
 
   <target name="create-c++-pipes-makefile" depends="check-c++-makefiles" 
                                            if="need.c++.pipes.makefile">
+    <antcall target="create-c++-pipes-configure"/>
     <mkdir dir="${build.c++.pipes}"/>
     <chmod file="${c++.pipes.src}/configure" perm="ugo+x"/>
     <exec executable="${c++.pipes.src}/configure" dir="${build.c++.pipes}"
@@ -1726,6 +1771,7 @@
   <target name="create-c++-examples-pipes-makefile" 
           depends="check-c++-makefiles" 
           if="need.c++.examples.pipes.makefile">
+    <antcall target="create-c++-examples-pipes-configure"/>
     <mkdir dir="${build.c++.examples.pipes}"/>
     <chmod file="${c++.examples.pipes.src}/configure" perm="ugo+x"/>
     <exec executable="${c++.examples.pipes.src}/configure" 
@@ -2107,6 +2153,7 @@
 
   <!-- taskcontroller targets -->
   <target name="init-task-controller-build">
+    <antcall target="create-c++-task-controller-configure"/>
     <mkdir dir="${build.c++.task-controller}" />
     <copy todir="${build.c++.task-controller}">
       <fileset dir="${c++.task-controller.src}" includes="*.c"/>
