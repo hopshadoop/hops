@@ -76,6 +76,9 @@ Trunk (unreleased changes)
 
     HDFS-1585. Fix build after HDFS-1547 (todd)
 
+    HDFS-863. Potential deadlock in TestOverReplicatedBlocks. 
+    (Ken Goodhope via jghoman)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES

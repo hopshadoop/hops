@@ -75,22 +75,28 @@ public class TestOverReplicatedBlocks extends TestCase {
       final DatanodeID corruptDataNode = 
         cluster.getDataNodes().get(2).dnRegistration;
       final FSNamesystem namesystem = cluster.getNamesystem();
-      synchronized (namesystem.heartbeats) {
-        // set live datanode's remaining space to be 0 
-        // so they will be chosen to be deleted when over-replication occurs
-        for (DatanodeDescriptor datanode : namesystem.heartbeats) {
-          if (!corruptDataNode.equals(datanode)) {
-            datanode.updateHeartbeat(100L, 100L, 0L, 0);
+      try {
+        namesystem.writeLock();
+        synchronized (namesystem.heartbeats) {
+          // set live datanode's remaining space to be 0 
+          // so they will be chosen to be deleted when over-replication occurs
+          for (DatanodeDescriptor datanode : namesystem.heartbeats) {
+            if (!corruptDataNode.equals(datanode)) {
+              datanode.updateHeartbeat(100L, 100L, 0L, 0);
+            }
           }
-        }
-        
-        // decrease the replication factor to 1; 
-        namesystem.setReplication(fileName.toString(), (short)1);
 
-        // corrupt one won't be chosen to be excess one
-        // without 4910 the number of live replicas would be 0: block gets lost
-        assertEquals(1, namesystem.blockManager.countNodes(block).liveReplicas());
+          // decrease the replication factor to 1; 
+          namesystem.setReplication(fileName.toString(), (short)1);
+
+          // corrupt one won't be chosen to be excess one
+          // without 4910 the number of live replicas would be 0: block gets lost
+          assertEquals(1, namesystem.blockManager.countNodes(block).liveReplicas());
+        }
+      } finally {
+        namesystem.writeUnlock();
       }
+      
     } finally {
       cluster.shutdown();
     }
