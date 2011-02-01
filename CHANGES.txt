@@ -499,11 +499,11 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2282. Fix TestMRServerPorts for the changes in
     TestHDFSServerPorts.  (shv via szetszwo)
 
-    MAPREDUCE-2238. Fix permissions handling to avoid leaving undeletable directories
-    in local dirs. (todd)
+    MAPREDUCE-2238. Fix permissions handling to avoid leaving undeletable
+    directories in local dirs. (todd)
 
-    MAPREDUCE-2277. TestCapacitySchedulerWithJobTracker needs to wait for jobs to
-    complete before testing status. (todd)
+    MAPREDUCE-2277. TestCapacitySchedulerWithJobTracker needs to wait for jobs
+    to complete before testing status. (todd)
 
     MAPREDUCE-2253. Servlets should specify content type (todd)
 
@@ -511,6 +511,10 @@ Release 0.22.0 - Unreleased
 
     MAPREDUCE-1754. Replace mapred.persmissions.supergroup with an 
     acl : mapreduce.cluster.administrators (Amareshwari Sriramadasu via shv)
+
+    MAPREDUCE-2256. FairScheduler fairshare preemption from multiple pools may
+    preempt all tasks from one pool causing that pool to go below fairshare.
+    (Priyo Mustafi via shv)
 
 Release 0.21.1 - Unreleased
 

@@ -867,7 +867,8 @@ public class FairScheduler extends TaskScheduler {
       JobInProgress job = taskTrackerManager.getJob(jobID);
       Pool pool = poolMgr.getPool(job);
       PoolSchedulable sched = pool.getSchedulable(taskType);
-      if (tasksLeft.get(pool) > sched.getFairShare()) {
+      int tasksLeftForPool = tasksLeft.get(pool);
+      if (tasksLeftForPool > sched.getFairShare()) {
         eventLog.log("PREEMPT", status.getTaskID(),
             status.getTaskTracker());
         try {
@@ -875,6 +876,9 @@ public class FairScheduler extends TaskScheduler {
           tasksToPreempt--;
           if (tasksToPreempt == 0)
             break;
+          
+          // reduce tasks left for pool
+          tasksLeft.put(pool, --tasksLeftForPool);
         } catch (IOException e) {
           LOG.error("Failed to kill task " + status.getTaskID(), e);
         }
