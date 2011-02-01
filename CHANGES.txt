@@ -516,6 +516,8 @@ Release 0.22.0 - Unreleased
     preempt all tasks from one pool causing that pool to go below fairshare.
     (Priyo Mustafi via shv)
 
+    MAPREDUCE-2281. MR part of HADOOP-6642. (Chris Douglas, Po Cheung via shv)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES
