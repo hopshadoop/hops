@@ -53,6 +53,8 @@ Trunk (unreleased changes)
 
     MAPREDUCE-2290. Fix compilation error in TestTaskCommit. (eli)
 
+    MAPREDUCE-2294. Fix compilation error in mumak. (todd)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES
