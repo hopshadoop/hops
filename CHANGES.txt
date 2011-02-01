@@ -513,6 +513,8 @@ Release 0.22.0 - Unreleased
 
     HDFS-1561. BackupNode listens on the default host. (shv)
 
+    HDFS-1591. HDFS part of HADOOP-6642. (Chris Douglas, Po Cheung via shv)
+
 Release 0.21.1 - Unreleased
 
   IMPROVEMENTS
