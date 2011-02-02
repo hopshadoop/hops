@@ -190,7 +190,7 @@ public class TestDFSUpgrade extends TestCase {
       UpgradeUtilities.createStorageDirs(NAME_NODE, nameNodeDirs, "current");
       cluster = createCluster();
       baseDirs = UpgradeUtilities.createStorageDirs(DATA_NODE, dataNodeDirs, "current");
-      UpgradeUtilities.createVersionFile(DATA_NODE, baseDirs,
+      UpgradeUtilities.createVersionFile(conf, DATA_NODE, baseDirs,
                                          new StorageInfo(Integer.MIN_VALUE,
                                                          UpgradeUtilities.getCurrentNamespaceID(cluster),
                                                          UpgradeUtilities.getCurrentFsscTime(cluster)));
@@ -203,7 +203,7 @@ public class TestDFSUpgrade extends TestCase {
       UpgradeUtilities.createStorageDirs(NAME_NODE, nameNodeDirs, "current");
       cluster = createCluster();
       baseDirs = UpgradeUtilities.createStorageDirs(DATA_NODE, dataNodeDirs, "current");
-      UpgradeUtilities.createVersionFile(DATA_NODE, baseDirs,
+      UpgradeUtilities.createVersionFile(conf, DATA_NODE, baseDirs,
                                          new StorageInfo(UpgradeUtilities.getCurrentLayoutVersion(),
                                                          UpgradeUtilities.getCurrentNamespaceID(cluster),
                                                          Long.MAX_VALUE));
@@ -238,7 +238,7 @@ public class TestDFSUpgrade extends TestCase {
       
       log("NameNode upgrade with old layout version in current", numDirs);
       baseDirs = UpgradeUtilities.createStorageDirs(NAME_NODE, nameNodeDirs, "current");
-      UpgradeUtilities.createVersionFile(NAME_NODE, baseDirs,
+      UpgradeUtilities.createVersionFile(conf, NAME_NODE, baseDirs,
                                          new StorageInfo(Storage.LAST_UPGRADABLE_LAYOUT_VERSION + 1,
                                                          UpgradeUtilities.getCurrentNamespaceID(null),
                                                          UpgradeUtilities.getCurrentFsscTime(null)));
@@ -247,7 +247,7 @@ public class TestDFSUpgrade extends TestCase {
       
       log("NameNode upgrade with future layout version in current", numDirs);
       baseDirs = UpgradeUtilities.createStorageDirs(NAME_NODE, nameNodeDirs, "current");
-      UpgradeUtilities.createVersionFile(NAME_NODE, baseDirs,
+      UpgradeUtilities.createVersionFile(conf, NAME_NODE, baseDirs,
                                          new StorageInfo(Integer.MIN_VALUE,
                                                          UpgradeUtilities.getCurrentNamespaceID(null),
                                                          UpgradeUtilities.getCurrentFsscTime(null)));

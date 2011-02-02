@@ -192,7 +192,7 @@ public class TestDFSRollback extends TestCase {
                                                 .build();
       UpgradeUtilities.createStorageDirs(DATA_NODE, dataNodeDirs, "current");
       baseDirs = UpgradeUtilities.createStorageDirs(DATA_NODE, dataNodeDirs, "previous");
-      UpgradeUtilities.createVersionFile(DATA_NODE, baseDirs,
+      UpgradeUtilities.createVersionFile(conf, DATA_NODE, baseDirs,
                                          new StorageInfo(Integer.MIN_VALUE,
                                                          UpgradeUtilities.getCurrentNamespaceID(cluster),
                                                          UpgradeUtilities.getCurrentFsscTime(cluster)));
@@ -212,7 +212,7 @@ public class TestDFSRollback extends TestCase {
                                                 .build();
       UpgradeUtilities.createStorageDirs(DATA_NODE, dataNodeDirs, "current");
       baseDirs = UpgradeUtilities.createStorageDirs(DATA_NODE, dataNodeDirs, "previous");
-      UpgradeUtilities.createVersionFile(DATA_NODE, baseDirs,
+      UpgradeUtilities.createVersionFile(conf, DATA_NODE, baseDirs,
                                          new StorageInfo(UpgradeUtilities.getCurrentLayoutVersion(),
                                                          UpgradeUtilities.getCurrentNamespaceID(cluster),
                                                          Long.MAX_VALUE));
@@ -251,7 +251,7 @@ public class TestDFSRollback extends TestCase {
       log("NameNode rollback with old layout version in previous", numDirs);
       UpgradeUtilities.createStorageDirs(NAME_NODE, nameNodeDirs, "current");
       baseDirs = UpgradeUtilities.createStorageDirs(NAME_NODE, nameNodeDirs, "previous");
-      UpgradeUtilities.createVersionFile(NAME_NODE, baseDirs,
+      UpgradeUtilities.createVersionFile(conf, NAME_NODE, baseDirs,
                                          new StorageInfo(1,
                                                          UpgradeUtilities.getCurrentNamespaceID(null),
                                                          UpgradeUtilities.getCurrentFsscTime(null)));

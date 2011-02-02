@@ -439,11 +439,11 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
    * Should do everything that would be done for the NameNode,
    * except for loading the image.
    * 
-   * @param bnImage {@link BackupStorage}
+   * @param bnImage {@link BackupImage}
    * @param conf configuration
    * @throws IOException
    */
-  FSNamesystem(Configuration conf, BackupStorage bnImage) throws IOException {
+  FSNamesystem(Configuration conf, BackupImage bnImage) throws IOException {
     try {
       initialize(conf, bnImage);
     } catch(IOException e) {
@@ -523,8 +523,8 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
   }
   
   NamespaceInfo getNamespaceInfo() {
-    return new NamespaceInfo(dir.fsImage.getNamespaceID(),
-                             dir.fsImage.getCTime(),
+    return new NamespaceInfo(dir.fsImage.getStorage().getNamespaceID(),
+                             dir.fsImage.getStorage().getCTime(),
                              getDistributedUpgradeVersion());
   }
 
@@ -2655,7 +2655,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
    * @return registration ID
    */
   public String getRegistrationID() {
-    return Storage.getRegistrationID(dir.fsImage);
+    return Storage.getRegistrationID(dir.fsImage.getStorage());
   }
     
   /**
@@ -3422,10 +3422,10 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
     
     // if it is disabled - enable it and vice versa.
     if(arg.equals("check"))
-      return getFSImage().getRestoreFailedStorage();
+      return getFSImage().getStorage().getRestoreFailedStorage();
     
     boolean val = arg.equals("true");  // false if not
-    getFSImage().setRestoreFailedStorage(val);
+    getFSImage().getStorage().setRestoreFailedStorage(val);
     
     return val;
     } finally {
@@ -4803,18 +4803,20 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
    * @throws IOException
    */
   void registerBackupNode(NamenodeRegistration registration)
-  throws IOException {
+    throws IOException {
     writeLock();
     try {
-    if(getFSImage().getNamespaceID() != registration.getNamespaceID())
-      throw new IOException("Incompatible namespaceIDs: " 
-          + " Namenode namespaceID = " + getFSImage().getNamespaceID() 
-          + "; " + registration.getRole() +
-              " node namespaceID = " + registration.getNamespaceID());
-    boolean regAllowed = getEditLog().checkBackupRegistration(registration);
-    if(!regAllowed)
-      throw new IOException("Registration is not allowed. " +
-          "Another node is registered as a backup.");
+      if(getFSImage().getStorage().getNamespaceID() 
+         != registration.getNamespaceID())
+        throw new IOException("Incompatible namespaceIDs: "
+            + " Namenode namespaceID = "
+            + getFSImage().getStorage().getNamespaceID() + "; "
+            + registration.getRole() +
+            " node namespaceID = " + registration.getNamespaceID());
+      boolean regAllowed = getEditLog().checkBackupRegistration(registration);
+      if(!regAllowed)
+        throw new IOException("Registration is not allowed. " +
+                              "Another node is registered as a backup.");
     } finally {
       writeUnlock();
     }
@@ -4828,15 +4830,17 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
    * @throws IOException
    */
   void releaseBackupNode(NamenodeRegistration registration)
-  throws IOException {
+    throws IOException {
     writeLock();
     try {
-    if(getFSImage().getNamespaceID() != registration.getNamespaceID())
-      throw new IOException("Incompatible namespaceIDs: " 
-          + " Namenode namespaceID = " + getFSImage().getNamespaceID() 
-          + "; " + registration.getRole() +
-              " node namespaceID = " + registration.getNamespaceID());
-    getEditLog().releaseBackupStream(registration);
+      if(getFSImage().getStorage().getNamespaceID()
+         != registration.getNamespaceID())
+        throw new IOException("Incompatible namespaceIDs: "
+            + " Namenode namespaceID = "
+            + getFSImage().getStorage().getNamespaceID() + "; "
+            + registration.getRole() +
+            " node namespaceID = " + registration.getNamespaceID());
+      getEditLog().releaseBackupStream(registration);
     } finally {
       writeUnlock();
     }

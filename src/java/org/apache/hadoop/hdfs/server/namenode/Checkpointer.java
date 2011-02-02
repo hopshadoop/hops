@@ -29,8 +29,8 @@ import org.apache.hadoop.hdfs.protocol.FSConstants;
 import org.apache.hadoop.hdfs.server.common.HdfsConstants.NamenodeRole;
 import static org.apache.hadoop.hdfs.server.common.Util.now;
 import org.apache.hadoop.hdfs.server.namenode.FSImage.CheckpointStates;
-import org.apache.hadoop.hdfs.server.namenode.FSImage.NameNodeDirType;
-import org.apache.hadoop.hdfs.server.namenode.FSImage.NameNodeFile;
+import org.apache.hadoop.hdfs.server.namenode.NNStorage.NameNodeDirType;
+import org.apache.hadoop.hdfs.server.namenode.NNStorage.NameNodeFile;
 import org.apache.hadoop.hdfs.server.protocol.CheckpointCommand;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeCommand;
@@ -63,8 +63,8 @@ class Checkpointer extends Daemon {
 
   private String infoBindAddress;
 
-  private BackupStorage getFSImage() {
-    return (BackupStorage)backupNode.getFSImage();
+  private BackupImage getFSImage() {
+    return (BackupImage)backupNode.getFSImage();
   }
 
   private NamenodeProtocol getNamenode(){
@@ -178,8 +178,8 @@ class Checkpointer extends Daemon {
   private void downloadCheckpoint(CheckpointSignature sig) throws IOException {
     // Retrieve image file
     String fileid = "getimage=1";
-    Collection<File> list = getFSImage().getFiles(NameNodeFile.IMAGE,
-        NameNodeDirType.IMAGE);
+    Collection<File> list = getFSImage()
+      .getStorage().getFiles(NameNodeFile.IMAGE, NameNodeDirType.IMAGE);
     File[] files = list.toArray(new File[list.size()]);
     assert files.length > 0 : "No checkpoint targets.";
     String nnHttpAddr = backupNode.nnHttpAddress;
@@ -189,7 +189,8 @@ class Checkpointer extends Daemon {
 
     // Retrieve edits file
     fileid = "getedit=1";
-    list = getFSImage().getFiles(NameNodeFile.EDITS, NameNodeDirType.EDITS);
+    list = getFSImage()
+      .getStorage().getFiles(NameNodeFile.EDITS, NameNodeDirType.EDITS);
     files = list.toArray(new File[list.size()]);
     assert files.length > 0 : "No checkpoint targets.";
     TransferFsImage.getFileClient(nnHttpAddr, fileid, files, false);
@@ -207,7 +208,7 @@ class Checkpointer extends Daemon {
     String fileid = "putimage=1&port=" + httpPort +
       "&machine=" + infoBindAddress +
       "&token=" + sig.toString() +
-      "&newChecksum=" + getFSImage().imageDigest.toString();
+      "&newChecksum=" + getFSImage().getStorage().getImageDigest().toString();
     LOG.info("Posted URL " + backupNode.nnHttpAddress + fileid);
     TransferFsImage.getFileClient(backupNode.nnHttpAddress, 
         fileid, (File[])null, false);
@@ -246,7 +247,7 @@ class Checkpointer extends Daemon {
       downloadCheckpoint(sig);
     }
 
-    BackupStorage bnImage = getFSImage();
+    BackupImage bnImage = getFSImage();
     bnImage.loadCheckpoint(sig);
     sig.validateStorageInfo(bnImage);
     bnImage.saveCheckpoint();
@@ -262,6 +263,6 @@ class Checkpointer extends Daemon {
         getFSImage().getEditLog().close();
     LOG.info("Checkpoint completed in "
         + (now() - startTime)/1000 + " seconds."
-        + " New Image Size: " + bnImage.getFsImageName().length());
+        + " New Image Size: " + bnImage.getStorage().getFsImageName().length());
   }
 }

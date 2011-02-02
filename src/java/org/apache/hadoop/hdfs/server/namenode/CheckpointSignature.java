@@ -41,10 +41,10 @@ public class CheckpointSignature extends StorageInfo
   public CheckpointSignature() {}
 
   CheckpointSignature(FSImage fsImage) {
-    super(fsImage);
+    super(fsImage.getStorage());
     editsTime = fsImage.getEditLog().getFsEditTime();
-    checkpointTime = fsImage.getCheckpointTime();
-    imageDigest = fsImage.imageDigest;
+    checkpointTime = fsImage.getStorage().getCheckpointTime();
+    imageDigest = fsImage.getStorage().getImageDigest();
   }
 
   CheckpointSignature(String str) {
@@ -76,18 +76,21 @@ public class CheckpointSignature extends StorageInfo
   }
 
   void validateStorageInfo(FSImage si) throws IOException {
-    if(layoutVersion != si.layoutVersion
-        || namespaceID != si.namespaceID || cTime != si.cTime
-        || checkpointTime != si.checkpointTime ||
-        !imageDigest.equals(si.imageDigest)) {
+    if(layoutVersion != si.getStorage().layoutVersion
+       || namespaceID != si.getStorage().namespaceID 
+       || cTime != si.getStorage().cTime
+       || checkpointTime != si.getStorage().getCheckpointTime() ||
+       !imageDigest.equals(si.getStorage().getImageDigest())) {
       // checkpointTime can change when the image is saved - do not compare
       throw new IOException("Inconsistent checkpoint fields.\n"
           + "LV = " + layoutVersion + " namespaceID = " + namespaceID
           + " cTime = " + cTime + "; checkpointTime = " + checkpointTime
           + " ; imageDigest = " + imageDigest
           + ".\nExpecting respectively: "
-          + si.layoutVersion + "; " + si.namespaceID + "; " + si.cTime
-          + "; " + si.checkpointTime + "; " + si.imageDigest);
+          + si.getStorage().layoutVersion + "; " 
+          + si.getStorage().namespaceID + "; " + si.getStorage().cTime
+          + "; " + si.getStorage().getCheckpointTime() + "; " 
+          + si.getStorage().getImageDigest());
     }
   }
 

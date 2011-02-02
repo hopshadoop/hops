@@ -49,6 +49,8 @@ Trunk (unreleased changes)
 
     HDFS-1335. HDFS side change of HADDOP-6904: RPC compatibility. (hairong)
 
+    HDFS-1557. Separate Storage from FSImage. (Ivan Kelly via jitendra)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image

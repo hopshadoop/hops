@@ -346,7 +346,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
     nodeRegistration = new NamenodeRegistration(
         getHostPortString(rpcAddress),
         getHostPortString(httpAddress),
-        getFSImage(), getRole(), getFSImage().getCheckpointTime());
+        getFSImage().getStorage(), getRole(), getFSImage().getStorage().getCheckpointTime());
     return nodeRegistration;
   }
 
@@ -1336,7 +1336,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
    * Returns the name of the fsImage file
    */
   public File getFsImageName() throws IOException {
-    return getFSImage().getFsImageName();
+    return getFSImage().getStorage().getFsImageName();
   }
     
   public FSImage getFSImage() {
@@ -1348,7 +1348,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
    * checkpointing
    */
   public File[] getFsImageNameCheckpoint() throws IOException {
-    return getFSImage().getFsImageNameCheckpoint();
+    return getFSImage().getStorage().getFsImageNameCheckpoint();
   }
 
   /**
@@ -1414,7 +1414,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
 
     FSNamesystem nsys = new FSNamesystem(new FSImage(dirsToFormat,
                                          editDirsToFormat), conf);
-    nsys.dir.fsImage.format();
+    nsys.dir.fsImage.getStorage().format();
     return false;
   }
 

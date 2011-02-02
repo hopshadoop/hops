@@ -188,7 +188,7 @@ public class TestDFSStartupVersions extends TestCase {
       File[] storage = UpgradeUtilities.createStorageDirs(
                                                           DATA_NODE, conf.getStrings(DFSConfigKeys.DFS_DATANODE_DATA_DIR_KEY), "current");
       log("DataNode version info", DATA_NODE, i, versions[i]);
-      UpgradeUtilities.createVersionFile(DATA_NODE, storage, versions[i]);
+      UpgradeUtilities.createVersionFile(conf, DATA_NODE, storage, versions[i]);
       try {
         cluster.startDataNodes(conf, 1, false, StartupOption.REGULAR, null);
       } catch (Exception ignore) {

@@ -45,7 +45,7 @@ import org.apache.hadoop.hdfs.server.common.Storage;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
 import org.apache.hadoop.hdfs.server.common.Storage.StorageDirectory;
 import org.apache.hadoop.hdfs.server.datanode.DataStorage;
-import org.apache.hadoop.hdfs.server.namenode.FSImage;
+import org.apache.hadoop.hdfs.server.namenode.NNStorage;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 
 /**
@@ -301,7 +301,7 @@ public class UpgradeUtilities {
    *
    * @return the created version file
    */
-  public static File[] createVersionFile(NodeType nodeType, File[] parent,
+  public static File[] createVersionFile(Configuration conf, NodeType nodeType, File[] parent,
                                          StorageInfo version) throws IOException 
   {
     Storage storage = null;
@@ -311,7 +311,8 @@ public class UpgradeUtilities {
       FileUtil.fullyDelete(versionFile);
       switch (nodeType) {
       case NAME_NODE:
-        storage = new FSImage(version);
+        storage = new NNStorage(conf);
+        storage.setStorageInfo(version);
         break;
       case DATA_NODE:
         storage = new DataStorage(version, "doNotCare");
