@@ -59,6 +59,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-2294. Fix compilation error in mumak. (todd)
 
+    MAPREDUCE-2300. Fix TestUmbilicalProtocolWithJobToken on trunk after
+    HADOOP-6904. (todd)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES
