@@ -84,6 +84,9 @@ Trunk (unreleased changes)
     HDFS-1610. Fix TestClientProtocolWithDelegationToken and TestBlockToken
     on trunk after HADOOP-6904 (todd)
 
+    HDFS-1607. Fix referenced to misspelled method name getProtocolSigature
+    (todd)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES
