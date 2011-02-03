@@ -59,6 +59,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2300. Fix TestUmbilicalProtocolWithJobToken on trunk after
     HADOOP-6904. (todd)
 
+    MAPREDUCE-2296. Fix references to misspelled method name
+    getProtocolSigature (todd)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES

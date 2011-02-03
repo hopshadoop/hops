@@ -93,7 +93,7 @@ public class LocalJobRunner implements ClientProtocol {
   @Override
   public ProtocolSignature getProtocolSignature(String protocol,
       long clientVersion, int clientMethodsHash) throws IOException {
-    return ProtocolSignature.getProtocolSigature(
+    return ProtocolSignature.getProtocolSignature(
         this, protocol, clientVersion, clientMethodsHash);
   }
 
@@ -133,7 +133,7 @@ public class LocalJobRunner implements ClientProtocol {
     @Override
     public ProtocolSignature getProtocolSignature(String protocol,
         long clientVersion, int clientMethodsHash) throws IOException {
-      return ProtocolSignature.getProtocolSigature(
+      return ProtocolSignature.getProtocolSignature(
           this, protocol, clientVersion, clientMethodsHash);
     }
 
