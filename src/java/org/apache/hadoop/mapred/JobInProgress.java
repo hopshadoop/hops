@@ -1253,9 +1253,14 @@ public class JobInProgress {
    *  Returns the total job counters, by adding together the job, 
    *  the map and the reduce counters.
    */
-  public synchronized Counters getCounters() {
+  public Counters getCounters() {
     Counters result = new Counters();
-    result.incrAllCounters(getJobCounters());
+    synchronized (this) {
+      result.incrAllCounters(getJobCounters());
+    }
+
+    // the counters of TIPs are not updated in place.
+    // hence read-only access is ok without any locks
     incrementTaskCounters(result, maps);
     return incrementTaskCounters(result, reduces);
   }

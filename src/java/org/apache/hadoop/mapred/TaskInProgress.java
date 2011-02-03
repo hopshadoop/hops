@@ -129,7 +129,7 @@ class TaskInProgress {
   //task to commit, <taskattemptid>  
   private TaskAttemptID taskToCommit;
   
-  private Counters counters = new Counters();
+  private volatile Counters counters = new Counters();
   
   private HashMap<TaskAttemptID, Long> dispatchTimeMap = 
     new HashMap<TaskAttemptID, Long>();

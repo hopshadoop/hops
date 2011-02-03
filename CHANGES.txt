@@ -28,6 +28,10 @@ Trunk (unreleased changes)
     (hairong)
 
   OPTIMIZATIONS
+    
+    MAPREDUCE-2026. Make JobTracker.getJobCounters() and
+    JobInProgress.getCounters() aquire locks in a shorter time period.
+    (Joydeep Sen Sarma via schen)
 
   BUG FIXES
 

@@ -3538,25 +3538,26 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
       throws AccessControlException, IOException {
 
     JobID oldJobID = JobID.downgrade(jobid);
-
+    JobInProgress job;
     synchronized (this) {
-      JobInProgress job = jobs.get(oldJobID);
-      if (job != null) {
-	// check the job-access
-        aclsManager.checkAccess(job, UserGroupInformation.getCurrentUser(),
-            Operation.VIEW_JOB_COUNTERS);
-
-        if (!isJobInited(job)) {
-	  return EMPTY_COUNTERS;
-	}
-
-        Counters counters = job.getCounters();
-        if (counters != null) {
-          return new org.apache.hadoop.mapreduce.Counters(counters);
-        }
-        return null;
-      } 
+      job = jobs.get(oldJobID);
     }
+
+    if (job != null) {
+      // check the job-access
+      aclsManager.checkAccess(job, UserGroupInformation.getCurrentUser(),
+                              Operation.VIEW_JOB_COUNTERS);
+
+      if (!isJobInited(job)) {
+        return EMPTY_COUNTERS;
+      }
+
+      Counters counters = job.getCounters();
+      if (counters != null) {
+        return new org.apache.hadoop.mapreduce.Counters(counters);
+      }
+      return null;
+    } 
 
     Counters counters = completedJobStatusStore.readCounters(oldJobID);
     if (counters != null) {
