@@ -37,9 +37,6 @@ Trunk (unreleased changes)
 
     MAPREDUCE-2199. build is broken 0.22 branch creation. (cos)
 
-    MAPREDUCE-2200. TestUmbilicalProtocolWithJobToken is failing without Krb
-    evironment: needs to be conditional. (cos)
-
     MAPREDUCE-1752. Implement getFileBlockLocations in HarFilesystem.
     (Patrick Kling via dhruba)
 
@@ -526,6 +523,9 @@ Release 0.22.0 - Unreleased
     (Priyo Mustafi via shv)
 
     MAPREDUCE-2281. MR part of HADOOP-6642. (Chris Douglas, Po Cheung via shv)
+
+    MAPREDUCE-2200. TestUmbilicalProtocolWithJobToken is failing without Krb
+    evironment: needs to be conditional. (cos)
 
 Release 0.21.1 - Unreleased
 
