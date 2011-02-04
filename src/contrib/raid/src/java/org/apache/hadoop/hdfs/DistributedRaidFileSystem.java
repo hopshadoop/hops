@@ -17,37 +17,28 @@
  */
 package org.apache.hadoop.hdfs;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.DataInput;
 import java.io.PrintStream;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Random;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.ChecksumException;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FilterFileSystem;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FSInputStream;
-import org.apache.hadoop.hdfs.BlockMissingException;
-import org.apache.hadoop.hdfs.DistributedFileSystem;
-import org.apache.hadoop.util.Progressable;
-import org.apache.hadoop.util.ReflectionUtils;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.raid.Decoder;
 import org.apache.hadoop.raid.RaidNode;
 import org.apache.hadoop.raid.ReedSolomonDecoder;
 import org.apache.hadoop.raid.XORDecoder;
 import org.apache.hadoop.raid.protocol.PolicyInfo.ErasureCodeType;
+import org.apache.hadoop.util.ReflectionUtils;
 
 /**
  * This is an implementation of the Hadoop  RAID Filesystem. This FileSystem 
@@ -445,6 +436,29 @@ public class DistributedRaidFileSystem extends FilterFileSystem {
                          stripeLength, corruptOffset);
             if (npath == null)
               continue;
+            try {
+              String outdir = conf.get("fs.raid.recoverylogdir");
+              if (outdir != null) {
+                DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd-HH-mm-ss");
+                java.util.Date date = new java.util.Date();
+                String fname = path.getName() + dateFormat.format(date) +
+                (new Random()).nextInt() + ".txt";
+                Path outputunraid = new Path(outdir, fname);
+                FileSystem fs = outputunraid.getFileSystem(conf);
+                FSDataOutputStream dout = fs.create(outputunraid);
+                PrintStream ps = new PrintStream(dout);
+                ps.println("Recovery attempt log");
+                ps.println("Source path : " + path );
+                ps.println("Alternate path : " + alternates[idx].destPath);
+                ps.println("Stripe lentgh : " + stripeLength);
+                ps.println("Corrupt offset : " + corruptOffset);
+                String output = (npath==null) ? "UNSUCCESSFUL" : npath.toString();
+                ps.println("Output from unRaid : " + output);
+                ps.close();
+              }
+            } catch (Exception exc) {
+              LOG.info("Error while creating recovery log: " + exc);
+            }
 
             closeCurrentStream();
             LOG.info("Using block at offset " + corruptOffset + " from " +

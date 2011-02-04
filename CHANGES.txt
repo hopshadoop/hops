@@ -27,6 +27,8 @@ Trunk (unreleased changes)
     MAPREDUCE-2263. MapReduce side of HADOOP-6904: RPC compatibility.
     (hairong)
 
+    MAPREDUCE-1706. Log RAID recoveries on HDFS. (schen)
+
   OPTIMIZATIONS
     
     MAPREDUCE-2026. Make JobTracker.getJobCounters() and

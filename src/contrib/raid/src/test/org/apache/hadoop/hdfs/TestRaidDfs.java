@@ -17,49 +17,38 @@
  */
 package org.apache.hadoop.hdfs;
 
+import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileWriter;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.PrintWriter;
+import java.io.InputStreamReader;
 import java.io.RandomAccessFile;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.GregorianCalendar;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Properties;
 import java.util.Random;
+import java.util.regex.Pattern;
 import java.util.zip.CRC32;
 
 import junit.framework.TestCase;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
-import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.fs.BlockLocation;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.FilterFileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.apache.hadoop.hdfs.protocol.ClientProtocol;
-import org.apache.hadoop.hdfs.protocol.LocatedBlock;
-import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.protocol.Block;
-import org.apache.hadoop.hdfs.DistributedFileSystem;
-import org.apache.hadoop.hdfs.DistributedRaidFileSystem;
+import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.raid.RaidNode;
 import org.apache.hadoop.raid.RaidUtils;
 import org.apache.hadoop.raid.protocol.PolicyInfo.ErasureCodeType;
+import org.apache.hadoop.util.StringUtils;
 
 public class TestRaidDfs extends TestCase {
   final static String TEST_DIR = new File(System.getProperty("test.build.data",
       "build/contrib/raid/test/data")).getAbsolutePath();
+  final static String LOG_DIR = "/raidlog";
   final static long RELOAD_INTERVAL = 1000;
   final static Log LOG = LogFactory.getLog("org.apache.hadoop.raid.TestRaidDfs");
   final static int NUM_DATANODES = 3;
@@ -79,6 +68,7 @@ public class TestRaidDfs extends TestCase {
     new File(TEST_DIR).mkdirs(); // Make sure data directory exists
     conf = new Configuration();
 
+    conf.set("fs.raid.recoverylogdir", LOG_DIR);
     conf.setInt(RaidNode.RS_PARITY_LENGTH_KEY, rsParityLength);
 
     // scan all policies once every 5 second
@@ -198,6 +188,7 @@ public class TestRaidDfs extends TestCase {
     // Validate
     DistributedRaidFileSystem raidfs = getRaidFS();
     assertTrue(validateFile(raidfs, srcFile, length, crc));
+    validateLogFile(getRaidFS(), new Path(LOG_DIR));
   }
 
   /**
@@ -428,6 +419,30 @@ public class TestRaidDfs extends TestCase {
       LOG.info("CRC mismatch of file " + name + ": " + newcrc + " vs. " + crc);
     }
     return true;
+  }
+  //
+  // validates the contents of raid recovery log file
+  //
+  public static void validateLogFile(FileSystem fileSys, Path logDir)
+      throws IOException {
+    FileStatus f = fileSys.listStatus(logDir)[0];
+    FSDataInputStream stm = fileSys.open(f.getPath());
+    try {
+      BufferedReader reader = new BufferedReader(new InputStreamReader(stm));
+      assertEquals("Recovery attempt log", reader.readLine());
+      assertTrue(Pattern.matches("Source path : /user/dhruba/raidtest/.*",
+                 reader.readLine()));
+      assertTrue(Pattern.matches("Alternate path : .*/destraid",
+                 reader.readLine()));
+      assertEquals("Stripe lentgh : 3", reader.readLine());
+      assertTrue(Pattern.matches("Corrupt offset : \\d*", reader.readLine()));
+      assertTrue(Pattern.matches("Output from unRaid : " +
+          "hdfs://.*/tmp/raid/user/dhruba/raidtest/.*recovered",
+          reader.readLine()));
+    } finally {
+      stm.close();
+    }
+    LOG.info("Raid HDFS Recovery log verified");
   }
 
   /*
