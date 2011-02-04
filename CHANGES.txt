@@ -535,6 +535,9 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2077. Resolve name clash in the deprecated 
     o.a.h.util.MemoryCalculatorPlugin (Luke Lu via shv)
 
+    MAPREDUCE-2188. The new API MultithreadedMapper doesn't initialize
+    RecordReader. (Owen O'Malley via shv)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES
