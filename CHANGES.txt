@@ -541,6 +541,9 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-1915. Fix IndexOutOfBoundsException in IndexCache.
     (Priyo Mustafi via shv)
 
+    MAPREDUCE-1974. Fix multiple preemtions of the same task in FairScheduler.
+    (Scott Chen via shv)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES

@@ -924,7 +924,7 @@ public class FairScheduler extends TaskScheduler {
 
   private List<TaskStatus> getRunningTasks(JobInProgress job, TaskType type) {
     // Create a list of all running TaskInProgress'es in the job
-    List<TaskInProgress> tips = new ArrayList<TaskInProgress>();
+    Set<TaskInProgress> tips = new HashSet<TaskInProgress>();
     if (type == TaskType.MAP) {
       // Jobs may have both "non-local maps" which have a split with no locality
       // info (e.g. the input file is not in HDFS), and maps with locality info,
