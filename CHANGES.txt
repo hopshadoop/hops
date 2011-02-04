@@ -525,6 +525,9 @@ Release 0.22.0 - Unreleased
 
     HDFS-900. Corrupt replicas are not processed correctly in block report (shv)
 
+    HDFS-1529. Incorrect handling of interrupts in waitForAckedSeqno can cause
+    deadlock (todd)
+
 Release 0.21.1 - Unreleased
 
   IMPROVEMENTS

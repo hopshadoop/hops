@@ -24,6 +24,7 @@ import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.FileNotFoundException;
+import java.io.InterruptedIOException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -1167,7 +1168,16 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
       while (!closed && dataQueue.size() + ackQueue.size()  > MAX_PACKETS) {
         try {
           dataQueue.wait();
-        } catch (InterruptedException  e) {
+        } catch (InterruptedException e) {
+          // If we get interrupted while waiting to queue data, we still need to get rid
+          // of the current packet. This is because we have an invariant that if
+          // currentPacket gets full, it will get queued before the next writeChunk.
+          //
+          // Rather than wait around for space in the queue, we should instead try to
+          // return to the caller as soon as possible, even though we slightly overrun
+          // the MAX_PACKETS iength.
+          Thread.currentThread().interrupt();
+          break;
         }
       }
       isClosed();
@@ -1339,6 +1349,11 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
           throw ioe;
         }
       }
+    } catch (InterruptedIOException interrupt) {
+      // This kind of error doesn't mean that the stream itself is broken - just the
+      // flushing thread got interrupted. So, we shouldn't close down the writer,
+      // but instead just propagate the error
+      throw interrupt;
     } catch (IOException e) {
       DFSClient.LOG.warn("Error while syncing", e);
       synchronized (this) {
@@ -1416,7 +1431,8 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
         try {
           dataQueue.wait(1000); // when we receive an ack, we notify on dataQueue
         } catch (InterruptedException ie) {
-          Thread.currentThread().interrupt();
+          throw new InterruptedIOException(
+            "Interrupted while waiting for data to be acknowledged by pipeline");
         }
       }
     }
