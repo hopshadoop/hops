@@ -523,6 +523,8 @@ Release 0.22.0 - Unreleased
 
     HDFS-1591. HDFS part of HADOOP-6642. (Chris Douglas, Po Cheung via shv)
 
+    HDFS-900. Corrupt replicas are not processed correctly in block report (shv)
+
 Release 0.21.1 - Unreleased
 
   IMPROVEMENTS
