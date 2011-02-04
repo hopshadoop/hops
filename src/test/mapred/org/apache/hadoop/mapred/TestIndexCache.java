@@ -149,6 +149,50 @@ public class TestIndexCache extends TestCase {
     }
   }
 
+  public void testInvalidReduceNumberOrLength() throws Exception {
+    JobConf conf = new JobConf();
+    FileSystem fs = FileSystem.getLocal(conf).getRaw();
+    Path p = new Path(System.getProperty("test.build.data", "/tmp"),
+                      "cache").makeQualified(fs);
+    fs.delete(p, true);
+    conf.setInt(TTConfig.TT_INDEX_CACHE, 1);
+    final int partsPerMap = 1000;
+    final int bytesPerFile = partsPerMap * 24;
+    IndexCache cache = new IndexCache(conf);
+
+    // fill cache
+    Path feq = new Path(p, "invalidReduceOrPartsPerMap");
+    writeFile(fs, feq, bytesPerFile, partsPerMap);
+
+    // Number of reducers should always be less than partsPerMap as reducer
+    // numbers start from 0 and there cannot be more reducer than parts
+
+    try {
+      // Number of reducers equal to partsPerMap
+      cache.getIndexInformation("reduceEqualPartsPerMap", 
+               partsPerMap, // reduce number == partsPerMap
+               feq, UserGroupInformation.getCurrentUser().getShortUserName());
+      fail("Number of reducers equal to partsPerMap did not fail");
+    } catch (Exception e) {
+      if (!(e instanceof IOException)) {
+        throw e;
+      }
+    }
+
+    try {
+      // Number of reducers more than partsPerMap
+      cache.getIndexInformation(
+      "reduceMorePartsPerMap", 
+      partsPerMap + 1, // reduce number > partsPerMap
+      feq, UserGroupInformation.getCurrentUser().getShortUserName());
+      fail("Number of reducers more than partsPerMap did not fail");
+    } catch (Exception e) {
+      if (!(e instanceof IOException)) {
+        throw e;
+      }
+    }
+  }
+
   private static void checkRecord(IndexRecord rec, long fill) {
     assertEquals(fill, rec.startOffset);
     assertEquals(fill, rec.rawLength);

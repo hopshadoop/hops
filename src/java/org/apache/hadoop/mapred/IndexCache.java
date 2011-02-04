@@ -80,7 +80,7 @@ class IndexCache {
     }
 
     if (info.mapSpillRecord.size() == 0 ||
-        info.mapSpillRecord.size() < reduce) {
+        info.mapSpillRecord.size() <= reduce) {
       throw new IOException("Invalid request " +
         " Map Id = " + mapId + " Reducer = " + reduce +
         " Index Info Length = " + info.mapSpillRecord.size());

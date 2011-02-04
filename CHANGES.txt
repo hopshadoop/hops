@@ -538,6 +538,9 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2188. The new API MultithreadedMapper doesn't initialize
     RecordReader. (Owen O'Malley via shv)
 
+    MAPREDUCE-1915. Fix IndexOutOfBoundsException in IndexCache.
+    (Priyo Mustafi via shv)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES
