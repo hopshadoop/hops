@@ -219,7 +219,7 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>mv: Wrong FS: har:/dest/dir0.har/dir0/file0, expected: hdfs://\w+[.a-z]*:[0-9]+</expected-output>
+          <expected-output>mv: Wrong FS: har:/dest/dir0.har/dir0/file0, expected: hdfs://\w+[-.a-z0-9]*:[0-9]+</expected-output>
         </comparator>
         <comparator>
           <type>TokenComparator</type>

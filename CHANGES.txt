@@ -544,6 +544,9 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-1974. Fix multiple preemtions of the same task in FairScheduler.
     (Scott Chen via shv)
 
+    MAPREDUCE-2304. Fix TestMRCLI to allow hostname with a hyphen (-).
+    (Priyo Mustafi via shv)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES
