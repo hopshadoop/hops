@@ -264,6 +264,15 @@ class JSPUtil {
   public static String generateJobTable(String label, Collection<JobInProgress> jobs
       , int refresh, int rowId, JobConf conf) throws IOException {
 
+    // Remove uninitialized jobs because calling JobInProgress synchronized
+    // methods while job initialization takes long time
+    for (Iterator<JobInProgress> it = jobs.iterator(); it.hasNext();) {
+      JobInProgress job = it.next();
+      if (!job.inited()) {
+        it.remove();
+      }
+    }
+
     boolean isModifiable = label.equals("Running") &&
         privateActionsAllowed(conf);
     StringBuilder sb = new StringBuilder();

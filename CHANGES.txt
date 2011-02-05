@@ -547,6 +547,10 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2304. Fix TestMRCLI to allow hostname with a hyphen (-).
     (Priyo Mustafi via shv)
 
+    MAPREDUCE-1825 jobqueue_details.jsp and FairSchedulerServelet should not
+    call finishedMaps and finishedReduces when job is not initialized.
+    (Scott Chen via shv)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES

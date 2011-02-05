@@ -99,6 +99,9 @@ public class JobSchedulable extends Schedulable {
 
   @Override
   public int getRunningTasks() {
+    if (!job.inited()) {
+      return 0;
+    }
     return taskType == TaskType.MAP ? job.runningMaps() : job.runningReduces();
   }
 
