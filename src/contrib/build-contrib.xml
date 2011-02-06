@@ -104,9 +104,6 @@
     <fileset dir="${hadoop.root}/lib">
       <include name="**/*.jar" />
     </fileset>
-    <fileset dir="${build.ivy.lib.dir}">
-      <include name="**/*.jar" />
-    </fileset>
     <path refid="${ant.project.name}.common-classpath"/>
     <pathelement path="${clover.jar}"/>
   </path>
