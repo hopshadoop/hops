@@ -17,7 +17,7 @@
    limitations under the License.
 -->
 
-<project name="Hadoop-Hdfs" default="compile" 
+<project name="hadoop-hdfs" default="compile" 
    xmlns:artifact="urn:maven-artifact-ant"
    xmlns:ivy="antlib:org.apache.ivy.ant"> 
 
@@ -1842,11 +1842,11 @@
     <ivy:cachepath pathid="ivy-test.classpath" conf="system"/>
   </target>
 
-  <target name="ivy-report" depends="ivy-resolve-releaseaudit"
+  <target name="ivy-report" depends="ivy-resolve"
     description="Generate">
     <ivy:report todir="${build.ivy.report.dir}" settingsRef="${ant.project.name}.ivy.settings"/>
     <echo>
-      Reports generated:${build.ivy.report.dir}
+      Reports generated: ${build.ivy.report.dir}
     </echo>
   </target>
 
