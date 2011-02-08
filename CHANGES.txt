@@ -50,6 +50,8 @@ Trunk (unreleased changes)
     HDFS-1335. HDFS side change of HADDOP-6904: RPC compatibility. (hairong)
 
     HDFS-1557. Separate Storage from FSImage. (Ivan Kelly via jitendra)
+    
+    HDFS-560 Enhancements/tuning to hadoop-hdfs/build.xml
 
   OPTIMIZATIONS
 
