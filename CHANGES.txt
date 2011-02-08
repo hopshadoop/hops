@@ -58,6 +58,8 @@ Trunk (unreleased changes)
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
     downloads and loading. (hairong)
 
+    HDFS-1601. Pipeline ACKs are sent as lots of tiny TCP packets (todd)
+
   BUG FIXES
 
     HDFS-1516. mvn-install is broken after 0.22 branch creation. (cos)
