@@ -805,7 +805,7 @@ public class FSEditLog implements NNStorageListener {
       return; // nothing to do, edits.new exists!
 
     // check if any of failed storage is now available and put it back
-    storage.attemptRestoreRemovedStorage(false);
+    storage.attemptRestoreRemovedStorage();
 
     divertFileStreams(
         Storage.STORAGE_DIR_CURRENT + "/" + NameNodeFile.EDITS_NEW.getName());

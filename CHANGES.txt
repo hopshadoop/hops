@@ -87,6 +87,8 @@ Trunk (unreleased changes)
     HDFS-1607. Fix referenced to misspelled method name getProtocolSigature
     (todd)
 
+    HDFS-1602. Fix HADOOP-4885 for it is doesn't work as expected. (boryas)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES
