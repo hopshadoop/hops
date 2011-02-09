@@ -93,6 +93,8 @@ Trunk (unreleased changes)
 
     HDFS-1602. Fix HADOOP-4885 for it is doesn't work as expected. (boryas)
 
+    HDFS-1600. Fix release audit warnings on trunk. (todd)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES
