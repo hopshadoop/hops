@@ -446,7 +446,6 @@ public class FSEditLog implements NNStorageListener {
     try {
       synchronized (this) {
         try {
-        assert editStreams.size() > 0 : "no editlog streams";
         printStatistics(false);
   
         // if somebody is already syncing, then wait
@@ -473,6 +472,7 @@ public class FSEditLog implements NNStorageListener {
         sync = true;
   
         // swap buffers
+        assert editStreams.size() > 0 : "no editlog streams";
         for(EditLogOutputStream eStream : editStreams) {
           try {
             eStream.setReadyToFlush();
@@ -518,8 +518,8 @@ public class FSEditLog implements NNStorageListener {
     } finally {
       // Prevent RuntimeException from blocking other log edit sync 
       synchronized (this) {
-        synctxid = syncStart;
         if (sync) {
+          synctxid = syncStart;
           isSyncRunning = false;
         }
         this.notifyAll();
@@ -954,6 +954,15 @@ public class FSEditLog implements NNStorageListener {
       return getEditFile(it.next()).lastModified();
     return 0;
   }
+
+  /**
+   * Return the txid of the last synced transaction.
+   * For test use only
+   */
+  synchronized long getSyncTxId() {
+    return synctxid;
+  }
+
 
   // sets the initial capacity of the flush buffer.
   public void setBufferCapacity(int size) {

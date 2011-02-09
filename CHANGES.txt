@@ -534,6 +534,9 @@ Release 0.22.0 - Unreleased
     HDFS-1529. Incorrect handling of interrupts in waitForAckedSeqno can cause
     deadlock (todd)
 
+    HDFS-1597. Batched edit log syncs can reset synctxid and throw assertions
+    (todd)
+
 Release 0.21.1 - Unreleased
 
   IMPROVEMENTS
