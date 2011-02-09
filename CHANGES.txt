@@ -64,6 +64,8 @@ Trunk (unreleased changes)
     MAPREDUCE-2296. Fix references to misspelled method name
     getProtocolSigature (todd)
 
+    MAPREDUCE-2311. Fix TestFairScheduler failure (schen)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES

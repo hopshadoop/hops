@@ -669,9 +669,6 @@ public class FairScheduler extends TaskScheduler {
     Map<String, Integer> userJobs = new HashMap<String, Integer>();
     Map<String, Integer> poolJobs = new HashMap<String, Integer>();
     for (JobInProgress job: jobs) {
-      if (!job.inited()) {
-        continue;
-      }
       String user = job.getJobConf().getUser();
       String pool = poolMgr.getPoolName(job);
       int userCount = userJobs.containsKey(user) ? userJobs.get(user) : 0;

@@ -47,6 +47,7 @@ import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.mapreduce.server.jobtracker.TaskTracker;
 import org.apache.hadoop.mapreduce.split.JobSplit;
 import org.apache.hadoop.net.Node;
+import org.mortbay.log.Log;
 
 public class TestFairScheduler extends TestCase {
   final static String TEST_DIR = new File(System.getProperty("test.build.data",
@@ -137,7 +138,8 @@ public class TestFairScheduler extends TestCase {
       initialized = true;
     }
     
-    public boolean isInitialized() {
+    @Override
+    public boolean inited() {
       return initialized;
     }
 
@@ -1366,12 +1368,12 @@ public class TestFairScheduler extends TestCase {
     // Submit jobs, advancing time in-between to make sure that they are
     // all submitted at distinct times.
     JobInProgress job1 = submitJobNotInitialized(JobStatus.PREP, 10, 10);
-    assertTrue(((FakeJobInProgress)job1).isInitialized());
+    assertTrue(((FakeJobInProgress)job1).inited());
     job1.getStatus().setRunState(JobStatus.RUNNING);
     JobInfo info1 = scheduler.infos.get(job1);
     advanceTime(10);
     JobInProgress job2 = submitJobNotInitialized(JobStatus.PREP, 10, 10);
-    assertTrue(((FakeJobInProgress)job2).isInitialized());
+    assertTrue(((FakeJobInProgress)job2).inited());
     job2.getStatus().setRunState(JobStatus.RUNNING);
     JobInfo info2 = scheduler.infos.get(job2);
     advanceTime(10);
@@ -1382,10 +1384,10 @@ public class TestFairScheduler extends TestCase {
     JobInfo info4 = scheduler.infos.get(job4);
     
     // Only two of the jobs should be initialized.
-    assertTrue(((FakeJobInProgress)job1).isInitialized());
-    assertTrue(((FakeJobInProgress)job2).isInitialized());
-    assertFalse(((FakeJobInProgress)job3).isInitialized());
-    assertFalse(((FakeJobInProgress)job4).isInitialized());
+    assertTrue(((FakeJobInProgress)job1).inited());
+    assertTrue(((FakeJobInProgress)job2).inited());
+    assertFalse(((FakeJobInProgress)job3).inited());
+    assertFalse(((FakeJobInProgress)job4).inited());
     
     // Check scheduler variables
     assertEquals(2.0,  info1.mapSchedulable.getFairShare());
