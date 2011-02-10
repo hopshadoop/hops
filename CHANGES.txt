@@ -556,6 +556,8 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2285. MiniMRCluster does not start after ant test-patch
     (todd)
 
+    MAPREDUCE-2315. javadoc is failing in nightly build (todd)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES

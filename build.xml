@@ -1054,14 +1054,14 @@
        <group title="contrib: Index" packages="org.apache.hadoop.contrib.index*"/>
        <group title="contrib: Streaming" packages="org.apache.hadoop.streaming*:org.apache.hadoop.typedbytes*"/>
        <doclet name="org.apache.hadoop.classification.tools.ExcludePrivateAnnotationsStandardDoclet"
-         path="${common.ivy.lib.dir}/hadoop-common-${version}.jar"/>
+         path="${common.ivy.lib.dir}/hadoop-common-${hadoop-common.version}.jar"/>
     </javadoc>
   </target>	
 
   <target name="api-xml" depends="ivy-retrieve-jdiff,javadoc,write-null">
     <javadoc maxmemory="${javadoc.maxmemory}">
        <doclet name="org.apache.hadoop.classification.tools.ExcludePrivateAnnotationsJDiffDoclet"
-         path="${common.ivy.lib.dir}/hadoop-common-${version}.jar:${jdiff.jar}:${xerces.jar}">
+         path="${common.ivy.lib.dir}/hadoop-common-${hadoop-common.version}.jar:${jdiff.jar}:${xerces.jar}">
          <param name="-apidir" value="${jdiff.xml.dir}"/>
          <param name="-apiname" value="hadoop-mapred ${version}"/>
          <param name="${jdiff.stability}"/>
@@ -1089,7 +1089,7 @@
 	     sourceFiles="${jdiff.home}/Null.java"
 	     maxmemory="${javadoc.maxmemory}">
        <doclet name="org.apache.hadoop.classification.tools.ExcludePrivateAnnotationsJDiffDoclet"
-         path="${common.ivy.lib.dir}/hadoop-common-${version}.jar:${jdiff.jar}:${xerces.jar}">
+         path="${common.ivy.lib.dir}/hadoop-common-${hadoop-common.version}.jar:${jdiff.jar}:${xerces.jar}">
          <param name="-oldapi" value="hadoop-mapred ${jdiff.stable}"/>
          <param name="-newapi" value="hadoop-mapred ${version}"/>
          <param name="-oldapidir" value="${jdiff.xml.dir}"/>
@@ -1318,8 +1318,8 @@
         <include name="${examples.final.name}.jar"/>
       </fileset>
     </copy>
-    <copy tofile="${system-test-build-dir}/${final.name}/lib/hadoop-common-${version}.jar"
-      file="${system-test-build-dir}/ivy/lib/${ant.project.name}/system/hadoop-common-${herriot.suffix}-${version}.jar"
+    <copy tofile="${system-test-build-dir}/${final.name}/lib/hadoop-common-${hadoop-common.version}.jar"
+      file="${system-test-build-dir}/ivy/lib/${ant.project.name}/system/hadoop-common-${herriot.suffix}-${hadoop-common.version}.jar"
       overwrite="true"/>
     <copy tofile="${system-test-build-dir}/${final.name}/lib/hadoop-hdfs-${version}.jar"
       file="${system-test-build-dir}/ivy/lib/${ant.project.name}/system/hadoop-hdfs-${herriot.suffix}-${version}.jar"
