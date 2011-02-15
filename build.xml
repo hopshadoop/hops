@@ -1208,6 +1208,12 @@
     <copy todir="${dist.dir}/" file="build-utils.xml"/>
 
     <chmod perm="ugo+x" type="file" parallel="false">
+        <fileset file="${dist.dir}/src/examples/pipes/configure"/>
+        <fileset file="${dist.dir}/src/c++/utils/configure"/>
+        <fileset file="${dist.dir}/src/c++/pipes/configure"/>
+        <fileset file="${dist.dir}/src/c++/task-controller/configure"/>
+    </chmod>
+    <chmod perm="ugo+x" type="file" parallel="false">
         <fileset dir="${dist.dir}/bin"/>
         <fileset dir="${dist.dir}/src/contrib/">
           <include name="*/bin/*" />
@@ -1228,11 +1234,19 @@
         <tarfileset dir="${build.dir}" mode="664">
           <exclude name="${final.name}/bin/*" />
           <exclude name="${final.name}/contrib/*/bin/*" />
+          <exclude name="${final.name}/src/examples/pipes/configure"/>
+          <exclude name="${final.name}/src/c++/utils/configure"/>
+          <exclude name="${final.name}/src/c++/pipes/configure"/>
+          <exclude name="${final.name}/src/c++/task-controller/configure"/>
           <include name="${final.name}/**" />
         </tarfileset>
         <tarfileset dir="${build.dir}" mode="755">
           <include name="${final.name}/bin/*" />
           <include name="${final.name}/contrib/*/bin/*" />
+          <include name="${final.name}/src/examples/pipes/configure"/>
+          <include name="${final.name}/src/c++/utils/configure"/>
+          <include name="${final.name}/src/c++/pipes/configure"/>
+          <include name="${final.name}/src/c++/task-controller/configure"/>
         </tarfileset>
       </param.listofitems>
     </macro_tar>
