@@ -53,6 +53,9 @@ Trunk (unreleased changes)
     
     HDFS-560 Enhancements/tuning to hadoop-hdfs/build.xml
 
+    HDFS-1629. Add a method to BlockPlacementPolicy for keeping the chosen
+    nodes in the output array.  (szetszwo)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
