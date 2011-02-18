@@ -108,6 +108,7 @@ public class BlockPlacementPolicyRaid extends BlockPlacementPolicy {
   @Override
   DatanodeDescriptor[] chooseTarget(String srcPath, int numOfReplicas,
       DatanodeDescriptor writer, List<DatanodeDescriptor> chosenNodes,
+      boolean returnChosenNodes,
       HashMap<Node, Node> excludedNodes, long blocksize) {
     try {
       if (excludedNodes == null) {
@@ -116,7 +117,7 @@ public class BlockPlacementPolicyRaid extends BlockPlacementPolicy {
       addExcludedNodes(srcPath, excludedNodes);
       DatanodeDescriptor[] result =
         defaultPolicy.chooseTarget(numOfReplicas, writer,
-          chosenNodes, excludedNodes, blocksize);
+          chosenNodes, returnChosenNodes, excludedNodes, blocksize);
       cachedLocatedBlocks.get(srcPath).
           add(new LocatedBlock(new Block(), result));
       return result;

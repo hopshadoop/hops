@@ -29,6 +29,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-1706. Log RAID recoveries on HDFS. (schen)
 
+    MAPREDUCE-2334. Update BlockPlacementPolicyRaid for the new method
+    in BlockPlacementPolicy.  (szetszwo)
+
   OPTIMIZATIONS
     
     MAPREDUCE-2026. Make JobTracker.getJobCounters() and
