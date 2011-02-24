@@ -586,6 +586,10 @@ Release 0.21.1 - Unreleased
 
     HDFS-996. JUnit tests should never depend on anything in conf (cos)
 
+    HDFS-1612. Update HDFS design documentation for append, quota, symlink,
+    block placement and checkpoint/backup node features.  (Joe Crobak
+    via szetszwo)
+
   INCOMPATIBLE CHANGES
 
     HDFS-538. Per the contract elucidated in HADOOP-6201, throw
