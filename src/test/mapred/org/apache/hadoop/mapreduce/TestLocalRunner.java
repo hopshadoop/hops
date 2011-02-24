@@ -38,6 +38,7 @@ import org.apache.hadoop.mapred.LocalJobRunner;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.FileSplit;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.util.ReflectionUtils;
 
 import org.junit.Test;
 import junit.framework.TestCase;
@@ -318,7 +319,7 @@ public class TestLocalRunner extends TestCase {
    * Run a test with several mappers in parallel, operating at different
    * speeds. Verify that the correct amount of output is created.
    */
-  @Test
+  @Test(timeout=120*1000)
   public void testMultiMaps() throws Exception {
     Job job = Job.getInstance();
 
@@ -341,7 +342,39 @@ public class TestLocalRunner extends TestCase {
     FileInputFormat.addInputPath(job, inputPath);
     FileOutputFormat.setOutputPath(job, outputPath);
 
-    job.waitForCompletion(true);
+    final Thread toInterrupt = Thread.currentThread();
+    Thread interrupter = new Thread() {
+      public void run() {
+        try {
+          Thread.sleep(120*1000); // 2m
+          toInterrupt.interrupt();
+        } catch (InterruptedException ie) {}
+      }
+    };
+    LOG.info("Submitting job...");
+    job.submit();
+    LOG.info("Starting thread to interrupt main thread in 2 minutes");
+    interrupter.start();
+    LOG.info("Waiting for job to complete...");
+    try {
+      job.waitForCompletion(true);
+    } catch (InterruptedException ie) {
+      LOG.fatal("Interrupted while waiting for job completion", ie);
+      for (int i = 0; i < 10; i++) {
+        LOG.fatal("Dumping stacks");
+        ReflectionUtils.logThreadInfo(LOG, "multimap threads", 0);
+        Thread.sleep(1000);
+      }
+      throw ie;
+    }
+    LOG.info("Job completed, stopping interrupter");
+    interrupter.interrupt();
+    try {
+      interrupter.join();
+    } catch (InterruptedException ie) {
+      // it might interrupt us right as we interrupt it
+    }
+    LOG.info("Verifying output");
 
     verifyOutput(outputPath);
   }
