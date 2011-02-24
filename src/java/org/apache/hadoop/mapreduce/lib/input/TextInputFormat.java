@@ -43,7 +43,12 @@ public class TextInputFormat extends FileInputFormat<LongWritable, Text> {
   public RecordReader<LongWritable, Text> 
     createRecordReader(InputSplit split,
                        TaskAttemptContext context) {
-    return new LineRecordReader();
+    String delimiter = context.getConfiguration().get(
+        "textinputformat.record.delimiter");
+    byte[] recordDelimiterBytes = null;
+    if (null != delimiter)
+      recordDelimiterBytes = delimiter.getBytes();
+    return new LineRecordReader(recordDelimiterBytes);
   }
 
   @Override

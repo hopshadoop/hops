@@ -66,6 +66,14 @@ public class LineRecordReader extends RecordReader<LongWritable, Text> {
   private Counter inputByteCounter;
   private CompressionCodec codec;
   private Decompressor decompressor;
+  private byte[] recordDelimiterBytes;
+
+  public LineRecordReader() {
+  }
+
+  public LineRecordReader(byte[] recordDelimiter) {
+    this.recordDelimiterBytes = recordDelimiter;
+  }
 
   public void initialize(InputSplit genericSplit,
                          TaskAttemptContext context) throws IOException {
@@ -90,17 +98,33 @@ public class LineRecordReader extends RecordReader<LongWritable, Text> {
           ((SplittableCompressionCodec)codec).createInputStream(
             fileIn, decompressor, start, end,
             SplittableCompressionCodec.READ_MODE.BYBLOCK);
-        in = new LineReader(cIn, job);
+        if (null == this.recordDelimiterBytes){
+          in = new LineReader(cIn, job);
+        } else {
+          in = new LineReader(cIn, job, this.recordDelimiterBytes);
+        }
+
         start = cIn.getAdjustedStart();
         end = cIn.getAdjustedEnd();
         filePosition = cIn;
       } else {
-        in = new LineReader(codec.createInputStream(fileIn, decompressor), job);
+        if (null == this.recordDelimiterBytes) {
+          in = new LineReader(codec.createInputStream(fileIn, decompressor),
+              job);
+        } else {
+          in = new LineReader(codec.createInputStream(fileIn,
+              decompressor), job, this.recordDelimiterBytes);
+        }
         filePosition = fileIn;
       }
     } else {
       fileIn.seek(start);
-      in = new LineReader(fileIn, job);
+      if (null == this.recordDelimiterBytes){
+        in = new LineReader(fileIn, job);
+      } else {
+        in = new LineReader(fileIn, job, this.recordDelimiterBytes);
+      }
+
       filePosition = fileIn;
     }
     // If this is not the first split, we always throw away first record

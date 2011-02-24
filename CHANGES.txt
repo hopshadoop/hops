@@ -32,6 +32,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2334. Update BlockPlacementPolicyRaid for the new method
     in BlockPlacementPolicy.  (szetszwo)
 
+    MAPREDUCE-2254. Allow setting of end-of-record delimiter for
+    TextInputFormat (Ahmed Radwan via todd)
+
   OPTIMIZATIONS
     
     MAPREDUCE-2026. Make JobTracker.getJobCounters() and
