@@ -35,6 +35,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2254. Allow setting of end-of-record delimiter for
     TextInputFormat (Ahmed Radwan via todd)
 
+    MAPREDUCE-1927. Unit test for HADOOP-6835 (concatenated gzip support).
+    (Greg Roelofs via tomwhite)
+
   OPTIMIZATIONS
     
     MAPREDUCE-2026. Make JobTracker.getJobCounters() and

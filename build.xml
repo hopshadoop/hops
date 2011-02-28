@@ -94,6 +94,7 @@
   <property name="test.generated.dir" value="${test.build.dir}/src"/>
   <property name="test.build.data" value="${test.build.dir}/data"/>
   <property name="test.cache.data" value="${test.build.dir}/cache"/>
+  <property name="test.concat.data" value="${test.build.dir}/concat"/>
   <property name="test.debug.data" value="${test.build.dir}/debug"/>
   <property name="test.log.dir" value="${test.build.dir}/logs"/>
   <property name="test.build.classes" value="${test.build.dir}/classes"/>
@@ -571,6 +572,8 @@
 
      <delete dir="${test.cache.data}"/>
      <mkdir dir="${test.cache.data}"/>
+     <delete dir="${test.concat.data}"/>
+     <mkdir dir="${test.concat.data}"/>
      <delete dir="${test.debug.data}"/>
      <mkdir dir="${test.debug.data}"/>
      <copy file="${test.src.dir}/mapred/org/apache/hadoop/mapred/testscript.txt" todir="${test.debug.data}"/>
@@ -582,6 +585,12 @@
      <copy file="${test.src.dir}/mapred/org/apache/hadoop/mapred/test.tar.gz" todir="${test.cache.data}"/>
      <copy file="${test.src.dir}/mapred/org/apache/hadoop/cli/testMRConf.xml" todir="${test.cache.data}"/>
      <copy file="${test.src.dir}/mapred/org/apache/hadoop/cli/data60bytes" todir="${test.cache.data}"/>
+     <copy file="${test.src.dir}/mapred/org/apache/hadoop/mapred/concat.bz2" todir="${test.concat.data}"/>
+     <copy file="${test.src.dir}/mapred/org/apache/hadoop/mapred/concat.gz" todir="${test.concat.data}"/>
+     <copy file="${test.src.dir}/mapred/org/apache/hadoop/mapred/testCompressThenConcat.txt.bz2" todir="${test.concat.data}"/>
+     <copy file="${test.src.dir}/mapred/org/apache/hadoop/mapred/testCompressThenConcat.txt.gz" todir="${test.concat.data}"/>
+     <copy file="${test.src.dir}/mapred/org/apache/hadoop/mapred/testConcatThenCompress.txt.bz2" todir="${test.concat.data}"/>
+     <copy file="${test.src.dir}/mapred/org/apache/hadoop/mapred/testConcatThenCompress.txt.gz" todir="${test.concat.data}"/>
   </target>
 
   <macrodef name="macro-compile-test">
@@ -678,6 +687,7 @@
           value="${test.src.dir}/krb5.conf"/>
         <sysproperty key="test.tools.input.dir" value = "${test.tools.input.dir}"/>
         <sysproperty key="test.cache.data" value="${test.cache.data}"/>     
+        <sysproperty key="test.concat.data" value="${test.concat.data}"/>
         <sysproperty key="test.debug.data" value="${test.debug.data}"/>
         <sysproperty key="hadoop.log.dir" value="@{test.dir}/logs"/>
         <sysproperty key="test.src.dir" value="@{fileset.dir}"/>
