@@ -640,7 +640,7 @@ abstract class TaskRunner extends Thread {
   }
   
   /**
-   * Given a "jobJar" (typically retrieved via {@link Configuration.getJar()}),
+   * Given a "jobJar" (typically retrieved via {@link JobConf#getJar()}),
    * appends classpath entries for it, as well as its lib/ and classes/
    * subdirectories.
    * 
