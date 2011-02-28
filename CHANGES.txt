@@ -590,6 +590,9 @@ Release 0.21.1 - Unreleased
     block placement and checkpoint/backup node features.  (Joe Crobak
     via szetszwo)
 
+    HDFS-1189. Quota counts missed between clear quota and set quota.
+    (John George via szetszwo)
+
   INCOMPATIBLE CHANGES
 
     HDFS-538. Per the contract elucidated in HADOOP-6201, throw
