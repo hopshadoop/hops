@@ -330,6 +330,7 @@ class JSPUtil {
         int completedMaps = job.finishedMaps();
         int completedReduces = job.finishedReduces();
         String name = HtmlQuoting.quoteHtmlChars(profile.getJobName());
+        String abbreviatedName = getAbbreviatedJobName(name);
         String jobpri = job.getPriority().toString();
         String schedulingInfo =
           HtmlQuoting.quoteHtmlChars(job.getStatus().getSchedulingInfo());
@@ -348,8 +349,8 @@ class JSPUtil {
             + refresh + "\">" + jobid + "</a></td>" + "<td id=\"priority_"
             + rowId + "\">" + jobpri + "</td>" + "<td id=\"user_" + rowId
             + "\">" + HtmlQuoting.quoteHtmlChars(profile.getUser()) +
-              "</td>" + "<td id=\"name_" + rowId
-            + "\">" + ("".equals(name) ? "&nbsp;" : name) + "</td>" + "<td>"
+              "</td>" + "<td title=\"" + name + "\" id=\"name_" + rowId
+            + "\">" + ("".equals(abbreviatedName) ? "&nbsp;" : abbreviatedName) + "</td>" + "<td>"
             + StringUtils.formatPercent(status.mapProgress(), 2)
             + ServletUtil.percentageGraph(status.mapProgress() * 100, 80)
             + "</td><td>" + desiredMaps + "</td><td>" + completedMaps
@@ -370,6 +371,10 @@ class JSPUtil {
     sb.append("</table>\n");
     
     return sb.toString();
+  }
+
+  static String getAbbreviatedJobName(String name) {
+    return (name.length() > 80 ? name.substring(0,76) + "..." : name);
   }
 
   @SuppressWarnings("unchecked")
@@ -411,7 +416,7 @@ class JSPUtil {
             "<td id=\"priority_" + rowId + "\">" + 
               status.getJobPriority().toString() + "</td>" +
             "<td id=\"user_" + rowId + "\">" + HtmlQuoting.quoteHtmlChars(status.getUsername()) + "</td>" +
-            "<td id=\"name_" + rowId + "\">" + HtmlQuoting.quoteHtmlChars(status.getJobName()) + "</td>" +
+            "<td title=\"" + HtmlQuoting.quoteHtmlChars(status.getJobName()) + "\" id=\"name_" + rowId + "\">" + HtmlQuoting.quoteHtmlChars(getAbbreviatedJobName(status.getJobName())) + "</td>" +
             "<td>" + JobStatus.getJobRunState(status.getRunState()) + "</td>" +
             "<td>" + new Date(status.getStartTime()) + "</td>" +
             "<td>" + new Date(status.getFinishTime()) + "</td>" +
