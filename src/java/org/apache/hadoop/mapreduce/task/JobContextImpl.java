@@ -31,6 +31,7 @@ import org.apache.hadoop.mapreduce.InputFormat;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobID;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.OutputFormat;
 import org.apache.hadoop.mapreduce.Partitioner;
@@ -263,7 +264,16 @@ public class JobContextImpl implements JobContext {
    * @return boolean 
    */
   public boolean getJobSetupCleanupNeeded() {
-    return conf.getBoolean("mapred.committer.job.setup.cleanup.needed", true);
+    return conf.getBoolean(MRJobConfig.SETUP_CLEANUP_NEEDED, true);
+  }
+  
+  /**
+   * Get whether task-cleanup is needed for the job 
+   * 
+   * @return boolean 
+   */
+  public boolean getTaskCleanupNeeded() {
+    return conf.getBoolean(MRJobConfig.TASK_CLEANUP_NEEDED, true);
   }
 
   /**

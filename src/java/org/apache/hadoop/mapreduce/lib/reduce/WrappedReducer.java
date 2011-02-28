@@ -193,6 +193,11 @@ public class WrappedReducer<KEYIN, VALUEIN, KEYOUT, VALUEOUT>
     }
 
     @Override
+    public boolean getTaskCleanupNeeded() {
+      return reduceContext.getTaskCleanupNeeded();
+    }
+
+    @Override
     public Path[] getLocalCacheArchives() throws IOException {
       return reduceContext.getLocalCacheArchives();
     }

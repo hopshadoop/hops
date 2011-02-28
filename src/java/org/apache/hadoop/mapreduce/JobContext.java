@@ -182,6 +182,13 @@ public interface JobContext extends MRJobConfig {
    * @return boolean 
    */
   public boolean getJobSetupCleanupNeeded();
+  
+  /**
+   * Get whether task-cleanup is needed for the job 
+   * 
+   * @return boolean 
+   */
+  public boolean getTaskCleanupNeeded();
 
   /**
    * Get whether the task profiling is enabled.

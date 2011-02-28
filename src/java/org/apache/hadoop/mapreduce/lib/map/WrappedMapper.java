@@ -200,6 +200,11 @@ public class WrappedMapper<KEYIN, VALUEIN, KEYOUT, VALUEOUT>
     }
 
     @Override
+    public boolean getTaskCleanupNeeded() {
+      return mapContext.getTaskCleanupNeeded();
+    }
+
+    @Override
     public Path[] getLocalCacheArchives() throws IOException {
       return mapContext.getLocalCacheArchives();
     }

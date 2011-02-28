@@ -146,6 +146,7 @@ public class JobInProgress {
   private volatile boolean jobKilled = false;
   private volatile boolean jobFailed = false;
   private final boolean jobSetupCleanupNeeded;
+  private final boolean taskCleanupNeeded;
 
   JobPriority priority = JobPriority.NORMAL;
   protected JobTracker jobtracker;
@@ -360,6 +361,8 @@ public class JobInProgress {
         MRJobConfig.SPECULATIVE_SLOWNODE_THRESHOLD,1.0f);
     this.jobSetupCleanupNeeded = conf.getBoolean(
         MRJobConfig.SETUP_CLEANUP_NEEDED, true);
+    this.taskCleanupNeeded = conf.getBoolean(
+        MRJobConfig.TASK_CLEANUP_NEEDED, true);
     if (tracker != null) { // Some mock tests have null tracker
       this.jobHistory = tracker.getJobHistory();
     }
@@ -369,6 +372,7 @@ public class JobInProgress {
   JobInProgress(JobConf conf) {
     restartCount = 0;
     jobSetupCleanupNeeded = false;
+    taskCleanupNeeded = true;
 
     this.memoryPerMap = conf.getMemoryForMapTask();
     this.memoryPerReduce = conf.getMemoryForReduceTask();
@@ -449,6 +453,7 @@ public class JobInProgress {
           numMapTasks + numReduceTasks + 10);
       JobContext jobContext = new JobContextImpl(conf, jobId);
       this.jobSetupCleanupNeeded = jobContext.getJobSetupCleanupNeeded();
+      this.taskCleanupNeeded = jobContext.getTaskCleanupNeeded();
 
       // Construct the jobACLs
       status.setJobACLs(jobtracker.getJobACLsManager().constructJobACLs(conf));
@@ -1078,12 +1083,12 @@ public class JobInProgress {
       status.setRunState(TaskStatus.State.KILLED);
     }
     
-    // If the job is complete and a task has just reported its 
-    // state as FAILED_UNCLEAN/KILLED_UNCLEAN, 
+    // If the job is complete or task-cleanup is switched off
+    // and a task has just reported its state as FAILED_UNCLEAN/KILLED_UNCLEAN, 
     // make the task's state FAILED/KILLED without launching cleanup attempt.
     // Note that if task is already a cleanup attempt, 
     // we don't change the state to make sure the task gets a killTaskAction
-    if ((this.isComplete() || jobFailed || jobKilled) && 
+    if ((this.isComplete() || jobFailed || jobKilled || !taskCleanupNeeded) && 
         !tip.isCleanupAttempt(taskid)) {
       if (status.getRunState() == TaskStatus.State.FAILED_UNCLEAN) {
         status.setRunState(TaskStatus.State.FAILED);

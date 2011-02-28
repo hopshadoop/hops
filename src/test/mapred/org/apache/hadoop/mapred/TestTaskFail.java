@@ -32,6 +32,7 @@ import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.lib.IdentityReducer;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.MapReduceTestUtil;
 import org.apache.hadoop.mapreduce.TaskType;
 
@@ -125,7 +126,8 @@ public class TestTaskFail extends TestCase {
   }
   
   private void validateAttempt(TaskInProgress tip, TaskAttemptID attemptId, 
-                               TaskStatus ts, boolean isCleanup, JobTracker jt) 
+                               TaskStatus ts, boolean isCleanup,
+                               boolean containsCleanupLog, JobTracker jt) 
   throws IOException {
     assertEquals(isCleanup, tip.isCleanupAttempt(attemptId));
     assertTrue(ts != null);
@@ -142,11 +144,12 @@ public class TestTaskFail extends TestCase {
         "&filter=STDERR";
     assertEquals(HttpURLConnection.HTTP_OK, TestWebUIAuthorization
         .getHttpStatusCode(tasklogUrl, tip.getUser(), "GET"));
-    if (!isCleanup) {
+    if (containsCleanupLog) {
       // validate task logs: tasklog should contain both task logs
       // and cleanup logs
       assertTrue(log.contains(cleanupLog));
-    } else {
+    }
+    if (isCleanup) {
       // validate tasklogs for cleanup attempt
       log = MapReduceTestUtil.readTaskLog(
                  TaskLog.LogName.STDERR, attemptId, true);
@@ -169,7 +172,7 @@ public class TestTaskFail extends TestCase {
     }
   }
 
-  private void validateJob(RunningJob job, JobTracker jt) 
+  private void validateJob(RunningJob job, JobTracker jt, boolean cleanupNeeded) 
   throws IOException {
     assertEquals(JobStatus.SUCCEEDED, job.getJobState());
 	    
@@ -181,19 +184,21 @@ public class TestTaskFail extends TestCase {
       new TaskAttemptID(new TaskID(jobId, TaskType.MAP, 0), 0);
     TaskInProgress tip = jt.getTip(attemptId.getTaskID());
     TaskStatus ts = jt.getTaskStatus(attemptId);
-    validateAttempt(tip, attemptId, ts, false, jt);
+    // task logs will contain cleanup message because the task is failed by
+    // throwing IOException
+    validateAttempt(tip, attemptId, ts, false, true, jt);
     
     attemptId =  new TaskAttemptID(new TaskID(jobId, TaskType.MAP, 0), 1);
     // this should be cleanup attempt since the second attempt fails
     // with System.exit
     ts = jt.getTaskStatus(attemptId);
-    validateAttempt(tip, attemptId, ts, true, jt);
+    validateAttempt(tip, attemptId, ts, cleanupNeeded, false, jt);
     
     attemptId =  new TaskAttemptID(new TaskID(jobId, TaskType.MAP, 0), 2);
     // this should be cleanup attempt since the third attempt fails
     // with Error
     ts = jt.getTaskStatus(attemptId);
-    validateAttempt(tip, attemptId, ts, true, jt);
+    validateAttempt(tip, attemptId, ts, cleanupNeeded, false, jt);
   }
   
   public void testWithDFS() throws IOException {
@@ -219,18 +224,25 @@ public class TestTaskFail extends TestCase {
       jobConf.setOutputCommitter(CommitterWithLogs.class);
       RunningJob rJob = launchJob(jobConf, inDir, outDir, input);
       rJob.waitForCompletion();
-      validateJob(rJob, jt);
+      validateJob(rJob, jt, true);
       // launch job with fail tasks and fail-cleanups
       fileSys.delete(outDir, true);
       jobConf.setOutputCommitter(CommitterWithFailTaskCleanup.class);
       rJob = launchJob(jobConf, inDir, outDir, input);
       rJob.waitForCompletion();
-      validateJob(rJob, jt);
+      validateJob(rJob, jt, true);
       fileSys.delete(outDir, true);
       jobConf.setOutputCommitter(CommitterWithFailTaskCleanup2.class);
       rJob = launchJob(jobConf, inDir, outDir, input);
       rJob.waitForCompletion();
-      validateJob(rJob, jt);
+      validateJob(rJob, jt, true);
+      // launch job with task-cleanup switched off
+      fileSys.delete(outDir, true);
+      jobConf.setOutputCommitter(CommitterWithFailTaskCleanup.class);
+      jobConf.setBoolean(MRJobConfig.TASK_CLEANUP_NEEDED, false);
+      rJob = launchJob(jobConf, inDir, outDir, input);
+      rJob.waitForCompletion();
+      validateJob(rJob, jt, false);
     } finally {
       if (dfs != null) { dfs.shutdown(); }
       if (mr != null) { mr.shutdown(); }

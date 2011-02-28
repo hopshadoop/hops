@@ -191,6 +191,11 @@ class ChainReduceContextImpl<KEYIN, VALUEIN, KEYOUT, VALUEOUT> implements
   }
 
   @Override
+  public boolean getTaskCleanupNeeded() {
+    return base.getTaskCleanupNeeded();
+  }
+
+  @Override
   public Path[] getLocalCacheArchives() throws IOException {
     return base.getLocalCacheArchives();
   }

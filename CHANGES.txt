@@ -38,6 +38,8 @@ Trunk (unreleased changes)
     MAPREDUCE-1927. Unit test for HADOOP-6835 (concatenated gzip support).
     (Greg Roelofs via tomwhite)
 
+    MAPREDUCE-2206. The task-cleanup tasks should be optional. (schen)
+
   OPTIMIZATIONS
     
     MAPREDUCE-2026. Make JobTracker.getJobCounters() and
