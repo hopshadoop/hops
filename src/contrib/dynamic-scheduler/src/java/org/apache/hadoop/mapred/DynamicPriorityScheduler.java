@@ -111,9 +111,21 @@ class DynamicPriorityScheduler extends TaskScheduler {
       totalSpending = 0.0f;
       for (BudgetQueue queue: store.getQueues()) {
         if (!infoQueues.contains(queue.name)) {
-          infoQueues.add(queue.name);
+          Queue[] newQueues = new Queue[infoQueues.size()+1];
+          int i = 0;
+          for (String infoQueue: infoQueues) {
+            newQueues[i] = queueManager.getQueue(infoQueue);
+            i++;
+          }
+          Queue newQueue = new Queue();
+          newQueue.setName(queue.name);
+          newQueues[i] = newQueue;
+          queueManager.setQueues(newQueues);
+
           QueueInfo newQueueInfo = new QueueInfo(queue.name, null, this); 
           queueManager.setSchedulerInfo(queue.name, newQueueInfo);
+
+          infoQueues = queueManager.getLeafQueueNames();
         }
         if (!queueList.equals("")) {
           queueList += ",";

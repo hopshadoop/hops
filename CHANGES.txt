@@ -567,6 +567,9 @@ Release 0.22.0 - Unreleased
 
     MAPREDUCE-2315. javadoc is failing in nightly build (todd)
 
+    MAPREDUCE-2054. Hierarchical queue implementation broke dynamic queue
+    addition in Dynamic Scheduler. (Thomas Sandholm via tomwhite)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES

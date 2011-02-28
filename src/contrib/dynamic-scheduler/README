@@ -162,6 +162,6 @@ else:
   params = ""
 timestamp = long(time.time()*1000)
 params = params + "&user=%s&timestamp=%d" % (USER,timestamp)
-print "-Dmapred.job.timestamp=%d -Dmapred.job.signature=%s -Dmapreduce.job.queue.name=%s" % (timestamp, hmac_sha1(params, KEY), USER)
+print "-Dmapred.job.timestamp=%d -Dmapred.job.signature=%s -Dmapreduce.job.queuename=%s" % (timestamp, hmac_sha1(params, KEY), USER)
 
 
