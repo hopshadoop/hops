@@ -72,6 +72,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-2311. Fix TestFairScheduler failure (schen)
 
+    MAPREDUCE-1996. API: Reducer.reduce() method detail misstatement.
+    (Harsh J Chouraria via tomwhite)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES

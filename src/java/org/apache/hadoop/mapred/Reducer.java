@@ -186,7 +186,7 @@ public interface Reducer<K2, V2, K3, V3> extends JobConfigurable, Closeable {
    *
    * <p>Applications can use the {@link Reporter} provided to report progress 
    * or just indicate that they are alive. In scenarios where the application 
-   * takes an insignificant amount of time to process individual key/value 
+   * takes a significant amount of time to process individual key/value 
    * pairs, this is crucial since the framework might assume that the task has 
    * timed-out and kill that task. The other way of avoiding this is to set 
    * <a href="{@docRoot}/../mapred-default.html#mapreduce.task.timeout">
