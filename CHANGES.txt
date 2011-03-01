@@ -17,6 +17,8 @@ Trunk (unreleased changes)
     HDFS-1448. Add a new tool Offline Edits Viewer (oev).  (Erik Steffl
     via szetszwo)
 
+    HDFS-1626. Make BLOCK_INVALIDATE_LIMIT configurable. (szetszwo)
+
   IMPROVEMENTS
 
     HDFS-1510. Added test-patch.properties required by test-patch.sh (nigel)
