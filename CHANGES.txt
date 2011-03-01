@@ -83,6 +83,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2203. Wrong javadoc for TaskRunner's appendJobJarClasspaths
     method. (Jingguo Yao via tomwhite)
 
+    MAPREDUCE-2074. Task should fail when symlink creation fails.
+    (Priyo Mustafi via tomwhite)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES

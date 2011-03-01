@@ -737,7 +737,8 @@ abstract class TaskRunner extends Thread {
       if (!flink.exists()) {
         LOG.info(String.format("Creating symlink: %s <- %s", target, link));
         if (0 != FileUtil.symLink(target, link)) {
-          LOG.warn(String.format("Failed to create symlink: %s <- %s", target, link));
+          throw new IOException(String.format(
+                "Failed to create symlink: %s <- %s", target, link));
         }
       }
     }
