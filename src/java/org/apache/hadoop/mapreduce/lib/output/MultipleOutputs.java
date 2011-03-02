@@ -20,8 +20,6 @@ package org.apache.hadoop.mapreduce.lib.output;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.io.Writable;
-import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.mapreduce.*;
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl;
 import org.apache.hadoop.util.ReflectionUtils;
@@ -218,14 +216,14 @@ public class MultipleOutputs<KEYOUT, VALUEOUT> {
   private static Class<?> getNamedOutputKeyClass(JobContext job,
                                                 String namedOutput) {
     return job.getConfiguration().getClass(MO_PREFIX + namedOutput + KEY, null,
-      WritableComparable.class);
+      Object.class);
   }
 
   // Returns the value class for a named output.
-  private static Class<? extends Writable> getNamedOutputValueClass(
+  private static Class<?> getNamedOutputValueClass(
       JobContext job, String namedOutput) {
     return job.getConfiguration().getClass(MO_PREFIX + namedOutput + VALUE,
-      null, Writable.class);
+      null, Object.class);
   }
 
   /**

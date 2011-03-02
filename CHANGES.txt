@@ -40,6 +40,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-2206. The task-cleanup tasks should be optional. (schen)
 
+    MAPREDUCE-2225. MultipleOutputs should not require the use of 'Writable'.
+    (Harsh J Chouraria via tomwhite)
+
   OPTIMIZATIONS
     
     MAPREDUCE-2026. Make JobTracker.getJobCounters() and

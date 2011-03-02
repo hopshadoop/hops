@@ -20,8 +20,6 @@ package org.apache.hadoop.mapred.lib;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.io.Writable;
-import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.mapred.*;
 import org.apache.hadoop.util.Progressable;
 
@@ -253,11 +251,11 @@ public class MultipleOutputs {
    * @param namedOutput named output
    * @return class for the named output key
    */
-  public static Class<? extends WritableComparable> getNamedOutputKeyClass(JobConf conf,
+  public static Class<?> getNamedOutputKeyClass(JobConf conf,
                                                 String namedOutput) {
     checkNamedOutput(conf, namedOutput, false);
     return conf.getClass(MO_PREFIX + namedOutput + KEY, null,
-	WritableComparable.class);
+	Object.class);
   }
 
   /**
@@ -267,11 +265,11 @@ public class MultipleOutputs {
    * @param namedOutput named output
    * @return class of named output value
    */
-  public static Class<? extends Writable> getNamedOutputValueClass(JobConf conf,
+  public static Class<?> getNamedOutputValueClass(JobConf conf,
                                                   String namedOutput) {
     checkNamedOutput(conf, namedOutput, false);
     return conf.getClass(MO_PREFIX + namedOutput + VALUE, null,
-      Writable.class);
+      Object.class);
   }
 
   /**
