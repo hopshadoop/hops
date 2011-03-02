@@ -1105,11 +1105,12 @@ public class Job extends JobContextImpl implements JobContext {
       eventCounter += events.length;
       printTaskEvents(events, filter, profiling, mapRanges, reduceRanges);
     }
-    LOG.info("Job complete: " + jobId);
     Counters counters = getCounters();
     if (counters != null) {
       LOG.info(counters.toString());
     }
+    LOG.info("Job " + jobId + " completed with status: "
+          + getStatus().getState());
     return isSuccessful();
   }
 

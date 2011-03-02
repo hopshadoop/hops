@@ -43,6 +43,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2225. MultipleOutputs should not require the use of 'Writable'.
     (Harsh J Chouraria via tomwhite)
 
+    MAPREDUCE-1811. Job.monitorAndPrintJob() should print status of the job
+    at completion. (Harsh J Chouraria via tomwhite)
+
   OPTIMIZATIONS
     
     MAPREDUCE-2026. Make JobTracker.getJobCounters() and
