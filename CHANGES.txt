@@ -49,6 +49,8 @@ Trunk (unreleased changes)
     MAPREDUCE-993. bin/hadoop job -events <jobid> <from-event-#> <#-of-events>
     help message is confusing. (Harsh J Chouraria via tomwhite)
 
+    MAPREDUCE-2302. Add static factory methods in GaloisField. (schen)
+
   OPTIMIZATIONS
     
     MAPREDUCE-2026. Make JobTracker.getJobCounters() and

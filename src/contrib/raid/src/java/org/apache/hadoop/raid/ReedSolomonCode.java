@@ -25,7 +25,7 @@ public class ReedSolomonCode implements ErasureCode {
   private final int[] generatingPolynomial;
   private final int PRIMITIVE_ROOT = 2;
   private final int[] primitivePower;
-  private final GaloisField GF = new GaloisField();
+  private final GaloisField GF = GaloisField.getInstance();
   private int[] errSignature;
   private final int[] paritySymbolLocations;
   private final int[] dataBuff;

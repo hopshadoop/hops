@@ -27,7 +27,7 @@ public class TestGaloisField extends TestCase {
 
   final int TEST_TIMES = 10000;
   final Random RAND = new Random();
-  final static GaloisField GF = new GaloisField();
+  final static GaloisField GF = GaloisField.getInstance();
 
   private int randGF() {
     return 0x000000FF & RAND.nextInt(GF.getFieldSize());
@@ -38,6 +38,18 @@ public class TestGaloisField extends TestCase {
       result[i] = randGF();
     }
     return result;
+  }
+
+  public void testGetInstance() {
+    GaloisField gf1 = GaloisField.getInstance(256, 285);
+    GaloisField gf2 = GaloisField.getInstance();
+    GaloisField gf3 = GaloisField.getInstance(128, 137);
+    GaloisField gf4 = GaloisField.getInstance(128, 137);
+    GaloisField gf5 = GaloisField.getInstance(512, 529);
+    GaloisField gf6 = GaloisField.getInstance(512, 529);
+    assertTrue(gf1 == gf2);
+    assertTrue(gf3 == gf4);
+    assertTrue(gf5 == gf6);
   }
 
   public void testDistributivity() {

@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.raid;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Implementation of Galois field arithmetics with 2^p elements.
  * The input must be unsigned integers.
@@ -34,15 +37,42 @@ public class GaloisField {
 
   // Field size 256 is good for byte based system
   private static final int DEFAULT_FIELD_SIZE = 256;
-  // primitive polynomial 1 + X + X^2 + X^4 + X^8
+  // primitive polynomial 1 + X^2 + X^3 + X^4 + X^8
   private static final int DEFAULT_PRIMITIVE_POLYNOMIAL = 285;
 
+  static private final Map<Integer, GaloisField> instances =
+    new HashMap<Integer, GaloisField>();
+
   /**
-   * An object can perform Galois field arithmetics
+   * Get the object performs Galois field arithmetics
    * @param fieldSize size of the field
    * @param primitivePolynomial a primitive polynomial corresponds to the size
    */
-  public GaloisField(int fieldSize, int primitivePolynomial) {
+  public static GaloisField getInstance(int fieldSize,
+      int primitivePolynomial) {
+    int key = ((fieldSize << 16) & 0xFFFF0000) + (primitivePolynomial & 0x0000FFFF);
+    GaloisField gf;
+    synchronized (instances) {
+      gf = instances.get(key);
+      if (gf == null) {
+        gf = new GaloisField(fieldSize, primitivePolynomial);
+        instances.put(key, gf);
+      }
+    }
+    return gf;
+  }
+
+  /**
+   * Get the object performs Galois field arithmetics with default setting
+   */
+  public static GaloisField getInstance() {
+    return getInstance(DEFAULT_FIELD_SIZE, DEFAULT_PRIMITIVE_POLYNOMIAL);
+  }
+
+  private GaloisField(int fieldSize, int primitivePolynomial) {
+    assert fieldSize > 0;
+    assert primitivePolynomial > 0;
+
     this.fieldSize = fieldSize;
     this.primitivePeriod = fieldSize - 1;
     this.primitivePolynomial = primitivePolynomial;
@@ -85,13 +115,6 @@ public class GaloisField {
         divTable[i][j] = z;
       }
     }
-  }
-
-  /**
-   * An object can perform Galois field arithmetics
-   */
-  public GaloisField() {
-    this(DEFAULT_FIELD_SIZE, DEFAULT_PRIMITIVE_POLYNOMIAL);
   }
 
   /**
