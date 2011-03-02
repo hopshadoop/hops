@@ -46,6 +46,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1811. Job.monitorAndPrintJob() should print status of the job
     at completion. (Harsh J Chouraria via tomwhite)
 
+    MAPREDUCE-993. bin/hadoop job -events <jobid> <from-event-#> <#-of-events>
+    help message is confusing. (Harsh J Chouraria via tomwhite)
+
   OPTIMIZATIONS
     
     MAPREDUCE-2026. Make JobTracker.getJobCounters() and

@@ -359,7 +359,7 @@ public class CLI extends Configured implements Tool {
         " <job-id> <group-name> <counter-name>]");
     } else if ("-events".equals(cmd)) {
       System.err.println(prefix + "[" + cmd + 
-        " <job-id> <from-event-#> <#-of-events>]");
+        " <job-id> <from-event-#> <#-of-events>]. Event #s start from 1.");
     } else if ("-history".equals(cmd)) {
       System.err.println(prefix + "[" + cmd + " <jobHistoryFile>]");
     } else if ("-list".equals(cmd)) {
