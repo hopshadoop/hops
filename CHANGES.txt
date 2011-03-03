@@ -51,6 +51,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-2302. Add static factory methods in GaloisField. (schen)
 
+    MAPREDUCE-2351. mapred.job.tracker.history.completed.location should
+    support an arbitrary filesystem URI. (tomwhite)
+
   OPTIMIZATIONS
     
     MAPREDUCE-2026. Make JobTracker.getJobCounters() and

@@ -152,8 +152,9 @@ public class JobHistory {
     String doneLocation =
       conf.get(JTConfig.JT_JOBHISTORY_COMPLETED_LOCATION);
     if (doneLocation != null) {
-      done = fs.makeQualified(new Path(doneLocation));
-      doneDirFs = fs;
+      Path donePath = new Path(doneLocation);
+      doneDirFs = donePath.getFileSystem(conf);
+      done = doneDirFs.makeQualified(donePath);
     } else {
       done = logDirFs.makeQualified(new Path(logDir, "done"));
       doneDirFs = logDirFs;

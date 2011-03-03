@@ -606,9 +606,18 @@ public class TestJobHistory extends TestCase {
     // Validate the job queue name
     assertTrue(jobInfo.getJobQueueName().equals(conf.getQueueName()));
   }
-
+  
   public void testDoneFolderOnHDFS() throws IOException, InterruptedException {
+    runDoneFolderTest("history_done");
+  }
+    
+  public void testDoneFolderNotOnDefaultFileSystem() throws IOException, InterruptedException {
+    runDoneFolderTest("file://" + System.getProperty("test.build.data", "tmp") + "/history_done");
+  }
+    
+  private void runDoneFolderTest(String doneFolder) throws IOException, InterruptedException {
     MiniMRCluster mr = null;
+    MiniDFSCluster dfsCluster = null;
     try {
       JobConf conf = new JobConf();
       // keep for less time
@@ -616,7 +625,6 @@ public class TestJobHistory extends TestCase {
       conf.setLong("mapred.jobtracker.retirejob.interval", 1000);
 
       //set the done folder location
-      String doneFolder = "history_done";
       conf.set(JTConfig.JT_JOBHISTORY_COMPLETED_LOCATION, doneFolder);
 
       String logDir =
@@ -639,7 +647,7 @@ public class TestJobHistory extends TestCase {
       assertEquals("No of file in logDir not correct", 2,
           logDirFs.listStatus(logDirPath).length);
       
-      MiniDFSCluster dfsCluster = new MiniDFSCluster(conf, 2, true, null);
+      dfsCluster = new MiniDFSCluster(conf, 2, true, null);
       mr = new MiniMRCluster(2, dfsCluster.getFileSystem().getUri().toString(),
           3, null, null, conf);
 
@@ -674,7 +682,7 @@ public class TestJobHistory extends TestCase {
       RunningJob job = UtilsForTests.runJobSucceed(conf, inDir, outDir);
       
       assertEquals("History DONE folder not correct", 
-          doneFolder, doneDir.getName());
+          new Path(doneFolder).getName(), doneDir.getName());
       JobID id = job.getID();
       String logFileName = getDoneFile(jobHistory, conf, id, doneDir);
 
@@ -723,6 +731,9 @@ public class TestJobHistory extends TestCase {
       if (mr != null) {
         cleanupLocalFiles(mr);
         mr.shutdown();
+      }
+      if (dfsCluster != null) {
+        dfsCluster.shutdown();
       }
     }
   }
