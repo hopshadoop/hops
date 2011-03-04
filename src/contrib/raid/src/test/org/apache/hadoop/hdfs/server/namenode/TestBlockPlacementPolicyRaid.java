@@ -42,6 +42,7 @@ import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.server.namenode.BlockPlacementPolicyRaid.CachedFullPathNames;
 import org.apache.hadoop.hdfs.server.namenode.BlockPlacementPolicyRaid.CachedLocatedBlocks;
+import org.apache.hadoop.hdfs.server.namenode.BlockPlacementPolicyRaid.FileType;
 import org.apache.hadoop.raid.RaidNode;
 import org.junit.Test;
 
@@ -111,6 +112,7 @@ public class TestBlockPlacementPolicyRaid {
       cluster.startDataNodes(conf, 6, true, null, racks, hosts, null);
       int numBlocks = 6;
       DFSTestUtil.createFile(fs, new Path(parity), numBlocks, (short)2, 0L);
+      DFSTestUtil.waitReplication(fs, new Path(parity), (short)2);
       FileStatus srcStat = fs.getFileStatus(new Path(src));
       BlockLocation[] srcLoc =
         fs.getFileBlockLocations(srcStat, 0, srcStat.getLen());
@@ -496,7 +498,8 @@ public class TestBlockPlacementPolicyRaid {
       FSNamesystem namesystem, BlockPlacementPolicyRaid policy,
       Block block) throws IOException {
     INodeFile inode = namesystem.blockManager.blocksMap.getINode(block);
-    return policy.getCompanionBlocks(inode.getFullPathName(), block);
+    FileType type = policy.getFileType(inode.getFullPathName());
+    return policy.getCompanionBlocks(inode.getFullPathName(), type, block);
   }
 
   private List<LocatedBlock> getBlocks(FSNamesystem namesystem, String file) 

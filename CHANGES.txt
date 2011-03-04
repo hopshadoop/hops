@@ -54,6 +54,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2351. mapred.job.tracker.history.completed.location should
     support an arbitrary filesystem URI. (tomwhite)
 
+    MAPREDUCE-2239. BlockPlacementPolicyRaid should call getBlockLocations
+    only when necessary. (schen)
+
   OPTIMIZATIONS
     
     MAPREDUCE-2026. Make JobTracker.getJobCounters() and
