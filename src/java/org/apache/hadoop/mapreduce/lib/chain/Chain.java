@@ -692,13 +692,13 @@ public class Chain {
           + CHAIN_MAPPER_CONFIG + (index - 1));
       if (!inputKeyClass.isAssignableFrom(previousMapperConf.getClass(
           MAPPER_OUTPUT_KEY_CLASS, null))) {
-        throw new IllegalArgumentException("The Mapper output key class does"
-            + " not match the previous Mapper input key class");
+        throw new IllegalArgumentException("The specified Mapper input key class does"
+            + " not match the previous Mapper's output key class.");
       }
       if (!inputValueClass.isAssignableFrom(previousMapperConf.getClass(
           MAPPER_OUTPUT_VALUE_CLASS, null))) {
-        throw new IllegalArgumentException("The Mapper output value class"
-            + " does not match the previous Mapper input value class");
+        throw new IllegalArgumentException("The specified Mapper input value class"
+            + " does not match the previous Mapper's output value class.");
       }
     }
   }
