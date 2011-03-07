@@ -91,7 +91,7 @@ public class ClusterWithLinuxTaskController extends TestCase {
 
     @Override
     protected String getTaskControllerExecutablePath() {
-      return taskControllerExePath;
+      return new File(taskControllerExePath).getAbsolutePath();
     }
 
     void setTaskControllerExe(String execPath) {
