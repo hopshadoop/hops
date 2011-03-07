@@ -576,7 +576,7 @@ public class TestTaskTrackerLocalization extends TestCase {
 
     // With default task controller, the job-acls.xml file is owned by TT and
     // permissions are 700
-    checkFilePermissions(jobACLsFile.getAbsolutePath(), "-rwx------",
+    checkFilePermissions(jobACLsFile.getAbsolutePath(), "-rw-------",
         taskTrackerUGI.getShortUserName(), taskTrackerUGI.getGroupNames()[0]);
 
     validateJobACLsFileContent();

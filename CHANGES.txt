@@ -607,6 +607,9 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2054. Hierarchical queue implementation broke dynamic queue
     addition in Dynamic Scheduler. (Thomas Sandholm via tomwhite)
 
+    MAPREDUCE-2272. Job ACL file should not be executable
+    (Harsh J Chouraria via todd)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES

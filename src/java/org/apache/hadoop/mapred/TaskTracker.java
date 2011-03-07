@@ -59,7 +59,6 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.DF;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
-import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
@@ -1159,7 +1158,7 @@ public class TaskTracker
 
     FileOutputStream out;
     try {
-      out = SecureIOUtils.createForWrite(aclFile, 0700);
+      out = SecureIOUtils.createForWrite(aclFile, 0600);
     } catch (SecureIOUtils.AlreadyExistsException aee) {
       LOG.warn("Job ACL file already exists at " + aclFile, aee);
       return;
