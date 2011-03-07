@@ -621,6 +621,9 @@ Release 0.22.0 - Unreleased
 
     MAPREDUCE-2284. TestLocalRunner.testMultiMaps times out (todd)
 
+    MAPREDUCE-2336. Tool-related packages should be in the Tool javadoc group.
+    (tomwhite)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES

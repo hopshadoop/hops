@@ -1056,7 +1056,7 @@
 
        <group title="Packages" packages="org.apache.*"/>
        <group title="Libraries" packages="org.apache.hadoop.mapred.lib*:org.apache.hadoop.mapreduce.lib*"/>
-       <group title="Tools" packages="org.apache.hadoop.tools"/>
+       <group title="Tools" packages="org.apache.hadoop.fs*:org.apache.hadoop.tools*:org.apache.hadoop.mapred.tool*:org.apache.hadoop.mapreduce.tool*"/>
        <group title="Examples" packages="org.apache.hadoop.examples*"/>
 
        <group title="contrib: DataJoin" packages="org.apache.hadoop.contrib.utils.join*"/>
