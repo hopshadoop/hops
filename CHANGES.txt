@@ -613,6 +613,9 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2241. ClusterWithLinuxTaskController should accept relative path
     on the command line. (todd)
 
+    MAPREDUCE-2251. Remove unused mapreduce.job.userhistorylocation config.
+    (Harsh J Chouraria via todd)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES

@@ -33,16 +33,6 @@
 </property>
 
 <property>
-  <name>mapreduce.job.userhistorylocation</name>
-  <value></value>
-  <description> User can specify a location to store the history files of 
-  a particular job. If nothing is specified, the logs are stored in 
-  output directory. The files are stored in "_logs/history/" in the directory.
-  User can stop logging by giving the value "none". 
-  </description>
-</property>
-
-<property>
   <name>mapreduce.jobtracker.jobhistory.completed.location</name>
   <value></value>
   <description> The completed job history files are stored at this single well 

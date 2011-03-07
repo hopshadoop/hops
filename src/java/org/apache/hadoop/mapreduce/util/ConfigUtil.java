@@ -174,8 +174,6 @@ public class ConfigUtil {
       new String[] {TTConfig.TT_LOCAL_CACHE_SIZE});
     Configuration.addDeprecation("tasktracker.contention.tracking", 
       new String[] {TTConfig.TT_CONTENTION_TRACKING});
-    Configuration.addDeprecation("hadoop.job.history.user.location", 
-      new String[] {MRJobConfig.HISTORY_LOCATION});
     Configuration.addDeprecation("job.end.notification.url", 
       new String[] {MRJobConfig.END_NOTIFICATION_URL});
     Configuration.addDeprecation("job.end.retry.attempts", 
@@ -250,8 +248,6 @@ public class ConfigUtil {
       new String[] {MRJobConfig.CACHE_SYMLINK});
     Configuration.addDeprecation("mapred.working.dir", 
       new String[] {MRJobConfig.WORKING_DIR});
-    Configuration.addDeprecation("hadoop.job.history.user.location", 
-      new String[] {MRJobConfig.HISTORY_LOCATION});
     Configuration.addDeprecation("user.name", 
       new String[] {MRJobConfig.USER_NAME});
     Configuration.addDeprecation("mapred.output.key.class", 

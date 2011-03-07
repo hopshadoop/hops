@@ -545,7 +545,6 @@ public class HadoopArchives implements Tool {
     conf.setReducerClass(HArchivesReducer.class);
     conf.setMapOutputKeyClass(IntWritable.class);
     conf.setMapOutputValueClass(Text.class);
-    conf.set(MRJobConfig.HISTORY_LOCATION, "none");
     FileInputFormat.addInputPath(conf, jobDirectory);
     //make sure no speculative execution is done
     conf.setSpeculativeExecution(false);

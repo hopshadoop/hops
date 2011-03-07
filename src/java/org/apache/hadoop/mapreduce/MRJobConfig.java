@@ -90,8 +90,6 @@ public interface MRJobConfig {
 
   public static final String WORKING_DIR = "mapreduce.job.working.dir";
 
-  public static final String HISTORY_LOCATION = "mapreduce.job.userhistorylocation";
-
   public static final String END_NOTIFICATION_URL = "mapreduce.job.end-notification.url";
 
   public static final String END_NOTIFICATION_RETRIES = "mapreduce.job.end-notification.retry.attempts";

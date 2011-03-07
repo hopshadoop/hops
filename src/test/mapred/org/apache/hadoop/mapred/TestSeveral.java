@@ -342,8 +342,6 @@ public class TestSeveral extends TestCase {
 
     conf.setLong(JobContext.MAP_MAX_ATTEMPTS, 1);
 
-    conf.set(JobContext.HISTORY_LOCATION, "none");
-
     conf.setNumReduceTasks(0);
 
     final Path inDir = new Path("./wc/input");
@@ -396,8 +394,6 @@ public class TestSeveral extends TestCase {
     final Path inDir = new Path("./wc/input");
     final Path outDir = new Path("./wc/output");
     final Path histDir = new Path("./wc/history");
-
-    conf.set(JobContext.HISTORY_LOCATION, histDir.toString());
 
     FileInputFormat.setInputPaths(conf, inDir);
     FileOutputFormat.setOutputPath(conf, outDir);
