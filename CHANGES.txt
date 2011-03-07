@@ -57,6 +57,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2239. BlockPlacementPolicyRaid should call getBlockLocations
     only when necessary. (schen)
 
+    MAPREDUCE-2331. Add coverage of task graph servlet to fair scheduler system
+    test. (todd)
+
   OPTIMIZATIONS
     
     MAPREDUCE-2026. Make JobTracker.getJobCounters() and

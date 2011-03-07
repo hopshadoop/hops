@@ -102,6 +102,8 @@ public class TestFairSchedulerSystem {
           }));
     }
 
+    JobClient jc = new JobClient(mr.createJobConf(null));
+
     // Wait for the tasks to finish, and visit the scheduler servlet
     // every few seconds while waiting.
     for (Future<Void> future : futures) {
@@ -114,6 +116,16 @@ public class TestFairSchedulerSystem {
         }
         checkServlet(true);
         checkServlet(false);
+
+        JobStatus jobs[] = jc.getAllJobs();
+        if (jobs == null) {
+          System.err.println("No jobs running, not checking tasklog servlet");
+          continue;
+        }
+        for (JobStatus j : jobs) {
+          System.err.println("Checking task log for " + j.getJobID());
+          checkTaskGraphServlet(j.getJobID());
+        }
       }
     }
   }
@@ -144,5 +156,32 @@ public class TestFairSchedulerSystem {
 
     String contents = sb.toString();
     assertTrue(contents.contains("Fair Scheduler Administration"));
- }
+  }
+
+  private void checkTaskGraphServlet(JobID job) throws Exception {
+    String jtURL = "http://localhost:" +
+      mr.getJobTrackerRunner().getJobTrackerInfoPort();
+    URL url = new URL(jtURL + "/taskgraph?jobid=" + job.toString() + "&type=map");
+    HttpURLConnection connection = (HttpURLConnection)url.openConnection();
+    connection.setRequestMethod("GET");
+    connection.connect();
+    assertEquals(200, connection.getResponseCode());
+
+    // Just to be sure, slurp the content and make sure it looks like the scheduler
+    String contents = slurpContents(connection);
+    assertTrue(contents.contains("</svg>"));
+  }
+
+  private String slurpContents(HttpURLConnection connection) throws Exception {
+    BufferedReader reader = new BufferedReader(
+      new InputStreamReader(connection.getInputStream()));
+    StringBuilder sb = new StringBuilder();
+
+    String line = null;
+    while ((line = reader.readLine()) != null) {
+      sb.append(line).append('\n');
+    }
+
+    return sb.toString();
+  }
 }
