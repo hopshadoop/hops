@@ -55,6 +55,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSClient;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.protocol.AlreadyBeingCreatedException;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
@@ -67,12 +68,12 @@ import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager;
 import org.apache.hadoop.hdfs.security.token.block.ExportedBlockKeys;
 import org.apache.hadoop.hdfs.server.common.HdfsConstants;
 import org.apache.hadoop.hdfs.server.common.Util;
-import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.namenode.BlockPlacementPolicy;
 import org.apache.hadoop.hdfs.server.namenode.BlockPlacementPolicyDefault;
+import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.namenode.UnsupportedActionException;
-import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations.BlockWithLocations;
+import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocol;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
@@ -355,9 +356,7 @@ public class Balancer implements Tool {
         IOUtils.closeSocket(sock);
         
         proxySource.removePendingBlock(this);
-        synchronized(target) {
-          target.removePendingBlock(this);
-        }
+        target.removePendingBlock(this);
 
         synchronized (this ) {
           reset();
@@ -1546,7 +1545,9 @@ public class Balancer implements Tool {
         resetData();
         
         try {
-          Thread.sleep(2*conf.getLong("dfs.heartbeat.interval", 3));
+          Thread.sleep(2000*conf.getLong(
+              DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY,
+              DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_DEFAULT));
         } catch (InterruptedException ignored) {
         }
         
