@@ -50,6 +50,13 @@ public class TestLocalRunner extends TestCase {
 
   private static final Log LOG = LogFactory.getLog(TestLocalRunner.class);
 
+  private static int INPUT_SIZES[] =
+    new int[] { 50000, 500, 500, 20,  5000, 500};
+  private static int OUTPUT_SIZES[] =
+    new int[] { 1,     500, 500, 500, 500, 500};
+  private static int SLEEP_INTERVALS[] =
+    new int[] { 10000, 15,  15, 20, 250, 60 };
+
   private static class StressMapper
       extends Mapper<LongWritable, Text, LongWritable, Text> {
 
@@ -76,49 +83,12 @@ public class TestLocalRunner extends TestCase {
     public void map(LongWritable key, Text val, Context c)
         throws IOException, InterruptedException {
 
-      switch(threadId) {
-      case 0:
-        // Write a single value and be done.
+      // Write many values quickly.
+      for (int i = 0; i < OUTPUT_SIZES[threadId]; i++) {
         c.write(new LongWritable(0), val);
-        break;
-      case 1:
-      case 2:
-        // Write many values quickly.
-        for (int i = 0; i < 500; i++) {
-          c.write(new LongWritable(0), val);
-        }
-        break;
-      case 3:
-        // Write many values, using thread sleeps to delay this.
-        for (int i = 0; i < 50; i++) {
-          for (int j = 0; j < 10; j++) {
-            c.write(new LongWritable(0), val);
-          }
+        if (i % SLEEP_INTERVALS[threadId] == 1) {
           Thread.sleep(1);
         }
-        break;
-      case 4:
-        // Write many values, using busy-loops to delay this.
-        for (int i = 0; i < 500; i++) {
-          for (int j = 0; j < 10000; j++) {
-            this.exposedState++;
-          }
-          c.write(new LongWritable(0), val);
-        }
-        break;
-      case 5:
-        // Write many values, using very slow busy-loops to delay this.
-        for (int i = 0; i < 500; i++) {
-          for (int j = 0; j < 100000; j++) {
-            this.exposedState++;
-          }
-          c.write(new LongWritable(0), val);
-        }
-        break;
-      default:
-        // Write a single value and be done.
-        c.write(new LongWritable(0), val);
-        break;
       }
     }
 
@@ -195,12 +165,12 @@ public class TestLocalRunner extends TestCase {
   // This is the total number of map output records we expect to generate,
   // based on input file sizes (see createMultiMapsInput()) and the behavior
   // of the different StressMapper threads.
-  private final static int TOTAL_RECORDS = 50000
-      + (500 * 500)
-      + (500 * 500)
-      + (20 * 500)
-      + (5000 * 500)
-      + (500 * 500);
+  private static int TOTAL_RECORDS = 0;
+  static {
+    for (int i = 0; i < 6; i++) {
+      TOTAL_RECORDS += INPUT_SIZES[i] * OUTPUT_SIZES[i];
+    }
+  }
 
   private final String INPUT_DIR = "multiMapInput";
   private final String OUTPUT_DIR = "multiMapOutput";
@@ -239,13 +209,9 @@ public class TestLocalRunner extends TestCase {
 
     // Create input files, with sizes calibrated based on
     // the amount of work done in each mapper.
-    createInputFile(inputPath, 0, 50000);
-    createInputFile(inputPath, 1, 500);
-    createInputFile(inputPath, 2, 500);
-    createInputFile(inputPath, 3, 20);
-    createInputFile(inputPath, 4, 5000);
-    createInputFile(inputPath, 5, 500);
-
+    for (int i = 0; i < 6; i++) {
+      createInputFile(inputPath, i, INPUT_SIZES[i]);
+    }
     return inputPath;
   }
 

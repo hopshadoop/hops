@@ -619,6 +619,8 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2251. Remove unused mapreduce.job.userhistorylocation config.
     (Harsh J Chouraria via todd)
 
+    MAPREDUCE-2284. TestLocalRunner.testMultiMaps times out (todd)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES
