@@ -61,6 +61,8 @@ Trunk (unreleased changes)
     HDFS-1628. Display full path in AccessControlException.  (John George
     via szetszwo)
 
+    HDFS-1731. Allow using a file to exclude certain tests from build (todd)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
