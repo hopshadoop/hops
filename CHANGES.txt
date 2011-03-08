@@ -60,6 +60,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2331. Add coverage of task graph servlet to fair scheduler system
     test. (todd)
 
+    MAPREDUCE-2367. Allow using a file to exclude certain tests from build.
+    (todd)
+
   OPTIMIZATIONS
     
     MAPREDUCE-2026. Make JobTracker.getJobCounters() and

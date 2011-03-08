@@ -123,6 +123,7 @@
   <property name="test.mapred.commit.tests.file" value="${test.src.dir}/commit-tests" />
   <property name="test.mapred.smoke.tests.file" value="${test.src.dir}/smoke-tests" />
   <property name="test.mapred.all.tests.file" value="${test.src.dir}/all-tests" />
+  <property name="test.exclude.file" value="/dev/null" />
 
   <property name="librecordio.test.dir" value="${test.build.dir}/librecordio"/>
   <property name="web.src.dir" value="${basedir}/src/web"/>
@@ -719,6 +720,7 @@
             excludes="**/${test.exclude}.java aop/** system/**">
             <patternset>
               <includesfile name="@{test.file}"/>
+              <excludesfile name="${test.exclude.file}" />
             </patternset>
             <patternset refid="@{exclude.list.id}"/>
           </fileset>
@@ -733,7 +735,8 @@
         <batchtest todir="@{test.dir}" if="tests.notestcase.fi">
           <fileset dir="@{fileset.dir}/aop"
             includes="**/${test.include}.java"
-            excludes="**/${test.exclude}.java" />
+            excludes="**/${test.exclude}.java"
+            excludesfile="${test.exclude.file}" />
         </batchtest>
         <!-- batch test for testing a single test case in aop folder with
         fault injection-->
