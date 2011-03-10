@@ -109,6 +109,9 @@ Trunk (unreleased changes)
     HDFS-1691. Remove a duplicated static initializer for reading default
     configurations in DFSck.  (Alexey Diomin via szetszwo)
 
+    HDFS-1738. change hdfs jmxget to return an empty string instead of 
+    null when an attribute value is not available (tanping vi boryas)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES
