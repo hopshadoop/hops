@@ -63,6 +63,9 @@ Trunk (unreleased changes)
 
     HDFS-1731. Allow using a file to exclude certain tests from build (todd)
 
+    HDFS-1736. Remove the dependency from DatanodeJspHelper to FsShell.
+    (Daryn Sharp via szetszwo)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
