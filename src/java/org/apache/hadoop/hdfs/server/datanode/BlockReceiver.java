@@ -80,6 +80,7 @@ class BlockReceiver implements java.io.Closeable, FSConstants {
   DatanodeInfo srcDataNode = null;
   private Checksum partialCrc = null;
   private final DataNode datanode;
+  private final BlockConstructionStage initialStage;
   final private ReplicaInPipelineInterface replicaInfo;
   volatile private boolean mirrorError;
 
@@ -96,6 +97,11 @@ class BlockReceiver implements java.io.Closeable, FSConstants {
       this.clientName = clientName;
       this.srcDataNode = srcDataNode;
       this.datanode = datanode;
+      
+      //for datanode, we have
+      //1: clientName.length() == 0, and
+      //2: stage == null, PIPELINE_SETUP_CREATE or TRANSFER_RBW
+      this.initialStage = stage;
       //
       // Open local disk out
       //
@@ -647,9 +653,11 @@ class BlockReceiver implements java.io.Closeable, FSConstants {
         // close the block/crc files
         close();
 
-        // Finalize the block. Does this fsync()?
-        block.setNumBytes(replicaInfo.getNumBytes());
-        datanode.data.finalizeBlock(block);
+        if (initialStage != BlockConstructionStage.TRANSFER_RBW) {
+          // Finalize the block. Does this fsync()?
+          block.setNumBytes(replicaInfo.getNumBytes());
+          datanode.data.finalizeBlock(block);
+        }
         datanode.myMetrics.blocksWritten.inc();
       }
 
@@ -680,7 +688,8 @@ class BlockReceiver implements java.io.Closeable, FSConstants {
    * if this write is for a replication request (and not from a client)
    */
   private void cleanupBlock() throws IOException {
-    if (clientName.length() == 0) { // not client write
+    if (clientName.length() == 0
+        && initialStage != BlockConstructionStage.TRANSFER_RBW) {
       datanode.data.unfinalizeBlock(block);
     }
   }

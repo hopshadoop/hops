@@ -358,7 +358,7 @@ public class SimulatedFSDataset  implements FSConstants, FSDatasetInterface, Con
 
   @Override
   public synchronized void unfinalizeBlock(Block b) throws IOException {
-    if (isBeingWritten(b)) {
+    if (isValidRbw(b)) {
       blockMap.remove(b);
     }
   }
@@ -452,15 +452,16 @@ public class SimulatedFSDataset  implements FSConstants, FSDatasetInterface, Con
     return binfo.isFinalized();
   }
 
-  /* check if a block is created but not finalized */
-  private synchronized boolean isBeingWritten(Block b) {
+  @Override
+  public synchronized boolean isValidRbw(Block b) {
     BInfo binfo = blockMap.get(b);
     if (binfo == null) {
       return false;
     }
     return !binfo.isFinalized();  
   }
-  
+
+  @Override
   public String toString() {
     return getStorageInfo();
   }
@@ -541,7 +542,7 @@ public class SimulatedFSDataset  implements FSConstants, FSDatasetInterface, Con
           throw new ReplicaAlreadyExistsException("Block " + b + 
               " is valid, and cannot be written to.");
       }
-    if (isBeingWritten(b)) {
+    if (isValidRbw(b)) {
         throw new ReplicaAlreadyExistsException("Block " + b + 
             " is being written, and cannot be written to.");
     }
@@ -827,5 +828,18 @@ public class SimulatedFSDataset  implements FSConstants, FSDatasetInterface, Con
   @Override
   public long getReplicaVisibleLength(Block block) throws IOException {
     return block.getNumBytes();
+  }
+
+  @Override
+  public ReplicaInPipelineInterface convertTemporaryToRbw(Block temporary)
+      throws IOException {
+    final BInfo r = blockMap.get(temporary);
+    if (r == null) {
+      throw new IOException("Block not found, temporary=" + temporary);
+    } else if (r.isFinalized()) {
+      throw new IOException("Replica already finalized, temporary="
+          + temporary + ", r=" + r);
+    }
+    return r;
   }
 }

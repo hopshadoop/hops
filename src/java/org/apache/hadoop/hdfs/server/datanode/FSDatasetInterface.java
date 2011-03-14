@@ -215,6 +215,14 @@ public interface FSDatasetInterface extends FSDatasetMBean {
   throws IOException;
 
   /**
+   * Covert a temporary replica to a RBW.
+   * @param temporary the temporary replica being converted
+   * @return the result RBW
+   */
+  public ReplicaInPipelineInterface convertTemporaryToRbw(
+      Block temporary) throws IOException;
+
+  /**
    * Append to a finalized replica and returns the meta info of the replica
    * 
    * @param b block
@@ -280,6 +288,13 @@ public interface FSDatasetInterface extends FSDatasetMBean {
    * @return - true if the specified block is valid
    */
   public boolean isValidBlock(Block b);
+
+  /**
+   * Is the block a valid RBW?
+   * @param b
+   * @return - true if the specified block is a valid RBW
+   */
+  public boolean isValidRbw(Block b);
 
   /**
    * Invalidates the specified blocks
