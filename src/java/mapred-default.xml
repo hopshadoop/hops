@@ -1011,6 +1011,26 @@
   </description>
 </property>
 
+<!-- TaskTracker DistributedCache configuration -->
+<property>
+  <name>mapreduce.tasktracker.cache.local.size</name>
+  <value>10737418240</value>
+  <description>The number of bytes to allocate in each local TaskTracker
+  directory for holding Distributed Cache data.</description>
+</property>
+
+<property>
+  <name>mapreduce.tasktracker.cache.local.numberdirectories</name>
+  <value>10000</value>
+  <description>
+  The maximum number of subdirectories that should be created in any particular
+  distributed cache store. After this many directories have been created,
+  cache items will be expunged regardless of whether the total size threshold
+  has been exceeded.
+  </description>
+</property>
+<!-- End of TaskTracker DistributedCache configuration -->
+
 <property>
   <name>mapreduce.task.merge.progress.records</name>
   <value>10000</value>

@@ -115,6 +115,9 @@ Trunk (unreleased changes)
     MAPREDUCE-1242. Chain APIs error misleading.
     (Harsh J Chouraria via tomwhite)
 
+    MAPREDUCE-2379. Adds missing DistributedCache configurations in 
+    mapred-default.xml (Todd Lipcon via amareshwari)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES
