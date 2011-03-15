@@ -121,6 +121,8 @@ Trunk (unreleased changes)
 
     HDFS-1748. Balancer utilization classification is incomplete.  (szetszwo)
 
+    HDFS-1757. Don't compile fuse-dfs by default. (eli)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES

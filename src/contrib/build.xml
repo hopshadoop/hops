@@ -28,7 +28,8 @@
   <!-- ====================================================== -->
   <target name="compile">
     <subant target="compile">
-      <fileset dir="." includes="*/build.xml"/>
+      <fileset dir="." includes="thriftfs/build.xml"/>
+      <fileset dir="." includes="hdfsproxy/build.xml"/>
     </subant>
   </target>
   
@@ -46,8 +47,6 @@
   <!-- ====================================================== -->
   <target name="test">
     <subant target="test">
-      <property name="continueOnFailure" value="true"/>
-      <fileset dir="." includes="fuse-dfs/build.xml"/>
       <fileset dir="." includes="hdfsproxy/build.xml"/>
     </subant>
   </target>
