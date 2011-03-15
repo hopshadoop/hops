@@ -71,6 +71,8 @@ Trunk (unreleased changes)
     HDFS-1731. Amend previous commit for this JIRA to fix build on Cygwin.
     (todd)
 
+    HDFS-780. Revive TestFuseDFS. (eli)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image

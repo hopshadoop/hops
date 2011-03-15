@@ -46,6 +46,8 @@
   <!-- ====================================================== -->
   <target name="test">
     <subant target="test">
+      <property name="continueOnFailure" value="true"/>
+      <fileset dir="." includes="fuse-dfs/build.xml"/>
       <fileset dir="." includes="hdfsproxy/build.xml"/>
     </subant>
   </target>
