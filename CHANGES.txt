@@ -635,6 +635,9 @@ Release 0.22.0 - Unreleased
 
     MAPREDUCE-2336. Tool-related packages should be in the Tool javadoc group.
     (tomwhite)
+    
+    MAPREDUCE-2394. JUnit output format doesn't propagate into raid contrib
+    build. (todd)
 
 Release 0.21.1 - Unreleased
 
