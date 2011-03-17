@@ -689,7 +689,6 @@ public class MiniMRCluster {
     tracker.shutdown();
 
     Thread thread = taskTrackerThreadList.remove(id);
-    thread.interrupt();
     
     try {
       thread.join();
@@ -752,7 +751,6 @@ public class MiniMRCluster {
         TaskTrackerRunner taskTracker = taskTrackerList.get(idx);
         Thread taskTrackerThread = taskTrackerThreadList.get(idx);
         taskTracker.shutdown();
-        taskTrackerThread.interrupt();
         try {
           taskTrackerThread.join();
         } catch (InterruptedException ex) {

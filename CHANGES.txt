@@ -639,6 +639,9 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2394. JUnit output format doesn't propagate into raid contrib
     build. (todd)
 
+    MAPREDUCE-2392. TaskTracker shutdown in the tests sometimes take 60s.
+    (tomwhite)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES

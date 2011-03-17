@@ -176,6 +176,8 @@ public class TestJobRetire extends TestCase {
    */
   class WaitingTaskTracker extends TaskTracker {
     
+    private volatile boolean alive = true;
+    
     WaitingTaskTracker(JobConf conf) throws IOException, InterruptedException {
       super(conf);
     }
@@ -185,8 +187,16 @@ public class TestJobRetire extends TestCase {
       HeartbeatResponse response = super.transmitHeartBeat(now);
       LOG.info("WaitingTaskTracker waiting");
       // wait forever
-      UtilsForTests.waitFor(Long.MAX_VALUE);
-      throw new IOException ("WaitingTaskTracker interrupted. Bailing out");
+      while (alive) {
+        UtilsForTests.waitFor(1000);
+      }
+      throw new IOException ("WaitingTaskTracker shutdown. Bailing out");
+    }
+    
+    @Override
+    public synchronized void shutdown() throws IOException {
+      alive = false;
+      super.shutdown();
     }
   }
   
