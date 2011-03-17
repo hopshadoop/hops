@@ -66,7 +66,8 @@
       <fileset dir="." includes="dynamic-scheduler/build.xml"/>
       <fileset dir="." includes="gridmix/build.xml"/>
       <fileset dir="." includes="vertica/build.xml"/>
-      <fileset dir="." includes="mumak/build.xml"/>
+      <!-- mumak tests disabled due to timeouts. See MAPREDUCE-2348
+      <fileset dir="." includes="mumak/build.xml"/> -->
       <fileset dir="." includes="raid/build.xml"/>
     </subant>
     <available file="${build.contrib.dir}/testsfailed" property="testsfailed"/>

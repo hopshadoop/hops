@@ -118,6 +118,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2379. Adds missing DistributedCache configurations in 
     mapred-default.xml (Todd Lipcon via amareshwari)
 
+    MAPREDUCE-2348. Disable mumak tests on trunk since they currently time out
+    (todd)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES
