@@ -73,6 +73,9 @@ Trunk (unreleased changes)
 
     HDFS-780. Revive TestFuseDFS. (eli)
 
+    HDFS-1445. Batch the calls in DataStorage to FileUtil.createHardLink().
+    (Matt Foley via jghoman)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
