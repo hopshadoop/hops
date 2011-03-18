@@ -42,7 +42,7 @@ public class TestOverReplicatedBlocks extends TestCase {
    */
   public void testProcesOverReplicateBlock() throws IOException {
     Configuration conf = new HdfsConfiguration();
-    conf.setLong("dfs.blockreport.intervalMsec", 1000L);
+    conf.setLong(DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_KEY, 1000L);
     conf.set(DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_KEY, Integer.toString(2));
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
     FileSystem fs = cluster.getFileSystem();

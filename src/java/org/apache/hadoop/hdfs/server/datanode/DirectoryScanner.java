@@ -135,7 +135,7 @@ public class DirectoryScanner {
 
   DirectoryScanner(FSDataset dataset, Configuration conf) {
     this.dataset = dataset;
-    int interval = conf.getInt("dfs.datanode.directoryscan.interval",
+    int interval = conf.getInt(DFSConfigKeys.DFS_DATANODE_DIRECTORYSCAN_INTERVAL_KEY,
         DEFAULT_SCAN_INTERVAL);
     scanPeriod = interval * 1000L;
     int threads = 

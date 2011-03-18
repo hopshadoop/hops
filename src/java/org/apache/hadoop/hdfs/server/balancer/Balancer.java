@@ -1329,7 +1329,8 @@ public class Balancer implements Tool {
     /* set the win width */
     private void setWinWidth(Configuration conf) {
       winWidth = conf.getLong(
-          "dfs.balancer.movedWinWidth", 5400*1000L);
+          DFSConfigKeys.DFS_BALANCER_MOVEDWINWIDTH_KEY, 
+          DFSConfigKeys.DFS_BALANCER_MOVEDWINWIDTH_DEFAULT);
     }
     
     /* add a block thus marking a block to be moved */

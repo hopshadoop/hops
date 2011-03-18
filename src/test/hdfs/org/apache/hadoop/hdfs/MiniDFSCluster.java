@@ -457,10 +457,10 @@ public class MiniDFSCluster {
           fileAsURI(new File(base_dir, "namesecondary2")));
     }
     
-    int replication = conf.getInt("dfs.replication", 3);
-    conf.setInt("dfs.replication", Math.min(replication, numDataNodes));
+    int replication = conf.getInt(DFSConfigKeys.DFS_REPLICATION_KEY, 3);
+    conf.setInt(DFSConfigKeys.DFS_REPLICATION_KEY, Math.min(replication, numDataNodes));
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_SAFEMODE_EXTENSION_KEY, 0);
-    conf.setInt("dfs.namenode.decommission.interval", 3); // 3 second
+    conf.setInt(DFSConfigKeys.DFS_NAMENODE_DECOMMISSION_INTERVAL_KEY, 3); // 3 second
     
     // Format and clean out DataNode directories
     if (format) {
@@ -587,8 +587,8 @@ public class MiniDFSCluster {
 
     int curDatanodesNum = dataNodes.size();
     // for mincluster's the default initialDelay for BRs is 0
-    if (conf.get("dfs.blockreport.initialDelay") == null) {
-      conf.setLong("dfs.blockreport.initialDelay", 0);
+    if (conf.get(DFSConfigKeys.DFS_BLOCKREPORT_INITIAL_DELAY_KEY) == null) {
+      conf.setLong(DFSConfigKeys.DFS_BLOCKREPORT_INITIAL_DELAY_KEY, 0);
     }
     // If minicluster's name node is null assume that the conf has been
     // set with the right address:port of the name node.
