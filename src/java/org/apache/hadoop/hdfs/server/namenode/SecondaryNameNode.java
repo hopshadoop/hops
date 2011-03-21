@@ -705,12 +705,14 @@ public class SecondaryNameNode implements Runnable {
         sdEdits = it.next();
       if (sdEdits == null)
         throw new IOException("Could not locate checkpoint edits");
+      
+      this.getStorage().setStorageInfo(sig);
+      this.getStorage().setImageDigest(sig.getImageDigest());
       if (loadImage) {
-        // to avoid assert in loadFSImage()
-        this.getStorage().layoutVersion = -1;
         loadFSImage(getStorage().getStorageFile(sdName, NameNodeFile.IMAGE));
       }
       loadFSEdits(sdEdits);
+      
       sig.validateStorageInfo(this);
       saveNamespace(false);
     }
