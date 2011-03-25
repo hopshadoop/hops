@@ -3032,6 +3032,10 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
    * effect causes more datanodes to be declared dead.
    */
   void heartbeatCheck() {
+    if (isInSafeMode()) {
+      // not to check dead nodes if in safemode
+      return;
+    }
     boolean allAlive = false;
     while (!allAlive) {
       boolean foundDead = false;
