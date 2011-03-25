@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdfs.protocol.DataTransferProtocol.Status.CHECKS
 import static org.apache.hadoop.hdfs.protocol.DataTransferProtocol.Status.ERROR;
 import static org.apache.hadoop.hdfs.protocol.DataTransferProtocol.Status.ERROR_ACCESS_TOKEN;
 import static org.apache.hadoop.hdfs.protocol.DataTransferProtocol.Status.SUCCESS;
+import static org.apache.hadoop.hdfs.server.common.Util.now;
 import static org.apache.hadoop.hdfs.server.datanode.DataNode.DN_CLIENTTRACE_FORMAT;
 
 import java.io.BufferedInputStream;
@@ -36,13 +37,12 @@ import java.net.SocketException;
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DataTransferProtocol;
+import org.apache.hadoop.hdfs.protocol.DataTransferProtocol.BlockConstructionStage;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.FSConstants;
-import org.apache.hadoop.hdfs.protocol.DataTransferProtocol.BlockConstructionStage;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager;
 import org.apache.hadoop.hdfs.server.common.HdfsConstants;
-import static org.apache.hadoop.hdfs.server.common.Util.now;
 import org.apache.hadoop.hdfs.server.datanode.FSDatasetInterface.MetaDataInputStream;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.MD5Hash;
@@ -50,8 +50,8 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.metrics.util.MetricsTimeVaryingInt;
 import org.apache.hadoop.metrics.util.MetricsTimeVaryingRate;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
+import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.DataChecksum;
 import org.apache.hadoop.util.StringUtils;
 
@@ -236,12 +236,15 @@ class DataXceiver extends DataTransferProtocol.Receiver
    * Write a block to disk.
    */
   @Override
-  protected void opWriteBlock(DataInputStream in, Block block, 
-      int pipelineSize, BlockConstructionStage stage,
-      long newGs, long minBytesRcvd, long maxBytesRcvd,
-      String client, DatanodeInfo srcDataNode, DatanodeInfo[] targets,
-      Token<BlockTokenIdentifier> blockToken) throws IOException {
-    updateCurrentThreadName("Receiving block " + block + " client=" + client);
+  protected void opWriteBlock(final DataInputStream in, final Block block, 
+      final int pipelineSize, final BlockConstructionStage stage,
+      final long newGs, final long minBytesRcvd, final long maxBytesRcvd,
+      final String clientname, final DatanodeInfo srcDataNode,
+      final DatanodeInfo[] targets, final Token<BlockTokenIdentifier> blockToken
+      ) throws IOException {
+    updateCurrentThreadName("Receiving block " + block + " client=" + clientname);
+    final boolean isDatanode = clientname.length() == 0;
+    final boolean isClient = !isDatanode;
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("writeBlock receive buf size " + s.getReceiveBufferSize() +
@@ -268,7 +271,7 @@ class DataXceiver extends DataTransferProtocol.Receiver
             BlockTokenSecretManager.AccessMode.WRITE);
       } catch (InvalidToken e) {
         try {
-          if (client.length() != 0) {
+          if (isClient) {
             ERROR_ACCESS_TOKEN.write(replyOut);
             Text.writeString(replyOut, datanode.dnRegistration.getName());
             replyOut.flush();
@@ -291,14 +294,14 @@ class DataXceiver extends DataTransferProtocol.Receiver
     String firstBadLink = "";           // first datanode that failed in connection setup
     DataTransferProtocol.Status mirrorInStatus = SUCCESS;
     try {
-      if (client.length() == 0 || 
+      if (isDatanode || 
           stage != BlockConstructionStage.PIPELINE_CLOSE_RECOVERY) {
         // open a block receiver
         blockReceiver = new BlockReceiver(block, in, 
             s.getRemoteSocketAddress().toString(),
             s.getLocalSocketAddress().toString(),
             stage, newGs, minBytesRcvd, maxBytesRcvd,
-            client, srcDataNode, datanode);
+            clientname, srcDataNode, datanode);
       } else {
         datanode.data.recoverClose(block, newGs, minBytesRcvd);
       }
@@ -329,7 +332,7 @@ class DataXceiver extends DataTransferProtocol.Receiver
 
           // Write header: Copied from DFSClient.java!
           DataTransferProtocol.Sender.opWriteBlock(mirrorOut, originalBlock,
-              pipelineSize, stage, newGs, minBytesRcvd, maxBytesRcvd, client,
+              pipelineSize, stage, newGs, minBytesRcvd, maxBytesRcvd, clientname,
               srcDataNode, targets, blockToken);
 
           if (blockReceiver != null) { // send checksum header
@@ -338,7 +341,7 @@ class DataXceiver extends DataTransferProtocol.Receiver
           mirrorOut.flush();
 
           // read connect ack (only for clients, not for replication req)
-          if (client.length() != 0) {
+          if (isClient) {
             mirrorInStatus = DataTransferProtocol.Status.read(mirrorIn);
             firstBadLink = Text.readString(mirrorIn);
             if (LOG.isDebugEnabled() || mirrorInStatus != SUCCESS) {
@@ -350,7 +353,7 @@ class DataXceiver extends DataTransferProtocol.Receiver
           }
 
         } catch (IOException e) {
-          if (client.length() != 0) {
+          if (isClient) {
             ERROR.write(replyOut);
             Text.writeString(replyOut, mirrorNode);
             replyOut.flush();
@@ -361,7 +364,7 @@ class DataXceiver extends DataTransferProtocol.Receiver
           mirrorIn = null;
           IOUtils.closeSocket(mirrorSock);
           mirrorSock = null;
-          if (client.length() > 0) {
+          if (isClient) {
             throw e;
           } else {
             LOG.info(datanode.dnRegistration + ":Exception transfering block " +
@@ -373,7 +376,7 @@ class DataXceiver extends DataTransferProtocol.Receiver
       }
 
       // send connect ack back to source (only for clients)
-      if (client.length() != 0) {
+      if (isClient) {
         if (LOG.isDebugEnabled() || mirrorInStatus != SUCCESS) {
           LOG.info("Datanode " + targets.length +
                    " forwarding connect ack to upstream firstbadlink is " +
@@ -392,7 +395,7 @@ class DataXceiver extends DataTransferProtocol.Receiver
       }
 
       // update its generation stamp
-      if (client.length() != 0 && 
+      if (isClient && 
           stage == BlockConstructionStage.PIPELINE_CLOSE_RECOVERY) {
         block.setGenerationStamp(newGs);
         block.setNumBytes(minBytesRcvd);
@@ -401,7 +404,7 @@ class DataXceiver extends DataTransferProtocol.Receiver
       // if this write is for a replication request or recovering
       // a failed close for client, then confirm block. For other client-writes,
       // the block is finalized in the PacketResponder.
-      if ((client.length() == 0 && stage != BlockConstructionStage.TRANSFER_RBW)
+      if ((isDatanode  && stage != BlockConstructionStage.TRANSFER_RBW)
           ||
           stage == BlockConstructionStage.PIPELINE_CLOSE_RECOVERY) {
         datanode.closeBlock(block, DataNode.EMPTY_DEL_HINT);

@@ -36,13 +36,13 @@ import java.util.zip.Checksum;
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.fs.FSOutputSummer;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.DataTransferProtocol.BlockConstructionStage;
+import org.apache.hadoop.hdfs.protocol.DataTransferProtocol.PacketHeader;
+import org.apache.hadoop.hdfs.protocol.DataTransferProtocol.PipelineAck;
+import org.apache.hadoop.hdfs.protocol.DataTransferProtocol.Status;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.FSConstants;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
-import org.apache.hadoop.hdfs.protocol.DataTransferProtocol.BlockConstructionStage;
-import org.apache.hadoop.hdfs.protocol.DataTransferProtocol.PipelineAck;
-import org.apache.hadoop.hdfs.protocol.DataTransferProtocol.PacketHeader;
-import org.apache.hadoop.hdfs.protocol.DataTransferProtocol.Status;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.Daemon;
@@ -58,7 +58,6 @@ class BlockReceiver implements java.io.Closeable, FSConstants {
   public static final Log LOG = DataNode.LOG;
   static final Log ClientTraceLog = DataNode.ClientTraceLog;
   
-  private Block block; // the block to receive
   private DataInputStream in = null; // from where data are read
   private DataChecksum checksum; // from where chunks of a block can be read
   private OutputStream out = null; // to block file at local disk
@@ -76,28 +75,41 @@ class BlockReceiver implements java.io.Closeable, FSConstants {
   private Daemon responder = null;
   private DataTransferThrottler throttler;
   private FSDataset.BlockWriteStreams streams;
-  private String clientName;
-  DatanodeInfo srcDataNode = null;
+  private DatanodeInfo srcDataNode = null;
   private Checksum partialCrc = null;
   private final DataNode datanode;
-  private final BlockConstructionStage initialStage;
-  final private ReplicaInPipelineInterface replicaInfo;
   volatile private boolean mirrorError;
 
-  BlockReceiver(Block block, DataInputStream in, String inAddr,
-                String myAddr, BlockConstructionStage stage, 
-                long newGs, long minBytesRcvd, long maxBytesRcvd, 
-                String clientName, DatanodeInfo srcDataNode, DataNode datanode)
-                throws IOException {
+  /** The client name.  It is empty if a datanode is the client */
+  private final String clientname;
+  private final boolean isClient; 
+  private final boolean isDatanode; 
+
+  /** the block to receive */
+  private final Block block; 
+  /** the replica to write */
+  private final ReplicaInPipelineInterface replicaInfo;
+  /** pipeline stage */
+  private final BlockConstructionStage initialStage;
+
+  BlockReceiver(final Block block, final DataInputStream in,
+      final String inAddr, final String myAddr,
+      final BlockConstructionStage stage, 
+      final long newGs, final long minBytesRcvd, final long maxBytesRcvd, 
+      final String clientname, final DatanodeInfo srcDataNode,
+      final DataNode datanode) throws IOException {
     try{
       this.block = block;
       this.in = in;
       this.inAddr = inAddr;
       this.myAddr = myAddr;
-      this.clientName = clientName;
       this.srcDataNode = srcDataNode;
       this.datanode = datanode;
-      
+
+      this.clientname = clientname;
+      this.isDatanode = clientname.length() == 0;
+      this.isClient = !this.isDatanode;
+
       //for datanode, we have
       //1: clientName.length() == 0, and
       //2: stage == null, PIPELINE_SETUP_CREATE or TRANSFER_RBW
@@ -105,7 +117,7 @@ class BlockReceiver implements java.io.Closeable, FSConstants {
       //
       // Open local disk out
       //
-      if (clientName.length() == 0) { //replication or move
+      if (isDatanode) { //replication or move
         replicaInfo = datanode.data.createTemporary(block);
       } else {
         switch (stage) {
@@ -140,8 +152,8 @@ class BlockReceiver implements java.io.Closeable, FSConstants {
       this.bytesPerChecksum = checksum.getBytesPerChecksum();
       this.checksumSize = checksum.getChecksumSize();
       
-      boolean isCreate = stage == BlockConstructionStage.PIPELINE_SETUP_CREATE 
-      || clientName.length() == 0;
+      final boolean isCreate = isDatanode 
+          || stage == BlockConstructionStage.PIPELINE_SETUP_CREATE;
       streams = replicaInfo.createStreams(isCreate,
           this.bytesPerChecksum, this.checksumSize);
       if (streams != null) {
@@ -526,7 +538,7 @@ class BlockReceiver implements java.io.Closeable, FSConstants {
        * protocol includes acks and only the last datanode needs to verify 
        * checksum.
        */
-      if (mirrorOut == null || clientName.length() == 0) {
+      if (mirrorOut == null || isDatanode) {
         verifyChunks(pktBuf, dataOff, len, pktBuf, checksumOff);
       }
 
@@ -625,7 +637,7 @@ class BlockReceiver implements java.io.Closeable, FSConstants {
       throttler = throttlerArg;
 
     try {
-      if (clientName.length() > 0) {
+      if (isClient) {
         responder = new Daemon(datanode.threadGroup, 
                                new PacketResponder(this, block, mirrIn, 
                                                    replyOut, numTargets,
@@ -649,7 +661,7 @@ class BlockReceiver implements java.io.Closeable, FSConstants {
       // if this write is for a replication request (and not
       // from a client), then finalize block. For client-writes, 
       // the block is finalized in the PacketResponder.
-      if (clientName.length() == 0) {
+      if (isDatanode) {
         // close the block/crc files
         close();
 
@@ -688,7 +700,7 @@ class BlockReceiver implements java.io.Closeable, FSConstants {
    * if this write is for a replication request (and not from a client)
    */
   private void cleanupBlock() throws IOException {
-    if (clientName.length() == 0
+    if (isDatanode
         && initialStage != BlockConstructionStage.TRANSFER_RBW) {
       datanode.data.unfinalizeBlock(block);
     }
@@ -925,12 +937,11 @@ class BlockReceiver implements java.io.Closeable, FSConstants {
               block.setNumBytes(replicaInfo.getNumBytes());
               datanode.data.finalizeBlock(block);
               datanode.closeBlock(block, DataNode.EMPTY_DEL_HINT);
-              if (ClientTraceLog.isInfoEnabled() &&
-                  receiver.clientName.length() > 0) {
+              if (ClientTraceLog.isInfoEnabled() && isClient) {
                 long offset = 0;
                 ClientTraceLog.info(String.format(DN_CLIENTTRACE_FORMAT,
                       receiver.inAddr, receiver.myAddr, block.getNumBytes(),
-                      "HDFS_WRITE", receiver.clientName, offset,
+                      "HDFS_WRITE", receiver.clientname, offset,
                       datanode.dnRegistration.getStorageID(), block, endTime-startTime));
               } else {
                 LOG.info("Received block " + block + 
