@@ -22,7 +22,6 @@ import static org.apache.hadoop.hdfs.protocol.DataTransferProtocol.Status.SUCCES
 import static org.apache.hadoop.hdfs.server.datanode.DataNode.DN_CLIENTTRACE_FORMAT;
 
 import java.io.BufferedOutputStream;
-import java.io.Closeable;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
@@ -55,7 +54,7 @@ import org.apache.hadoop.util.StringUtils;
  * may copies it to another site. If a throttler is provided,
  * streaming throttling is also supported.
  **/
-class BlockReceiver implements Closeable, FSConstants {
+class BlockReceiver implements java.io.Closeable, FSConstants {
   public static final Log LOG = DataNode.LOG;
   static final Log ClientTraceLog = DataNode.ClientTraceLog;
   
@@ -630,7 +629,7 @@ class BlockReceiver implements Closeable, FSConstants {
       DataInputStream mirrIn,   // input from next datanode
       DataOutputStream replyOut,  // output to previous datanode
       String mirrAddr, DataTransferThrottler throttlerArg,
-      final DatanodeInfo[] downstreams) throws IOException {
+      int numTargets) throws IOException {
 
       boolean responderClosed = false;
       mirrorOut = mirrOut;
@@ -639,8 +638,10 @@ class BlockReceiver implements Closeable, FSConstants {
 
     try {
       if (isClient) {
-        responder = new Daemon(datanode.threadGroup,
-            new PacketResponder(downstreams, mirrIn, replyOut));
+        responder = new Daemon(datanode.threadGroup, 
+                               new PacketResponder(this, block, mirrIn, 
+                                                   replyOut, numTargets,
+                                                   Thread.currentThread()));
         responder.start(); // start thread to processes reponses
       }
 
@@ -787,59 +788,46 @@ class BlockReceiver implements Closeable, FSConstants {
    * Processed responses from downstream datanodes in the pipeline
    * and sends back replies to the originator.
    */
-  private class PacketResponder implements Runnable, Closeable, FSConstants {   
+  class PacketResponder implements Runnable, FSConstants {   
 
-    /** queue for packets waiting for ack */
-    private final LinkedList<Packet> ackQueue = new LinkedList<Packet>(); 
-    /** the thread that spawns this responder */
-    private final Thread receiverThread = Thread.currentThread();
-    /** is this responder running? */
+    //packet waiting for ack
+    private LinkedList<Packet> ackQueue = new LinkedList<Packet>(); 
     private volatile boolean running = true;
+    private Block block;
+    DataInputStream mirrorIn;   // input from downstream datanode
+    DataOutputStream replyOut;  // output to upstream datanode
+    private int numTargets;     // number of downstream datanodes including myself
+    private BlockReceiver receiver; // The owner of this responder.
+    private Thread receiverThread; // the thread that spawns this responder
 
-    /** downstream datanodes excluding myself */
-    private final DatanodeInfo[] downstreams;
-    /** input from the next downstream datanode */
-    private final DataInputStream downstreamIn;
-    /** output to upstream datanode/client */
-    private final DataOutputStream upstreamOut;
-
-    /** for log and error messages */
-    private final String myString; 
-
-    @Override
     public String toString() {
-      return getClass().getSimpleName() + ": block=" + block + ", downstreams="
-          + (downstreams == null? null: Arrays.asList(downstreams));
+      return "PacketResponder " + numTargets + " for Block " + this.block;
     }
 
-    PacketResponder(final DatanodeInfo[] downstreams,
-        final DataInputStream downstreamIn,
-        final DataOutputStream upstreamOut) {
-      this.downstreams = downstreams;
-      this.downstreamIn = downstreamIn;
-      this.upstreamOut = upstreamOut;
-
-      this.myString = toString();
-    }
-
-    private boolean isLastDatanode() {
-      return downstreams != null && downstreams.length == 0;
+    PacketResponder(BlockReceiver receiver, Block b, DataInputStream in, 
+                    DataOutputStream out, int numTargets,
+                    Thread receiverThread) {
+      this.receiverThread = receiverThread;
+      this.receiver = receiver;
+      this.block = b;
+      mirrorIn = in;
+      replyOut = out;
+      this.numTargets = numTargets;
     }
 
     /**
      * enqueue the seqno that is still be to acked by the downstream datanode.
      * @param seqno
      * @param lastPacketInBlock
-     * @param offsetInBlock
+     * @param lastByteInPacket
      */
-    synchronized void enqueue(final long seqno,
-        final boolean lastPacketInBlock, final long offsetInBlock) {
+    synchronized void enqueue(long seqno, boolean lastPacketInBlock, long lastByteInPacket) {
       if (running) {
-        final Packet p = new Packet(seqno, lastPacketInBlock, offsetInBlock);
         if(LOG.isDebugEnabled()) {
-          LOG.debug(myString + ": enqueue " + p);
+          LOG.debug("PacketResponder " + numTargets + " adding seqno " + seqno +
+                    " to ack queue.");
         }
-        ackQueue.addLast(p);
+        ackQueue.addLast(new Packet(seqno, lastPacketInBlock, lastByteInPacket));
         notifyAll();
       }
     }
@@ -847,8 +835,7 @@ class BlockReceiver implements Closeable, FSConstants {
     /**
      * wait for all pending packets to be acked. Then shutdown thread.
      */
-    @Override
-    public synchronized void close() {
+    synchronized void close() {
       while (running && ackQueue.size() != 0 && datanode.shouldRun) {
         try {
           wait();
@@ -857,7 +844,8 @@ class BlockReceiver implements Closeable, FSConstants {
         }
       }
       if(LOG.isDebugEnabled()) {
-        LOG.debug(myString + ": closing");
+        LOG.debug("PacketResponder " + numTargets +
+                 " for block " + block + " Closing down.");
       }
       running = false;
       notifyAll();
@@ -879,19 +867,21 @@ class BlockReceiver implements Closeable, FSConstants {
             PipelineAck ack = new PipelineAck();
             long seqno = PipelineAck.UNKOWN_SEQNO;
             try {
-              if (!isLastDatanode() && !mirrorError) {// not the last DN & no mirror error
+              if (numTargets != 0 && !mirrorError) {// not the last DN & no mirror error
                 // read an ack from downstream datanode
-                ack.readFields(downstreamIn);
+                ack.readFields(mirrorIn);
                 if (LOG.isDebugEnabled()) {
-                  LOG.debug(myString + " got " + ack);
+                  LOG.debug("PacketResponder " + numTargets + " got " + ack);
                 }
                 seqno = ack.getSeqno();
               }
-              if (seqno != PipelineAck.UNKOWN_SEQNO || isLastDatanode()) {
+              if (seqno != PipelineAck.UNKOWN_SEQNO || numTargets == 0) {
                 synchronized (this) {
                   while (running && datanode.shouldRun && ackQueue.size() == 0) {
                     if (LOG.isDebugEnabled()) {
-                      LOG.debug(myString + ": seqno=" + seqno +
+                      LOG.debug("PacketResponder " + numTargets + 
+                                " seqno = " + seqno +
+                                " for block " + block +
                                 " waiting for local datanode to finish write.");
                     }
                     wait();
@@ -901,10 +891,11 @@ class BlockReceiver implements Closeable, FSConstants {
                   }
                   pkt = ackQueue.getFirst();
                   expected = pkt.seqno;
-                  if (downstreams != null && downstreams.length > 0
-                      && seqno != expected) {
-                    throw new IOException(myString + "seqno: expected="
-                        + expected + ", received=" + seqno);
+                  if (numTargets > 0 && seqno != expected) {
+                    throw new IOException("PacketResponder " + numTargets +
+                                          " for block " + block +
+                                          " expected seqno:" + expected +
+                                          " received:" + seqno);
                   }
                   lastPacketInBlock = pkt.lastPacketInBlock;
                 }
@@ -919,7 +910,8 @@ class BlockReceiver implements Closeable, FSConstants {
                 // notify client of the error
                 // and wait for the client to shut down the pipeline
                 mirrorError = true;
-                LOG.info(myString, ioe);
+                LOG.info("PacketResponder " + block + " " + numTargets + 
+                      " Exception " + StringUtils.stringifyException(ioe));
               }
             }
 
@@ -931,7 +923,8 @@ class BlockReceiver implements Closeable, FSConstants {
                * because this datanode has a problem. The upstream datanode
                * will detect that this datanode is bad, and rightly so.
                */
-              LOG.info(myString + ": Thread is interrupted.");
+              LOG.info("PacketResponder " + block +  " " + numTargets +
+                       " : Thread is interrupted.");
               running = false;
               continue;
             }
@@ -939,7 +932,7 @@ class BlockReceiver implements Closeable, FSConstants {
             // If this is the last packet in block, then close block
             // file and finalize the block before responding success
             if (lastPacketInBlock) {
-              BlockReceiver.this.close();
+              receiver.close();
               final long endTime = ClientTraceLog.isInfoEnabled() ? System.nanoTime() : 0;
               block.setNumBytes(replicaInfo.getNumBytes());
               datanode.data.finalizeBlock(block);
@@ -947,12 +940,13 @@ class BlockReceiver implements Closeable, FSConstants {
               if (ClientTraceLog.isInfoEnabled() && isClient) {
                 long offset = 0;
                 ClientTraceLog.info(String.format(DN_CLIENTTRACE_FORMAT,
-                      inAddr, myAddr, block.getNumBytes(),
-                      "HDFS_WRITE", clientname, offset,
+                      receiver.inAddr, receiver.myAddr, block.getNumBytes(),
+                      "HDFS_WRITE", receiver.clientname, offset,
                       datanode.dnRegistration.getStorageID(), block, endTime-startTime));
               } else {
-                LOG.info("Received block " + block + " of size "
-                    + block.getNumBytes() + " from " + inAddr);
+                LOG.info("Received block " + block + 
+                         " of size " + block.getNumBytes() + 
+                         " from " + receiver.inAddr);
               }
             }
 
@@ -963,7 +957,7 @@ class BlockReceiver implements Closeable, FSConstants {
               replies[0] = SUCCESS;
               replies[1] = ERROR;
             } else {
-              short ackLen = isLastDatanode() ? 0 : ack.getNumOfReplies();
+              short ackLen = numTargets == 0 ? 0 : ack.getNumOfReplies();
               replies = new Status[1+ackLen];
               replies[0] = SUCCESS;
               for (int i=0; i<ackLen; i++) {
@@ -973,18 +967,20 @@ class BlockReceiver implements Closeable, FSConstants {
             PipelineAck replyAck = new PipelineAck(expected, replies);
             
             // send my ack back to upstream datanode
-            replyAck.write(upstreamOut);
-            upstreamOut.flush();
+            replyAck.write(replyOut);
+            replyOut.flush();
             if (LOG.isDebugEnabled()) {
-              LOG.debug(myString + ", replyAck=" + replyAck);
+              LOG.debug("PacketResponder " + numTargets + 
+                        " for block " + block +
+                        " responded an ack: " + replyAck);
             }
             if (pkt != null) {
               // remove the packet from the ack queue
               removeAckHead();
               // update bytes acked
               if (replyAck.isSuccess() && 
-                  pkt.offsetInBlock > replicaInfo.getBytesAcked()) {
-                replicaInfo.setBytesAcked(pkt.offsetInBlock);
+                  pkt.lastByteInBlock>replicaInfo.getBytesAcked()) {
+                replicaInfo.setBytesAcked(pkt.lastByteInBlock);
               }
             }
         } catch (IOException e) {
@@ -995,7 +991,8 @@ class BlockReceiver implements Closeable, FSConstants {
             } catch (IOException ioe) {
               LOG.warn("DataNode.checkDiskError failed in run() with: ", ioe);
             }
-            LOG.info(myString, e);
+            LOG.info("PacketResponder " + block + " " + numTargets + 
+                     " Exception " + StringUtils.stringifyException(e));
             running = false;
             if (!Thread.interrupted()) { // failure not caused by interruption
               receiverThread.interrupt();
@@ -1003,13 +1000,15 @@ class BlockReceiver implements Closeable, FSConstants {
           }
         } catch (Throwable e) {
           if (running) {
-            LOG.info(myString, e);
+            LOG.info("PacketResponder " + block + " " + numTargets + 
+                     " Exception " + StringUtils.stringifyException(e));
             running = false;
             receiverThread.interrupt();
           }
         }
       }
-      LOG.info(myString + " terminating");
+      LOG.info("PacketResponder " + numTargets + 
+               " for block " + block + " terminating");
     }
     
     /**
@@ -1026,23 +1025,15 @@ class BlockReceiver implements Closeable, FSConstants {
   /**
    * This information is cached by the Datanode in the ackQueue.
    */
-  private static class Packet {
-    final long seqno;
-    final boolean lastPacketInBlock;
-    final long offsetInBlock;
+  static private class Packet {
+    long seqno;
+    boolean lastPacketInBlock;
+    long lastByteInBlock;
 
-    Packet(long seqno, boolean lastPacketInBlock, long offsetInBlock) {
+    Packet(long seqno, boolean lastPacketInBlock, long lastByteInPacket) {
       this.seqno = seqno;
       this.lastPacketInBlock = lastPacketInBlock;
-      this.offsetInBlock = offsetInBlock;
-    }
-
-    @Override
-    public String toString() {
-      return getClass().getSimpleName() + "(seqno=" + seqno
-        + ", lastPacketInBlock=" + lastPacketInBlock
-        + ", offsetInBlock=" + offsetInBlock
-        + ")";
+      this.lastByteInBlock = lastByteInPacket;
     }
   }
 }

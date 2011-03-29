@@ -21,6 +21,10 @@ Trunk (unreleased changes)
 
     HDFS-1675. Support transferring RBW between datanodes. (szetszwo)
 
+    HDFS-1785. In BlockReceiver and DataXceiver, clientName.length() is used
+    multiple times for determining whether the source is a client or a
+    datanode.  (szetszwo)
+
   IMPROVEMENTS
 
     HDFS-1510. Added test-patch.properties required by test-patch.sh (nigel)
@@ -81,13 +85,6 @@ Trunk (unreleased changes)
 
     HDFS-1541. Not marking datanodes dead when namenode in safemode.
     (hairong)
-
-    HDFS-1785. In BlockReceiver and DataXceiver, clientName.length() is used
-    multiple times for determining whether the source is a client or a
-    datanode.  (szetszwo)
-
-    HDFS-1789. Refactor frequently used codes from DFSOutputStream,
-    BlockReceiver and DataXceiver.  (szetszwo)
 
     HDFS-1120. Make DataNode's block-to-device placement policy pluggable
     (Harsh J Chouraria via todd)
