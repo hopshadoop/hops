@@ -3103,6 +3103,14 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
       throw new IOException("ProcessReport from dead or unregisterted node: "
                             + nodeID.getName());
     }
+    // To minimize startup time, we discard any second (or later) block reports
+    // that we receive while still in startup phase.
+    if (isInStartupSafeMode() && node.numBlocks() > 0) {
+      NameNode.stateChangeLog.info("BLOCK* NameSystem.processReport: "
+          + "discarded non-initial block report from " + nodeID.getName()
+          + " because namenode still in startup phase");
+      return;
+    }
 
     blockManager.processReport(node, newReport);
     NameNode.getNameNodeMetrics().blockReport.inc((int) (now() - startTime));
@@ -4169,6 +4177,15 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
     if (safeMode == null)
       return false;
     return safeMode.isOn();
+  }
+  
+  /**
+   * Check whether the name node is in startup mode.
+   */
+  synchronized boolean isInStartupSafeMode() {
+    if (safeMode == null)
+      return false;
+    return safeMode.isOn() && !safeMode.isManual();
   }
 
   /**

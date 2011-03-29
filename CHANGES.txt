@@ -92,6 +92,9 @@ Trunk (unreleased changes)
     HDFS-1789. Refactor frequently used codes from DFSOutputStream and
     DataXceiver.  (szetszwo)
 
+    HDFS-1767. Namenode ignores non-initial block report from datanodes
+    when in safemode during startup. (Matt Foley via suresh)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
