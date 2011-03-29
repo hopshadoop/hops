@@ -89,6 +89,9 @@ Trunk (unreleased changes)
     HDFS-1789. Refactor frequently used codes from DFSOutputStream,
     BlockReceiver and DataXceiver.  (szetszwo)
 
+    HDFS-1120. Make DataNode's block-to-device placement policy pluggable
+    (Harsh J Chouraria via todd)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
