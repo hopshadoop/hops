@@ -63,9 +63,6 @@ Trunk (unreleased changes)
     MAPREDUCE-2367. Allow using a file to exclude certain tests from build.
     (todd)
     
-    MAPREDUCE-2367. Amend previous commit for this JIRA to fix build on Cygwin.
-    (todd)
-
   OPTIMIZATIONS
     
     MAPREDUCE-2026. Make JobTracker.getJobCounters() and
