@@ -602,6 +602,8 @@ Release 0.22.0 - Unreleased
 
     HDFS-1625. Ignore disk space values in TestDataNodeMXBean.  (szetszwo)
 
+    HDFS-1781. Fix the path for jsvc in bin/hdfs.  (John George via szetszwo)
+
 Release 0.21.1 - Unreleased
 
   IMPROVEMENTS
