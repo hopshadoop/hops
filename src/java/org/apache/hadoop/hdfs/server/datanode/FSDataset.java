@@ -530,7 +530,6 @@ public class FSDataset implements FSConstants, FSDatasetInterface {
     
   static class FSVolumeSet {
     FSVolume[] volumes = null;
-    int curVolume = 0;
     BlockVolumeChoosingPolicy blockChooser;
       
     FSVolumeSet(FSVolume[] volumes, BlockVolumeChoosingPolicy blockChooser) {

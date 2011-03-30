@@ -147,6 +147,8 @@ Trunk (unreleased changes)
 
     HDFS-1770. TestFiRename fails due to invalid block size. (eli)
 
+    HDFS-1797. Fix new findbugs warning introduced by HDFS-1120 (todd)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES
