@@ -4555,7 +4555,8 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
       bean = new StandardMBean(this,FSNamesystemMBean.class);
       mbeanName = MBeanUtil.registerMBean("NameNode", "FSNamesystemState", bean);
     } catch (NotCompliantMBeanException e) {
-      e.printStackTrace();
+      LOG.warn("Exception in initializing StandardMBean as FSNamesystemMBean",
+	  e);
     }
 
     LOG.info("Registered FSNamesystemStatusMBean");

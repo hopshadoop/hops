@@ -146,6 +146,9 @@ Trunk (unreleased changes)
 
     HDFS-1797. Fix new findbugs warning introduced by HDFS-1120 (todd)
 
+    HDFS-1611. Fix up some log messages in DFSClient and MBean registration
+    (Uma Maheswara Rao G via todd)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES
