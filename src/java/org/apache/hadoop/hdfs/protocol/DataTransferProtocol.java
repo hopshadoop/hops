@@ -46,10 +46,10 @@ public interface DataTransferProtocol {
    * when protocol changes. It is not very obvious. 
    */
   /*
-   * Version 20:
-   *    Added TRANSFER_RBW
+   * Version 21:
+   *    Added a new operation Op.TRANSFER_BLOCK.
    */
-  public static final int DATA_TRANSFER_VERSION = 20;
+  public static final int DATA_TRANSFER_VERSION = 21;
 
   /** Operation */
   public enum Op {
@@ -58,7 +58,8 @@ public interface DataTransferProtocol {
     READ_METADATA((byte)82),
     REPLACE_BLOCK((byte)83),
     COPY_BLOCK((byte)84),
-    BLOCK_CHECKSUM((byte)85);
+    BLOCK_CHECKSUM((byte)85),
+    TRANSFER_BLOCK((byte)86);
 
     /** The code for this operation. */
     public final byte code;
@@ -144,8 +145,10 @@ public interface DataTransferProtocol {
     PIPELINE_CLOSE_RECOVERY,
     // pipeline set up for block creation
     PIPELINE_SETUP_CREATE,
-    // similar to replication but transferring rbw instead of finalized
-    TRANSFER_RBW;
+    // transfer RBW for adding datanodes
+    TRANSFER_RBW,
+    // transfer Finalized for adding datanodes
+    TRANSFER_FINALIZED;
     
     final static private byte RECOVERY_BIT = (byte)1;
     
@@ -264,14 +267,23 @@ public interface DataTransferProtocol {
       if (src != null) {
         src.write(out);
       }
-      out.writeInt(targets.length - 1);
-      for (int i = 1; i < targets.length; i++) {
-        targets[i].write(out);
-      }
-
+      write(out, 1, targets);
       blockToken.write(out);
     }
-    
+
+    /** Send {@link Op#TRANSFER_BLOCK} */
+    public static void opTransferBlock(DataOutputStream out, Block blk,
+        String client, DatanodeInfo[] targets,
+        Token<BlockTokenIdentifier> blockToken) throws IOException {
+      op(out, Op.TRANSFER_BLOCK);
+
+      blk.writeId(out);
+      Text.writeString(out, client);
+      write(out, 0, targets);
+      blockToken.write(out);
+      out.flush();
+    }
+
     /** Send OP_REPLACE_BLOCK */
     public static void opReplaceBlock(DataOutputStream out,
         Block blk, String storageId, DatanodeInfo src,
@@ -306,6 +318,16 @@ public interface DataTransferProtocol {
       blockToken.write(out);
       out.flush();
     }
+
+    /** Write an array of {@link DatanodeInfo} */
+    private static void write(final DataOutputStream out,
+        final int start, 
+        final DatanodeInfo[] datanodeinfos) throws IOException {
+      out.writeInt(datanodeinfos.length - start);
+      for (int i = start; i < datanodeinfos.length; i++) {
+        datanodeinfos[i].write(out);
+      }
+    }
   }
 
   /** Receiver */
@@ -339,6 +361,9 @@ public interface DataTransferProtocol {
         break;
       case BLOCK_CHECKSUM:
         opBlockChecksum(in);
+        break;
+      case TRANSFER_BLOCK:
+        opTransferBlock(in);
         break;
       default:
         throw new IOException("Unknown op " + op + " in data stream");
@@ -377,14 +402,7 @@ public interface DataTransferProtocol {
       final String client = Text.readString(in); // working on behalf of this client
       final DatanodeInfo src = in.readBoolean()? DatanodeInfo.read(in): null;
 
-      final int nTargets = in.readInt();
-      if (nTargets < 0) {
-        throw new IOException("Mislabelled incoming datastream.");
-      }
-      final DatanodeInfo targets[] = new DatanodeInfo[nTargets];
-      for (int i = 0; i < targets.length; i++) {
-        targets[i] = DatanodeInfo.read(in);
-      }
+      final DatanodeInfo targets[] = readDatanodeInfos(in);
       final Token<BlockTokenIdentifier> blockToken = readBlockToken(in);
 
       opWriteBlock(in, blk, pipelineSize, stage,
@@ -399,6 +417,27 @@ public interface DataTransferProtocol {
         int pipelineSize, BlockConstructionStage stage, long newGs,
         long minBytesRcvd, long maxBytesRcvd, String client, DatanodeInfo src,
         DatanodeInfo[] targets, Token<BlockTokenIdentifier> blockToken)
+        throws IOException;
+
+    /** Receive {@link Op#TRANSFER_BLOCK} */
+    private void opTransferBlock(DataInputStream in) throws IOException {
+      final Block blk = new Block();
+      blk.readId(in);
+      final String client = Text.readString(in);
+      final DatanodeInfo targets[] = readDatanodeInfos(in);
+      final Token<BlockTokenIdentifier> blockToken = readBlockToken(in);
+
+      opTransferBlock(in, blk, client, targets, blockToken);
+    }
+
+    /**
+     * Abstract {@link Op#TRANSFER_BLOCK} method.
+     * For {@link BlockConstructionStage#TRANSFER_RBW}
+     * or {@link BlockConstructionStage#TRANSFER_FINALIZED}.
+     */
+    protected abstract void opTransferBlock(DataInputStream in, Block blk,
+        String client, DatanodeInfo[] targets,
+        Token<BlockTokenIdentifier> blockToken)
         throws IOException;
 
     /** Receive OP_REPLACE_BLOCK */
@@ -453,6 +492,21 @@ public interface DataTransferProtocol {
     protected abstract void opBlockChecksum(DataInputStream in,
         Block blk, Token<BlockTokenIdentifier> blockToken)
         throws IOException;
+
+    /** Read an array of {@link DatanodeInfo} */
+    private static DatanodeInfo[] readDatanodeInfos(final DataInputStream in
+        ) throws IOException {
+      final int n = in.readInt();
+      if (n < 0) {
+        throw new IOException("Mislabelled incoming datastream: "
+            + n + " = n < 0");
+      }
+      final DatanodeInfo[] datanodeinfos= new DatanodeInfo[n];
+      for (int i = 0; i < datanodeinfos.length; i++) {
+        datanodeinfos[i] = DatanodeInfo.read(in);
+      }
+      return datanodeinfos;
+    }
 
     /** Read an AccessToken */
     static private Token<BlockTokenIdentifier> readBlockToken(DataInputStream in
