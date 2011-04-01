@@ -153,6 +153,9 @@ Trunk (unreleased changes)
     HDFS-1611. Fix up some log messages in DFSClient and MBean registration
     (Uma Maheswara Rao G via todd)
 
+    HDFS-1543. Reduce dev. cycle time by moving system testing artifacts from
+    default build and push to maven for HDFS (Luke Lu via cos)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES
