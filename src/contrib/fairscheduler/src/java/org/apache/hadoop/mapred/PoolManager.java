@@ -167,6 +167,9 @@ public class PoolManager {
     long time = System.currentTimeMillis();
     if (time > lastReloadAttempt + ALLOC_RELOAD_INTERVAL) {
       lastReloadAttempt = time;
+      if (null == allocFile) {
+        return;
+      }
       try {
         // Get last modified time of alloc file depending whether it's a String
         // (for a path name) or an URL (for a classloader resource)

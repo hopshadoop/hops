@@ -71,6 +71,9 @@ Trunk (unreleased changes)
 
   BUG FIXES
 
+    MAPREDUCE-2307. Exception thrown in Jobtracker logs, when the Scheduler
+    configured is FairScheduler. (Devaraj K via matei)
+
     MAPREDUCE-2199. build is broken 0.22 branch creation. (cos)
 
     MAPREDUCE-1752. Implement getFileBlockLocations in HarFilesystem.
