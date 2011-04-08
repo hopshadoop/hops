@@ -96,6 +96,9 @@ Trunk (unreleased changes)
     HDFS-1767. Namenode ignores non-initial block report from datanodes
     when in safemode during startup. (Matt Foley via suresh)
 
+    HDFS-1817. Move pipeline_Fi_[39-51] from TestFiDataTransferProtocol
+    to TestFiPipelineClose.  (szetszwo)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
