@@ -155,7 +155,8 @@ public class TestFairSchedulerSystem {
     }
 
     String contents = sb.toString();
-    assertTrue(contents.contains("Fair Scheduler Administration"));
+    assertTrue("Bad contents for fair scheduler servlet: " + contents,
+      contents.contains("Fair Scheduler Administration"));
   }
 
   private void checkTaskGraphServlet(JobID job) throws Exception {
@@ -169,7 +170,8 @@ public class TestFairSchedulerSystem {
 
     // Just to be sure, slurp the content and make sure it looks like the scheduler
     String contents = slurpContents(connection);
-    assertTrue(contents.contains("</svg>"));
+    assertTrue("Bad contents for job " + job + ":\n" + contents,
+      contents.contains("</svg>"));
   }
 
   private String slurpContents(HttpURLConnection connection) throws Exception {

@@ -124,6 +124,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2395. TestBlockFixer timing out on trunk. (Ramkumar Vadali via
     todd)
 
+    MAPREDUCE-2426. Make TestFairSchedulerSystem fail with more verbose output
+    (todd)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES
