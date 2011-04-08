@@ -156,6 +156,9 @@ Trunk (unreleased changes)
     HDFS-1543. Reduce dev. cycle time by moving system testing artifacts from
     default build and push to maven for HDFS (Luke Lu via cos)
 
+    HDFS-1818. TestHDFSCLI is failing on trunk after HADOOP-7202.
+    (Aaron T. Myers via todd)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES
