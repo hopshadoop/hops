@@ -29,6 +29,7 @@ import java.util.List;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.mapreduce.Cluster.JobTrackerStatus;
 import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
@@ -646,8 +647,8 @@ public class MiniMRCluster {
     ClusterStatus status = null;
     if (jobTracker.isUp()) {
       status = jobTracker.getJobTracker().getClusterStatus(false);
-      while (jobTracker.isActive() && status.getJobTrackerState() 
-             == JobTracker.State.INITIALIZING) {
+      while (jobTracker.isActive() && status.getJobTrackerStatus() 
+             == JobTrackerStatus.INITIALIZING) {
         try {
           LOG.info("JobTracker still initializing. Waiting.");
           Thread.sleep(1000);

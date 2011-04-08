@@ -50,6 +50,7 @@ import org.apache.hadoop.io.SequenceFile.CompressionType;
 import org.apache.hadoop.mapred.SortValidator.RecordStatsChecker.NonSplitableSequenceFileInputFormat;
 import org.apache.hadoop.mapred.lib.IdentityMapper;
 import org.apache.hadoop.mapred.lib.IdentityReducer;
+import org.apache.hadoop.mapreduce.Cluster.JobTrackerStatus;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.util.StringUtils;
 
@@ -246,7 +247,7 @@ public class UtilsForTests {
     while (true) {
       try {
         ClusterStatus status = jobClient.getClusterStatus();
-        while (status.getJobTrackerState() != JobTracker.State.RUNNING) {
+        while (status.getJobTrackerStatus() != JobTrackerStatus.RUNNING) {
           waitFor(100);
           status = jobClient.getClusterStatus();
         }

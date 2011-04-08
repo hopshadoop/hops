@@ -32,6 +32,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.mapred.JobTracker.RecoveryManager;
+import org.apache.hadoop.mapreduce.Cluster.JobTrackerStatus;
 import org.apache.hadoop.mapreduce.MRConfig;
 
 import static org.apache.hadoop.mapred.QueueManagerTestUtils.createQueuesConfigFile;
@@ -131,7 +132,7 @@ public class TestRecoveryManager extends TestCase {
     
     // check if the jobtracker came up or not
     assertEquals("JobTracker crashed!", 
-                 JobTracker.State.RUNNING, status.getJobTrackerState());
+                 JobTrackerStatus.RUNNING, status.getJobTrackerStatus());
 
     // assert the no of recovered jobs
     assertEquals("No of recovered jobs not correct",

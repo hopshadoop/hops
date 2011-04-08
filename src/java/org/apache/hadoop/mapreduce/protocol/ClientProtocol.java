@@ -25,6 +25,7 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.mapreduce.security.token.delegation.DelegationTokenSelector;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.VersionedProtocol;
+import org.apache.hadoop.mapreduce.Cluster.JobTrackerStatus;
 import org.apache.hadoop.mapreduce.ClusterMetrics;
 import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.JobID;
@@ -111,8 +112,10 @@ public interface ClientProtocol extends VersionedProtocol {
    * Version 34: Modified submitJob to use Credentials instead of TokenStorage.
    * Version 35: Added the method getQueueAdmins(queueName) as part of
    *             MAPREDUCE-1664.
+   * Version 36: Added the method getJobTrackerStatus() as part of
+   *             MAPREDUCE-2337.
    */
-  public static final long versionID = 35L;
+  public static final long versionID = 36L;
 
   /**
    * Allocate a name for the job.
@@ -142,9 +145,21 @@ public interface ClientProtocol extends VersionedProtocol {
    * @return {@link State} of the JobTracker
    * @throws IOException
    * @throws InterruptedException
+   * @deprecated Use {@link #getJobTrackerStatus()} instead.
    */
+  @Deprecated
   public State getJobTrackerState() throws IOException, InterruptedException;
-  
+
+  /**
+   * Get the JobTracker's status.
+   * 
+   * @return {@link JobTrackerStatus} of the JobTracker
+   * @throws IOException
+   * @throws InterruptedException
+   */
+  public JobTrackerStatus getJobTrackerStatus() throws IOException,
+    InterruptedException;
+
   public long getTaskTrackerExpiryInterval() throws IOException,
                                                InterruptedException;
   

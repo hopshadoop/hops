@@ -317,6 +317,9 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-1159.  Limit Job name in web UI to be 80 char long.  (Harsh J
     Chouraria via szetszwo)
 
+    MAPREDUCE-2337. Remove dependence of public MapReduce API on classes in
+    server package. (tomwhite)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and

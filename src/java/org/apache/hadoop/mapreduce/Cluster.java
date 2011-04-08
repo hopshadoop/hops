@@ -52,6 +52,10 @@ import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public class Cluster {
+  
+  @InterfaceStability.Evolving
+  public static enum JobTrackerStatus {INITIALIZING, RUNNING};
+  
   private ClientProtocol client;
   private UserGroupInformation ugi;
   private Configuration conf;
@@ -311,9 +315,23 @@ public class Cluster {
    * @return {@link State} of the JobTracker
    * @throws IOException
    * @throws InterruptedException
+   * @deprecated Use {@link #getJobTrackerStatus()} instead.
    */
+  @Deprecated
   public State getJobTrackerState() throws IOException, InterruptedException {
     return client.getJobTrackerState();
+  }
+  
+  /**
+   * Get the JobTracker's status.
+   * 
+   * @return {@link JobTrackerStatus} of the JobTracker
+   * @throws IOException
+   * @throws InterruptedException
+   */
+  public JobTrackerStatus getJobTrackerStatus() throws IOException,
+      InterruptedException {
+    return client.getJobTrackerStatus();
   }
   
   /**

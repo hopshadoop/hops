@@ -44,6 +44,7 @@ import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskReport;
 import org.apache.hadoop.mapreduce.TaskTrackerInfo;
 import org.apache.hadoop.mapreduce.TaskType;
+import org.apache.hadoop.mapreduce.Cluster.JobTrackerStatus;
 import org.apache.hadoop.mapreduce.protocol.ClientProtocol;
 import org.apache.hadoop.tools.rumen.TaskInfo;
 import org.apache.hadoop.tools.rumen.MapTaskAttemptInfo;
@@ -382,6 +383,11 @@ public class MockSimulatorJobTracker implements InterTrackerProtocol,
   @Override
   public org.apache.hadoop.mapreduce.server.jobtracker.State getJobTrackerState()
       throws IOException, InterruptedException {
+    throw new UnsupportedOperationException();
+  }
+  
+  @Override
+  public JobTrackerStatus getJobTrackerStatus() {
     throw new UnsupportedOperationException();
   }
 

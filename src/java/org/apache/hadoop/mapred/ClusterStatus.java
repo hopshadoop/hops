@@ -31,6 +31,7 @@ import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.mapreduce.ClusterMetrics;
 import org.apache.hadoop.mapreduce.TaskTrackerInfo;
+import org.apache.hadoop.mapreduce.Cluster.JobTrackerStatus;
 
 /**
  * Status information on the current state of the Map-Reduce cluster.
@@ -381,9 +382,20 @@ public class ClusterStatus implements Writable {
    * as {@link JobTracker.State}
    * 
    * @return the current state of the <code>JobTracker</code>.
+   * @deprecated Use {@link #getJobTrackerStatus()} instead.
    */
+  @Deprecated
   public JobTracker.State getJobTrackerState() {
     return state;
+  }
+  
+  /**
+   * Get the JobTracker's status.
+   * 
+   * @return {@link JobTrackerStatus} of the JobTracker
+   */
+  public JobTrackerStatus getJobTrackerStatus() {
+    return JobTrackerStatus.valueOf(state.name());
   }
 
   /**

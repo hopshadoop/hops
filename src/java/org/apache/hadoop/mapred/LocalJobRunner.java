@@ -48,6 +48,7 @@ import org.apache.hadoop.mapreduce.QueueInfo;
 import org.apache.hadoop.mapreduce.TaskCompletionEvent;
 import org.apache.hadoop.mapreduce.TaskTrackerInfo;
 import org.apache.hadoop.mapreduce.TaskType;
+import org.apache.hadoop.mapreduce.Cluster.JobTrackerStatus;
 import org.apache.hadoop.mapreduce.filecache.DistributedCache;
 import org.apache.hadoop.mapreduce.filecache.TaskDistributedCacheManager;
 import org.apache.hadoop.mapreduce.filecache.TrackerDistributedCacheManager;
@@ -659,8 +660,16 @@ public class LocalJobRunner implements ClientProtocol {
         reduce_tasks, 0, 0, 1, 1, jobs.size(), 1, 0, 0);
   }
 
+  /**
+   * @deprecated Use {@link #getJobTrackerStatus()} instead.
+   */
+  @Deprecated
   public State getJobTrackerState() throws IOException, InterruptedException {
     return State.RUNNING;
+  }
+  
+  public JobTrackerStatus getJobTrackerStatus() {
+    return JobTrackerStatus.RUNNING;
   }
 
   public long getTaskTrackerExpiryInterval() throws IOException, InterruptedException {
