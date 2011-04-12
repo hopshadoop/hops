@@ -1358,8 +1358,9 @@ public class DataNode extends Configured
      */
     DataTransfer(DatanodeInfo targets[], Block b, BlockConstructionStage stage,
         final String clientname) throws IOException {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug(getClass().getSimpleName() + ": " + b
+      if (DataTransferProtocol.LOG.isDebugEnabled()) {
+        DataTransferProtocol.LOG.debug(getClass().getSimpleName() + ": "
+            + b + " (numBytes=" + b.getNumBytes() + ")"
             + ", stage=" + stage
             + ", clientname=" + clientname
             + ", targests=" + Arrays.asList(targets));
@@ -2016,12 +2017,9 @@ public class DataNode extends Configured
    *          the stored GS and the visible length. 
    * @param targets
    * @param client
-   * @return whether the replica is an RBW
    */
-  boolean transferReplicaForPipelineRecovery(final Block b,
+  void transferReplicaForPipelineRecovery(final Block b,
       final DatanodeInfo[] targets, final String client) throws IOException {
-    checkWriteAccess(b);
-
     final long storedGS;
     final long visible;
     final BlockConstructionStage stage;
@@ -2033,7 +2031,8 @@ public class DataNode extends Configured
       } else if (data.isValidBlock(b)) {
         stage = BlockConstructionStage.TRANSFER_FINALIZED;
       } else {
-        throw new IOException(b + " is not a RBW or a Finalized");
+        final String r = data.getReplicaString(b.getBlockId());
+        throw new IOException(b + " is neither a RBW nor a Finalized, r=" + r);
       }
 
       storedGS = data.getStoredBlock(b.getBlockId()).getGenerationStamp();
@@ -2051,7 +2050,6 @@ public class DataNode extends Configured
     if (targets.length > 0) {
       new DataTransfer(targets, b, stage, client).run();
     }
-    return stage == BlockConstructionStage.TRANSFER_RBW;
   }
 
   // Determine a Datanode's streaming address

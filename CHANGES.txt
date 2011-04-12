@@ -27,6 +27,9 @@ Trunk (unreleased changes)
 
     HDFS_1630. Support fsedits checksum. (hairong)
 
+    HDFS-1606. Provide a stronger data guarantee in the write pipeline by
+    adding a new datanode when an existing datanode failed.  (szetszwo)
+
   IMPROVEMENTS
 
     HDFS-1510. Added test-patch.properties required by test-patch.sh (nigel)

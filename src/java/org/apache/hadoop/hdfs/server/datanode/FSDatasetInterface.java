@@ -105,6 +105,11 @@ public interface FSDatasetInterface extends FSDatasetMBean {
   public Replica getReplica(long blockId);
 
   /**
+   * @return replica meta information
+   */
+  public String getReplicaString(long blockId);
+
+  /**
    * @return the generation stamp stored with the block.
    */
   public Block getStoredBlock(long blkid) throws IOException;

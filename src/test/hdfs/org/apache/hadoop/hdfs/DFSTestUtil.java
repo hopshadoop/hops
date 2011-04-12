@@ -403,7 +403,8 @@ public class DFSTestUtil {
   public static DataTransferProtocol.Status transferRbw(final Block b, 
       final DFSClient dfsClient, final DatanodeInfo... datanodes) throws IOException {
     Assert.assertEquals(2, datanodes.length);
-    final Socket s = DFSOutputStream.createSocketForPipeline(datanodes, dfsClient);
+    final Socket s = DFSOutputStream.createSocketForPipeline(datanodes[0],
+        datanodes.length, dfsClient);
     final long writeTimeout = dfsClient.getDatanodeWriteTimeout(datanodes.length);
     final DataOutputStream out = new DataOutputStream(new BufferedOutputStream(
         NetUtils.getOutputStream(s, writeTimeout),

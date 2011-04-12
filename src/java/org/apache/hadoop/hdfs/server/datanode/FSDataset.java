@@ -2033,6 +2033,12 @@ public class FSDataset implements FSConstants, FSDatasetInterface {
     return volumeMap.get(blockId);
   }
 
+  @Override 
+  public synchronized String getReplicaString(long blockId) {
+    final Replica r = volumeMap.get(blockId);
+    return r == null? "null": r.toString();
+  }
+
   @Override // FSDatasetInterface
   public synchronized ReplicaRecoveryInfo initReplicaRecovery(
       RecoveringBlock rBlock) throws IOException {
