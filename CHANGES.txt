@@ -30,6 +30,8 @@ Trunk (unreleased changes)
     HDFS-1606. Provide a stronger data guarantee in the write pipeline by
     adding a new datanode when an existing datanode failed.  (szetszwo)
 
+    HDFS-1442. Api to get delegation token in Hdfs class. (jitendra)
+
   IMPROVEMENTS
 
     HDFS-1510. Added test-patch.properties required by test-patch.sh (nigel)
