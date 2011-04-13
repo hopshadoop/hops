@@ -106,6 +106,9 @@ Trunk (unreleased changes)
     HDFS-1817. Move pipeline_Fi_[39-51] from TestFiDataTransferProtocol
     to TestFiPipelineClose.  (szetszwo)
 
+    HDFS-1760. In FSDirectory.getFullPathName(..), it is better to return "/"
+    for root directory instead of an empty string.  (Daryn Sharp via szetszwo)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
