@@ -651,6 +651,9 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2392. TaskTracker shutdown in the tests sometimes take 60s.
     (tomwhite)
 
+    MAPREDUCE-2437. SLive uses only part* files to generating the final report.
+    (shv)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES

@@ -229,6 +229,7 @@ public class SliveTest implements Tool {
       List<OperationOutput> noOperations = new ArrayList<OperationOutput>();
       Map<String, List<OperationOutput>> splitTypes = new TreeMap<String, List<OperationOutput>>();
       for(FileStatus fn : reduceFiles) {
+        if(!fn.getPath().getName().startsWith("part")) continue;
         fileReader = new BufferedReader(new InputStreamReader(
             new DataInputStream(fs.open(fn.getPath()))));
         String line;
