@@ -88,7 +88,7 @@ public interface FSConstants {
   // Version is reflected in the data storage file.
   // Versions are negative.
   // Decrement LAYOUT_VERSION to define a new version.
-  public static final int LAYOUT_VERSION = -28;
+  public static final int LAYOUT_VERSION = -30;
   // Current version: 
-  // -28: Support fsedits checksum
+  // -30: store only last component of a path in image
 }
