@@ -1220,7 +1220,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
     }
     final UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     namesystem.createSymlink(target, link,
-      new PermissionStatus(ugi.getUserName(), null, dirPerms), createParent);
+      new PermissionStatus(ugi.getShortUserName(), null, dirPerms), createParent);
   }
 
   /** @inheritDoc */

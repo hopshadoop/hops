@@ -2024,7 +2024,7 @@ class FSDirectory implements Closeable {
         return null;
       }
     }
-    final String userName = UserGroupInformation.getCurrentUser().getUserName();
+    final String userName = dirPerms.getUserName();
     INodeSymlink newNode = unprotectedSymlink(path, target, modTime, modTime,
       new PermissionStatus(userName, null, FsPermission.getDefault()));         
     if (newNode == null) {
