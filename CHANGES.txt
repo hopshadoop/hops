@@ -178,6 +178,9 @@ Trunk (unreleased changes)
     HDFS-1828. TestBlocksWithNotEnoughRacks intermittently fails assert.
     (Matt Foley via eli)
 
+    HDFS-1824. delay instantiation of file system object until it is
+     needed (linked to HADOOP-7207) (boryas)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES
