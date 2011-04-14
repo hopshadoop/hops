@@ -172,6 +172,9 @@ Trunk (unreleased changes)
     HDFS-1818. TestHDFSCLI is failing on trunk after HADOOP-7202.
     (Aaron T. Myers via todd)
 
+    HDFS-1828. TestBlocksWithNotEnoughRacks intermittently fails assert.
+    (Matt Foley via eli)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES
