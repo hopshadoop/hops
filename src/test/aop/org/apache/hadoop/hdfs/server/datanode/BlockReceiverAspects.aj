@@ -44,6 +44,11 @@ import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 privileged public aspect BlockReceiverAspects {
   public static final Log LOG = LogFactory.getLog(BlockReceiverAspects.class);
 
+  BlockReceiver BlockReceiver.PacketResponder.getReceiver(){
+    LOG.info("FI: getReceiver() " + getClass().getName());
+    return BlockReceiver.this;
+  }
+
   pointcut callReceivePacket(BlockReceiver blockreceiver) :
     call(* receivePacket(..)) && target(blockreceiver);
 	
@@ -80,7 +85,7 @@ privileged public aspect BlockReceiverAspects {
 
   after(BlockReceiver.PacketResponder responder)
       throws IOException: afterDownstreamStatusRead(responder) {
-    final DataNode d = responder.receiver.getDataNode();
+    final DataNode d = responder.getReceiver().getDataNode();
     DataTransferTest dtTest = DataTransferTestUtil.getDataTransferTest();
     if (dtTest != null)
       dtTest.fiAfterDownstreamStatusRead.run(d.getDatanodeRegistration());
@@ -124,8 +129,9 @@ privileged public aspect BlockReceiverAspects {
       LOG.debug("FI: no pipeline has been found in acking");
       return;
     }
-    LOG.debug("FI: Acked total bytes from: " + 
-        pr.receiver.datanode.dnRegistration.getStorageID() + ": " + acked);
+    LOG.debug("FI: Acked total bytes from: "
+        + pr.getReceiver().datanode.dnRegistration.getStorageID()
+        + ": " + acked);
     if (pTest instanceof PipelinesTest) {
       bytesAckedService((PipelinesTest)pTest, pr, acked);
     }
@@ -133,7 +139,7 @@ privileged public aspect BlockReceiverAspects {
 
   private void bytesAckedService 
       (final PipelinesTest pTest, final PacketResponder pr, final long acked) {
-    NodeBytes nb = new NodeBytes(pr.receiver.datanode.dnRegistration, acked);
+    NodeBytes nb = new NodeBytes(pr.getReceiver().datanode.dnRegistration, acked);
     try {
       pTest.fiCallSetBytesAcked.run(nb);
     } catch (IOException e) {
@@ -201,7 +207,7 @@ privileged public aspect BlockReceiverAspects {
 
   after(BlockReceiver.PacketResponder packetresponder) throws IOException
       : pipelineAck(packetresponder) {
-    final DatanodeRegistration dr = packetresponder.receiver.getDataNode().getDatanodeRegistration();
+    final DatanodeRegistration dr = packetresponder.getReceiver().getDataNode().getDatanodeRegistration();
     LOG.info("FI: fiPipelineAck, datanode=" + dr);
 
     final DataTransferTest test = DataTransferTestUtil.getDataTransferTest();

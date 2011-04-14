@@ -109,6 +109,9 @@ Trunk (unreleased changes)
     HDFS-1760. In FSDirectory.getFullPathName(..), it is better to return "/"
     for root directory instead of an empty string.  (Daryn Sharp via szetszwo)
 
+    HDFS-1833. Reduce repeated string constructions and unnecessary fields,
+    and fix comments in BlockReceiver.PacketResponder.  (szetszwo)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
