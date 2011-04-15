@@ -1285,9 +1285,10 @@ class FSDirectory implements Closeable {
    * Check whether the path specifies a directory
    */
   boolean isDir(String src) throws UnresolvedLinkException {
+    src = normalizePath(src);
     readLock();
     try {
-      INode node = rootDir.getNode(normalizePath(src), false);
+      INode node = rootDir.getNode(src, false);
       return node != null && node.isDirectory();
     } finally {
       readUnlock();

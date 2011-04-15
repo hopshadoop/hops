@@ -184,6 +184,9 @@ Trunk (unreleased changes)
     HDFS-1824. delay instantiation of file system object until it is
      needed (linked to HADOOP-7207) (boryas)
 
+    HDFS-1831. Fix append bug in FileContext and implement CreateFlag
+    check (related to HADOOP-7223). (suresh)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES

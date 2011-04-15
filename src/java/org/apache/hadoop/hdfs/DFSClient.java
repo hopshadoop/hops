@@ -573,8 +573,9 @@ public class DFSClient implements FSConstants, java.io.Closeable {
                              int buffersize)
       throws IOException {
     return create(src, FsPermission.getDefault(),
-        overwrite ? EnumSet.of(CreateFlag.OVERWRITE) : EnumSet.of(CreateFlag.CREATE), 
-        replication, blockSize, progress, buffersize);
+        overwrite ? EnumSet.of(CreateFlag.CREATE, CreateFlag.OVERWRITE)
+            : EnumSet.of(CreateFlag.CREATE), replication, blockSize, progress,
+        buffersize);
   }
 
   /**
@@ -640,9 +641,29 @@ public class DFSClient implements FSConstants, java.io.Closeable {
   }
   
   /**
+   * Append to an existing file if {@link CreateFlag#APPEND} is present
+   */
+  private OutputStream primitiveAppend(String src, EnumSet<CreateFlag> flag,
+      int buffersize, Progressable progress) throws IOException {
+    if (flag.contains(CreateFlag.APPEND)) {
+      HdfsFileStatus stat = getFileInfo(src);
+      if (stat == null) { // No file to append to
+        // New file needs to be created if create option is present
+        if (!flag.contains(CreateFlag.CREATE)) {
+          throw new FileNotFoundException("failed to append to non-existent file "
+              + src + " on client " + clientName);
+        }
+        return null;
+      }
+      return callAppend(stat, src, buffersize, progress);
+    }
+    return null;
+  }
+  
+  /**
    * Same as {{@link #create(String, FsPermission, EnumSet, short, long,
    *  Progressable, int)} except that the permission
-   *   is absolute (ie has already been masked with umask.
+   *  is absolute (ie has already been masked with umask.
    */
   public OutputStream primitiveCreate(String src, 
                              FsPermission absPermission,
@@ -655,9 +676,13 @@ public class DFSClient implements FSConstants, java.io.Closeable {
                              int bytesPerChecksum)
       throws IOException, UnresolvedLinkException {
     checkOpen();
-    OutputStream result = new DFSOutputStream(this, src, absPermission,
-        flag, createParent, replication, blockSize, progress, buffersize,
-        bytesPerChecksum);
+    CreateFlag.validate(flag);
+    OutputStream result = primitiveAppend(src, flag, buffersize, progress);
+    if (result == null) {
+      result = new DFSOutputStream(this, src, absPermission,
+          flag, createParent, replication, blockSize, progress, buffersize,
+          bytesPerChecksum);
+    }
     leasechecker.put(src, result);
     return result;
   }
@@ -699,6 +724,25 @@ public class DFSClient implements FSConstants, java.io.Closeable {
     }
   }
 
+  /** Method to get stream returned by append call */
+  private OutputStream callAppend(HdfsFileStatus stat, String src,
+      int buffersize, Progressable progress) throws IOException {
+    LocatedBlock lastBlock = null;
+    try {
+      lastBlock = namenode.append(src, clientName);
+    } catch(RemoteException re) {
+      throw re.unwrapRemoteException(AccessControlException.class,
+                                     FileNotFoundException.class,
+                                     SafeModeException.class,
+                                     DSQuotaExceededException.class,
+                                     UnsupportedOperationException.class,
+                                     UnresolvedPathException.class);
+    }
+    return new DFSOutputStream(this, src, buffersize, progress,
+        lastBlock, stat, conf.getInt(DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY, 
+                                     DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_DEFAULT));
+  }
+  
   /**
    * Append to an existing HDFS file.  
    * 
@@ -712,22 +756,8 @@ public class DFSClient implements FSConstants, java.io.Closeable {
   OutputStream append(String src, int buffersize, Progressable progress)
       throws IOException {
     checkOpen();
-    HdfsFileStatus stat = null;
-    LocatedBlock lastBlock = null;
-    try {
-      stat = getFileInfo(src);
-      lastBlock = namenode.append(src, clientName);
-    } catch(RemoteException re) {
-      throw re.unwrapRemoteException(AccessControlException.class,
-                                     FileNotFoundException.class,
-                                     SafeModeException.class,
-                                     DSQuotaExceededException.class,
-                                     UnsupportedOperationException.class,
-                                     UnresolvedPathException.class);
-    }
-    OutputStream result = new DFSOutputStream(this, src, buffersize, progress,
-        lastBlock, stat, conf.getInt(DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY, 
-                                     DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_DEFAULT));
+    HdfsFileStatus stat = getFileInfo(src);
+    OutputStream result = callAppend(stat, src, buffersize, progress);
     leasechecker.put(src, result);
     return result;
   }
