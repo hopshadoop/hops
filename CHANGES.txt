@@ -62,6 +62,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-2367. Allow using a file to exclude certain tests from build.
     (todd)
+
+    MAPREDUCE-2202. Generalize CLITest structure and interfaces to faciliate
+    upstream adoption (e.g. for web or system testing). (cos)
     
   OPTIMIZATIONS
     
