@@ -115,6 +115,9 @@ Trunk (unreleased changes)
     HDFS-1833. Reduce repeated string constructions and unnecessary fields,
     and fix comments in BlockReceiver.PacketResponder.  (szetszwo)
 
+    HDFS-1486. Generalize CLITest structure and interfaces to faciliate
+    upstream adoption (e.g. for web testing). (cos)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
