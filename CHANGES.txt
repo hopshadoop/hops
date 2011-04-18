@@ -118,6 +118,9 @@ Trunk (unreleased changes)
     HDFS-1486. Generalize CLITest structure and interfaces to faciliate
     upstream adoption (e.g. for web testing). (cos)
 
+    HDFS-1844. Move "fs -help" shell command tests from HDFS to COMMOM; see
+    also HADOOP-7230.  (Daryn Sharp via szetszwo)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
