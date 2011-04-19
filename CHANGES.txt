@@ -654,6 +654,9 @@ Release 0.22.0 - Unreleased
     HDFS-1821. Fix username resolution in NameNode.createSymlink(..) and
     FSDirectory.addSymlink(..).  (John George via szetszwo)
 
+    HDFS-1806. TestBlockReport.blockReport_08() and _09() are timing-dependent
+    and likely to fail on fast servers. (Matt Foley via eli)
+
 Release 0.21.1 - Unreleased
 
   IMPROVEMENTS
