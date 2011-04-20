@@ -660,6 +660,8 @@ Release 0.22.0 - Unreleased
     HDFS-1845. Symlink comes up as directory after namenode restart.
     (John George via eli)
 
+    HDFS-1666. Disable failing hdfsproxy test TestAuthorizationFilter (todd)
+
 Release 0.21.1 - Unreleased
 
   IMPROVEMENTS
