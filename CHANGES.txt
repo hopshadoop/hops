@@ -121,6 +121,10 @@ Trunk (unreleased changes)
     HDFS-1844. Move "fs -help" shell command tests from HDFS to COMMOM; see
     also HADOOP-7230.  (Daryn Sharp via szetszwo)
 
+    HDFS-1840. In DFSClient, terminate the lease renewing thread when all files
+    being written are closed for a grace period, and start a new thread when
+    new files are opened for write.  (szetszwo)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
