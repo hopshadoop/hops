@@ -40,6 +40,7 @@ import org.apache.hadoop.hdfs.tools.DFSAdmin;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 
@@ -736,11 +737,13 @@ public class TestCheckpoint extends TestCase {
   public void testSaveNamespace() throws IOException {
     MiniDFSCluster cluster = null;
     DistributedFileSystem fs = null;
+    FileContext fc;
     try {
       Configuration conf = new HdfsConfiguration();
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(numDatanodes).format(false).build();
       cluster.waitActive();
       fs = (DistributedFileSystem)(cluster.getFileSystem());
+      fc = FileContext.getFileContext(cluster.getURI());
 
       // Saving image without safe mode should fail
       DFSAdmin admin = new DFSAdmin(conf);
@@ -756,6 +759,12 @@ public class TestCheckpoint extends TestCase {
       Path file = new Path("namespace.dat");
       writeFile(fs, file, replication);
       checkFile(fs, file, replication);
+
+      // create new link
+      Path symlink = new Path("file.link");
+      fc.createSymlink(file, symlink, false);
+      assertTrue(fc.getFileLinkStatus(symlink).isSymlink());
+
       // verify that the edits file is NOT empty
       Collection<URI> editsDirs = cluster.getNameEditsDirs();
       for(URI uri : editsDirs) {
@@ -784,6 +793,8 @@ public class TestCheckpoint extends TestCase {
       cluster.waitActive();
       fs = (DistributedFileSystem)(cluster.getFileSystem());
       checkFile(fs, file, replication);
+      fc = FileContext.getFileContext(cluster.getURI());
+      assertTrue(fc.getFileLinkStatus(symlink).isSymlink());
     } finally {
       if(fs != null) fs.close();
       if(cluster!= null) cluster.shutdown();

@@ -461,7 +461,9 @@ abstract class INode implements Comparable<byte[]>, FSInodeInfo {
                         long nsQuota,
                         long dsQuota,
                         long preferredBlockSize) {
-    if (blocks == null) {
+    if (symlink.length() != 0) { // check if symbolic link
+      return new INodeSymlink(symlink, modificationTime, atime, permissions);
+    }  else if (blocks == null) { //not sym link and blocks null? directory!
       if (nsQuota >= 0 || dsQuota >= 0) {
         return new INodeDirectoryWithQuota(
             permissions, modificationTime, nsQuota, dsQuota);
@@ -469,10 +471,6 @@ abstract class INode implements Comparable<byte[]>, FSInodeInfo {
       // regular directory
       return new INodeDirectory(permissions, modificationTime);
     }
-    // check if symbolic link
-    if (symlink.length() != 0) {
-      return new INodeSymlink(symlink, modificationTime, atime, permissions);
-    } 
     // file
     return new INodeFile(permissions, blocks, replication,
         modificationTime, atime, preferredBlockSize);
