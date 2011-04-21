@@ -322,9 +322,16 @@ public class TestDatanodeBlockScanner extends TestCase {
     
     // Restart the datanodes containing corrupt replicas 
     // so they would be reported to namenode and re-replicated
-    for (int i =0; i < numCorruptReplicas; i++) 
+    // They MUST be restarted in reverse order from highest to lowest index,
+    // because the act of restarting them removes them from the ArrayList
+    // and causes the indexes of all nodes above them in the list to change.
+    for (int i = numCorruptReplicas - 1; i >= 0 ; i--) {
+      LOG.info("restarting node with corrupt replica: position " 
+          + i + " node " + corruptReplicasDNIDs[i] + " " 
+          + cluster.getDataNodes().get(corruptReplicasDNIDs[i]).getSelfAddr());
      cluster.restartDataNode(corruptReplicasDNIDs[i]);
-
+    }
+    
     // Loop until all corrupt replicas are reported
     int corruptReplicaSize = cluster.getNamesystem().
                               numCorruptReplicas(blk);
