@@ -195,6 +195,20 @@ creations/deletions), or "all".</description>
 </property>
 
 <property>
+  <name>dfs.namenode.fs-limits.max-component-length</name>
+  <value>0</value>
+  <description>Defines the maximum number of characters in each component
+      of a path.  A value of 0 will disable the check.</description>
+</property>
+
+<property>
+  <name>dfs.namenode.fs-limits.max-directory-items</name>
+  <value>0</value>
+  <description>Defines the maximum number of items that a directory may
+      contain.  A value of 0 will disable the check.</description>
+</property>
+
+<property>
   <name>dfs.namenode.edits.dir</name>
   <value>${dfs.namenode.name.dir}</value>
   <description>Determines where on the local filesystem the DFS name node

@@ -34,6 +34,8 @@ Trunk (unreleased changes)
 
     HDFS-1070. Speedup namenode image loading and saving by storing only
     local file names. (hairong)
+    
+    HDFS-1751. Intrinsic limits for HDFS files, directories (daryn via boryas).
 
   IMPROVEMENTS
 

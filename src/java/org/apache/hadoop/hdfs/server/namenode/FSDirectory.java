@@ -42,6 +42,8 @@ import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.FSConstants;
 import org.apache.hadoop.hdfs.protocol.DirectoryListing;
+import org.apache.hadoop.hdfs.protocol.FSLimitException;
+import org.apache.hadoop.hdfs.protocol.FSLimitException.*;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.HdfsLocatedFileStatus;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
@@ -68,6 +70,8 @@ class FSDirectory implements Closeable {
   FSImage fsImage;  
   private volatile boolean ready = false;
   private static final long UNKNOWN_DISK_SPACE = -1;
+  private final int maxComponentLength;
+  private final int maxDirItems;
   private final int lsLimit;  // max list limit
 
   // lock to protect BlockMap.
@@ -119,6 +123,14 @@ class FSDirectory implements Closeable {
     this.lsLimit = configuredLimit>0 ?
         configuredLimit : DFSConfigKeys.DFS_LIST_LIMIT_DEFAULT;
     
+    // filesystem limits
+    this.maxComponentLength = conf.getInt(
+        DFSConfigKeys.DFS_NAMENODE_MAX_COMPONENT_LENGTH_KEY,
+        DFSConfigKeys.DFS_NAMENODE_MAX_COMPONENT_LENGTH_DEFAULT);
+    this.maxDirItems = conf.getInt(
+        DFSConfigKeys.DFS_NAMENODE_MAX_DIRECTORY_ITEMS_KEY,
+        DFSConfigKeys.DFS_NAMENODE_MAX_DIRECTORY_ITEMS_DEFAULT);
+
     int threshold = conf.getInt(
         DFSConfigKeys.DFS_NAMENODE_NAME_CACHE_THRESHOLD_KEY,
         DFSConfigKeys.DFS_NAMENODE_NAME_CACHE_THRESHOLD_DEFAULT);
@@ -158,12 +170,17 @@ class FSDirectory implements Closeable {
     }
     writeLock();
     try {
-      this.ready = true;
+      setReady(true);
       this.nameCache.initialized();
       cond.signalAll();
     } finally {
       writeUnlock();
     }
+  }
+
+  // exposed for unit tests
+  protected void setReady(boolean flag) {
+    ready = flag;
   }
 
   private void incrDeletedFileCount(int count) {
@@ -1613,12 +1630,58 @@ class FSDirectory implements Closeable {
         commonAncestor);
   }
   
+  /**
+   * Verify that filesystem limit constraints are not violated
+   * @throws PathComponentTooLongException child's name is too long
+   * @throws MaxDirectoryItemsExceededException items per directory is exceeded
+   */
+  protected <T extends INode> void verifyFsLimits(INode[] pathComponents,
+      int pos, T child) throws FSLimitException {
+    boolean includeChildName = false;
+    try {
+      if (maxComponentLength != 0) {
+        int length = child.getLocalName().length();
+        if (length > maxComponentLength) {
+          includeChildName = true;
+          throw new PathComponentTooLongException(maxComponentLength, length);
+        }
+      }
+      if (maxDirItems != 0) {
+        INodeDirectory parent = (INodeDirectory)pathComponents[pos-1];
+        int count = parent.getChildren().size();
+        if (count >= maxDirItems) {
+          throw new MaxDirectoryItemsExceededException(maxDirItems, count);
+        }
+      }
+    } catch (FSLimitException e) {
+      String badPath = getFullPathName(pathComponents, pos-1);
+      if (includeChildName) {
+        badPath += Path.SEPARATOR + child.getLocalName();
+      }
+      e.setPathName(badPath);
+      // Do not throw if edits log is still being processed
+      if (ready) throw(e);
+      // log pre-existing paths that exceed limits
+      NameNode.LOG.error("FSDirectory.verifyFsLimits - " + e.getLocalizedMessage());
+    }
+  }
+  
   /** Add a node child to the inodes at index pos. 
    * Its ancestors are stored at [0, pos-1]. 
    * QuotaExceededException is thrown if it violates quota limit */
   private <T extends INode> T addChild(INode[] pathComponents, int pos,
       T child, long childDiskspace, boolean inheritPermission,
       boolean checkQuota) throws QuotaExceededException {
+	// The filesystem limits are not really quotas, so this check may appear
+	// odd.  It's because a rename operation deletes the src, tries to add
+	// to the dest, if that fails, re-adds the src from whence it came.
+	// The rename code disables the quota when it's restoring to the
+	// original location becase a quota violation would cause the the item
+	// to go "poof".  The fs limits must be bypassed for the same reason.
+    if (checkQuota) {
+      verifyFsLimits(pathComponents, pos, child);
+    }
+    
     INode.DirCounts counts = new INode.DirCounts();
     child.spaceConsumedInTree(counts);
     if (childDiskspace < 0) {
