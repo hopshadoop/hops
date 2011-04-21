@@ -241,10 +241,13 @@ public class DFSTestUtil {
       BlockLocation locs[] = fs.getFileBlockLocations(
         fs.getFileStatus(fileName), 0, Long.MAX_VALUE);
       for (int j = 0; j < locs.length; j++) {
-        String[] loc = locs[j].getHosts();
-        if (loc.length != replFactor) {
-          System.out.println("File " + fileName + " has replication factor " +
-              loc.length);
+        String[] hostnames = locs[j].getNames();
+        if (hostnames.length != replFactor) {
+          String hostNameList = "";
+          for (String h : hostnames) hostNameList += h + " ";
+          System.out.println("Block " + j + " of file " + fileName 
+              + " has replication factor " + hostnames.length + "; locations "
+              + hostNameList);
           good = false;
           try {
             System.out.println("Waiting for replication factor to drain");
@@ -252,6 +255,10 @@ public class DFSTestUtil {
           } catch (InterruptedException e) {} 
           break;
         }
+      }
+      if (good) {
+        System.out.println("All blocks of file " + fileName
+            + " verified to have replication factor " + replFactor);
       }
     } while(!good);
   }

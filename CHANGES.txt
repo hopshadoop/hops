@@ -127,6 +127,9 @@ Trunk (unreleased changes)
     being written are closed for a grace period, and start a new thread when
     new files are opened for write.  (szetszwo)
 
+    HDFS-1854. make failure message more useful in
+    DFSTestUtil.waitReplication(). (Matt Foley via eli)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
