@@ -244,7 +244,7 @@ public class TestCrcCorruption {
   private void doTestEntirelyCorruptFile(int numDataNodes) throws Exception {
     long fileSize = 4096;
     Path file = new Path("/testFile");
-
+    short replFactor = (short)numDataNodes;
     Configuration conf = new Configuration();
     conf.setInt(DFSConfigKeys.DFS_REPLICATION_KEY, numDataNodes);
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(numDataNodes).build();
@@ -253,11 +253,12 @@ public class TestCrcCorruption {
       cluster.waitActive();
       FileSystem fs = cluster.getFileSystem();
 
-      DFSTestUtil.createFile(fs, file, fileSize, (short)numDataNodes, 12345L /*seed*/);
-      DFSTestUtil.waitReplication(fs, file, (short)numDataNodes);
+      DFSTestUtil.createFile(fs, file, fileSize, replFactor, 12345L /*seed*/);
+      DFSTestUtil.waitReplication(fs, file, replFactor);
 
       String block = DFSTestUtil.getFirstBlock(fs, file).getBlockName();
-      cluster.corruptBlockOnDataNodes(block);
+      int blockFilesCorrupted = cluster.corruptBlockOnDataNodes(block);
+      assertEquals("All replicas not corrupted", replFactor, blockFilesCorrupted);
 
       try {
         IOUtils.copyBytes(fs.open(file), new IOUtils.NullOutputStream(), conf,

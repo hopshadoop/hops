@@ -151,6 +151,7 @@ public class TestReplication extends TestCase {
     DFSClient dfsClient = null;
     LocatedBlocks blocks = null;
     int replicaCount = 0;
+    short replFactor = 1;
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
     cluster.waitActive();
     fs = cluster.getFileSystem();
@@ -159,16 +160,19 @@ public class TestReplication extends TestCase {
   
     // Create file with replication factor of 1
     Path file1 = new Path("/tmp/testBadBlockReportOnTransfer/file1");
-    DFSTestUtil.createFile(fs, file1, 1024, (short)1, 0);
-    DFSTestUtil.waitReplication(fs, file1, (short)1);
+    DFSTestUtil.createFile(fs, file1, 1024, replFactor, 0);
+    DFSTestUtil.waitReplication(fs, file1, replFactor);
   
     // Corrupt the block belonging to the created file
     String block = DFSTestUtil.getFirstBlock(fs, file1).getBlockName();
-    cluster.corruptBlockOnDataNodes(block);
-  
+
+    int blockFilesCorrupted = cluster.corruptBlockOnDataNodes(block);
+    assertEquals("Corrupted too few blocks", replFactor, blockFilesCorrupted); 
+
     // Increase replication factor, this should invoke transfer request
     // Receiving datanode fails on checksum and reports it to namenode
-    fs.setReplication(file1, (short)2);
+    replFactor = 2;
+    fs.setReplication(file1, replFactor);
   
     // Now get block details and check if the block is corrupt
     blocks = dfsClient.getNamenode().

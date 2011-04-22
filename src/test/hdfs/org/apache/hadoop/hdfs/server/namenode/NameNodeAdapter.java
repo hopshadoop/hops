@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 import java.io.IOException;
 
 import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 
 /**
@@ -56,5 +57,20 @@ public class NameNodeAdapter {
    */
   public static Server getRpcServer(NameNode namenode) {
     return namenode.server;
+  }
+
+  /**
+   * Return a tuple of the replica state (number racks, number live
+   * replicas, and number needed replicas) for the given block.
+   * @param namenode to proxy the invocation to.
+   */
+  public static int[] getReplicaInfo(NameNode namenode, Block b) {
+    FSNamesystem ns = namenode.getNamesystem();
+    ns.readLock();
+    int[] r = {ns.blockManager.getNumberOfRacks(b),
+               ns.blockManager.countNodes(b).liveReplicas(),
+               ns.blockManager.neededReplications.contains(b) ? 1 : 0};
+    ns.readUnlock();
+    return r;
   }
 }

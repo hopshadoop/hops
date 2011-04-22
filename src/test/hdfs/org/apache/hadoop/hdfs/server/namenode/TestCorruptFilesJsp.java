@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertEquals;
 
 import java.net.URL;
 import java.util.Collection;
@@ -31,7 +32,6 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.apache.hadoop.hdfs.TestDatanodeBlockScanner;
 import org.junit.Test;
 
 /** A JUnit test for corrupt_files.jsp */
@@ -82,7 +82,7 @@ public class TestCorruptFilesJsp  {
       for (int idx = 0; idx < filepaths.length - 1; idx++) {
         String blockName = DFSTestUtil.getFirstBlock(fs, filepaths[idx])
             .getBlockName();
-        TestDatanodeBlockScanner.corruptReplica(blockName, 0);
+        assertTrue(cluster.corruptReplica(blockName, 0));
 
         // read the file so that the corrupt block is reported to NN
         FSDataInputStream in = fs.open(filepaths[idx]);

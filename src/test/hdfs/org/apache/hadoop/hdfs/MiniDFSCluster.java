@@ -878,29 +878,69 @@ public class MiniDFSCluster {
     System.out.println("Cluster is active");
   }
 
-  /*
-   * Corrupt a block on all datanode
+  /**
+   * Return the contents of the given block on the given datanode.
+   *
+   * @param The index of the datanode
+   * @param The name of the block
+   * @throws IOException on error accessing the file for the given block
+   * @return The contents of the block file, null if none found
    */
-  void corruptBlockOnDataNodes(String blockName) throws Exception{
-    for (int i=0; i < dataNodes.size(); i++)
-      corruptBlockOnDataNode(i,blockName);
+  public String readBlockOnDataNode(int i, String blockName) throws IOException {
+    assert (i >= 0 && i < dataNodes.size()) : "Invalid datanode "+i;
+
+    // Each datanode has multiple data dirs, check each
+    for (int dn = i*2; dn < i*2+2; dn++) {
+      File dataDir = new File(getBaseDirectory() + "data");
+      File blockFile = new File(dataDir,
+          "data" + (dn+1) + FINALIZED_DIR_NAME + blockName);
+      if (blockFile.exists()) {
+        return DFSTestUtil.readFile(blockFile);
+      }
+    }
+    return null;
   }
 
-  /*
-   * Corrupt a block on a particular datanode
+  /**
+   * Corrupt a block on all datanodes.
+   *
+   * @param The name of the block
+   * @throws IOException on error accessing the given block.
+   * @return The number of block files corrupted.
+   */  
+  public int corruptBlockOnDataNodes(String blockName) throws IOException {
+    int blocksCorrupted = 0;
+    for (int i=0; i < dataNodes.size(); i++) {
+      if (corruptReplica(blockName, i)) {
+        blocksCorrupted++;
+      }
+    }
+    return blocksCorrupted;
+  }
+
+  /**
+   * Corrupt a block on a particular datanode.
+   *
+   * @param The index of the datanode
+   * @param The name of the block
+   * @throws IOException on error accessing the given block or if
+   * the contents of the block (on the same datanode) differ.
+   * @return true if a replica was corrupted, false otherwise
    */
-  boolean corruptBlockOnDataNode(int i, String blockName) throws Exception {
+  public boolean corruptReplica(String blockName, int i) throws IOException {
     Random random = new Random();
-    boolean corrupted = false;
-    File dataDir = new File(getBaseDirectory() + "data");
-    if (i < 0 || i >= dataNodes.size())
-      return false;
+    assert (i >= 0 && i < dataNodes.size()) : "Invalid datanode "+i;
+    int filesCorrupted = 0;
+
+    // Each datanode has multiple data dirs, check each
     for (int dn = i*2; dn < i*2+2; dn++) {
-      File blockFile = new File(dataDir, "data" + (dn+1) + FINALIZED_DIR_NAME +
-                                blockName);
-      System.out.println("Corrupting for: " + blockFile);
-      if (blockFile.exists()) {
-        // Corrupt replica by writing random bytes into replica
+      File dataDir = new File(getBaseDirectory() + "data");
+      File blockFile = new File(dataDir,
+          "data" + (dn+1) + FINALIZED_DIR_NAME + blockName);
+
+      // Corrupt the replica by writing some bytes into a random offset
+      if (blockFile.exists()) { 
+        System.out.println("Corrupting " + blockFile);
         RandomAccessFile raFile = new RandomAccessFile(blockFile, "rw");
         FileChannel channel = raFile.getChannel();
         String badString = "BADBAD";
@@ -908,10 +948,12 @@ public class MiniDFSCluster {
         raFile.seek(rand);
         raFile.write(badString.getBytes());
         raFile.close();
+        filesCorrupted++;
       }
-      corrupted = true;
     }
-    return corrupted;
+    assert filesCorrupted == 0 || filesCorrupted == 1
+      : "Unexpected # block files";
+    return filesCorrupted == 1;
   }
 
   /*

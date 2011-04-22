@@ -54,7 +54,7 @@ public class TestOverReplicatedBlocks extends TestCase {
       
       // corrupt the block on datanode 0
       Block block = DFSTestUtil.getFirstBlock(fs, fileName);
-      TestDatanodeBlockScanner.corruptReplica(block.getBlockName(), 0);
+      assertTrue(cluster.corruptReplica(block.getBlockName(), 0));
       DataNodeProperties dnProps = cluster.stopDataNode(0);
       // remove block scanner log to trigger block scanning
       File scanLog = new File(System.getProperty("test.build.data"),
