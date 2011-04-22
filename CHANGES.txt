@@ -131,6 +131,9 @@ Trunk (unreleased changes)
     DFSTestUtil.waitReplication(). (Matt Foley via eli)
 
     HDFS-1562. Add rack policy tests. (eli)
+ 
+    HDFS-1856. TestDatanodeBlockScanner waits forever, errs without giving 
+    information. (Matt Foley via eli)
 
   OPTIMIZATIONS
 
