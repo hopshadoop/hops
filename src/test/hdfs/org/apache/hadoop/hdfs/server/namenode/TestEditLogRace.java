@@ -261,7 +261,7 @@ public class TestEditLogRace {
 
 
         LOG.info("Save " + i + ": entering safe mode");
-        namesystem.enterSafeMode();
+        namesystem.enterSafeMode(false);
 
         // Verify edit logs before the save
         verifyEditLogs(namesystem, fsimage);
@@ -275,7 +275,6 @@ public class TestEditLogRace {
 
         namesystem.leaveSafeMode(false);
         LOG.info("Save " + i + ": complete");
-
       }
     } finally {
       stopTransactionWorkers();

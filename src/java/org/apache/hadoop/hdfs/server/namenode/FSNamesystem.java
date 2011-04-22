@@ -237,7 +237,9 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
   public Daemon lmthread = null;   // LeaseMonitor thread
   Daemon smmthread = null;  // SafeModeMonitor thread
   public Daemon replthread = null;  // Replication thread
-  
+  Daemon nnrmthread = null; // NamenodeResourceMonitor thread
+
+  private volatile boolean hasResourcesAvailable = false;
   private volatile boolean fsRunning = true;
   long systemStart = 0;
 
@@ -248,6 +250,13 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
   private long heartbeatExpireInterval;
   //replicationRecheckInterval is how often namenode checks for new replication work
   private long replicationRecheckInterval;
+
+  //resourceRecheckInterval is how often namenode checks for the disk space availability
+  private long resourceRecheckInterval;
+
+  // The actual resource checker instance.
+  private NameNodeResourceChecker nnResourceChecker;
+
   private FsServerDefaults serverDefaults;
   // allow appending to hdfs files
   private boolean supportAppends = true;
@@ -298,6 +307,11 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
    */
   private void initialize(Configuration conf, FSImage fsImage)
       throws IOException {
+    resourceRecheckInterval =
+        conf.getLong(DFSConfigKeys.DFS_NAMENODE_RESOURCE_CHECK_INTERVAL_KEY,
+        DFSConfigKeys.DFS_NAMENODE_RESOURCE_CHECK_INTERVAL_DEFAULT);
+    nnResourceChecker = new NameNodeResourceChecker(conf);
+    checkAvailableResources();
     this.systemStart = now();
     this.blockManager = new BlockManager(this, conf);
     this.fsLock = new ReentrantReadWriteLock(true); // fair locking
@@ -345,6 +359,9 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
     lmthread.start();
     replthread.start();
 
+    this.nnrmthread = new Daemon(new NameNodeResourceMonitor());
+    nnrmthread.start();
+
     this.dnthread = new Daemon(new DecommissionManager(this).new Monitor(
         conf.getInt(DFSConfigKeys.DFS_NAMENODE_DECOMMISSION_INTERVAL_KEY, 
                     DFSConfigKeys.DFS_NAMENODE_DECOMMISSION_INTERVAL_DEFAULT),
@@ -357,7 +374,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
                       ScriptBasedMapping.class,
             DNSToSwitchMapping.class), conf);
     
-    /* If the dns to swith mapping supports cache, resolve network 
+    /* If the dns to switch mapping supports cache, resolve network
      * locations of those hosts in the include list, 
      * and store the mapping in the cache; so future calls to resolve
      * will be fast.
@@ -555,6 +572,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
       if (dnthread != null) dnthread.interrupt();
       if (smmthread != null) smmthread.interrupt();
       if (dtSecretManager != null) dtSecretManager.stopThreads();
+      if (nnrmthread != null) nnrmthread.interrupt();
     } catch (Exception e) {
       LOG.warn("Exception shutting down FSNamesystem", e);
     } finally {
@@ -2838,6 +2856,57 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
   }
 
   /**
+   * Returns whether or not there were available resources at the last check of
+   * resources.
+   *
+   * @return true if there were sufficient resources available, false otherwise.
+   */
+  private boolean nameNodeHasResourcesAvailable() {
+    return hasResourcesAvailable;
+  }
+
+  /**
+   * Perform resource checks and cache the results.
+   * @throws IOException
+   */
+  private void checkAvailableResources() throws IOException {
+    hasResourcesAvailable = nnResourceChecker.hasAvailableDiskSpace();
+  }
+
+  /**
+   * Periodically calls hasAvailableResources of NameNodeResourceChecker, and if
+   * there are found to be insufficient resources available, causes the NN to
+   * enter safe mode. If resources are later found to have returned to
+   * acceptable levels, this daemon will cause the NN to exit safe mode.
+   */
+  class NameNodeResourceMonitor implements Runnable  {
+    @Override
+    public void run () {
+      try {
+        while (fsRunning) {
+          checkAvailableResources();
+          if(!nameNodeHasResourcesAvailable()) {
+            String lowResourcesMsg = "NameNode low on available disk space. ";
+            if (!isInSafeMode()) {
+              FSNamesystem.LOG.warn(lowResourcesMsg + "Entering safe mode.");
+            } else {
+              FSNamesystem.LOG.warn(lowResourcesMsg + "Already in safe mode.");
+            }
+            enterSafeMode(true);
+          }
+          try {
+            Thread.sleep(resourceRecheckInterval);
+          } catch (InterruptedException ie) {
+            // Deliberately ignore
+          }
+        }
+      } catch (Exception e) {
+        FSNamesystem.LOG.error("Exception in NameNodeResourceMonitor: ", e);
+      }
+    }
+  }
+
+  /**
    * Update access keys.
    */
   void updateBlockKey() throws IOException {
@@ -3824,6 +3893,8 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
     private long lastStatusReport = 0;
     /** flag indicating whether replication queues have been initialized */
     private boolean initializedReplQueues = false;
+    /** Was safemode entered automatically because available resources were low. */
+    private boolean resourcesLow = false;
     
     /**
      * Creates SafeModeInfo when the name node enters
@@ -3848,14 +3919,15 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
     }
 
     /**
-     * Creates SafeModeInfo when safe mode is entered manually.
+     * Creates SafeModeInfo when safe mode is entered manually, or because
+     * available resources are low.
      *
      * The {@link #threshold} is set to 1.5 so that it could never be reached.
      * {@link #blockTotal} is set to -1 to indicate that safe mode is manual.
      * 
      * @see SafeModeInfo
      */
-    private SafeModeInfo() {
+    private SafeModeInfo(boolean resourcesLow) {
       this.threshold = 1.5f;  // this threshold can never be reached
       this.datanodeThreshold = Integer.MAX_VALUE;
       this.extension = Integer.MAX_VALUE;
@@ -3864,6 +3936,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
       this.blockTotal = -1;
       this.blockSafe = -1;
       this.reached = -1;
+      this.resourcesLow = resourcesLow;
       enter();
       reportStatus("STATE* Safe mode is ON.", true);
     }
@@ -3914,7 +3987,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
         }
         if(needUpgrade) {
           // switch to manual safe mode
-          safeMode = new SafeModeInfo();
+          safeMode = new SafeModeInfo(false);
           return;
         }
       }
@@ -3981,7 +4054,8 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
      */
     boolean needEnter() {
       return (threshold != 0 && blockSafe < blockThreshold) ||
-        (getNumLiveDataNodes() < datanodeThreshold);
+        (getNumLiveDataNodes() < datanodeThreshold) ||
+        (!nameNodeHasResourcesAvailable());
     }
       
     /**
@@ -4053,10 +4127,11 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
     }
 
     /**
-     * Check if safe mode was entered manually or at startup.
+     * Check if safe mode was entered manually or automatically (at startup, or
+     * when disk space is low).
      */
     boolean isManual() {
-      return extension == Integer.MAX_VALUE;
+      return extension == Integer.MAX_VALUE && !resourcesLow;
     }
 
     /**
@@ -4067,12 +4142,31 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
     }
 
     /**
+     * Check if safe mode was entered due to resources being low.
+     */
+    boolean areResourcesLow() {
+      return resourcesLow;
+    }
+
+    /**
+     * Set that resources are low for this instance of safe mode.
+     */
+    void setResourcesLow() {
+      resourcesLow = true;
+    }
+
+    /**
      * A tip on how safe mode is to be turned off: manually or automatically.
      */
     String getTurnOffTip() {
       if(reached < 0)
         return "Safe mode is OFF.";
-      String leaveMsg = "Safe mode will be turned off automatically";
+      String leaveMsg = "";
+      if (areResourcesLow()) {
+        leaveMsg = "Resources are low on NN. Safe mode must be turned off manually";
+      } else {
+        leaveMsg = "Safe mode will be turned off automatically";
+      }
       if(isManual()) {
         if(getDistributedUpgradeState())
           return leaveMsg + " upon completion of " + 
@@ -4080,6 +4174,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
             getDistributedUpgradeStatus() + "%";
         leaveMsg = "Use \"hdfs dfsadmin -safemode leave\" to turn safe mode off";
       }
+
       if(blockTotal < 0)
         return leaveMsg + ".";
 
@@ -4202,7 +4297,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
         leaveSafeMode(false);
         break;
       case SAFEMODE_ENTER: // enter safe mode
-        enterSafeMode();
+        enterSafeMode(false);
         break;
       }
     }
@@ -4307,7 +4402,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
    * Enter safe mode manually.
    * @throws IOException
    */
-  void enterSafeMode() throws IOException {
+  void enterSafeMode(boolean resourcesLow) throws IOException {
     writeLock();
     try {
     // Ensure that any concurrent operations have been fully synced
@@ -4315,8 +4410,11 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
     // is entirely stable on disk as soon as we're in safe mode.
     getEditLog().logSyncAll();
     if (!isInSafeMode()) {
-      safeMode = new SafeModeInfo();
+      safeMode = new SafeModeInfo(resourcesLow);
       return;
+    }
+    if (resourcesLow) {
+      safeMode.setResourcesLow();
     }
     safeMode.setManual();
     NameNode.stateChangeLog.info("STATE* Safe mode is ON. " 

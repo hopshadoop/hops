@@ -207,6 +207,9 @@ Trunk (unreleased changes)
     HDFS-1831. Fix append bug in FileContext and implement CreateFlag
     check (related to HADOOP-7223). (suresh)
 
+    HDFS-1594. When the disk becomes full Namenode is getting shutdown and 
+    not able to recover. (Aaron T. Myers via eli)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES
