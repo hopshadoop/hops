@@ -692,6 +692,8 @@ Release 0.21.1 - Unreleased
     MAPREDUCE-1929. Allow artifacts to be published to the staging Apache Nexus
     Maven Repository. (tomwhite)
 
+    MAPREDUCE-2317. Fix a NPE in HadoopArchives.  (Devaraj K via szetszwo)
+
 Release 0.21.0 - 2010-08-13
 
   INCOMPATIBLE CHANGES
@@ -2197,6 +2199,4 @@ Release 0.21.0 - 2010-08-13
     (Amar Kamat via amareshwari)
 
     MAPREDUCE-1856. Extract a subset of tests for smoke (DOA) validation (cos)
-
-    MAPREDUCE-2317. Fix a NPE in HadoopArchives.  (Devaraj K via szetszwo)
 
