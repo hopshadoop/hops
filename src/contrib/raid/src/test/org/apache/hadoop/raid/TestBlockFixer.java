@@ -637,12 +637,9 @@ public class TestBlockFixer {
     return crc.getValue();
   }
 
-  static void corruptBlock(String blockName) throws IOException {
-    boolean corrupted = false;
-    for (int i = 0; i < NUM_DATANODES; i++) {
-      corrupted |= TestDatanodeBlockScanner.corruptReplica(blockName, i);
-    }
-    assertTrue("could not corrupt block", corrupted);
+  void corruptBlock(String blockName) throws IOException {
+    assertTrue("Could not corrupt block",
+        dfs.corruptBlockOnDataNodes(blockName) > 0);
   }
   
   static void reportCorruptBlocks(FileSystem fs, Path file, int[] idxs,

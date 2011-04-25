@@ -130,6 +130,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2426. Make TestFairSchedulerSystem fail with more verbose output
     (todd)
 
+    MAPREDUCE-2448. NoSuchMethodError:
+    org.apache.hadoop.hdfs.TestDatanodeBlockScanner.corruptReplica(..) (eli)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES
