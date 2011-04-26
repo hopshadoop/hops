@@ -679,6 +679,9 @@ Release 0.22.0 - Unreleased
 
     HDFS-1666. Disable failing hdfsproxy test TestAuthorizationFilter (todd)
 
+    HDFS-1823. start-dfs.sh script fails if HADOOP_HOME is not set.
+    (tomwhite via eli)
+
 Release 0.21.1 - Unreleased
 
   IMPROVEMENTS

@@ -27,6 +27,8 @@ if [ -d "${HADOOP_COMMON_HOME}" ]; then
   . "$HADOOP_COMMON_HOME"/bin/hadoop-config.sh
 elif [ -d "${HADOOP_HOME}" ]; then
   . "$HADOOP_HOME"/bin/hadoop-config.sh
+elif [ -e "${HADOOP_HDFS_HOME}"/bin/hadoop-config.sh ]; then
+  . "$HADOOP_HDFS_HOME"/bin/hadoop-config.sh
 else
   echo "Hadoop common not found."
   exit
