@@ -431,6 +431,9 @@ Release 0.22.0 - Unreleased
 
     HDFS-1582. Remove auto-generated native build files. (rvs via eli)
 
+    HDFS-1861. Rename dfs.datanode.max.xcievers and bump its default value.
+    (eli)
+
   OPTIMIZATIONS
 
     HDFS-1140. Speedup INode.getPathComponents. (Dmytro Molkov via shv)

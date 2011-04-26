@@ -172,8 +172,8 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final int     DFS_DATANODE_HANDLER_COUNT_DEFAULT = 3;
   public static final String  DFS_DATANODE_HTTP_ADDRESS_KEY = "dfs.datanode.http.address";
   public static final String  DFS_DATANODE_HTTP_ADDRESS_DEFAULT = "0.0.0.0:50075";
-  public static final String  DFS_DATANODE_MAX_XCIEVERS_KEY = "dfs.datanode.max.xcievers";
-  public static final int     DFS_DATANODE_MAX_XCIEVERS_DEFAULT = 256;
+  public static final String  DFS_DATANODE_MAX_RECEIVER_THREADS_KEY = "dfs.datanode.max.transfer.threads";
+  public static final int     DFS_DATANODE_MAX_RECEIVER_THREADS_DEFAULT = 4096;
   public static final String  DFS_DATANODE_NUMBLOCKS_KEY = "dfs.datanode.numblocks";
   public static final int     DFS_DATANODE_NUMBLOCKS_DEFAULT = 64;
   public static final String  DFS_DATANODE_SCAN_PERIOD_HOURS_KEY = "dfs.datanode.scan.period.hours";
