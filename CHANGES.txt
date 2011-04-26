@@ -135,6 +135,9 @@ Trunk (unreleased changes)
     HDFS-1856. TestDatanodeBlockScanner waits forever, errs without giving 
     information. (Matt Foley via eli)
 
+    HDFS-1295. Improve namenode restart times by short-circuiting the
+    first block reports from datanodes. (Matt Foley via suresh)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image

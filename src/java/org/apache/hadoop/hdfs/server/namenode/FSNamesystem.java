@@ -3196,20 +3196,15 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
    * update the (machine-->blocklist) and (block-->machinelist) tables.
    */
   public void processReport(DatanodeID nodeID, 
-                                         BlockListAsLongs newReport
-                                        ) throws IOException {
+      BlockListAsLongs newReport) throws IOException {
+    long startTime, endTime;
 
     writeLock();
+    startTime = now(); //after acquiring write lock
     try {
-    long startTime = now();
-    if (NameNode.stateChangeLog.isDebugEnabled()) {
-      NameNode.stateChangeLog.debug("BLOCK* NameSystem.processReport: "
-                             + "from " + nodeID.getName()+" " + 
-                             newReport.getNumberOfBlocks()+" blocks");
-    }
     DatanodeDescriptor node = getDatanode(nodeID);
     if (node == null || !node.isAlive) {
-      throw new IOException("ProcessReport from dead or unregisterted node: "
+      throw new IOException("ProcessReport from dead or unregistered node: "
                             + nodeID.getName());
     }
     // To minimize startup time, we discard any second (or later) block reports
@@ -3222,10 +3217,16 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
     }
 
     blockManager.processReport(node, newReport);
-    NameNode.getNameNodeMetrics().blockReport.inc((int) (now() - startTime));
     } finally {
+      endTime = now();
       writeUnlock();
     }
+
+    // Log the block report processing stats from Namenode perspective
+    NameNode.getNameNodeMetrics().blockReport.inc((int) (endTime - startTime));
+    NameNode.stateChangeLog.info("BLOCK* NameSystem.processReport: from "
+        + nodeID.getName() + ", blocks: " + newReport.getNumberOfBlocks()
+        + ", processing time: " + (endTime - startTime) + " msecs");
   }
 
   /**
@@ -4020,8 +4021,13 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
       if (isPopulatingReplQueues()) {
         LOG.warn("Replication queues already initialized.");
       }
+      long startTimeMisReplicatedScan = now();
       blockManager.processMisReplicatedBlocks();
       initializedReplQueues = true;
+      NameNode.stateChangeLog.info("STATE* Replication Queue initialization "
+          + "scan for invalid, over- and under-replicated blocks "
+          + "completed in " + (now() - startTimeMisReplicatedScan)
+          + " msec");
     }
 
     /**

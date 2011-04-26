@@ -24,11 +24,8 @@ import java.util.*;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.hdfs.protocol.Block;
-import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
-import org.apache.hadoop.hdfs.protocol.BlockListAsLongs.BlockReportIterator;
-import org.apache.hadoop.hdfs.server.common.HdfsConstants.ReplicaState;
 import org.apache.hadoop.hdfs.server.protocol.BlockCommand;
 import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand;
 import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand.RecoveringBlock;
@@ -278,7 +275,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
   /**
    * Iterates over the list of blocks belonging to the datanode.
    */
-  static private class BlockIterator implements Iterator<BlockInfo> {
+  static class BlockIterator implements Iterator<BlockInfo> {
     private BlockInfo current;
     private DatanodeDescriptor node;
       
@@ -419,141 +416,6 @@ public class DatanodeDescriptor extends DatanodeInfo {
       }
     }
     return blockarray;
-  }
-
-  void reportDiff(BlockManager blockManager,
-                  BlockListAsLongs newReport,
-                  Collection<Block> toAdd,    // add to DatanodeDescriptor
-                  Collection<Block> toRemove, // remove from DatanodeDescriptor
-                  Collection<Block> toInvalidate, // should be removed from DN
-                  Collection<BlockInfo> toCorrupt) {// add to corrupt replicas
-    // place a delimiter in the list which separates blocks 
-    // that have been reported from those that have not
-    BlockInfo delimiter = new BlockInfo(new Block(), 1);
-    boolean added = this.addBlock(delimiter);
-    assert added : "Delimiting block cannot be present in the node";
-    if(newReport == null)
-      newReport = new BlockListAsLongs();
-    // scan the report and process newly reported blocks
-    BlockReportIterator itBR = newReport.getBlockReportIterator();
-    while(itBR.hasNext()) {
-      Block iblk = itBR.next();
-      ReplicaState iState = itBR.getCurrentReplicaState();
-      BlockInfo storedBlock = processReportedBlock(blockManager, iblk, iState,
-                                               toAdd, toInvalidate, toCorrupt);
-      // move block to the head of the list
-      if(storedBlock != null && storedBlock.findDatanode(this) >= 0)
-        this.moveBlockToHead(storedBlock);
-    }
-    // collect blocks that have not been reported
-    // all of them are next to the delimiter
-    Iterator<? extends Block> it = new BlockIterator(delimiter.getNext(0),this);
-    while(it.hasNext())
-      toRemove.add(it.next());
-    this.removeBlock(delimiter);
-  }
-
-  /**
-   * Process a block replica reported by the data-node.
-   * 
-   * <ol>
-   * <li>If the block is not known to the system (not in blocksMap) then the
-   * data-node should be notified to invalidate this block.</li>
-   * <li>If the reported replica is valid that is has the same generation stamp
-   * and length as recorded on the name-node, then the replica location is
-   * added to the name-node.</li>
-   * <li>If the reported replica is not valid, then it is marked as corrupt,
-   * which triggers replication of the existing valid replicas.
-   * Corrupt replicas are removed from the system when the block
-   * is fully replicated.</li>
-   * </ol>
-   * 
-   * @param blockManager
-   * @param block reported block replica
-   * @param rState reported replica state
-   * @param toAdd add to DatanodeDescriptor
-   * @param toInvalidate missing blocks (not in the blocks map)
-   *        should be removed from the data-node
-   * @param toCorrupt replicas with unexpected length or generation stamp;
-   *        add to corrupt replicas
-   * @return
-   */
-  BlockInfo processReportedBlock(
-                  BlockManager blockManager,
-                  Block block,                // reported block replica
-                  ReplicaState rState,        // reported replica state
-                  Collection<Block> toAdd,    // add to DatanodeDescriptor
-                  Collection<Block> toInvalidate, // should be removed from DN
-                  Collection<BlockInfo> toCorrupt) {// add to corrupt replicas
-    if(FSNamesystem.LOG.isDebugEnabled()) {
-      FSNamesystem.LOG.debug("Reported block " + block
-          + " on " + getName() + " size " + block.getNumBytes()
-          + " replicaState = " + rState);
-    }
-
-    // find block by blockId
-    BlockInfo storedBlock = blockManager.blocksMap.getStoredBlock(block);
-    if(storedBlock == null) {
-      // If blocksMap does not contain reported block id,
-      // the replica should be removed from the data-node.
-      toInvalidate.add(new Block(block));
-      return null;
-    }
-
-    if(FSNamesystem.LOG.isDebugEnabled()) {
-      FSNamesystem.LOG.debug("In memory blockUCState = " +
-          storedBlock.getBlockUCState());
-    }
-
-    // Ignore replicas already scheduled to be removed from the DN
-    if(blockManager.belongsToInvalidates(getStorageID(), block)) {
-      assert storedBlock.findDatanode(this) < 0 : "Block " + block 
-        + " in recentInvalidatesSet should not appear in DN " + this;
-      return storedBlock;
-    }
-
-    // Block is on the DN
-    boolean isCorrupt = false;
-    switch(rState) {
-    case FINALIZED:
-      switch(storedBlock.getBlockUCState()) {
-      case COMPLETE:
-      case COMMITTED:
-        if(storedBlock.getGenerationStamp() != block.getGenerationStamp()
-            || storedBlock.getNumBytes() != block.getNumBytes())
-          isCorrupt = true;
-        break;
-      case UNDER_CONSTRUCTION:
-      case UNDER_RECOVERY:
-        ((BlockInfoUnderConstruction)storedBlock).addReplicaIfNotPresent(
-            this, block, rState);
-      }
-      if(!isCorrupt && storedBlock.findDatanode(this) < 0)
-        if (storedBlock.getNumBytes() != block.getNumBytes()) {
-          toAdd.add(new Block(block));
-        } else {
-          toAdd.add(storedBlock);
-        }
-      break;
-    case RBW:
-    case RWR:
-      if(!storedBlock.isComplete())
-        ((BlockInfoUnderConstruction)storedBlock).addReplicaIfNotPresent(
-                                                      this, block, rState);
-      else
-        isCorrupt = true;
-      break;
-    case RUR:       // should not be reported
-    case TEMPORARY: // should not be reported
-    default:
-      FSNamesystem.LOG.warn("Unexpected replica state " + rState
-          + " for block: " + storedBlock + 
-          " on " + getName() + " size " + storedBlock.getNumBytes());
-      break;
-    }
-    if(isCorrupt)
-        toCorrupt.add(storedBlock);
-    return storedBlock;
   }
 
   /** Serialization for FSEditLog */
