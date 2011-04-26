@@ -119,8 +119,8 @@ import org.apache.hadoop.security.token.delegation.DelegationKey;
 class ImageLoaderCurrent implements ImageLoader {
   protected final DateFormat dateFormat = 
                                       new SimpleDateFormat("yyyy-MM-dd HH:mm");
-  private static int [] versions = 
-    {-16, -17, -18, -19, -20, -21, -22, -23, -24, -25, -26, -27, -28, -30};
+  private static int[] versions = { -16, -17, -18, -19, -20, -21, -22, -23,
+      -24, -25, -26, -27, -28, -30, -31, -32, -33, -34 };
   private int imageVersion = 0;
 
   /* (non-Javadoc)

@@ -509,6 +509,8 @@ public class FSEditLogLoader {
         }
         validateChecksum(in, checksum, numEdits);
       }
+    } catch (IOException ex) {
+      check203UpgradeFailure(logVersion, ex);
     } finally {
       if(closeOnExit)
         in.close();
@@ -651,5 +653,26 @@ public class FSEditLogLoader {
         blocks[i] = new BlockInfo(blk, replication);
     }
     return blocks;
+  }
+  
+  /** 
+   * Throw appropriate exception during upgrade from 203, when editlog loading
+   * could fail due to opcode conflicts.
+   */
+  private void check203UpgradeFailure(int logVersion, IOException ex)
+      throws IOException {
+    // 0.20.203 version version has conflicting opcodes with the later releases.
+    // The editlog must be emptied by restarting the namenode, before proceeding
+    // with the upgrade.
+    if (Storage.is203LayoutVersion(logVersion)
+        && logVersion != FSConstants.LAYOUT_VERSION) {
+      String msg = "During upgrade failed to load the editlog version "
+          + logVersion + " from release 0.20.203. Please go back to the old "
+          + " release and restart the namenode. This empties the editlog "
+          + " and saves the namespace. Resume the upgrade after this step.";
+      throw new IOException(msg, ex);
+    } else {
+      throw ex;
+    }
   }
 }

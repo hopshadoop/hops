@@ -78,6 +78,9 @@ public abstract class Storage extends StorageInfo {
   // last layout version that did not support persistent rbw replicas
   public static final int PRE_RBW_LAYOUT_VERSION = -19;
   
+  /** Layout versions of 0.20.203 release */
+  public static final int[] LAYOUT_VERSIONS_203 = {-19, -31};
+
   private   static final String STORAGE_FILE_LOCK     = "in_use.lock";
   protected static final String STORAGE_FILE_VERSION  = "VERSION";
   public    static final String STORAGE_DIR_CURRENT   = "current";
@@ -860,5 +863,14 @@ public abstract class Storage extends StorageInfo {
     return "NS-" + Integer.toString(storage.getNamespaceID())
       + "-" + Integer.toString(storage.getLayoutVersion())
       + "-" + Long.toString(storage.getCTime());
+  }
+  
+  public static boolean is203LayoutVersion(int layoutVersion) {
+    for (int lv203 : LAYOUT_VERSIONS_203) {
+      if (lv203 == layoutVersion) {
+        return true;
+      }
+    }
+    return false;
   }
 }

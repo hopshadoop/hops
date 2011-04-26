@@ -210,6 +210,10 @@ Trunk (unreleased changes)
     HDFS-1594. When the disk becomes full Namenode is getting shutdown and 
     not able to recover. (Aaron T. Myers via eli)
 
+    HDFS-1842. Handle editlog opcode conflict with 0.20.203 during upgrade,
+    by throwing an error to indicate the editlog needs to be empty.
+    (suresh)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES
