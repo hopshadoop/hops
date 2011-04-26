@@ -755,10 +755,14 @@ public class DFSClient implements FSConstants, java.io.Closeable {
    * 
    * @see ClientProtocol#append(String, String) 
    */
-  OutputStream append(String src, int buffersize, Progressable progress)
+  OutputStream append(String src, int buffersize, Progressable progress) 
       throws IOException {
     checkOpen();
     HdfsFileStatus stat = getFileInfo(src);
+    if (stat == null) { // No file found
+      throw new FileNotFoundException("failed to append to non-existent file "
+          + src + " on client " + clientName);
+    }
     OutputStream result = callAppend(stat, src, buffersize, progress);
     leasechecker.put(src, result);
     return result;

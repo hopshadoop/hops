@@ -17,12 +17,15 @@
  */
 package org.apache.hadoop.hdfs;
 
+import static org.junit.Assert.*;
+
 import java.io.File;
 import java.io.IOException;
+import java.io.FileNotFoundException;
 import java.net.InetSocketAddress;
 import java.util.List;
 
-import junit.framework.TestCase;
+import org.junit.Test;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
@@ -41,7 +44,7 @@ import org.apache.hadoop.hdfs.server.datanode.SimulatedFSDataset;
  * This class tests the building blocks that are needed to
  * support HDFS appends.
  */
-public class TestFileAppend extends TestCase {
+public class TestFileAppend{
   boolean simulatedStorage = false;
 
   private static byte[] fileContents = null;
@@ -101,6 +104,7 @@ public class TestFileAppend extends TestCase {
    * Test that copy on write for blocks works correctly
    * @throws IOException an exception might be thrown
    */
+  @Test
   public void testCopyOnWrite() throws IOException {
     Configuration conf = new HdfsConfiguration();
     if (simulatedStorage) {
@@ -171,6 +175,7 @@ public class TestFileAppend extends TestCase {
    * Test a simple flush on a simple HDFS file.
    * @throws IOException an exception might be thrown
    */
+  @Test
   public void testSimpleFlush() throws IOException {
     Configuration conf = new HdfsConfiguration();
     if (simulatedStorage) {
@@ -226,6 +231,7 @@ public class TestFileAppend extends TestCase {
    * Test that file data can be flushed.
    * @throws IOException an exception might be thrown
    */
+  @Test
   public void testComplexFlush() throws IOException {
     Configuration conf = new HdfsConfiguration();
     if (simulatedStorage) {
@@ -263,6 +269,28 @@ public class TestFileAppend extends TestCase {
       System.out.println("Throwable :" + e);
       e.printStackTrace();
       throw new IOException("Throwable : " + e);
+    } finally {
+      fs.close();
+      cluster.shutdown();
+    }
+  }
+ 
+  /**
+   * FileNotFoundException is expected for appending to a non-exisiting file
+   * 
+   * @throws FileNotFoundException as the result
+   */
+  @Test(expected = FileNotFoundException.class)
+  public void testFileNotFound() throws IOException {
+    Configuration conf = new HdfsConfiguration();
+    if (simulatedStorage) {
+      conf.setBoolean(SimulatedFSDataset.CONFIG_PROPERTY_SIMULATED, true);
+    }
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).build();
+    FileSystem fs = cluster.getFileSystem();
+    try {
+      Path file1 = new Path("/nonexistingfile.dat");
+      fs.append(file1);
     } finally {
       fs.close();
       cluster.shutdown();
