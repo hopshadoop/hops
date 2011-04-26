@@ -660,6 +660,9 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2437. SLive uses only part* files to generating the final report.
     (shv)
 
+    MAPREDUCE-2428. start-mapred.sh script fails if HADOOP_HOME is not set.
+    (tomwhite via eli)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES
