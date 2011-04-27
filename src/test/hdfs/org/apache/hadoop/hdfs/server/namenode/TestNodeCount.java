@@ -19,6 +19,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -35,12 +36,21 @@ import junit.framework.TestCase;
 /**
  * Test if live nodes count per node is correct 
  * so NN makes right decision for under/over-replicated blocks
+ * 
+ * Two of the "while" loops below use "busy wait"
+ * because they are detecting transient states.
  */
 public class TestNodeCount extends TestCase {
+  final short REPLICATION_FACTOR = (short)2;
+  final long TIMEOUT = 20000L;
+  long timeout = 0;
+  long failtime = 0;
+  Block lastBlock = null;
+  NumberReplicas lastNum = null;
+
   public void testNodeCount() throws Exception {
     // start a mini dfs cluster of 2 nodes
     final Configuration conf = new HdfsConfiguration();
-    final short REPLICATION_FACTOR = (short)2;
     final MiniDFSCluster cluster = 
       new MiniDFSCluster.Builder(conf).numDataNodes(REPLICATION_FACTOR).build();
     try {
@@ -83,13 +93,11 @@ public class TestNodeCount extends TestCase {
       cluster.restartDataNode(dnprop);
       cluster.waitActive();
       
-      // check if excessive replica is detected
-      NumberReplicas num = null;
-      do {
-       synchronized (namesystem) {
-         num = namesystem.blockManager.countNodes(block);
-       }
-      } while (num.excessReplicas() == 0);
+      // check if excessive replica is detected (transient)
+      initializeTimeout(TIMEOUT);
+      while (countNodes(block, namesystem).excessReplicas() == 0) {
+        checkTimeout("excess replicas not detected");
+      }
       
       // find out a non-excess node
       Iterator<DatanodeDescriptor> iter = namesystem.blockManager.blocksMap.nodeIterator(block);
@@ -119,20 +127,65 @@ public class TestNodeCount extends TestCase {
       }
 
       // The block should be replicated
-      do {
-        num = namesystem.blockManager.countNodes(block);
-      } while (num.liveReplicas() != REPLICATION_FACTOR);
+      initializeTimeout(TIMEOUT);
+      while (countNodes(block, namesystem).liveReplicas() != REPLICATION_FACTOR) {
+        checkTimeout("live replica count not correct", 1000);
+      }
 
       // restart the first datanode
       cluster.restartDataNode(dnprop);
       cluster.waitActive();
 
-      // check if excessive replica is detected
-      do {
-        num = namesystem.blockManager.countNodes(block);
-      } while (num.excessReplicas() != 2);
+      // check if excessive replica is detected (transient)
+      initializeTimeout(TIMEOUT);
+      while (countNodes(block, namesystem).excessReplicas() != 2) {
+        checkTimeout("excess replica count not equal to 2");
+      }
+
     } finally {
       cluster.shutdown();
+    }
+  }
+  
+  void initializeTimeout(long timeout) {
+    this.timeout = timeout;
+    this.failtime = System.currentTimeMillis()
+        + ((timeout <= 0) ? Long.MAX_VALUE : timeout);
+  }
+  
+  /* busy wait on transient conditions */
+  void checkTimeout(String testLabel) throws TimeoutException {
+    checkTimeout(testLabel, 0);
+  }
+  
+  /* check for timeout, then wait for cycleTime msec */
+  void checkTimeout(String testLabel, long cycleTime) throws TimeoutException {
+    if (System.currentTimeMillis() > failtime) {
+      throw new TimeoutException("Timeout: "
+          + testLabel + " for block " + lastBlock + " after " + timeout 
+          + " msec.  Last counts: live = " + lastNum.liveReplicas()
+          + ", excess = " + lastNum.excessReplicas()
+          + ", corrupt = " + lastNum.corruptReplicas());   
+    }
+    if (cycleTime > 0) {
+      try {
+        Thread.sleep(cycleTime);
+      } catch (InterruptedException ie) {
+        //ignore
+      }
+    }
+  }
+
+  /* threadsafe read of the replication counts for this block */
+  NumberReplicas countNodes(Block block, FSNamesystem namesystem) {
+    namesystem.readLock();
+    try {
+      lastBlock = block;
+      lastNum = namesystem.blockManager.countNodes(block);
+      return lastNum;
+    }
+    finally {
+      namesystem.readUnlock();
     }
   }
 }

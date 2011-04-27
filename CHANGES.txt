@@ -223,6 +223,9 @@ Trunk (unreleased changes)
     HDFS-1808. TestBalancer waits forever, errs without giving information.
     (Matt Foley via eli)
 
+    HDFS-1829. TestNodeCount waits forever, errs without giving information.
+    (Matt Foley via eli)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES
