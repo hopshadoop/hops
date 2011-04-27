@@ -255,7 +255,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
   private long resourceRecheckInterval;
 
   // The actual resource checker instance.
-  private NameNodeResourceChecker nnResourceChecker;
+  NameNodeResourceChecker nnResourceChecker;
 
   private FsServerDefaults serverDefaults;
   // allow appending to hdfs files

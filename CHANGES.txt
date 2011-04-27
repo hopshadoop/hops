@@ -141,6 +141,8 @@ Trunk (unreleased changes)
     HDFS-1843. Discover file not found early for file append. 
     (Bharath Mundlapudi via jitendra)
 
+    HDFS-1862. Improve test reliability of HDFS-1594. (Aaron T. Myers via eli)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
