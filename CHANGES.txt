@@ -220,6 +220,9 @@ Trunk (unreleased changes)
     by throwing an error to indicate the editlog needs to be empty.
     (suresh)
 
+    HDFS-1808. TestBalancer waits forever, errs without giving information.
+    (Matt Foley via eli)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES
