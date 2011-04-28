@@ -43,7 +43,14 @@ class EditLogFileOutputStream extends EditLogOutputStream {
   private DataOutputBuffer bufCurrent; // current buffer for writing
   private DataOutputBuffer bufReady; // buffer ready for flushing
   final private int initBufferSize; // inital buffer size
-  static ByteBuffer fill = ByteBuffer.allocateDirect(512); // preallocation
+  static ByteBuffer fill = ByteBuffer.allocateDirect(1024 * 1024); // preallocation, 1MB
+
+  static {
+    fill.position(0);
+    for (int i = 0; i < fill.capacity(); i++) {
+      fill.put(FSEditLogOpCodes.OP_INVALID.getOpCode());
+    }
+  }
 
   /**
    * Creates output buffers and file object.
@@ -182,12 +189,11 @@ class EditLogFileOutputStream extends EditLogOutputStream {
         FSNamesystem.LOG.debug("Preallocating Edit log, current size "
             + fc.size());
       }
-      long newsize = position + 1024 * 1024; // 1MB
       fill.position(0);
-      int written = fc.write(fill, newsize);
+      int written = fc.write(fill, position);
       if(FSNamesystem.LOG.isDebugEnabled()) {
         FSNamesystem.LOG.debug("Edit log size is now " + fc.size() +
-            " written " + written + " bytes " + " at offset " + newsize);
+            " written " + written + " bytes " + " at offset " + position);
       }
     }
   }

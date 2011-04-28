@@ -143,6 +143,9 @@ Trunk (unreleased changes)
 
     HDFS-1862. Improve test reliability of HDFS-1594. (Aaron T. Myers via eli)
 
+    HDFS-1846. Preallocate edit log with OP_INVALID instead of zero bytes
+    to ensure blocks are actually allocated. (Aaron T. Myers via todd)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image

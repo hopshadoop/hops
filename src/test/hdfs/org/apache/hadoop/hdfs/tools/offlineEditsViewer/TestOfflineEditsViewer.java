@@ -238,11 +238,11 @@ public class TestOfflineEditsViewer {
     // compares position to limit
     if(!small.equals(large)) { return false; }
 
-    // everything after limit should be zero 
+    // everything after limit should be 0xFF
     int i = large.limit();
     large.clear();
     for(; i < large.capacity(); i++) {
-      if(large.get(i) != 0) {
+      if(large.get(i) != FSEditLogOpCodes.OP_INVALID.getOpCode()) {
         return false;
       }
     }
