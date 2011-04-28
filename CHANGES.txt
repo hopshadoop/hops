@@ -7,6 +7,10 @@ Trunk (unreleased changes)
   NEW FEATURES
 
   IMPROVEMENTS
+
+    MAPREDUCE-2153. Bring in more job configuration properties in to the trace 
+    file. (Rajesh Balamohan via amarrk)
+
     MAPREDUCE-1461. Feature to instruct rumen-folder utility to skip jobs worth 
     of specific duration. (Rajesh Balamohan via amarrk)
 

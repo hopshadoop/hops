@@ -120,8 +120,20 @@ public class ZombieJob implements JobStory {
   @Override
   public synchronized JobConf getJobConf() {
     if (jobConf == null) {
-      // TODO : add more to jobConf ?
       jobConf = new JobConf();
+      
+      // Add parameters from the configuration in the job trace
+      //
+      // The reason why the job configuration parameters, as seen in the jobconf
+      // file, are added first because the specialized values obtained from 
+      // Rumen should override the job conf values.
+      //
+      for (Map.Entry<Object, Object> entry : job.getJobProperties().entrySet()) {
+        jobConf.set(entry.getKey().toString(), entry.getValue().toString());
+      }
+      
+      //TODO Eliminate parameters that are already copied from the job's 
+      // configuration file.
       jobConf.setJobName(getName());
       jobConf.setUser(getUser());
       jobConf.setNumMapTasks(getNumberMaps());

@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.tools.rumen;
 
+import java.util.Properties;
 import java.util.regex.Pattern;
 import java.util.regex.Matcher;
 
@@ -57,6 +58,8 @@ class ParsedConfigFile {
   final String jobID;
 
   final boolean valid;
+  
+  final Properties properties = new Properties();
 
   private int maybeGetIntValue(String propName, String attr, String value,
       int oldValue) {
@@ -145,6 +148,8 @@ class ParsedConfigFile {
                 "true".equals(((Text) field.getFirstChild()).getData());
           }
         }
+        
+        properties.setProperty(attr, value);
 
         if ("mapred.child.java.opts".equals(attr) && value != null) {
           Matcher matcher = heapPattern.matcher(value);

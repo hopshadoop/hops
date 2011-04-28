@@ -1594,6 +1594,8 @@ public class HadoopLogsAnalyzer extends Configured implements Tool {
       jobBeingTraced.setJobMapMB(jobconf.jobMapMB);
       jobBeingTraced.setJobReduceMB(jobconf.jobReduceMB);
 
+      jobBeingTraced.setJobProperties(jobconf.properties);
+      
       jobconf = null;
 
       finalizeJob();

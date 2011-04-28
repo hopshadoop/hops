@@ -96,6 +96,8 @@ public class JobBuilder {
   private static final Pattern heapPattern =
       Pattern.compile("-Xmx([0-9]+[kKmMgGtT])");
 
+  private Properties jobConfigurationParameters = null;
+
   public JobBuilder(String jobID) {
     this.jobID = jobID;
   }
@@ -228,6 +230,7 @@ public class JobBuilder {
           "JobBuilder.process(Properties conf) called after LoggedJob built");
     }
 
+    //TODO remove this once the deprecate APIs in LoggedJob are removed
     result.setQueue(extract(conf, JobConfPropertyNames.QUEUE_NAMES
         .getCandidates(), "default"));
     result.setJobName(extract(conf, JobConfPropertyNames.JOB_NAMES
@@ -239,6 +242,8 @@ public class JobBuilder {
         JobConfPropertyNames.MAP_JAVA_OPTS_S.getCandidates()));
     maybeSetJobReduceMB(extractMegabytes(conf,
         JobConfPropertyNames.REDUCE_JAVA_OPTS_S.getCandidates()));
+        
+    this.jobConfigurationParameters = conf;
   }
 
   /**
@@ -248,9 +253,12 @@ public class JobBuilder {
    * @return Parsed {@link LoggedJob} object.
    */
   public LoggedJob build() {
-    // The main job here is to build CDFs
+    // The main job here is to build CDFs and manage the conf
     finalized = true;
 
+    // set the conf
+    result.setJobProperties(jobConfigurationParameters);
+    
     // initialize all the per-job statistics gathering places
     Histogram[] successfulMapAttemptTimes =
         new Histogram[ParsedHost.numberOfDistances() + 1];

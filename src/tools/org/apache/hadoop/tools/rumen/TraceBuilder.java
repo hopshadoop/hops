@@ -50,7 +50,6 @@ public class TraceBuilder extends Configured implements Tool {
   static final int RUN_METHOD_FAILED_EXIT_CODE = 3;
 
   TopologyBuilder topologyBuilder = new TopologyBuilder();
-  JobConfigurationParser jobConfParser;
   Outputter<LoggedJob> traceWriter;
   Outputter<LoggedNetworkTopology> topologyWriter;
 
@@ -191,25 +190,11 @@ public class TraceBuilder extends Configured implements Tool {
     return jobId != null;
   }
 
-  private void addInterestedProperties(List<String> interestedProperties,
-      String[] names) {
-    for (String name : names) {
-      interestedProperties.add(name);
-    }
-  }
 
   @SuppressWarnings("unchecked")
   @Override
   public int run(String[] args) throws Exception {
     MyOptions options = new MyOptions(args, getConf());
-    List<String> interestedProperties = new ArrayList<String>();
-    {
-      for (JobConfPropertyNames candidateSet : JobConfPropertyNames.values()) {
-        addInterestedProperties(interestedProperties, candidateSet
-            .getCandidates());
-      }
-    }
-    jobConfParser = new JobConfigurationParser(interestedProperties);
     traceWriter = options.clazzTraceOutputter.newInstance();
     traceWriter.init(options.traceOutput, getConf());
     topologyWriter = new DefaultOutputter<LoggedNetworkTopology>();
@@ -254,7 +239,7 @@ public class TraceBuilder extends Configured implements Tool {
               }
 
               if (isJobConfXml(filePair.first(), ris)) {
-                processJobConf(jobConfParser.parse(ris.rewind()), jobBuilder);
+            	processJobConf(JobConfigurationParser.parse(ris.rewind()), jobBuilder);
               } else {
                 parser = JobHistoryParserFactory.getParser(ris);
                 if (parser == null) {

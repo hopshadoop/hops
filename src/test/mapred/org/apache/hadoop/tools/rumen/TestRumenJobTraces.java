@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.tools.rumen;
 
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -446,37 +447,12 @@ public class TestRumenJobTraces {
     String[] oldProps1 = { "mapred.job.queue.name", "mapred.job.name",
         "mapred.child.java.opts" };
 
-    String[] oldProps2 = { "mapred.job.queue.name", "mapred.child.java.opts" };
-
-    validateJobConfParser(oldProps1, oldProps2, "sample-conf.file.xml", false);
-
-    // Validate parser with new mapreduce config properties from
-    // sample-conf-file.new.xml
-    String[] newProps1 = { MRJobConfig.QUEUE_NAME, MRJobConfig.JOB_NAME,
-        MRJobConfig.MAP_JAVA_OPTS, MRJobConfig.REDUCE_JAVA_OPTS };
-
-    String[] newProps2 = { MRJobConfig.QUEUE_NAME,
-        MRJobConfig.MAP_JAVA_OPTS, MRJobConfig.REDUCE_JAVA_OPTS };
-
-    validateJobConfParser(newProps1, newProps2,
-        "sample-conf.file.new.xml", true);
+    validateJobConfParser("sample-conf.file.xml", false);
+    validateJobConfParser("sample-conf.file.new.xml", true);
   }
 
-  private void validateJobConfParser(String[] list1, String[] list2,
-      String confFile, boolean newConfig)
+  private void validateJobConfParser(String confFile, boolean newConfig)
       throws Exception {
-    List<String> interested1 = new ArrayList<String>();
-    for (String interested : list1) {
-      interested1.add(interested);
-    }
-
-    List<String> interested2 = new ArrayList<String>();
-    for (String interested : list2) {
-      interested2.add(interested);
-    }
-
-    JobConfigurationParser jcp1 = new JobConfigurationParser(interested1);
-    JobConfigurationParser jcp2 = new JobConfigurationParser(interested2);
 
     final Configuration conf = new Configuration();
     final FileSystem lfs = FileSystem.getLocal(conf);
@@ -494,43 +470,20 @@ public class TestRumenJobTraces {
         new PossiblyDecompressedInputStream(inputPath, conf);
 
     try {
-      Properties props1 = jcp1.parse(inputConfStream);
+      Properties props = JobConfigurationParser.parse(inputConfStream);
       inputConfStream.close();
 
-      inputConfStream = new PossiblyDecompressedInputStream(inputPath, conf);
-      Properties props2 = jcp2.parse(inputConfStream);
-
-      assertEquals("testJobConfigurationParser: wrong number of properties",
-          list1.length, props1.size());
-      assertEquals("testJobConfigurationParser: wrong number of properties",
-          list2.length, props2.size());
-
-      // Make sure that parser puts the interested properties into props1 and
-      // props2 as defined by list1 and list2.
       String oldOrNew = newConfig ? "New" : "Old";
       assertEquals(oldOrNew + " config property for job queue name is not "
           + " extracted properly.", "TheQueue",
-          JobBuilder.extract(props1, JobConfPropertyNames.QUEUE_NAMES
+          JobBuilder.extract(props, JobConfPropertyNames.QUEUE_NAMES
           .getCandidates(), null));
       assertEquals(oldOrNew + " config property for job name is not "
           + " extracted properly.", "MyMRJob",
-          JobBuilder.extract(props1, JobConfPropertyNames.JOB_NAMES
+          JobBuilder.extract(props, JobConfPropertyNames.JOB_NAMES
           .getCandidates(), null));
 
-      assertEquals(oldOrNew + " config property for job queue name is not "
-          + " extracted properly.", "TheQueue",
-          JobBuilder.extract(props2, JobConfPropertyNames.QUEUE_NAMES
-          .getCandidates(), null));
-      
-      // This config property is not interested for props2. So props should not
-      // contain this.
-      assertNull("Uninterested " + oldOrNew + " config property for job name "
-          + " is extracted.",
-          JobBuilder.extract(props2, JobConfPropertyNames.JOB_NAMES
-          .getCandidates(), null));
-
-      validateChildJavaOpts(newConfig, props1);
-      validateChildJavaOpts(newConfig, props2);
+      validateChildJavaOpts(newConfig, props);
 
     } finally {
       inputConfStream.close();
@@ -575,6 +528,64 @@ public class TestRumenJobTraces {
           .getCandidates(), null));
     }
   }
+  
+    /**
+     * Test if the {@link JobConfigurationParser} can correctly extract out 
+     * key-value pairs from the job configuration.
+     */
+    @Test
+    public void testJobConfigurationParsing() throws Exception {
+      final FileSystem lfs = FileSystem.getLocal(new Configuration());
+  
+      final Path rootTempDir =
+          new Path(System.getProperty("test.build.data", "/tmp")).makeQualified(
+              lfs.getUri(), lfs.getWorkingDirectory());
+  
+      final Path tempDir = new Path(rootTempDir, "TestJobConfigurationParser");
+      lfs.delete(tempDir, true);
+  
+      // Add some configuration parameters to the conf
+      JobConf jConf = new JobConf(false);
+      String key = "test.data";
+      String value = "hello world";
+      jConf.set(key, value);
+      
+      // create the job conf file
+      Path jobConfPath = new Path(tempDir.toString(), "job.xml");
+      lfs.delete(jobConfPath, false);
+      DataOutputStream jobConfStream = lfs.create(jobConfPath);
+      jConf.writeXml(jobConfStream);
+      jobConfStream.close();
+      
+      // now read the job conf file using the job configuration parser
+      Properties properties = 
+        JobConfigurationParser.parse(lfs.open(jobConfPath));
+      
+      // check if the required parameter is loaded
+      assertEquals("Total number of extracted properties (" + properties.size() 
+                   + ") doesn't match the expected size of 1 ["
+                   + "JobConfigurationParser]",
+                   1, properties.size());
+      // check if the key is present in the extracted configuration
+      assertTrue("Key " + key + " is missing in the configuration extracted "
+                 + "[JobConfigurationParser]",
+                 properties.keySet().contains(key));
+      // check if the desired property has the correct value
+      assertEquals("JobConfigurationParser couldn't recover the parameters"
+                   + " correctly",
+                  value, properties.get(key));
+      
+      // Test ZombieJob
+      LoggedJob job = new LoggedJob();
+      job.setJobProperties(properties);
+      
+      ZombieJob zjob = new ZombieJob(job, null);
+      Configuration zconf = zjob.getJobConf();
+      // check if the required parameter is loaded
+      assertEquals("ZombieJob couldn't recover the parameters correctly", 
+                   value, zconf.get(key));
+    }
+
 
   @Test
   public void testTopologyBuilder() throws Exception {
