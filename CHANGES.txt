@@ -231,6 +231,9 @@ Trunk (unreleased changes)
     HDFS-1829. TestNodeCount waits forever, errs without giving information.
     (Matt Foley via eli)
 
+    HDFS-1860. when renewing/canceling DelegationToken over http we need to
+     pass exception information back to the caller.(boryas)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES
