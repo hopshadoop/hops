@@ -663,6 +663,9 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2428. start-mapred.sh script fails if HADOOP_HOME is not set.
     (tomwhite via eli)
 
+    MAPREDUCE-2445. Fix TestMiniMRWithDFSWithDistinctUsers to be a valid test.
+    (todd)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES

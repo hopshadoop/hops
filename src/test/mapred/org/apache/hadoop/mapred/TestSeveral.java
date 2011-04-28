@@ -93,10 +93,10 @@ public class TestSeveral extends TestCase {
           }
         });
 
-        TestMiniMRWithDFSWithDistinctUsers.mkdir(fs, "/user");
-        TestMiniMRWithDFSWithDistinctUsers.mkdir(fs, "/mapred");
-        TestMiniMRWithDFSWithDistinctUsers.mkdir(fs, 
-            conf.get(JTConfig.JT_STAGING_AREA_ROOT));
+        TestMiniMRWithDFSWithDistinctUsers.mkdir(fs, "/user", "mapred", "mapred", (short)01777);
+        TestMiniMRWithDFSWithDistinctUsers.mkdir(fs, "/mapred", "mapred", "mapred", (short)01777);
+        TestMiniMRWithDFSWithDistinctUsers.mkdir(fs, conf.get(JTConfig.JT_STAGING_AREA_ROOT),
+                                                 "mapred", "mapred", (short)01777);
 
         UserGroupInformation MR_UGI = UserGroupInformation.getLoginUser(); 
 
