@@ -71,6 +71,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-2202. Generalize CLITest structure and interfaces to faciliate
     upstream adoption (e.g. for web or system testing). (cos)
+
+    MAPREDUCE-2420. JobTracker should be able to renew delegation token over 
+    HTTP (Boris Shkolnik via jitendra)
     
   OPTIMIZATIONS
     
