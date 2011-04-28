@@ -311,6 +311,17 @@
           </td>
         </tr>
         <tr>
+        <td><code>-starts-after</code></td>
+            <td>Specify the time (in milliseconds) relative to the start of   
+              the trace, after which this utility should consider the 
+              jobs from input trace.
+            </td>
+            <td>If this value is specified as 10000, Folder would ignore 
+              first 10000ms worth of jobs in the trace and 
+              start considering the rest of the jobs in the trace for folding.
+            </td>
+          </tr>
+          <tr>
           <td><code>-temp-directory</code></td>
           <td>Temporary directory for the Folder. By default the <strong>output
               folder's parent directory</strong> is used as the scratch space.

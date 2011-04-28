@@ -61,6 +61,7 @@ public class Folder extends Configured implements Tool {
   private boolean debug = false;
   private boolean allowMissorting = false;
   private int skewBufferLength = 0;
+  private long startsAfter = -1;
 
   static final private Log LOG = LogFactory.getLog(Folder.class);
 
@@ -130,8 +131,9 @@ public class Folder extends Configured implements Tool {
 
     for (int i = 0; i < args.length; ++i) {
       String thisArg = args[i];
-
-      if (thisArg.equalsIgnoreCase("-output-duration")) {
+      if (thisArg.equalsIgnoreCase("-starts-after")) {
+        startsAfter = parseDuration(args[++i]);
+      } else if (thisArg.equalsIgnoreCase("-output-duration")) {
         outputDuration = parseDuration(args[++i]);
       } else if (thisArg.equalsIgnoreCase("-input-cycle")) {
         inputCycle = parseDuration(args[++i]);
@@ -273,6 +275,31 @@ public class Folder extends Configured implements Tool {
         LOG.error("The job trace is empty");
 
         return EMPTY_JOB_TRACE;
+      }
+      
+      // If starts-after time is specified, skip the number of jobs till we reach
+      // the starting time limit.
+      if (startsAfter > 0) {
+        LOG.info("starts-after time is specified. Initial job submit time : " 
+                 + job.getSubmitTime());
+
+        long approximateTime = job.getSubmitTime() + startsAfter;
+        job = reader.nextJob();
+        long skippedCount = 0;
+        while (job != null && job.getSubmitTime() < approximateTime) {
+          job = reader.nextJob();
+          skippedCount++;
+        }
+
+        LOG.debug("Considering jobs with submit time greater than " 
+                  + startsAfter + " ms. Skipped " + skippedCount + " jobs.");
+
+        if (job == null) {
+          LOG.error("No more jobs to process in the trace with 'starts-after'"+
+                    " set to " + startsAfter + "ms.");
+          return EMPTY_JOB_TRACE;
+        }
+        LOG.info("The first job has a submit time of " + job.getSubmitTime());
       }
 
       firstJobSubmitTime = job.getSubmitTime();
