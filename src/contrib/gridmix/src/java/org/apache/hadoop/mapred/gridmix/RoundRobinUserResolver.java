@@ -38,8 +38,13 @@ public class RoundRobinUserResolver implements UserResolver {
 
   private int uidx = 0;
   private List<UserGroupInformation> users = Collections.emptyList();
-  private final HashMap<UserGroupInformation,UserGroupInformation> usercache =
-    new HashMap<UserGroupInformation,UserGroupInformation>();
+
+  /**
+   *  Mapping between user names of original cluster and UGIs of proxy users of
+   *  simulated cluster
+   */
+  private final HashMap<String,UserGroupInformation> usercache =
+      new HashMap<String,UserGroupInformation>();
   
   /**
    * Userlist assumes one UGI per line, each UGI matching
@@ -89,11 +94,12 @@ public class RoundRobinUserResolver implements UserResolver {
   @Override
   public synchronized boolean setTargetUsers(URI userloc, Configuration conf)
   throws IOException {
+    uidx = 0;
     users = parseUserList(userloc, conf);
     if (users.size() == 0) {
       throw new IOException(buildEmptyUsersErrorMsg(userloc));
     }
-    usercache.keySet().retainAll(users);
+    usercache.clear();
     return true;
   }
 
@@ -105,20 +111,13 @@ public class RoundRobinUserResolver implements UserResolver {
   @Override
   public synchronized UserGroupInformation getTargetUgi(
     UserGroupInformation ugi) {
-    UserGroupInformation ret = usercache.get(ugi);
-    if (null == ret) {
-      ret = users.get(uidx++ % users.size());
-      usercache.put(ugi, ret);
+    // UGI of proxy user
+    UserGroupInformation targetUGI = usercache.get(ugi.getUserName());
+    if (null == targetUGI) {
+      targetUGI = users.get(uidx++ % users.size());
+      usercache.put(ugi.getUserName(), targetUGI);
     }
-    UserGroupInformation val = null;
-    try {
-      val = 
-        UserGroupInformation.createProxyUser(ret.getUserName(), 
-          UserGroupInformation.getLoginUser());
-    } catch (IOException e) {
-      LOG.error("Error while creating the proxy user " ,e);
-    }
-    return val;
+    return targetUGI;
   }
 
   /**

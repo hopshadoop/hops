@@ -80,6 +80,9 @@ Trunk (unreleased changes)
 
   BUG FIXES
 
+    MAPREDUCE-2417. Fix Gridmix in RoundRobinUserResolver mode to
+    map testing/proxy users to unique users in a trace.
+
     MAPREDUCE-2307. Exception thrown in Jobtracker logs, when the Scheduler
     configured is FairScheduler. (Devaraj K via matei)
 
