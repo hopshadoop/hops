@@ -630,6 +630,14 @@ public class MiniDFSCluster {
   }
 
   /**
+   * @return URI of the namenode from a single namenode MiniDFSCluster
+   */
+  public URI getURI() {
+    checkSingleNameNode();
+    return getURI(0);
+  }
+  
+  /**
    * @return URI of the given namenode in MiniDFSCluster
    */
   public URI getURI(int nnIndex) {

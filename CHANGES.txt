@@ -475,6 +475,9 @@ Trunk (unreleased changes)
     HDFS-1860. when renewing/canceling DelegationToken over http we need to
      pass exception information back to the caller.(boryas)
 
+    HDFS-1871. Mapreduce build fails due to MiniDFSCluster change from
+    HDFS-1052. (suresh)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES
