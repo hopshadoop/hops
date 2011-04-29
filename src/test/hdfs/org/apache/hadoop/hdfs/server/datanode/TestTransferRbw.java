@@ -29,11 +29,12 @@ import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DataTransferProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.FSConstants.DatanodeReportType;
 import org.apache.hadoop.hdfs.server.common.HdfsConstants.ReplicaState;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.log4j.Level;
 import org.junit.Assert;
 import org.junit.Test;
@@ -49,14 +50,14 @@ public class TestTransferRbw {
   private static final Random RAN = new Random();
   private static final short REPLICATION = (short)1;
 
-  private static ReplicaBeingWritten getRbw(final DataNode datanode
-      ) throws InterruptedException {
-    return (ReplicaBeingWritten)getReplica(datanode, ReplicaState.RBW);
+  private static ReplicaBeingWritten getRbw(final DataNode datanode,
+      String bpid) throws InterruptedException {
+    return (ReplicaBeingWritten)getReplica(datanode, bpid, ReplicaState.RBW);
   }
   private static ReplicaInPipeline getReplica(final DataNode datanode,
-      final ReplicaState expectedState) throws InterruptedException {
+      final String bpid, final ReplicaState expectedState) throws InterruptedException {
     final FSDataset dataset = ((FSDataset)datanode.data);
-    final Collection<ReplicaInfo> replicas = dataset.volumeMap.replicas();
+    final Collection<ReplicaInfo> replicas = dataset.volumeMap.replicas(bpid);
     for(int i = 0; i < 5 && replicas.size() == 0; i++) {
       LOG.info("wait since replicas.size() == 0; i=" + i);
       Thread.sleep(1000);
@@ -94,9 +95,10 @@ public class TestTransferRbw {
       final ReplicaBeingWritten oldrbw;
       final DataNode newnode;
       final DatanodeInfo newnodeinfo;
+      final String bpid = cluster.getNamesystem().getBlockPoolId();
       {
         final DataNode oldnode = cluster.getDataNodes().get(0);
-        oldrbw = getRbw(oldnode);
+        oldrbw = getRbw(oldnode, bpid);
         LOG.info("oldrbw = " + oldrbw);
         
         //add a datanode
@@ -109,15 +111,15 @@ public class TestTransferRbw {
               ).getDatanodeReport(DatanodeReportType.LIVE);
           Assert.assertEquals(2, datatnodeinfos.length);
           int i = 0;
-          for(; i < datatnodeinfos.length
-                && !datatnodeinfos[i].equals(newnode.dnRegistration); i++);
+          for(DatanodeRegistration dnReg = newnode.getDNRegistrationForBP(bpid);
+              i < datatnodeinfos.length && !datatnodeinfos[i].equals(dnReg); i++);
           Assert.assertTrue(i < datatnodeinfos.length);
           newnodeinfo = datatnodeinfos[i];
           oldnodeinfo = datatnodeinfos[1 - i];
         }
         
         //transfer RBW
-        final Block b = new Block(oldrbw.getBlockId(), oldrbw.getBytesAcked(),
+        final ExtendedBlock b = new ExtendedBlock(bpid, oldrbw.getBlockId(), oldrbw.getBytesAcked(),
             oldrbw.getGenerationStamp());
         final DataTransferProtocol.Status s = DFSTestUtil.transferRbw(
             b, fs.getClient(), oldnodeinfo, newnodeinfo);
@@ -125,7 +127,7 @@ public class TestTransferRbw {
       }
 
       //check new rbw
-      final ReplicaBeingWritten newrbw = getRbw(newnode);
+      final ReplicaBeingWritten newrbw = getRbw(newnode, bpid);
       LOG.info("newrbw = " + newrbw);
       Assert.assertEquals(oldrbw.getBlockId(), newrbw.getBlockId());
       Assert.assertEquals(oldrbw.getGenerationStamp(), newrbw.getGenerationStamp());

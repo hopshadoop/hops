@@ -34,6 +34,7 @@ function print_usage(){
   echo "  oiv                  apply the offline fsimage viewer to an fsimage"
   echo "  oev                  apply the offline edits viewer to an edits file"
   echo "  fetchdt              fetch a delegation token from the NameNode"
+  echo "  getconf              get config values from configuration"
   echo "						Use -help to see options"
   echo ""
   echo "Most commands print help when invoked w/o parameters."
@@ -94,6 +95,8 @@ elif [ "$COMMAND" = "oev" ] ; then
   CLASS=org.apache.hadoop.hdfs.tools.offlineEditsViewer.OfflineEditsViewer
 elif [ "$COMMAND" = "fetchdt" ] ; then
   CLASS=org.apache.hadoop.hdfs.tools.DelegationTokenFetcher
+elif [ "$COMMAND" = "getconf" ] ; then
+  CLASS=org.apache.hadoop.hdfs.tools.GetConf
 else
   echo $COMMAND - invalid command
   print_usage

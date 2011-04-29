@@ -98,7 +98,7 @@ public class TestDatanodeRestart {
       out.write(writeBuf);
       out.hflush();
       DataNode dn = cluster.getDataNodes().get(0);
-      for (FSVolume volume : ((FSDataset)dn.data).volumes.volumes) {
+      for (FSVolume volume : ((FSDataset)dn.data).volumes.getVolumes()) {
         File currentDir = volume.getDir().getParentFile();
         File rbwDir = new File(currentDir, "rbw");
         for (File file : rbwDir.listFiles()) {
@@ -112,16 +112,17 @@ public class TestDatanodeRestart {
       dn = cluster.getDataNodes().get(0);
 
       // check volumeMap: one rwr replica
+      String bpid = cluster.getNamesystem().getBlockPoolId();
       ReplicasMap replicas = ((FSDataset)(dn.data)).volumeMap;
-      Assert.assertEquals(1, replicas.size());
-      ReplicaInfo replica = replicas.replicas().iterator().next();
+      Assert.assertEquals(1, replicas.size(bpid));
+      ReplicaInfo replica = replicas.replicas(bpid).iterator().next();
       Assert.assertEquals(ReplicaState.RWR, replica.getState());
       if (isCorrupt) {
         Assert.assertEquals((fileLen-1)/512*512, replica.getNumBytes());
       } else {
         Assert.assertEquals(fileLen, replica.getNumBytes());
       }
-      dn.data.invalidate(new Block[]{replica});
+      dn.data.invalidate(bpid, new Block[]{replica});
     } finally {
       IOUtils.closeStream(out);
       if (fs.exists(src)) {
@@ -146,9 +147,10 @@ public class TestDatanodeRestart {
         DFSTestUtil.createFile(fs, fileName, 1, (short)1, 0L);
         DFSTestUtil.waitReplication(fs, fileName, (short)1);
       }
+      String bpid = cluster.getNamesystem().getBlockPoolId();
       DataNode dn = cluster.getDataNodes().get(0);
       Iterator<ReplicaInfo> replicasItor = 
-        ((FSDataset)dn.data).volumeMap.replicas().iterator();
+        ((FSDataset)dn.data).volumeMap.replicas(bpid).iterator();
       ReplicaInfo replica = replicasItor.next();
       createUnlinkTmpFile(replica, true, true); // rename block file
       createUnlinkTmpFile(replica, false, true); // rename meta file
@@ -165,7 +167,7 @@ public class TestDatanodeRestart {
 
       // check volumeMap: 4 finalized replica
       Collection<ReplicaInfo> replicas = 
-        ((FSDataset)(dn.data)).volumeMap.replicas();
+        ((FSDataset)(dn.data)).volumeMap.replicas(bpid);
       Assert.assertEquals(4, replicas.size());
       replicasItor = replicas.iterator();
       while (replicasItor.hasNext()) {

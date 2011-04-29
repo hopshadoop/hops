@@ -31,7 +31,7 @@ import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.SecretManager;
@@ -174,7 +174,7 @@ public class BlockTokenSecretManager extends
   }
 
   /** Generate an block token for current user */
-  public Token<BlockTokenIdentifier> generateToken(Block block,
+  public Token<BlockTokenIdentifier> generateToken(ExtendedBlock block,
       EnumSet<AccessMode> modes) throws IOException {
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     String userID = (ugi == null ? null : ugi.getShortUserName());
@@ -182,10 +182,10 @@ public class BlockTokenSecretManager extends
   }
 
   /** Generate a block token for a specified user */
-  public Token<BlockTokenIdentifier> generateToken(String userId, Block block,
-      EnumSet<AccessMode> modes) throws IOException {
+  public Token<BlockTokenIdentifier> generateToken(String userId,
+      ExtendedBlock block, EnumSet<AccessMode> modes) throws IOException {
     BlockTokenIdentifier id = new BlockTokenIdentifier(userId, block
-        .getBlockId(), modes);
+        .getBlockPoolId(), block.getBlockId(), modes);
     return new Token<BlockTokenIdentifier>(id, this);
   }
 
@@ -194,8 +194,8 @@ public class BlockTokenSecretManager extends
    * method doesn't check if token password is correct. It should be used only
    * when token password has already been verified (e.g., in the RPC layer).
    */
-  public void checkAccess(BlockTokenIdentifier id, String userId, Block block,
-      AccessMode mode) throws InvalidToken {
+  public void checkAccess(BlockTokenIdentifier id, String userId,
+      ExtendedBlock block, AccessMode mode) throws InvalidToken {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Checking access for user=" + userId + ", block=" + block
           + ", access mode=" + mode + " using " + id.toString());
@@ -203,6 +203,10 @@ public class BlockTokenSecretManager extends
     if (userId != null && !userId.equals(id.getUserId())) {
       throw new InvalidToken("Block token with " + id.toString()
           + " doesn't belong to user " + userId);
+    }
+    if (!id.getBlockPoolId().equals(block.getBlockPoolId())) {
+      throw new InvalidToken("Block token with " + id.toString()
+          + " doesn't apply to block " + block);
     }
     if (id.getBlockId() != block.getBlockId()) {
       throw new InvalidToken("Block token with " + id.toString()
@@ -220,7 +224,7 @@ public class BlockTokenSecretManager extends
 
   /** Check if access should be allowed. userID is not checked if null */
   public void checkAccess(Token<BlockTokenIdentifier> token, String userId,
-      Block block, AccessMode mode) throws InvalidToken {
+      ExtendedBlock block, AccessMode mode) throws InvalidToken {
     BlockTokenIdentifier id = new BlockTokenIdentifier();
     try {
       id.readFields(new DataInputStream(new ByteArrayInputStream(token

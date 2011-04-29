@@ -24,6 +24,7 @@ import java.util.Date;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableFactories;
@@ -48,6 +49,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
   protected long capacity;
   protected long dfsUsed;
   protected long remaining;
+  protected long blockPoolUsed;
   protected long lastUpdate;
   protected int xceiverCount;
   protected String location = NetworkTopology.DEFAULT_RACK;
@@ -89,6 +91,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
     this.capacity = from.getCapacity();
     this.dfsUsed = from.getDfsUsed();
     this.remaining = from.getRemaining();
+    this.blockPoolUsed = from.getBlockPoolUsed();
     this.lastUpdate = from.getLastUpdate();
     this.xceiverCount = from.getXceiverCount();
     this.location = from.getNetworkLocation();
@@ -101,6 +104,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
     this.capacity = 0L;
     this.dfsUsed = 0L;
     this.remaining = 0L;
+    this.blockPoolUsed = 0L;
     this.lastUpdate = 0L;
     this.xceiverCount = 0;
     this.adminState = null;    
@@ -118,6 +122,9 @@ public class DatanodeInfo extends DatanodeID implements Node {
   /** The used space by the data node. */
   public long getDfsUsed() { return dfsUsed; }
 
+  /** The used space by the block pool on data node. */
+  public long getBlockPoolUsed() { return blockPoolUsed; }
+
   /** The used space by the data node. */
   public long getNonDfsUsed() { 
     long nonDFSUsed = capacity - dfsUsed - remaining;
@@ -126,23 +133,20 @@ public class DatanodeInfo extends DatanodeID implements Node {
 
   /** The used space by the data node as percentage of present capacity */
   public float getDfsUsedPercent() { 
-    if (capacity <= 0) {
-      return 100;
-    }
-
-    return ((float)dfsUsed * 100.0f)/(float)capacity; 
+    return DFSUtil.getPercentUsed(dfsUsed, capacity);
   }
 
   /** The raw free space. */
   public long getRemaining() { return remaining; }
 
+  /** Used space by the block pool as percentage of present capacity */
+  public float getBlockPoolUsedPercent() {
+    return DFSUtil.getPercentUsed(blockPoolUsed, capacity);
+  }
+  
   /** The remaining space as percentage of configured capacity. */
   public float getRemainingPercent() { 
-    if (capacity <= 0) {
-      return 0;
-    }
-
-    return ((float)remaining * 100.0f)/(float)capacity; 
+    return DFSUtil.getPercentRemaining(remaining, capacity);
   }
 
   /** The time when this information was accurate. */
@@ -159,6 +163,11 @@ public class DatanodeInfo extends DatanodeID implements Node {
   /** Sets raw free space. */
   public void setRemaining(long remaining) { 
     this.remaining = remaining; 
+  }
+
+  /** Sets block pool used space */
+  public void setBlockPoolUsed(long bpUsed) { 
+    this.blockPoolUsed = bpUsed; 
   }
 
   /** Sets time when this information was accurate. */
@@ -342,6 +351,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
     out.writeLong(capacity);
     out.writeLong(dfsUsed);
     out.writeLong(remaining);
+    out.writeLong(blockPoolUsed);
     out.writeLong(lastUpdate);
     out.writeInt(xceiverCount);
     Text.writeString(out, location);
@@ -359,6 +369,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
     this.capacity = in.readLong();
     this.dfsUsed = in.readLong();
     this.remaining = in.readLong();
+    this.blockPoolUsed = in.readLong();
     this.lastUpdate = in.readLong();
     this.xceiverCount = in.readInt();
     this.location = Text.readString(in);

@@ -18,31 +18,33 @@
 package org.apache.hadoop.hdfs.server.datanode;
 
 import java.io.IOException;
+import java.util.List;
+
 import org.apache.hadoop.hdfs.server.datanode.FSDataset.FSVolume;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 
 public class RoundRobinVolumesPolicy implements BlockVolumeChoosingPolicy {
 
-  int curVolume = 0;
+  private int curVolume = 0;
 
   @Override
-  public synchronized FSVolume chooseVolume(FSVolume[] volumes, long blockSize)
+  public synchronized FSVolume chooseVolume(List<FSVolume> volumes, long blockSize)
       throws IOException {
-    if(volumes.length < 1) {
+    if(volumes.size() < 1) {
       throw new DiskOutOfSpaceException("No more available volumes");
     }
     
     // since volumes could've been removed because of the failure
     // make sure we are not out of bounds
-    if(curVolume >= volumes.length) {
+    if(curVolume >= volumes.size()) {
       curVolume = 0;
     }
     
     int startVolume = curVolume;
     
     while (true) {
-      FSVolume volume = volumes[curVolume];
-      curVolume = (curVolume + 1) % volumes.length;
+      FSVolume volume = volumes.get(curVolume);
+      curVolume = (curVolume + 1) % volumes.size();
       if (volume.getAvailable() > blockSize) { return volume; }
       if (curVolume == startVolume) {
         throw new DiskOutOfSpaceException("Insufficient space for an additional block");

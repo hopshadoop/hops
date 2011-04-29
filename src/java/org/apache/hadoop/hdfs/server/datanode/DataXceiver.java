@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
-import static org.apache.hadoop.hdfs.protocol.DataTransferProtocol.Status.CHECKSUM_OK;
 import static org.apache.hadoop.hdfs.protocol.DataTransferProtocol.Status.ERROR;
 import static org.apache.hadoop.hdfs.protocol.DataTransferProtocol.Status.ERROR_ACCESS_TOKEN;
 import static org.apache.hadoop.hdfs.protocol.DataTransferProtocol.Status.SUCCESS;
@@ -36,15 +35,16 @@ import java.net.SocketException;
 import java.util.Arrays;
 
 import org.apache.commons.logging.Log;
-import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DataTransferProtocol;
 import org.apache.hadoop.hdfs.protocol.DataTransferProtocol.BlockConstructionStage;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.FSConstants;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager;
 import org.apache.hadoop.hdfs.server.common.HdfsConstants;
 import org.apache.hadoop.hdfs.server.datanode.FSDatasetInterface.MetaDataInputStream;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.io.Text;
@@ -130,10 +130,10 @@ class DataXceiver extends DataTransferProtocol.Receiver
       opStartTime = now();
       processOp(op, in);
     } catch (Throwable t) {
-      LOG.error(datanode.dnRegistration + ":DataXceiver",t);
+      LOG.error(datanode.getMachineName() + ":DataXceiver",t);
     } finally {
       if (LOG.isDebugEnabled()) {
-        LOG.debug(datanode.dnRegistration + ":Number of active connections is: "
+        LOG.debug(datanode.getMachineName() + ":Number of active connections is: "
             + datanode.getXceiverCount());
       }
       updateCurrentThreadName("Cleaning up");
@@ -147,7 +147,7 @@ class DataXceiver extends DataTransferProtocol.Receiver
    * Read a block from the disk.
    */
   @Override
-  protected void opReadBlock(DataInputStream in, Block block,
+  protected void opReadBlock(DataInputStream in, ExtendedBlock block,
       long startOffset, long length, String clientName,
       Token<BlockTokenIdentifier> blockToken) throws IOException {
     OutputStream baseStream = NetUtils.getOutputStream(s, 
@@ -160,12 +160,14 @@ class DataXceiver extends DataTransferProtocol.Receiver
   
     // send the block
     BlockSender blockSender = null;
+    DatanodeRegistration dnR = 
+      datanode.getDNRegistrationForBP(block.getBlockPoolId());
     final String clientTraceFmt =
       clientName.length() > 0 && ClientTraceLog.isInfoEnabled()
         ? String.format(DN_CLIENTTRACE_FORMAT, localAddress, remoteAddress,
             "%d", "HDFS_READ", clientName, "%d",
-            datanode.dnRegistration.getStorageID(), block, "%d")
-        : datanode.dnRegistration + " Served block " + block + " to " +
+            dnR.getStorageID(), block, "%d")
+        : dnR + " Served block " + block + " to " +
             s.getInetAddress();
 
     updateCurrentThreadName("Sending block " + block);
@@ -180,18 +182,6 @@ class DataXceiver extends DataTransferProtocol.Receiver
 
       SUCCESS.write(out); // send op status
       long read = blockSender.sendBlock(out, baseStream, null); // send data
-
-      // If client verification succeeded, and if it's for the whole block,
-      // tell the DataBlockScanner that it's good. This is an optional response
-      // from the client. If absent, we close the connection (which is what we
-      // always do anyways).
-      try {
-        if (DataTransferProtocol.Status.read(in) == CHECKSUM_OK) {
-          if (blockSender.isBlockReadFully() && datanode.blockScanner != null) {
-            datanode.blockScanner.verifiedByClient(block);
-          }
-        }
-      } catch (IOException ignored) {}
       
       datanode.myMetrics.bytesRead.inc((int) read);
       datanode.myMetrics.blocksRead.inc();
@@ -202,7 +192,7 @@ class DataXceiver extends DataTransferProtocol.Receiver
       /* What exactly should we do here?
        * Earlier version shutdown() datanode if there is disk error.
        */
-      LOG.warn(datanode.dnRegistration +  ":Got exception while serving " + 
+      LOG.warn(dnR +  ":Got exception while serving " + 
           block + " to " +
                 s.getInetAddress() + ":\n" + 
                 StringUtils.stringifyException(ioe) );
@@ -222,7 +212,7 @@ class DataXceiver extends DataTransferProtocol.Receiver
    * Write a block to disk.
    */
   @Override
-  protected void opWriteBlock(final DataInputStream in, final Block block, 
+  protected void opWriteBlock(final DataInputStream in, final ExtendedBlock block, 
       final int pipelineSize, final BlockConstructionStage stage,
       final long newGs, final long minBytesRcvd, final long maxBytesRcvd,
       final String clientname, final DatanodeInfo srcDataNode,
@@ -257,8 +247,7 @@ class DataXceiver extends DataTransferProtocol.Receiver
     // We later mutate block's generation stamp and length, but we need to
     // forward the original version of the block to downstream mirrors, so
     // make a copy here.
-    final Block originalBlock = new Block(block);
-
+    final ExtendedBlock originalBlock = new ExtendedBlock(block);
     block.setNumBytes(dataXceiverServer.estimateBlockSize);
     LOG.info("Receiving block " + block + 
              " src: " + remoteAddress +
@@ -352,7 +341,7 @@ class DataXceiver extends DataTransferProtocol.Receiver
           if (isClient) {
             throw e;
           } else {
-            LOG.info(datanode.dnRegistration + ":Exception transfering block " +
+            LOG.info(datanode + ":Exception transfering block " +
                      block + " to mirror " + mirrorNode +
                      ". continuing without the mirror.\n" +
                      StringUtils.stringifyException(e));
@@ -427,7 +416,7 @@ class DataXceiver extends DataTransferProtocol.Receiver
 
   @Override
   protected void opTransferBlock(final DataInputStream in,
-      final Block blk, final String client,
+      final ExtendedBlock blk, final String client,
       final DatanodeInfo[] targets,
       final Token<BlockTokenIdentifier> blockToken) throws IOException {
     checkAccess(null, true, blk, blockToken,
@@ -450,14 +439,13 @@ class DataXceiver extends DataTransferProtocol.Receiver
    * Get block checksum (MD5 of CRC32).
    */
   @Override
-  protected void opBlockChecksum(DataInputStream in, Block block,
+  protected void opBlockChecksum(DataInputStream in, ExtendedBlock block,
       Token<BlockTokenIdentifier> blockToken) throws IOException {
     final DataOutputStream out = new DataOutputStream(
         NetUtils.getOutputStream(s, datanode.socketWriteTimeout));
     checkAccess(out, true, block, blockToken,
         DataTransferProtocol.Op.BLOCK_CHECKSUM,
         BlockTokenSecretManager.AccessMode.READ);
-
     updateCurrentThreadName("Reading metadata for block " + block);
     final MetaDataInputStream metadataIn = 
       datanode.data.getMetaDataInputStream(block);
@@ -501,13 +489,13 @@ class DataXceiver extends DataTransferProtocol.Receiver
    * Read a block from the disk and then sends it to a destination.
    */
   @Override
-  protected void opCopyBlock(DataInputStream in, Block block,
+  protected void opCopyBlock(DataInputStream in, ExtendedBlock block,
       Token<BlockTokenIdentifier> blockToken) throws IOException {
     updateCurrentThreadName("Copying block " + block);
     // Read in the header
     if (datanode.isBlockTokenEnabled) {
       try {
-        datanode.blockTokenSecretManager.checkAccess(blockToken, null, block,
+        datanode.blockPoolTokenSecretManager.checkAccess(blockToken, null, block,
             BlockTokenSecretManager.AccessMode.COPY);
       } catch (InvalidToken e) {
         LOG.warn("Invalid access token in request from " + remoteAddress
@@ -577,7 +565,7 @@ class DataXceiver extends DataTransferProtocol.Receiver
    */
   @Override
   protected void opReplaceBlock(DataInputStream in,
-      Block block, String sourceID, DatanodeInfo proxySource,
+      ExtendedBlock block, String sourceID, DatanodeInfo proxySource,
       Token<BlockTokenIdentifier> blockToken) throws IOException {
     updateCurrentThreadName("Replacing block " + block + " from " + sourceID);
 
@@ -585,7 +573,7 @@ class DataXceiver extends DataTransferProtocol.Receiver
     block.setNumBytes(dataXceiverServer.estimateBlockSize);
     if (datanode.isBlockTokenEnabled) {
       try {
-        datanode.blockTokenSecretManager.checkAccess(blockToken, null, block,
+        datanode.blockPoolTokenSecretManager.checkAccess(blockToken, null, block,
             BlockTokenSecretManager.AccessMode.REPLACE);
       } catch (InvalidToken e) {
         LOG.warn("Invalid access token in request from " + remoteAddress
@@ -713,13 +701,13 @@ class DataXceiver extends DataTransferProtocol.Receiver
   }
 
   private void checkAccess(DataOutputStream out, final boolean reply, 
-      final Block blk,
+      final ExtendedBlock blk,
       final Token<BlockTokenIdentifier> t,
       final DataTransferProtocol.Op op,
       final BlockTokenSecretManager.AccessMode mode) throws IOException {
     if (datanode.isBlockTokenEnabled) {
       try {
-        datanode.blockTokenSecretManager.checkAccess(t, null, blk, mode);
+        datanode.blockPoolTokenSecretManager.checkAccess(t, null, blk, mode);
       } catch(InvalidToken e) {
         try {
           if (reply) {
@@ -729,7 +717,9 @@ class DataXceiver extends DataTransferProtocol.Receiver
             }
             ERROR_ACCESS_TOKEN.write(out);
             if (mode == BlockTokenSecretManager.AccessMode.WRITE) {
-              Text.writeString(out, datanode.dnRegistration.getName());
+              DatanodeRegistration dnR = 
+                datanode.getDNRegistrationForBP(blk.getBlockPoolId());
+              Text.writeString(out, dnR.getName());
             }
             out.flush();
           }

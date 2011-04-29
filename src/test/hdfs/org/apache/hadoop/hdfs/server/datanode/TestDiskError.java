@@ -51,7 +51,6 @@ public class TestDiskError {
   private FileSystem fs;
   private MiniDFSCluster cluster;
   private Configuration conf;
-  private String dataDir;
 
   @Before
   public void setUp() throws Exception {
@@ -60,7 +59,6 @@ public class TestDiskError {
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
     cluster.waitActive();
     fs = cluster.getFileSystem();
-    dataDir = cluster.getDataDirectory();
   }
 
   @After
@@ -86,8 +84,11 @@ public class TestDiskError {
     cluster.startDataNodes(conf, 2, true, null, null);
     cluster.waitActive();
     final int dnIndex = 0;
-    File dir1 = new File(new File(dataDir, "data"+(2*dnIndex+1)), "current/rbw");
-    File dir2 = new File(new File(dataDir, "data"+(2*dnIndex+2)), "current/rbw");
+    String bpid = cluster.getNamesystem().getBlockPoolId();
+    File storageDir = MiniDFSCluster.getStorageDir(dnIndex, 0);
+    File dir1 = MiniDFSCluster.getRbwDir(storageDir, bpid);
+    storageDir = MiniDFSCluster.getStorageDir(dnIndex, 1);
+    File dir2 = MiniDFSCluster.getRbwDir(storageDir, bpid);
     try {
       // make the data directory of the first datanode to be readonly
       assertTrue("Couldn't chmod local vol", dir1.setReadOnly());
@@ -95,7 +96,7 @@ public class TestDiskError {
 
       // create files and make sure that first datanode will be down
       DataNode dn = cluster.getDataNodes().get(dnIndex);
-      for (int i=0; DataNode.isDatanodeUp(dn); i++) {
+      for (int i=0; dn.isDatanodeUp(); i++) {
         Path fileName = new Path("/test.txt"+i);
         DFSTestUtil.createFile(fs, fileName, 1024, (short)2, 1L);
         DFSTestUtil.waitReplication(fs, fileName, (short)2);
@@ -152,9 +153,11 @@ public class TestDiskError {
     out.close();
 
     // the temporary block & meta files should be deleted
-    String dataDir = cluster.getDataDirectory();
-    File dir1 = new File(new File(dataDir, "data"+(2*sndNode+1)), "current/rbw");
-    File dir2 = new File(new File(dataDir, "data"+(2*sndNode+2)), "current/rbw");
+    String bpid = cluster.getNamesystem().getBlockPoolId();
+    File storageDir = MiniDFSCluster.getStorageDir(sndNode, 0);
+    File dir1 = MiniDFSCluster.getRbwDir(storageDir, bpid);
+    storageDir = MiniDFSCluster.getStorageDir(sndNode, 1);
+    File dir2 = MiniDFSCluster.getRbwDir(storageDir, bpid);
     while (dir1.listFiles().length != 0 || dir2.listFiles().length != 0) {
       Thread.sleep(100);
     }

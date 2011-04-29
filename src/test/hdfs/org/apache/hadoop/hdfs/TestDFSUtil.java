@@ -28,7 +28,7 @@ import java.util.List;
 
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
-import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.fs.BlockLocation;
 
@@ -43,11 +43,11 @@ public class TestDFSUtil {
     ds[0] = d;
 
     // ok
-    Block b1 = new Block(1, 1, 1);
+    ExtendedBlock b1 = new ExtendedBlock("bpid", 1, 1, 1);
     LocatedBlock l1 = new LocatedBlock(b1, ds, 0, false);
 
     // corrupt
-    Block b2 = new Block(2, 1, 1);
+    ExtendedBlock b2 = new ExtendedBlock("bpid", 2, 1, 1);
     LocatedBlock l2 = new LocatedBlock(b2, ds, 0, true);
 
     List<LocatedBlock> ls = Arrays.asList(l1, l2);

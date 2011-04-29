@@ -64,7 +64,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.protocol.AlreadyBeingCreatedException;
-import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.ClientDatanodeProtocol;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.CorruptFileBlocks;
@@ -197,7 +197,7 @@ public class DFSClient implements FSConstants, java.io.Closeable {
       ClientDatanodeProtocol.LOG.debug("ClientDatanodeProtocol addr=" + addr);
     }
     UserGroupInformation ticket = UserGroupInformation
-        .createRemoteUser(locatedBlock.getBlock().toString());
+        .createRemoteUser(locatedBlock.getBlock().getLocalBlock().toString());
     ticket.addToken(locatedBlock.getBlockToken());
     return (ClientDatanodeProtocol)RPC.getProxy(ClientDatanodeProtocol.class,
         ClientDatanodeProtocol.versionID, addr, ticket, conf, NetUtils
@@ -979,7 +979,7 @@ public class DFSClient implements FSConstants, java.io.Closeable {
         refetchBlocks = false;
       }
       LocatedBlock lb = locatedblocks.get(i);
-      final Block block = lb.getBlock();
+      final ExtendedBlock block = lb.getBlock();
       final DatanodeInfo[] datanodes = lb.getLocations();
       
       //try each datanode location of the block
@@ -1589,7 +1589,7 @@ public class DFSClient implements FSConstants, java.io.Closeable {
     /**
      * Returns the block containing the target position. 
      */
-    public Block getCurrentBlock() {
+    public ExtendedBlock getCurrentBlock() {
       return ((DFSInputStream)in).getCurrentBlock();
     }
 
@@ -1608,7 +1608,7 @@ public class DFSClient implements FSConstants, java.io.Closeable {
     }
   }
 
-  void reportChecksumFailure(String file, Block blk, DatanodeInfo dn) {
+  void reportChecksumFailure(String file, ExtendedBlock blk, DatanodeInfo dn) {
     DatanodeInfo [] dnArr = { dn };
     LocatedBlock [] lblocks = { new LocatedBlock(blk, dnArr) };
     reportChecksumFailure(file, lblocks);

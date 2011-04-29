@@ -18,33 +18,41 @@
 package org.apache.hadoop.hdfs.server.balancer;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeoutException;
 
+import junit.framework.TestCase;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSClient;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
-import org.apache.hadoop.hdfs.protocol.LocatedBlock;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.FSConstants.DatanodeReportType;
+import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.server.datanode.SimulatedFSDataset;
-import org.apache.hadoop.hdfs.DFSConfigKeys;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.mortbay.log.Log;
+import org.apache.hadoop.hdfs.server.namenode.NameNode;
 
-import junit.framework.TestCase;
 /**
  * This class tests if a balancer schedules tasks correctly.
  */
 public class TestBalancer extends TestCase {
+  private static final Log LOG = LogFactory.getLog(
+  "org.apache.hadoop.hdfs.TestReplication");
+  
   final private static long CAPACITY = 500L;
   final private static String RACK0 = "/rack0";
   final private static String RACK1 = "/rack1";
@@ -59,14 +67,13 @@ public class TestBalancer extends TestCase {
   static final double CAPACITY_ALLOWED_VARIANCE = 0.005;  // 0.5%
   static final double BALANCE_ALLOWED_VARIANCE = 0.11;    // 10%+delta
   static final int DEFAULT_BLOCK_SIZE = 10;
-  private Balancer balancer;
-  private Random r = new Random();
+  private static final Random r = new Random();
 
   static {
     Balancer.setBlockMoveWaitTime(1000L) ;
   }
 
-  private void initConf(Configuration conf) {
+  static void initConf(Configuration conf) {
     conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, DEFAULT_BLOCK_SIZE);
     conf.setInt(DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY, DEFAULT_BLOCK_SIZE);
     conf.setLong(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY, 1L);
@@ -87,7 +94,8 @@ public class TestBalancer extends TestCase {
   /* fill up a cluster with <code>numNodes</code> datanodes 
    * whose used space to be <code>size</code>
    */
-  private Block[] generateBlocks(Configuration conf, long size, short numNodes) throws IOException {
+  private ExtendedBlock[] generateBlocks(Configuration conf, long size,
+      short numNodes) throws IOException {
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(numNodes).build();
     try {
       cluster.waitActive();
@@ -101,10 +109,11 @@ public class TestBalancer extends TestCase {
       getBlockLocations(fileName, 0, fileLen).getLocatedBlocks();
 
       int numOfBlocks = locatedBlocks.size();
-      Block[] blocks = new Block[numOfBlocks];
+      ExtendedBlock[] blocks = new ExtendedBlock[numOfBlocks];
       for(int i=0; i<numOfBlocks; i++) {
-        Block b = locatedBlocks.get(i).getBlock();
-        blocks[i] = new Block(b.getBlockId(), b.getNumBytes(), b.getGenerationStamp());
+        ExtendedBlock b = locatedBlocks.get(i).getBlock();
+        blocks[i] = new ExtendedBlock(b.getBlockPoolId(), b.getBlockId(), b
+            .getNumBytes(), b.getGenerationStamp());
       }
 
       return blocks;
@@ -114,8 +123,8 @@ public class TestBalancer extends TestCase {
   }
 
   /* Distribute all blocks according to the given distribution */
-  Block[][] distributeBlocks(Block[] blocks, short replicationFactor, 
-      final long[] distribution ) {
+  static Block[][] distributeBlocks(ExtendedBlock[] blocks,
+      short replicationFactor, final long[] distribution) {
     // make a copy
     long[] usedSpace = new long[distribution.length];
     System.arraycopy(distribution, 0, usedSpace, 0, distribution.length);
@@ -133,7 +142,7 @@ public class TestBalancer extends TestCase {
           int chosenIndex = r.nextInt(usedSpace.length);
           if( usedSpace[chosenIndex]>0 ) {
             notChosen = false;
-            blockReports.get(chosenIndex).add(blocks[i]);
+            blockReports.get(chosenIndex).add(blocks[i].getLocalBlock());
             usedSpace[chosenIndex] -= blocks[i].getNumBytes();
           }
         }
@@ -144,6 +153,14 @@ public class TestBalancer extends TestCase {
       results[i] = nodeBlockList.toArray(new Block[nodeBlockList.size()]);
     }
     return results;
+  }
+
+  static long sum(long[] x) {
+    long s = 0L;
+    for(long a : x) {
+      s += a;
+    }
+    return s;
   }
 
   /* we first start a cluster and fill the cluster up to a certain size.
@@ -158,13 +175,11 @@ public class TestBalancer extends TestCase {
     }
 
     // calculate total space that need to be filled
-    long totalUsedSpace=0L;
-    for(int i=0; i<distribution.length; i++) {
-      totalUsedSpace += distribution[i];
-    }
+    final long totalUsedSpace = sum(distribution);
 
     // fill the cluster
-    Block[] blocks = generateBlocks(conf, totalUsedSpace, (short)numDatanodes);
+    ExtendedBlock[] blocks = generateBlocks(conf, totalUsedSpace,
+        (short) numDatanodes);
 
     // redistribute blocks
     Block[][] blocksDN = distributeBlocks(
@@ -183,10 +198,7 @@ public class TestBalancer extends TestCase {
     for(int i = 0; i < blocksDN.length; i++)
       cluster.injectBlocks(i, Arrays.asList(blocksDN[i]));
 
-    long totalCapacity = 0L;
-    for(long capacity:capacities) {
-      totalCapacity += capacity;
-    }
+    final long totalCapacity = sum(capacities);
     runBalancer(conf, totalUsedSpace, totalCapacity);
     cluster.shutdown();
   }
@@ -295,10 +307,8 @@ public class TestBalancer extends TestCase {
       cluster.waitActive();
       client = DFSClient.createNamenode(conf);
 
-      long totalCapacity=0L;
-      for(long capacity:capacities) {
-        totalCapacity += capacity;
-      }
+      long totalCapacity = sum(capacities);
+      
       // fill up the cluster to be 30% full
       long totalUsedSpace = totalCapacity*3/10;
       createFile(totalUsedSpace/numOfDatanodes, (short)numOfDatanodes);
@@ -315,31 +325,18 @@ public class TestBalancer extends TestCase {
     }
   }
 
-  /* Start balancer and check if the cluster is balanced after the run */
-  private void runBalancer(Configuration conf, long totalUsedSpace, long totalCapacity )
-  throws Exception {
-    waitForHeartBeat(totalUsedSpace, totalCapacity);
-
-    // start rebalancing
-    balancer = new Balancer(conf);
-    balancer.run(new String[0]);
-
-    waitForHeartBeat(totalUsedSpace, totalCapacity);
-    Log.info("Rebalancing.");
-    waitForBalancer(totalUsedSpace, totalCapacity);
-  }
-
-  private void runBalancerDefaultConstructor(Configuration conf,
+  private void runBalancer(Configuration conf,
       long totalUsedSpace, long totalCapacity) throws Exception {
     waitForHeartBeat(totalUsedSpace, totalCapacity);
 
     // start rebalancing
-    balancer = new Balancer();
-    balancer.setConf(conf);
-    balancer.run(new String[0]);
+    final List<InetSocketAddress> namenodes =new ArrayList<InetSocketAddress>();
+    namenodes.add(NameNode.getServiceAddress(conf, true));
+    final int r = Balancer.run(namenodes, Balancer.Parameters.DEFALUT, conf);
+    assertEquals(Balancer.ReturnStatus.SUCCESS.code, r);
 
     waitForHeartBeat(totalUsedSpace, totalCapacity);
-    Log.info("Rebalancing with default ctor.");
+    LOG.info("Rebalancing with default ctor.");
     waitForBalancer(totalUsedSpace, totalCapacity);
   }
   
@@ -401,10 +398,8 @@ public class TestBalancer extends TestCase {
       cluster.waitActive();
       client = DFSClient.createNamenode(conf);
 
-      long totalCapacity = 0L;
-      for (long capacity : capacities) {
-        totalCapacity += capacity;
-      }
+      long totalCapacity = sum(capacities);
+
       // fill up the cluster to be 30% full
       long totalUsedSpace = totalCapacity * 3 / 10;
       createFile(totalUsedSpace / numOfDatanodes, (short) numOfDatanodes);
@@ -415,7 +410,7 @@ public class TestBalancer extends TestCase {
       totalCapacity += newCapacity;
 
       // run balancer and validate results
-      runBalancerDefaultConstructor(conf, totalUsedSpace, totalCapacity);
+      runBalancer(conf, totalUsedSpace, totalCapacity);
     } finally {
       cluster.shutdown();
     }

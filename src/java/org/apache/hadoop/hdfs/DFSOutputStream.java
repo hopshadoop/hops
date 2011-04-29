@@ -45,7 +45,6 @@ import org.apache.hadoop.fs.ParentNotDirectoryException;
 import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.DSQuotaExceededException;
 import org.apache.hadoop.hdfs.protocol.DataTransferProtocol;
@@ -53,6 +52,7 @@ import org.apache.hadoop.hdfs.protocol.DataTransferProtocol.BlockConstructionSta
 import org.apache.hadoop.hdfs.protocol.DataTransferProtocol.PacketHeader;
 import org.apache.hadoop.hdfs.protocol.DataTransferProtocol.PipelineAck;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.NSQuotaExceededException;
@@ -282,7 +282,7 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
   //
   class DataStreamer extends Daemon {
     private volatile boolean streamerClosed = false;
-    private Block block; // its length is number of bytes acked
+    private ExtendedBlock block; // its length is number of bytes acked
     private Token<BlockTokenIdentifier> accessToken;
     private DataOutputStream blockStream;
     private DataInputStream blockReplyStream;
@@ -929,8 +929,8 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
 
       if (success) {
         // update pipeline at the namenode
-        Block newBlock = new Block(
-            block.getBlockId(), block.getNumBytes(), newGS);
+        ExtendedBlock newBlock = new ExtendedBlock(
+            block.getBlockPoolId(), block.getBlockId(), block.getNumBytes(), newGS);
         dfsClient.namenode.updatePipeline(dfsClient.clientName, block, newBlock, nodes);
         // update client side generation stamp
         block = newBlock;
@@ -1015,8 +1015,8 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
         blockReplyStream = new DataInputStream(NetUtils.getInputStream(s));
 
         // send the request
-        DataTransferProtocol.Sender.opWriteBlock(out, block, nodes.length,
-            recoveryFlag ? stage.getRecoveryStage() : stage, newGS, 
+        DataTransferProtocol.Sender.opWriteBlock(out, block,
+            nodes.length, recoveryFlag ? stage.getRecoveryStage() : stage, newGS, 
             block.getNumBytes(), bytesSent, dfsClient.clientName, null, nodes,
             accessToken);
         checksum.writeHeader(out);
@@ -1120,7 +1120,7 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
       } 
     }
 
-    Block getBlock() {
+    ExtendedBlock getBlock() {
       return block;
     }
 
@@ -1636,7 +1636,7 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
 
       flushInternal();             // flush all data to Datanodes
       // get last block before destroying the streamer
-      Block lastBlock = streamer.getBlock();
+      ExtendedBlock lastBlock = streamer.getBlock();
       closeThreads(false);
       completeFile(lastBlock);
       dfsClient.leasechecker.remove(src);
@@ -1647,7 +1647,7 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
 
   // should be called holding (this) lock since setTestFilename() may 
   // be called during unit tests
-  private void completeFile(Block last) throws IOException {
+  private void completeFile(ExtendedBlock last) throws IOException {
     long localstart = System.currentTimeMillis();
     boolean fileComplete = false;
     while (!fileComplete) {

@@ -33,12 +33,13 @@ import org.apache.hadoop.hdfs.BlockReader;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.server.common.HdfsConstants;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.net.NetUtils;
 
@@ -119,7 +120,8 @@ public class TestDataNodeVolumeFailure {
     // fail the volume
     // delete/make non-writable one of the directories (failed volume)
     data_fail = new File(dataDir, "data3");
-    failedDir = new File(data_fail, MiniDFSCluster.FINALIZED_DIR_NAME);
+    failedDir = MiniDFSCluster.getFinalizedDir(dataDir, 
+        cluster.getNamesystem().getBlockPoolId());
     if (failedDir.exists() &&
         //!FileUtil.fullyDelete(failedDir)
         !deteteBlocks(failedDir)
@@ -137,8 +139,10 @@ public class TestDataNodeVolumeFailure {
     
     // make sure a block report is sent 
     DataNode dn = cluster.getDataNodes().get(1); //corresponds to dir data3
-    long[] bReport = dn.getFSDataset().getBlockReport().getBlockListAsLongs();
-    cluster.getNameNode().blockReport(dn.dnRegistration, bReport);
+    String bpid = cluster.getNamesystem().getBlockPoolId();
+    DatanodeRegistration dnR = dn.getDNRegistrationForBP(bpid);
+    long[] bReport = dn.getFSDataset().getBlockReport(bpid).getBlockListAsLongs();
+    cluster.getNameNode().blockReport(dnR, bpid, bReport);
 
     // verify number of blocks and files...
     verify(filename, filesize);
@@ -216,7 +220,7 @@ public class TestDataNodeVolumeFailure {
     
     for (LocatedBlock lb : locatedBlocks) {
       DatanodeInfo dinfo = lb.getLocations()[1];
-      Block b = lb.getBlock();
+      ExtendedBlock b = lb.getBlock();
       try {
         accessBlock(dinfo, lb);
       } catch (IOException e) {
@@ -254,8 +258,7 @@ public class TestDataNodeVolumeFailure {
     throws IOException {
     InetSocketAddress targetAddr = null;
     Socket s = null;
-    BlockReader blockReader = null; 
-    Block block = lblock.getBlock(); 
+    ExtendedBlock block = lblock.getBlock(); 
    
     targetAddr = NetUtils.createSocketAddr(datanode.getName());
       
@@ -263,8 +266,10 @@ public class TestDataNodeVolumeFailure {
     s.connect(targetAddr, HdfsConstants.READ_TIMEOUT);
     s.setSoTimeout(HdfsConstants.READ_TIMEOUT);
 
-    String file = BlockReader.getFileName(targetAddr, block.getBlockId());
-    blockReader = 
+    String file = BlockReader.getFileName(targetAddr, 
+        "test-blockpoolid",
+        block.getBlockId());
+    BlockReader blockReader = 
       BlockReader.newBlockReader(s, file, block, lblock
         .getBlockToken(), 0, -1, 4096);
 
@@ -314,9 +319,11 @@ public class TestDataNodeVolumeFailure {
    */
   private int countRealBlocks(Map<String, BlockLocs> map) {
     int total = 0;
+    final String bpid = cluster.getNamesystem().getBlockPoolId();
     for(int i=0; i<dn_num; i++) {
-      for(int j=1; j<=2; j++) {
-        File dir = new File(dataDir, "data"+(2*i+j)+MiniDFSCluster.FINALIZED_DIR_NAME);
+      for(int j=0; j<=1; j++) {
+        File storageDir = MiniDFSCluster.getStorageDir(i, j);
+        File dir = MiniDFSCluster.getFinalizedDir(storageDir, bpid);
         if(dir == null) {
           System.out.println("dir is null for dn=" + i + " and data_dir=" + j);
           continue;

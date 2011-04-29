@@ -30,8 +30,8 @@ import java.util.Random;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.FSConstants.DatanodeReportType;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -65,11 +65,11 @@ public class TestDatanodeBlockScanner extends TestCase {
    * @throws IOException
    * @throws TimeoutException
    */
-  private static long waitForVerification(DatanodeInfo dn, FileSystem fs, 
+  private static long waitForVerification(int infoPort, FileSystem fs, 
                           Path file, int blocksValidated, 
                           long newTime, long timeout) 
   throws IOException, TimeoutException {
-    URL url = new URL("http://localhost:" + dn.getInfoPort() +
+    URL url = new URL("http://localhost:" + infoPort +
                       "/blockScannerReport?listblocks");
     long lastWarnTime = System.currentTimeMillis();
     if (newTime <= 0) newTime = 1L;
@@ -146,7 +146,8 @@ public class TestDatanodeBlockScanner extends TestCase {
     /*
      * The cluster restarted. The block should be verified by now.
      */
-    assertTrue(waitForVerification(dn, fs, file1, 1, startTime, TIMEOUT) >= startTime);
+    assertTrue(waitForVerification(dn.getInfoPort(), fs, file1, 1, startTime,
+        TIMEOUT) >= startTime);
     
     /*
      * Create a new file and read the block. The block should be marked 
@@ -155,12 +156,17 @@ public class TestDatanodeBlockScanner extends TestCase {
     DFSTestUtil.createFile(fs, file2, 10, (short)1, 0);
     IOUtils.copyBytes(fs.open(file2), new IOUtils.NullOutputStream(), 
                       conf, true); 
-    assertTrue(waitForVerification(dn, fs, file2, 2, startTime, TIMEOUT) >= startTime);
+    assertTrue(waitForVerification(dn.getInfoPort(), fs, file2, 2, startTime,
+        TIMEOUT) >= startTime);
     
     cluster.shutdown();
   }
 
-  public void testBlockCorruptionPolicy() throws Exception {
+  public static boolean corruptReplica(ExtendedBlock blk, int replica) throws IOException {
+    return MiniDFSCluster.corruptReplica(replica, blk);
+  }
+
+  public void testBlockCorruptionPolicy() throws IOException {
     Configuration conf = new HdfsConfiguration();
     conf.setLong(DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_KEY, 1000L);
     Random random = new Random();
@@ -172,13 +178,13 @@ public class TestDatanodeBlockScanner extends TestCase {
     fs = cluster.getFileSystem();
     Path file1 = new Path("/tmp/testBlockVerification/file1");
     DFSTestUtil.createFile(fs, file1, 1024, (short)3, 0);
-    String block = DFSTestUtil.getFirstBlock(fs, file1).getBlockName();
+    ExtendedBlock block = DFSTestUtil.getFirstBlock(fs, file1);
     
     DFSTestUtil.waitReplication(fs, file1, (short)3);
     assertFalse(DFSTestUtil.allBlockReplicasCorrupt(cluster, file1, 0));
 
     // Corrupt random replica of block 
-    assertTrue(cluster.corruptReplica(block, rand));
+    assertTrue(MiniDFSCluster.corruptReplica(rand, block));
 
     // Restart the datanode hoping the corrupt block to be reported
     cluster.restartDataNode(rand);
@@ -189,9 +195,9 @@ public class TestDatanodeBlockScanner extends TestCase {
   
     // Corrupt all replicas. Now, block should be marked as corrupt
     // and we should get all the replicas 
-    assertTrue(cluster.corruptReplica(block, 0));
-    assertTrue(cluster.corruptReplica(block, 1));
-    assertTrue(cluster.corruptReplica(block, 2));
+    assertTrue(MiniDFSCluster.corruptReplica(0, block));
+    assertTrue(MiniDFSCluster.corruptReplica(1, block));
+    assertTrue(MiniDFSCluster.corruptReplica(2, block));
 
     // Read the file to trigger reportBadBlocks by client
     try {
@@ -251,8 +257,7 @@ public class TestDatanodeBlockScanner extends TestCase {
     FileSystem fs = cluster.getFileSystem();
     Path file1 = new Path("/tmp/testBlockCorruptRecovery/file");
     DFSTestUtil.createFile(fs, file1, 1024, numReplicas, 0);
-    Block blk = DFSTestUtil.getFirstBlock(fs, file1);
-    String block = blk.getBlockName();
+    ExtendedBlock block = DFSTestUtil.getFirstBlock(fs, file1);
 
     // Wait until block is replicated to numReplicas
     DFSTestUtil.waitReplication(fs, file1, numReplicas);
@@ -260,7 +265,7 @@ public class TestDatanodeBlockScanner extends TestCase {
     // Corrupt numCorruptReplicas replicas of block 
     int[] corruptReplicasDNIDs = new int[numCorruptReplicas];
     for (int i=0, j=0; (j != numCorruptReplicas) && (i < numDataNodes); i++) {
-      if (cluster.corruptReplica(block, i)) {
+      if (corruptReplica(block, i)) {
         corruptReplicasDNIDs[j++] = i;
         LOG.info("successfully corrupted block " + block + " on node " 
                  + i + " " + cluster.getDataNodes().get(i).getSelfAddr());
@@ -281,7 +286,7 @@ public class TestDatanodeBlockScanner extends TestCase {
 
     // Loop until all corrupt replicas are reported
     DFSTestUtil.waitCorruptReplicas(fs, cluster.getNamesystem(), file1, 
-        blk, numCorruptReplicas);
+        block, numCorruptReplicas);
     
     // Loop until the block recovers after replication
     DFSTestUtil.waitReplication(fs, file1, numReplicas);
@@ -290,7 +295,7 @@ public class TestDatanodeBlockScanner extends TestCase {
     // Make sure the corrupt replica is invalidated and removed from
     // corruptReplicasMap
     DFSTestUtil.waitCorruptReplicas(fs, cluster.getNamesystem(), file1, 
-        blk, 0);
+        block, 0);
     cluster.shutdown();
   }
   
@@ -299,7 +304,6 @@ public class TestDatanodeBlockScanner extends TestCase {
     final Configuration conf = new HdfsConfiguration();
     final short REPLICATION_FACTOR = (short)2;
     final Path fileName = new Path("/file1");
-    String block; //block file name
 
     conf.setLong(DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_KEY, 3L);
     conf.setLong(DFSConfigKeys.DFS_NAMENODE_REPLICATION_INTERVAL_KEY, 3);
@@ -312,11 +316,12 @@ public class TestDatanodeBlockScanner extends TestCase {
                                                .build();
     cluster.waitActive();
     
+    ExtendedBlock block;
     try {
       FileSystem fs = cluster.getFileSystem();
       DFSTestUtil.createFile(fs, fileName, 1, REPLICATION_FACTOR, 0);
       DFSTestUtil.waitReplication(fs, fileName, REPLICATION_FACTOR);
-      block = DFSTestUtil.getFirstBlock(fs, fileName).getBlockName();
+      block = DFSTestUtil.getFirstBlock(fs, fileName);
     } finally {
       cluster.shutdown();
     }
@@ -330,8 +335,8 @@ public class TestDatanodeBlockScanner extends TestCase {
     cluster.waitActive();
     try {
       FileSystem fs = cluster.getFileSystem();
-      DatanodeInfo dn = new DatanodeInfo(cluster.getDataNodes().get(0).dnRegistration);
-      assertTrue(waitForVerification(dn, fs, fileName, 1, startTime, TIMEOUT) >= startTime);
+      int infoPort = cluster.getDataNodes().get(0).getInfoPort();
+      assertTrue(waitForVerification(infoPort, fs, fileName, 1, startTime, TIMEOUT) >= startTime);
       
       // Truncate replica of block
       if (!changeReplicaLength(block, 0, -1)) {
@@ -373,43 +378,31 @@ public class TestDatanodeBlockScanner extends TestCase {
   /**
    * Change the length of a block at datanode dnIndex
    */
-  static boolean changeReplicaLength(String blockName, int dnIndex, int lenDelta) throws IOException {
-    File baseDir = new File(MiniDFSCluster.getBaseDirectory(), "data");
-    for (int i=dnIndex*2; i<dnIndex*2+2; i++) {
-      File blockFile = new File(baseDir, "data" + (i+1) + 
-          MiniDFSCluster.FINALIZED_DIR_NAME + blockName);
-      if (blockFile.exists()) {
-        RandomAccessFile raFile = new RandomAccessFile(blockFile, "rw");
-        long origLen = raFile.length();
-        raFile.setLength(origLen + lenDelta);
-        raFile.close();
-        LOG.info("assigned length " + (origLen + lenDelta) 
-            + " to block file " + blockFile.getPath()
-            + " on datanode " + dnIndex);
-        return true;
-      }
+  static boolean changeReplicaLength(ExtendedBlock blk, int dnIndex,
+      int lenDelta) throws IOException {
+    File blockFile = MiniDFSCluster.getBlockFile(dnIndex, blk);
+    if (blockFile != null && blockFile.exists()) {
+      RandomAccessFile raFile = new RandomAccessFile(blockFile, "rw");
+      raFile.setLength(raFile.length()+lenDelta);
+      raFile.close();
+      return true;
     }
-    LOG.info("failed to change length of block " + blockName);
+    LOG.info("failed to change length of block " + blk);
     return false;
   }
   
-  private static void waitForBlockDeleted(String blockName, int dnIndex,
-      long timeout) 
-  throws IOException, TimeoutException, InterruptedException {
-    File baseDir = new File(MiniDFSCluster.getBaseDirectory(), "data");
-    File blockFile1 = new File(baseDir, "data" + (2*dnIndex+1) + 
-        MiniDFSCluster.FINALIZED_DIR_NAME + blockName);
-    File blockFile2 = new File(baseDir, "data" + (2*dnIndex+2) + 
-        MiniDFSCluster.FINALIZED_DIR_NAME + blockName);
+  private static void waitForBlockDeleted(ExtendedBlock blk, int dnIndex,
+      long timeout) throws IOException, TimeoutException, InterruptedException {
+    File blockFile = MiniDFSCluster.getBlockFile(dnIndex, blk);
     long failtime = System.currentTimeMillis() 
                     + ((timeout > 0) ? timeout : Long.MAX_VALUE);
-    while (blockFile1.exists() || blockFile2.exists()) {
+    while (blockFile != null && blockFile.exists()) {
       if (failtime < System.currentTimeMillis()) {
         throw new TimeoutException("waited too long for blocks to be deleted: "
-            + blockFile1.getPath() + (blockFile1.exists() ? " still exists; " : " is absent; ")
-            + blockFile2.getPath() + (blockFile2.exists() ? " still exists." : " is absent."));
+            + blockFile.getPath() + (blockFile.exists() ? " still exists; " : " is absent; "));
       }
       Thread.sleep(100);
+      blockFile = MiniDFSCluster.getBlockFile(dnIndex, blk);
     }
   }
 }

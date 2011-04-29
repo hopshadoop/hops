@@ -19,21 +19,18 @@ package org.apache.hadoop.hdfs;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Properties;
 
 import junit.framework.TestCase;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.BlockMissingException;
@@ -64,7 +61,7 @@ public class TestBlockMissingException extends TestCase {
       // extract block locations from File system. Wait till file is closed.
       LocatedBlocks locations = null;
       locations = fileSys.dfs.getNamenode().getBlockLocations(file1.toString(),
-                                                             0, numBlocks * blockSize);
+          0, numBlocks * blockSize);
       // remove block of file
       LOG.info("Remove first block of file");
       corruptBlock(file1, locations.get(0).getBlock());
@@ -119,46 +116,15 @@ public class TestBlockMissingException extends TestCase {
     assertTrue("Expected BlockMissingException ", gotException);
   }
 
-  /*
-   * The Data directories for a datanode
-   */
-  private File[] getDataNodeDirs(int i) throws IOException {
-    String base_dir = MiniDFSCluster.getBaseDirectory();
-    File data_dir = new File(base_dir, "data");
-    File dir1 = new File(data_dir, "data"+(2*i+1));
-    File dir2 = new File(data_dir, "data"+(2*i+2));
-    if (dir1.isDirectory() && dir2.isDirectory()) {
-      File[] dir = new File[2];
-      dir[0] = new File(dir1, MiniDFSCluster.FINALIZED_DIR_NAME);
-      dir[1] = new File(dir2, MiniDFSCluster.FINALIZED_DIR_NAME); 
-      return dir;
-    }
-    return new File[0];
-  }
-
   //
   // Corrupt specified block of file
   //
-  void corruptBlock(Path file, Block blockNum) throws IOException {
-    long id = blockNum.getBlockId();
-
-    // Now deliberately remove/truncate data blocks from the block.
-    //
-    for (int i = 0; i < NUM_DATANODES; i++) {
-      File[] dirs = getDataNodeDirs(i);
-      
-      for (int j = 0; j < dirs.length; j++) {
-        File[] blocks = dirs[j].listFiles();
-        assertTrue("Blocks do not exist in data-dir", (blocks != null) && (blocks.length >= 0));
-        for (int idx = 0; idx < blocks.length; idx++) {
-          if (blocks[idx].getName().startsWith("blk_" + id) &&
-              !blocks[idx].getName().endsWith(".meta")) {
-            blocks[idx].delete();
-            LOG.info("Deleted block " + blocks[idx]);
-          }
-        }
-      }
+  void corruptBlock(Path file, ExtendedBlock blk) {
+    // Now deliberately remove/truncate data blocks from the file.
+    File[] blockFiles = dfs.getAllBlockFiles(blk);
+    for (File f : blockFiles) {
+      f.delete();
+      LOG.info("Deleted block " + f);
     }
   }
-
 }

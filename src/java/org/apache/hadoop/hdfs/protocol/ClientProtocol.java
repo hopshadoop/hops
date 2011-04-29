@@ -67,9 +67,9 @@ public interface ClientProtocol extends VersionedProtocol {
    * Compared to the previous version the following changes have been introduced:
    * (Only the latest change is reflected.
    * The log of historical changes can be retrieved from the svn).
-   * 66: Add getAdditionalDatanode(..)
+   * 67: Add block pool ID to Block
    */
-  public static final long versionID = 66L;
+  public static final long versionID = 67L;
   
   ///////////////////////////////////////
   // File contents
@@ -126,7 +126,7 @@ public interface ClientProtocol extends VersionedProtocol {
    * <p>
    * Blocks have a maximum size.  Clients that intend to create
    * multi-block files must also use 
-   * {@link #addBlock(String, String, Block, DatanodeInfo[])}
+   * {@link #addBlock(String, String, ExtendedBlock, DatanodeInfo[])}
    *
    * @param src path of the file being created.
    * @param masked masked permission.
@@ -259,7 +259,7 @@ public interface ClientProtocol extends VersionedProtocol {
    * @throws UnresolvedLinkException If <code>src</code> contains a symlink
    * @throws IOException If an I/O error occurred
    */
-  public void abandonBlock(Block b, String src, String holder)
+  public void abandonBlock(ExtendedBlock b, String src, String holder)
       throws AccessControlException, FileNotFoundException,
       UnresolvedLinkException, IOException;
 
@@ -293,7 +293,7 @@ public interface ClientProtocol extends VersionedProtocol {
    * @throws IOException If an I/O error occurred
    */
   public LocatedBlock addBlock(String src, String clientName,
-      @Nullable Block previous, @Nullable DatanodeInfo[] excludeNodes)
+      @Nullable ExtendedBlock previous, @Nullable DatanodeInfo[] excludeNodes)
       throws AccessControlException, FileNotFoundException,
       NotReplicatedYetException, SafeModeException, UnresolvedLinkException,
       IOException;
@@ -316,7 +316,7 @@ public interface ClientProtocol extends VersionedProtocol {
    * @throws UnresolvedLinkException If <code>src</code> contains a symlink
    * @throws IOException If an I/O error occurred
    */
-  public LocatedBlock getAdditionalDatanode(final String src, final Block blk,
+  public LocatedBlock getAdditionalDatanode(final String src, final ExtendedBlock blk,
       final DatanodeInfo[] existings, final DatanodeInfo[] excludes,
       final int numAdditionalNodes, final String clientName
       ) throws AccessControlException, FileNotFoundException,
@@ -329,7 +329,7 @@ public interface ClientProtocol extends VersionedProtocol {
    * The function returns whether the file has been closed successfully.
    * If the function returns false, the caller should try again.
    * 
-   * close() also commits the last block of the file by reporting
+   * close() also commits the last block of file by reporting
    * to the name-node the actual generation stamp and the length
    * of the block that the client has transmitted to data-nodes.
    *
@@ -344,7 +344,7 @@ public interface ClientProtocol extends VersionedProtocol {
    * @throws UnresolvedLinkException If <code>src</code> contains a symlink 
    * @throws IOException If an I/O error occurred
    */
-  public boolean complete(String src, String clientName, Block last)
+  public boolean complete(String src, String clientName, ExtendedBlock last)
       throws AccessControlException, FileNotFoundException, SafeModeException,
       UnresolvedLinkException, IOException;
 
@@ -554,6 +554,8 @@ public interface ClientProtocol extends VersionedProtocol {
    * <li> [3] contains number of under replicated blocks in the system.</li>
    * <li> [4] contains number of blocks with a corrupt replica. </li>
    * <li> [5] contains number of blocks without any good replicas left. </li>
+   * <li> [5] contains number of blocks without any good replicas left. </li>
+   * <li> [6] contains the total used space of the block pool. </li>
    * </ul>
    * Use public constants like {@link #GET_STATS_CAPACITY_IDX} in place of 
    * actual numbers to index into the array.
@@ -854,8 +856,8 @@ public interface ClientProtocol extends VersionedProtocol {
    * @return a located block with a new generation stamp and an access token
    * @throws IOException if any error occurs
    */
-  public LocatedBlock updateBlockForPipeline(Block block, String clientName) 
-      throws IOException;
+  public LocatedBlock updateBlockForPipeline(ExtendedBlock block,
+      String clientName) throws IOException;
 
   /**
    * Update a pipeline for a block under construction
@@ -866,8 +868,8 @@ public interface ClientProtocol extends VersionedProtocol {
    * @param newNodes datanodes in the pipeline
    * @throws IOException if any error occurs
    */
-  public void updatePipeline(String clientName, Block oldBlock, 
-      Block newBlock, DatanodeID[] newNodes)
+  public void updatePipeline(String clientName, ExtendedBlock oldBlock, 
+      ExtendedBlock newBlock, DatanodeID[] newNodes)
       throws IOException;
 
   /**

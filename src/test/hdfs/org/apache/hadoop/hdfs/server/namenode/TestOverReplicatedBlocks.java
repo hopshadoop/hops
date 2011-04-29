@@ -28,8 +28,9 @@ import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.TestDatanodeBlockScanner;
 import org.apache.hadoop.hdfs.MiniDFSCluster.DataNodeProperties;
-import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
+import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 
 import junit.framework.TestCase;
@@ -43,7 +44,9 @@ public class TestOverReplicatedBlocks extends TestCase {
   public void testProcesOverReplicateBlock() throws IOException {
     Configuration conf = new HdfsConfiguration();
     conf.setLong(DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_KEY, 1000L);
-    conf.set(DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_KEY, Integer.toString(2));
+    conf.set(
+        DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_KEY,
+        Integer.toString(2));
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
     FileSystem fs = cluster.getFileSystem();
 
@@ -53,13 +56,14 @@ public class TestOverReplicatedBlocks extends TestCase {
       DFSTestUtil.waitReplication(fs, fileName, (short)3);
       
       // corrupt the block on datanode 0
-      Block block = DFSTestUtil.getFirstBlock(fs, fileName);
-      assertTrue(cluster.corruptReplica(block.getBlockName(), 0));
+      ExtendedBlock block = DFSTestUtil.getFirstBlock(fs, fileName);
+      assertTrue(TestDatanodeBlockScanner.corruptReplica(block, 0));
       DataNodeProperties dnProps = cluster.stopDataNode(0);
       // remove block scanner log to trigger block scanning
-      File scanLog = new File(System.getProperty("test.build.data"),
-          "dfs/data/data1" + MiniDFSCluster.FINALIZED_DIR_NAME + 
-          "dncp_block_verification.log.curr");
+      File scanLog = new File(MiniDFSCluster.getFinalizedDir(
+          MiniDFSCluster.getStorageDir(0, 0),
+          cluster.getNamesystem().getBlockPoolId()).getParent().toString()
+          + "/../dncp_block_verification.log.prev");
       //wait for one minute for deletion to succeed;
       for(int i=0; !scanLog.delete(); i++) {
         assertTrue("Could not delete log file in one minute", i < 60);
@@ -72,17 +76,21 @@ public class TestOverReplicatedBlocks extends TestCase {
       cluster.restartDataNode(dnProps);
       DFSTestUtil.waitReplication(fs, fileName, (short)2);
       
+      String blockPoolId = cluster.getNamesystem().getBlockPoolId();
       final DatanodeID corruptDataNode = 
-        cluster.getDataNodes().get(2).dnRegistration;
+        DataNodeTestUtils.getDNRegistrationForBP(
+            cluster.getDataNodes().get(2), blockPoolId);
+         
       final FSNamesystem namesystem = cluster.getNamesystem();
       try {
         namesystem.writeLock();
         synchronized (namesystem.heartbeats) {
           // set live datanode's remaining space to be 0 
           // so they will be chosen to be deleted when over-replication occurs
+          String corruptMachineName = corruptDataNode.getName();
           for (DatanodeDescriptor datanode : namesystem.heartbeats) {
-            if (!corruptDataNode.equals(datanode)) {
-              datanode.updateHeartbeat(100L, 100L, 0L, 0);
+            if (!corruptMachineName.equals(datanode.getName())) {
+              datanode.updateHeartbeat(100L, 100L, 0L, 100L, 0);
             }
           }
 
@@ -91,7 +99,8 @@ public class TestOverReplicatedBlocks extends TestCase {
 
           // corrupt one won't be chosen to be excess one
           // without 4910 the number of live replicas would be 0: block gets lost
-          assertEquals(1, namesystem.blockManager.countNodes(block).liveReplicas());
+          assertEquals(1, namesystem.blockManager.countNodes(block.getLocalBlock())
+              .liveReplicas());
         }
       } finally {
         namesystem.writeUnlock();

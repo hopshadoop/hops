@@ -31,6 +31,7 @@ import org.apache.hadoop.hdfs.DeprecatedUTF8;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableFactories;
 import org.apache.hadoop.io.WritableFactory;
+import org.apache.hadoop.io.WritableUtils;
 
 /**
  * NamespaceInfo is returned by the name-node in reply 
@@ -42,14 +43,17 @@ import org.apache.hadoop.io.WritableFactory;
 public class NamespaceInfo extends StorageInfo {
   String  buildVersion;
   int distributedUpgradeVersion;
+  String blockPoolID = "";    // id of the block pool
 
   public NamespaceInfo() {
     super();
     buildVersion = null;
   }
   
-  public NamespaceInfo(int nsID, long cT, int duVersion) {
-    super(FSConstants.LAYOUT_VERSION, nsID, cT);
+  public NamespaceInfo(int nsID, String clusterID, String bpID, 
+      long cT, int duVersion) {
+    super(FSConstants.LAYOUT_VERSION, nsID, clusterID, cT);
+    blockPoolID = bpID;
     buildVersion = Storage.getBuildVersion();
     this.distributedUpgradeVersion = duVersion;
   }
@@ -62,6 +66,10 @@ public class NamespaceInfo extends StorageInfo {
     return distributedUpgradeVersion;
   }
   
+  public String getBlockPoolID() {
+    return blockPoolID;
+  }
+
   /////////////////////////////////////////////////
   // Writable
   /////////////////////////////////////////////////
@@ -77,11 +85,17 @@ public class NamespaceInfo extends StorageInfo {
     DeprecatedUTF8.writeString(out, getBuildVersion());
     super.write(out);
     out.writeInt(getDistributedUpgradeVersion());
+    WritableUtils.writeString(out, blockPoolID);
   }
 
   public void readFields(DataInput in) throws IOException {
     buildVersion = DeprecatedUTF8.readString(in);
     super.readFields(in);
     distributedUpgradeVersion = in.readInt();
+    blockPoolID = WritableUtils.readString(in);
+  }
+  
+  public String toString(){
+    return super.toString() + ";bpid=" + blockPoolID;
   }
 }

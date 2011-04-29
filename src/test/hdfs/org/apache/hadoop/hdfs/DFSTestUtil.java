@@ -50,7 +50,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileSystem.Statistics;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSClient.DFSDataInputStream;
-import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.DataTransferProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
@@ -238,7 +238,7 @@ public class DFSTestUtil {
   public static boolean allBlockReplicasCorrupt(MiniDFSCluster cluster,
       Path file, int blockNo) throws IOException {
     DFSClient client = new DFSClient(new InetSocketAddress("localhost",
-        cluster.getNameNodePort()), cluster.getConfiguration());
+        cluster.getNameNodePort()), cluster.getConfiguration(0));
     LocatedBlocks blocks;
     try {
        blocks = client.getNamenode().getBlockLocations(
@@ -254,7 +254,7 @@ public class DFSTestUtil {
    * the requested number of racks, with the requested number of
    * replicas, and the requested number of replicas still needed.
    */
-  public static void waitForReplication(MiniDFSCluster cluster, Block b,
+  public static void waitForReplication(MiniDFSCluster cluster, ExtendedBlock b,
       int racks, int replicas, int neededReplicas)
       throws IOException, TimeoutException, InterruptedException {
     int curRacks = 0;
@@ -265,7 +265,7 @@ public class DFSTestUtil {
 
     do {
       Thread.sleep(1000);
-      int []r = NameNodeAdapter.getReplicaInfo(cluster.getNameNode(), b);
+      int []r = NameNodeAdapter.getReplicaInfo(cluster.getNameNode(), b.getLocalBlock());
       curRacks = r[0];
       curReplicas = r[1];
       curNeededReplicas = r[2];
@@ -288,11 +288,11 @@ public class DFSTestUtil {
    * given block in the file contains the given number of corrupt replicas.
    */
   public static void waitCorruptReplicas(FileSystem fs, FSNamesystem ns,
-      Path file, Block b, int corruptRepls)
+      Path file, ExtendedBlock b, int corruptRepls)
       throws IOException, TimeoutException {
     int count = 0;
     final int ATTEMPTS = 20;
-    int repls = ns.numCorruptReplicas(b);
+    int repls = ns.numCorruptReplicas(b.getLocalBlock());
     while (repls != corruptRepls && count < ATTEMPTS) {
       try {
         IOUtils.copyBytes(fs.open(file), new IOUtils.NullOutputStream(),
@@ -301,7 +301,7 @@ public class DFSTestUtil {
         // Swallow exceptions
       }
       System.out.println("Waiting for "+corruptRepls+" corrupt replicas");
-      repls = ns.numCorruptReplicas(b);
+      repls = ns.numCorruptReplicas(b.getLocalBlock());
       count++;
     }
     if (count == ATTEMPTS) {
@@ -342,11 +342,11 @@ public class DFSTestUtil {
    * Returns the index of the first datanode which has a copy
    * of the given block, or -1 if no such datanode exists.
    */
-  public static int firstDnWithBlock(MiniDFSCluster cluster, Block b)
+  public static int firstDnWithBlock(MiniDFSCluster cluster, ExtendedBlock b)
       throws IOException {
     int numDatanodes = cluster.getDataNodes().size();
     for (int i = 0; i < numDatanodes; i++) {
-      String blockContent = cluster.readBlockOnDataNode(i, b.getBlockName());
+      String blockContent = cluster.readBlockOnDataNode(i, b);
       if (blockContent != null) {
         return i;
       }
@@ -405,7 +405,7 @@ public class DFSTestUtil {
     files = null;
   }
   
-  public static Block getFirstBlock(FileSystem fs, Path path) throws IOException {
+  public static ExtendedBlock getFirstBlock(FileSystem fs, Path path) throws IOException {
     DFSDataInputStream in = 
       (DFSDataInputStream) ((DistributedFileSystem)fs).open(path);
     in.readByte();
@@ -553,7 +553,7 @@ public class DFSTestUtil {
   }
 
   /** For {@link TestTransferRbw} */
-  public static DataTransferProtocol.Status transferRbw(final Block b, 
+  public static DataTransferProtocol.Status transferRbw(final ExtendedBlock b, 
       final DFSClient dfsClient, final DatanodeInfo... datanodes) throws IOException {
     assertEquals(2, datanodes.length);
     final Socket s = DFSOutputStream.createSocketForPipeline(datanodes[0],

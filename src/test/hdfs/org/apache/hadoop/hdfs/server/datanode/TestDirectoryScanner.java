@@ -21,6 +21,8 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Random;
 
 import org.apache.commons.logging.Log;
@@ -48,6 +50,7 @@ public class TestDirectoryScanner extends TestCase {
   private static final int DEFAULT_GEN_STAMP = 9999;
 
   private MiniDFSCluster cluster;
+  private String bpid;
   private FSDataset fds = null;
   private DirectoryScanner scanner = null;
   private Random rand = new Random();
@@ -69,7 +72,7 @@ public class TestDirectoryScanner extends TestCase {
   /** Truncate a block file */
   private long truncateBlockFile() throws IOException {
     synchronized (fds) {
-      for (ReplicaInfo b : fds.volumeMap.replicas()) {
+      for (ReplicaInfo b : fds.volumeMap.replicas(bpid)) {
         File f = b.getBlockFile();
         File mf = b.getMetaFile();
         // Truncate a block file that has a corresponding metadata file
@@ -88,7 +91,7 @@ public class TestDirectoryScanner extends TestCase {
   /** Delete a block file */
   private long deleteBlockFile() {
     synchronized(fds) {
-      for (ReplicaInfo b : fds.volumeMap.replicas()) {
+      for (ReplicaInfo b : fds.volumeMap.replicas(bpid)) {
         File f = b.getBlockFile();
         File mf = b.getMetaFile();
         // Delete a block file that has corresponding metadata file
@@ -104,7 +107,7 @@ public class TestDirectoryScanner extends TestCase {
   /** Delete block meta file */
   private long deleteMetaFile() {
     synchronized(fds) {
-      for (ReplicaInfo b : fds.volumeMap.replicas()) {
+      for (ReplicaInfo b : fds.volumeMap.replicas(bpid)) {
         File file = b.getMetaFile();
         // Delete a metadata file
         if (file.exists() && file.delete()) {
@@ -121,7 +124,7 @@ public class TestDirectoryScanner extends TestCase {
     long id = rand.nextLong();
     while (true) {
       id = rand.nextLong();
-      if (fds.fetchReplicaInfo(id) == null) {
+      if (fds.fetchReplicaInfo(bpid, id) == null) {
         break;
       }
     }
@@ -139,10 +142,11 @@ public class TestDirectoryScanner extends TestCase {
 
   /** Create a block file in a random volume*/
   private long createBlockFile() throws IOException {
-    FSVolume[] volumes = fds.volumes.volumes;
-    int index = rand.nextInt(volumes.length - 1);
+    List<FSVolume> volumes = fds.volumes.getVolumes();
+    int index = rand.nextInt(volumes.size() - 1);
     long id = getFreeBlockId();
-    File file = new File(volumes[index].getDir().getPath(), getBlockFile(id));
+    File finalizedDir = volumes.get(index).getBlockPoolSlice(bpid).getFinalizedDir();
+    File file = new File(finalizedDir, getBlockFile(id));
     if (file.createNewFile()) {
       LOG.info("Created block file " + file.getName());
     }
@@ -151,10 +155,11 @@ public class TestDirectoryScanner extends TestCase {
 
   /** Create a metafile in a random volume*/
   private long createMetaFile() throws IOException {
-    FSVolume[] volumes = fds.volumes.volumes;
-    int index = rand.nextInt(volumes.length - 1);
+    List<FSVolume> volumes = fds.volumes.getVolumes();
+    int index = rand.nextInt(volumes.size() - 1);
     long id = getFreeBlockId();
-    File file = new File(volumes[index].getDir().getPath(), getMetaFile(id));
+    File finalizedDir = volumes.get(index).getBlockPoolSlice(bpid).getFinalizedDir();
+    File file = new File(finalizedDir, getMetaFile(id));
     if (file.createNewFile()) {
       LOG.info("Created metafile " + file.getName());
     }
@@ -163,10 +168,11 @@ public class TestDirectoryScanner extends TestCase {
 
   /** Create block file and corresponding metafile in a rondom volume */
   private long createBlockMetaFile() throws IOException {
-    FSVolume[] volumes = fds.volumes.volumes;
-    int index = rand.nextInt(volumes.length - 1);
+    List<FSVolume> volumes = fds.volumes.getVolumes();
+    int index = rand.nextInt(volumes.size() - 1);
     long id = getFreeBlockId();
-    File file = new File(volumes[index].getDir().getPath(), getBlockFile(id));
+    File finalizedDir = volumes.get(index).getBlockPoolSlice(bpid).getFinalizedDir();
+    File file = new File(finalizedDir, getBlockFile(id));
     if (file.createNewFile()) {
       LOG.info("Created block file " + file.getName());
 
@@ -185,7 +191,7 @@ public class TestDirectoryScanner extends TestCase {
         LOG.info("Created extraneous file " + name2);
       }
 
-      file = new File(volumes[index].getDir().getPath(), getMetaFile(id));
+      file = new File(finalizedDir, getMetaFile(id));
       if (file.createNewFile()) {
         LOG.info("Created metafile " + file.getName());
       }
@@ -196,12 +202,18 @@ public class TestDirectoryScanner extends TestCase {
   private void scan(long totalBlocks, int diffsize, long missingMetaFile, long missingBlockFile,
       long missingMemoryBlocks, long mismatchBlocks) {
     scanner.reconcile();
-    assertEquals(totalBlocks, scanner.totalBlocks);
-    assertEquals(diffsize, scanner.diff.size());
-    assertEquals(missingMetaFile, scanner.missingMetaFile);
-    assertEquals(missingBlockFile, scanner.missingBlockFile);
-    assertEquals(missingMemoryBlocks, scanner.missingMemoryBlocks);
-    assertEquals(mismatchBlocks, scanner.mismatchBlocks);
+    
+    assertTrue(scanner.diffs.containsKey(bpid));
+    LinkedList<DirectoryScanner.ScanInfo> diff = scanner.diffs.get(bpid);
+    assertTrue(scanner.stats.containsKey(bpid));
+    DirectoryScanner.Stats stats = scanner.stats.get(bpid);
+    
+    assertEquals(diffsize, diff.size());
+    assertEquals(totalBlocks, stats.totalBlocks);
+    assertEquals(missingMetaFile, stats.missingMetaFile);
+    assertEquals(missingBlockFile, stats.missingBlockFile);
+    assertEquals(missingMemoryBlocks, stats.missingMemoryBlocks);
+    assertEquals(mismatchBlocks, stats.mismatchBlocks);
   }
 
   public void testDirectoryScanner() throws Exception {
@@ -215,10 +227,12 @@ public class TestDirectoryScanner extends TestCase {
     cluster = new MiniDFSCluster.Builder(CONF).build();
     try {
       cluster.waitActive();
+      bpid = cluster.getNamesystem().getBlockPoolId();
       fds = (FSDataset) cluster.getDataNodes().get(0).getFSDataset();
       CONF.setInt(DFSConfigKeys.DFS_DATANODE_DIRECTORYSCAN_THREADS_KEY,
                   parallelism);
       scanner = new DirectoryScanner(fds, CONF);
+      scanner.setRetainDiffs(true);
 
       // Add files with 100 blocks
       createFile("/tmp/t1", 10000);
@@ -318,19 +332,26 @@ public class TestDirectoryScanner extends TestCase {
       truncateBlockFile();
       scan(totalBlocks+3, 6, 2, 2, 3, 2);
       scan(totalBlocks+1, 0, 0, 0, 0, 0);
+      
+      // Test14: validate clean shutdown of DirectoryScanner
+      ////assertTrue(scanner.getRunStatus()); //assumes "real" FSDataset, not sim
+      scanner.shutdown();
+      assertFalse(scanner.getRunStatus());
+      
     } finally {
+      scanner.shutdown();
       cluster.shutdown();
     }
   }
 
   private void verifyAddition(long blockId, long genStamp, long size) {
     final ReplicaInfo replicainfo;
-    replicainfo = fds.fetchReplicaInfo(blockId);
+    replicainfo = fds.fetchReplicaInfo(bpid, blockId);
     assertNotNull(replicainfo);
 
     // Added block has the same file as the one created by the test
     File file = new File(getBlockFile(blockId));
-    assertEquals(file.getName(), fds.findBlockFile(blockId).getName());
+    assertEquals(file.getName(), fds.findBlockFile(bpid, blockId).getName());
 
     // Generation stamp is same as that of created file
     assertEquals(genStamp, replicainfo.getGenerationStamp());
@@ -341,12 +362,12 @@ public class TestDirectoryScanner extends TestCase {
 
   private void verifyDeletion(long blockId) {
     // Ensure block does not exist in memory
-    assertNull(fds.fetchReplicaInfo(blockId));
+    assertNull(fds.fetchReplicaInfo(bpid, blockId));
   }
 
   private void verifyGenStamp(long blockId, long genStamp) {
     final ReplicaInfo memBlock;
-    memBlock = fds.fetchReplicaInfo(blockId);
+    memBlock = fds.fetchReplicaInfo(bpid, blockId);
     assertNotNull(memBlock);
     assertEquals(genStamp, memBlock.getGenerationStamp());
   }

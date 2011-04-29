@@ -140,10 +140,10 @@ class DataXceiverServer implements Runnable, FSConstants {
       } catch (SocketTimeoutException ignored) {
         // wake up to see if should continue to run
       } catch (IOException ie) {
-        LOG.warn(datanode.dnRegistration + ":DataXceiveServer: " 
+        LOG.warn(datanode.getMachineName() + ":DataXceiveServer: " 
                                 + StringUtils.stringifyException(ie));
       } catch (Throwable te) {
-        LOG.error(datanode.dnRegistration + ":DataXceiveServer: Exiting due to:" 
+        LOG.error(datanode.getMachineName() + ":DataXceiveServer: Exiting due to:" 
                                  + StringUtils.stringifyException(te));
         datanode.shouldRun = false;
       }
@@ -151,7 +151,7 @@ class DataXceiverServer implements Runnable, FSConstants {
     try {
       ss.close();
     } catch (IOException ie) {
-      LOG.warn(datanode.dnRegistration + ":DataXceiveServer: " 
+      LOG.warn(datanode.getMachineName() + ":DataXceiveServer: " 
                               + StringUtils.stringifyException(ie));
     }
   }
@@ -162,7 +162,7 @@ class DataXceiverServer implements Runnable, FSConstants {
     try {
       this.ss.close();
     } catch (IOException ie) {
-      LOG.warn(datanode.dnRegistration + ":DataXceiveServer.kill(): " 
+      LOG.warn(datanode.getMachineName() + ":DataXceiveServer.kill(): " 
                               + StringUtils.stringifyException(ie));
     }
 

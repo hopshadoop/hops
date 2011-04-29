@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdfs.server.datanode;
 
 import java.io.IOException;
+import java.util.List;
+
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.hdfs.server.datanode.FSDataset.FSVolume;
@@ -44,7 +46,7 @@ public interface BlockVolumeChoosingPolicy {
    * @return the chosen volume to store the block.
    * @throws IOException when disks are unavailable or are full.
    */
-  public FSVolume chooseVolume(FSVolume[] volumes, long blockSize)
+  public FSVolume chooseVolume(List<FSVolume> volumes, long blockSize)
     throws IOException;
 
 }

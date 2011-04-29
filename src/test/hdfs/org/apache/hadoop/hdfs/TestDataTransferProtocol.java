@@ -45,14 +45,15 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DataTransferProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.DataTransferProtocol.BlockConstructionStage;
 import org.apache.hadoop.hdfs.protocol.FSConstants.DatanodeReportType;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager;
 import org.apache.hadoop.hdfs.server.common.HdfsConstants;
+import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.Text;
@@ -146,7 +147,7 @@ public class TestDataTransferProtocol extends TestCase {
     in.readFully(arr);
   }
   
-  private void writeZeroLengthPacket(Block block, String description)
+  private void writeZeroLengthPacket(ExtendedBlock block, String description)
   throws IOException {
     sendOut.writeByte((byte)DataChecksum.CHECKSUM_CRC32);
     sendOut.writeInt(512);         // checksum size
@@ -167,12 +168,12 @@ public class TestDataTransferProtocol extends TestCase {
     sendRecvData(description, false);
   }
   
-  private void testWrite(Block block, BlockConstructionStage stage, long newGS,
+  private void testWrite(ExtendedBlock block, BlockConstructionStage stage, long newGS,
       String description, Boolean eofExcepted) throws IOException {
     sendBuf.reset();
     recvBuf.reset();
-    DataTransferProtocol.Sender.opWriteBlock(sendOut, block, 0, stage, newGS,
-        block.getNumBytes(), block.getNumBytes(), "cl", null,
+    DataTransferProtocol.Sender.opWriteBlock(sendOut, block, 0,
+        stage, newGS, block.getNumBytes(), block.getNumBytes(), "cl", null,
         new DatanodeInfo[1], BlockTokenSecretManager.DUMMY_TOKEN);
     if (eofExcepted) {
       ERROR.write(recvOut);
@@ -194,7 +195,9 @@ public class TestDataTransferProtocol extends TestCase {
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(numDataNodes).build();
     try {
       cluster.waitActive();
-      datanode = cluster.getDataNodes().get(0).dnRegistration;
+      String poolId = cluster.getNamesystem().getBlockPoolId(); 
+      datanode = DataNodeTestUtils.getDNRegistrationForBP(
+          cluster.getDataNodes().get(0), poolId);
       dnAddr = NetUtils.createSocketAddr(datanode.getName());
       FileSystem fileSys = cluster.getFileSystem();
 
@@ -202,7 +205,7 @@ public class TestDataTransferProtocol extends TestCase {
       Path file = new Path("dataprotocol.dat");    
       DFSTestUtil.createFile(fileSys, file, 1L, (short)numDataNodes, 0L);
       // get the first blockid for the file
-      Block firstBlock = DFSTestUtil.getFirstBlock(fileSys, file);
+      ExtendedBlock firstBlock = DFSTestUtil.getFirstBlock(fileSys, file);
       // test PIPELINE_SETUP_CREATE on a finalized block
       testWrite(firstBlock, BlockConstructionStage.PIPELINE_SETUP_CREATE, 0L,
           "Cannot create an existing block", true);
@@ -240,8 +243,8 @@ public class TestDataTransferProtocol extends TestCase {
 
       /* Test writing to a new block */
       long newBlockId = firstBlock.getBlockId() + 1;
-      Block newBlock = new Block(newBlockId, 0, 
-          firstBlock.getGenerationStamp());
+      ExtendedBlock newBlock = new ExtendedBlock(firstBlock.getBlockPoolId(),
+          newBlockId, 0, firstBlock.getGenerationStamp());
 
       // test PIPELINE_SETUP_CREATE on a new block
       testWrite(newBlock, BlockConstructionStage.PIPELINE_SETUP_CREATE, 0L,
@@ -337,7 +340,8 @@ public class TestDataTransferProtocol extends TestCase {
     createFile(fileSys, file, fileLen);
 
     // get the first blockid for the file
-    Block firstBlock = DFSTestUtil.getFirstBlock(fileSys, file);
+    final ExtendedBlock firstBlock = DFSTestUtil.getFirstBlock(fileSys, file);
+    final String poolId = firstBlock.getBlockPoolId();
     long newBlockId = firstBlock.getBlockId() + 1;
 
     recvBuf.reset();
@@ -357,7 +361,7 @@ public class TestDataTransferProtocol extends TestCase {
     /* Test OP_WRITE_BLOCK */
     sendBuf.reset();
     DataTransferProtocol.Sender.opWriteBlock(sendOut, 
-        new Block(newBlockId), 0,
+        new ExtendedBlock(poolId, newBlockId), 0,
         BlockConstructionStage.PIPELINE_SETUP_CREATE, 0L, 0L, 0L, "cl", null,
         new DatanodeInfo[1], BlockTokenSecretManager.DUMMY_TOKEN);
     sendOut.writeByte((byte)DataChecksum.CHECKSUM_CRC32);
@@ -371,7 +375,7 @@ public class TestDataTransferProtocol extends TestCase {
     sendBuf.reset();
     recvBuf.reset();
     DataTransferProtocol.Sender.opWriteBlock(sendOut,
-        new Block(++newBlockId), 0,
+        new ExtendedBlock(poolId, ++newBlockId), 0,
         BlockConstructionStage.PIPELINE_SETUP_CREATE, 0L, 0L, 0L, "cl", null,
         new DatanodeInfo[1], BlockTokenSecretManager.DUMMY_TOKEN);
     sendOut.writeByte((byte)DataChecksum.CHECKSUM_CRC32);
@@ -395,7 +399,7 @@ public class TestDataTransferProtocol extends TestCase {
     sendBuf.reset();
     recvBuf.reset();
     DataTransferProtocol.Sender.opWriteBlock(sendOut, 
-        new Block(++newBlockId), 0,
+        new ExtendedBlock(poolId, ++newBlockId), 0,
         BlockConstructionStage.PIPELINE_SETUP_CREATE, 0L, 0L, 0L, "cl", null,
         new DatanodeInfo[1], BlockTokenSecretManager.DUMMY_TOKEN);
     sendOut.writeByte((byte)DataChecksum.CHECKSUM_CRC32);
@@ -418,7 +422,8 @@ public class TestDataTransferProtocol extends TestCase {
     
     /* Test OP_READ_BLOCK */
 
-    Block blk = new Block(firstBlock);
+    String bpid = cluster.getNamesystem().getBlockPoolId();
+    ExtendedBlock blk = new ExtendedBlock(bpid, firstBlock.getLocalBlock());
     long blkid = blk.getBlockId();
     // bad block id
     sendBuf.reset();

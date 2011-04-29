@@ -31,7 +31,7 @@ import java.util.Arrays;
 
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.fs.ChecksumException;
-import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.FSConstants;
 import org.apache.hadoop.hdfs.protocol.DataTransferProtocol.PacketHeader;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
@@ -47,7 +47,7 @@ class BlockSender implements java.io.Closeable, FSConstants {
   public static final Log LOG = DataNode.LOG;
   static final Log ClientTraceLog = DataNode.ClientTraceLog;
   
-  private Block block; // the block to read from
+  private ExtendedBlock block; // the block to read from
 
   /** the replica to read from */
   private final Replica replica;
@@ -83,21 +83,22 @@ class BlockSender implements java.io.Closeable, FSConstants {
   private volatile ChunkChecksum lastChunkChecksum = null;
 
   
-  BlockSender(Block block, long startOffset, long length,
+  BlockSender(ExtendedBlock block, long startOffset, long length,
               boolean corruptChecksumOk, boolean chunkOffsetOK,
               boolean verifyChecksum, DataNode datanode) throws IOException {
     this(block, startOffset, length, corruptChecksumOk, chunkOffsetOK,
          verifyChecksum, datanode, null);
   }
 
-  BlockSender(Block block, long startOffset, long length,
+  BlockSender(ExtendedBlock block, long startOffset, long length,
               boolean corruptChecksumOk, boolean chunkOffsetOK,
               boolean verifyChecksum, DataNode datanode, String clientTraceFmt)
       throws IOException {
     try {
       this.block = block;
       synchronized(datanode.data) { 
-        this.replica = datanode.data.getReplica(block.getBlockId());
+        this.replica = datanode.data.getReplica(block.getBlockPoolId(), 
+            block.getBlockId());
         if (replica == null) {
           throw new ReplicaNotFoundException(block);
         }
@@ -153,9 +154,8 @@ class BlockSender implements java.io.Closeable, FSConstants {
       this.clientTraceFmt = clientTraceFmt;
 
       if ( !corruptChecksumOk || datanode.data.metaFileExists(block) ) {
-        checksumIn = new DataInputStream(
-                new BufferedInputStream(datanode.data.getMetaDataInputStream(block),
-                                        BUFFER_SIZE));
+        checksumIn = new DataInputStream(new BufferedInputStream(datanode.data
+            .getMetaDataInputStream(block), BUFFER_SIZE));
 
         // read and handle the common header here. For now just a version
        BlockMetadataHeader header = BlockMetadataHeader.readHeader(checksumIn);
@@ -201,7 +201,8 @@ class BlockSender implements java.io.Closeable, FSConstants {
           || (length + startOffset) > endOffset) {
         String msg = " Offset " + startOffset + " and length " + length
         + " don't match block " + block + " ( blockLen " + endOffset + " )";
-        LOG.warn(datanode.dnRegistration + ":sendBlock() : " + msg);
+        LOG.warn(datanode.getDNRegistrationForBP(block.getBlockPoolId()) +
+            ":sendBlock() : " + msg);
         throw new IOException(msg);
       }
       

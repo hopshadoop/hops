@@ -140,7 +140,7 @@ public class OfflineEditsViewerHelper {
     // no check, if it's not it throws an exception which is what we want
     DistributedFileSystem dfs =
       (DistributedFileSystem)cluster.getFileSystem();
-    FileContext fc = FileContext.getFileContext(cluster.getURI(), config);
+    FileContext fc = FileContext.getFileContext(cluster.getURI(0), config);
     // OP_ADD 0, OP_SET_GENSTAMP 10
     Path pathFileCreate = new Path("/file_create");
     FSDataOutputStream s = dfs.create(pathFileCreate);

@@ -44,6 +44,7 @@ import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.HDFSPolicyProvider;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.protocol.Block;
@@ -53,6 +54,7 @@ import org.apache.hadoop.hdfs.protocol.CorruptFileBlocks;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.DirectoryListing;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.FSConstants;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
@@ -171,6 +173,8 @@ public class NameNode implements NamenodeProtocols, FSConstants {
 
   public static final Log LOG = LogFactory.getLog(NameNode.class.getName());
   public static final Log stateChangeLog = LogFactory.getLog("org.apache.hadoop.hdfs.StateChange");
+  
+  public static final String NAMENODE_ADDRESS_ATTRIBUTE_KEY = "name.node.address";
 
   protected FSNamesystem namesystem; 
   protected NamenodeRole role;
@@ -226,7 +230,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
   public static InetSocketAddress getAddress(String address) {
     return NetUtils.createSocketAddr(address, DEFAULT_PORT);
   }
-
+  
   /**
    * Set the configuration property for the service rpc address
    * to address
@@ -255,6 +259,16 @@ public class NameNode implements NamenodeProtocols, FSConstants {
 
   public static InetSocketAddress getAddress(Configuration conf) {
     URI filesystemURI = FileSystem.getDefaultUri(conf);
+    return getAddress(filesystemURI);
+  }
+
+
+  /**
+   * TODO:FEDERATION
+   * @param filesystemURI
+   * @return address of file system
+   */
+  public static InetSocketAddress getAddress(URI filesystemURI) {
     String authority = filesystemURI.getAuthority();
     if (authority == null) {
       throw new IllegalArgumentException(String.format(
@@ -435,14 +449,6 @@ public class NameNode implements NamenodeProtocols, FSConstants {
     this.emptier.setDaemon(true);
     this.emptier.start();
   }
-
-  public static String getInfoServer(Configuration conf) {
-    return UserGroupInformation.isSecurityEnabled() ? conf.get(
-        DFSConfigKeys.DFS_NAMENODE_HTTPS_ADDRESS_KEY,
-        DFSConfigKeys.DFS_NAMENODE_HTTPS_ADDRESS_DEFAULT) : conf.get(
-        DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY,
-        DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_DEFAULT);
-  }
   
   private void startHttpServer(final Configuration conf) throws IOException {
     final InetSocketAddress infoSocAddr = getHttpServerAddress(conf);
@@ -497,7 +503,8 @@ public class NameNode implements NamenodeProtocols, FSConstants {
                 .getPort());
           }
           httpServer.setAttribute("name.node", NameNode.this);
-          httpServer.setAttribute("name.node.address", getNameNodeAddress());
+          httpServer.setAttribute(NAMENODE_ADDRESS_ATTRIBUTE_KEY,
+              getNameNodeAddress());
           httpServer.setAttribute("name.system.image", getFSImage());
           httpServer.setAttribute(JspHelper.CURRENT_CONF, conf);
           httpServer.addInternalServlet("getDelegationToken",
@@ -583,6 +590,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
       throws IOException { 
     this.role = role;
     try {
+      initializeGenericKeys(conf);
       initialize(conf);
     } catch (IOException e) {
       this.stop();
@@ -816,7 +824,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
   @Override
   public LocatedBlock addBlock(String src,
                                String clientName,
-                               Block previous,
+                               ExtendedBlock previous,
                                DatanodeInfo[] excludedNodes)
       throws IOException {
     if(stateChangeLog.isDebugEnabled()) {
@@ -838,7 +846,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
   }
 
   @Override
-  public LocatedBlock getAdditionalDatanode(final String src, final Block blk,
+  public LocatedBlock getAdditionalDatanode(final String src, final ExtendedBlock blk,
       final DatanodeInfo[] existings, final DatanodeInfo[] excludes,
       final int numAdditionalNodes, final String clientName
       ) throws IOException {
@@ -867,7 +875,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
   /**
    * The client needs to give up on the block.
    */
-  public void abandonBlock(Block b, String src, String holder)
+  public void abandonBlock(ExtendedBlock b, String src, String holder)
       throws IOException {
     if(stateChangeLog.isDebugEnabled()) {
       stateChangeLog.debug("*BLOCK* NameNode.abandonBlock: "
@@ -879,7 +887,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
   }
 
   /** {@inheritDoc} */
-  public boolean complete(String src, String clientName, Block last)
+  public boolean complete(String src, String clientName, ExtendedBlock last)
       throws IOException {
     if(stateChangeLog.isDebugEnabled()) {
       stateChangeLog.debug("*DIR* NameNode.complete: "
@@ -897,7 +905,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
   public void reportBadBlocks(LocatedBlock[] blocks) throws IOException {
     stateChangeLog.info("*DIR* NameNode.reportBadBlocks");
     for (int i = 0; i < blocks.length; i++) {
-      Block blk = blocks[i].getBlock();
+      ExtendedBlock blk = blocks[i].getBlock();
       DatanodeInfo[] nodes = blocks[i].getLocations();
       for (int j = 0; j < nodes.length; j++) {
         DatanodeInfo dn = nodes[j];
@@ -908,21 +916,21 @@ public class NameNode implements NamenodeProtocols, FSConstants {
 
   /** {@inheritDoc} */
   @Override
-  public LocatedBlock updateBlockForPipeline(Block block, String clientName)
+  public LocatedBlock updateBlockForPipeline(ExtendedBlock block, String clientName)
       throws IOException {
     return namesystem.updateBlockForPipeline(block, clientName);
   }
 
 
   @Override
-  public void updatePipeline(String clientName, Block oldBlock,
-      Block newBlock, DatanodeID[] newNodes)
+  public void updatePipeline(String clientName, ExtendedBlock oldBlock,
+      ExtendedBlock newBlock, DatanodeID[] newNodes)
       throws IOException {
     namesystem.updatePipeline(clientName, oldBlock, newBlock, newNodes);
   }
   
   /** {@inheritDoc} */
-  public void commitBlockSynchronization(Block block,
+  public void commitBlockSynchronization(ExtendedBlock block,
       long newgenerationstamp, long newlength,
       boolean closeFile, boolean deleteblock, DatanodeID[] newtargets)
       throws IOException {
@@ -1268,14 +1276,21 @@ public class NameNode implements NamenodeProtocols, FSConstants {
                                        long capacity,
                                        long dfsUsed,
                                        long remaining,
+                                       long blockPoolUsed,
                                        int xmitsInProgress,
                                        int xceiverCount) throws IOException {
     verifyRequest(nodeReg);
     return namesystem.handleHeartbeat(nodeReg, capacity, dfsUsed, remaining,
-        xceiverCount, xmitsInProgress);
+        blockPoolUsed, xceiverCount, xmitsInProgress);
   }
 
+  /**
+   * sends block report to the corresponding namenode (for the poolId)
+   * @return DataNodeCommand from the namenode
+   * @throws IOException
+   */
   public DatanodeCommand blockReport(DatanodeRegistration nodeReg,
+                                     String poolId,
                                      long[] blocks) throws IOException {
     verifyRequest(nodeReg);
     BlockListAsLongs blist = new BlockListAsLongs(blocks);
@@ -1285,13 +1300,14 @@ public class NameNode implements NamenodeProtocols, FSConstants {
            + " blocks");
     }
 
-    namesystem.processReport(nodeReg, blist);
+    namesystem.processReport(nodeReg, poolId, blist);
     if (getFSImage().isUpgradeFinalized())
-      return DatanodeCommand.FINALIZE;
+      return new DatanodeCommand.Finalize(poolId);
     return null;
   }
 
   public void blockReceived(DatanodeRegistration nodeReg, 
+                            String poolId,
                             Block blocks[],
                             String delHints[]) throws IOException {
     verifyRequest(nodeReg);
@@ -1300,7 +1316,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
           +"from "+nodeReg.getName()+" "+blocks.length+" blocks.");
     }
     for (int i = 0; i < blocks.length; i++) {
-      namesystem.blockReceived(nodeReg, blocks[i], delHints[i]);
+      namesystem.blockReceived(nodeReg, poolId, blocks[i], delHints[i]);
     }
   }
 
@@ -1343,8 +1359,12 @@ public class NameNode implements NamenodeProtocols, FSConstants {
    */
   public void verifyRequest(NodeRegistration nodeReg) throws IOException {
     verifyVersion(nodeReg.getVersion());
-    if (!namesystem.getRegistrationID().equals(nodeReg.getRegistrationID()))
+    if (!namesystem.getRegistrationID().equals(nodeReg.getRegistrationID())) {
+      LOG.warn("Invalid registrationID - expected: "
+          + namesystem.getRegistrationID() + " received: "
+          + nodeReg.getRegistrationID());
       throw new UnregisteredNodeException(nodeReg);
+    }
   }
     
   /**
@@ -1379,10 +1399,19 @@ public class NameNode implements NamenodeProtocols, FSConstants {
 
   /**
    * Returns the address on which the NameNodes is listening to.
-   * @return the address on which the NameNodes is listening to.
+   * @return namenode rpc address
    */
   public InetSocketAddress getNameNodeAddress() {
     return rpcAddress;
+  }
+  
+  /**
+   * Returns namenode service rpc address, if set. Otherwise returns
+   * namenode rpc address.
+   * @return namenode service rpc address used by datanodes
+   */
+  public InetSocketAddress getServiceRpcAddress() {
+    return serviceRPCAddress != null ? serviceRPCAddress : rpcAddress;
   }
 
   /**
@@ -1430,7 +1459,7 @@ public class NameNode implements NamenodeProtocols, FSConstants {
         continue;
       if (isConfirmationNeeded) {
         System.err.print("Re-format filesystem in " + curDir +" ? (Y or N) ");
-        if (!(System.in.read() == 'Y')) {
+        if (System.in.read() != 'Y') {
           System.err.println("Format aborted in "+ curDir);
           return true;
         }
@@ -1438,9 +1467,26 @@ public class NameNode implements NamenodeProtocols, FSConstants {
       }
     }
 
-    FSNamesystem nsys = new FSNamesystem(new FSImage(dirsToFormat,
-                                         editDirsToFormat), conf);
-    nsys.dir.fsImage.getStorage().format();
+    FSImage fsImage = new FSImage(dirsToFormat, editDirsToFormat);
+    FSNamesystem nsys = new FSNamesystem(fsImage, conf);
+    
+    // if clusterID is not provided - see if you can find the current one
+    String clusterId = StartupOption.FORMAT.getClusterId();
+    if(clusterId == null || clusterId.equals("")) {
+      // try to get one from the existing storage
+      clusterId = fsImage.getStorage().determineClusterId();
+      if (clusterId == null || clusterId.equals("")) {
+        throw new IllegalArgumentException("Format must be provided with clusterid");
+      }
+      if(isConfirmationNeeded) {
+        System.err.print("Use existing cluster id=" + clusterId + "? (Y or N)");
+        if(System.in.read() != 'Y') {
+          throw new IllegalArgumentException("Format must be provided with clusterid");
+        }
+        while(System.in.read() != '\n'); // discard the enter-key
+      }
+    }
+    nsys.dir.fsImage.getStorage().format(clusterId);
     return false;
   }
 
@@ -1499,7 +1545,8 @@ public class NameNode implements NamenodeProtocols, FSConstants {
       "Usage: java NameNode [" +
       StartupOption.BACKUP.getName() + "] | [" +
       StartupOption.CHECKPOINT.getName() + "] | [" +
-      StartupOption.FORMAT.getName() + "] | [" +
+      StartupOption.FORMAT.getName() + "[" + StartupOption.CLUSTERID.getName() +  
+      " cid ]] | [" +
       StartupOption.UPGRADE.getName() + "] | [" +
       StartupOption.ROLLBACK.getName() + "] | [" +
       StartupOption.FINALIZE.getName() + "] | [" +
@@ -1513,6 +1560,14 @@ public class NameNode implements NamenodeProtocols, FSConstants {
       String cmd = args[i];
       if (StartupOption.FORMAT.getName().equalsIgnoreCase(cmd)) {
         startOpt = StartupOption.FORMAT;
+        // might be followed by two args
+        if (i + 2 < argsLen
+            && args[i + 1].equalsIgnoreCase(StartupOption.CLUSTERID.getName())) {
+          i += 2;
+          startOpt.setClusterId(args[i]);
+        }
+      } else if (StartupOption.GENCLUSTERID.getName().equalsIgnoreCase(cmd)) {
+        startOpt = StartupOption.GENCLUSTERID;
       } else if (StartupOption.REGULAR.getName().equalsIgnoreCase(cmd)) {
         startOpt = StartupOption.REGULAR;
       } else if (StartupOption.BACKUP.getName().equalsIgnoreCase(cmd)) {
@@ -1521,6 +1576,12 @@ public class NameNode implements NamenodeProtocols, FSConstants {
         startOpt = StartupOption.CHECKPOINT;
       } else if (StartupOption.UPGRADE.getName().equalsIgnoreCase(cmd)) {
         startOpt = StartupOption.UPGRADE;
+        // might be followed by two args
+        if (i + 2 < argsLen
+            && args[i + 1].equalsIgnoreCase(StartupOption.CLUSTERID.getName())) {
+          i += 2;
+          startOpt.setClusterId(args[i]);
+        }
       } else if (StartupOption.ROLLBACK.getName().equalsIgnoreCase(cmd)) {
         startOpt = StartupOption.ROLLBACK;
       } else if (StartupOption.FINALIZE.getName().equalsIgnoreCase(cmd)) {
@@ -1558,6 +1619,11 @@ public class NameNode implements NamenodeProtocols, FSConstants {
         boolean aborted = format(conf, true);
         System.exit(aborted ? 1 : 0);
         return null; // avoid javac warning
+      case GENCLUSTERID:
+        System.err.println("Generating new cluster id:");
+        System.out.println(NNStorage.newClusterID());
+        System.exit(0);
+        return null;
       case FINALIZE:
         aborted = finalize(conf, true);
         System.exit(aborted ? 1 : 0);
@@ -1567,6 +1633,47 @@ public class NameNode implements NamenodeProtocols, FSConstants {
         return new BackupNode(conf, startOpt.toNodeRole());
       default:
         return new NameNode(conf);
+    }
+  }
+
+  /**
+   * In federation configuration is set for a set of
+   * namenode and secondary namenode/backup/checkpointer, which are
+   * grouped under a logical nameservice ID. The configuration keys specific 
+   * to them have suffix set to configured nameserviceId.
+   * 
+   * This method copies the value from specific key of format key.nameserviceId
+   * to key, to set up the generic configuration. Once this is done, only
+   * generic version of the configuration is read in rest of the code, for
+   * backward compatibility and simpler code changes.
+   * 
+   * @param conf
+   *          Configuration object to lookup specific key and to set the value
+   *          to the key passed. Note the conf object is modified
+   * @see DFSUtil#setGenericConf()
+   */
+  static void initializeGenericKeys(Configuration conf) {
+    final String nameserviceId = DFSUtil.getNameServiceId(conf);
+    if ((nameserviceId == null) || nameserviceId.isEmpty()) {
+      return;
+    }
+    
+    DFSUtil.setGenericConf(conf, nameserviceId,
+        DFSConfigKeys.DFS_NAMENODE_RPC_ADDRESS_KEY,
+        DFSConfigKeys.DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY,
+        DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY,
+        DFSConfigKeys.DFS_NAMENODE_HTTPS_ADDRESS_KEY,
+        DFSConfigKeys.DFS_NAMENODE_KEYTAB_FILE_KEY,
+        DFSConfigKeys.DFS_NAMENODE_SECONDARY_HTTP_ADDRESS_KEY,
+        DFSConfigKeys.DFS_SECONDARY_NAMENODE_KEYTAB_FILE_KEY,
+        DFSConfigKeys.DFS_NAMENODE_BACKUP_ADDRESS_KEY,
+        DFSConfigKeys.DFS_NAMENODE_BACKUP_HTTP_ADDRESS_KEY,
+        DFSConfigKeys.DFS_NAMENODE_BACKUP_SERVICE_RPC_ADDRESS_KEY);
+    
+    if (conf.get(DFSConfigKeys.DFS_NAMENODE_RPC_ADDRESS_KEY) != null) {
+      URI defaultUri = URI.create(FSConstants.HDFS_URI_SCHEME + "://"
+          + conf.get(DFSConfigKeys.DFS_NAMENODE_RPC_ADDRESS_KEY));
+      conf.set(DFSConfigKeys.FS_DEFAULT_NAME_KEY, defaultUri.toString());
     }
   }
     

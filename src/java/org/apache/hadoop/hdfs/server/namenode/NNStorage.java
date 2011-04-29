@@ -27,12 +27,16 @@ import java.io.DataInputStream;
 import java.io.FileInputStream;
 import java.io.Closeable;
 import java.net.URI;
+import java.net.UnknownHostException;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import java.util.Properties;
+import java.util.UUID;
 import java.io.RandomAccessFile;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -41,6 +45,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.protocol.FSConstants;
 import org.apache.hadoop.hdfs.server.common.Storage;
+import org.apache.hadoop.hdfs.server.common.StorageInfo;
 import org.apache.hadoop.hdfs.server.common.UpgradeManager;
 import org.apache.hadoop.hdfs.server.common.Util;
 import org.apache.hadoop.hdfs.server.common.HdfsConstants.NodeType;
@@ -51,6 +56,7 @@ import org.apache.hadoop.hdfs.server.namenode.JournalStream.JournalType;
 import org.apache.hadoop.conf.Configuration;
 
 import org.apache.hadoop.io.MD5Hash;
+import org.apache.hadoop.net.DNS;
 
 /**
  * NNStorage is responsible for management of the StorageDirectories used by
@@ -134,6 +140,7 @@ public class NNStorage extends Storage implements Closeable {
   final private List<NNStorageListener> listeners;
   private UpgradeManager upgradeManager = null;
   protected MD5Hash imageDigest = null;
+  protected String blockpoolID = ""; // id of the block pool
 
   /**
    * flag that controls if we try to restore failed storages
@@ -159,6 +166,19 @@ public class NNStorage extends Storage implements Closeable {
 
     storageDirs = new CopyOnWriteArrayList<StorageDirectory>();
     this.listeners = new CopyOnWriteArrayList<NNStorageListener>();
+  }
+
+  /**
+   * Construct the NNStorage.
+   * @param storageInfo storage information
+   * @param bpid block pool Id
+   */
+  public NNStorage(StorageInfo storageInfo, String bpid) {
+    super(NodeType.NAME_NODE, storageInfo);
+
+    storageDirs = new CopyOnWriteArrayList<StorageDirectory>();
+    this.listeners = new CopyOnWriteArrayList<NNStorageListener>();
+    this.blockpoolID = bpid;
   }
 
   @Override // Storage
@@ -553,7 +573,6 @@ public class NNStorage extends Storage implements Closeable {
    * in this filesystem. */
   private void format(StorageDirectory sd) throws IOException {
     sd.clearDirectory(); // create currrent dir
-
     for (NNStorageListener listener : listeners) {
       listener.formatOccurred(sd);
     }
@@ -566,9 +585,11 @@ public class NNStorage extends Storage implements Closeable {
   /**
    * Format all available storage directories.
    */
-  public void format() throws IOException {
+  public void format(String clusterId) throws IOException {
     this.layoutVersion = FSConstants.LAYOUT_VERSION;
     this.namespaceID = newNamespaceID();
+    this.clusterID = clusterId;
+    this.blockpoolID = newBlockPoolID();
     this.cTime = 0L;
     this.setCheckpointTime(now());
     for (Iterator<StorageDirectory> it =
@@ -598,6 +619,7 @@ public class NNStorage extends Storage implements Closeable {
       newID = r.nextInt(0x7FFFFFFF);  // use 31 bits only
     return newID;
   }
+
 
   /**
    * Move {@code current} to {@code lastcheckpoint.tmp} and
@@ -647,9 +669,17 @@ public class NNStorage extends Storage implements Closeable {
                            StorageDirectory sd
                            ) throws IOException {
     super.getFields(props, sd);
-    if (layoutVersion == 0)
+    if (layoutVersion == 0) {
       throw new IOException("NameNode directory "
                             + sd.getRoot() + " is not formatted.");
+    }
+
+    // No Block pool ID in version LAST_PRE_FEDERATION_LAYOUT_VERSION or before
+    if (layoutVersion < LAST_PRE_FEDERATION_LAYOUT_VERSION) {
+      String sbpid = props.getProperty("blockpoolID");
+      setBlockPoolID(sd.getRoot(), sbpid);
+    }
+    
     String sDUS, sDUV;
     sDUS = props.getProperty("distributedUpgradeState");
     sDUV = props.getProperty("distributedUpgradeVersion");
@@ -689,6 +719,10 @@ public class NNStorage extends Storage implements Closeable {
                            StorageDirectory sd
                            ) throws IOException {
     super.setFields(props, sd);
+    // Set blockpoolID in version LAST_PRE_FEDERATION_LAYOUT_VERSION or before
+    if (layoutVersion < LAST_PRE_FEDERATION_LAYOUT_VERSION) {
+      props.setProperty("blockpoolID", blockpoolID);
+    }
     boolean uState = getDistributedUpgradeState();
     int uVersion = getDistributedUpgradeVersion();
     if(uState && uVersion != getLayoutVersion()) {
@@ -890,5 +924,105 @@ public class NNStorage extends Storage implements Closeable {
 
     lsd = listStorageDirectories();
     LOG.debug("at the end current list of storage dirs:" + lsd);
+  }
+  
+  /**
+   * Generate new clusterID.
+   * 
+   * clusterID is a persistent attribute of the cluster.
+   * It is generated when the cluster is created and remains the same
+   * during the life cycle of the cluster.  When a new name node is formated, if 
+   * this is a new cluster, a new clusterID is geneated and stored.  Subsequent 
+   * name node must be given the same ClusterID during its format to be in the 
+   * same cluster.
+   * When a datanode register it receive the clusterID and stick with it.
+   * If at any point, name node or data node tries to join another cluster, it 
+   * will be rejected.
+   * 
+   * @return new clusterID
+   */ 
+  public static String newClusterID() {
+    return "CID-" + UUID.randomUUID().toString();
+  }
+
+  void setClusterID(String cid) {
+    clusterID = cid;
+  }
+
+  /**
+   * try to find current cluster id in the VERSION files
+   * returns first cluster id found in any VERSION file
+   * null in case none found
+   * @return clusterId or null in case no cluster id found
+   */
+  public String determineClusterId() {
+    String cid = null;
+    Iterator<StorageDirectory> sdit = dirIterator(NameNodeDirType.IMAGE);
+    while(sdit.hasNext()) {
+      StorageDirectory sd = sdit.next();
+      try {
+        Properties props = sd.readFrom(sd.getVersionFile());
+        cid = props.getProperty("clusterID");
+        LOG.info("current cluster id for sd="+sd.getCurrentDir() + 
+            ";lv=" + layoutVersion + ";cid=" + cid);
+        
+        if(cid != null && !cid.equals(""))
+          return cid;
+      } catch (Exception e) {
+        LOG.warn("this sd not available: " + e.getLocalizedMessage());
+      } //ignore
+    }
+    LOG.warn("couldn't find any VERSION file containing valid ClusterId");
+    return null;
+  }
+
+  /**
+   * Generate new blockpoolID.
+   * 
+   * @return new blockpoolID
+   */ 
+  String newBlockPoolID() throws UnknownHostException{
+    String ip = "unknownIP";
+    try {
+      ip = DNS.getDefaultIP("default");
+    } catch (UnknownHostException e) {
+      LOG.warn("Could not find ip address of \"default\" inteface.");
+      throw e;
+    }
+    
+    int rand = 0;
+    try {
+      rand = SecureRandom.getInstance("SHA1PRNG").nextInt(Integer.MAX_VALUE);
+    } catch (NoSuchAlgorithmException e) {
+      final Random R = new Random();
+      LOG.warn("Could not use SecureRandom");
+      rand = R.nextInt(Integer.MAX_VALUE);
+    }
+    String bpid = "BP-" + rand + "-"+ ip + "-" + System.currentTimeMillis();
+    return bpid;
+  }
+
+  /** Validate and set block pool ID */
+  void setBlockPoolID(String bpid) {
+    blockpoolID = bpid;
+  }
+
+  /** Validate and set block pool ID */
+  private void setBlockPoolID(File storage, String bpid)
+      throws InconsistentFSStateException {
+    if (bpid == null || bpid.equals("")) {
+      throw new InconsistentFSStateException(storage, "file "
+          + Storage.STORAGE_FILE_VERSION + " has no block pool Id.");
+    }
+    
+    if (!blockpoolID.equals("") && !blockpoolID.equals(bpid)) {
+      throw new InconsistentFSStateException(storage,
+          "Unexepcted blockpoolID " + bpid + " . Expected " + blockpoolID);
+    }
+    blockpoolID = bpid;
+  }
+  
+  public String getBlockPoolID() {
+    return blockpoolID;
   }
 }

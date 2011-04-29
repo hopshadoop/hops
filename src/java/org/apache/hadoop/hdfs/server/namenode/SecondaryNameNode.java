@@ -33,7 +33,10 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.DFSUtil.ErrorSimulator;
+import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.protocol.FSConstants;
 import org.apache.hadoop.hdfs.server.common.HdfsConstants;
 import org.apache.hadoop.hdfs.server.common.InconsistentFSStateException;
@@ -43,8 +46,6 @@ import org.apache.hadoop.hdfs.server.common.Storage.StorageState;
 import org.apache.hadoop.hdfs.server.namenode.NNStorage.NameNodeDirType;
 import org.apache.hadoop.hdfs.server.namenode.NNStorage.NameNodeFile;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocol;
-import org.apache.hadoop.hdfs.DFSConfigKeys;
-import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.http.HttpServer;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RemoteException;
@@ -124,6 +125,7 @@ public class SecondaryNameNode implements Runnable {
    */
   public SecondaryNameNode(Configuration conf)  throws IOException {
     try {
+      NameNode.initializeGenericKeys(conf);
       initialize(conf);
     } catch(IOException e) {
       shutdown();
@@ -381,6 +383,10 @@ public class SecondaryNameNode implements Runnable {
         throw new RuntimeException(e);
       }
   }
+  
+  InetSocketAddress getNameNodeAddress() {
+    return nameNodeAddr;
+  }
 
   /**
    * Copy the new fsimage into the NameNode
@@ -403,7 +409,7 @@ public class SecondaryNameNode implements Runnable {
       throw new IOException("This is not a DFS");
     }
 
-    String configuredAddress = NameNode.getInfoServer(conf);
+    String configuredAddress = DFSUtil.getInfoServer(null, conf);
     InetSocketAddress sockAddr = NetUtils.createSocketAddr(configuredAddress);
     if (sockAddr.getAddress().isAnyLocalAddress()) {
       if(UserGroupInformation.isSecurityEnabled()) {
@@ -708,9 +714,12 @@ public class SecondaryNameNode implements Runnable {
       if (loadImage) {
         // to avoid assert in loadFSImage()
         this.getStorage().layoutVersion = -1;
-        loadFSImage(getStorage().getStorageFile(sdName, NameNodeFile.IMAGE));
+        getStorage();
+        loadFSImage(NNStorage.getStorageFile(sdName, NameNodeFile.IMAGE));
       }
       loadFSEdits(sdEdits);
+      storage.setClusterID(sig.getClusterID());
+      storage.setBlockPoolID(sig.getBlockpoolID());
       sig.validateStorageInfo(this);
       saveNamespace(false);
     }

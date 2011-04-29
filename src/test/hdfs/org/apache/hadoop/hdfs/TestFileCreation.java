@@ -27,12 +27,9 @@ import java.util.EnumSet;
 
 import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FileAlreadyExistsException;
-import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FsServerDefaults;
 import org.apache.hadoop.fs.ParentNotDirectoryException;
@@ -40,6 +37,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.FSConstants;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
@@ -799,8 +797,9 @@ public class TestFileCreation extends junit.framework.TestCase {
       for(DatanodeInfo datanodeinfo: locatedblock.getLocations()) {
         DataNode datanode = cluster.getDataNode(datanodeinfo.ipcPort);
         FSDataset dataset = (FSDataset)datanode.data;
-        Block b = dataset.getStoredBlock(locatedblock.getBlock().getBlockId());
-        File blockfile = dataset.findBlockFile(b.getBlockId());
+        ExtendedBlock blk = locatedblock.getBlock();
+        Block b = dataset.getStoredBlock(blk.getBlockPoolId(), blk.getBlockId());
+        File blockfile = dataset.findBlockFile(blk.getBlockPoolId(), b.getBlockId());
         System.out.println("blockfile=" + blockfile);
         if (blockfile != null) {
           BufferedReader in = new BufferedReader(new FileReader(blockfile));
@@ -865,10 +864,10 @@ public class TestFileCreation extends junit.framework.TestCase {
       dfs = (DistributedFileSystem)cluster.getFileSystem();
 
       // create a new file.
-      final String f = DIR + "dhrubashutdown";
+      final String f = DIR + "testFsCloseAfterClusterShutdown";
       final Path fpath = new Path(f);
       FSDataOutputStream out = TestFileCreation.createFile(dfs, fpath, DATANODE_NUM);
-      out.write("something_dhruba".getBytes());
+      out.write("something_test".getBytes());
       out.hflush();    // ensure that block is allocated
 
       // shutdown last datanode in pipeline.

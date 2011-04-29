@@ -154,7 +154,7 @@ class FSDirectory implements Closeable {
     // format before starting up if requested
     if (startOpt == StartupOption.FORMAT) {
       fsImage.getStorage().setStorageDirectories(dataDirs, editsDirs);
-      fsImage.getStorage().format();
+      fsImage.getStorage().format(fsImage.getStorage().determineClusterId()); // reuse current id
       startOpt = StartupOption.REGULAR;
     }
     try {

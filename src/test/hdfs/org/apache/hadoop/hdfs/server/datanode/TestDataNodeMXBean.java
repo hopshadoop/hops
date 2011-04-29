@@ -44,6 +44,9 @@ public class TestDataNodeMXBean {
 
       MBeanServer mbs = ManagementFactory.getPlatformMBeanServer(); 
       ObjectName mxbeanName = new ObjectName("HadoopInfo:type=DataNodeInfo");
+      // get attribute "ClusterId"
+      String clusterId = (String) mbs.getAttribute(mxbeanName, "ClusterId");
+      Assert.assertEquals(datanode.getClusterId(), clusterId);
       // get attribute "Version"
       String version = (String)mbs.getAttribute(mxbeanName, "Version");
       Assert.assertEquals(datanode.getVersion(),version);
@@ -53,10 +56,10 @@ public class TestDataNodeMXBean {
       // get attribute "HttpPort"
       String httpPort = (String)mbs.getAttribute(mxbeanName, "HttpPort");
       Assert.assertEquals(datanode.getHttpPort(),httpPort);
-      // get attribute "NamenodeAddress"
-      String namenodeAddress = (String)mbs.getAttribute(mxbeanName, 
-          "NamenodeAddress");
-      Assert.assertEquals(datanode.getNamenodeAddress(),namenodeAddress);
+      // get attribute "NamenodeAddresses"
+      String namenodeAddresses = (String)mbs.getAttribute(mxbeanName, 
+          "NamenodeAddresses");
+      Assert.assertEquals(datanode.getNamenodeAddresses(),namenodeAddresses);
       // get attribute "getVolumeInfo"
       String volumeInfo = (String)mbs.getAttribute(mxbeanName, "VolumeInfo");
       Assert.assertEquals(replaceDigits(datanode.getVolumeInfo()),

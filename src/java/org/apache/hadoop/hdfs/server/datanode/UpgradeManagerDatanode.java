@@ -22,6 +22,7 @@ import java.io.IOException;
 import org.apache.hadoop.hdfs.protocol.FSConstants;
 import org.apache.hadoop.hdfs.server.common.HdfsConstants;
 import org.apache.hadoop.hdfs.server.common.UpgradeManager;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
 import org.apache.hadoop.hdfs.server.protocol.UpgradeCommand;
 import org.apache.hadoop.util.Daemon;
@@ -38,10 +39,12 @@ import org.apache.hadoop.util.Daemon;
 class UpgradeManagerDatanode extends UpgradeManager {
   DataNode dataNode = null;
   Daemon upgradeDaemon = null;
+  String bpid = null;
 
-  UpgradeManagerDatanode(DataNode dataNode) {
+  UpgradeManagerDatanode(DataNode dataNode, String bpid) {
     super();
     this.dataNode = dataNode;
+    this.bpid = bpid;
   }
 
   public HdfsConstants.NodeType getType() {
@@ -52,11 +55,11 @@ class UpgradeManagerDatanode extends UpgradeManager {
     if( ! super.initializeUpgrade())
       return; // distr upgrade is not needed
     DataNode.LOG.info("\n   Distributed upgrade for DataNode " 
-        + dataNode.dnRegistration.getName() 
+        + dataNode.getMachineName() 
         + " version " + getUpgradeVersion() + " to current LV " 
         + FSConstants.LAYOUT_VERSION + " is initialized.");
     UpgradeObjectDatanode curUO = (UpgradeObjectDatanode)currentUpgrades.first();
-    curUO.setDatanode(dataNode);
+    curUO.setDatanode(dataNode, this.bpid);
     upgradeState = curUO.preUpgradeAction(nsInfo);
     // upgradeState is true if the data-node should start the upgrade itself
   }
@@ -89,7 +92,8 @@ class UpgradeManagerDatanode extends UpgradeManager {
           "UpgradeManagerDatanode.currentUpgrades is not null.";
         assert upgradeDaemon == null : 
           "UpgradeManagerDatanode.upgradeDaemon is not null.";
-        dataNode.namenode.processUpgradeCommand(broadcastCommand);
+        DatanodeProtocol nn = dataNode.getBPNamenode(bpid);
+        nn.processUpgradeCommand(broadcastCommand);
         return true;
       }
     }
@@ -104,12 +108,12 @@ class UpgradeManagerDatanode extends UpgradeManager {
     }
     upgradeState = true;
     UpgradeObjectDatanode curUO = (UpgradeObjectDatanode)currentUpgrades.first();
-    curUO.setDatanode(dataNode);
+    curUO.setDatanode(dataNode, this.bpid);
     curUO.startUpgrade();
     upgradeDaemon = new Daemon(curUO);
     upgradeDaemon.start();
     DataNode.LOG.info("\n   Distributed upgrade for DataNode " 
-        + dataNode.dnRegistration.getName() 
+        + dataNode.getMachineName() 
         + " version " + getUpgradeVersion() + " to current LV " 
         + FSConstants.LAYOUT_VERSION + " is started.");
     return true;
@@ -124,7 +128,7 @@ class UpgradeManagerDatanode extends UpgradeManager {
     if(startUpgrade()) // upgrade started
       return;
     throw new IOException(
-        "Distributed upgrade for DataNode " + dataNode.dnRegistration.getName() 
+        "Distributed upgrade for DataNode " + dataNode.getMachineName() 
         + " version " + getUpgradeVersion() + " to current LV " 
         + FSConstants.LAYOUT_VERSION + " cannot be started. "
         + "The upgrade object is not defined.");
@@ -139,7 +143,7 @@ class UpgradeManagerDatanode extends UpgradeManager {
     currentUpgrades = null;
     upgradeDaemon = null;
     DataNode.LOG.info("\n   Distributed upgrade for DataNode " 
-        + dataNode.dnRegistration.getName() 
+        + dataNode.getMachineName()
         + " version " + getUpgradeVersion() + " to current LV " 
         + FSConstants.LAYOUT_VERSION + " is complete.");
   }

@@ -22,6 +22,7 @@ import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
 import java.lang.management.MemoryUsage;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.URLEncoder;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
@@ -29,11 +30,13 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
+import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.jsp.JspWriter;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
@@ -131,7 +134,12 @@ class NamenodeJspHelper {
         + "\n  <tr><td id='col1'>Compiled:</td><td>" + VersionInfo.getDate()
         + " by " + VersionInfo.getUser() + " from " + VersionInfo.getBranch()
         + "\n  <tr><td id='col1'>Upgrades:</td><td>"
-        + getUpgradeStatusText(fsn) + "\n</table></div>";
+        + getUpgradeStatusText(fsn) 
+        + "\n  <tr><td id='col1'>Cluster ID:</td><td>" + fsn.getClusterId()
+        + "</td></tr>\n" 
+        + "\n  <tr><td id='col1'>Block Pool ID:</td><td>" + fsn.getBlockPoolId()
+        + "</td></tr>\n" 
+        + "\n</table></div>";
   }
 
   static String getWarningText(FSNamesystem fsn) {
@@ -254,10 +262,8 @@ class NamenodeJspHelper {
       long used = fsnStats[1];
       long nonDFS = total - remaining - used;
       nonDFS = nonDFS < 0 ? 0 : nonDFS;
-      float percentUsed = total <= 0 ? 0f : ((float) used * 100.0f)
-          / (float) total;
-      float percentRemaining = total <= 0 ? 100f : ((float) remaining * 100.0f)
-          / (float) total;
+      float percentUsed = DFSUtil.getPercentUsed(used, total);
+      float percentRemaining = DFSUtil.getPercentRemaining(used, total);
       float median = 0;
       float max = 0;
       float min = 0;
@@ -283,6 +289,9 @@ class NamenodeJspHelper {
         dev = (float) Math.sqrt(dev/usages.length);
       }
 
+      long bpUsed = fsnStats[6];
+      float percentBpUsed = DFSUtil.getPercentUsed(bpUsed, total);
+      
       out.print("<div id=\"dfstable\"> <table>\n" + rowTxt() + colTxt()
           + "Configured Capacity" + colTxt() + ":" + colTxt()
           + StringUtils.byteDesc(total) + rowTxt() + colTxt() + "DFS Used"
@@ -295,6 +304,10 @@ class NamenodeJspHelper {
           + StringUtils.limitDecimalTo2(percentUsed) + " %" + rowTxt()
           + colTxt() + "DFS Remaining%" + colTxt() + ":" + colTxt()
           + StringUtils.limitDecimalTo2(percentRemaining) + " %"
+          + rowTxt() + colTxt() + "Block Pool Used" + colTxt() + ":" + colTxt()
+          + StringUtils.byteDesc(bpUsed) + rowTxt()
+          + colTxt() + "Block Pool Used%"+ colTxt() + ":" + colTxt()
+          + StringUtils.limitDecimalTo2(percentBpUsed) + " %" 
           + rowTxt() + colTxt() + "DataNodes usages" + colTxt() + ":" + colTxt()
           + "Min %" + colTxt() + "Median %" + colTxt() + "Max %" + colTxt()
           + "stdev %" + rowTxt() + colTxt() + colTxt() + colTxt()
@@ -326,28 +339,26 @@ class NamenodeJspHelper {
   }
 
   static String getDelegationToken(final NameNode nn,
-      HttpServletRequest request, Configuration conf) throws IOException,
-      InterruptedException {
-    final UserGroupInformation ugi = JspHelper.getUGI(request, conf);
-
+      HttpServletRequest request, Configuration conf,
+      final UserGroupInformation ugi) throws IOException, InterruptedException {
     Token<DelegationTokenIdentifier> token = ugi
         .doAs(new PrivilegedExceptionAction<Token<DelegationTokenIdentifier>>() {
           public Token<DelegationTokenIdentifier> run() throws IOException {
             return nn.getDelegationToken(new Text(ugi.getUserName()));
           }
         });
-
     return token == null ? null : token.encodeToUrlString();
   }
 
-  static void redirectToRandomDataNode(final NameNode nn, 
-                                       HttpServletRequest request,
-                                       HttpServletResponse resp,
-                                       Configuration conf
-                                       ) throws IOException,
-                                                InterruptedException {
+  static void redirectToRandomDataNode(ServletContext context,
+      HttpServletRequest request, HttpServletResponse resp) throws IOException,
+      InterruptedException {
+    final NameNode nn = (NameNode) context.getAttribute("name.node");
+    final Configuration conf = (Configuration) context
+        .getAttribute(JspHelper.CURRENT_CONF);
     final DatanodeID datanode = nn.getNamesystem().getRandomDatanode();
-    String tokenString = getDelegationToken(nn, request, conf);
+    UserGroupInformation ugi = JspHelper.getUGI(context, request, conf);
+    String tokenString = getDelegationToken(nn, request, conf, ugi);
     // if the user is defined, get a delegation token and stringify it
     final String redirectLocation;
     final String nodeToRedirect;
@@ -359,12 +370,14 @@ class NamenodeJspHelper {
       nodeToRedirect = nn.getHttpAddress().getHostName();
       redirectPort = nn.getHttpAddress().getPort();
     }
+    String addr = NameNode.getHostPortString(nn.getNameNodeAddress());
     String fqdn = InetAddress.getByName(nodeToRedirect).getCanonicalHostName();
     redirectLocation = "http://" + fqdn + ":" + redirectPort
         + "/browseDirectory.jsp?namenodeInfoPort="
         + nn.getHttpAddress().getPort() + "&dir=/"
         + (tokenString == null ? "" :
-           JspHelper.getDelegationTokenUrlParam(tokenString));
+           JspHelper.getDelegationTokenUrlParam(tokenString))
+        + JspHelper.getUrlParam(JspHelper.NAMENODE_ADDRESS, addr);
     resp.sendRedirect(redirectLocation);
   }
 
@@ -405,11 +418,13 @@ class NamenodeJspHelper {
     }
 
     private void generateNodeDataHeader(JspWriter out, DatanodeDescriptor d,
-        String suffix, boolean alive, int nnHttpPort) throws IOException {
+        String suffix, boolean alive, int nnHttpPort, String nnaddr)
+        throws IOException {
       // from nn_browsedfscontent.jsp:
       String url = "http://" + d.getHostName() + ":" + d.getInfoPort()
           + "/browseDirectory.jsp?namenodeInfoPort=" + nnHttpPort + "&dir="
-          + URLEncoder.encode("/", "UTF-8");
+          + URLEncoder.encode("/", "UTF-8")
+          + JspHelper.getUrlParam(JspHelper.NAMENODE_ADDRESS, nnaddr);
 
       String name = d.getHostName() + ":" + d.getPort();
       if (!name.matches("\\d+\\.\\d+.\\d+\\.\\d+.*"))
@@ -424,8 +439,9 @@ class NamenodeJspHelper {
     }
 
     void generateDecommissioningNodeData(JspWriter out, DatanodeDescriptor d,
-        String suffix, boolean alive, int nnHttpPort) throws IOException {
-      generateNodeDataHeader(out, d, suffix, alive, nnHttpPort);
+        String suffix, boolean alive, int nnHttpPort, String nnaddr)
+        throws IOException {
+      generateNodeDataHeader(out, d, suffix, alive, nnHttpPort, nnaddr);
       if (!alive) {
         return;
       }
@@ -448,8 +464,8 @@ class NamenodeJspHelper {
           + "\n");
     }
     
-    void generateNodeData(JspWriter out, DatanodeDescriptor d,
-        String suffix, boolean alive, int nnHttpPort) throws IOException {
+    void generateNodeData(JspWriter out, DatanodeDescriptor d, String suffix,
+        boolean alive, int nnHttpPort, String nnaddr) throws IOException {
       /*
        * Say the datanode is dn1.hadoop.apache.org with ip 192.168.0.5 we use:
        * 1) d.getHostName():d.getPort() to display. Domain and port are stripped
@@ -461,7 +477,7 @@ class NamenodeJspHelper {
        * interact with datanodes.
        */
 
-      generateNodeDataHeader(out, d, suffix, alive, nnHttpPort);
+      generateNodeDataHeader(out, d, suffix, alive, nnHttpPort, nnaddr);
       if (!alive) {
         out.print("<td class=\"decommissioned\"> " + 
             d.isDecommissioned() + "\n");
@@ -480,6 +496,11 @@ class NamenodeJspHelper {
 
       long timestamp = d.getLastUpdate();
       long currentTime = System.currentTimeMillis();
+      
+      long bpUsed = d.getBlockPoolUsed();
+      String percentBpUsed = StringUtils.limitDecimalTo2(d
+          .getBlockPoolUsedPercent());
+
       out.print("<td class=\"lastcontact\"> "
           + ((currentTime - timestamp) / 1000)
           + "<td class=\"adminstate\">"
@@ -496,18 +517,29 @@ class NamenodeJspHelper {
           + percentUsed
           + "<td class=\"pcused\">"
           + ServletUtil.percentageGraph((int) Double.parseDouble(percentUsed),
-              100) + "<td align=\"right\" class=\"pcremaining`\">"
-          + percentRemaining + "<td title=" + "\"blocks scheduled : "
-          + d.getBlocksScheduled() + "\" class=\"blocks\">" + d.numBlocks()
+              100) 
+          + "<td align=\"right\" class=\"pcremaining`\">"
+          + percentRemaining 
+          + "<td title=" + "\"blocks scheduled : "
+          + d.getBlocksScheduled() + "\" class=\"blocks\">" + d.numBlocks()+"\n"
+          + "<td align=\"right\" class=\"bpused\">"
+          + StringUtils.limitDecimalTo2(bpUsed * 1.0 / diskBytes)
+          + "<td align=\"right\" class=\"pcbpused\">"
+          + percentBpUsed
           + "<td align=\"right\" class=\"volfails\">"
           + d.getVolumeFailures() + "\n");
     }
 
-    void generateNodesList(JspWriter out, NameNode nn,
+    void generateNodesList(ServletContext context, JspWriter out,
         HttpServletRequest request) throws IOException {
       ArrayList<DatanodeDescriptor> live = new ArrayList<DatanodeDescriptor>();
       ArrayList<DatanodeDescriptor> dead = new ArrayList<DatanodeDescriptor>();
+      final NameNode nn = (NameNode)context.getAttribute("name.node");
       nn.getNamesystem().DFSNodesStatus(live, dead);
+      InetSocketAddress nnSocketAddress = (InetSocketAddress) context
+          .getAttribute(NameNode.NAMENODE_ADDRESS_ATTRIBUTE_KEY);
+      String nnaddr = nnSocketAddress.getAddress().getHostAddress() + ":"
+          + nnSocketAddress.getPort();
 
       whatNodes = request.getParameter("whatNodes"); // show only live or only
                                                      // dead nodes
@@ -576,12 +608,18 @@ class NamenodeJspHelper {
                 + "> Used <br>(%) <th " + nodeHeaderStr("pcused")
                 + "> Used <br>(%) <th " + nodeHeaderStr("pcremaining")
                 + "> Remaining <br>(%) <th " + nodeHeaderStr("blocks")
+                + "> Blocks <th "
+                + nodeHeaderStr("bpused") + "> Block Pool<br>Used (" 
+                + diskByteStr + ") <th "
+                + nodeHeaderStr("pcbpused")
+                + "> Block Pool<br>Used (%)"
                 + "> Blocks <th " + nodeHeaderStr("volfails")
                 +"> Failed Volumes\n");
 
             JspHelper.sortNodeList(live, sorterField, sorterOrder);
             for (int i = 0; i < live.size(); i++) {
-              generateNodeData(out, live.get(i), port_suffix, true, nnHttpPort);
+              generateNodeData(out, live.get(i), port_suffix, true, nnHttpPort,
+                  nnaddr);
             }
           }
           out.print("</table>\n");
@@ -598,7 +636,8 @@ class NamenodeJspHelper {
 
             JspHelper.sortNodeList(dead, sorterField, sorterOrder);
             for (int i = 0; i < dead.size(); i++) {
-              generateNodeData(out, dead.get(i), port_suffix, false, nnHttpPort);
+              generateNodeData(out, dead.get(i), port_suffix, false,
+                  nnHttpPort, nnaddr);
             }
 
             out.print("</table>\n");
@@ -628,7 +667,7 @@ class NamenodeJspHelper {
             JspHelper.sortNodeList(decommissioning, "name", "ASC");
             for (int i = 0; i < decommissioning.size(); i++) {
               generateDecommissioningNodeData(out, decommissioning.get(i),
-                  port_suffix, true, nnHttpPort);
+                  port_suffix, true, nnHttpPort, nnaddr);
             }
             out.print("</table>\n");
           }

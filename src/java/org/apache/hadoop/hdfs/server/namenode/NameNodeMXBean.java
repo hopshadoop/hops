@@ -21,7 +21,6 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * 
  * This is the JMX management interface for namenode information
  */
 @InterfaceAudience.Public
@@ -55,6 +54,7 @@ public interface NameNodeMXBean {
    * @return the total raw bytes including non-dfs used space
    */
   public long getTotal();
+  
   
   /**
    * Gets the safemode status
@@ -94,6 +94,16 @@ public interface NameNodeMXBean {
    */
   public float getPercentRemaining();
   
+  /**
+   * Get the total space used by the block pools of this namenode
+   */
+  public long getBlockPoolUsedSpace();
+  
+  /**
+   * Get the total space used by the block pool as percentage of total capacity
+   */
+  public float getPercentBlockPoolUsed();
+    
   /**
    * Gets the total numbers of blocks on the cluster.
    * 
@@ -135,4 +145,18 @@ public interface NameNodeMXBean {
    * @return the decommissioning node information
    */
   public String getDecomNodes();
+  
+  /**
+   * Gets the cluster id.
+   * 
+   * @return the cluster id
+   */
+  public String getClusterId();
+  
+  /**
+   * Gets the block pool id.
+   * 
+   * @return the block pool id
+   */
+  public String getBlockPoolId();
 }

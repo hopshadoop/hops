@@ -32,12 +32,14 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ChecksumException;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.server.common.GenerationStamp;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
+import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.log4j.Level;
 
 /**
@@ -62,8 +64,9 @@ public class TestFileCorruption extends TestCase {
       FileSystem fs = cluster.getFileSystem();
       util.createFiles(fs, "/srcdat");
       // Now deliberately remove the blocks
-      File data_dir = new File(System.getProperty("test.build.data"),
-                               "dfs/data/data5/current");
+      File storageDir = MiniDFSCluster.getStorageDir(2, 0);
+      String bpid = cluster.getNamesystem().getBlockPoolId();
+      File data_dir = MiniDFSCluster.getFinalizedDir(storageDir, bpid);
       assertTrue("data directory does not exist", data_dir.exists());
       File[] blocks = data_dir.listFiles();
       assertTrue("Blocks do not exist in data-dir", (blocks != null) && (blocks.length > 0));
@@ -122,12 +125,14 @@ public class TestFileCorruption extends TestCase {
       DFSTestUtil.createFile(fs, FILE_PATH, FILE_LEN, (short)2, 1L);
       
       // get the block
-      File dataDir = new File(cluster.getDataDirectory(),
-          "data1" + MiniDFSCluster.FINALIZED_DIR_NAME);
-      Block blk = getBlock(dataDir);
+      final String bpid = cluster.getNamesystem().getBlockPoolId();
+      File storageDir = MiniDFSCluster.getStorageDir(0, 0);
+      File dataDir = MiniDFSCluster.getFinalizedDir(storageDir, bpid);
+      ExtendedBlock blk = getBlock(bpid, dataDir);
       if (blk == null) {
-        blk = getBlock(new File(cluster.getDataDirectory(),
-          "dfs/data/data2" + MiniDFSCluster.FINALIZED_DIR_NAME));
+        storageDir = MiniDFSCluster.getStorageDir(0, 1);
+        dataDir = MiniDFSCluster.getFinalizedDir(storageDir, bpid);
+        blk = getBlock(bpid, dataDir);
       }
       assertFalse(blk==null);
 
@@ -138,8 +143,10 @@ public class TestFileCorruption extends TestCase {
       DataNode dataNode = datanodes.get(2);
       
       // report corrupted block by the third datanode
+      DatanodeRegistration dnR = 
+        DataNodeTestUtils.getDNRegistrationForBP(dataNode, blk.getBlockPoolId());
       cluster.getNamesystem().markBlockAsCorrupt(blk, 
-          new DatanodeInfo(dataNode.dnRegistration ));
+          new DatanodeInfo(dnR));
       
       // open the file
       fs.open(FILE_PATH);
@@ -152,7 +159,7 @@ public class TestFileCorruption extends TestCase {
     
   }
   
-  private Block getBlock(File dataDir) {
+  private ExtendedBlock getBlock(String bpid, File dataDir) {
     assertTrue("data directory does not exist", dataDir.exists());
     File[] blocks = dataDir.listFiles();
     assertTrue("Blocks do not exist in dataDir", (blocks != null) && (blocks.length > 0));
@@ -179,6 +186,6 @@ public class TestFileCorruption extends TestCase {
         break;
       }
     }
-    return new Block(blockId, blocks[idx].length(), blockTimeStamp);
+    return new ExtendedBlock(bpid, blockId, blocks[idx].length(), blockTimeStamp);
   }
 }

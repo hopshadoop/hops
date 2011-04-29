@@ -125,26 +125,30 @@ class Checkpointer extends Daemon {
   // The main work loop
   //
   public void run() {
-    final long fiveMinMS = 5 * 60 * 1000; // How often to poll edits size
-    final long periodMS = checkpointPeriod * 1000; // How often to checkpoint, regardless of edits' size
-    long lastCheckpointTimeMS = backupNode.shouldCheckpointAtStartup() ? 0 : now();
-    long lastSizeCheckMS = now();
+    // Check the size of the edit log once every 5 minutes.
+    long periodMSec = 5 * 60;   // 5 minutes
+    if(checkpointPeriod < periodMSec) {
+      periodMSec = checkpointPeriod;
+    }
+    periodMSec *= 1000;
 
+    long lastCheckpointTime = 0;
+    if(!backupNode.shouldCheckpointAtStartup())
+      lastCheckpointTime = now();
     while(shouldRun) {
       try {
         long now = now();
-        boolean editsTooBig = false;
-        boolean periodExpired = now >= lastCheckpointTimeMS + periodMS;
-
-        if(now >= lastSizeCheckMS + fiveMinMS) {
-          editsTooBig = getJournalSize() > checkpointSize;
-          lastSizeCheckMS = now;
+        boolean shouldCheckpoint = false;
+        if(now >= lastCheckpointTime + periodMSec) {
+          shouldCheckpoint = true;
+        } else {
+          long size = getJournalSize();
+          if(size >= checkpointSize)
+            shouldCheckpoint = true;
         }
-
-        if(periodExpired || editsTooBig) {
+        if(shouldCheckpoint) {
           doCheckpoint();
-          lastCheckpointTimeMS = now;
-          lastSizeCheckMS = now;
+          lastCheckpointTime = now;
         }
       } catch(IOException e) {
         LOG.error("Exception in doCheckpoint: ", e);
@@ -154,7 +158,7 @@ class Checkpointer extends Daemon {
         break;
       }
       try {
-        Thread.sleep(Math.min(fiveMinMS, periodMS));
+        Thread.sleep(periodMSec);
       } catch(InterruptedException ie) {
         // do nothing
       }
@@ -248,6 +252,8 @@ class Checkpointer extends Daemon {
     }
 
     BackupImage bnImage = getFSImage();
+    bnImage.getStorage().setBlockPoolID(backupNode.getBlockPoolId());
+    bnImage.getStorage().setClusterID(backupNode.getClusterId());
     bnImage.loadCheckpoint(sig);
     sig.validateStorageInfo(bnImage);
     bnImage.saveCheckpoint();

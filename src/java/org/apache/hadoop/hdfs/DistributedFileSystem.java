@@ -46,9 +46,9 @@ import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSClient.DFSDataInputStream;
-import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.DirectoryListing;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.FSConstants;
 import org.apache.hadoop.hdfs.protocol.FSConstants.DatanodeReportType;
 import org.apache.hadoop.hdfs.protocol.FSConstants.UpgradeAction;
@@ -701,7 +701,7 @@ public class DistributedFileSystem extends FileSystem {
 
     // Find block in data stream.
     DFSClient.DFSDataInputStream dfsIn = (DFSClient.DFSDataInputStream) in;
-    Block dataBlock = dfsIn.getCurrentBlock();
+    ExtendedBlock dataBlock = dfsIn.getCurrentBlock();
     if (dataBlock == null) {
       LOG.error("Error: Current block in data stream is null! ");
       return false;
@@ -714,7 +714,7 @@ public class DistributedFileSystem extends FileSystem {
 
     // Find block in checksum stream
     DFSClient.DFSDataInputStream dfsSums = (DFSClient.DFSDataInputStream) sums;
-    Block sumsBlock = dfsSums.getCurrentBlock();
+    ExtendedBlock sumsBlock = dfsSums.getCurrentBlock();
     if (sumsBlock == null) {
       LOG.error("Error: Current block in checksum stream is null! ");
       return false;

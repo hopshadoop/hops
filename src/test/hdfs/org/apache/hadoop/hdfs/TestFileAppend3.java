@@ -30,6 +30,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
@@ -191,7 +192,7 @@ public class TestFileAppend3 extends junit.framework.TestCase {
     final LocatedBlocks locatedblocks = fs.dfs.getNamenode().getBlockLocations(p.toString(), 0L, len1);
     assertEquals(1, locatedblocks.locatedBlockCount());
     final LocatedBlock lb = locatedblocks.get(0);
-    final Block blk = lb.getBlock();
+    final ExtendedBlock blk = lb.getBlock();
     assertEquals(len1, lb.getBlockSize());
 
     DatanodeInfo[] datanodeinfos = lb.getLocations();
@@ -260,14 +261,15 @@ public class TestFileAppend3 extends junit.framework.TestCase {
     final int numblock = locatedblocks.locatedBlockCount();
     for(int i = 0; i < numblock; i++) {
       final LocatedBlock lb = locatedblocks.get(i);
-      final Block blk = lb.getBlock();
+      final ExtendedBlock blk = lb.getBlock();
       final long size = lb.getBlockSize();
       if (i < numblock - 1) {
         assertEquals(BLOCK_SIZE, size);
       }
       for(DatanodeInfo datanodeinfo : lb.getLocations()) {
         final DataNode dn = cluster.getDataNode(datanodeinfo.getIpcPort());
-        final Block metainfo = dn.data.getStoredBlock(blk.getBlockId());
+        final Block metainfo = dn.data.getStoredBlock(blk.getBlockPoolId(), 
+            blk.getBlockId());
         assertEquals(size, metainfo.getNumBytes());
       }
     }

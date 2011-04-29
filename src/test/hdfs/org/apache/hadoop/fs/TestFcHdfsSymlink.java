@@ -56,7 +56,7 @@ public class TestFcHdfsSymlink extends FileContextSymlinkBaseTest {
   }
 
   protected URI testURI() {
-    return cluster.getURI();
+    return cluster.getURI(0);
   }
 
   @Override
@@ -73,7 +73,7 @@ public class TestFcHdfsSymlink extends FileContextSymlinkBaseTest {
     conf.setBoolean(DFSConfigKeys.DFS_PERMISSIONS_ENABLED_KEY, true);
     conf.set(FsPermission.UMASK_LABEL, "000");
     cluster = new MiniDFSCluster.Builder(conf).build();
-    fc = FileContext.getFileContext(cluster.getURI());
+    fc = FileContext.getFileContext(cluster.getURI(0));
   }
   
   @AfterClass
@@ -130,7 +130,7 @@ public class TestFcHdfsSymlink extends FileContextSymlinkBaseTest {
     // Ditto when using another file context since the file system
     // for the slash is resolved according to the link's parent.
     FileContext localFc = FileContext.getLocalFSFileContext();
-    Path linkQual = new Path(cluster.getURI().toString(), fileViaLink); 
+    Path linkQual = new Path(cluster.getURI(0).toString(), fileViaLink); 
     assertEquals(fileSize, localFc.getFileStatus(linkQual).getLen());    
   }
   

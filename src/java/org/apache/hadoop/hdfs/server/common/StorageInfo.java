@@ -23,7 +23,7 @@ import java.io.IOException;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.io.Writable;
-
+import org.apache.hadoop.io.WritableUtils;
 
 /**
  * Common class for storage information.
@@ -34,14 +34,16 @@ import org.apache.hadoop.io.Writable;
 public class StorageInfo implements Writable {
   public int   layoutVersion;   // layout version of the storage data
   public int   namespaceID;     // id of the file system
+  public String clusterID;      // id of the cluster
   public long  cTime;           // creation time of the file system state
   
   public StorageInfo () {
-    this(0, 0, 0L);
+    this(0, 0, "", 0L);
   }
   
-  public StorageInfo(int layoutV, int nsID, long cT) {
+  public StorageInfo(int layoutV, int nsID, String cid, long cT) {
     layoutVersion = layoutV;
+    clusterID = cid;
     namespaceID = nsID;
     cTime = cT;
   }
@@ -63,13 +65,19 @@ public class StorageInfo implements Writable {
   public int    getNamespaceID()  { return namespaceID; }
 
   /**
+   * cluster id of the file system.<p>
+   */
+  public String    getClusterID()  { return clusterID; }
+  
+  /**
    * Creation time of the file system state.<p>
    * Modified during upgrades.
    */
   public long   getCTime()        { return cTime; }
-
+  
   public void   setStorageInfo(StorageInfo from) {
     layoutVersion = from.layoutVersion;
+    clusterID = from.clusterID;
     namespaceID = from.namespaceID;
     cTime = from.cTime;
   }
@@ -80,12 +88,21 @@ public class StorageInfo implements Writable {
   public void write(DataOutput out) throws IOException {
     out.writeInt(getLayoutVersion());
     out.writeInt(getNamespaceID());
+    WritableUtils.writeString(out, clusterID);
     out.writeLong(getCTime());
   }
 
   public void readFields(DataInput in) throws IOException {
     layoutVersion = in.readInt();
     namespaceID = in.readInt();
+    clusterID = WritableUtils.readString(in);
     cTime = in.readLong();
+  }
+  
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append("lv=").append(layoutVersion).append(";cid=").append(clusterID)
+    .append(";nsid=").append(namespaceID).append(";c=").append(cTime);
+    return sb.toString();
   }
 }

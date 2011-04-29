@@ -27,9 +27,9 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.RecoveryInProgressException;
 import org.apache.hadoop.hdfs.server.common.HdfsConstants.ReplicaState;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
@@ -70,12 +70,18 @@ public class TestBlockRecovery {
   private DataNode dn;
   private Configuration conf;
   private final static long RECOVERY_ID = 3000L;
+  private final static String CLUSTER_ID = "testClusterID";
+  private final static String POOL_ID = "BP-TEST";
   private final static long BLOCK_ID = 1000L;
   private final static long GEN_STAMP = 2000L;
   private final static long BLOCK_LEN = 3000L;
   private final static long REPLICA_LEN1 = 6000L;
   private final static long REPLICA_LEN2 = 5000L;
-  private final static Block block = new Block(BLOCK_ID, BLOCK_LEN, GEN_STAMP);
+  private final static ExtendedBlock block = new ExtendedBlock(POOL_ID,
+      BLOCK_ID, BLOCK_LEN, GEN_STAMP);
+  
+  private final NamespaceInfo nsifno = 
+    new NamespaceInfo(1,CLUSTER_ID, POOL_ID, 2, 3);
 
   static {
     ((Log4JLogger)FSNamesystem.LOG).getLogger().setLevel(Level.ALL);
@@ -100,11 +106,14 @@ public class TestBlockRecovery {
     dataDir.mkdirs();
     dirs.add(dataDir);
     DatanodeProtocol namenode = mock(DatanodeProtocol.class);
-    when(namenode.versionRequest()).thenReturn(new NamespaceInfo(1, 1L, 1));
+    when(namenode.versionRequest()).thenReturn(new NamespaceInfo
+        (1, CLUSTER_ID, POOL_ID, 1L, 1));
     when(namenode.sendHeartbeat(any(DatanodeRegistration.class), anyLong(), 
-        anyLong(), anyLong(), anyInt(), anyInt())).thenReturn(
+        anyLong(), anyLong(), anyLong(), anyInt(), anyInt())).thenReturn(
             new DatanodeCommand[0]);
-    dn = new DataNode(conf, dirs, namenode, null);
+    dn = new DataNode(conf, dirs, null);
+    
+    DataNodeTestUtils.setBPNamenodeByIndex(dn, nsifno, POOL_ID, namenode);
   }
 
   /**
@@ -146,12 +155,12 @@ public class TestBlockRecovery {
     syncList.add(record1);
     syncList.add(record2);
     
-    when(dn1.updateReplicaUnderRecovery((Block)anyObject(), anyLong(), 
-        anyLong())).thenReturn(new Block(block.getBlockId(), 
-            expectLen, block.getGenerationStamp()));
-    when(dn2.updateReplicaUnderRecovery((Block)anyObject(), anyLong(), 
-        anyLong())).thenReturn(new Block(block.getBlockId(), 
-            expectLen, block.getGenerationStamp()));
+    when(dn1.updateReplicaUnderRecovery((ExtendedBlock)anyObject(), anyLong(), 
+        anyLong())).thenReturn(new ExtendedBlock(block.getBlockPoolId(), 
+            block.getBlockId(), expectLen, block.getGenerationStamp()));
+    when(dn2.updateReplicaUnderRecovery((ExtendedBlock)anyObject(), anyLong(), 
+        anyLong())).thenReturn(new ExtendedBlock(block.getBlockPoolId(), 
+            block.getBlockId(), expectLen, block.getGenerationStamp()));
     dn.syncBlock(rBlock, syncList);
   }
   
@@ -344,10 +353,10 @@ public class TestBlockRecovery {
     verify(dn2).updateReplicaUnderRecovery(block, RECOVERY_ID, minLen);    
   }  
 
-  private Collection<RecoveringBlock> initRecoveringBlocks() {
+  private Collection<RecoveringBlock> initRecoveringBlocks() throws IOException {
     Collection<RecoveringBlock> blocks = new ArrayList<RecoveringBlock>(1);
     DatanodeInfo[] locs = new DatanodeInfo[] {
-        new DatanodeInfo(dn.dnRegistration),
+        new DatanodeInfo(dn.getDNRegistrationForBP(block.getBlockPoolId())),
         mock(DatanodeInfo.class) };
     RecoveringBlock rBlock = new RecoveringBlock(block, locs, RECOVERY_ID);
     blocks.add(rBlock);
@@ -410,14 +419,16 @@ public class TestBlockRecovery {
         initReplicaRecovery(any(RecoveringBlock.class));
     Daemon d = spyDN.recoverBlocks(initRecoveringBlocks());
     d.join();
-    verify(dn.namenode).commitBlockSynchronization(
+    DatanodeProtocol dnP = dn.getBPNamenode(POOL_ID);
+    verify(dnP).commitBlockSynchronization(
         block, RECOVERY_ID, 0, true, true, DatanodeID.EMPTY_ARRAY);
   }
 
-  private List<BlockRecord> initBlockRecords(DataNode spyDN) {
+  private List<BlockRecord> initBlockRecords(DataNode spyDN) throws IOException {
     List<BlockRecord> blocks = new ArrayList<BlockRecord>(1);
+    DatanodeRegistration dnR = dn.getDNRegistrationForBP(block.getBlockPoolId());
     BlockRecord blockRecord = new BlockRecord(
-        new DatanodeID(dn.dnRegistration), spyDN,
+        new DatanodeID(dnR), spyDN,
         new ReplicaRecoveryInfo(block.getBlockId(), block.getNumBytes(),
             block.getGenerationStamp(), ReplicaState.FINALIZED));
     blocks.add(blockRecord);
@@ -465,8 +476,9 @@ public class TestBlockRecovery {
     } catch (IOException e) {
       e.getMessage().startsWith("Cannot recover ");
     }
-    verify(dn.namenode, never()).commitBlockSynchronization(
-        any(Block.class), anyLong(), anyLong(), anyBoolean(),
+    DatanodeProtocol namenode = dn.getBPNamenode(POOL_ID);
+    verify(namenode, never()).commitBlockSynchronization(
+        any(ExtendedBlock.class), anyLong(), anyLong(), anyBoolean(),
         anyBoolean(), any(DatanodeID[].class));
   }
 
@@ -492,8 +504,9 @@ public class TestBlockRecovery {
       } catch (IOException e) {
         e.getMessage().startsWith("Cannot recover ");
       }
-      verify(dn.namenode, never()).commitBlockSynchronization(
-          any(Block.class), anyLong(), anyLong(), anyBoolean(),
+      DatanodeProtocol namenode = dn.getBPNamenode(POOL_ID);
+      verify(namenode, never()).commitBlockSynchronization(
+          any(ExtendedBlock.class), anyLong(), anyLong(), anyBoolean(),
           anyBoolean(), any(DatanodeID[].class));
     } finally {
       streams.close();

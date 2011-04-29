@@ -39,7 +39,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.BlockReader;
 import org.apache.hadoop.hdfs.DFSClient;
-import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.DirectoryListing;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
@@ -297,7 +297,7 @@ public class NamenodeFsck {
     StringBuilder report = new StringBuilder();
     int i = 0;
     for (LocatedBlock lBlk : blocks.getLocatedBlocks()) {
-      Block block = lBlk.getBlock();
+      ExtendedBlock block = lBlk.getBlock();
       boolean isCorrupt = lBlk.isCorrupt();
       String blkName = block.toString();
       DatanodeInfo[] locs = lBlk.getLocations();
@@ -311,7 +311,8 @@ public class NamenodeFsck {
       if (isCorrupt) {
         corrupt++;
         res.corruptBlocks++;
-        out.print("\n" + path + ": CORRUPT block " + block.getBlockName()+"\n");
+        out.print("\n" + path + ": CORRUPT blockpool " + block.getBlockPoolId() + 
+            " block " + block.getBlockName()+"\n");
       }
       if (locs.length >= minReplication)
         res.numMinReplicatedBlocks++;
@@ -476,7 +477,7 @@ public class NamenodeFsck {
     TreeSet<DatanodeInfo> deadNodes = new TreeSet<DatanodeInfo>();
     Socket s = null;
     BlockReader blockReader = null; 
-    Block block = lblock.getBlock(); 
+    ExtendedBlock block = lblock.getBlock(); 
 
     while (s == null) {
       DatanodeInfo chosenNode;
@@ -502,7 +503,8 @@ public class NamenodeFsck {
         s.connect(targetAddr, HdfsConstants.READ_TIMEOUT);
         s.setSoTimeout(HdfsConstants.READ_TIMEOUT);
         
-        String file = BlockReader.getFileName(targetAddr, block.getBlockId());
+        String file = BlockReader.getFileName(targetAddr, block.getBlockPoolId(),
+            block.getBlockId());
         blockReader = BlockReader.newBlockReader(s, file, block, lblock
             .getBlockToken(), 0, -1, conf.getInt("io.file.buffer.size", 4096));
         

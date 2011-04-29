@@ -36,14 +36,16 @@ import java.util.zip.Checksum;
 
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.fs.FSOutputSummer;
-import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DataTransferProtocol.BlockConstructionStage;
 import org.apache.hadoop.hdfs.protocol.DataTransferProtocol.PacketHeader;
 import org.apache.hadoop.hdfs.protocol.DataTransferProtocol.PipelineAck;
 import org.apache.hadoop.hdfs.protocol.DataTransferProtocol.Status;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.FSConstants;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.Daemon;
@@ -87,14 +89,14 @@ class BlockReceiver implements Closeable, FSConstants {
   private final boolean isDatanode;
 
   /** the block to receive */
-  private final Block block; 
+  private final ExtendedBlock block; 
   /** the replica to write */
   private final ReplicaInPipelineInterface replicaInfo;
   /** pipeline stage */
   private final BlockConstructionStage stage;
   private final boolean isTransfer;
 
-  BlockReceiver(final Block block, final DataInputStream in,
+  BlockReceiver(final ExtendedBlock block, final DataInputStream in,
       final String inAddr, final String myAddr,
       final BlockConstructionStage stage, 
       final long newGs, final long minBytesRcvd, final long maxBytesRcvd, 
@@ -145,14 +147,16 @@ class BlockReceiver implements Closeable, FSConstants {
         case PIPELINE_SETUP_APPEND:
           replicaInfo = datanode.data.append(block, newGs, minBytesRcvd);
           if (datanode.blockScanner != null) { // remove from block scanner
-            datanode.blockScanner.deleteBlock(block);
+            datanode.blockScanner.deleteBlock(block.getBlockPoolId(),
+                block.getLocalBlock());
           }
           block.setGenerationStamp(newGs);
           break;
         case PIPELINE_SETUP_APPEND_RECOVERY:
           replicaInfo = datanode.data.recoverAppend(block, newGs, minBytesRcvd);
           if (datanode.blockScanner != null) { // remove from block scanner
-            datanode.blockScanner.deleteBlock(block);
+            datanode.blockScanner.deleteBlock(block.getBlockPoolId(),
+                block.getLocalBlock());
           }
           block.setGenerationStamp(newGs);
           break;
@@ -267,7 +271,8 @@ class BlockReceiver implements Closeable, FSConstants {
    * affect this datanode unless it is caused by interruption.
    */
   private void handleMirrorOutError(IOException ioe) throws IOException {
-    LOG.info(datanode.dnRegistration + ":Exception writing block " +
+    String bpid = block.getBlockPoolId();
+    LOG.info(datanode.getDNRegistrationForBP(bpid) + ":Exception writing block " +
              block + " to mirror " + mirrorAddr + "\n" +
              StringUtils.stringifyException(ioe));
     if (Thread.interrupted()) { // shut down if the thread is interrupted
@@ -286,6 +291,7 @@ class BlockReceiver implements Closeable, FSConstants {
   private void verifyChunks( byte[] dataBuf, int dataOff, int len, 
                              byte[] checksumBuf, int checksumOff ) 
                              throws IOException {
+    DatanodeProtocol nn = datanode.getBPNamenode(block.getBlockPoolId());
     while (len > 0) {
       int chunkLen = Math.min(len, bytesPerChecksum);
       
@@ -298,7 +304,7 @@ class BlockReceiver implements Closeable, FSConstants {
                       srcDataNode + " to namenode");
             LocatedBlock lb = new LocatedBlock(block, 
                                             new DatanodeInfo[] {srcDataNode});
-            datanode.namenode.reportBadBlocks(new LocatedBlock[] {lb});
+            nn.reportBadBlocks(new LocatedBlock[] {lb});
           } catch (IOException e) {
             LOG.warn("Failed to report bad block " + block + 
                       " from datanode " + srcDataNode + " to namenode");
@@ -974,10 +980,12 @@ class BlockReceiver implements Closeable, FSConstants {
               datanode.closeBlock(block, DataNode.EMPTY_DEL_HINT);
               if (ClientTraceLog.isInfoEnabled() && isClient) {
                 long offset = 0;
+                DatanodeRegistration dnR = 
+                  datanode.getDNRegistrationForBP(block.getBlockPoolId());
                 ClientTraceLog.info(String.format(DN_CLIENTTRACE_FORMAT,
                       inAddr, myAddr, block.getNumBytes(),
                       "HDFS_WRITE", clientname, offset,
-                      datanode.dnRegistration.getStorageID(), block, endTime-startTime));
+                      dnR.getStorageID(), block, endTime-startTime));
               } else {
                 LOG.info("Received block " + block + " of size "
                     + block.getNumBytes() + " from " + inAddr);

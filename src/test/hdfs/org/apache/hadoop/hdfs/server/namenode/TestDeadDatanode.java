@@ -30,6 +30,7 @@ import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
+import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol;
@@ -86,10 +87,12 @@ public class TestDeadDatanode {
     cluster = new MiniDFSCluster.Builder(conf).build();
     cluster.waitActive();
 
+    String poolId = cluster.getNamesystem().getBlockPoolId();
     // wait for datanode to be marked live
     DataNode dn = cluster.getDataNodes().get(0);
-    DatanodeRegistration reg = cluster.getDataNodes().get(0)
-        .getDatanodeRegistration();
+    DatanodeRegistration reg = 
+      DataNodeTestUtils.getDNRegistrationForBP(cluster.getDataNodes().get(0), poolId);
+      
     waitForDatanodeState(reg.getStorageID(), true, 20000);
 
     // Shutdown and wait for datanode to be marked dead
@@ -97,13 +100,13 @@ public class TestDeadDatanode {
     waitForDatanodeState(reg.getStorageID(), false, 20000);
 
     DatanodeProtocol dnp = cluster.getNameNode();
-    Block block = new Block(0);
-    Block[] blocks = new Block[] { block };
+    
+    Block[] blocks = new Block[] { new Block(0) };
     String[] delHints = new String[] { "" };
     
     // Ensure blockReceived call from dead datanode is rejected with IOException
     try {
-      dnp.blockReceived(reg, blocks, delHints);
+      dnp.blockReceived(reg, poolId, blocks, delHints);
       Assert.fail("Expected IOException is not thrown");
     } catch (IOException ex) {
       // Expected
@@ -112,7 +115,7 @@ public class TestDeadDatanode {
     // Ensure blockReport from dead datanode is rejected with IOException
     long[] blockReport = new long[] { 0L, 0L, 0L };
     try {
-      dnp.blockReport(reg, blockReport);
+      dnp.blockReport(reg, poolId, blockReport);
       Assert.fail("Expected IOException is not thrown");
     } catch (IOException ex) {
       // Expected
@@ -120,7 +123,7 @@ public class TestDeadDatanode {
 
     // Ensure heartbeat from dead datanode is rejected with a command
     // that asks datanode to register again
-    DatanodeCommand[] cmd = dnp.sendHeartbeat(reg, 0, 0, 0, 0, 0);
+    DatanodeCommand[] cmd = dnp.sendHeartbeat(reg, 0, 0, 0, 0, 0, 0);
     Assert.assertEquals(1, cmd.length);
     Assert.assertEquals(cmd[0].getAction(), DatanodeCommand.REGISTER
         .getAction());

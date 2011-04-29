@@ -31,6 +31,7 @@ import static org.junit.Assert.*;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.io.IOUtils;
 
 /**
@@ -82,8 +83,9 @@ public class TestCrcCorruption {
       // file disallows this Datanode to send data to another datanode.
       // However, a client is alowed access to this block.
       //
-      File data_dir = new File(System.getProperty("test.build.data"),
-                               "dfs/data/data1" + MiniDFSCluster.FINALIZED_DIR_NAME);
+      File storageDir = MiniDFSCluster.getStorageDir(0, 1);
+      String bpid = cluster.getNamesystem().getBlockPoolId();
+      File data_dir = MiniDFSCluster.getFinalizedDir(storageDir, bpid);
       assertTrue("data directory does not exist", data_dir.exists());
       File[] blocks = data_dir.listFiles();
       assertTrue("Blocks do not exist in data-dir", (blocks != null) && (blocks.length > 0));
@@ -135,12 +137,13 @@ public class TestCrcCorruption {
           }
         }
       }
+      
       //
       // Now deliberately corrupt all meta blocks from the second
       // directory of the first datanode
       //
-      data_dir = new File(System.getProperty("test.build.data"),
-                               "dfs/data/data2" + MiniDFSCluster.FINALIZED_DIR_NAME);
+      storageDir = MiniDFSCluster.getStorageDir(0, 1);
+      data_dir = MiniDFSCluster.getFinalizedDir(storageDir, bpid);
       assertTrue("data directory does not exist", data_dir.exists());
       blocks = data_dir.listFiles();
       assertTrue("Blocks do not exist in data-dir", (blocks != null) && (blocks.length > 0));
@@ -256,7 +259,7 @@ public class TestCrcCorruption {
       DFSTestUtil.createFile(fs, file, fileSize, replFactor, 12345L /*seed*/);
       DFSTestUtil.waitReplication(fs, file, replFactor);
 
-      String block = DFSTestUtil.getFirstBlock(fs, file).getBlockName();
+      ExtendedBlock block = DFSTestUtil.getFirstBlock(fs, file);
       int blockFilesCorrupted = cluster.corruptBlockOnDataNodes(block);
       assertEquals("All replicas not corrupted", replFactor, blockFilesCorrupted);
 

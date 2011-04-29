@@ -147,9 +147,9 @@ public class TestDataNodeVolumeFailureReporting {
     DFSTestUtil.createFile(fs, file1, 1024, (short)3, 1L);
     DFSTestUtil.waitReplication(fs, file1, (short)3);
     ArrayList<DataNode> dns = cluster.getDataNodes();
-    assertTrue("DN1 should be up", DataNode.isDatanodeUp(dns.get(0)));
-    assertTrue("DN2 should be up", DataNode.isDatanodeUp(dns.get(1)));
-    assertTrue("DN3 should be up", DataNode.isDatanodeUp(dns.get(2)));
+    assertTrue("DN1 should be up", dns.get(0).isDatanodeUp());
+    assertTrue("DN2 should be up", dns.get(1).isDatanodeUp());
+    assertTrue("DN3 should be up", dns.get(2).isDatanodeUp());
 
     /*
      * The metrics should confirm the volume failures.
@@ -188,7 +188,7 @@ public class TestDataNodeVolumeFailureReporting {
     Path file2 = new Path("/test2");
     DFSTestUtil.createFile(fs, file2, 1024, (short)3, 1L);
     DFSTestUtil.waitReplication(fs, file2, (short)3);
-    assertTrue("DN3 should still be up", DataNode.isDatanodeUp(dns.get(2)));
+    assertTrue("DN3 should still be up", dns.get(2).isDatanodeUp());
     assertEquals("Vol3 should report 1 failure",
         1, metrics3.volumesFailed.getCurrentIntervalValue());
     live.clear();
@@ -233,7 +233,7 @@ public class TestDataNodeVolumeFailureReporting {
     DFSTestUtil.createFile(fs, file3, 1024, (short)3, 1L);
     DFSTestUtil.waitReplication(fs, file3, (short)2);
     // Eventually the DN should go down
-    while (DataNode.isDatanodeUp(dns.get(2))) {
+    while (dns.get(2).isDatanodeUp()) {
       Thread.sleep(1000);
     }
     // and report two failed volumes

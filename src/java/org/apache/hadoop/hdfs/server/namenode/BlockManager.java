@@ -443,7 +443,7 @@ public class BlockManager {
     if (!blk.isComplete()) {
       final BlockInfoUnderConstruction uc = (BlockInfoUnderConstruction)blk;
       final DatanodeDescriptor[] locations = uc.getExpectedLocations();
-      return new LocatedBlock(uc, locations, pos, false);
+      return namesystem.createLocatedBlock(uc, locations, pos, false);
     }
 
     // get block locations
@@ -469,7 +469,7 @@ public class BlockManager {
           machines[j++] = d;
       }
     }
-    return new LocatedBlock(blk, machines, pos, isCorrupt);
+    return namesystem.createLocatedBlock(blk, machines, pos, isCorrupt);
   }
 
   /**

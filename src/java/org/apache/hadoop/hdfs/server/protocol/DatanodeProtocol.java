@@ -23,6 +23,7 @@ import java.io.*;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.ipc.VersionedProtocol;
@@ -44,9 +45,9 @@ import org.apache.avro.reflect.Nullable;
 @InterfaceAudience.Private
 public interface DatanodeProtocol extends VersionedProtocol {
   /**
-   * 26: remove getBlockLocations optimization
+   * 27: Add block pool ID to Block
    */
-  public static final long versionID = 26;
+  public static final long versionID = 27L;
   
   // error code
   final static int NOTIFY = 0;
@@ -70,7 +71,6 @@ public interface DatanodeProtocol extends VersionedProtocol {
   /** 
    * Register Datanode.
    *
-   * @see org.apache.hadoop.hdfs.server.datanode.DataNode#dnRegistration
    * @see org.apache.hadoop.hdfs.server.namenode.FSNamesystem#registerDatanode(DatanodeRegistration)
    * 
    * @return updated {@link org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration}, which contains 
@@ -86,11 +86,20 @@ public interface DatanodeProtocol extends VersionedProtocol {
    * an array of "DatanodeCommand" objects.
    * A DatanodeCommand tells the DataNode to invalidate local block(s), 
    * or to copy them to other DataNodes, etc.
+   * @param registration datanode registration information
+   * @param capacity total storage capacity available at the datanode
+   * @param dfsUsed storage used by HDFS
+   * @param remaining remaining storage available for HDFS
+   * @param blockPoolUsed storage used by the block pool
+   * @param xmitsInProgress number of transfers from this datanode to others
+   * @param xceiverCount number of active transceiver threads
+   * @throws IOException on error
    */
   @Nullable
   public DatanodeCommand[] sendHeartbeat(DatanodeRegistration registration,
                                        long capacity,
                                        long dfsUsed, long remaining,
+                                       long blockPoolUsed,
                                        int xmitsInProgress,
                                        int xceiverCount) throws IOException;
 
@@ -101,6 +110,7 @@ public interface DatanodeProtocol extends VersionedProtocol {
    * the locally-stored blocks.  It's invoked upon startup and then
    * infrequently afterwards.
    * @param registration
+   * @param poolId - the block pool ID for the blocks
    * @param blocks - the block list as an array of longs.
    *     Each block is represented as 2 longs.
    *     This is done instead of Block[] to reduce memory used by block reports.
@@ -109,6 +119,7 @@ public interface DatanodeProtocol extends VersionedProtocol {
    * @throws IOException
    */
   public DatanodeCommand blockReport(DatanodeRegistration registration,
+                                     String poolId,
                                      long[] blocks) throws IOException;
     
   /**
@@ -120,6 +131,7 @@ public interface DatanodeProtocol extends VersionedProtocol {
    * this DataNode, it will call blockReceived().
    */
   public void blockReceived(DatanodeRegistration registration,
+                            String poolId,
                             Block blocks[],
                             String[] delHints) throws IOException;
 
@@ -154,7 +166,7 @@ public interface DatanodeProtocol extends VersionedProtocol {
   /**
    * Commit block synchronization in lease recovery
    */
-  public void commitBlockSynchronization(Block block,
+  public void commitBlockSynchronization(ExtendedBlock block,
       long newgenerationstamp, long newlength,
       boolean closeFile, boolean deleteblock, DatanodeID[] newtargets
       ) throws IOException;

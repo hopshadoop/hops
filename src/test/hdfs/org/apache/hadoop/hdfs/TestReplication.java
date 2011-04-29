@@ -37,6 +37,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.protocol.FSConstants.DatanodeReportType;
@@ -164,7 +165,7 @@ public class TestReplication extends TestCase {
     DFSTestUtil.waitReplication(fs, file1, replFactor);
   
     // Corrupt the block belonging to the created file
-    String block = DFSTestUtil.getFirstBlock(fs, file1).getBlockName();
+    ExtendedBlock block = DFSTestUtil.getFirstBlock(fs, file1);
 
     int blockFilesCorrupted = cluster.corruptBlockOnDataNodes(block);
     assertEquals("Corrupted too few blocks", replFactor, blockFilesCorrupted); 
@@ -329,28 +330,23 @@ public class TestReplication extends TestCase {
       waitForBlockReplication(testFile, dfsClient.getNamenode(), numDataNodes, -1);
 
       // get first block of the file.
-      String block = dfsClient.getNamenode().
-                       getBlockLocations(testFile, 0, Long.MAX_VALUE).
-                       get(0).getBlock().getBlockName();
+      ExtendedBlock block = dfsClient.getNamenode().getBlockLocations(testFile,
+          0, Long.MAX_VALUE).get(0).getBlock();
       
       cluster.shutdown();
       cluster = null;
       
-      //Now mess up some of the replicas.
-      //Delete the first and corrupt the next two.
-      File baseDir = new File(System.getProperty("test.build.data"), 
-                                                 "dfs/data");
       for (int i=0; i<25; i++) {
         buffer[i] = '0';
       }
       
       int fileCount = 0;
-      for (int i=0; i<6; i++) {
-        File blockFile = new File(baseDir, "data" + (i+1) + 
-            MiniDFSCluster.FINALIZED_DIR_NAME + block);
+      // Choose 3 copies of block file - delete 1 and corrupt the remaining 2
+      for (int dnIndex=0; dnIndex<3; dnIndex++) {
+        File blockFile = MiniDFSCluster.getBlockFile(dnIndex, block);
         LOG.info("Checking for file " + blockFile);
         
-        if (blockFile.exists()) {
+        if (blockFile != null && blockFile.exists()) {
           if (fileCount == 0) {
             LOG.info("Deleting file " + blockFile);
             assertTrue(blockFile.delete());
@@ -429,7 +425,7 @@ public class TestReplication extends TestCase {
     DFSTestUtil.createFile(fs, fileName, fileLen, REPLICATION_FACTOR, 0);
     DFSTestUtil.waitReplication(fs, fileName, REPLICATION_FACTOR);
 
-    String block = DFSTestUtil.getFirstBlock(fs, fileName).getBlockName();
+    ExtendedBlock block = DFSTestUtil.getFirstBlock(fs, fileName);
 
     // Change the length of a replica
     for (int i=0; i<cluster.getDataNodes().size(); i++) {

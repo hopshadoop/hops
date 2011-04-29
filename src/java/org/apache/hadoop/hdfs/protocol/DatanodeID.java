@@ -24,6 +24,7 @@ import java.io.IOException;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.DeprecatedUTF8;
 import org.apache.hadoop.io.WritableComparable;
 
@@ -73,6 +74,18 @@ public class DatanodeID implements WritableComparable<DatanodeID> {
     this.name = nodeName;
     this.storageID = storageID;
     this.infoPort = infoPort;
+    this.ipcPort = ipcPort;
+  }
+  
+  public void setName(String name) {
+    this.name = name;
+  }
+
+  public void setInfoPort(int infoPort) {
+    this.infoPort = infoPort;
+  }
+  
+  public void setIpcPort(int ipcPort) {
     this.ipcPort = ipcPort;
   }
   

@@ -78,18 +78,21 @@ public abstract class Storage extends StorageInfo {
   // last layout version that did not support persistent rbw replicas
   public static final int PRE_RBW_LAYOUT_VERSION = -19;
   
+  // last layout version that is before federation
+  public static final int LAST_PRE_FEDERATION_LAYOUT_VERSION = -30;
+  
   /** Layout versions of 0.20.203 release */
   public static final int[] LAYOUT_VERSIONS_203 = {-19, -31};
 
   private   static final String STORAGE_FILE_LOCK     = "in_use.lock";
   protected static final String STORAGE_FILE_VERSION  = "VERSION";
   public    static final String STORAGE_DIR_CURRENT   = "current";
-  private   static final String STORAGE_DIR_PREVIOUS  = "previous";
-  private   static final String STORAGE_TMP_REMOVED   = "removed.tmp";
-  private   static final String STORAGE_TMP_PREVIOUS  = "previous.tmp";
-  private   static final String STORAGE_TMP_FINALIZED = "finalized.tmp";
-  private   static final String STORAGE_TMP_LAST_CKPT = "lastcheckpoint.tmp";
-  private   static final String STORAGE_PREVIOUS_CKPT = "previous.checkpoint";
+  public    static final String STORAGE_DIR_PREVIOUS  = "previous";
+  public    static final String STORAGE_TMP_REMOVED   = "removed.tmp";
+  public    static final String STORAGE_TMP_PREVIOUS  = "previous.tmp";
+  public    static final String STORAGE_TMP_FINALIZED = "finalized.tmp";
+  public    static final String STORAGE_TMP_LAST_CKPT = "lastcheckpoint.tmp";
+  public    static final String STORAGE_PREVIOUS_CKPT = "previous.checkpoint";
   
   public enum StorageState {
     NON_EXISTENT,
@@ -115,7 +118,7 @@ public abstract class Storage extends StorageInfo {
     public boolean isOfType(StorageDirType type);
   }
   
-  private NodeType storageType;    // Type of the node using this storage 
+  protected NodeType storageType;    // Type of the node using this storage 
   protected List<StorageDirectory> storageDirs = new ArrayList<StorageDirectory>();
   
   private class DirIterator implements Iterator<StorageDirectory> {
@@ -198,19 +201,32 @@ public abstract class Storage extends StorageInfo {
    */
   @InterfaceAudience.Private
   public class StorageDirectory {
-    File              root; // root directory
-    FileLock          lock; // storage lock
-    StorageDirType dirType; // storage dir type
+    final File root;              // root directory
+    final boolean useLock;        // flag to enable storage lock
+    final StorageDirType dirType; // storage dir type
+    FileLock lock;                // storage lock
     
     public StorageDirectory(File dir) {
       // default dirType is null
-      this(dir, null);
+      this(dir, null, true);
     }
     
     public StorageDirectory(File dir, StorageDirType dirType) {
+      this(dir, dirType, true);
+    }
+    
+    /**
+     * Constructor
+     * @param dir directory corresponding to the storage
+     * @param dirType storage directory type
+     * @param useLock true - enables locking on the storage directory and false
+     *          disables locking
+     */
+    public StorageDirectory(File dir, StorageDirType dirType, boolean useLock) {
       this.root = dir;
       this.lock = null;
       this.dirType = dirType;
+      this.useLock = useLock;
     }
     
     /**
@@ -235,22 +251,26 @@ public abstract class Storage extends StorageInfo {
     public void read() throws IOException {
       read(getVersionFile());
     }
-    
     public void read(File from) throws IOException {
+      Properties props = readFrom(from);
+      getFields(props, this);
+    }
+    
+    public Properties readFrom(File from) throws IOException {
       RandomAccessFile file = new RandomAccessFile(from, "rws");
       FileInputStream in = null;
+      Properties props = new Properties();
       try {
         in = new FileInputStream(file.getFD());
         file.seek(0);
-        Properties props = new Properties();
         props.load(in);
-        getFields(props, this);
       } finally {
         if (in != null) {
           in.close();
         }
         file.close();
       }
+      return props;
     }
 
     /**
@@ -610,6 +630,10 @@ public abstract class Storage extends StorageInfo {
      * @throws IOException if locking fails
      */
     public void lock() throws IOException {
+      if (!useLock) {
+        LOG.info("Locking is disabled");
+        return;
+      }
       this.lock = tryLock();
       if (lock == null) {
         String msg = "Cannot lock storage " + this.root 
@@ -666,11 +690,6 @@ public abstract class Storage extends StorageInfo {
     this.storageType = type;
   }
   
-  protected Storage(NodeType type, int nsID, long cT) {
-    super(FSConstants.LAYOUT_VERSION, nsID, cT);
-    this.storageType = type;
-  }
-  
   protected Storage(NodeType type, StorageInfo storageInfo) {
     super(storageInfo);
     this.storageType = type;
@@ -716,8 +735,9 @@ public abstract class Storage extends StorageInfo {
   public static void checkVersionUpgradable(int oldVersion) 
                                      throws IOException {
     if (oldVersion > LAST_UPGRADABLE_LAYOUT_VERSION) {
-      String msg = "*********** Upgrade is not supported from this older" +
-                   " version of storage to the current version." + 
+      String msg = "*********** Upgrade is not supported from this " +
+                   " older version " + oldVersion + 
+                   " of storage to the current version." + 
                    " Please upgrade to " + LAST_UPGRADABLE_HADOOP_VERSION +
                    " or a later version and then upgrade to current" +
                    " version. Old layout version is " + 
@@ -741,29 +761,11 @@ public abstract class Storage extends StorageInfo {
   protected void getFields(Properties props, 
                            StorageDirectory sd 
                            ) throws IOException {
-    String sv, st, sid, sct;
-    sv = props.getProperty("layoutVersion");
-    st = props.getProperty("storageType");
-    sid = props.getProperty("namespaceID");
-    sct = props.getProperty("cTime");
-    if (sv == null || st == null || sid == null || sct == null)
-      throw new InconsistentFSStateException(sd.root,
-                                             "file " + STORAGE_FILE_VERSION + " is invalid.");
-    int rv = Integer.parseInt(sv);
-    NodeType rt = NodeType.valueOf(st);
-    int rid = Integer.parseInt(sid);
-    long rct = Long.parseLong(sct);
-    if (!storageType.equals(rt) ||
-        !((namespaceID == 0) || (rid == 0) || namespaceID == rid))
-      throw new InconsistentFSStateException(sd.root,
-                                             "is incompatible with others.");
-    if (rv < FSConstants.LAYOUT_VERSION) // future version
-      throw new IncorrectVersionException(rv, "storage directory " 
-                                          + sd.root.getCanonicalPath());
-    layoutVersion = rv;
-    storageType = rt;
-    namespaceID = rid;
-    cTime = rct;
+    setLayoutVersion(props, sd);
+    setNamespaceID(props, sd);
+    setStorageType(props, sd);
+    setcTime(props, sd);
+    setClusterId(props, layoutVersion, sd);
   }
   
   /**
@@ -779,6 +781,10 @@ public abstract class Storage extends StorageInfo {
     props.setProperty("layoutVersion", String.valueOf(layoutVersion));
     props.setProperty("storageType", storageType.toString());
     props.setProperty("namespaceID", String.valueOf(namespaceID));
+    // Set clusterID in version LAST_PRE_FEDERATION_LAYOUT_VERSION or before
+    if (layoutVersion < LAST_PRE_FEDERATION_LAYOUT_VERSION) {
+      props.setProperty("clusterID", clusterID);
+    }
     props.setProperty("cTime", String.valueOf(cTime));
   }
 
@@ -861,8 +867,72 @@ public abstract class Storage extends StorageInfo {
 
   public static String getRegistrationID(StorageInfo storage) {
     return "NS-" + Integer.toString(storage.getNamespaceID())
+      + "-" + storage.getClusterID()
       + "-" + Integer.toString(storage.getLayoutVersion())
       + "-" + Long.toString(storage.getCTime());
+  }
+  
+  String getProperty(Properties props, StorageDirectory sd,
+      String name) throws InconsistentFSStateException {
+    String property = props.getProperty(name);
+    if (property == null) {
+      throw new InconsistentFSStateException(sd.root, "file "
+          + STORAGE_FILE_VERSION + " has " + name + " mising.");
+    }
+    return property;
+  }
+  
+  /** Validate and set storage type from {@link Properties}*/
+  protected void setStorageType(Properties props, StorageDirectory sd)
+      throws InconsistentFSStateException {
+    NodeType type = NodeType.valueOf(getProperty(props, sd, "storageType"));
+    if (!storageType.equals(type)) {
+      throw new InconsistentFSStateException(sd.root,
+          "node type is incompatible with others.");
+    }
+    storageType = type;
+  }
+  
+  /** Validate and set ctime from {@link Properties}*/
+  protected void setcTime(Properties props, StorageDirectory sd)
+      throws InconsistentFSStateException {
+    cTime = Long.parseLong(getProperty(props, sd, "cTime"));
+  }
+
+  /** Validate and set clusterId from {@link Properties}*/
+  protected void setClusterId(Properties props, int layoutVersion,
+      StorageDirectory sd) throws InconsistentFSStateException {
+    // No Cluster ID in version LAST_PRE_FEDERATION_LAYOUT_VERSION or before
+    if (layoutVersion < Storage.LAST_PRE_FEDERATION_LAYOUT_VERSION) {
+      String cid = getProperty(props, sd, "clusterID");
+      if (!(clusterID.equals("") || cid.equals("") || clusterID.equals(cid))) {
+        throw new InconsistentFSStateException(sd.getRoot(),
+            "cluster Id is incompatible with others.");
+      }
+      clusterID = cid;
+    }
+  }
+  
+  /** Validate and set layout version from {@link Properties}*/
+  protected void setLayoutVersion(Properties props, StorageDirectory sd)
+      throws IncorrectVersionException, InconsistentFSStateException {
+    int lv = Integer.parseInt(getProperty(props, sd, "layoutVersion"));
+    if (lv < FSConstants.LAYOUT_VERSION) { // future version
+      throw new IncorrectVersionException(lv, "storage directory "
+          + sd.root.getAbsolutePath());
+    }
+    layoutVersion = lv;
+  }
+  
+  /** Validate and set namespaceID version from {@link Properties}*/
+  protected void setNamespaceID(Properties props, StorageDirectory sd)
+      throws InconsistentFSStateException {
+    int nsId = Integer.parseInt(getProperty(props, sd, "namespaceID"));
+    if (namespaceID != 0 && nsId != 0 && namespaceID != nsId) {
+      throw new InconsistentFSStateException(sd.root,
+          "namespaceID is incompatible with others.");
+    }
+    namespaceID = nsId;
   }
   
   public static boolean is203LayoutVersion(int layoutVersion) {

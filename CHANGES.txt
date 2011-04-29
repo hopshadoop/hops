@@ -11,19 +11,252 @@ Trunk (unreleased changes)
 
   NEW FEATURES
 
+    HDFS-1365. Federation: propose ClusterID and BlockPoolID format 
+    (Tanping via boryas)
+
+    HDFS-1394. Federation: modify -format option for namenode to generated 
+    new blockpool id and accept newcluster (boryas)
+
+    HDFS-1400. Federation: DataTransferProtocol uses ExtendedBlockPool to 
+    include BlockPoolID in the protocol. (suresh)
+
+    HDFS-1428. Federation : add cluster ID and block pool ID into 
+    Name node web UI(Tanping via boryas)
+
+    HDFS-1450. Federation: Introduce block pool ID into FSDatasetInterface.
+    (suresh)
+
+    HDFS-1632. Federation: data node storage structure changes and
+    introduce block pool storage. (Tanping via suresh)
+
+    HDFS-1634. Federation: Convert single threaded DataNode into 
+    per BlockPool thread model.(boryas)
+
+    HDFS-1637. Federation: FSDataset in Datanode should be created after 
+    initial handshake with namenode. (boryas and jitendra)
+
+    HDFS-1653. Federation: Block received message from datanode sends invalid 
+    DatanodeRegistration. (Tanping via suresh)
+
+    HDFS-1645. Federation: DatanodeCommond.Finalize needs to include 
+    BlockPoolId.  (suresh)
+
+    HDFS-1638. Federation: DataNode.handleDiskError needs to inform 
+    ALL namenodes if a disk failed (boryas)
+
+    HDFS-1647. Federation: Multiple namenode configuration. (jitendra)
+
+    HDFS-1639. Federation: Add block pool management to FSDataset. (suresh)
+
+    HDFS-1648. Federation: Only DataStorage must be locked using in_use.lock 
+    and no locks must be associated with BlockPoolStorage. (Tanping via suresh)
+
+    HDFS-1641. Federation: Datanode fields that are no longer used should 
+    be removed (boryas)
+
+    HDFS-1642. Federation: add Datanode.getDNRegistration(String bpid) 
+    method  (boryas)
+
+    HDFS-1643. Federation: remove namenode argument from DataNode 
+    constructor (boryas)
+
+    HDFS-1657. Federation: Tests that corrupt block files fail due to changed 
+    file path in federation. (suresh)
+
+    HDFS-1661. Federation: Remove unnecessary TODO:FEDERATION comments.
+    (jitendra)
+
+    HDFS-1660. Federation: Datanode doesn't start with two namenodes (boryas)
+
+    HDFS-1650. Federation: TestReplication fails. (Tanping via suresh)
+
+    HDFS-1651. Federation: Tests fail due to null pointer exception in 
+    Datnode#shutdown() method. (Tanping via suresh)
+
+    HDFS-1649. Federation: Datanode command to refresh namenode list at 
+    the datanode. (jitendra)
+
+    HDFS-1646. Federation: MiniDFSClsuter#waitActive() waits for ever 
+    with the introduction of BPOfferService in datanode. (suresh)
+
+    HDFS-1659. Federation: BPOfferService exits after one iteration 
+    incorrectly.  (Tanping via suresh)
+
+    HDFS-1654. Federation: Fix TestDFSUpgrade and TestDFSRollback failures.
+    (suresh)
+    
+    HDFS-1668. Federation: Datanodes sends block pool usage information 
+    to the namenode in heartbeat. (suresh)
+
+    HDFS-1669. Federation: Fix TestHftpFileSystem failure. (suresh)
+
+    HDFS-1670. Federation: remove dnRegistration from Datanode (boryas)
+
+    HDFS-1662. Federation: fix unit test case, TestCheckpoint 
+    and TestDataNodeMXBean (tanping via boryas)
+
+    HDFS-1671. Federation: shutdown in DataNode should be able to 
+    shutdown individual BP threads as well as the whole DN (boryas).
+
+    HDFS-1663. Federation: Rename getPoolId() everywhere to 
+    getBlockPoolId() (tanping via boryas)
+
+    HDFS-1652. FederationL Add support for multiple namenodes in MiniDFSCluster.
+    (suresh)
+
+    HDFS-1672. Federation: refactor stopDatanode(name) to work 
+    with multiple Block Pools (boryas)
+
+    HDFS-1687. Federation: DirectoryScanner changes for 
+    federation (Matt Foley via boryas)
+
+    HDFS-1626. Make BLOCK_INVALIDATE_LIMIT configurable. (szetszwo)
+
+    HDFS-1655. Federation: DatablockScanner should scan blocks for 
+    all the block pools. (jitendra)
+
+    HDFS-1664. Federation: Add block pool storage usage to Namenode WebUI.
+    (Tanping via suresh)
+
+    HDFS-1674. Federation: Rename BlockPool class to BlockPoolSlice. 
+    (jghoman, Tanping via suresh)
+
+    HDFS-1673. Federation: Datanode changes to track block token secret per 
+    namenode. (suresh)
+
+    HDFS-1677. Federation: Fix TestFsck and TestListCorruptFileBlocks 
+    failures. (Tanping via suresh)
+
+    HDFS-1678. Federation: Remove unnecessary #getBlockpool() 
+    for NameNodeMXBean in FSNameSystem. (Tanping via Suresh)
+
+    HDFS-1688. Federation: Fix failures in fault injection tests,
+    TestDiskError, TestDatanodeRestart and TestDFSTartupVersions. (suresh)
+
+    HDFS-1696. Federation: when build version doesn't match - 
+    datanode should wait (keep connecting) untill NN comes up 
+    with the right version (boryas)
+
+    HDFS-1681. Balancer: support per pool and per node policies. (szetszwo)
+
+    HDFS-1695. Federation: Fix testOIV and TestDatanodeUtils 
+    (jhoman and tanping via boryas)
+
+    HDFS:1699. Federation: Fix failure of TestBlockReport.
+    (Matt Foley via suresh)
+
+    HDFS-1698. Federation: TestOverReplicatedBlocks and TestWriteToReplica 
+    failing. (jhoman and jitendra)
+
+    HDFS-1701. Federation: Fix TestHeartbeathandling.
+    (Erik Steffl and Tanping Wang via suresh)
+
+    HDFS-1693. Federation: Fix TestDFSStorageStateRecovery failure. (suresh)
+
+    HDFS-1694. Federation: SimulatedFSDataset changes to work with
+    federation and multiple block pools. (suresh)
+
+    HDFS-1689. Federation: Configuration for namenodes. (suresh and jitendra)
+
+    HDFS-1682. Change Balancer CLI for multiple namenodes and balancing
+    policy.  (szetszwo)
+
+    HDFS-1697. Federation: fix TestBlockRecovery (boryas)
+
+    HDFS-1702. Federation: fix TestBackupNode and TestRefreshNamendoes
+    failures. (suresh)
+
+    HDFS-1706. Federation: TestFileAppend2, TestFileAppend3 and 
+    TestBlockTokenWithDFS failing. (jitendra)
+
+    HDFS-1704. Federation: Add a tool that lists namenodes, secondary and
+    backup from configuration file. (suresh)
+
+    HDFS-1711. Federation: create method for updating machine name in 
+    DataNode.java (boryas)
+
+    HDFS-1712. Federation: when looking up datanode we should use machineNmae 
+    (in testOverReplicatedBlocks) (boryas)
+
+    HDFS-1709. Federation: Error "nnaddr url param is null" when clicking on a 
+    node from NN Live Node Link. (jitendra)
+
+    HDFS-1714. Federation: refactor upgrade object in DataNode (boryas) 
+
+    HDFS-1715. Federation: warning/error not generated when datanode sees 
+    inconsistent/different Cluster ID between namenodes (boryas)
+
+    HDFS-1715. Federation: warning/error not generated when datanode sees 
+    inconsistent/different Cluster ID between namenodes (boryas)
+
+    HDFS-1716. Federation: Add decommission tests for federated namenodes.
+    (suresh)
+
+    HDFS-1713. Federation: Prevent DataBlockScanner from running in tight loop.
+    (jitendra)
+
+    HDFS-1721. Federation: Configuration for principal names should not be 
+    namenode specific. (jitendra)
+
+    HDFS-1717. Federation: FSDataset volumeMap access is not synchronized
+    correctly. (suresh)
+
+    HDFS-1722. Federation: Add flag to MiniDFSCluser to differentiate between
+    federation and non-federation modes. (boryas via suresh)
+
+    HDFS-1718. Federation: MiniDFSCluster#waitActive() bug causes some tests
+    to fail. (suresh)
+
+    HDFS-1719. Federation: Fix TestDFSRemove that fails intermittently.
+    (suresh)
+
+    HDFS-1720. Federation: FSVolumeSet volumes is not synchronized correctly.
+    (suresh)
+
+    HDFS-1700. Federation: fsck needs to work with federation changes.
+    (Matt Foley via suresh)
+
     HDFS-1482. Add listCorruptFileBlocks to DistributedFileSystem.
     (Patrick Kling via hairong)
 
     HDFS-1448. Add a new tool Offline Edits Viewer (oev).  (Erik Steffl
     via szetszwo)
 
-    HDFS-1626. Make BLOCK_INVALIDATE_LIMIT configurable. (szetszwo)
+    HDFS-1735. Federation: merge FSImage change in federation to
+    FSImage+NNStorage refactoring in trunk. (suresh)
+
+    HDFS-1737. Federation: Update the layout version for federation
+    changes. (suresh)
+
+    HDFS-1744. Federation: Add new layout version to offline image viewer
+    and edits viewer. (suresh)
+
+    HDFS-1745. Federation: Fix fault injection test failures. (suresh)
+
+    HDFS-1746. Federation: TestFileAppend3 fails intermittently. (jitendra)
+
+    HDFS-1703. Improve start/stop scripts and add decommission tool for
+    federation. (Tanping Wang, Erik Steffl via suresh)
+
+    HDFS-1749. Federation: TestListCorruptFileBlocks failing in federation 
+    branch. (jitendra)
+
+    HDFS-1754. Federation: testFsck fails. (boryas)
+
+    HDFS-1755. Federation: The BPOfferService must always connect to namenode as 
+    the login user. (jitendra)
 
     HDFS-1675. Support transferring RBW between datanodes. (szetszwo)
+
+    HDFS-1791. Federation: Add command to delete block pool directories 
+    from a datanode. (jitendra)
 
     HDFS-1761. Add a new DataTransferProtocol operation, Op.TRANSFER_BLOCK,
     for transferring RBW/Finalized with acknowledgement and without using RPC.
     (szetszwo)
+
+    HDFS-1813. Federation: Authentication using BlockToken in RPC to datanode 
+               fails. (jitendra)
 
     HDFS_1630. Support fsedits checksum. (hairong)
 
@@ -41,10 +274,19 @@ Trunk (unreleased changes)
 
     HDFS-1510. Added test-patch.properties required by test-patch.sh (nigel)
 
-    HDFS-1481. NameNode should validate fsimage before rolling. (hairong)
+    HDFS-1628. Display full path in AccessControlException.  (John George
+    via szetszwo)
 
-    HDFS-1518. Wrong description in FSNamesystem's javadoc. 
-    (Jingguo Yao via eli)
+    HDFS-1707. Federation: Failure in browsing data on new namenodes. (jitendra)
+
+    HDFS-1683. Test Balancer with multiple NameNodes.  (szetszwo)
+
+    HDFS-1547. Improve decommission mechanism. (suresh)
+
+    HDFS-1588. Remove hardcoded strings for configuration keys, "dfs.hosts"
+    and "dfs.hosts.exlude". (Erik Steffl via suresh)
+
+    HDFS-1481. NameNode should validate fsimage before rolling. (hairong)
 
     HDFS-1506. Refactor fsimage loading code. (hairong)
 
@@ -59,14 +301,6 @@ Trunk (unreleased changes)
     HDFS-1539. A config option for the datanode to fsycn a block file
     when block is completely written. (dhruba)
 
-    HDFS-1547. Improve decommission mechanism. (suresh)
-
-    HDFS-1586. Add InterfaceAudience and InterfaceStability annotations to 
-    MiniDFSCluster. (suresh)
-
-    HDFS-1588. Remove hardcoded strings for configuration keys, "dfs.hosts"
-    and "dfs.hosts.exlude". (Erik Steffl via suresh)
-
     HDFS-1335. HDFS side change of HADDOP-6904: RPC compatibility. (hairong)
 
     HDFS-1557. Separate Storage from FSImage. (Ivan Kelly via jitendra)
@@ -75,9 +309,6 @@ Trunk (unreleased changes)
 
     HDFS-1629. Add a method to BlockPlacementPolicy for keeping the chosen
     nodes in the output array.  (szetszwo)
-
-    HDFS-1628. Display full path in AccessControlException.  (John George
-    via szetszwo)
 
     HDFS-1731. Allow using a file to exclude certain tests from build (todd)
 
@@ -155,15 +386,27 @@ Trunk (unreleased changes)
 
   BUG FIXES
 
+    HDFS-1449. Fix test failures - ExtendedBlock must return 
+    block file name in #getBlockName(). (suresh)
+
+    HDFS-1680. Fix TestBalancer. (szetszwo)
+
+    HDFS-1705. Balancer command throws NullPointerException. (suresh via
+    szetszwo)
+
+    HDFS-1559. Add missing UGM overrides to TestRefreshUserMappings
+    (Todd Lipcon via eli)
+
+    HDFS-1585. Fix build after HDFS-1547 (todd)
+
+    HDFS-1684. Balancer cannot start with with multiple namenodes.  (szetszwo)
+
     HDFS-1516. mvn-install is broken after 0.22 branch creation. (cos)
 
     HDFS-1360. TestBlockRecovery should bind ephemeral ports.
     (Todd Lipcon via hairong)
 
     HDFS-1551. Fix pom templates dependency list (gkesavan)
-
-    HDFS-1559. Add missing UGM overrides to TestRefreshUserMappings
-    (Todd Lipcon via eli)
 
     HDFS-1509. A savenamespace command writes the fsimage and edits into
     all configured directories. (dhruba)
@@ -173,26 +416,24 @@ Trunk (unreleased changes)
 
     HDFS-1463. Accesstime of a file is not updated in safeMode. (dhruba)
 
-    HDFS-1585. Fix build after HDFS-1547 (todd)
-
     HDFS-863. Potential deadlock in TestOverReplicatedBlocks. 
     (Ken Goodhope via jghoman)
 
-    HDFS-1610. Fix TestClientProtocolWithDelegationToken and TestBlockToken
-    on trunk after HADOOP-6904 (todd)
-
     HDFS-1607. Fix referenced to misspelled method name getProtocolSigature
     (todd)
+
+    HDFS-1610. Fix TestClientProtocolWithDelegationToken and TestBlockToken
+    on trunk after HADOOP-6904 (todd)
 
     HDFS-1600. Fix release audit warnings on trunk. (todd)
 
     HDFS-1691. Remove a duplicated static initializer for reading default
     configurations in DFSck.  (Alexey Diomin via szetszwo)
 
+    HDFS-1748. Balancer utilization classification is incomplete.  (szetszwo)
+
     HDFS-1738. change hdfs jmxget to return an empty string instead of 
     null when an attribute value is not available (tanping vi boryas)
-
-    HDFS-1748. Balancer utilization classification is incomplete.  (szetszwo)
 
     HDFS-1757. Don't compile fuse-dfs by default. (eli)
 
@@ -266,6 +507,8 @@ Release 0.22.0 - Unreleased
     HDFS-202.  HDFS support of listLocatedStatus introduced in HADOOP-6870.
     HDFS piggyback block locations to each file status when listing a
     directory.  (hairong)
+
+    HDFS-1359. Add BlockPoolID to Block. (suresh)
 
     HDFS-1361. Add -fileStatus operation to NNThroughputBenchmark. (shv)
 
@@ -395,9 +638,6 @@ Release 0.22.0 - Unreleased
 
     HDFS-1426. Remove unused method BlockInfo#listCount. (hairong)
 
-    HDFS-1456. Provide builder for constructing instances of MiniDFSCluster.
-    (jghoman)
-
     HDFS-1472. Allow programmatic access to fsck output.
     (Ramkumar Vadali via dhruba)
 
@@ -455,8 +695,14 @@ Release 0.22.0 - Unreleased
 
     HDFS-1582. Remove auto-generated native build files. (rvs via eli)
 
+    HDFS-1456. Provide builder for constructing instances of MiniDFSCluster.
+    (jghoman)
+
     HDFS-1861. Rename dfs.datanode.max.xcievers and bump its default value.
     (eli)
+
+    HDFS-1052. HDFS Federation - Merge of umbrella jira changes from
+    HDFS-1052 branch into trunk.
 
   OPTIMIZATIONS
 
@@ -594,6 +840,9 @@ Release 0.22.0 - Unreleased
     HDFS-1357. HFTP traffic served by DataNode shouldn't use service port 
     on NameNode. (Kan Zhang via jghoman)
 
+    HDFS-1419. HDFS Federation: Three test cases need minor modification after 
+    the new block id change (Tanping Wang via suresh)
+
     HDFS-96. HDFS supports blocks larger than 2 GB.
     (Patrick Kling via dhruba)
 
@@ -610,6 +859,9 @@ Release 0.22.0 - Unreleased
     HDFS-1498. FSDirectory#unprotectedConcat calls setModificationTime 
     on a file. (eli)
 
+    HDFS-1625. Ignore disk space values in TestDataNodeMXBean.  (szetszwo)
+
+Release 0.21.1 - Unreleased
     HDFS-1466. TestFcHdfsSymlink relies on /tmp/test not existing. (eli)
 
     HDFS-874. TestHDFSFileContextMainOperations fails on weirdly 
@@ -620,14 +872,11 @@ Release 0.22.0 - Unreleased
     HDFS-1487. FSDirectory.removeBlock() should update diskspace count 
     of the block owner node (Zhong Wang via eli).
 
-    HDFS-1001. DataXceiver and BlockReader disagree on when to send/recv
-    CHECKSUM_OK. (bc Wong via eli)
+    HDFS-1467. Append pipeline never succeeds with more than one replica.
+    (Todd Lipcon via eli)
 
     HDFS-1167. New property for local conf directory in system-test-hdfs.xml
     file. (Vinay Thota via cos)
-
-    HDFS-1467. Append pipeline never succeeds with more than one replica.
-    (Todd Lipcon via eli)
 
     HDFS-1503. TestSaveNamespace fails. (Todd Lipcon via cos)
 
@@ -666,11 +915,6 @@ Release 0.22.0 - Unreleased
     HDFS-884. DataNode throws IOException if all data directories are 
     unavailable. (Steve Loughran and shv)
 
-    HDFS-1572. Checkpointer should trigger checkpoint with specified period.
-    (jghoman)
-
-    HDFS-1561. BackupNode listens on the default host. (shv)
-
     HDFS-1591. HDFS part of HADOOP-6642. (Chris Douglas, Po Cheung via shv)
 
     HDFS-900. Corrupt replicas are not processed correctly in block report (shv)
@@ -688,7 +932,8 @@ Release 0.22.0 - Unreleased
 
     HDFS-981. test-contrib fails due to test-cactus failure (cos)
 
-    HDFS-1625. Ignore disk space values in TestDataNodeMXBean.  (szetszwo)
+    HDFS-1001. DataXceiver and BlockReader disagree on when to send/recv
+    CHECKSUM_OK. (bc Wong via eli)
 
     HDFS-1781. Fix the path for jsvc in bin/hdfs.  (John George via szetszwo)
 
@@ -710,8 +955,6 @@ Release 0.22.0 - Unreleased
     (tomwhite via eli)
 
 Release 0.21.1 - Unreleased
-
-  IMPROVEMENTS
 
     HDFS-1411. Correct backup node startup command in hdfs user guide.
     (Ching-Shen Chen via shv)
@@ -736,6 +979,17 @@ Release 0.21.1 - Unreleased
     HDFS-1292. Allow artifacts to be published to the staging Apache Nexus
     Maven Repository.  (Giridharan Kesavan via tomwhite)
 
+    HDFS-1552. Remove java5 dependencies from build. (cos) 
+
+    HDFS-1189. Quota counts missed between clear quota and set quota.
+    (John George via szetszwo)
+
+    HDFS-1665. Balancer misuses dfs.heartbeat.interval as milliseconds.
+    (szetszwo)
+
+    HDFS-1728. SecondaryNameNode.checkpointSize is in bytes but not in MB.
+    (szetszwo)
+
     HDFS-1206. TestFiHFlush fails intermittently. (cos)
 
     HDFS-1548. Fault-injection tests are executed multiple times if invoked
@@ -749,14 +1003,6 @@ Release 0.21.1 - Unreleased
     block placement and checkpoint/backup node features.  (Joe Crobak
     via szetszwo)
 
-    HDFS-1189. Quota counts missed between clear quota and set quota.
-    (John George via szetszwo)
-
-    HDFS-1665. Balancer misuses dfs.heartbeat.interval as milliseconds.
-    (szetszwo)
-
-    HDFS-1728. SecondaryNameNode.checkpointSize is in bytes but not in MB.
-    (szetszwo)
 
     HDFS-1596. Replace fs.checkpoint.* with dfs.namenode.checkpoint.*
     in documentations.  (Harsh J Chouraria via szetszwo)
@@ -809,6 +1055,8 @@ Release 0.21.0 - 2010-08-13
     HDFS-1016. HDFS side change for HADOOP-6569. This jira changes the
     error message on the screen when cat a directory or a 
     non-existent file. (hairong)
+
+    HDFS-1439. HDFS Federation: Fix compilation error in TestFiHftp. (suresh)
 
   NEW FEATURES
 

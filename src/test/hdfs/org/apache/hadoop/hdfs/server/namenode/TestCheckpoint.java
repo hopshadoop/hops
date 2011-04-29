@@ -19,6 +19,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import junit.framework.TestCase;
 import java.io.*;
+import java.net.InetSocketAddress;
 import java.net.URI;
 import java.util.Collection;
 import java.util.List;
@@ -26,6 +27,7 @@ import java.util.Iterator;
 import java.util.Random;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
@@ -656,7 +658,7 @@ public class TestCheckpoint extends TestCase {
       //
       assertTrue(!fileSys.exists(file1));
       assertTrue(!fileSys.exists(file2));
-      namedirs = cluster.getNameDirs();
+      namedirs = cluster.getNameDirs(0);
 
       //
       // Create file1
@@ -743,7 +745,7 @@ public class TestCheckpoint extends TestCase {
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(numDatanodes).format(false).build();
       cluster.waitActive();
       fs = (DistributedFileSystem)(cluster.getFileSystem());
-      fc = FileContext.getFileContext(cluster.getURI());
+      fc = FileContext.getFileContext(cluster.getURI(0));
 
       // Saving image without safe mode should fail
       DFSAdmin admin = new DFSAdmin(conf);
@@ -766,7 +768,7 @@ public class TestCheckpoint extends TestCase {
       assertTrue(fc.getFileLinkStatus(symlink).isSymlink());
 
       // verify that the edits file is NOT empty
-      Collection<URI> editsDirs = cluster.getNameEditsDirs();
+      Collection<URI> editsDirs = cluster.getNameEditsDirs(0);
       for(URI uri : editsDirs) {
         File ed = new File(uri.getPath());
         assertTrue(new File(ed, "current/edits").length() > Integer.SIZE/Byte.SIZE);
@@ -793,12 +795,91 @@ public class TestCheckpoint extends TestCase {
       cluster.waitActive();
       fs = (DistributedFileSystem)(cluster.getFileSystem());
       checkFile(fs, file, replication);
-      fc = FileContext.getFileContext(cluster.getURI());
+      fc = FileContext.getFileContext(cluster.getURI(0));
       assertTrue(fc.getFileLinkStatus(symlink).isSymlink());
     } finally {
       if(fs != null) fs.close();
       if(cluster!= null) cluster.shutdown();
     }
+  }
+  
+  /* Test case to test CheckpointSignature */
+  @SuppressWarnings("deprecation")
+  public void testCheckpointSignature() throws IOException {
+
+    MiniDFSCluster cluster = null;
+    Configuration conf = new HdfsConfiguration();
+
+    cluster = new MiniDFSCluster.Builder(conf).numDataNodes(numDatanodes)
+        .format(false).build();
+    NameNode nn = cluster.getNameNode();
+
+    SecondaryNameNode secondary = startSecondaryNameNode(conf);
+    // prepare checkpoint image
+    secondary.doCheckpoint();
+    CheckpointSignature sig = nn.rollEditLog();
+    // manipulate the CheckpointSignature fields
+    sig.setBlockpoolID("somerandomebpid");
+    sig.clusterID = "somerandomcid";
+    try {
+      sig.validateStorageInfo(nn.getFSImage()); // this should fail
+      assertTrue("This test is expected to fail.", false);
+    } catch (Exception ignored) {
+    }
+
+    secondary.shutdown();
+    cluster.shutdown();
+  }
+  
+  /**
+   * Starts two namenodes and two secondary namenodes, verifies that secondary
+   * namenodes are configured correctly to talk to their respective namenodes
+   * and can do the checkpoint.
+   * 
+   * @throws IOException
+   */
+  @SuppressWarnings("deprecation")
+  public void testMultipleSecondaryNamenodes() throws IOException {
+    Configuration conf = new HdfsConfiguration();
+    String nameserviceId1 = "ns1";
+    String nameserviceId2 = "ns2";
+    conf.set(DFSConfigKeys.DFS_FEDERATION_NAMESERVICES, nameserviceId1
+        + "," + nameserviceId2);
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numNameNodes(2)
+        .nameNodePort(9928).build();
+    Configuration snConf1 = new HdfsConfiguration(cluster.getConfiguration(0));
+    Configuration snConf2 = new HdfsConfiguration(cluster.getConfiguration(1));
+    InetSocketAddress nn1RpcAddress = cluster.getNameNode(0).rpcAddress;
+    InetSocketAddress nn2RpcAddress = cluster.getNameNode(1).rpcAddress;
+    String nn1 = nn1RpcAddress.getHostName() + ":" + nn1RpcAddress.getPort();
+    String nn2 = nn2RpcAddress.getHostName() + ":" + nn2RpcAddress.getPort();
+
+    // Set the Service Rpc address to empty to make sure the node specific
+    // setting works
+    snConf1.set(DFSConfigKeys.DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY, "");
+    snConf2.set(DFSConfigKeys.DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY, "");
+
+    // Set the nameserviceIds
+    snConf1.set(DFSUtil.getNameServiceIdKey(
+        DFSConfigKeys.DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY, nameserviceId1), nn1);
+    snConf2.set(DFSUtil.getNameServiceIdKey(
+        DFSConfigKeys.DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY, nameserviceId2), nn2);
+
+    SecondaryNameNode secondary1 = startSecondaryNameNode(snConf1);
+    SecondaryNameNode secondary2 = startSecondaryNameNode(snConf2);
+
+    // make sure the two secondary namenodes are talking to correct namenodes.
+    assertEquals(secondary1.getNameNodeAddress().getPort(), nn1RpcAddress.getPort());
+    assertEquals(secondary2.getNameNodeAddress().getPort(), nn2RpcAddress.getPort());
+    assertTrue(secondary1.getNameNodeAddress().getPort() != secondary2
+        .getNameNodeAddress().getPort());
+
+    // both should checkpoint.
+    secondary1.doCheckpoint();
+    secondary2.doCheckpoint();
+    secondary1.shutdown();
+    secondary2.shutdown();
+    cluster.shutdown();
   }
   
   /**

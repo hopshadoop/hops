@@ -25,8 +25,8 @@ import java.util.Random;
 import java.util.List;
 import java.io.IOException;
 
-import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.server.common.HdfsConstants;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
@@ -125,7 +125,7 @@ public class BlockReaderTestUtil {
       throws IOException {
     InetSocketAddress targetAddr = null;
     Socket sock = null;
-    Block block = testBlock.getBlock();
+    ExtendedBlock block = testBlock.getBlock();
     DatanodeInfo[] nodes = testBlock.getLocations();
     targetAddr = NetUtils.createSocketAddr(nodes[0].getName());
     sock = new Socket();

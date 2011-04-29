@@ -75,7 +75,7 @@ public class TestNNLeaseRecovery {
 
     FileSystem.setDefaultUri(conf, "hdfs://localhost:0");
     conf.set(DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY, "0.0.0.0:0");
-    NameNode.format(conf);
+    GenericTestUtils.formatNamenode(conf);
     fsn = spy(new FSNamesystem(conf));
   }
 
@@ -265,7 +265,7 @@ public class TestNNLeaseRecovery {
     
     BlockInfo lastBlock = fsn.dir.getFileINode(anyString()).getLastBlock(); 
     try {
-      fsn.commitBlockSynchronization(lastBlock,
+      fsn.commitBlockSynchronization(fsn.getExtendedBlock(lastBlock),
         recoveryId, newSize, true, false, new DatanodeID[1]);
     } catch (IOException ioe) {
       assertTrue(ioe.getMessage().startsWith("Block (="));
@@ -293,7 +293,7 @@ public class TestNNLeaseRecovery {
     when(lastBlock.isComplete()).thenReturn(true);
     
     try {
-      fsn.commitBlockSynchronization(lastBlock,
+      fsn.commitBlockSynchronization(fsn.getExtendedBlock(lastBlock),
         recoveryId, newSize, true, false, new DatanodeID[1]);
     } catch (IOException ioe) {
       assertTrue(ioe.getMessage().startsWith("Unexpected block (="));
@@ -321,7 +321,7 @@ public class TestNNLeaseRecovery {
     when(((BlockInfoUnderConstruction)lastBlock).getBlockRecoveryId()).thenReturn(recoveryId-100);
     
     try {
-      fsn.commitBlockSynchronization(lastBlock,
+      fsn.commitBlockSynchronization(fsn.getExtendedBlock(lastBlock),
         recoveryId, newSize, true, false, new DatanodeID[1]);
     } catch (IOException ioe) {
       assertTrue(ioe.getMessage().startsWith("The recovery id " + recoveryId + " does not match current recovery id " + (recoveryId-100)));
@@ -349,7 +349,7 @@ public class TestNNLeaseRecovery {
     when(((BlockInfoUnderConstruction)lastBlock).getBlockRecoveryId()).thenReturn(recoveryId+100);
     
     try {           
-      fsn.commitBlockSynchronization(lastBlock,
+      fsn.commitBlockSynchronization(fsn.getExtendedBlock(lastBlock),
         recoveryId, newSize, true, false, new DatanodeID[1]);
     } catch (IOException ioe) {
       assertTrue(ioe.getMessage().startsWith("The recovery id " + recoveryId + " does not match current recovery id " + (recoveryId+100)));
@@ -378,10 +378,11 @@ public class TestNNLeaseRecovery {
     
     boolean recoveryChecked = false;
     try {
-      fsn.commitBlockSynchronization(lastBlock,
+      fsn.commitBlockSynchronization(fsn.getExtendedBlock(lastBlock),
         recoveryId, newSize, true, false, new DatanodeID[1]);
     } catch (NullPointerException ioe) {
       // It is fine to get NPE here because the datanodes array is empty
+      LOG.info("Exception ", ioe);
       recoveryChecked = true;
     }
     assertTrue("commitBlockSynchronization had to throw NPE here", recoveryChecked);

@@ -34,6 +34,7 @@ import java.util.HashMap;
 import java.util.Random;
 import java.util.TreeSet;
 
+import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.jsp.JspWriter;
 
@@ -46,6 +47,7 @@ import org.apache.hadoop.hdfs.BlockReader;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
@@ -66,6 +68,7 @@ public class JspHelper {
   public static final String CURRENT_CONF = "current.conf";
   final static public String WEB_UGI_PROPERTY_NAME = "dfs.web.ugi";
   public static final String DELEGATION_PARAMETER_NAME = "delegation";
+  public static final String NAMENODE_ADDRESS = "nnaddr";
   static final String SET_DELEGATION = "&" + DELEGATION_PARAMETER_NAME +
                                               "=";
   private static final Log LOG = LogFactory.getLog(JspHelper.class);
@@ -181,7 +184,7 @@ public class JspHelper {
     return chosenNode;
   }
 
-  public static void streamBlockInAscii(InetSocketAddress addr, 
+  public static void streamBlockInAscii(InetSocketAddress addr, String poolId,
       long blockId, Token<BlockTokenIdentifier> blockToken, long genStamp,
       long blockSize, long offsetIntoBlock, long chunkSizeToView,
       JspWriter out, Configuration conf) throws IOException {
@@ -193,9 +196,9 @@ public class JspHelper {
       long amtToRead = Math.min(chunkSizeToView, blockSize - offsetIntoBlock);     
       
       // Use the block name for file name. 
-      String file = BlockReader.getFileName(addr, blockId);
+      String file = BlockReader.getFileName(addr, poolId, blockId);
       BlockReader blockReader = BlockReader.newBlockReader(s, file,
-        new Block(blockId, 0, genStamp), blockToken,
+        new ExtendedBlock(poolId, blockId, 0, genStamp), blockToken,
         offsetIntoBlock, amtToRead, conf.getInt("io.file.buffer.size", 4096));
         
     byte[] buf = new byte[(int)amtToRead];
@@ -359,14 +362,16 @@ public class JspHelper {
 
   public static void printPathWithLinks(String dir, JspWriter out, 
                                         int namenodeInfoPort,
-                                        String tokenString
+                                        String tokenString,
+                                        String nnAddress
                                         ) throws IOException {
     try {
       String[] parts = dir.split(Path.SEPARATOR);
       StringBuilder tempPath = new StringBuilder(dir.length());
       out.print("<a href=\"browseDirectory.jsp" + "?dir="+ Path.SEPARATOR
           + "&namenodeInfoPort=" + namenodeInfoPort
-          + getDelegationTokenUrlParam(tokenString) + "\">" + Path.SEPARATOR
+          + getDelegationTokenUrlParam(tokenString) 
+          + getUrlParam(NAMENODE_ADDRESS, nnAddress) + "\">" + Path.SEPARATOR
           + "</a>");
       tempPath.append(Path.SEPARATOR);
       for (int i = 0; i < parts.length-1; i++) {
@@ -374,7 +379,8 @@ public class JspHelper {
           tempPath.append(parts[i]);
           out.print("<a href=\"browseDirectory.jsp" + "?dir="
               + tempPath.toString() + "&namenodeInfoPort=" + namenodeInfoPort
-              + getDelegationTokenUrlParam(tokenString));
+              + getDelegationTokenUrlParam(tokenString)
+              + getUrlParam(NAMENODE_ADDRESS, nnAddress));
           out.print("\">" + parts[i] + "</a>" + Path.SEPARATOR);
           tempPath.append(Path.SEPARATOR);
         }
@@ -391,7 +397,8 @@ public class JspHelper {
   public static void printGotoForm(JspWriter out,
                                    int namenodeInfoPort,
                                    String tokenString,
-                                   String file) throws IOException {
+                                   String file,
+                                   String nnAddress) throws IOException {
     out.print("<form action=\"browseDirectory.jsp\" method=\"get\" name=\"goto\">");
     out.print("Goto : ");
     out.print("<input name=\"dir\" type=\"text\" width=\"50\" id\"dir\" value=\""+ file+"\">");
@@ -402,6 +409,8 @@ public class JspHelper {
       out.print("<input name=\"" + DELEGATION_PARAMETER_NAME
           + "\" type=\"hidden\" value=\"" + tokenString + "\">");
     }
+    out.print("<input name=\""+ NAMENODE_ADDRESS +"\" type=\"hidden\" "
+        + "value=\"" + nnAddress  + "\">");
     out.print("</form>");
   }
   
@@ -475,16 +484,43 @@ public class JspHelper {
     return UserGroupInformation.createRemoteUser(strings[0]);
   }
 
+  private static String getNNServiceAddress(ServletContext context,
+      HttpServletRequest request) {
+    String namenodeAddressInUrl = request.getParameter(NAMENODE_ADDRESS);
+    InetSocketAddress namenodeAddress = null;
+    if (namenodeAddressInUrl != null) {
+      namenodeAddress = DFSUtil.getSocketAddress(namenodeAddressInUrl);
+    } else if (context != null) {
+      namenodeAddress = (InetSocketAddress) context
+          .getAttribute(NameNode.NAMENODE_ADDRESS_ATTRIBUTE_KEY);
+    }
+    if (namenodeAddress != null) {
+      return (namenodeAddress.getAddress().getHostAddress() + ":" 
+          + namenodeAddress.getPort());
+    }
+    return null;
+  }
+
+  /**
+   * See
+   * {@link JspHelper#getUGI(ServletContext, HttpServletRequest, Configuration)}
+   * , ServletContext is passed as null.
+   */
+  public static UserGroupInformation getUGI(HttpServletRequest request,
+      Configuration conf) throws IOException {
+    return getUGI(null, request, conf);
+  }
+  
   /**
    * Get {@link UserGroupInformation} and possibly the delegation token out of
    * the request.
+   * @param context the ServletContext that is serving this request.
    * @param request the http request
    * @return a new user from the request
    * @throws AccessControlException if the request has no token
    */
-  public static UserGroupInformation getUGI(HttpServletRequest request,
-                                            Configuration conf
-                                           ) throws IOException {
+  public static UserGroupInformation getUGI(ServletContext context,
+      HttpServletRequest request, Configuration conf) throws IOException {
     UserGroupInformation ugi = null;
     if(UserGroupInformation.isSecurityEnabled()) {
       String user = request.getRemoteUser();
@@ -493,12 +529,12 @@ public class JspHelper {
         Token<DelegationTokenIdentifier> token = 
           new Token<DelegationTokenIdentifier>();
         token.decodeFromUrlString(tokenString);
-        InetSocketAddress serviceAddr = NameNode.getAddress(conf);
-        LOG.info("Setting service in token: "
-            + new Text(serviceAddr.getAddress().getHostAddress() + ":"
-                + serviceAddr.getPort()));
-        token.setService(new Text(serviceAddr.getAddress().getHostAddress()
-            + ":" + serviceAddr.getPort()));
+        String serviceAddress = getNNServiceAddress(context, request);
+        if (serviceAddress != null) {
+          LOG.info("Setting service in token: "
+              + new Text(serviceAddress));
+          token.setService(new Text(serviceAddress));
+        }
         ByteArrayInputStream buf = new ByteArrayInputStream(token
             .getIdentifier());
         DataInputStream in = new DataInputStream(buf);
@@ -549,5 +585,13 @@ public class JspHelper {
     }
   }
 
-
+  /**
+   * Returns the url parameter for the given bpid string.
+   * @param name parameter name
+   * @param val parameter value
+   * @return url parameter
+   */
+  public static String getUrlParam(String name, String val) {
+    return val == null ? "" : "&" + name + "=" + val;
+  }
 }

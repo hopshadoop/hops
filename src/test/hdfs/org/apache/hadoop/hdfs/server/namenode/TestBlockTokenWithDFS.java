@@ -31,8 +31,8 @@ import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.security.token.block.*;
 import org.apache.hadoop.hdfs.server.balancer.TestBalancer;
@@ -122,7 +122,7 @@ public class TestBlockTokenWithDFS extends TestCase {
     InetSocketAddress targetAddr = null;
     Socket s = null;
     BlockReader blockReader = null;
-    Block block = lblock.getBlock();
+    ExtendedBlock block = lblock.getBlock();
     try {
       DatanodeInfo[] nodes = lblock.getLocations();
       targetAddr = NetUtils.createSocketAddr(nodes[0].getName());
@@ -130,7 +130,8 @@ public class TestBlockTokenWithDFS extends TestCase {
       s.connect(targetAddr, HdfsConstants.READ_TIMEOUT);
       s.setSoTimeout(HdfsConstants.READ_TIMEOUT);
 
-      String file = BlockReader.getFileName(targetAddr, block.getBlockId());
+      String file = BlockReader.getFileName(targetAddr, 
+          "test-blockpoolid", block.getBlockId());
       blockReader = BlockReader.newBlockReader(s, file, block, 
           lblock.getBlockToken(), 0, -1, 
           conf.getInt("io.file.buffer.size", 4096));
@@ -351,7 +352,8 @@ public class TestBlockTokenWithDFS extends TestCase {
       // read should succeed
       tryRead(conf, lblock, true);
       // use a token with wrong blockID
-      Block wrongBlock = new Block(lblock.getBlock().getBlockId() + 1);
+      ExtendedBlock wrongBlock = new ExtendedBlock(lblock.getBlock()
+          .getBlockPoolId(), lblock.getBlock().getBlockId() + 1);
       lblock.setBlockToken(cluster.getNameNode().getNamesystem()
           .blockTokenSecretManager.generateToken(wrongBlock,
               EnumSet.of(BlockTokenSecretManager.AccessMode.READ)));
@@ -413,7 +415,7 @@ public class TestBlockTokenWithDFS extends TestCase {
       assertTrue(cluster.restartDataNodes(true));
       cluster.waitActive();
       assertEquals(numDataNodes, cluster.getDataNodes().size());
-      cluster.shutdownNameNode();
+      cluster.shutdownNameNode(0);
 
       // confirm tokens cached in in1 are still valid
       lblocks = DFSTestUtil.getAllBlocks(in1);
@@ -449,8 +451,8 @@ public class TestBlockTokenWithDFS extends TestCase {
        */
 
       // restart the namenode and then shut it down for test
-      cluster.restartNameNode();
-      cluster.shutdownNameNode();
+      cluster.restartNameNode(0);
+      cluster.shutdownNameNode(0);
 
       // verify blockSeekTo() still works (forced to use cached tokens)
       in1.seek(0);
@@ -469,13 +471,13 @@ public class TestBlockTokenWithDFS extends TestCase {
        */
 
       // restore the cluster and restart the datanodes for test
-      cluster.restartNameNode();
+      cluster.restartNameNode(0);
       assertTrue(cluster.restartDataNodes(true));
       cluster.waitActive();
       assertEquals(numDataNodes, cluster.getDataNodes().size());
 
       // shutdown namenode so that DFSClient can't get new tokens from namenode
-      cluster.shutdownNameNode();
+      cluster.shutdownNameNode(0);
 
       // verify blockSeekTo() fails (cached tokens become invalid)
       in1.seek(0);
@@ -484,7 +486,7 @@ public class TestBlockTokenWithDFS extends TestCase {
       assertFalse(checkFile2(in3));
 
       // restart the namenode to allow DFSClient to re-fetch tokens
-      cluster.restartNameNode();
+      cluster.restartNameNode(0);
       // verify blockSeekTo() works again (by transparently re-fetching
       // tokens from namenode)
       in1.seek(0);

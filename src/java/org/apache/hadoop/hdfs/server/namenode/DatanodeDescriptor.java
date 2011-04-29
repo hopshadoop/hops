@@ -26,10 +26,6 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
-import org.apache.hadoop.hdfs.server.protocol.BlockCommand;
-import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand;
-import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand.RecoveringBlock;
-import org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.hdfs.DeprecatedUTF8;
 import org.apache.hadoop.io.WritableUtils;
@@ -121,7 +117,6 @@ public class DatanodeDescriptor extends DatanodeInfo {
   private long lastBlocksScheduledRollTime = 0;
   private static final int BLOCKS_SCHEDULED_ROLL_INTERVAL = 600*1000; //10min
   private int volumeFailures = 0;
-  
   /** 
    * When set to true, the node is not in include list and is not allowed
    * to communicate with the namenode
@@ -135,7 +130,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
    * @param nodeID id of the data node
    */
   public DatanodeDescriptor(DatanodeID nodeID) {
-    this(nodeID, 0L, 0L, 0L, 0);
+    this(nodeID, 0L, 0L, 0L, 0L, 0);
   }
 
   /** DatanodeDescriptor constructor
@@ -157,7 +152,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
   public DatanodeDescriptor(DatanodeID nodeID, 
                             String networkLocation,
                             String hostName) {
-    this(nodeID, networkLocation, hostName, 0L, 0L, 0L, 0);
+    this(nodeID, networkLocation, hostName, 0L, 0L, 0L, 0L, 0);
   }
   
   /** DatanodeDescriptor constructor
@@ -165,16 +160,18 @@ public class DatanodeDescriptor extends DatanodeInfo {
    * @param nodeID id of the data node
    * @param capacity capacity of the data node
    * @param dfsUsed space used by the data node
-   * @param remaining remaing capacity of the data node
+   * @param remaining remaining capacity of the data node
+   * @param bpused space used by the block pool corresponding to this namenode
    * @param xceiverCount # of data transfers at the data node
    */
   public DatanodeDescriptor(DatanodeID nodeID, 
                             long capacity,
                             long dfsUsed,
                             long remaining,
+                            long bpused,
                             int xceiverCount) {
     super(nodeID);
-    updateHeartbeat(capacity, dfsUsed, remaining, xceiverCount);
+    updateHeartbeat(capacity, dfsUsed, remaining, bpused, xceiverCount);
   }
 
   /** DatanodeDescriptor constructor
@@ -184,6 +181,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
    * @param capacity capacity of the data node, including space used by non-dfs
    * @param dfsUsed the used space by dfs datanode
    * @param remaining remaining capacity of the data node
+   * @param bpused space used by the block pool corresponding to this namenode
    * @param xceiverCount # of data transfers at the data node
    */
   public DatanodeDescriptor(DatanodeID nodeID,
@@ -192,9 +190,10 @@ public class DatanodeDescriptor extends DatanodeInfo {
                             long capacity,
                             long dfsUsed,
                             long remaining,
+                            long bpused,
                             int xceiverCount) {
     super(nodeID, networkLocation, hostName);
-    updateHeartbeat(capacity, dfsUsed, remaining, xceiverCount);
+    updateHeartbeat(capacity, dfsUsed, remaining, bpused, xceiverCount);
   }
 
   /**
@@ -250,6 +249,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
   void resetBlocks() {
     this.capacity = 0;
     this.remaining = 0;
+    this.blockPoolUsed = 0;
     this.dfsUsed = 0;
     this.xceiverCount = 0;
     this.blockList = null;
@@ -263,10 +263,11 @@ public class DatanodeDescriptor extends DatanodeInfo {
   /**
    */
   void updateHeartbeat(long capacity, long dfsUsed, long remaining,
-      int xceiverCount) {
+      long blockPoolUsed, int xceiverCount) {
     this.capacity = capacity;
     this.dfsUsed = dfsUsed;
     this.remaining = remaining;
+    this.blockPoolUsed = blockPoolUsed;
     this.lastUpdate = System.currentTimeMillis();
     this.xceiverCount = xceiverCount;
     rollBlocksScheduled(lastUpdate);
@@ -353,31 +354,22 @@ public class DatanodeDescriptor extends DatanodeInfo {
     }
   }
   
-  BlockCommand getReplicationCommand(int maxTransfers) {
-    List<BlockTargetPair> blocktargetlist = replicateBlocks.poll(maxTransfers);
-    return blocktargetlist == null? null:
-        new BlockCommand(DatanodeProtocol.DNA_TRANSFER, blocktargetlist);
+  List<BlockTargetPair> getReplicationCommand(int maxTransfers) {
+    return replicateBlocks.poll(maxTransfers);
   }
 
-  BlockRecoveryCommand getLeaseRecoveryCommand(int maxTransfers) {
+  BlockInfoUnderConstruction[] getLeaseRecoveryCommand(int maxTransfers) {
     List<BlockInfoUnderConstruction> blocks = recoverBlocks.poll(maxTransfers);
     if(blocks == null)
       return null;
-    BlockRecoveryCommand brCommand = new BlockRecoveryCommand(blocks.size());
-    for(BlockInfoUnderConstruction b : blocks) {
-      brCommand.add(new RecoveringBlock(
-          b, b.getExpectedLocations(), b.getBlockRecoveryId()));
-    }
-    return brCommand;
+    return blocks.toArray(new BlockInfoUnderConstruction[blocks.size()]);
   }
 
   /**
    * Remove the specified number of blocks to be invalidated
    */
-  BlockCommand getInvalidateBlocks(int maxblocks) {
-    Block[] deleteList = getBlockArray(invalidateBlocks, maxblocks); 
-    return deleteList == null? 
-        null: new BlockCommand(DatanodeProtocol.DNA_INVALIDATE, deleteList);
+  Block[] getInvalidateBlocks(int maxblocks) {
+    return getBlockArray(invalidateBlocks, maxblocks); 
   }
 
   static private Block[] getBlockArray(Collection<Block> blocks, int max) {
@@ -427,6 +419,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
     this.capacity = in.readLong();
     this.dfsUsed = in.readLong();
     this.remaining = in.readLong();
+    this.blockPoolUsed = in.readLong();
     this.lastUpdate = in.readLong();
     this.xceiverCount = in.readInt();
     this.location = Text.readString(in);
@@ -542,6 +535,18 @@ public class DatanodeDescriptor extends DatanodeInfo {
   }
   
   /**
+   * Set the flag to indicate if this datanode is disallowed from communicating
+   * with the namenode.
+   */
+  void setDisallowed(boolean flag) {
+    disallowed = flag;
+  }
+  
+  boolean isDisallowed() {
+    return disallowed;
+  }
+
+  /**
    * @return number of failed volumes in the datanode.
    */
   public int getVolumeFailures() {
@@ -555,17 +560,5 @@ public class DatanodeDescriptor extends DatanodeInfo {
   public void updateRegInfo(DatanodeID nodeReg) {
     super.updateRegInfo(nodeReg);
     volumeFailures = 0;
-  }
-  
-  /**
-   * Set the flag to indicate if this datanode is disallowed from communicating
-   * with the namenode.
-   */
-  void setDisallowed(boolean flag) {
-    disallowed = flag;
-  }
-  
-  boolean isDisallowed() {
-    return disallowed;
   }
 }

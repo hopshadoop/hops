@@ -18,6 +18,9 @@
 package org.apache.hadoop.hdfs.server.datanode;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
 import junit.framework.Assert;
 import org.apache.hadoop.hdfs.server.datanode.FSDataset.FSVolume;
 import org.apache.hadoop.util.ReflectionUtils;
@@ -29,28 +32,28 @@ public class TestRoundRobinVolumesPolicy {
   // Test the Round-Robin block-volume choosing algorithm.
   @Test
   public void testRR() throws Exception {
-    FSVolume[] volumes = new FSVolume[2];
+    final List<FSVolume> volumes = new ArrayList<FSVolume>();
 
     // First volume, with 100 bytes of space.
-    volumes[0] = Mockito.mock(FSVolume.class);
-    Mockito.when(volumes[0].getAvailable()).thenReturn(100L);
+    volumes.add(Mockito.mock(FSVolume.class));
+    Mockito.when(volumes.get(0).getAvailable()).thenReturn(100L);
 
     // Second volume, with 200 bytes of space.
-    volumes[1] = Mockito.mock(FSVolume.class);
-    Mockito.when(volumes[1].getAvailable()).thenReturn(200L);
+    volumes.add(Mockito.mock(FSVolume.class));
+    Mockito.when(volumes.get(1).getAvailable()).thenReturn(200L);
 
     RoundRobinVolumesPolicy policy = ReflectionUtils.newInstance(
         RoundRobinVolumesPolicy.class, null);
     
     // Test two rounds of round-robin choosing
-    Assert.assertEquals(volumes[0], policy.chooseVolume(volumes, 0));
-    Assert.assertEquals(volumes[1], policy.chooseVolume(volumes, 0));
-    Assert.assertEquals(volumes[0], policy.chooseVolume(volumes, 0));
-    Assert.assertEquals(volumes[1], policy.chooseVolume(volumes, 0));
+    Assert.assertEquals(volumes.get(0), policy.chooseVolume(volumes, 0));
+    Assert.assertEquals(volumes.get(1), policy.chooseVolume(volumes, 0));
+    Assert.assertEquals(volumes.get(0), policy.chooseVolume(volumes, 0));
+    Assert.assertEquals(volumes.get(1), policy.chooseVolume(volumes, 0));
 
     // The first volume has only 100L space, so the policy should
     // wisely choose the second one in case we ask for more.
-    Assert.assertEquals(volumes[1], policy.chooseVolume(volumes, 150));
+    Assert.assertEquals(volumes.get(1), policy.chooseVolume(volumes, 150));
 
     // Fail if no volume can be chosen?
     try {
