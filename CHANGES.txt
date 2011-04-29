@@ -83,6 +83,9 @@ Trunk (unreleased changes)
 
   BUG FIXES
 
+    MAPREDUCE-2416. Remove the restriction of specifying group names in
+    users-list file for Gridmix in RoundRobinUserResolver mode.
+
     MAPREDUCE-2417. Fix Gridmix in RoundRobinUserResolver mode to
     map testing/proxy users to unique users in a trace.
 

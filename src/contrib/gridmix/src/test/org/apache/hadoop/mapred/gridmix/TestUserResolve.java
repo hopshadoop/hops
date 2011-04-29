@@ -115,9 +115,20 @@ public class TestUserResolve {
         RoundRobinUserResolver.buildEmptyUsersErrorMsg(userRsrc);
     validateBadUsersFile(rslv, userRsrc, expectedErrorMsg);
 
-    // Create user resource file with valid content
+    // Create user resource file with valid content like older users list file
+    // with usernames and groups
     writeUserList(usersFilePath,
         "user0,groupA,groupB,groupC\nuser1,groupA,groupC\n");
+    validateValidUsersFile(rslv, userRsrc);
+
+    // Create user resource file with valid content with
+    // usernames with groups and without groups
+    writeUserList(usersFilePath, "user0,groupA,groupB\nuser1,");
+    validateValidUsersFile(rslv, userRsrc);
+
+    // Create user resource file with valid content with
+    // usernames without groups
+    writeUserList(usersFilePath, "user0\nuser1");
     validateValidUsersFile(rslv, userRsrc);
   }
 
@@ -129,15 +140,16 @@ public class TestUserResolve {
     UserGroupInformation ugi1 = UserGroupInformation.createRemoteUser("hfre0");
     assertEquals("user0", rslv.getTargetUgi(ugi1).getUserName());
     assertEquals("user1", 
-      rslv.getTargetUgi(UserGroupInformation.createRemoteUser("hfre1"))
-          .getUserName());
+        rslv.getTargetUgi(UserGroupInformation.createRemoteUser("hfre1"))
+            .getUserName());
     assertEquals("user0",
-      rslv.getTargetUgi(UserGroupInformation.createRemoteUser("hfre2"))
-          .getUserName());
+        rslv.getTargetUgi(UserGroupInformation.createRemoteUser("hfre2"))
+            .getUserName());
     assertEquals("user0", rslv.getTargetUgi(ugi1).getUserName());
     assertEquals("user1",
-      rslv.getTargetUgi(UserGroupInformation.createRemoteUser("hfre3"))
-          .getUserName());
+        rslv.getTargetUgi(UserGroupInformation.createRemoteUser("hfre3"))
+            .getUserName());
+
     // Verify if same user comes again, its mapped user name should be
     // correct even though UGI is constructed again.
     assertEquals("user0", rslv.getTargetUgi(

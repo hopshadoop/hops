@@ -472,28 +472,27 @@ hadoop jar &lt;gridmix-jar&gt; org.apache.hadoop.mapred.gridmix.Gridmix \
       </table>
       <p>If the parameter <code>gridmix.user.resolve.class</code> is set to
       <code>org.apache.hadoop.mapred.gridmix.RoundRobinUserResolver</code>,
-      we need to define a users-list file with a list of test users and groups.
+      we need to define a users-list file with a list of test users.
       This is specified using the <code>-users</code> option to GridMix.</p>
       <note>
       Specifying a users-list file using the <code>-users</code> option is
       mandatory when using the round-robin user-resolver. Other user-resolvers
       ignore this option.
       </note>
-      <p>A users-list file has one user-group-information (UGI) per line, each
-      UGI of the format:</p>
+      <p>A users-list file has one user per line, each line of the format:</p>
       <source>
-      &lt;username&gt;,&lt;group&gt;[,group]*
+      &lt;username&gt;
       </source>
       <p>For example:</p>
       <source>
-      user1,group1
-      user2,group2,group3
-      user3,group3,group4
+      user1
+      user2
+      user3
       </source>
       <p>In the above example we have defined three users <code>user1</code>,
-      <code>user2</code> and <code>user3</code> with their respective groups.
+      <code>user2</code> and <code>user3</code>.
       Now we would associate each unique user in the trace to the above users
-      defined in round-robin fashion. For example, if traces users are
+      defined in round-robin fashion. For example, if trace's users are
       <code>tuser1</code>, <code>tuser2</code>, <code>tuser3</code>,
       <code>tuser4</code> and <code>tuser5</code>, then the mappings would
       be:</p>
@@ -504,6 +503,10 @@ hadoop jar &lt;gridmix-jar&gt; org.apache.hadoop.mapred.gridmix.Gridmix \
       tuser4 -&gt; user1
       tuser5 -&gt; user2
       </source>
+      <p>For backward compatibility reasons, each line of users-list file can
+      contain username followed by groupnames in the form username[,group]*.
+      The groupnames will be ignored by Gridmix.
+      </p>
     </section>
     <section id="assumptions">
       <title>Simplifying Assumptions</title>
