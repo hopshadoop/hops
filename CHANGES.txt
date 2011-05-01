@@ -377,6 +377,9 @@ Trunk (unreleased changes)
     HDFS-1846. Preallocate edit log with OP_INVALID instead of zero bytes
     to ensure blocks are actually allocated. (Aaron T. Myers via todd)
 
+    HDFS-1741. Provide a minimal pom file to allow integration of HDFS into Sonar
+    analysis (cos)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
