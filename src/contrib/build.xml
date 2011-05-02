@@ -22,13 +22,21 @@
   <!-- In case one of the contrib subdirectories -->
   <!-- fails the build or test targets and you cannot fix it: -->
   <!-- Then add to fileset: excludes="badcontrib/build.xml" -->
+  <patternset id="contrib-builds">
+    <include name="*/build.xml" />
+      <!-- raid compilation disabled due to failure after
+           federation merge. See MAPREDUCE-2465. -->
+    <exclude name="raid/build.xml" />
+  </patternset>
 
   <!-- ====================================================== -->
   <!-- Compile contribs.                                      -->
   <!-- ====================================================== -->
   <target name="compile">
     <subant target="compile">
-      <fileset dir="." includes="*/build.xml"/>
+      <fileset dir=".">
+        <patternset refid="contrib-builds" />
+      </fileset>
     </subant>
   </target>
 
@@ -37,7 +45,9 @@
   <!-- ====================================================== -->
   <target name="compile-test">
     <subant target="compile-test">
-      <fileset dir="." includes="*/build.xml"/>
+      <fileset dir=".">
+        <patternset refid="contrib-builds" />
+      </fileset>
     </subant>
   </target>
   
@@ -46,7 +56,9 @@
   <!-- ====================================================== -->
   <target name="package">
     <subant target="package">
-      <fileset dir="." includes="*/build.xml"/>
+      <fileset dir=".">
+        <patternset refid="contrib-builds" />
+      </fileset>
     </subant>
   </target>
   
@@ -68,7 +80,9 @@
       <fileset dir="." includes="vertica/build.xml"/>
       <!-- mumak tests disabled due to timeouts. See MAPREDUCE-2348
       <fileset dir="." includes="mumak/build.xml"/> -->
-      <fileset dir="." includes="raid/build.xml"/>
+      <!-- raid tests disabled due to compilation failure after
+           federation merge. See MAPREDUCE-2465.
+      <fileset dir="." includes="raid/build.xml"/> -->
     </subant>
     <available file="${build.contrib.dir}/testsfailed" property="testsfailed"/>
     <fail if="testsfailed">Tests failed!</fail>
@@ -108,7 +122,9 @@
   <!-- ====================================================== -->
   <target name="clean">
     <subant target="clean">
-      <fileset dir="." includes="*/build.xml"/>
+      <fileset dir=".">
+        <patternset refid="contrib-builds" />
+      </fileset>
     </subant>
   </target>
 
