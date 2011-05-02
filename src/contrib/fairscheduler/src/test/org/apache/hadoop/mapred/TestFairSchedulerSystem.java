@@ -18,6 +18,7 @@
 package org.apache.hadoop.mapred;
 
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.mapreduce.SleepJob;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.hadoop.conf.Configuration;
@@ -68,6 +69,7 @@ public class TestFairSchedulerSystem {
     conf.set("mapred.fairscheduler.preemption.interval", "1");
     conf.set("mapred.fairscheduler.preemption", "true");
     conf.set("mapred.fairscheduler.eventlog.enabled", "true");
+    conf.set("mapred.fairscheduler.poolnameproperty", "group.name");
     conf.set(JTConfig.JT_PERSIST_JOBSTATUS, "false");
     mr = new MiniMRCluster(taskTrackers, "file:///", 1, null, null, conf);
   }
@@ -166,6 +168,10 @@ public class TestFairSchedulerSystem {
     String contents = sb.toString();
     assertTrue("Bad contents for fair scheduler servlet: " + contents,
       contents.contains("Fair Scheduler Administration"));
+
+    String userGroups[] = UserGroupInformation.getCurrentUser().getGroupNames();
+    String primaryGroup = ">" + userGroups[0] + "<";
+    assertTrue(contents.contains(primaryGroup));
   }
 
   private void checkTaskGraphServlet(JobID job) throws Exception {

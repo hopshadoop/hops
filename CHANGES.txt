@@ -689,6 +689,9 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2445. Fix TestMiniMRWithDFSWithDistinctUsers to be a valid test.
     (todd)
 
+    MAPREDUCE-2457. Job submission should inject group.name on the JobTracker
+    (Alejandro Abdelnur via todd)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES
