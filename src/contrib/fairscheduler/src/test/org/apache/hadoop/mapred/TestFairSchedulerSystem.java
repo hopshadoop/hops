@@ -123,8 +123,17 @@ public class TestFairSchedulerSystem {
           continue;
         }
         for (JobStatus j : jobs) {
-          System.err.println("Checking task log for " + j.getJobID());
-          checkTaskGraphServlet(j.getJobID());
+          System.err.println("Checking task graph for " + j.getJobID());
+          try {
+            checkTaskGraphServlet(j.getJobID());
+          } catch (AssertionError err) {
+            // The task graph servlet will be empty if the job has retired.
+            // This is OK.
+            RunningJob rj = jc.getJob(j.getJobID());
+            if (!rj.isRetired()) {
+              throw err;
+            }
+          }
         }
       }
     }
