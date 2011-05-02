@@ -83,6 +83,9 @@ Trunk (unreleased changes)
 
   BUG FIXES
 
+    MAPREDUCE-1978. Rumen TraceBuilder should provide recursive
+    input folder scanning.
+
     MAPREDUCE-2416. Remove the restriction of specifying group names in
     users-list file for Gridmix in RoundRobinUserResolver mode.
 

@@ -153,15 +153,15 @@
       <title>Trace Builder</title>
       
       <p><code>Command:</code></p>
-      <source>java org.apache.hadoop.tools.rumen.TraceBuilder [options] [jobtrace-output] [topology-output] [input]</source>
-      
+      <source>java org.apache.hadoop.tools.rumen.TraceBuilder [options] &lt;jobtrace-output&gt; &lt;topology-output&gt; &lt;inputs&gt;</source>
+
       <p>This command invokes the <code>TraceBuilder</code> utility of 
          <em>Rumen</em>. It converts the JobHistory files into a series of JSON 
-         objects and output them in the <code>[jobtrace-output]</code> file. 
-         It also extracts the cluster layout (topology) and outputs it in the
-         <code>[topology-output]</code> file. 
-         <code>[input]</code> represents a space separated list of JobHistory 
-         files and folders.
+         objects and writes them into the <code>&lt;jobtrace-output&gt;</code>
+         file. It also extracts the cluster layout (topology) and writes it in
+         the<code>&lt;topology-output&gt;</code> file.
+         <code>&lt;inputs&gt;</code> represents a space-separated list of
+         JobHistory files and folders.
       </p>
          
          <note>1) Input and output to <code>TraceBuilder</code> is expected to
@@ -173,9 +173,12 @@
                regular expressions.
          </note>
          <note>
-               2) TraceBuilder does not recursively scan the input folder for
-               job history files. Only the files that are directly placed under 
-               the input folder will be considered for generating the trace.
+               2) By default, TraceBuilder does not recursively scan the input
+               folder for job history files. Only the files that are directly
+               placed under the input folder will be considered for generating
+               the trace. To add all the files under the input directory by
+               recursively scanning the input directory, use ‘-recursive’
+               option.
          </note>
       
       <p>Cluster topology is used as follows :</p>
@@ -206,6 +209,15 @@
               usage cases, one can specify a customized Demuxer class that can 
               extract individual job history logs and job configuration files 
               from the source files.
+          </td>
+        </tr>
+        <tr>
+          <td><code>-recursive</code></td>
+          <td>Recursively traverse input paths for job history logs.</td>
+          <td>This option should be used to inform the TraceBuilder to
+          recursively scan the input paths and process all the files under it.
+          Note that, by default, only the history logs that are directly under
+          the input folder are considered for generating the trace.
           </td>
         </tr>
       </table>

@@ -292,60 +292,160 @@ public class TestRumenJobTraces {
   }
 
   /**
-   * Test if {@link TraceBuilder} can process globbed input file paths.
+   * Check if processing of input arguments is as expected by passing globbed
+   * input path
+   * <li> without -recursive option and
+   * <li> with -recursive option.
    */
   @Test
-  public void testGlobbedInput() throws Exception {
+  public void testProcessInputArgument() throws Exception {
     final Configuration conf = new Configuration();
     final FileSystem lfs = FileSystem.getLocal(conf);
-    
+
     // define the test's root temporary directory
     final Path rootTempDir =
       new Path(System.getProperty("test.build.data", "/tmp"))
-            .makeQualified(lfs.getUri(), lfs.getWorkingDirectory());
+          .makeQualified(lfs.getUri(), lfs.getWorkingDirectory());
     // define the test's root input directory
-    Path testRootInputDir = new Path(rootTempDir, "TestGlobbedInputPath");
+    Path testRootInputDir = new Path(rootTempDir, "TestProcessInputArgument");
     // define the nested input directory
     Path nestedInputDir = new Path(testRootInputDir, "1/2/3/4");
     // define the globbed version of the nested input directory
-    Path globbedInputNestedDir = 
+    Path globbedInputNestedDir =
       lfs.makeQualified(new Path(testRootInputDir, "*/*/*/*/*"));
-    
-    // define a file in the nested test input directory
-    Path inputPath1 = new Path(nestedInputDir, "test.txt");
-    // define a sub-folder in the nested test input directory
-    Path inputPath2Parent = new Path(nestedInputDir, "test");
-    lfs.mkdirs(inputPath2Parent);
-    // define a file in the sub-folder within the nested test input directory
-    Path inputPath2 = new Path(inputPath2Parent, "test.txt");
-    
-    // create empty input files
-    lfs.createNewFile(inputPath1);
-    lfs.createNewFile(inputPath2);
-    
-    // define the output trace and topology files
-    Path outputTracePath = new Path(testRootInputDir, "test.json");
-    Path outputTopologyTracePath = new Path(testRootInputDir, "topology.json");
-    
-    String[] args = 
-      new String[] {outputTracePath.toString(), 
-                    outputTopologyTracePath.toString(), 
-                    globbedInputNestedDir.toString() };
-    
-    // invoke TraceBuilder's MyOptions command options parsing module/utility
-    MyOptions options = new TraceBuilder.MyOptions(args, conf);
-    
-    lfs.delete(testRootInputDir, true);
-    
-    assertEquals("Error in detecting globbed input FileSystem paths", 
-                 2, options.inputs.size());
-    
-    assertTrue("Missing input file " + inputPath1, 
-               options.inputs.contains(inputPath1));
-    assertTrue("Missing input file " + inputPath2, 
-               options.inputs.contains(inputPath2));
+    try {
+      lfs.delete(nestedInputDir, true);
+
+      List<String> recursiveInputPaths = new ArrayList<String>();
+      List<String> nonRecursiveInputPaths = new ArrayList<String>();
+      // Create input files under the given path with multiple levels of
+      // sub directories
+      createHistoryLogsHierarchy(nestedInputDir, lfs, recursiveInputPaths,
+          nonRecursiveInputPaths);
+
+      // Check the case of globbed input path and without -recursive option
+      List<Path> inputs = MyOptions.processInputArgument(
+                              globbedInputNestedDir.toString(), conf, false);
+      validateHistoryLogPaths(inputs, nonRecursiveInputPaths);
+
+      // Check the case of globbed input path and with -recursive option
+      inputs = MyOptions.processInputArgument(
+                   globbedInputNestedDir.toString(), conf, true);
+      validateHistoryLogPaths(inputs, recursiveInputPaths);
+
+    } finally {
+      lfs.delete(testRootInputDir, true);
+    }
   }
-  
+
+  /**
+   * Validate if the input history log paths are as expected.
+   * @param inputs  the resultant input paths to be validated
+   * @param expectedHistoryFileNames  the expected input history logs
+   * @throws IOException
+   */
+  private void validateHistoryLogPaths(List<Path> inputs,
+      List<String> expectedHistoryFileNames) throws IOException {
+
+    System.out.println("\nExpected history files are:");
+    for (String historyFile : expectedHistoryFileNames) {
+      System.out.println(historyFile);
+    }
+    System.out.println("\nResultant history files are:");
+    List<String> historyLogs = new ArrayList<String>();
+    for (Path p : inputs) {
+      historyLogs.add(p.toUri().getPath());
+      System.out.println(p.toUri().getPath());
+    }
+
+    assertEquals("Number of history logs found is different from the expected.",
+        expectedHistoryFileNames.size(), inputs.size());
+
+    // Verify if all the history logs are expected ones and they are in the
+    // expected order
+    assertTrue("Some of the history log files do not match the expected.",
+        historyLogs.equals(expectedHistoryFileNames));
+  }
+
+  /**
+   * Create history logs under the given path with multiple levels of
+   * sub directories as shown below.
+   * <br>
+   * Create a file, an empty subdirectory and a nonempty subdirectory
+   * &lt;historyDir&gt; under the given input path.
+   * <br>
+   * The subdirectory &lt;historyDir&gt; contains the following dir structure:
+   * <br>
+   * <br>&lt;historyDir&gt;/historyFile1.txt
+   * <br>&lt;historyDir&gt;/historyFile1.gz
+   * <br>&lt;historyDir&gt;/subDir1/historyFile2.txt
+   * <br>&lt;historyDir&gt;/subDir1/historyFile2.gz
+   * <br>&lt;historyDir&gt;/subDir2/historyFile3.txt
+   * <br>&lt;historyDir&gt;/subDir2/historyFile3.gz
+   * <br>&lt;historyDir&gt;/subDir1/subDir11/historyFile4.txt
+   * <br>&lt;historyDir&gt;/subDir1/subDir11/historyFile4.gz
+   * <br>&lt;historyDir&gt;/subDir2/subDir21/
+   * <br>
+   * Create the lists of input paths that should be processed by TraceBuilder
+   * for recursive case and non-recursive case.
+   * @param nestedInputDir the input history logs directory where history files
+   *                       with nested subdirectories are created
+   * @param fs         FileSystem of the input paths
+   * @param recursiveInputPaths input paths for recursive case
+   * @param nonRecursiveInputPaths input paths for non-recursive case
+   * @throws IOException
+   */
+  private void createHistoryLogsHierarchy(Path nestedInputDir, FileSystem fs,
+      List<String> recursiveInputPaths, List<String> nonRecursiveInputPaths)
+  throws IOException {
+    List<Path> dirs = new ArrayList<Path>();
+    // define a file in the nested test input directory
+    Path inputPath1 = new Path(nestedInputDir, "historyFile.txt");
+    // define an empty sub-folder in the nested test input directory
+    Path emptyDir = new Path(nestedInputDir, "emptyDir");
+    // define a nonempty sub-folder in the nested test input directory
+    Path historyDir = new Path(nestedInputDir, "historyDir");
+
+    fs.mkdirs(nestedInputDir);
+    // Create an empty input file
+    fs.createNewFile(inputPath1);
+    // Create empty subdir
+    fs.mkdirs(emptyDir);// let us not create any files under this dir
+
+    fs.mkdirs(historyDir);
+    dirs.add(historyDir);
+
+    Path subDir1 = new Path(historyDir, "subDir1");
+    fs.mkdirs(subDir1);
+    dirs.add(subDir1);
+    Path subDir2 = new Path(historyDir, "subDir2");
+    fs.mkdirs(subDir2);
+    dirs.add(subDir2);
+
+    Path subDir11 = new Path(subDir1, "subDir11");
+    fs.mkdirs(subDir11);
+    dirs.add(subDir11);
+    Path subDir21 = new Path(subDir2, "subDir21");
+    fs.mkdirs(subDir21);// let us not create any files under this dir
+
+    int i = 0;
+    for (Path dir : dirs) {
+      i++;
+      Path gzPath = new Path(dir, "historyFile" + i + ".gz");
+      Path txtPath = new Path(dir, "historyFile" + i + ".txt");
+      fs.createNewFile(txtPath);
+      fs.createNewFile(gzPath);
+      recursiveInputPaths.add(gzPath.toUri().getPath());
+      recursiveInputPaths.add(txtPath.toUri().getPath());
+      if (i == 1) {
+        nonRecursiveInputPaths.add(gzPath.toUri().getPath());
+        nonRecursiveInputPaths.add(txtPath.toUri().getPath());
+      }
+    }
+    recursiveInputPaths.add(inputPath1.toUri().getPath());
+    nonRecursiveInputPaths.add(inputPath1.toUri().getPath());
+  }
+
   /**
    * Test if {@link CurrentJHParser} can read events from current JH files.
    */

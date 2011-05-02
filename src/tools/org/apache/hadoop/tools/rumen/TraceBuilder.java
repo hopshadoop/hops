@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
@@ -34,7 +35,9 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.mapreduce.jobhistory.HistoryEvent;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistory;
@@ -67,69 +70,110 @@ public class TraceBuilder extends Configured implements Tool {
         IOException, ClassNotFoundException {
       int switchTop = 0;
 
+      // to determine if the input paths should be recursively scanned or not
+      boolean doRecursiveTraversal = false;
+
       while (args[switchTop].startsWith("-")) {
         if (args[switchTop].equalsIgnoreCase("-demuxer")) {
           inputDemuxerClass =
               Class.forName(args[++switchTop]).asSubclass(InputDemuxer.class);
-
-          ++switchTop;
+        } else if (args[switchTop].equalsIgnoreCase("-recursive")) {
+          doRecursiveTraversal = true;
         }
+        ++switchTop;
       }
 
       traceOutput = new Path(args[0 + switchTop]);
       topologyOutput = new Path(args[1 + switchTop]);
 
       for (int i = 2 + switchTop; i < args.length; ++i) {
-        processInputArguments(args[i], conf);
+        inputs.addAll(processInputArgument(
+            args[i], conf, doRecursiveTraversal));
       }
     }
-    
-    /** Processes the input file/folder arguments. If the input is a file then 
-     *  it is directly considered for further processing. If the input is a 
-     *  folder, then all the files in the input folder are considered for 
-     *  further processing.
-     *
-     *  NOTE: If the input represents a globbed path, then it is first flattened
-     *        and then the individual paths represented by the globbed input
-     *        path are processed.
+
+    /**
+     * Compare the history file names, not the full paths.
+     * Job history file name format is such that doing lexicographic sort on the
+     * history file names should result in the order of jobs' submission times.
      */
-    private void processInputArguments(String input, Configuration conf) 
-    throws IOException {
+    private static class HistoryLogsComparator
+        implements Comparator<FileStatus> {
+      @Override
+      public int compare(FileStatus file1, FileStatus file2) {
+        return file1.getPath().getName().compareTo(
+                   file2.getPath().getName());
+      }
+    }
+
+    /**
+     * Processes the input file/folder argument. If the input is a file,
+     * then it is directly considered for further processing by TraceBuilder.
+     * If the input is a folder, then all the history logs in the
+     * input folder are considered for further processing.
+     *
+     * If isRecursive is true, then the input path is recursively scanned
+     * for job history logs for further processing by TraceBuilder.
+     *
+     * NOTE: If the input represents a globbed path, then it is first flattened
+     *       and then the individual paths represented by the globbed input
+     *       path are considered for further processing.
+     *
+     * @param input        input path, possibly globbed
+     * @param conf         configuration
+     * @param isRecursive  whether to recursively traverse the input paths to
+     *                     find history logs
+     * @return the input history log files' paths
+     * @throws FileNotFoundException
+     * @throws IOException
+     */
+    static List<Path> processInputArgument(String input, Configuration conf,
+        boolean isRecursive) throws FileNotFoundException, IOException {
       Path inPath = new Path(input);
       FileSystem fs = inPath.getFileSystem(conf);
       FileStatus[] inStatuses = fs.globStatus(inPath);
-      
+
+      List<Path> inputPaths = new LinkedList<Path>();
       if (inStatuses == null || inStatuses.length == 0) {
-        return;
+        return inputPaths;
       }
-      
+
       for (FileStatus inStatus : inStatuses) {
         Path thisPath = inStatus.getPath();
         if (inStatus.isDirectory()) {
-          FileStatus[] statuses = fs.listStatus(thisPath);
 
-          List<String> dirNames = new ArrayList<String>();
+          // Find list of files in this path(recursively if -recursive option
+          // is specified).
+          List<FileStatus> historyLogs = new ArrayList<FileStatus>();
 
-          for (FileStatus s : statuses) {
-            if (s.isDirectory()) continue;
-            String name = s.getPath().getName();
+          RemoteIterator<LocatedFileStatus> iter =
+            fs.listFiles(thisPath, isRecursive);
+          while (iter.hasNext()) {
+            LocatedFileStatus child = iter.next();
+            String fileName = child.getPath().getName();
 
-            if (!(name.endsWith(".crc") || name.startsWith("."))) {
-              dirNames.add(name);
+            if (!(fileName.endsWith(".crc") || fileName.startsWith("."))) {
+              historyLogs.add(child);
             }
           }
 
-          String[] sortableNames = dirNames.toArray(new String[1]);
+          if (historyLogs.size() > 0) {
+            // Add the sorted history log file names in this path to the
+            // inputPaths list
+            FileStatus[] sortableNames =
+                historyLogs.toArray(new FileStatus[historyLogs.size()]);
+            Arrays.sort(sortableNames, new HistoryLogsComparator());
 
-          Arrays.sort(sortableNames);
-
-          for (String dirName : sortableNames) {
-            inputs.add(new Path(thisPath, dirName));
+            for (FileStatus historyLog : sortableNames) {
+              inputPaths.add(historyLog.getPath());
+            }
           }
         } else {
-          inputs.add(thisPath);
+          inputPaths.add(thisPath);
         }
       }
+
+      return inputPaths;
     }
   }
 
