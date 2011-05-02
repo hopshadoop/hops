@@ -86,7 +86,7 @@ public class TestReadWhileWriting {
       //   of data can be read successfully.
       checkFile(p, half, conf);
       AppendTestUtil.LOG.info("leasechecker.interruptAndJoin()");
-      ((DistributedFileSystem)fs).dfs.leasechecker.interruptAndJoin();
+      ((DistributedFileSystem)fs).dfs.leaserenewer.interruptAndJoin();
 
       //c. On M1, append another half block of data.  Close file on M1.
       {

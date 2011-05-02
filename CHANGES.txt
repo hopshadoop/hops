@@ -380,6 +380,9 @@ Trunk (unreleased changes)
     HDFS-1741. Provide a minimal pom file to allow integration of HDFS into Sonar
     analysis (cos)
 
+    HDFS-1870. Move and rename DFSClient.LeaseChecker to a seperated class
+    LeaseRenewer.  (szetszwo)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image

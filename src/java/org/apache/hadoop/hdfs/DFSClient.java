@@ -31,21 +31,17 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.net.SocketTimeoutException;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.SortedMap;
-import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 
 import javax.net.SocketFactory;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
@@ -64,7 +60,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.protocol.AlreadyBeingCreatedException;
-import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.ClientDatanodeProtocol;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.CorruptFileBlocks;
@@ -73,6 +68,7 @@ import org.apache.hadoop.hdfs.protocol.DataTransferProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.DirectoryListing;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.FSConstants;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
@@ -101,7 +97,6 @@ import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.StringUtils;
 
@@ -122,7 +117,7 @@ public class DFSClient implements FSConstants, java.io.Closeable {
   public static final long SERVER_DEFAULTS_VALIDITY_PERIOD = 60 * 60 * 1000L; // 1 hour
   static final int TCP_WINDOW_SIZE = 128 * 1024; // 128 KB
   final ClientProtocol namenode;
-  private final ClientProtocol rpcNamenode;
+  final ClientProtocol rpcNamenode;
   final UserGroupInformation ugi;
   volatile boolean clientRunning = true;
   private volatile FsServerDefaults serverDefaults;
@@ -138,7 +133,7 @@ public class DFSClient implements FSConstants, java.io.Closeable {
   final DataTransferProtocol.ReplaceDatanodeOnFailure dtpReplaceDatanodeOnFailure;
   final FileSystem.Statistics stats;
   final int hdfsTimeout;    // timeout value for a DFS operation.
-  final LeaseChecker leasechecker;
+  final LeaseRenewer leaserenewer;
 
   /**
    * The locking hierarchy is to first acquire lock on DFSClient object, followed by 
@@ -254,7 +249,7 @@ public class DFSClient implements FSConstants, java.io.Closeable {
 
     // The hdfsTimeout is currently the same as the ipc timeout 
     this.hdfsTimeout = Client.getTimeout(conf);
-    this.leasechecker = new LeaseChecker(hdfsTimeout);
+    this.leaserenewer = new LeaseRenewer(this, hdfsTimeout);
 
     this.ugi = UserGroupInformation.getCurrentUser();
     
@@ -320,10 +315,10 @@ public class DFSClient implements FSConstants, java.io.Closeable {
    */
   public synchronized void close() throws IOException {
     if(clientRunning) {
-      leasechecker.close();
+      leaserenewer.close();
       clientRunning = false;
       try {
-        leasechecker.interruptAndJoin();
+        leaserenewer.interruptAndJoin();
       } catch (InterruptedException ie) {
       }
   
@@ -638,7 +633,7 @@ public class DFSClient implements FSConstants, java.io.Closeable {
         flag, createParent, replication, blockSize, progress, buffersize,
         conf.getInt(DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY, 
                     DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_DEFAULT));
-    leasechecker.put(src, result);
+    leaserenewer.put(src, result);
     return result;
   }
   
@@ -685,7 +680,7 @@ public class DFSClient implements FSConstants, java.io.Closeable {
           flag, createParent, replication, blockSize, progress, buffersize,
           bytesPerChecksum);
     }
-    leasechecker.put(src, result);
+    leaserenewer.put(src, result);
     return result;
   }
   
@@ -764,7 +759,7 @@ public class DFSClient implements FSConstants, java.io.Closeable {
           + src + " on client " + clientName);
     }
     OutputStream result = callAppend(stat, src, buffersize, progress);
-    leasechecker.put(src, result);
+    leaserenewer.put(src, result);
     return result;
   }
 
@@ -1361,211 +1356,6 @@ public class DFSClient implements FSConstants, java.io.Closeable {
       throw re.unwrapRemoteException(AccessControlException.class,
                                      FileNotFoundException.class,
                                      UnresolvedPathException.class);
-    }
-  }
-
-  /** Lease management*/
-  class LeaseChecker {
-    static final long LEASE_RENEWER_GRACE_DEFAULT = 60*1000L;
-    static final long LEASE_RENEWER_SLEEP_DEFAULT = 1000L;
-    /** A map from src -> DFSOutputStream of files that are currently being
-     * written by this client.
-     */
-    private final SortedMap<String, OutputStream> pendingCreates
-        = new TreeMap<String, OutputStream>();
-    /** The time in milliseconds that the map became empty. */
-    private long emptyTime = Long.MAX_VALUE;
-    /** A fixed lease renewal time period in milliseconds */
-    private final long renewal;
-
-    /** A daemon for renewing lease */
-    private Daemon daemon = null;
-    /** Only the daemon with currentId should run. */
-    private int currentId = 0;
-
-    /** 
-     * A period in milliseconds that the lease renewer thread should run
-     * after the map became empty.
-     * If the map is empty for a time period longer than the grace period,
-     * the renewer should terminate.  
-     */
-    private long gracePeriod;
-    /**
-     * The time period in milliseconds
-     * that the renewer sleeps for each iteration. 
-     */
-    private volatile long sleepPeriod;
-
-    private LeaseChecker(final long timeout) {
-      this.renewal = (timeout > 0 && timeout < LEASE_SOFTLIMIT_PERIOD)? 
-          timeout/2: LEASE_SOFTLIMIT_PERIOD/2;
-      setGraceSleepPeriod(LEASE_RENEWER_GRACE_DEFAULT);
-    }
-
-    /** Set the grace period and adjust the sleep period accordingly. */
-    void setGraceSleepPeriod(final long gracePeriod) {
-      if (gracePeriod < 100L) {
-        throw new HadoopIllegalArgumentException(gracePeriod
-            + " = gracePeriod < 100ms is too small.");
-      }
-      synchronized(this) {
-        this.gracePeriod = gracePeriod;
-      }
-      final long half = gracePeriod/2;
-      this.sleepPeriod = half < LEASE_RENEWER_SLEEP_DEFAULT?
-          half: LEASE_RENEWER_SLEEP_DEFAULT;
-    }
-
-    /** Is the daemon running? */
-    synchronized boolean isRunning() {
-      return daemon != null && daemon.isAlive();
-    }
-
-    /** Is the empty period longer than the grace period? */  
-    private synchronized boolean isRenewerExpired() {
-      return emptyTime != Long.MAX_VALUE
-          && System.currentTimeMillis() - emptyTime > gracePeriod;
-    }
-
-    synchronized void put(String src, OutputStream out) {
-      if (clientRunning) {
-        if (daemon == null || isRenewerExpired()) {
-          //start a new deamon with a new id.
-          final int id = ++currentId;
-          daemon = new Daemon(new Runnable() {
-            @Override
-            public void run() {
-              try {
-                LeaseChecker.this.run(id);
-              } catch(InterruptedException e) {
-                if (LOG.isDebugEnabled()) {
-                  LOG.debug(LeaseChecker.this.getClass().getSimpleName()
-                      + " is interrupted.", e);
-                }
-              }
-            }
-          });
-          daemon.start();
-        }
-        pendingCreates.put(src, out);
-        emptyTime = Long.MAX_VALUE;
-      }
-    }
-    
-    synchronized void remove(String src) {
-      pendingCreates.remove(src);
-      if (pendingCreates.isEmpty() && emptyTime == Long.MAX_VALUE) {
-        //discover the first time that the map is empty.
-        emptyTime = System.currentTimeMillis();
-      }
-    }
-    
-    void interruptAndJoin() throws InterruptedException {
-      Daemon daemonCopy = null;
-      synchronized (this) {
-        if (isRunning()) {
-          daemon.interrupt();
-          daemonCopy = daemon;
-        }
-      }
-     
-      if (daemonCopy != null) {
-        if(LOG.isDebugEnabled()) {
-          LOG.debug("Wait for lease checker to terminate");
-        }
-        daemonCopy.join();
-      }
-    }
-
-    void close() {
-      while (true) {
-        String src;
-        OutputStream out;
-        synchronized (this) {
-          if (pendingCreates.isEmpty()) {
-            return;
-          }
-          src = pendingCreates.firstKey();
-          out = pendingCreates.remove(src);
-        }
-        if (out != null) {
-          try {
-            out.close();
-          } catch (IOException ie) {
-            LOG.error("Exception closing file " + src+ " : " + ie, ie);
-          }
-        }
-      }
-    }
-
-    /**
-     * Abort all open files. Release resources held. Ignore all errors.
-     */
-    synchronized void abort() {
-      clientRunning = false;
-      while (!pendingCreates.isEmpty()) {
-        String src = pendingCreates.firstKey();
-        DFSOutputStream out = (DFSOutputStream)pendingCreates.remove(src);
-        if (out != null) {
-          try {
-            out.abort();
-          } catch (IOException ie) {
-            LOG.error("Exception aborting file " + src+ ": ", ie);
-          }
-        }
-      }
-      RPC.stopProxy(rpcNamenode); // close connections to the namenode
-    }
-
-    private void renew() throws IOException {
-      synchronized(this) {
-        if (pendingCreates.isEmpty()) {
-          return;
-        }
-      }
-      namenode.renewLease(clientName);
-    }
-
-    /**
-     * Periodically check in with the namenode and renew all the leases
-     * when the lease period is half over.
-     */
-    private void run(final int id) throws InterruptedException {
-      for(long lastRenewed = System.currentTimeMillis();
-          clientRunning && !Thread.interrupted();
-          Thread.sleep(sleepPeriod)) {
-        if (System.currentTimeMillis() - lastRenewed >= renewal) {
-          try {
-            renew();
-            lastRenewed = System.currentTimeMillis();
-          } catch (SocketTimeoutException ie) {
-            LOG.warn("Failed to renew lease for " + clientName + " for "
-                + (renewal/1000) + " seconds.  Aborting ...", ie);
-            abort();
-            break;
-          } catch (IOException ie) {
-            LOG.warn("Failed to renew lease for " + clientName + " for "
-                + (renewal/1000) + " seconds.  Will retry shortly ...", ie);
-          }
-        }
-
-        synchronized(this) {
-          if (id != currentId || isRenewerExpired()) {
-            //no longer the current daemon or expired
-            return;
-          }
-        }
-      }
-    }
-
-    /** {@inheritDoc} */
-    public String toString() {
-      String s = getClass().getSimpleName();
-      if (LOG.isTraceEnabled()) {
-        return s + "@" + DFSClient.this + ": "
-               + StringUtils.stringifyException(new Throwable("for testing"));
-      }
-      return s;
     }
   }
 
