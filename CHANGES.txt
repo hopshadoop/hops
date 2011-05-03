@@ -484,6 +484,9 @@ Trunk (unreleased changes)
     HDFS-1871. Mapreduce build fails due to MiniDFSCluster change from
     HDFS-1052. (suresh)
 
+    HDFS-1876. One MiniDFSCluster constructor ignores numDataNodes parameter
+    (todd)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES
