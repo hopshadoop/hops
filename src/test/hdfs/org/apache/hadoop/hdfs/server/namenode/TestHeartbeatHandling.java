@@ -81,7 +81,6 @@ public class TestHeartbeatHandling extends TestCase {
             blockList.add(new Block(i, 0, GenerationStamp.FIRST_VALID_STAMP));
           }
           dd.addBlocksToBeInvalidated(blockList);
-               
           cmds = sendHeartBeat(nodeReg, dd, namesystem);
           assertEquals(2, cmds.length);
           assertEquals(DatanodeProtocol.DNA_TRANSFER, cmds[0].getAction());
@@ -115,6 +114,6 @@ public class TestHeartbeatHandling extends TestCase {
   private static DatanodeCommand[] sendHeartBeat(DatanodeRegistration nodeReg,
       DatanodeDescriptor dd, FSNamesystem namesystem) throws IOException {
     return namesystem.handleHeartbeat(nodeReg, dd.getCapacity(), 
-        dd.getDfsUsed(), dd.getRemaining(), dd.getBlockPoolUsed(), 0, 0);
+        dd.getDfsUsed(), dd.getRemaining(), dd.getBlockPoolUsed(), 0, 0, 0);
   }
 }

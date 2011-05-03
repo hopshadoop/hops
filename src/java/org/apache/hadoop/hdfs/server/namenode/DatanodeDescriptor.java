@@ -130,7 +130,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
    * @param nodeID id of the data node
    */
   public DatanodeDescriptor(DatanodeID nodeID) {
-    this(nodeID, 0L, 0L, 0L, 0L, 0);
+    this(nodeID, 0L, 0L, 0L, 0L, 0, 0);
   }
 
   /** DatanodeDescriptor constructor
@@ -152,7 +152,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
   public DatanodeDescriptor(DatanodeID nodeID, 
                             String networkLocation,
                             String hostName) {
-    this(nodeID, networkLocation, hostName, 0L, 0L, 0L, 0L, 0);
+    this(nodeID, networkLocation, hostName, 0L, 0L, 0L, 0L, 0, 0);
   }
   
   /** DatanodeDescriptor constructor
@@ -169,9 +169,11 @@ public class DatanodeDescriptor extends DatanodeInfo {
                             long dfsUsed,
                             long remaining,
                             long bpused,
-                            int xceiverCount) {
+                            int xceiverCount,
+                            int failedVolumes) {
     super(nodeID);
-    updateHeartbeat(capacity, dfsUsed, remaining, bpused, xceiverCount);
+    updateHeartbeat(capacity, dfsUsed, remaining, bpused, xceiverCount, 
+        failedVolumes);
   }
 
   /** DatanodeDescriptor constructor
@@ -191,9 +193,11 @@ public class DatanodeDescriptor extends DatanodeInfo {
                             long dfsUsed,
                             long remaining,
                             long bpused,
-                            int xceiverCount) {
+                            int xceiverCount,
+                            int failedVolumes) {
     super(nodeID, networkLocation, hostName);
-    updateHeartbeat(capacity, dfsUsed, remaining, bpused, xceiverCount);
+    updateHeartbeat(capacity, dfsUsed, remaining, bpused, xceiverCount, 
+        failedVolumes);
   }
 
   /**
@@ -254,6 +258,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
     this.xceiverCount = 0;
     this.blockList = null;
     this.invalidateBlocks.clear();
+    this.volumeFailures = 0;
   }
 
   public int numBlocks() {
@@ -261,15 +266,17 @@ public class DatanodeDescriptor extends DatanodeInfo {
   }
 
   /**
+   * Updates stats from datanode heartbeat.
    */
   void updateHeartbeat(long capacity, long dfsUsed, long remaining,
-      long blockPoolUsed, int xceiverCount) {
+      long blockPoolUsed, int xceiverCount, int volFailures) {
     this.capacity = capacity;
     this.dfsUsed = dfsUsed;
     this.remaining = remaining;
     this.blockPoolUsed = blockPoolUsed;
     this.lastUpdate = System.currentTimeMillis();
     this.xceiverCount = xceiverCount;
+    this.volumeFailures = volFailures;
     rollBlocksScheduled(lastUpdate);
   }
 
@@ -528,13 +535,6 @@ public class DatanodeDescriptor extends DatanodeInfo {
   }  // End of class DecommissioningStatus
 
   /**
-   * Increment the volume failure count.
-   */
-  public void incVolumeFailure() {
-    volumeFailures++;
-  }
-  
-  /**
    * Set the flag to indicate if this datanode is disallowed from communicating
    * with the namenode.
    */
@@ -554,11 +554,9 @@ public class DatanodeDescriptor extends DatanodeInfo {
   }
 
   /**
-   * Reset the volume failure count when a DN re-registers.
    * @param nodeReg DatanodeID to update registration for.
    */
   public void updateRegInfo(DatanodeID nodeReg) {
     super.updateRegInfo(nodeReg);
-    volumeFailures = 0;
   }
 }

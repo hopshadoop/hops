@@ -2674,7 +2674,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
         if( !heartbeats.contains(nodeS)) {
           heartbeats.add(nodeS);
           //update its timestamp
-          nodeS.updateHeartbeat(0L, 0L, 0L, 0L, 0);
+          nodeS.updateHeartbeat(0L, 0L, 0L, 0L, 0, 0);
           nodeS.isAlive = true;
         }
       }
@@ -2795,7 +2795,8 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
    */
   DatanodeCommand[] handleHeartbeat(DatanodeRegistration nodeReg,
       long capacity, long dfsUsed, long remaining, long blockPoolUsed,
-      int xceiverCount, int xmitsInProgress) throws IOException {
+      int xceiverCount, int xmitsInProgress, int failedVolumes) 
+      throws IOException {
     DatanodeCommand cmd = null;
     synchronized (heartbeats) {
       synchronized (datanodeMap) {
@@ -2818,7 +2819,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
 
         updateStats(nodeinfo, false);
         nodeinfo.updateHeartbeat(capacity, dfsUsed, remaining, blockPoolUsed,
-            xceiverCount);
+            xceiverCount, failedVolumes);
         updateStats(nodeinfo, true);
         
         //check lease recovery
@@ -3062,22 +3063,6 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
 
   public void setNodeReplicationLimit(int limit) {
     blockManager.maxReplicationStreams = limit;
-  }
-
-  /**
-   * Update the descriptor for the datanode to reflect a volume failure.
-   * @param nodeID DatanodeID to update count for.
-   * @throws IOException
-   */
-  synchronized public void incVolumeFailure(DatanodeID nodeID)
-    throws IOException {
-    DatanodeDescriptor nodeInfo = getDatanode(nodeID);
-    if (nodeInfo != null) {
-      nodeInfo.incVolumeFailure();
-    } else {
-      NameNode.stateChangeLog.warn("BLOCK* NameSystem.incVolumeFailure: "
-                                   + nodeID.getName() + " does not exist");
-    }
   }
 
   /**

@@ -958,7 +958,7 @@ public class DataNode extends Configured
           data.getRemaining(),
           data.getBlockPoolUsed(blockPoolId),
           xmitsInProgress.get(),
-          getXceiverCount());
+          getXceiverCount(), data.getNumFailedVolumes());
     }
     
     //This must be called only by blockPoolManager
@@ -1702,7 +1702,7 @@ public class DataNode extends Configured
   protected void checkDiskError( ) {
     try {
       data.checkDataDir();
-    } catch(DiskErrorException de) {
+    } catch (DiskErrorException de) {
       handleDiskError(de.getMessage());
     }
   }
@@ -1715,7 +1715,7 @@ public class DataNode extends Configured
     // shutdown the DN completely.
     int dpError = hasEnoughResources ? DatanodeProtocol.DISK_ERROR  
                                      : DatanodeProtocol.FATAL_DISK_ERROR;  
-    myMetrics.volumesFailed.inc(1);
+    myMetrics.volumeFailures.inc(1);
 
     //inform NameNodes
     for(BPOfferService bpos: blockPoolManager.getAllNamenodeThreads()) {
@@ -1741,7 +1741,7 @@ public class DataNode extends Configured
   int getXceiverCount() {
     return threadGroup == null ? 0 : threadGroup.activeCount();
   }
-
+    
   static UpgradeManagerDatanode getUpgradeManagerDatanode(String bpid) {
     DataNode dn = getDataNode();
     BPOfferService bpos = dn.blockPoolManager.get(bpid);

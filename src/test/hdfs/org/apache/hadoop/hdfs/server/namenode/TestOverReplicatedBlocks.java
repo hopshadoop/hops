@@ -90,7 +90,7 @@ public class TestOverReplicatedBlocks extends TestCase {
           String corruptMachineName = corruptDataNode.getName();
           for (DatanodeDescriptor datanode : namesystem.heartbeats) {
             if (!corruptMachineName.equals(datanode.getName())) {
-              datanode.updateHeartbeat(100L, 100L, 0L, 100L, 0);
+              datanode.updateHeartbeat(100L, 100L, 0L, 100L, 0, 0);
             }
           }
 

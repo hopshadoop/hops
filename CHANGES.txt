@@ -873,6 +873,9 @@ Release 0.22.0 - Unreleased
 
     HDFS-1625. Ignore disk space values in TestDataNodeMXBean.  (szetszwo)
 
+    HDFS-1850. DN should transmit absolute failed volume count rather than 
+    increments to the NN. (eli)
+
 Release 0.21.1 - Unreleased
     HDFS-1466. TestFcHdfsSymlink relies on /tmp/test not existing. (eli)
 

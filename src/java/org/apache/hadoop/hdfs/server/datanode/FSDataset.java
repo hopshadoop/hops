@@ -783,7 +783,8 @@ public class FSDataset implements FSConstants, FSDatasetInterface {
      */
     private volatile List<FSVolume> volumes = null;
     BlockVolumeChoosingPolicy blockChooser;
-      
+    int numFailedVolumes = 0;
+
     FSVolumeSet(FSVolume[] volumes, BlockVolumeChoosingPolicy blockChooser) {
       List<FSVolume> list = Arrays.asList(volumes);
       this.volumes = Collections.unmodifiableList(list);
@@ -793,7 +794,11 @@ public class FSDataset implements FSConstants, FSDatasetInterface {
     private int numberOfVolumes() {
       return volumes.size();
     }
-      
+
+    private int numberOfFailedVolumes() {
+      return numFailedVolumes;
+    }
+    
     /** 
      * Get next volume. Synchronized to ensure {@link #curVolume} is updated
      * by a single thread and next volume is chosen with no concurrent
@@ -876,6 +881,7 @@ public class FSDataset implements FSConstants, FSDatasetInterface {
           }
           removedVols.add(volumeList.get(idx));
           volumeList.set(idx, null); // Remove the volume
+          numFailedVolumes++;
         }
       }
       
@@ -1217,6 +1223,13 @@ public class FSDataset implements FSConstants, FSDatasetInterface {
     synchronized(statsLock) {
       return volumes.getRemaining();
     }
+  }
+
+  /**
+   * Return the number of failed volumes in the FSDataset.
+   */
+  public int getNumFailedVolumes() {
+    return volumes.numberOfFailedVolumes();
   }
 
   /**

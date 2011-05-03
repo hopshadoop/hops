@@ -109,8 +109,8 @@ public class TestBlockRecovery {
     when(namenode.versionRequest()).thenReturn(new NamespaceInfo
         (1, CLUSTER_ID, POOL_ID, 1L, 1));
     when(namenode.sendHeartbeat(any(DatanodeRegistration.class), anyLong(), 
-        anyLong(), anyLong(), anyLong(), anyInt(), anyInt())).thenReturn(
-            new DatanodeCommand[0]);
+        anyLong(), anyLong(), anyLong(), anyInt(), anyInt(), anyInt()))
+        .thenReturn(new DatanodeCommand[0]);
     dn = new DataNode(conf, dirs, null);
     
     DataNodeTestUtils.setBPNamenodeByIndex(dn, nsifno, POOL_ID, namenode);

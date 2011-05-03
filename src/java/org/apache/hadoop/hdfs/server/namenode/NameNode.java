@@ -1278,10 +1278,11 @@ public class NameNode implements NamenodeProtocols, FSConstants {
                                        long remaining,
                                        long blockPoolUsed,
                                        int xmitsInProgress,
-                                       int xceiverCount) throws IOException {
+                                       int xceiverCount,
+                                       int failedVolumes) throws IOException {
     verifyRequest(nodeReg);
     return namesystem.handleHeartbeat(nodeReg, capacity, dfsUsed, remaining,
-        blockPoolUsed, xceiverCount, xmitsInProgress);
+        blockPoolUsed, xceiverCount, xmitsInProgress, failedVolumes);
   }
 
   /**
@@ -1321,22 +1322,25 @@ public class NameNode implements NamenodeProtocols, FSConstants {
   }
 
   /**
+   * Handle an error report from a datanode.
    */
   public void errorReport(DatanodeRegistration nodeReg,
-                          int errorCode, 
-                          String msg) throws IOException {
-    // Log error message from datanode
+                          int errorCode, String msg) throws IOException { 
     String dnName = (nodeReg == null ? "unknown DataNode" : nodeReg.getName());
-    LOG.info("Error report from " + dnName + ": " + msg);
+
     if (errorCode == DatanodeProtocol.NOTIFY) {
+      LOG.info("Error report from " + dnName + ": " + msg);
       return;
     }
     verifyRequest(nodeReg);
-    namesystem.incVolumeFailure(nodeReg);
+
     if (errorCode == DatanodeProtocol.DISK_ERROR) {
-      LOG.warn("Volume failed on " + dnName); 
+      LOG.warn("Disk error on " + dnName + ": " + msg);
     } else if (errorCode == DatanodeProtocol.FATAL_DISK_ERROR) {
+      LOG.warn("Fatal disk error on " + dnName + ": " + msg);
       namesystem.removeDatanode(nodeReg);            
+    } else {
+      LOG.info("Error report from " + dnName + ": " + msg);
     }
   }
     

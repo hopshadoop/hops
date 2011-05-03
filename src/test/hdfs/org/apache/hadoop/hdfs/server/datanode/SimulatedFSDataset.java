@@ -318,6 +318,10 @@ public class SimulatedFSDataset  implements FSConstants, FSDatasetInterface, Con
       return getBPStorage(bpid).getUsed();
     }
     
+    int getNumFailedVolumes() {
+      return 0;
+    }
+
     synchronized boolean alloc(String bpid, long amount) throws IOException {
       if (getFree() >= amount) {
         getBPStorage(bpid).alloc(amount);
@@ -475,6 +479,11 @@ public class SimulatedFSDataset  implements FSConstants, FSDatasetInterface, Con
   @Override // FSDatasetMBean
   public long getRemaining() throws IOException {
     return storage.getFree();
+  }
+
+  @Override // FSDatasetMBean
+  public int getNumFailedVolumes() {
+    return storage.getNumFailedVolumes();
   }
 
   @Override // FSDatasetInterface

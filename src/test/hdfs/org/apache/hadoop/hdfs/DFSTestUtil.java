@@ -58,6 +58,7 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.datanode.TestTransferRbw;
+import org.apache.hadoop.hdfs.server.namenode.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
 import org.apache.hadoop.io.IOUtils;
@@ -291,7 +292,7 @@ public class DFSTestUtil {
       Path file, ExtendedBlock b, int corruptRepls)
       throws IOException, TimeoutException {
     int count = 0;
-    final int ATTEMPTS = 20;
+    final int ATTEMPTS = 50;
     int repls = ns.numCorruptReplicas(b.getLocalBlock());
     while (repls != corruptRepls && count < ATTEMPTS) {
       try {
@@ -354,6 +355,88 @@ public class DFSTestUtil {
     return -1;
   }
 
+  /*
+   * Return the total capacity of all live DNs.
+   */
+  public static long getLiveDatanodeCapacity(FSNamesystem ns) {
+    ArrayList<DatanodeDescriptor> live = new ArrayList<DatanodeDescriptor>();
+    ArrayList<DatanodeDescriptor> dead = new ArrayList<DatanodeDescriptor>();
+    ns.DFSNodesStatus(live, dead);
+    long capacity = 0;
+    for (final DatanodeDescriptor dn : live) {
+      capacity += dn.getCapacity();
+    }
+    return capacity;
+  }
+
+  /*
+   * Return the capacity of the given live DN.
+   */
+  public static long getDatanodeCapacity(FSNamesystem ns, int index) {
+    ArrayList<DatanodeDescriptor> live = new ArrayList<DatanodeDescriptor>();
+    ArrayList<DatanodeDescriptor> dead = new ArrayList<DatanodeDescriptor>();
+    ns.DFSNodesStatus(live, dead);
+    return live.get(index).getCapacity();
+  }
+
+  /*
+   * Wait for the given # live/dead DNs, total capacity, and # vol failures. 
+   */
+  public static void waitForDatanodeStatus(FSNamesystem ns, int expectedLive, 
+      int expectedDead, long expectedVolFails, long expectedTotalCapacity, 
+      long timeout) throws InterruptedException, TimeoutException {
+    ArrayList<DatanodeDescriptor> live = new ArrayList<DatanodeDescriptor>();
+    ArrayList<DatanodeDescriptor> dead = new ArrayList<DatanodeDescriptor>();
+    final int ATTEMPTS = 10;
+    int count = 0;
+    long currTotalCapacity = 0;
+    int volFails = 0;
+
+    do {
+      Thread.sleep(timeout);
+      live.clear();
+      dead.clear();
+      ns.DFSNodesStatus(live, dead);
+      currTotalCapacity = 0;
+      volFails = 0;
+      for (final DatanodeDescriptor dd : live) {
+        currTotalCapacity += dd.getCapacity();
+        volFails += dd.getVolumeFailures();
+      }
+      count++;
+    } while ((expectedLive != live.size() ||
+              expectedDead != dead.size() ||
+              expectedTotalCapacity != currTotalCapacity ||
+              expectedVolFails != volFails)
+             && count < ATTEMPTS);
+
+    if (count == ATTEMPTS) {
+      throw new TimeoutException("Timed out waiting for capacity."
+          + " Live = "+live.size()+" Expected = "+expectedLive
+          + " Dead = "+dead.size()+" Expected = "+expectedDead
+          + " Total capacity = "+currTotalCapacity
+          + " Expected = "+expectedTotalCapacity
+          + " Vol Fails = "+volFails+" Expected = "+expectedVolFails);
+    }
+  }
+
+  /*
+   * Wait for the given DN to consider itself dead.
+   */
+  public static void waitForDatanodeDeath(DataNode dn) 
+      throws InterruptedException, TimeoutException {
+    final int ATTEMPTS = 10;
+    int count = 0;
+    do {
+      Thread.sleep(1000);
+      count++;
+    } while (dn.isDatanodeUp() && count < ATTEMPTS);
+
+    if (count == ATTEMPTS) {
+      throw new TimeoutException("Timed out waiting for DN to die");
+    }
+  }
+  
   /** return list of filenames created as part of createFiles */
   public String[] getFileNames(String topDir) {
     if (nFiles == 0)

@@ -93,6 +93,7 @@ public interface DatanodeProtocol extends VersionedProtocol {
    * @param blockPoolUsed storage used by the block pool
    * @param xmitsInProgress number of transfers from this datanode to others
    * @param xceiverCount number of active transceiver threads
+   * @param failedVolumes number of failed volumes
    * @throws IOException on error
    */
   @Nullable
@@ -101,7 +102,8 @@ public interface DatanodeProtocol extends VersionedProtocol {
                                        long dfsUsed, long remaining,
                                        long blockPoolUsed,
                                        int xmitsInProgress,
-                                       int xceiverCount) throws IOException;
+                                       int xceiverCount,
+                                       int failedVolumes) throws IOException;
 
   /**
    * blockReport() tells the NameNode about all the locally-stored blocks.
