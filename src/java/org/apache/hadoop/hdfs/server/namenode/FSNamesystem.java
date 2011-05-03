@@ -5517,6 +5517,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
     final Map<String, Object> info = new HashMap<String, Object>();
     final ArrayList<DatanodeDescriptor> aliveNodeList =
       this.getDatanodeListForReport(DatanodeReportType.LIVE); 
+    removeDecomNodeFromList(aliveNodeList);
     for (DatanodeDescriptor node : aliveNodeList) {
       final Map<String, Object> innerinfo = new HashMap<String, Object>();
       innerinfo.put("lastContact", getLastContact(node));
@@ -5536,6 +5537,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
     final Map<String, Object> info = new HashMap<String, Object>();
     final ArrayList<DatanodeDescriptor> deadNodeList =
       this.getDatanodeListForReport(DatanodeReportType.DEAD); 
+    removeDecomNodeFromList(deadNodeList);
     for (DatanodeDescriptor node : deadNodeList) {
       final Map<String, Object> innerinfo = new HashMap<String, Object>();
       innerinfo.put("lastContact", getLastContact(node));
@@ -5583,5 +5585,50 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean, FSClusterSt
   @Override  // NameNodeMXBean
   public String getBlockPoolId() {
     return blockPoolId;
+  }
+
+  /**
+   * Remove an already decommissioned data node who is neither in include nor
+   * exclude hosts lists from the the list of live or dead nodes.  This is used
+   * to not display an already decommssioned data node to the operators.
+   * The operation procedure of making a already decommissioned data node not
+   * to be displayed is as following:
+   * <ol>
+   *   <li> 
+   *   Host must have been in the include hosts list and the include hosts list
+   *   must not be empty.
+   *   </li>
+   *   <li>
+   *   Host is decommissioned by remaining in the include hosts list and added
+   *   into the exclude hosts list. Name node is updated with the new 
+   *   information by issuing dfsadmin -refreshNodes command.
+   *   </li>
+   *   <li>
+   *   Host is removed from both include hosts and exclude hosts lists.  Name 
+   *   node is updated with the new informationby issuing dfsamin -refreshNodes 
+   *   command.
+   *   <li>
+   * </ol>
+   * 
+   * @param nodeList
+   *          , array list of live or dead nodes.
+   */
+  void removeDecomNodeFromList(ArrayList<DatanodeDescriptor> nodeList) {
+    // If the include list is empty, any nodes are welcomed and it does not
+    // make sense to exclude any nodes from the cluster. Therefore, no remove.
+    if (hostsReader.getHosts().isEmpty()) {
+      return;
+    }
+    
+    for (Iterator<DatanodeDescriptor> it = nodeList.iterator(); it.hasNext();) {
+      DatanodeDescriptor node = it.next();
+      if ((!inHostsList(node, null)) && (!inExcludedHostsList(node, null))
+          && node.isDecommissioned()) {
+        // Include list is not empty, an existing datanode does not appear
+        // in both include or exclude lists and it has been decommissioned.
+        // Remove it from the node list.
+        it.remove();
+      }
+    }
   }
 }

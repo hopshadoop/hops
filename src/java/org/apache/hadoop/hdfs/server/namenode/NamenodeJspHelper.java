@@ -217,7 +217,12 @@ class NamenodeJspHelper {
       ArrayList<DatanodeDescriptor> live = new ArrayList<DatanodeDescriptor>();
       ArrayList<DatanodeDescriptor> dead = new ArrayList<DatanodeDescriptor>();
       fsn.DFSNodesStatus(live, dead);
-      
+      // If a data node has been first included in the include list, 
+      // then decommissioned, then removed from both include and exclude list.  
+      // We make the web console to "forget" this node by not displaying it.
+      fsn.removeDecomNodeFromList(live);  
+      fsn.removeDecomNodeFromList(dead); 
+
       int liveDecommissioned = 0;
       for (DatanodeDescriptor d : live) {
         liveDecommissioned += d.isDecommissioned() ? 1 : 0;
@@ -536,6 +541,8 @@ class NamenodeJspHelper {
       ArrayList<DatanodeDescriptor> dead = new ArrayList<DatanodeDescriptor>();
       final NameNode nn = (NameNode)context.getAttribute("name.node");
       nn.getNamesystem().DFSNodesStatus(live, dead);
+      nn.getNamesystem().removeDecomNodeFromList(live);
+      nn.getNamesystem().removeDecomNodeFromList(dead);
       InetSocketAddress nnSocketAddress = (InetSocketAddress) context
           .getAttribute(NameNode.NAMENODE_ADDRESS_ATTRIBUTE_KEY);
       String nnaddr = nnSocketAddress.getAddress().getHostAddress() + ":"

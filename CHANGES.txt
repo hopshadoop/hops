@@ -487,6 +487,10 @@ Trunk (unreleased changes)
     HDFS-1876. One MiniDFSCluster constructor ignores numDataNodes parameter
     (todd)
 
+    HDFS-1773. Do not show decommissioned datanodes, which are not in both
+    include and exclude lists, on web and JMX interfaces.
+    (Tanping Wang via szetszwo)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES
