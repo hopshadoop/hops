@@ -20,7 +20,7 @@ package org.apache.hadoop.hdfs;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.SocketTimeoutException;
-import java.util.SortedMap;
+import java.util.Map;
 import java.util.TreeMap;
 
 import org.apache.commons.logging.Log;
@@ -39,8 +39,8 @@ public class LeaseRenewer {
   /** A map from src -> DFSOutputStream of files that are currently being
    * written by this client.
    */
-  private final SortedMap<String, OutputStream> pendingCreates
-      = new TreeMap<String, OutputStream>();
+  private final Map<String, DFSOutputStream> filesBeingWritten
+      = new TreeMap<String, DFSOutputStream>();
   /** The time in milliseconds that the map became empty. */
   private long emptyTime = Long.MAX_VALUE;
   /** A fixed lease renewal time period in milliseconds */
@@ -98,7 +98,7 @@ public class LeaseRenewer {
         && System.currentTimeMillis() - emptyTime > gracePeriod;
   }
 
-  synchronized void put(String src, OutputStream out) {
+  synchronized void put(String src, DFSOutputStream out) {
     if (dfsclient.clientRunning) {
       if (daemon == null || isRenewerExpired()) {
         //start a new deamon with a new id.
@@ -118,14 +118,14 @@ public class LeaseRenewer {
         });
         daemon.start();
       }
-      pendingCreates.put(src, out);
+      filesBeingWritten.put(src, out);
       emptyTime = Long.MAX_VALUE;
     }
   }
   
   synchronized void remove(String src) {
-    pendingCreates.remove(src);
-    if (pendingCreates.isEmpty() && emptyTime == Long.MAX_VALUE) {
+    filesBeingWritten.remove(src);
+    if (filesBeingWritten.isEmpty() && emptyTime == Long.MAX_VALUE) {
       //discover the first time that the map is empty.
       emptyTime = System.currentTimeMillis();
     }
@@ -153,11 +153,11 @@ public class LeaseRenewer {
       String src;
       OutputStream out;
       synchronized (this) {
-        if (pendingCreates.isEmpty()) {
+        if (filesBeingWritten.isEmpty()) {
           return;
         }
-        src = pendingCreates.firstKey();
-        out = pendingCreates.remove(src);
+        src = filesBeingWritten.keySet().iterator().next();
+        out = filesBeingWritten.remove(src);
       }
       if (out != null) {
         try {
@@ -174,23 +174,23 @@ public class LeaseRenewer {
    */
   synchronized void abort() {
     dfsclient.clientRunning = false;
-    while (!pendingCreates.isEmpty()) {
-      String src = pendingCreates.firstKey();
-      DFSOutputStream out = (DFSOutputStream)pendingCreates.remove(src);
+    for(Map.Entry<String, DFSOutputStream> e : filesBeingWritten.entrySet()) {
+      final DFSOutputStream out = e.getValue();
       if (out != null) {
         try {
           out.abort();
         } catch (IOException ie) {
-          LOG.error("Exception aborting file " + src+ ": ", ie);
+          LOG.error("Failed to abort file " + e.getKey(), ie);
         }
       }
     }
+    filesBeingWritten.clear();
     RPC.stopProxy(dfsclient.rpcNamenode); // close connections to the namenode
   }
 
   private void renew() throws IOException {
     synchronized(this) {
-      if (pendingCreates.isEmpty()) {
+      if (filesBeingWritten.isEmpty()) {
         return;
       }
     }

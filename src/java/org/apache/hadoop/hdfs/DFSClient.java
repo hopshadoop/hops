@@ -629,7 +629,7 @@ public class DFSClient implements FSConstants, java.io.Closeable {
     if(LOG.isDebugEnabled()) {
       LOG.debug(src + ": masked=" + masked);
     }
-    OutputStream result = new DFSOutputStream(this, src, masked,
+    final DFSOutputStream result = new DFSOutputStream(this, src, masked,
         flag, createParent, replication, blockSize, progress, buffersize,
         conf.getInt(DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY, 
                     DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_DEFAULT));
@@ -640,7 +640,7 @@ public class DFSClient implements FSConstants, java.io.Closeable {
   /**
    * Append to an existing file if {@link CreateFlag#APPEND} is present
    */
-  private OutputStream primitiveAppend(String src, EnumSet<CreateFlag> flag,
+  private DFSOutputStream primitiveAppend(String src, EnumSet<CreateFlag> flag,
       int buffersize, Progressable progress) throws IOException {
     if (flag.contains(CreateFlag.APPEND)) {
       HdfsFileStatus stat = getFileInfo(src);
@@ -674,7 +674,7 @@ public class DFSClient implements FSConstants, java.io.Closeable {
       throws IOException, UnresolvedLinkException {
     checkOpen();
     CreateFlag.validate(flag);
-    OutputStream result = primitiveAppend(src, flag, buffersize, progress);
+    DFSOutputStream result = primitiveAppend(src, flag, buffersize, progress);
     if (result == null) {
       result = new DFSOutputStream(this, src, absPermission,
           flag, createParent, replication, blockSize, progress, buffersize,
@@ -722,7 +722,7 @@ public class DFSClient implements FSConstants, java.io.Closeable {
   }
 
   /** Method to get stream returned by append call */
-  private OutputStream callAppend(HdfsFileStatus stat, String src,
+  private DFSOutputStream callAppend(HdfsFileStatus stat, String src,
       int buffersize, Progressable progress) throws IOException {
     LocatedBlock lastBlock = null;
     try {
@@ -750,7 +750,7 @@ public class DFSClient implements FSConstants, java.io.Closeable {
    * 
    * @see ClientProtocol#append(String, String) 
    */
-  OutputStream append(String src, int buffersize, Progressable progress) 
+  DFSOutputStream append(String src, int buffersize, Progressable progress) 
       throws IOException {
     checkOpen();
     HdfsFileStatus stat = getFileInfo(src);
@@ -758,7 +758,7 @@ public class DFSClient implements FSConstants, java.io.Closeable {
       throw new FileNotFoundException("failed to append to non-existent file "
           + src + " on client " + clientName);
     }
-    OutputStream result = callAppend(stat, src, buffersize, progress);
+    final DFSOutputStream result = callAppend(stat, src, buffersize, progress);
     leaserenewer.put(src, result);
     return result;
   }

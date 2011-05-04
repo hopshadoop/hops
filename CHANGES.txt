@@ -496,6 +496,9 @@ Trunk (unreleased changes)
 
     HDFS-1889. incorrect path in start/stop dfs script. (John George via eli)
 
+    HDFS-1890. Improve the name, class and value type of the map
+    LeaseRenewer.pendingCreates.  (szetszwo)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES
