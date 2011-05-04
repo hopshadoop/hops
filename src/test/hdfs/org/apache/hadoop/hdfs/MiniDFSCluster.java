@@ -1100,11 +1100,10 @@ public class MiniDFSCluster {
   /**
    * Return the contents of the given block on the given datanode.
    *
-   * @param The index of the datanode
-   * @param The name of the block
+   * @param block block to be corrupted
    * @throws IOException on error accessing the file for the given block
    */
-  int corruptBlockOnDataNodes(ExtendedBlock block) throws IOException{
+  public int corruptBlockOnDataNodes(ExtendedBlock block) throws IOException{
     int blocksCorrupted = 0;
     File[] blockFiles = getAllBlockFiles(block);
     for (File f : blockFiles) {

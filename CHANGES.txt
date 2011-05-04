@@ -491,6 +491,9 @@ Trunk (unreleased changes)
     include and exclude lists, on web and JMX interfaces.
     (Tanping Wang via szetszwo)
 
+    HDFS-1888. MiniDFSCluster#corruptBlockOnDatanodes() access must be
+    public. (suresh)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES
