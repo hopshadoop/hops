@@ -494,6 +494,8 @@ Trunk (unreleased changes)
     HDFS-1888. MiniDFSCluster#corruptBlockOnDatanodes() access must be
     public. (suresh)
 
+    HDFS-1889. incorrect path in start/stop dfs script. (John George via eli)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES

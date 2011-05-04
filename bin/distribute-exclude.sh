@@ -50,8 +50,8 @@ if [ ! -f "$excludeFilenameLocal" ] ; then
   exit 1
 fi
 
-namenodes=$("$HADOOP_HOME/bin/hdfs" getconf -namenodes)
-excludeFilenameRemote=$("$HADOOP_HOME/bin/hdfs" getconf -excludeFile)
+namenodes=$("$HADOOP_HDFS_HOME/bin/hdfs" getconf -namenodes)
+excludeFilenameRemote=$("$HADOOP_HDFS_HOME/bin/hdfs" getconf -excludeFile)
 
 if [ "$excludeFilenameRemote" = '' ] ; then
   echo \

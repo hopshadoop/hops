@@ -47,7 +47,7 @@ fi
 #---------------------------------------------------------
 # namenodes
 
-NAMENODES=$($HADOOP_HOME/bin/hdfs getconf -namenodes)
+NAMENODES=$($HADOOP_HDFS_HOME/bin/hdfs getconf -namenodes)
 
 echo "Starting namenodes on [$NAMENODES]"
 
@@ -74,7 +74,7 @@ fi
 
 # if there are no secondary namenodes configured it returns
 # 0.0.0.0 or empty string
-SECONDARY_NAMENODES=$($HADOOP_HOME/bin/hdfs getconf -secondarynamenodes 2>&-)
+SECONDARY_NAMENODES=$($HADOOP_HDFS_HOME/bin/hdfs getconf -secondarynamenodes 2>&-)
 SECONDARY_NAMENODES=${SECONDARY_NAMENODES:='0.0.0.0'}
 
 if [ "$SECONDARY_NAMENODES" = '0.0.0.0' ] ; then
