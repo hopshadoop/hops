@@ -331,6 +331,20 @@ abstract class TaskRunner extends Thread {
   }
 
   /**
+   * Parse the given string and return an array of individual java opts. Split
+   * on whitespace and replace the special string "@taskid@" with the task ID
+   * given.
+   * 
+   * @param javaOpts The string to parse
+   * @param taskid The task ID to replace the special string with
+   * @return An array of individual java opts.
+   */
+  static String[] parseChildJavaOpts(String javaOpts, TaskAttemptID taskid) {
+    javaOpts = javaOpts.replace("@taskid@", taskid.toString());
+    return javaOpts.trim().split("\\s+");
+  }
+
+  /**
    * @param taskid
    * @param workDir
    * @param classPaths
@@ -375,10 +389,9 @@ abstract class TaskRunner extends Thread {
     //    </value>
     //  </property>
     //
-    String javaOpts = getChildJavaOpts(conf, 
-                                       JobConf.DEFAULT_MAPRED_TASK_JAVA_OPTS);
-    javaOpts = javaOpts.replace("@taskid@", taskid.toString());
-    String [] javaOptsSplit = javaOpts.split(" ");
+    String[] javaOptsSplit = parseChildJavaOpts(getChildJavaOpts(conf,
+                                       JobConf.DEFAULT_MAPRED_TASK_JAVA_OPTS),
+                                       taskid);
     
     // Add java.library.path; necessary for loading native libraries.
     //

@@ -692,6 +692,9 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2457. Job submission should inject group.name on the JobTracker
     (Alejandro Abdelnur via todd)
 
+    MAPREDUCE-2472. Extra whitespace in mapred.child.java.opts breaks JVM
+    initialization. (Aaron T. Myers via todd)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES
