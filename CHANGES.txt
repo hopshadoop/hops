@@ -499,6 +499,9 @@ Trunk (unreleased changes)
     HDFS-1890. Improve the name, class and value type of the map
     LeaseRenewer.pendingCreates.  (szetszwo)
 
+    HDFS-1891. Disable IPV6 for junit tests to fix TestBackupNode failure.
+    (suresh)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES
