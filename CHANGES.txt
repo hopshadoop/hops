@@ -74,6 +74,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-2420. JobTracker should be able to renew delegation token over 
     HTTP (Boris Shkolnik via jitendra)
+
+    MAPREDUCE-2474. Add docs to the new API Partitioner on how to access the
+    Job Configuration. (Harsh J Chouraria via todd)
     
   OPTIMIZATIONS
     

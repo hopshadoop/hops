@@ -20,6 +20,7 @@ package org.apache.hadoop.mapreduce;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.conf.Configurable;
 
 /** 
  * Partitions the key space.
@@ -30,6 +31,9 @@ import org.apache.hadoop.classification.InterfaceStability;
  * is the same as the number of reduce tasks for the job. Hence this controls
  * which of the <code>m</code> reduce tasks the intermediate key (and hence the 
  * record) is sent for reduction.</p>
+ * 
+ * Note: If you require your Partitioner class to obtain the Job's configuration
+ * object, implement the {@link Configurable} interface.
  * 
  * @see Reducer
  */
