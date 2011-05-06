@@ -683,6 +683,7 @@
         dir="${basedir}" timeout="${test.timeout}"
         errorProperty="tests.failed" failureProperty="tests.failed">
         <jvmarg value="${test.junit.jvmargs}" />
+        <sysproperty key="java.net.preferIPv4Stack" value="true"/>
         <sysproperty key="test.build.data" value="@{test.dir}/data"/>
         <sysproperty key="java.security.krb5.conf"
           value="${test.src.dir}/krb5.conf"/>
