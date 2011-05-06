@@ -176,7 +176,7 @@ public class TestSaveNamespace {
     conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_NAME_DIR_RESTORE_KEY, true);
 
     NameNode.initMetrics(conf, NamenodeRole.ACTIVE);
-    NameNode.format(conf);
+    GenericTestUtils.formatNamenode(conf);
     FSNamesystem fsn = new FSNamesystem(conf);
 
     // Replace the FSImage with a spy

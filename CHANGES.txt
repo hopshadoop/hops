@@ -502,6 +502,9 @@ Trunk (unreleased changes)
     HDFS-1891. Disable IPV6 for junit tests to fix TestBackupNode failure.
     (suresh)
 
+    HDFS-1898. Tests failing on trunk due to use of NameNode.format.
+    (todd via eli)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES

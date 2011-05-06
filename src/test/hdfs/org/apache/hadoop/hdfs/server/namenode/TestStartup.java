@@ -52,6 +52,7 @@ import org.apache.hadoop.hdfs.server.namenode.NNStorage.NameNodeDirType;
 import org.apache.hadoop.hdfs.server.namenode.NNStorage.NameNodeFile;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.MD5Hash;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.StringUtils;
 
 /**
@@ -371,7 +372,7 @@ public class TestStartup extends TestCase {
     conf.set("dfs.name.dir", new File(base_dir, "name").getPath());
     conf.setBoolean("dfs.permissions", false);
 
-    NameNode.format(conf);
+    GenericTestUtils.formatNamenode(conf);
 
     // create an uncompressed image
     LOG.info("Create an uncompressed fsimage");
@@ -433,7 +434,7 @@ public class TestStartup extends TestCase {
       conf.setBoolean(DFSConfigKeys.DFS_IMAGE_COMPRESSION_CODEC_KEY, true);
     }
 
-    NameNode.format(conf);
+    GenericTestUtils.formatNamenode(conf);
 
     // create an image
     LOG.info("Create an fsimage");
