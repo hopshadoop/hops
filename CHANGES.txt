@@ -79,6 +79,9 @@ Trunk (unreleased changes)
     Job Configuration. (Harsh J Chouraria via todd)
     
     MAPREDUCE-2475. Disable IPV6 for junit tests. (suresh srinivas via mahadev)
+
+    MAPREDUCE-2422. Removed unused internal methods from DistributedCache.
+    (tomwhite)
  
   OPTIMIZATIONS
     

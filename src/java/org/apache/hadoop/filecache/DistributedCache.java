@@ -24,8 +24,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.filecache.TaskDistributedCacheManager;
-import org.apache.hadoop.mapreduce.filecache.TrackerDistributedCacheManager;
 
 /**
  * Distribute application-specific large, read-only files efficiently.
@@ -116,9 +114,7 @@ import org.apache.hadoop.mapreduce.filecache.TrackerDistributedCacheManager;
  * (specifically those mentioned in the example above, as well
  * as {@link DistributedCache#addArchiveToClassPath(Path, Configuration)}),
  * as well as methods intended for use by the MapReduce framework
- * (e.g., {@link org.apache.hadoop.mapred.JobClient}).  For implementation
- * details, see {@link TrackerDistributedCacheManager} and 
- * {@link TaskDistributedCacheManager}.
+ * (e.g., {@link org.apache.hadoop.mapred.JobClient}).
  *
  * @see org.apache.hadoop.mapred.JobConf
  * @see org.apache.hadoop.mapred.JobClient

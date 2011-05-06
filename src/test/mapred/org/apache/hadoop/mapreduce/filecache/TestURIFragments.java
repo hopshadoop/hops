@@ -26,87 +26,87 @@ import org.junit.Test;
 public class TestURIFragments {
 
   /**
-   * Tests {@link TrackerDistributedCacheManager#checkURIs(URI[], URI[]).
+   * Tests {@link DistributedCache#checkURIs(URI[], URI[]).
    */
   @Test
   public void testURIs() throws URISyntaxException {
-    assertTrue(TrackerDistributedCacheManager.checkURIs(null, null));
+    assertTrue(DistributedCache.checkURIs(null, null));
 
     // uris with no fragments
-    assertFalse(TrackerDistributedCacheManager.checkURIs(new URI[] { new URI(
+    assertFalse(DistributedCache.checkURIs(new URI[] { new URI(
         "file://foo/bar/myCacheFile.txt") }, null));
-    assertFalse(TrackerDistributedCacheManager.checkURIs(null,
+    assertFalse(DistributedCache.checkURIs(null,
         new URI[] { new URI("file://foo/bar/myCacheArchive.txt") }));
-    assertFalse(TrackerDistributedCacheManager.checkURIs(new URI[] {
+    assertFalse(DistributedCache.checkURIs(new URI[] {
         new URI("file://foo/bar/myCacheFile1.txt#file"),
         new URI("file://foo/bar/myCacheFile2.txt") }, null));
-    assertFalse(TrackerDistributedCacheManager.checkURIs(null, new URI[] {
+    assertFalse(DistributedCache.checkURIs(null, new URI[] {
         new URI("file://foo/bar/myCacheArchive1.txt"),
         new URI("file://foo/bar/myCacheArchive2.txt#archive") }));
-    assertFalse(TrackerDistributedCacheManager.checkURIs(new URI[] { new URI(
+    assertFalse(DistributedCache.checkURIs(new URI[] { new URI(
         "file://foo/bar/myCacheFile.txt") }, new URI[] { new URI(
         "file://foo/bar/myCacheArchive.txt") }));
 
     // conflicts in fragment names
-    assertFalse(TrackerDistributedCacheManager.checkURIs(new URI[] {
+    assertFalse(DistributedCache.checkURIs(new URI[] {
         new URI("file://foo/bar/myCacheFile1.txt#file"),
         new URI("file://foo/bar/myCacheFile2.txt#file") }, null));
-    assertFalse(TrackerDistributedCacheManager.checkURIs(null, new URI[] {
+    assertFalse(DistributedCache.checkURIs(null, new URI[] {
         new URI("file://foo/bar/myCacheArchive1.txt#archive"),
         new URI("file://foo/bar/myCacheArchive2.txt#archive") }));
-    assertFalse(TrackerDistributedCacheManager.checkURIs(new URI[] { new URI(
+    assertFalse(DistributedCache.checkURIs(new URI[] { new URI(
         "file://foo/bar/myCacheFile.txt#cache") }, new URI[] { new URI(
         "file://foo/bar/myCacheArchive.txt#cache") }));
-    assertFalse(TrackerDistributedCacheManager.checkURIs(new URI[] {
+    assertFalse(DistributedCache.checkURIs(new URI[] {
         new URI("file://foo/bar/myCacheFile1.txt#file1"),
         new URI("file://foo/bar/myCacheFile2.txt#file2") }, new URI[] {
         new URI("file://foo/bar/myCacheArchive1.txt#archive"),
         new URI("file://foo/bar/myCacheArchive2.txt#archive") }));
-    assertFalse(TrackerDistributedCacheManager.checkURIs(new URI[] {
+    assertFalse(DistributedCache.checkURIs(new URI[] {
         new URI("file://foo/bar/myCacheFile1.txt#file"),
         new URI("file://foo/bar/myCacheFile2.txt#file") }, new URI[] {
         new URI("file://foo/bar/myCacheArchive1.txt#archive1"),
         new URI("file://foo/bar/myCacheArchive2.txt#archive2") }));
-    assertFalse(TrackerDistributedCacheManager.checkURIs(new URI[] {
+    assertFalse(DistributedCache.checkURIs(new URI[] {
         new URI("file://foo/bar/myCacheFile1.txt#file1"),
         new URI("file://foo/bar/myCacheFile2.txt#cache") }, new URI[] {
         new URI("file://foo/bar/myCacheArchive1.txt#cache"),
         new URI("file://foo/bar/myCacheArchive2.txt#archive2") }));
 
     // test ignore case
-    assertFalse(TrackerDistributedCacheManager.checkURIs(new URI[] {
+    assertFalse(DistributedCache.checkURIs(new URI[] {
         new URI("file://foo/bar/myCacheFile1.txt#file"),
         new URI("file://foo/bar/myCacheFile2.txt#FILE") }, null));
-    assertFalse(TrackerDistributedCacheManager.checkURIs(null, new URI[] {
+    assertFalse(DistributedCache.checkURIs(null, new URI[] {
         new URI("file://foo/bar/myCacheArchive1.txt#archive"),
         new URI("file://foo/bar/myCacheArchive2.txt#ARCHIVE") }));
-    assertFalse(TrackerDistributedCacheManager.checkURIs(new URI[] { new URI(
+    assertFalse(DistributedCache.checkURIs(new URI[] { new URI(
         "file://foo/bar/myCacheFile.txt#cache") }, new URI[] { new URI(
         "file://foo/bar/myCacheArchive.txt#CACHE") }));
-    assertFalse(TrackerDistributedCacheManager.checkURIs(new URI[] {
+    assertFalse(DistributedCache.checkURIs(new URI[] {
         new URI("file://foo/bar/myCacheFile1.txt#file1"),
         new URI("file://foo/bar/myCacheFile2.txt#file2") }, new URI[] {
         new URI("file://foo/bar/myCacheArchive1.txt#ARCHIVE"),
         new URI("file://foo/bar/myCacheArchive2.txt#archive") }));
-    assertFalse(TrackerDistributedCacheManager.checkURIs(new URI[] {
+    assertFalse(DistributedCache.checkURIs(new URI[] {
         new URI("file://foo/bar/myCacheFile1.txt#FILE"),
         new URI("file://foo/bar/myCacheFile2.txt#file") }, new URI[] {
         new URI("file://foo/bar/myCacheArchive1.txt#archive1"),
         new URI("file://foo/bar/myCacheArchive2.txt#archive2") }));
-    assertFalse(TrackerDistributedCacheManager.checkURIs(new URI[] {
+    assertFalse(DistributedCache.checkURIs(new URI[] {
         new URI("file://foo/bar/myCacheFile1.txt#file1"),
         new URI("file://foo/bar/myCacheFile2.txt#CACHE") }, new URI[] {
         new URI("file://foo/bar/myCacheArchive1.txt#cache"),
         new URI("file://foo/bar/myCacheArchive2.txt#archive2") }));
 
     // allowed uri combinations
-    assertTrue(TrackerDistributedCacheManager.checkURIs(new URI[] {
+    assertTrue(DistributedCache.checkURIs(new URI[] {
         new URI("file://foo/bar/myCacheFile1.txt#file1"),
         new URI("file://foo/bar/myCacheFile2.txt#file2") }, null));
-    assertTrue(TrackerDistributedCacheManager.checkURIs(null, new URI[] {
+    assertTrue(DistributedCache.checkURIs(null, new URI[] {
         new URI("file://foo/bar/myCacheArchive1.txt#archive1"),
         new URI("file://foo/bar/myCacheArchive2.txt#archive2") }));
-    assertTrue(TrackerDistributedCacheManager.checkURIs(new URI[] {
+    assertTrue(DistributedCache.checkURIs(new URI[] {
         new URI("file://foo/bar/myCacheFile1.txt#file1"),
         new URI("file://foo/bar/myCacheFile2.txt#file2") }, new URI[] {
         new URI("file://foo/bar/myCacheArchive1.txt#archive1"),

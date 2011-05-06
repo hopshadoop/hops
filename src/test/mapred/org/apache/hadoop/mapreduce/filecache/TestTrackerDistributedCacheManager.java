@@ -97,7 +97,7 @@ public class TestTrackerDistributedCacheManager extends TestCase {
     // during setUp() rather than in a subtle way later.
     assertTrue("Test root directory " + TEST_ROOT + " and all of its " +
                "parent directories must have a+x permissions",
-               TrackerDistributedCacheManager.ancestorsHaveExecutePermissions(
+               ClientDistributedCacheManager.ancestorsHaveExecutePermissions(
                  fs, new Path(TEST_ROOT.toString())));
 
     // Prepare the tests' mapred-local-dir
@@ -160,8 +160,8 @@ public class TestTrackerDistributedCacheManager extends TestCase {
     subConf.set(MRJobConfig.USER_NAME, userName);
     DistributedCache.addCacheFile(firstCacheFile.toUri(), subConf);
     DistributedCache.addFileToClassPath(secondCacheFile, subConf);
-    TrackerDistributedCacheManager.determineTimestamps(subConf);
-    TrackerDistributedCacheManager.determineCacheVisibilities(subConf);
+    ClientDistributedCacheManager.determineTimestamps(subConf);
+    ClientDistributedCacheManager.determineCacheVisibilities(subConf);
     // ****** End of imitating JobClient code
 
     Path jobFile = new Path(TEST_ROOT_DIR, "job.xml");
@@ -239,8 +239,8 @@ public class TestTrackerDistributedCacheManager extends TestCase {
     job1.setUser(userName);
     job1.addCacheFile(secondCacheFile.toUri());
     Configuration conf1 = job1.getConfiguration();
-    TrackerDistributedCacheManager.determineTimestamps(conf1);
-    TrackerDistributedCacheManager.determineCacheVisibilities(conf1);
+    ClientDistributedCacheManager.determineTimestamps(conf1);
+    ClientDistributedCacheManager.determineCacheVisibilities(conf1);
 
     // Task localizing for first job
     TaskDistributedCacheManager handle = manager
@@ -267,8 +267,8 @@ public class TestTrackerDistributedCacheManager extends TestCase {
     // add a file that is never localized
     job2.addCacheFile(thirdCacheFile.toUri());
     Configuration conf2 = job2.getConfiguration();
-    TrackerDistributedCacheManager.determineTimestamps(conf2);
-    TrackerDistributedCacheManager.determineCacheVisibilities(conf2);
+    ClientDistributedCacheManager.determineTimestamps(conf2);
+    ClientDistributedCacheManager.determineCacheVisibilities(conf2);
 
     // Task localizing for second job
     // localization for the "firstCacheFile" will fail.
@@ -376,8 +376,8 @@ public class TestTrackerDistributedCacheManager extends TestCase {
     job1.setUser(userName);
     job1.addCacheFile(cacheFile.toUri());
     Configuration conf1 = job1.getConfiguration();
-    TrackerDistributedCacheManager.determineTimestamps(conf1);
-    TrackerDistributedCacheManager.determineCacheVisibilities(conf1);
+    ClientDistributedCacheManager.determineTimestamps(conf1);
+    ClientDistributedCacheManager.determineCacheVisibilities(conf1);
 
     // Task localizing for job
     TaskDistributedCacheManager handle = manager
@@ -678,8 +678,8 @@ public class TestTrackerDistributedCacheManager extends TestCase {
     Configuration subConf = new Configuration(myConf);
     subConf.set(MRJobConfig.USER_NAME, userName);
     DistributedCache.addCacheFile(firstCacheFile.toUri(), subConf);
-    TrackerDistributedCacheManager.determineTimestamps(subConf);
-    TrackerDistributedCacheManager.determineCacheVisibilities(subConf);
+    ClientDistributedCacheManager.determineTimestamps(subConf);
+    ClientDistributedCacheManager.determineCacheVisibilities(subConf);
     // ****** End of imitating JobClient code
 
     // ****** Imitate TaskRunner code.
@@ -745,8 +745,8 @@ public class TestTrackerDistributedCacheManager extends TestCase {
     Configuration subConf2 = new Configuration(myConf);
     subConf2.set(MRJobConfig.USER_NAME, userName);
     DistributedCache.addCacheFile(firstCacheFile.toUri(), subConf2);
-    TrackerDistributedCacheManager.determineTimestamps(subConf2);
-    TrackerDistributedCacheManager.determineCacheVisibilities(subConf2);
+    ClientDistributedCacheManager.determineTimestamps(subConf2);
+    ClientDistributedCacheManager.determineCacheVisibilities(subConf2);
     
     handle =
       manager.newTaskDistributedCacheManager(subConf2);

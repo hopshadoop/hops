@@ -43,8 +43,9 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.QueueACL;
 import static org.apache.hadoop.mapred.QueueManager.toFullPropertyName;
+
+import org.apache.hadoop.mapreduce.filecache.ClientDistributedCacheManager;
 import org.apache.hadoop.mapreduce.filecache.DistributedCache;
-import org.apache.hadoop.mapreduce.filecache.TrackerDistributedCacheManager;
 import org.apache.hadoop.mapreduce.protocol.ClientProtocol;
 import org.apache.hadoop.mapreduce.security.TokenCache;
 import org.apache.hadoop.mapreduce.split.JobSplitWriter;
@@ -242,11 +243,11 @@ class JobSubmitter {
     }
 
     //  set the timestamps of the archives and files
-    TrackerDistributedCacheManager.determineTimestamps(conf);
+    ClientDistributedCacheManager.determineTimestamps(conf);
     //  set the public/private visibility of the archives and files
-    TrackerDistributedCacheManager.determineCacheVisibilities(conf);
+    ClientDistributedCacheManager.determineCacheVisibilities(conf);
     // get DelegationToken for each cached file
-    TrackerDistributedCacheManager.getDelegationTokens(conf, job
+    ClientDistributedCacheManager.getDelegationTokens(conf, job
         .getCredentials());
   }
   

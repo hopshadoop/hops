@@ -26,7 +26,6 @@ import org.apache.hadoop.conf.*;
 import org.apache.hadoop.util.*;
 import org.apache.hadoop.fs.*;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.mapred.DefaultTaskController;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.MRJobConfig;
@@ -122,218 +121,14 @@ import java.net.URI;
  * (specifically those mentioned in the example above, as well
  * as {@link DistributedCache#addArchiveToClassPath(Path, Configuration)}),
  * as well as methods intended for use by the MapReduce framework
- * (e.g., {@link org.apache.hadoop.mapred.JobClient}).  For implementation
- * details, see {@link TrackerDistributedCacheManager} and 
- * {@link TaskDistributedCacheManager}.
+ * (e.g., {@link org.apache.hadoop.mapred.JobClient}).
  *
- * @see TrackerDistributedCacheManager
- * @see TaskDistributedCacheManager
  * @see org.apache.hadoop.mapred.JobConf
  * @see org.apache.hadoop.mapred.JobClient
  */
 @Deprecated
 @InterfaceAudience.Private
 public class DistributedCache {
-  /**
-   * Get the locally cached file or archive; it could either be 
-   * previously cached (and valid) or copy it from the {@link FileSystem} now.
-   * 
-   * @param cache the cache to be localized, this should be specified as 
-   * new URI(scheme://scheme-specific-part/absolute_path_to_file#LINKNAME).
-   * @param conf The Confguration file which contains the filesystem
-   * @param baseDir The base cache Dir where you wnat to localize the files/archives
-   * @param fileStatus The file status on the dfs.
-   * @param isArchive if the cache is an archive or a file. In case it is an
-   *  archive with a .zip or .jar or .tar or .tgz or .tar.gz extension it will
-   *  be unzipped/unjarred/untarred automatically 
-   *  and the directory where the archive is unzipped/unjarred/untarred is
-   *  returned as the Path.
-   *  In case of a file, the path to the file is returned
-   * @param confFileStamp this is the hdfs file modification timestamp to verify that the 
-   * file to be cached hasn't changed since the job started
-   * @param currentWorkDir this is the directory where you would want to create symlinks 
-   * for the locally cached files/archives
-   * @return the path to directory where the archives are unjarred in case of archives,
-   * the path to the file where the file is copied locally 
-   * @throws IOException
-   * @deprecated Internal to MapReduce framework. 
-   * Use TrackerDistributedCacheManager instead.
-   */
-  @Deprecated
-  public static Path getLocalCache(URI cache, Configuration conf, 
-                                   Path baseDir, FileStatus fileStatus,
-                                   boolean isArchive, long confFileStamp,
-                                   Path currentWorkDir) 
-      throws IOException {
-    return getLocalCache(cache, conf, baseDir, fileStatus, isArchive, 
-        confFileStamp, currentWorkDir, true);
-  }
-
-  /**
-   * Get the locally cached file or archive; it could either be 
-   * previously cached (and valid) or copy it from the {@link FileSystem} now.
-   * 
-   * @param cache the cache to be localized, this should be specified as 
-   * new URI(scheme://scheme-specific-part/absolute_path_to_file#LINKNAME).
-   * @param conf The Confguration file which contains the filesystem
-   * @param baseDir The base cache Dir where you wnat to localize the files/archives
-   * @param fileStatus The file status on the dfs.
-   * @param isArchive if the cache is an archive or a file. In case it is an
-   *  archive with a .zip or .jar or .tar or .tgz or .tar.gz extension it will
-   *  be unzipped/unjarred/untarred automatically 
-   *  and the directory where the archive is unzipped/unjarred/untarred is
-   *  returned as the Path.
-   *  In case of a file, the path to the file is returned
-   * @param confFileStamp this is the hdfs file modification timestamp to verify that the 
-   * file to be cached hasn't changed since the job started
-   * @param currentWorkDir this is the directory where you would want to create symlinks 
-   * for the locally cached files/archives
-   * @param honorSymLinkConf if this is false, then the symlinks are not
-   * created even if conf says so (this is required for an optimization in task
-   * launches
-   * @return the path to directory where the archives are unjarred in case of archives,
-   * the path to the file where the file is copied locally 
-   * @throws IOException
-   * @deprecated Internal to MapReduce framework. 
-   * Use TrackerDistributedCacheManager instead.
-   */
-  @Deprecated
-  public static Path getLocalCache(URI cache, Configuration conf, 
-      Path baseDir, FileStatus fileStatus,
-      boolean isArchive, long confFileStamp,
-      Path currentWorkDir, boolean honorSymLinkConf) throws IOException {
-
-    return new TrackerDistributedCacheManager(conf, new DefaultTaskController())
-        .getLocalCache(cache, conf, baseDir.toString(), fileStatus, isArchive,
-            confFileStamp, currentWorkDir, honorSymLinkConf, false);
-  }
-
-  /**
-   * Get the locally cached file or archive; it could either be 
-   * previously cached (and valid) or copy it from the {@link FileSystem} now.
-   * 
-   * @param cache the cache to be localized, this should be specified as 
-   * new URI(scheme://scheme-specific-part/absolute_path_to_file#LINKNAME).
-   * @param conf The Confguration file which contains the filesystem
-   * @param baseDir The base cache Dir where you wnat to localize the files/archives
-   * @param isArchive if the cache is an archive or a file. In case it is an 
-   *  archive with a .zip or .jar or .tar or .tgz or .tar.gz extension it will 
-   *  be unzipped/unjarred/untarred automatically 
-   *  and the directory where the archive is unzipped/unjarred/untarred 
-   *  is returned as the Path.
-   *  In case of a file, the path to the file is returned
-   * @param confFileStamp this is the hdfs file modification timestamp to verify that the 
-   * file to be cached hasn't changed since the job started
-   * @param currentWorkDir this is the directory where you would want to create symlinks 
-   * for the locally cached files/archives
-   * @return the path to directory where the archives are unjarred in case of archives,
-   * the path to the file where the file is copied locally 
-   * @throws IOException
-   * @deprecated Internal to MapReduce framework.  
-   * Use TrackerDistributedCacheManager instead.
-   */
-  @Deprecated
-  public static Path getLocalCache(URI cache, Configuration conf, 
-                                   Path baseDir, boolean isArchive,
-                                   long confFileStamp, Path currentWorkDir) 
-      throws IOException {
-    return getLocalCache(cache, conf, 
-                         baseDir, null, isArchive,
-                         confFileStamp, currentWorkDir);
-  }
-
-  /**
-   * This is the opposite of getlocalcache. When you are done with
-   * using the cache, you need to release the cache
-   * @param cache The cache URI to be released
-   * @param conf configuration which contains the filesystem the cache 
-   * is contained in.
-   * @throws IOException
-   * @deprecated Internal to MapReduce framework. 
-   * Use TrackerDistributedCacheManager instead.
-   */
-  @Deprecated
-  public static void releaseCache(URI cache, Configuration conf)
-      throws IOException {
-	// find the timestamp of the uri
-    URI[] archives = DistributedCache.getCacheArchives(conf);
-    URI[] files = DistributedCache.getCacheFiles(conf);
-    String[] archivesTimestamps =
-          DistributedCache.getArchiveTimestamps(conf);
-    String[] filesTimestamps =
-          DistributedCache.getFileTimestamps(conf);
-    String timestamp = null;
-    if (archives != null) {
-      for (int i = 0; i < archives.length; i++) {
-        if (archives[i].equals(cache)) {
-          timestamp = archivesTimestamps[i];
-          break;
-        }
-      }
-    }
-    if (timestamp == null && files != null) {
-      for (int i = 0; i < files.length; i++) {
-        if (files[i].equals(cache)) {
-          timestamp = filesTimestamps[i];
-          break;
-        }
-      }
-    }
-    if (timestamp == null) {
-      throw new IOException("TimeStamp of the uri couldnot be found");
-    }
-    new TrackerDistributedCacheManager(conf, new DefaultTaskController())
-           .releaseCache(cache, conf, Long.parseLong(timestamp),
-            TrackerDistributedCacheManager.getLocalizedCacheOwner(false));
-  }
-  
-  /**
-   * Returns the relative path of the dir this cache will be localized in
-   * relative path that this cache will be localized in. For
-   * hdfs://hostname:port/absolute_path -- the relative path is
-   * hostname/absolute path -- if it is just /absolute_path -- then the
-   * relative path is hostname of DFS this mapred cluster is running
-   * on/absolute_path
-   * @deprecated Internal to MapReduce framework.  Use DistributedCacheManager
-   * instead.
-   */
-  @Deprecated
-  public static String makeRelative(URI cache, Configuration conf)
-      throws IOException {
-    return new TrackerDistributedCacheManager(conf, new DefaultTaskController())
-        .makeRelative(cache, conf);
-  }
-
-  /**
-   * Returns mtime of a given cache file on hdfs.
-   * 
-   * @param conf configuration
-   * @param cache cache file 
-   * @return mtime of a given cache file on hdfs
-   * @throws IOException
-   * @deprecated Internal to MapReduce framework.  
-   * Use {@link TrackerDistributedCacheManager} instead.
-   */
-  @Deprecated
-  public static long getTimestamp(Configuration conf, URI cache)
-    throws IOException {
-    return TrackerDistributedCacheManager.getTimestamp(conf, cache);
-  }
-
-  /**
-   * This method create symlinks for all files in a given dir in another directory
-   * @param conf the configuration
-   * @param jobCacheDir the target directory for creating symlinks
-   * @param workDir the directory in which the symlinks are created
-   * @throws IOException
-   * @deprecated Internal to MapReduce framework.  Use DistributedCacheManager
-   * instead.
-   */
-  @Deprecated
-  public static void createAllSymlink(Configuration conf, File jobCacheDir, File workDir)
-      throws IOException{
-    TrackerDistributedCacheManager.createAllSymlink(conf, jobCacheDir, workDir);
-  }
   
   /**
    * Set the configuration with the given set of archives.  Intended
@@ -441,64 +236,6 @@ public class DistributedCache {
   @Deprecated
   public static String[] getFileTimestamps(Configuration conf) {
     return conf.getStrings(MRJobConfig.CACHE_FILE_TIMESTAMPS);
-  }
-
-  /**
-   * This is to check the timestamp of the archives to be localized.
-   * Used by internal MapReduce code.
-   * @param conf Configuration which stores the timestamp's
-   * @param timestamps comma separated list of timestamps of archives.
-   * The order should be the same as the order in which the archives are added.
-   * @deprecated Use 
-   * {@link TrackerDistributedCacheManager#setArchiveTimestamps(Configuration, String)}
-   * instead
-   */
-  @Deprecated
-  public static void setArchiveTimestamps(Configuration conf, String timestamps) {
-    TrackerDistributedCacheManager.setArchiveTimestamps(conf, timestamps);
-  }
-
-  /**
-   * This is to check the timestamp of the files to be localized.
-   * Used by internal MapReduce code.
-   * @param conf Configuration which stores the timestamp's
-   * @param timestamps comma separated list of timestamps of files.
-   * The order should be the same as the order in which the files are added.
-   * @deprecated Use 
-   * {@link TrackerDistributedCacheManager#setFileTimestamps(Configuration, String)}
-   * instead
-   */
-  @Deprecated
-  public static void setFileTimestamps(Configuration conf, String timestamps) {
-    TrackerDistributedCacheManager.setFileTimestamps(conf, timestamps);
-  }
-  
-  /**
-   * Set the conf to contain the location for localized archives.  Used
-   * by internal DistributedCache code.
-   * @param conf The conf to modify to contain the localized caches
-   * @param str a comma separated list of local archives
-   * @deprecated Use 
-   * {@link TrackerDistributedCacheManager#setLocalArchives(Configuration, String)}
-   * instead
-   */
-  @Deprecated
-  public static void setLocalArchives(Configuration conf, String str) {
-    TrackerDistributedCacheManager.setLocalArchives(conf, str);
-  }
-
-  /**
-   * Set the conf to contain the location for localized files.  Used
-   * by internal DistributedCache code.
-   * @param conf The conf to modify to contain the localized caches
-   * @param str a comma separated list of local files
-   * @deprecated Use 
-   * {@link TrackerDistributedCacheManager#setLocalFiles(Configuration, String)}
-   * instead
-   */
-  @Deprecated
-  public static void setLocalFiles(Configuration conf, String str) {
-    TrackerDistributedCacheManager.setLocalFiles(conf, str);
   }
 
   /**
@@ -647,24 +384,45 @@ public class DistributedCache {
    * the various archives and files.  May be used by user code.
    * @param uriFiles The uri array of urifiles
    * @param uriArchives the uri array of uri archives
-   * @deprecated Use 
-   * {@link TrackerDistributedCacheManager#checkURIs(URI[], URI[])} instead
    */
-  @Deprecated
-  public static boolean checkURIs(URI[]  uriFiles, URI[] uriArchives){
-    return TrackerDistributedCacheManager.checkURIs(uriFiles, uriArchives);
+  public static boolean checkURIs(URI[] uriFiles, URI[] uriArchives) {
+    if ((uriFiles == null) && (uriArchives == null)) {
+      return true;
+    }
+    // check if fragment is null for any uri
+    // also check if there are any conflicts in fragment names
+    Set<String> fragments = new HashSet<String>();
+    
+    // iterate over file uris
+    if (uriFiles != null) {
+      for (int i = 0; i < uriFiles.length; i++) {
+        String fragment = uriFiles[i].getFragment();
+        if (fragment == null) {
+          return false;
+        }
+        String lowerCaseFragment = fragment.toLowerCase();
+        if (fragments.contains(lowerCaseFragment)) {
+          return false;
+        }
+        fragments.add(lowerCaseFragment);
+      }
+    }
+    
+    // iterate over archive uris
+    if (uriArchives != null) {
+      for (int i = 0; i < uriArchives.length; i++) {
+        String fragment = uriArchives[i].getFragment();
+        if (fragment == null) {
+          return false;
+        }
+        String lowerCaseFragment = fragment.toLowerCase();
+        if (fragments.contains(lowerCaseFragment)) {
+          return false;
+        }
+        fragments.add(lowerCaseFragment);
+      }
+    }
+    return true;
   }
 
-  /**
-   * Clear the entire contents of the cache and delete the backing files. This
-   * should only be used when the server is reinitializing, because the users
-   * are going to lose their files.
-   * @deprecated Internal to MapReduce framework. 
-   * Use TrackerDistributedCacheManager instead.
-   */
-  @Deprecated
-  public static void purgeCache(Configuration conf) throws IOException {
-    new TrackerDistributedCacheManager(conf, new DefaultTaskController())
-        .purgeCache();
-  }
 }

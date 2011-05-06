@@ -31,6 +31,7 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.filecache.DistributedCache;
+import org.apache.hadoop.mapreduce.filecache.TrackerDistributedCacheManager;
 
 /**
  * Verifies if TaskRunner.SetupWorkDir() is cleaning up files/dirs pointed
@@ -149,7 +150,7 @@ public class TestSetupWorkDir extends TestCase {
     Path myTargetDir = new Path(rootDir, "./tmp");
     createEmptyDir(fs, myTargetDir);
     createFile(fs, myTargetDir, "cacheFile.txt");
-    DistributedCache.setLocalFiles(jConf, 
+    TrackerDistributedCacheManager.setLocalFiles(jConf, 
         (myTargetDir.toString()+Path.SEPARATOR+"cacheFile.txt"));
     assertTrue("Did not create cache file in " + myTargetDir,
         (fs.listStatus(myTargetDir).length == 1));
@@ -203,7 +204,7 @@ public class TestSetupWorkDir extends TestCase {
     Path myTargetDir = new Path(rootDir, "./tmp");
     createEmptyDir(fs, myTargetDir);
     createFile(fs, myTargetDir, "cacheFile.txt");
-    DistributedCache.setLocalFiles(jConf, (myTargetDir.toString() +
+    TrackerDistributedCacheManager.setLocalFiles(jConf, (myTargetDir.toString() +
         Path.SEPARATOR+"cacheFile.txt"));
     assertTrue("Did not create cache file in " + myTargetDir,
         (fs.listStatus(myTargetDir).length == 1));
