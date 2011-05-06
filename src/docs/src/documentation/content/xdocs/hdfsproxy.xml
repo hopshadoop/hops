@@ -63,7 +63,7 @@
     
     <section>
       <title> Comparison with NameNode's H(S)FTP Interface </title>
-      <p>NameNode has a http listener started at <code>dfs.http.address</code> with default port 50070 when NameNode is started and it provided a HFTP interface for the client. Also it could have a https listener started at <code>dfs.https.address</code> if <code>dfs.https.enable</code> is defined as true (by default, <code>dfs.https.enable</code> is not defined) to provide a HSFTP interface for client.</p>
+      <p>NameNode has a http listener started at <code>dfs.namenode.http-address</code> with default port 50070 when NameNode is started and it provided a HFTP interface for the client. Also it could have a https listener started at <code>dfs.namenode.https-address</code> if <code>dfs.https.enable</code> is defined as true (by default, <code>dfs.https.enable</code> is not defined) to provide a HSFTP interface for client.</p>
       <section>
         <title>Advantages of Proxy Over NameNode HTTP(S) server</title>
         <ol>
@@ -338,11 +338,11 @@
                   <th>Description</th>
                 </tr>
                 <tr>
-                  <td>fs.default.name</td>
+                  <td>fs.defaultFS</td>
                   <td>Source Cluster NameNode address</td>
                 </tr>
                 <tr>
-                  <td>dfs.block.size</td>
+                  <td>dfs.blocksize</td>
                   <td>The block size for file tranfers</td>
                 </tr>
                 <tr>

@@ -229,16 +229,16 @@ to the web server.</p>
 		only those things visible using "other" permissions. Additional groups may be added to the comma-separated list.
     </li>
     
-	<li><code>dfs.permissions.supergroup = supergroup</code>
+	<li><code>dfs.permissions.superusergroup = supergroup</code>
 	<br />The name of the group of super-users.
 	</li>
 
-	<li><code>dfs.upgrade.permission = 0777</code>
+	<li><code>dfs.namenode.upgrade.permission = 0777</code>
 	<br />The choice of initial mode during upgrade. The <em>x</em> permission is <em>never</em> set for files. 
 		For configuration files, the decimal value <em>511<sub>10</sub></em> may be used.
     </li>
     
-	<li><code>dfs.umask = 022</code>
+	<li><code>fs.permissions.umask-mode = 022</code>
     <br />The <code>umask</code> used when creating files and directories. For configuration files, the decimal 
 		value <em>18<sub>10</sub></em> may be used.
 	</li>

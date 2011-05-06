@@ -309,8 +309,8 @@
      specified in the configuration file.
    </p>
    <p>The location of the Checkpoint (or Backup) node and its accompanying 
-      web interface are configured via the <code>dfs.backup.address</code> 
-      and <code>dfs.backup.http.address</code> configuration variables.
+      web interface are configured via the <code>dfs.namenode.backup.address</code> 
+      and <code>dfs.namenode.backup.http-address</code> configuration variables.
 	 </p>
    <p>
      The start of the checkpoint process on the Checkpoint node is 
@@ -375,8 +375,8 @@
     It is started with <code>bin/hdfs namenode -backup</code>.
    </p>
    <p>The location of the Backup (or Checkpoint) node and its accompanying 
-      web interface are configured via the <code>dfs.backup.address</code> 
-      and <code>dfs.backup.http.address</code> configuration variables.
+      web interface are configured via the <code>dfs.namenode.backup.address</code> 
+      and <code>dfs.namenode.backup.http-address</code> configuration variables.
 	 </p>
    <p>
     Use of a Backup node provides the option of running the NameNode with no 
@@ -384,7 +384,7 @@
     of the namespace to the Backup node. 
     To do this, start the NameNode with the 
     <code>-importCheckpoint</code> option, along with specifying no persistent
-    storage directories of type edits <code>dfs.name.edits.dir</code> 
+    storage directories of type edits <code>dfs.namenode.edits.dir</code> 
     for the NameNode configuration.
    </p> 
    <p>
@@ -405,7 +405,7 @@
    <ul>
       <li>
         Create an empty directory specified in the 
-        <code>dfs.name.dir</code> configuration variable;
+        <code>dfs.namenode.name.dir</code> configuration variable;
       </li>
       <li>
         Specify the location of the checkpoint directory in the 
@@ -418,9 +418,9 @@
    <p>
      The NameNode will upload the checkpoint from the 
      <code>dfs.namenode.checkpoint.dir</code> directory and then save it to the NameNode
-     directory(s) set in <code>dfs.name.dir</code>.
+     directory(s) set in <code>dfs.namenode.name.dir</code>.
      The NameNode will fail if a legal image is contained in 
-     <code>dfs.name.dir</code>.
+     <code>dfs.namenode.name.dir</code>.
      The NameNode verifies that the image in <code>dfs.namenode.checkpoint.dir</code> is
      consistent, but does not modify it in any way.
    </p>
