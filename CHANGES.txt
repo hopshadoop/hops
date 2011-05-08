@@ -383,6 +383,9 @@ Trunk (unreleased changes)
     HDFS-1870. Move and rename DFSClient.LeaseChecker to a seperated class
     LeaseRenewer.  (szetszwo)
 
+    HDFS-1866. Document dfs.datanode.max.transfer.threads in hdfs-default.xml
+    (Harsh J Chouraria via todd)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
