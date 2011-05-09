@@ -5822,7 +5822,7 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^Replication 2 set: hdfs://\w+[.a-z]*:[0-9]*/dir0/file0</expected-output>
+          <expected-output>^Replication 2 set: /dir0/file0</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -5839,7 +5839,7 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^Replication 2 set: hdfs://\w+[.a-z]*:[0-9]*/user/[a-z]*/file0</expected-output>
+          <expected-output>^Replication 2 set: file0</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -5857,11 +5857,11 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^Replication 2 set: hdfs://\w+[.a-z]*:[0-9]*/dir0/file0</expected-output>
+          <expected-output>^Replication 2 set: /dir0/file0</expected-output>
         </comparator>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^Replication 2 set: hdfs://\w+[.a-z]*:[0-9]*/dir0/file1</expected-output>
+          <expected-output>^Replication 2 set: /dir0/file1</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -5879,11 +5879,11 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^Replication 2 set: hdfs://\w+[.a-z]*:[0-9]*/user/[a-z]*/dir0/file0</expected-output>
+          <expected-output>^Replication 2 set: dir0/file0</expected-output>
         </comparator>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^Replication 2 set: hdfs://\w+[.a-z]*:[0-9]*/user/[a-z]*/dir0/file1</expected-output>
+          <expected-output>^Replication 2 set: dir0/file1</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -5932,7 +5932,7 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^Replication 2 set: hdfs://\w+[.a-z]*:[0-9]*/dir0/file0</expected-output>
+          <expected-output>^Replication 2 set: hdfs:///dir0/file0</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -5950,11 +5950,11 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^Replication 2 set: hdfs://\w+[.a-z]*:[0-9]*/dir0/file0</expected-output>
+          <expected-output>^Replication 2 set: hdfs:///dir0/file0</expected-output>
         </comparator>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^Replication 2 set: hdfs://\w+[.a-z]*:[0-9]*/dir0/file1</expected-output>
+          <expected-output>^Replication 2 set: hdfs:///dir0/file1</expected-output>
         </comparator>
       </comparators>
     </test>

@@ -386,6 +386,9 @@ Trunk (unreleased changes)
     HDFS-1866. Document dfs.datanode.max.transfer.threads in hdfs-default.xml
     (Harsh J Chouraria via todd)
 
+    HDFS-1890. Improve the name, class and value type of the map
+    LeaseRenewer.pendingCreates.  (szetszwo)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
@@ -499,14 +502,14 @@ Trunk (unreleased changes)
 
     HDFS-1889. incorrect path in start/stop dfs script. (John George via eli)
 
-    HDFS-1890. Improve the name, class and value type of the map
-    LeaseRenewer.pendingCreates.  (szetszwo)
-
     HDFS-1891. Disable IPV6 for junit tests to fix TestBackupNode failure.
     (suresh)
 
     HDFS-1898. Tests failing on trunk due to use of NameNode.format.
     (todd via eli)
+
+    HDFS-1902. Fix setrep path display for TestHDFSCLI.  (Daryn Sharp
+    via szetszwo)
 
 Release 0.22.0 - Unreleased
 
