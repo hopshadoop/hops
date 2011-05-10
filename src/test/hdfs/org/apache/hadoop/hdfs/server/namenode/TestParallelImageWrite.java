@@ -24,8 +24,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.server.namenode.FSImage;
 import org.apache.hadoop.hdfs.server.common.Storage.StorageDirectory;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
@@ -46,11 +46,13 @@ import java.io.FileInputStream;
  * Specifically with FSImage being written in parallel
  */
 public class TestParallelImageWrite extends TestCase {
+  private static final int NUM_DATANODES = 4;
   /** check if DFS remains in proper condition after a restart */
   public void testRestartDFS() throws Exception {
     final Configuration conf = new HdfsConfiguration();
     MiniDFSCluster cluster = null;
     FSNamesystem fsn = null;
+    int numNamenodeDirs;
     DFSTestUtil files = new DFSTestUtil("TestRestartDFS", 200, 3, 8*1024);
 
     final String dir = "/srcdat";
@@ -62,7 +64,13 @@ public class TestParallelImageWrite extends TestCase {
     FileStatus dirstatus;
 
     try {
-      cluster = new MiniDFSCluster.Builder(conf).format(true).numDataNodes(4).build();
+      cluster = new MiniDFSCluster.Builder(conf).format(true)
+          .numDataNodes(NUM_DATANODES).build();
+      String[] nameNodeDirs = conf.getStrings(
+          DFSConfigKeys.DFS_NAMENODE_NAME_DIR_KEY, new String[] {});
+      numNamenodeDirs = nameNodeDirs.length;
+      assertTrue("failed to get number of Namenode StorageDirs", 
+          numNamenodeDirs != 0);
       FileSystem fs = cluster.getFileSystem();
       files.createFiles(fs, dir);
 
@@ -77,7 +85,8 @@ public class TestParallelImageWrite extends TestCase {
     }
     try {
       // Here we restart the MiniDFScluster without formatting namenode
-      cluster = new MiniDFSCluster.Builder(conf).format(false).numDataNodes(4).build();
+      cluster = new MiniDFSCluster.Builder(conf).format(false)
+          .numDataNodes(NUM_DATANODES).build();
       fsn = cluster.getNamesystem();
       FileSystem fs = cluster.getFileSystem();
       assertTrue("Filesystem corrupted after restart.",
@@ -93,14 +102,16 @@ public class TestParallelImageWrite extends TestCase {
       assertEquals(dirstatus.getGroup() + "_XXX", newdirstatus.getGroup());
       rootmtime = fs.getFileStatus(rootpath).getModificationTime();
 
-      checkImages(fsn);
-
+      final long checkAfterRestart = checkImages(fsn, numNamenodeDirs);
+      
       // Modify the system and then perform saveNamespace
       files.cleanup(fs, dir);
       files.createFiles(fs, dir);
       fsn.setSafeMode(SafeModeAction.SAFEMODE_ENTER);
       cluster.getNameNode().saveNamespace();
-      checkImages(fsn);
+      final long checkAfterModify = checkImages(fsn, numNamenodeDirs);
+      assertTrue("Modified namespace doesn't change fsimage contents",
+          checkAfterRestart != checkAfterModify);
       fsn.setSafeMode(SafeModeAction.SAFEMODE_LEAVE);
       files.cleanup(fs, dir);
     } finally {
@@ -108,13 +119,29 @@ public class TestParallelImageWrite extends TestCase {
     }
   }
   
-  private void checkImages(FSNamesystem fsn) throws Exception {
-    Iterator<StorageDirectory> iter = fsn.
-            getFSImage().getStorage().dirIterator(NameNodeDirType.IMAGE);
+  /**
+   * Confirm that FSImage files in all StorageDirectory are the same,
+   * and non-empty, and there are the expected number of them.
+   * @param fsn - the FSNamesystem being checked.
+   * @param numImageDirs - the configured number of StorageDirectory of type IMAGE. 
+   * @return - the checksum of the FSImage files, which must all be the same.
+   * @throws AssertionFailedError if image files are empty or different,
+   *     if less than two StorageDirectory are provided, or if the
+   *     actual number of StorageDirectory is less than configured.
+   */
+  public static long checkImages(FSNamesystem fsn, int numImageDirs) throws Exception {
+    NNStorage stg = fsn.getFSImage().getStorage();
+    //any failed StorageDirectory is removed from the storageDirs list
+    assertEquals("Some StorageDirectories failed Upgrade",
+        numImageDirs, stg.getNumStorageDirs(NameNodeDirType.IMAGE));
+    assertTrue("Not enough fsimage copies in MiniDFSCluster " + 
+        "to test parallel write", numImageDirs > 1);
+    //checksum the FSImage stored in each storageDir
+    Iterator<StorageDirectory> iter = stg.dirIterator(NameNodeDirType.IMAGE);
     List<Long> checksums = new ArrayList<Long>();
     while (iter.hasNext()) {
       StorageDirectory sd = iter.next();
-      File fsImage = fsn.getFSImage().getStorage().getStorageFile(sd, NameNodeFile.IMAGE);
+      File fsImage = NNStorage.getStorageFile(sd, NameNodeFile.IMAGE);
       PureJavaCrc32 crc = new PureJavaCrc32();
       FileInputStream in = new FileInputStream(fsImage);
       byte[] buff = new byte[4096];
@@ -125,11 +152,14 @@ public class TestParallelImageWrite extends TestCase {
       long val = crc.getValue();
       checksums.add(val);
     }
-    assertTrue("Not enough fsimage copies in MiniDFSCluster " + 
-               "to test parallel write", checksums.size() > 1);
-    for (int i = 1; i < checksums.size(); i++) {
+    assertEquals(numImageDirs, checksums.size());
+    PureJavaCrc32 crc = new PureJavaCrc32();
+    long emptyCrc = crc.getValue();
+    assertTrue("Empty fsimage file", checksums.get(0) != emptyCrc);
+    for (int i = 1; i < numImageDirs; i++) {
       assertEquals(checksums.get(i - 1), checksums.get(i));
     }
+    return checksums.get(0);
   }
 }
 

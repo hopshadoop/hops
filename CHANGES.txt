@@ -405,6 +405,9 @@ Trunk (unreleased changes)
 
     HDFS-1601. Pipeline ACKs are sent as lots of tiny TCP packets (todd)
 
+    HDFS-1826. NameNode should save image to name directories in parallel
+    during upgrade. (Matt Foley via hairong)
+
   BUG FIXES
 
     HDFS-1449. Fix test failures - ExtendedBlock must return 

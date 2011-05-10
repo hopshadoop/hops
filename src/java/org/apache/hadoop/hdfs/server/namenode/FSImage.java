@@ -354,29 +354,62 @@ public class FSImage implements NNStorageListener, Closeable {
     int oldLV = storage.getLayoutVersion();
     storage.layoutVersion = FSConstants.LAYOUT_VERSION;
     storage.setCheckpointTime(now());
+    
+    List<StorageDirectory> errorSDs =
+      Collections.synchronizedList(new ArrayList<StorageDirectory>());
+    List<Thread> saveThreads = new ArrayList<Thread>();
+    File curDir, prevDir, tmpDir;
     for (Iterator<StorageDirectory> it = storage.dirIterator(); it.hasNext();) {
       StorageDirectory sd = it.next();
-      LOG.info("Upgrading image directory " + sd.getRoot()
+      LOG.info("Starting upgrade of image directory " + sd.getRoot()
                + ".\n   old LV = " + oldLV
                + "; old CTime = " + oldCTime
                + ".\n   new LV = " + storage.getLayoutVersion()
                + "; new CTime = " + storage.getCTime());
-      File curDir = sd.getCurrentDir();
-      File prevDir = sd.getPreviousDir();
-      File tmpDir = sd.getPreviousTmp();
-      assert curDir.exists() : "Current directory must exist.";
-      assert !prevDir.exists() : "prvious directory must not exist.";
-      assert !tmpDir.exists() : "prvious.tmp directory must not exist.";
-      assert !editLog.isOpen() : "Edits log must not be open.";
-      // rename current to tmp
-      NNStorage.rename(curDir, tmpDir);
-      // save new image
-      saveCurrent(sd);
-      // rename tmp to previous
-      NNStorage.rename(tmpDir, prevDir);
-      isUpgradeFinalized = false;
+      try {
+        curDir = sd.getCurrentDir();
+        prevDir = sd.getPreviousDir();
+        tmpDir = sd.getPreviousTmp();
+        assert curDir.exists() : "Current directory must exist.";
+        assert !prevDir.exists() : "prvious directory must not exist.";
+        assert !tmpDir.exists() : "prvious.tmp directory must not exist.";
+        assert !editLog.isOpen() : "Edits log must not be open.";
+
+        // rename current to tmp
+        NNStorage.rename(curDir, tmpDir);
+        
+        // launch thread to save new image
+        FSImageSaver saver = new FSImageSaver(sd, errorSDs);
+        Thread saveThread = new Thread(saver, saver.toString());
+        saveThreads.add(saveThread);
+        saveThread.start();
+        
+      } catch (Exception e) {
+        LOG.error("Failed upgrade of image directory " + sd.getRoot(), e);
+        errorSDs.add(sd);
+        continue;
+      }
+    }
+    waitForThreads(saveThreads);
+    saveThreads.clear();
+
+    for (Iterator<StorageDirectory> it = storage.dirIterator(); it.hasNext();) {
+      StorageDirectory sd = it.next();
+      if (errorSDs.contains(sd)) continue;
+      try {
+        prevDir = sd.getPreviousDir();
+        tmpDir = sd.getPreviousTmp();
+        // rename tmp to previous
+        NNStorage.rename(tmpDir, prevDir);
+      } catch (IOException ioe) {
+        LOG.error("Unable to rename temp to previous for " + sd.getRoot(), ioe);
+        errorSDs.add(sd);
+        continue;
+      }
       LOG.info("Upgrade of " + sd.getRoot() + " is complete.");
     }
+    isUpgradeFinalized = false;
+    storage.reportErrorsOnDirectories(errorSDs);
     storage.initializeDistributedUpgrade();
     editLog.open();
   }

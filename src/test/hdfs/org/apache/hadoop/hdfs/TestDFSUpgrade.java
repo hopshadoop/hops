@@ -33,6 +33,7 @@ import org.apache.hadoop.hdfs.protocol.FSConstants;
 import org.apache.hadoop.hdfs.server.common.Storage;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
 import org.apache.hadoop.hdfs.server.common.HdfsConstants.StartupOption;
+import org.apache.hadoop.hdfs.server.namenode.TestParallelImageWrite;
 import org.junit.Test;
 import static org.junit.Assert.*;
 
@@ -163,6 +164,8 @@ public class TestDFSUpgrade {
       UpgradeUtilities.createNameNodeStorageDirs(nameNodeDirs, "current");
       cluster = createCluster();
       checkNameNode(nameNodeDirs);
+      if (numDirs > 1)
+        TestParallelImageWrite.checkImages(cluster.getNamesystem(), numDirs);
       cluster.shutdown();
       UpgradeUtilities.createEmptyDirs(nameNodeDirs);
       
@@ -278,6 +281,23 @@ public class TestDFSUpgrade {
       startNameNodeShouldFail(StartupOption.UPGRADE);
       UpgradeUtilities.createEmptyDirs(nameNodeDirs);
     } // end numDir loop
+    
+    // One more check: normal NN upgrade with 4 directories, concurrent write
+    int numDirs = 4;
+    {
+      conf = new HdfsConfiguration();
+      conf.setInt(DFSConfigKeys.DFS_DATANODE_SCAN_PERIOD_HOURS_KEY, -1);      
+      conf = UpgradeUtilities.initializeStorageStateConf(numDirs, conf);
+      String[] nameNodeDirs = conf.getStrings(DFSConfigKeys.DFS_NAMENODE_NAME_DIR_KEY);
+      
+      log("Normal NameNode upgrade", numDirs);
+      UpgradeUtilities.createNameNodeStorageDirs(nameNodeDirs, "current");
+      cluster = createCluster();
+      checkNameNode(nameNodeDirs);
+      TestParallelImageWrite.checkImages(cluster.getNamesystem(), numDirs);
+      cluster.shutdown();
+      UpgradeUtilities.createEmptyDirs(nameNodeDirs);
+    }
   }
  
   @Test(expected=IOException.class)
