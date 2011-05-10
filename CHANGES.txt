@@ -514,6 +514,9 @@ Trunk (unreleased changes)
     HDFS-1902. Fix setrep path display for TestHDFSCLI.  (Daryn Sharp
     via szetszwo)
 
+    HDFS-1827. Fix timeout problem in TestBlockReplacement.  (Matt Foley
+    via szetszwo)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES

@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.TimeoutException;
 
 import junit.framework.TestCase;
 
@@ -82,7 +83,7 @@ public class TestBlockReplacement extends TestCase {
     assertTrue(totalBytes*1000/(end-start)<=bandwidthPerSec);
   }
   
-  public void testBlockReplacement() throws IOException {
+  public void testBlockReplacement() throws IOException, TimeoutException {
     final Configuration CONF = new HdfsConfiguration();
     final String[] INITIAL_RACKS = {"/RACK0", "/RACK1", "/RACK2"};
     final String[] NEW_RACKS = {"/RACK2"};
@@ -120,7 +121,7 @@ public class TestBlockReplacement extends TestCase {
       assertEquals(oldNodes.length, 3);
       ExtendedBlock b = block.getBlock();
       
-      // add a new datanode to the cluster
+      // add a fourth datanode to the cluster
       cluster.startDataNodes(CONF, 1, true, null, NEW_RACKS);
       cluster.waitActive();
       
@@ -154,6 +155,9 @@ public class TestBlockReplacement extends TestCase {
           }
         }
       }
+      //current state: the newNode is on RACK2, and "source" is the other dn on RACK2.
+      //the two datanodes on RACK0 and RACK1 are in "proxies".
+      //"source" and both "proxies" all contain the block, while newNode doesn't yet.
       assertTrue(source!=null && proxies.size()==2);
       
       // start to replace the block
@@ -161,24 +165,27 @@ public class TestBlockReplacement extends TestCase {
       LOG.info("Testcase 1: Proxy " + newNode.getName() 
            + " does not contain the block " + b);
       assertFalse(replaceBlock(b, source, newNode, proxies.get(0)));
-      // case 2: destination contains the block
+      // case 2: destination already contains the block
       LOG.info("Testcase 2: Destination " + proxies.get(1).getName() 
           + " contains the block " + b);
       assertFalse(replaceBlock(b, source, proxies.get(0), proxies.get(1)));
       // case 3: correct case
-      LOG.info("Testcase 3: Proxy=" + source.getName() + " source=" + 
-          proxies.get(0).getName() + " destination=" + newNode.getName() );
+      LOG.info("Testcase 3: Source=" + source.getName() + " Proxy=" + 
+          proxies.get(0).getName() + " Destination=" + newNode.getName() );
       assertTrue(replaceBlock(b, source, proxies.get(0), newNode));
+      // after cluster has time to resolve the over-replication,
       // block locations should contain two proxies and newNode
+      // but not source
       checkBlocks(new DatanodeInfo[]{newNode, proxies.get(0), proxies.get(1)},
           fileName.toString(), 
           DEFAULT_BLOCK_SIZE, REPLICATION_FACTOR, client);
       // case 4: proxies.get(0) is not a valid del hint
+      // expect either source or newNode replica to be deleted instead
       LOG.info("Testcase 4: invalid del hint " + proxies.get(0).getName() );
-      assertTrue(replaceBlock(b, proxies.get(1), proxies.get(0), source));
-      /* block locations should contain two proxies,
-       * and either of source or newNode
-       */
+      assertTrue(replaceBlock(b, proxies.get(0), proxies.get(1), source));
+      // after cluster has time to resolve the over-replication,
+      // block locations should contain two proxies,
+      // and either source or newNode, but not both.
       checkBlocks(proxies.toArray(new DatanodeInfo[proxies.size()]), 
           fileName.toString(), 
           DEFAULT_BLOCK_SIZE, REPLICATION_FACTOR, client);
@@ -187,10 +194,16 @@ public class TestBlockReplacement extends TestCase {
     }
   }
   
-  /* check if file's blocks exist at includeNodes */
+  /* check if file's blocks have expected number of replicas,
+   * and exist at all of includeNodes
+   */
   private void checkBlocks(DatanodeInfo[] includeNodes, String fileName, 
-      long fileLen, short replFactor, DFSClient client) throws IOException {
-    Boolean notDone;
+      long fileLen, short replFactor, DFSClient client) 
+      throws IOException, TimeoutException {
+    boolean notDone;
+    final long TIMEOUT = 20000L;
+    long starttime = System.currentTimeMillis();
+    long failtime = starttime + TIMEOUT;
     do {
       try {
         Thread.sleep(100);
@@ -214,7 +227,22 @@ public class TestBlockReplacement extends TestCase {
           }
         }
       }
+      if (System.currentTimeMillis() > failtime) {
+        String expectedNodesList = "";
+        String currentNodesList = "";
+        for (DatanodeInfo dn : includeNodes) 
+          expectedNodesList += dn.getName() + ", ";
+        for (DatanodeInfo dn : nodes) 
+          currentNodesList += dn.getName() + ", ";
+        LOG.info("Expected replica nodes are: " + expectedNodesList);
+        LOG.info("Current actual replica nodes are: " + currentNodesList);
+        throw new TimeoutException(
+            "Did not achieve expected replication to expected nodes "
+            + "after more than " + TIMEOUT + " msec.  See logs for details.");
+      }
     } while(notDone);
+    LOG.info("Achieved expected replication values in "
+        + (System.currentTimeMillis() - starttime) + " msec.");
   }
 
   /* Copy a block from sourceProxy to destination. If the block becomes
