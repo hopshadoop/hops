@@ -731,16 +731,19 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
       if (blackListed) {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Adding blacklisted reason for tracker : " + hostName 
-              + " Reason for blacklisting is : " + rfb);
+              + " Reason for blacklisting is : " + rfb
+              + " Reason details : " + reason);
         }
         if (!fi.getReasonforblacklisting().contains(rfb)) {
           LOG.info("Adding blacklisted reason for tracker : " + hostName
-              + " Reason for blacklisting is : " + rfb);
+              + " Reason for blacklisting is : " + rfb
+              + " Reason details : " + reason);
         }
         fi.addBlackListedReason(rfb, reason);
       } else {
         LOG.info("Blacklisting tracker : " + hostName 
-            + " Reason for blacklisting is : " + rfb);
+            + " Reason for blacklisting is : " + rfb
+            + " Reason details : " + reason);
         Set<TaskTracker> trackers = 
           hostnameToTaskTracker.get(hostName);
         synchronized (trackers) {
