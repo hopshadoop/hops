@@ -119,6 +119,13 @@ public interface NameNodeMXBean {
   public long getTotalFiles();
   
   /**
+   * Gets the total number of missing blocks on the cluster
+   * 
+   * @return the total number of files and blocks on the cluster
+   */
+  public long getNumberOfMissingBlocks();
+  
+  /**
    * Gets the number of threads.
    * 
    * @return the number of threads

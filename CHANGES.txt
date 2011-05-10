@@ -270,6 +270,9 @@ Trunk (unreleased changes)
     
     HDFS-1751. Intrinsic limits for HDFS files, directories (daryn via boryas).
 
+    HDFS-1873. Federation: Add cluster management web console.
+    (Tanping Wang via suresh)
+
   IMPROVEMENTS
 
     HDFS-1510. Added test-patch.properties required by test-patch.sh (nigel)
