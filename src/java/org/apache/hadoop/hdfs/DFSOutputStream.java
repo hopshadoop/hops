@@ -1639,7 +1639,7 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
       ExtendedBlock lastBlock = streamer.getBlock();
       closeThreads(false);
       completeFile(lastBlock);
-      dfsClient.leaserenewer.remove(src);
+      dfsClient.leaserenewer.closeFile(src, dfsClient);
     } finally {
       closed = true;
     }

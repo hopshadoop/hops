@@ -136,9 +136,14 @@ public class DFSClient implements FSConstants, java.io.Closeable {
   final LeaseRenewer leaserenewer;
 
   /**
-   * The locking hierarchy is to first acquire lock on DFSClient object, followed by 
-   * lock on leasechecker, followed by lock on an individual DFSOutputStream.
+   * A map from file names to {@link DFSOutputStream} objects
+   * that are currently being written by this client.
+   * Note that a file can only be written by a single client.
    */
+  private final Map<String, DFSOutputStream> filesBeingWritten
+      = new HashMap<String, DFSOutputStream>();
+
+  /** Create a {@link NameNode} proxy */
   public static ClientProtocol createNamenode(Configuration conf) throws IOException {
     return createNamenode(NameNode.getAddress(conf), conf);
   }
@@ -249,13 +254,14 @@ public class DFSClient implements FSConstants, java.io.Closeable {
 
     // The hdfsTimeout is currently the same as the ipc timeout 
     this.hdfsTimeout = Client.getTimeout(conf);
-    this.leaserenewer = new LeaseRenewer(this, hdfsTimeout);
-
     this.ugi = UserGroupInformation.getCurrentUser();
+    final String authority = nameNodeAddr == null? "null":
+        nameNodeAddr.getHostName() + ":" + nameNodeAddr.getPort();
+    this.leaserenewer = LeaseRenewer.getInstance(authority, ugi, this);
     
     String taskId = conf.get("mapred.task.id", "NONMAPREDUCE");
-    this.clientName = "DFSClient_" + taskId + "_" +
-                      r.nextInt() + "_" + Thread.currentThread().getId(); 
+    this.clientName = leaserenewer.getClientName(taskId);
+
     defaultBlockSize = conf.getLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, DEFAULT_BLOCK_SIZE);
     defaultReplication = (short) 
       conf.getInt(DFSConfigKeys.DFS_REPLICATION_KEY, 
@@ -309,19 +315,77 @@ public class DFSClient implements FSConstants, java.io.Closeable {
     }
   }
 
+  /** Put a file. */
+  void putFileBeingWritten(final String src, final DFSOutputStream out) {
+    synchronized(filesBeingWritten) {
+      filesBeingWritten.put(src, out);
+    }
+  }
+
+  /** Remove a file. */
+  void removeFileBeingWritten(final String src) {
+    synchronized(filesBeingWritten) {
+      filesBeingWritten.remove(src);
+    }
+  }
+
+  /** Is file-being-written map empty? */
+  boolean isFilesBeingWrittenEmpty() {
+    synchronized(filesBeingWritten) {
+      return filesBeingWritten.isEmpty();
+    }
+  }
+
+  /** Renew leases */
+  void renewLease() throws IOException {
+    if (clientRunning && !isFilesBeingWrittenEmpty()) {
+      namenode.renewLease(clientName);
+    }
+  }
+
+  /** Abort and release resources held.  Ignore all errors. */
+  void abort() {
+    clientRunning = false;
+    closeAllFilesBeingWritten(true);
+    RPC.stopProxy(rpcNamenode); // close connections to the namenode
+  }
+
+  /** Close/abort all files being written. */
+  private void closeAllFilesBeingWritten(final boolean abort) {
+    for(;;) {
+      final String src;
+      final DFSOutputStream out;
+      synchronized(filesBeingWritten) {
+        if (filesBeingWritten.isEmpty()) {
+          return;
+        }
+        src = filesBeingWritten.keySet().iterator().next();
+        out = filesBeingWritten.remove(src);
+      }
+      if (out != null) {
+        try {
+          if (abort) {
+            out.abort();
+          } else {
+            out.close();
+          }
+        } catch(IOException ie) {
+          LOG.error("Failed to " + (abort? "abort": "close") + " file " + src,
+              ie);
+        }
+      }
+    }
+  }
+
   /**
    * Close the file system, abandoning all of the leases and files being
    * created and close connections to the namenode.
    */
   public synchronized void close() throws IOException {
     if(clientRunning) {
-      leaserenewer.close();
+      closeAllFilesBeingWritten(false);
       clientRunning = false;
-      try {
-        leaserenewer.interruptAndJoin();
-      } catch (InterruptedException ie) {
-      }
-  
+      leaserenewer.closeClient(this);
       // close connections to the namenode
       RPC.stopProxy(rpcNamenode);
     }
@@ -633,7 +697,7 @@ public class DFSClient implements FSConstants, java.io.Closeable {
         flag, createParent, replication, blockSize, progress, buffersize,
         conf.getInt(DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY, 
                     DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_DEFAULT));
-    leaserenewer.put(src, result);
+    leaserenewer.put(src, result, this);
     return result;
   }
   
@@ -680,7 +744,7 @@ public class DFSClient implements FSConstants, java.io.Closeable {
           flag, createParent, replication, blockSize, progress, buffersize,
           bytesPerChecksum);
     }
-    leaserenewer.put(src, result);
+    leaserenewer.put(src, result, this);
     return result;
   }
   
@@ -759,7 +823,7 @@ public class DFSClient implements FSConstants, java.io.Closeable {
           + src + " on client " + clientName);
     }
     final DFSOutputStream result = callAppend(stat, src, buffersize, progress);
-    leaserenewer.put(src, result);
+    leaserenewer.put(src, result, this);
     return result;
   }
 

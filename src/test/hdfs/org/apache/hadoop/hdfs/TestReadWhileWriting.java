@@ -19,6 +19,7 @@ package org.apache.hadoop.hdfs;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.security.PrivilegedExceptionAction;
 
 import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
@@ -58,7 +59,8 @@ public class TestReadWhileWriting {
     conf.setLong(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY, 1);
 
     // create cluster
-    final MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
+    final MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
+        .numDataNodes(4).build();
     try {
       //change the lease limits.
       cluster.setLeasePeriod(SOFT_LEASE_LIMIT, HARD_LEASE_LIMIT);
@@ -93,7 +95,16 @@ public class TestReadWhileWriting {
         //sleep to let the lease is expired.
         Thread.sleep(2*SOFT_LEASE_LIMIT);
   
-        final DistributedFileSystem dfs = (DistributedFileSystem)FileSystem.newInstance(conf);
+        final UserGroupInformation current = UserGroupInformation.getCurrentUser();
+        final UserGroupInformation ugi = UserGroupInformation.createUserForTesting(
+            current.getShortUserName() + "x", new String[]{"supergroup"});
+        final DistributedFileSystem dfs = ugi.doAs(
+            new PrivilegedExceptionAction<DistributedFileSystem>() {
+          @Override
+          public DistributedFileSystem run() throws Exception {
+            return (DistributedFileSystem)FileSystem.newInstance(conf);
+          }
+        });
         final FSDataOutputStream out = append(dfs, p);
         write(out, 0, half);
         out.close();

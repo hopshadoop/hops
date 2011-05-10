@@ -389,6 +389,9 @@ Trunk (unreleased changes)
     HDFS-1890. Improve the name, class and value type of the map
     LeaseRenewer.pendingCreates.  (szetszwo)
 
+    HDFS-1865. Share LeaseRenewer among DFSClients so that there is only a
+    LeaseRenewer thread per namenode per user.  (szetszwo)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
