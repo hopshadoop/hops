@@ -82,7 +82,11 @@ Trunk (unreleased changes)
 
     MAPREDUCE-2422. Removed unused internal methods from DistributedCache.
     (tomwhite)
- 
+
+    MAPREDUCE-2456. Log the reduce taskID and associated TaskTrackers with
+    failed fetch notifications in the JobTracker log.
+    (Jeffrey Naisbitt via cdouglas)
+
   OPTIMIZATIONS
     
     MAPREDUCE-2026. Make JobTracker.getJobCounters() and
