@@ -410,8 +410,11 @@ public class DFSInputStream extends FSInputStream {
           refetchToken--;
           fetchBlockAt(target);
         } else {
-          DFSClient.LOG.info("Failed to connect to " + targetAddr
-              + ", add to deadNodes and continue", ex);
+          DFSClient.LOG.warn("Failed to connect to " + targetAddr
+              + ", add to deadNodes and continue " + ex);
+          if (DFSClient.LOG.isDebugEnabled()) {
+            DFSClient.LOG.debug("Connection failure ", ex);
+          }
           // Put chosen node into dead list, continue
           addToDeadNodes(chosenNode);
         }
@@ -653,9 +656,11 @@ public class DFSInputStream extends FSInputStream {
           fetchBlockAt(block.getStartOffset());
           continue;
         } else {
-          DFSClient.LOG.warn("Failed to connect to " + targetAddr + " for file " + src
-              + " for block " + block.getBlock() + ":"
-              + StringUtils.stringifyException(e));
+          DFSClient.LOG.warn("Failed to connect to " + targetAddr + 
+              " for file " + src + " for block " + block.getBlock() + ":" + e);
+          if (DFSClient.LOG.isDebugEnabled()) {
+            DFSClient.LOG.debug("Connection failure ", e);
+          }
         }
       } finally {
         IOUtils.closeStream(reader);
