@@ -27,7 +27,6 @@ import org.apache.hadoop.fi.FiTestUtil.ConstraintSatisfactionAction;
 import org.apache.hadoop.fi.FiTestUtil.CountdownConstraint;
 import org.apache.hadoop.fi.FiTestUtil.MarkerConstraint;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
-import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 
@@ -55,7 +54,7 @@ public class DataTransferTestUtil {
    * and some actions.
    */
   public static class DataTransferTest implements PipelineTest {
-    private List<Pipeline> pipelines = new ArrayList<Pipeline>();
+    private final List<Pipeline> pipelines = new ArrayList<Pipeline>();
     private volatile boolean isSuccess = false;
 
     /** Simulate action for the receiverOpWriteBlock pointcut */
@@ -101,7 +100,8 @@ public class DataTransferTestUtil {
     }
 
     /** Initialize the pipeline. */
-    public Pipeline initPipeline(LocatedBlock lb) {
+    @Override
+    public synchronized Pipeline initPipeline(LocatedBlock lb) {
       final Pipeline pl = new Pipeline(lb);
       if (pipelines.contains(pl)) {
         throw new IllegalStateException("thepipeline != null");
@@ -110,19 +110,30 @@ public class DataTransferTestUtil {
       return pl;
     }
 
-    /** Return the pipeline. */
-    public Pipeline getPipeline(DatanodeID id) {
-      if (pipelines == null) {
-        throw new IllegalStateException("thepipeline == null");
+    /** Return the pipeline for the datanode. */
+    @Override
+    public synchronized Pipeline getPipelineForDatanode(DatanodeID id) {
+      for (Pipeline p : pipelines) {
+        if (p.contains(id)){
+          return p;
+        }
       }
-      StringBuilder dnString = new StringBuilder();
-      for (Pipeline pipeline : pipelines) {
-        for (DatanodeInfo dni : pipeline.getDataNodes())
-          dnString.append(dni.getStorageID());
-        if (dnString.toString().contains(id.getStorageID()))
-          return pipeline;
-      }
+      FiTestUtil.LOG.info("FI: pipeline not found; id=" + id
+          + ", pipelines=" + pipelines);
       return null;
+    }
+
+    /**
+     * Is the test not yet success
+     * and the last pipeline contains the given datanode?
+     */
+    private synchronized boolean isNotSuccessAndLastPipelineContains(
+        int index, DatanodeID id) {
+      if (isSuccess()) {
+        return false;
+      }
+      final int n = pipelines.size();
+      return n == 0? false: pipelines.get(n-1).contains(index, id);
     }
   }
 
@@ -171,8 +182,7 @@ public class DataTransferTestUtil {
     @Override
     public void run(DatanodeID datanodeid) throws IOException {
       final DataTransferTest test = getDataTransferTest();
-      final Pipeline p = test.getPipeline(datanodeid);
-      if (p.contains(index, datanodeid)) {
+      if (test.isNotSuccessAndLastPipelineContains(index, datanodeid)) {
         marker.mark();
       }
     }
@@ -193,8 +203,7 @@ public class DataTransferTestUtil {
     @Override
     public void run(DatanodeID id) {
       final DataTransferTest test = getDataTransferTest();
-      final Pipeline p = test.getPipeline(id);
-      if (!test.isSuccess() && p.contains(index, id)) {
+      if (test.isNotSuccessAndLastPipelineContains(index, id)) {
         final String s = toString(id);
         FiTestUtil.LOG.info(s);
         throw new OutOfMemoryError(s);
@@ -215,8 +224,8 @@ public class DataTransferTestUtil {
     @Override
     public void run(DatanodeID id) {
       final DataTransferTest test = getDataTransferTest();
-      final Pipeline p = test.getPipeline(id);
-      if (p.contains(index, id) && countdown.isSatisfied()) {
+      if (test.isNotSuccessAndLastPipelineContains(index, id)
+          && countdown.isSatisfied()) {
         final String s = toString(id);
         FiTestUtil.LOG.info(s);
         throw new OutOfMemoryError(s);
@@ -234,8 +243,7 @@ public class DataTransferTestUtil {
     @Override
     public void run(DatanodeID id) throws DiskOutOfSpaceException {
       final DataTransferTest test = getDataTransferTest();
-      final Pipeline p = test.getPipeline(id);
-      if (p.contains(index, id)) {
+      if (test.isNotSuccessAndLastPipelineContains(index, id)) {
         final String s = toString(id);
         FiTestUtil.LOG.info(s);
         throw new DiskOutOfSpaceException(s);
@@ -256,8 +264,7 @@ public class DataTransferTestUtil {
     @Override
     public void run(DatanodeID id) throws IOException {
       final DataTransferTest test = getDataTransferTest();
-      final Pipeline p = test.getPipeline(id);
-      if (p.contains(index, id)) {
+      if (test.isNotSuccessAndLastPipelineContains(index, id)) {
         final String s = toString(id);
         FiTestUtil.LOG.info(s);
         throw new IOException(s);
@@ -284,8 +291,8 @@ public class DataTransferTestUtil {
     @Override
     public void run(DatanodeID id) throws DiskOutOfSpaceException {
       final DataTransferTest test = getDataTransferTest();
-      final Pipeline p = test.getPipeline(id);
-      if (p.contains(index, id) && countdown.isSatisfied()) {
+      if (test.isNotSuccessAndLastPipelineContains(index, id)
+          && countdown.isSatisfied()) {
         final String s = toString(id);
         FiTestUtil.LOG.info(s);
         throw new DiskOutOfSpaceException(s);
@@ -339,8 +346,7 @@ public class DataTransferTestUtil {
     @Override
     public void run(DatanodeID id) {
       final DataTransferTest test = getDataTransferTest();
-      final Pipeline p = test.getPipeline(id);
-      if (!test.isSuccess() && p.contains(index, id)) {
+      if (test.isNotSuccessAndLastPipelineContains(index, id)) {
         FiTestUtil.LOG.info(toString(id));
         if (maxDuration <= 0) {
           for(; FiTestUtil.sleep(1000); ); //sleep forever until interrupt
@@ -385,8 +391,8 @@ public class DataTransferTestUtil {
     @Override
     public void run(DatanodeID id) {
       final DataTransferTest test = getDataTransferTest();
-      final Pipeline p = test.getPipeline(id);
-      if (p.contains(index, id) && countdown.isSatisfied()) {
+      if (test.isNotSuccessAndLastPipelineContains(index, id)
+          && countdown.isSatisfied()) {
         final String s = toString(id) + ", duration = ["
         + minDuration + "," + maxDuration + ")";
         FiTestUtil.LOG.info(s);

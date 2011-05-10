@@ -23,5 +23,5 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 /** A pipeline contains a list of datanodes. */
 public interface PipelineTest {
   public Pipeline initPipeline(LocatedBlock lb);
-  public Pipeline getPipeline(DatanodeID id);
+  public Pipeline getPipelineForDatanode(DatanodeID id);
 }

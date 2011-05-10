@@ -526,6 +526,9 @@ Trunk (unreleased changes)
     HDFS-1827. Fix timeout problem in TestBlockReplacement.  (Matt Foley
     via szetszwo)
 
+    HDFS-1908. Fix a NullPointerException in fi.DataTransferTestUtil.
+    (szetszwo)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES

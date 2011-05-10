@@ -26,13 +26,16 @@ import java.util.ArrayList;
 
 public class Pipeline {
   private final List<String> datanodes = new ArrayList<String>();
-  private DatanodeInfo[] nodes;
 
   Pipeline(LocatedBlock lb) {
     for(DatanodeInfo d : lb.getLocations()) {
       datanodes.add(d.getName());
     }
-    nodes = lb.getLocations();
+  }
+
+  /** Does the pipeline contains d? */
+  public boolean contains(DatanodeID d) {
+    return datanodes.contains(d.getName());
   }
 
   /** Does the pipeline contains d at the n th position? */
@@ -40,12 +43,7 @@ public class Pipeline {
     return d.getName().equals(datanodes.get(n));
   }
 
-  /** Returns DatanodeInfo[] of the nodes of the constructed pipiline*/
-  public DatanodeInfo[] getDataNodes () {
-    return nodes;
-  }
-
-  /** {@inheritDoc} */
+  @Override
   public String toString() {
     return getClass().getSimpleName() + datanodes;
   }

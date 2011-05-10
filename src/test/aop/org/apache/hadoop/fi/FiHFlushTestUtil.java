@@ -44,9 +44,8 @@ public class FiHFlushTestUtil extends DataTransferTestUtil {
 
     /** {@inheritDoc} */
     public void run(DatanodeID id) throws IOException {
-      final Pipeline p = getPipelineTest().getPipeline(id);
+      final Pipeline p = getPipelineTest().getPipelineForDatanode(id);
       if (p == null) {
-        FiTestUtil.LOG.info("FI: couldn't find a pipeline for " + id);
         return;
       }
       if (p.contains(index, id)) {
