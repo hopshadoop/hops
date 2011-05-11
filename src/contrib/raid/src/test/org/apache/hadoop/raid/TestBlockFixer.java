@@ -19,17 +19,10 @@ package org.apache.hadoop.raid;
 
 import java.io.File;
 import java.io.FileWriter;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.GregorianCalendar;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Properties;
 import java.util.Random;
 import java.util.zip.CRC32;
 
@@ -40,26 +33,18 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.FilterFileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.mapred.MiniMRCluster;
-import org.apache.hadoop.hdfs.protocol.ClientProtocol;
-import org.apache.hadoop.hdfs.protocol.LocatedBlock;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
-import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
-import org.apache.hadoop.hdfs.DistributedRaidFileSystem;
 import org.apache.hadoop.hdfs.RaidDFSUtil;
-import org.apache.hadoop.hdfs.TestDatanodeBlockScanner;
 import org.apache.hadoop.hdfs.TestRaidDfs;
-import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.raid.RaidNode;
 import org.apache.hadoop.raid.RaidUtils;
 
@@ -186,7 +171,7 @@ public class TestBlockFixer {
       // Corrupt blocks in two different stripes. We can fix them.
       int[] corruptBlockIdxs = new int[]{0, 4, 6};
       for (int idx: corruptBlockIdxs)
-        corruptBlock(locs.get(idx).getBlock().getBlockName());
+        corruptBlock(locs.get(idx).getBlock());
       reportCorruptBlocks(dfs, file1, corruptBlockIdxs, blockSize);
       
       corruptFiles = RaidDFSUtil.getCorruptFiles(dfs);
@@ -265,7 +250,7 @@ public class TestBlockFixer {
       assertEquals("filesFixed() should return 0 before fixing files",
                    0, cnode.blockFixer.filesFixed());
       
-      corruptBlock(locs.get(0).getBlock().getBlockName());
+      corruptBlock(locs.get(0).getBlock());
       reportCorruptBlocks(dfs, file1, new int[]{0}, blockSize);
       
       corruptFiles = RaidDFSUtil.getCorruptFiles(dfs);
@@ -295,7 +280,7 @@ public class TestBlockFixer {
       // Now corrupt the generated block.
       locs = RaidDFSUtil.getBlockLocations(
         dfs, file1.toUri().getPath(), 0, srcStat.getLen());
-      corruptBlock(locs.get(0).getBlock().getBlockName());
+      corruptBlock(locs.get(0).getBlock());
       reportCorruptBlocks(dfs, file1, new int[]{0}, blockSize);
 
       try {
@@ -359,7 +344,6 @@ public class TestBlockFixer {
     Path parityFile = new Path("/destraid/user/dhruba/raidtest/file1");
     TestRaidDfs.createTestFilePartialLastBlock(fileSys, file1,
                                                           1, 7, blockSize);
-    long file1Len = fileSys.getFileStatus(file1).getLen();
     LOG.info("Test " + testName + " created test files");
 
     // create an instance of the RaidNode
@@ -395,7 +379,7 @@ public class TestBlockFixer {
       // Corrupt parity blocks for different stripes.
       int[] corruptBlockIdxs = new int[]{0, 1, 2};
       for (int idx: corruptBlockIdxs)
-        corruptBlock(locs.get(idx).getBlock().getBlockName());
+        corruptBlock(locs.get(idx).getBlock());
       reportCorruptBlocks(dfs, parityFile, corruptBlockIdxs, blockSize);
 
       corruptFiles = RaidDFSUtil.getCorruptFiles(dfs);
@@ -441,11 +425,9 @@ public class TestBlockFixer {
     int stripeLength = 3;
     mySetup(stripeLength, 0); // Time before har = 0 days.
     Path file1 = new Path("/user/dhruba/raidtest/file1");
-    Path destPath = new Path("/destraid/user/dhruba/raidtest");
     // Parity file will have 7 blocks.
     TestRaidDfs.createTestFilePartialLastBlock(fileSys, file1,
                                                1, 20, blockSize);
-    long file1Len = fileSys.getFileStatus(file1).getLen();
     LOG.info("Test " + testName + " created test files");
 
     // create an instance of the RaidNode
@@ -496,7 +478,7 @@ public class TestBlockFixer {
       // Corrupt parity blocks for different stripes.
       int[] corruptBlockIdxs = new int[]{0, 3};
       for (int idx: corruptBlockIdxs)
-        corruptBlock(locs.get(idx).getBlock().getBlockName());
+        corruptBlock(locs.get(idx).getBlock());
       reportCorruptBlocks(dfs, partFile, corruptBlockIdxs,
         partStat.getBlockSize());
 
@@ -564,7 +546,7 @@ public class TestBlockFixer {
 
     conf.setBoolean("dfs.permissions", false);
 
-    dfs = new MiniDFSCluster(conf, NUM_DATANODES, true, null);
+    dfs = new MiniDFSCluster.Builder(conf).numDataNodes(NUM_DATANODES).build();
     dfs.waitActive();
     fileSys = dfs.getFileSystem();
     namenode = fileSys.getUri().toString();
@@ -637,9 +619,9 @@ public class TestBlockFixer {
     return crc.getValue();
   }
 
-  void corruptBlock(String blockName) throws IOException {
+  void corruptBlock(ExtendedBlock block) throws IOException {
     assertTrue("Could not corrupt block",
-        dfs.corruptBlockOnDataNodes(blockName) > 0);
+        dfs.corruptBlockOnDataNodes(block) > 0);
   }
   
   static void reportCorruptBlocks(FileSystem fs, Path file, int[] idxs,

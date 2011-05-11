@@ -38,7 +38,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.server.namenode.BlockPlacementPolicyRaid.CachedFullPathNames;
 import org.apache.hadoop.hdfs.server.namenode.BlockPlacementPolicyRaid.CachedLocatedBlocks;
@@ -456,7 +456,7 @@ public class TestBlockPlacementPolicyRaid {
   private void verifyCompanionBlocks(Collection<LocatedBlock> companionBlocks,
       List<LocatedBlock> sourceBlocks, List<LocatedBlock> parityBlocks,
       int[] sourceBlockIndexes, int[] parityBlockIndexes) {
-    Set<Block> blockSet = new HashSet<Block>();
+    Set<ExtendedBlock> blockSet = new HashSet<ExtendedBlock>();
     for (LocatedBlock b : companionBlocks) {
       blockSet.add(b.getBlock());
     }
@@ -496,10 +496,12 @@ public class TestBlockPlacementPolicyRaid {
 
   private Collection<LocatedBlock> getCompanionBlocks(
       FSNamesystem namesystem, BlockPlacementPolicyRaid policy,
-      Block block) throws IOException {
-    INodeFile inode = namesystem.blockManager.blocksMap.getINode(block);
+      ExtendedBlock block) throws IOException {
+    INodeFile inode = namesystem.blockManager.blocksMap.getINode(block
+        .getLocalBlock());
     FileType type = policy.getFileType(inode.getFullPathName());
-    return policy.getCompanionBlocks(inode.getFullPathName(), type, block);
+    return policy.getCompanionBlocks(inode.getFullPathName(), type,
+        block.getLocalBlock());
   }
 
   private List<LocatedBlock> getBlocks(FSNamesystem namesystem, String file) 

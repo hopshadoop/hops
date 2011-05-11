@@ -27,7 +27,6 @@ import java.util.LinkedHashMap;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Comparator;
-import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -35,6 +34,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.net.NetworkTopology;
 import org.apache.hadoop.net.Node;
@@ -125,7 +125,7 @@ public class BlockPlacementPolicyRaid extends BlockPlacementPolicy {
       // Add the added block locations in the block locations cache.
       // So the rest of the blocks know about these locations.
       cachedLocatedBlocks.get(srcPath).
-          add(new LocatedBlock(new Block(), result));
+          add(new LocatedBlock(new ExtendedBlock(), result));
       return result;
     } catch (Exception e) {
       LOG.debug("Error happend when choosing datanode to write:" +
@@ -295,8 +295,8 @@ public class BlockPlacementPolicyRaid extends BlockPlacementPolicy {
    *              null if it is the block which is currently being written to
    * @return the block locations of companion blocks
    */
-  List<LocatedBlock> getCompanionBlocks(String path, FileType type, Block block)
-      throws IOException {
+  List<LocatedBlock> getCompanionBlocks(String path, FileType type,
+      Block block) throws IOException {
     switch (type) {
       case NOT_RAID:
         return new ArrayList<LocatedBlock>();
@@ -415,7 +415,7 @@ public class BlockPlacementPolicyRaid extends BlockPlacementPolicy {
 	      return blocks.size();
 	    }
       for (int i = 0; i < blocks.size(); i++) {
-        if (blocks.get(i).getBlock().equals(block)) {
+        if (blocks.get(i).getBlock().getLocalBlock().equals(block)) {
           return i;
         }
       }

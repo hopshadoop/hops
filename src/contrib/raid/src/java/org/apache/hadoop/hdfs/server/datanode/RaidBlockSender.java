@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
-import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.FileInputStream;
@@ -31,7 +30,7 @@ import java.util.Arrays;
 
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.fs.ChecksumException;
-import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.FSConstants;
 import org.apache.hadoop.hdfs.protocol.DataTransferProtocol.PacketHeader;
 import org.apache.hadoop.io.IOUtils;
@@ -46,10 +45,8 @@ public class RaidBlockSender implements java.io.Closeable, FSConstants {
   public static final Log LOG = DataNode.LOG;
   static final Log ClientTraceLog = DataNode.ClientTraceLog;
   
-  private Block block; // the block to read from
+  private ExtendedBlock block; // the block to read from
 
-  /** the replica to read from */
-  private final Replica replica = null;
   /** The visible length of a replica. */
   private final long replicaVisibleLength;
 
@@ -79,7 +76,7 @@ public class RaidBlockSender implements java.io.Closeable, FSConstants {
   private volatile ChunkChecksum lastChunkChecksum = null;
 
   
-  public RaidBlockSender(Block block, long blockLength, long startOffset, long length,
+  public RaidBlockSender(ExtendedBlock block, long blockLength, long startOffset, long length,
               boolean corruptChecksumOk, boolean chunkOffsetOK,
               boolean verifyChecksum, boolean transferToAllowed,
               DataInputStream metadataIn, InputStreamFactory streamFactory
@@ -90,14 +87,13 @@ public class RaidBlockSender implements java.io.Closeable, FSConstants {
         metadataIn, streamFactory, null);
   }
 
-  public RaidBlockSender(Block block, long blockLength, long startOffset, long length,
+  public RaidBlockSender(ExtendedBlock block, long blockLength, long startOffset, long length,
               boolean corruptChecksumOk, boolean chunkOffsetOK,
               boolean verifyChecksum, boolean transferToAllowed,
               DataInputStream metadataIn, InputStreamFactory streamFactory,
               String clientTraceFmt) throws IOException {
     try {
       this.block = block;
-      ChunkChecksum chunkChecksum = null;
       this.chunkOffsetOK = chunkOffsetOK;
       this.corruptChecksumOk = corruptChecksumOk;
       this.verifyChecksum = verifyChecksum;
@@ -140,13 +136,7 @@ public class RaidBlockSender implements java.io.Closeable, FSConstants {
         length = replicaVisibleLength;
       }
 
-      // end is either last byte on disk or the length for which we have a 
-      // checksum
-      if (chunkChecksum != null) {
-        endOffset = chunkChecksum.getDataLength();
-      } else {
-        endOffset = blockLength;
-      }
+      endOffset = blockLength;
       
       if (startOffset < 0 || startOffset > endOffset
           || (length + startOffset) > endOffset) {
@@ -166,10 +156,6 @@ public class RaidBlockSender implements java.io.Closeable, FSConstants {
         if (tmpLen < endOffset) {
           // will use on-disk checksum here since the end is a stable chunk
           endOffset = tmpLen;
-        } else if (chunkChecksum != null) {
-          //in last chunk which is changing. flag that we need to use in-memory 
-          // checksum 
-          this.lastChunkChecksum = chunkChecksum;
         }
       }
 
@@ -454,10 +440,10 @@ public class RaidBlockSender implements java.io.Closeable, FSConstants {
   }
   
   private static class BlockInputStreamFactory implements InputStreamFactory {
-    private final Block block;
+    private final ExtendedBlock block;
     private final FSDatasetInterface data;
 
-    private BlockInputStreamFactory(Block block, FSDatasetInterface data) {
+    private BlockInputStreamFactory(ExtendedBlock block, FSDatasetInterface data) {
       this.block = block;
       this.data = data;
     }

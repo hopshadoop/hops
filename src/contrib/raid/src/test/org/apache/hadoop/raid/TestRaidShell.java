@@ -19,18 +19,7 @@ package org.apache.hadoop.raid;
 
 import java.io.File;
 import java.io.FileWriter;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.io.PrintWriter;
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.GregorianCalendar;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Properties;
 import java.util.Random;
 import java.util.zip.CRC32;
 
@@ -40,25 +29,17 @@ import org.apache.commons.logging.LogFactory;
 
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.ToolRunner;
-import org.apache.hadoop.fs.BlockLocation;
-import org.apache.hadoop.fs.ChecksumException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.FilterFileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.apache.hadoop.hdfs.protocol.ClientProtocol;
-import org.apache.hadoop.hdfs.protocol.LocatedBlock;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
-import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
-import org.apache.hadoop.hdfs.DistributedRaidFileSystem;
 import org.apache.hadoop.hdfs.TestRaidDfs;
 import org.apache.hadoop.hdfs.RaidDFSUtil;
-import org.apache.hadoop.hdfs.TestDatanodeBlockScanner;
 import org.apache.hadoop.raid.RaidNode;
 
 
@@ -123,12 +104,11 @@ public class TestRaidShell extends TestCase {
       int[] corruptBlockIdxs = new int[]{0, 4, 6};
       for (int idx: corruptBlockIdxs) {
         LOG.info("Corrupting block " + locations.get(idx).getBlock());
-        corruptBlock(locations.get(idx).getBlock().getBlockName());
+        corruptBlock(locations.get(idx).getBlock());
       }
       TestBlockFixer.reportCorruptBlocks(fileSys, file1, corruptBlockIdxs,
         srcStat.getBlockSize());
 
-      String fileUriPath = file1.toUri().getPath();
       waitForCorruptBlocks(corruptBlockIdxs.length, dfs, file1);
 
       // Create RaidShell and fix the file.
@@ -147,7 +127,7 @@ public class TestRaidShell extends TestCase {
       long parityCrc = getCRC(fileSys, parityFile);
       locations = RaidDFSUtil.getBlockLocations(
         dfs, parityFile.toUri().getPath(), 0, parityStat.getLen());
-      corruptBlock(locations.get(0).getBlock().getBlockName());
+      corruptBlock(locations.get(0).getBlock());
       TestBlockFixer.reportCorruptBlocks(fileSys, parityFile, new int[]{0},
         srcStat.getBlockSize());
       waitForCorruptBlocks(1, dfs, parityFile);
@@ -186,16 +166,6 @@ public class TestRaidShell extends TestCase {
     assertEquals(numCorruptBlocks, actual);
   }
 
-  private static DistributedFileSystem getDFS(
-        Configuration conf, FileSystem dfs) throws IOException {
-    Configuration clientConf = new Configuration(conf);
-    clientConf.set("fs.hdfs.impl", "org.apache.hadoop.hdfs.DistributedFileSystem");
-    clientConf.setBoolean("fs.hdfs.impl.disable.cache", true);
-    URI dfsUri = dfs.getUri();
-    FileSystem.closeAll();
-    return (DistributedFileSystem) FileSystem.get(dfsUri, clientConf);
-  }
-
   private void mySetup(int stripeLength, int timeBeforeHar) throws Exception {
 
     new File(TEST_DIR).mkdirs(); // Make sure data directory exists
@@ -217,7 +187,7 @@ public class TestRaidShell extends TestCase {
     conf.setInt("hdfs.raid.stripeLength", stripeLength);
     conf.set("hdfs.raid.locations", "/destraid");
 
-    dfs = new MiniDFSCluster(conf, NUM_DATANODES, true, null);
+    dfs = new MiniDFSCluster.Builder(conf).numDataNodes(NUM_DATANODES).build();
     dfs.waitActive();
     fileSys = dfs.getFileSystem();
     namenode = fileSys.getUri().toString();
@@ -286,8 +256,8 @@ public class TestRaidShell extends TestCase {
     return crc.getValue();
   }
 
-  void corruptBlock(String blockName) throws IOException {
+  void corruptBlock(ExtendedBlock block) throws IOException {
     assertTrue("Could not corrupt block",
-        dfs.corruptBlockOnDataNodes(blockName) > 0);
+        dfs.corruptBlockOnDataNodes(block) > 0);
   }
 }

@@ -26,18 +26,14 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.regex.Pattern;
 import java.util.Random;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -47,9 +43,9 @@ import java.lang.reflect.InvocationTargetException;
 
 import org.apache.hadoop.util.DataChecksum;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
-import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DataTransferProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.FSConstants;
 import org.apache.hadoop.hdfs.protocol.FSConstants.DatanodeReportType;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
@@ -57,23 +53,19 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.server.common.HdfsConstants;
 import org.apache.hadoop.hdfs.server.datanode.FSDataset;
 import org.apache.hadoop.hdfs.server.datanode.RaidBlockSender;
-import org.apache.hadoop.io.Text;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
-import org.apache.hadoop.fs.ChecksumException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hdfs.RaidDFSUtil;
-import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.net.NetUtils;
 
 import org.apache.hadoop.raid.RaidNode;
 import org.apache.hadoop.raid.RaidUtils;
-import org.apache.hadoop.raid.protocol.PolicyInfo.ErasureCodeType;
 
 
 /**
@@ -375,7 +367,7 @@ public abstract class BlockFixer extends Configured implements Runnable {
         return false;
       }
       for (LocatedBlock lb: corrupt) {
-        Block corruptBlock = lb.getBlock();
+        ExtendedBlock corruptBlock = lb.getBlock();
         long corruptOffset = lb.getStartOffset();
         
         LOG.info("Found corrupt block " + corruptBlock +
@@ -446,7 +438,7 @@ public abstract class BlockFixer extends Configured implements Runnable {
         return false;
       }
       for (LocatedBlock lb: corrupt) {
-        Block corruptBlock = lb.getBlock();
+        ExtendedBlock corruptBlock = lb.getBlock();
         long corruptOffset = lb.getStartOffset();
         
         LOG.info("Found corrupt block " + corruptBlock +
@@ -512,7 +504,7 @@ public abstract class BlockFixer extends Configured implements Runnable {
         return false;
       }
       for (LocatedBlock lb: corrupt) {
-        Block corruptBlock = lb.getBlock();
+        ExtendedBlock corruptBlock = lb.getBlock();
         long corruptOffset = lb.getStartOffset();
 
         File localBlockFile =
@@ -541,7 +533,7 @@ public abstract class BlockFixer extends Configured implements Runnable {
      * parity block in the part file block.
      */
     private void processCorruptParityHarPartBlock(FileSystem dfs, Path partFile,
-                                                  Block corruptBlock,
+                                                  ExtendedBlock corruptBlock,
                                                   long corruptOffset,
                                                   FileStatus partFileStat,
                                                   HarIndex harIndex,

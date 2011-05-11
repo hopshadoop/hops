@@ -38,7 +38,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.raid.RaidNode;
 import org.apache.hadoop.raid.RaidUtils;
@@ -85,7 +85,7 @@ public class TestRaidDfs extends TestCase {
     conf.set("xor".equals(erasureCode) ? RaidNode.RAID_LOCATION_KEY :
              RaidNode.RAIDRS_LOCATION_KEY, "/destraid");
 
-    dfs = new MiniDFSCluster(conf, NUM_DATANODES, true, null);
+    dfs = new MiniDFSCluster.Builder(conf).numDataNodes(NUM_DATANODES).build();
     dfs.waitActive();
     fileSys = dfs.getFileSystem();
     namenode = fileSys.getUri().toString();
@@ -181,7 +181,7 @@ public class TestRaidDfs extends TestCase {
     for (int blockNumToCorrupt : listBlockNumToCorrupt) {
       LOG.info("Corrupt block " + blockNumToCorrupt + " of file " + srcFile);
       LocatedBlocks locations = getBlockLocations(srcFile);
-      corruptBlock(srcFile, locations.get(blockNumToCorrupt).getBlock(),
+      corruptBlock(dfs, srcFile, locations.get(blockNumToCorrupt).getBlock(),
             NUM_DATANODES, true);
     }
 
@@ -204,7 +204,6 @@ public class TestRaidDfs extends TestCase {
     stripeLength = 3;
     mySetup("rs", 3);
 
-    Path destPath = new Path("/destraid/user/dhruba/raidtest");
     int[][] corrupt = {{1, 2, 3}, {1, 4, 7}, {3, 6, 7}};
     try {
       for (int i = 0; i < corrupt.length; i++) {
@@ -253,7 +252,7 @@ public class TestRaidDfs extends TestCase {
       for (int blockIdx : corrupt) {
         LOG.info("Corrupt block " + blockIdx + " of file " + file);
         LocatedBlocks locations = getBlockLocations(file);
-        corruptBlock(file, locations.get(blockIdx).getBlock(),
+        corruptBlock(dfs, file, locations.get(blockIdx).getBlock(),
             NUM_DATANODES, true);
       }
       // Test that readFully returns the correct CRC when there are errors.
@@ -280,7 +279,6 @@ public class TestRaidDfs extends TestCase {
     mySetup("xor", 1);
 
     Path file = new Path("/user/dhruba/raidtest/file");
-    Path destPath = new Path("/destraid/user/dhruba/raidtest");
     createTestFilePartialLastBlock(fileSys, file, repl, numBlocks, blockSize);
     FileStatus stat = fileSys.getFileStatus(file);
 
@@ -311,7 +309,6 @@ public class TestRaidDfs extends TestCase {
     stripeLength = 3;
     mySetup("xor", 1);
 
-    Path destPath = new Path("/destraid/user/dhruba/raidtest");
     int[][] corrupt = {{0}, {4}, {7}}; // first, last and middle block
     try {
       for (int i = 0; i < corrupt.length; i++) {
@@ -445,92 +442,53 @@ public class TestRaidDfs extends TestCase {
     LOG.info("Raid HDFS Recovery log verified");
   }
 
-  /*
-   * The Data directories for a datanode
-   */
-  private static File[] getDataNodeDirs(int i) throws IOException {
-    File base_dir = new File(System.getProperty("test.build.data"), "dfs/");
-    File data_dir = new File(base_dir, "data");
-    File dir1 = new File(data_dir, "data"+(2*i+1));
-    File dir2 = new File(data_dir, "data"+(2*i+2));
-    if (dir1.isDirectory() && dir2.isDirectory()) {
-      File[] dir = new File[2];
-      dir[0] = new File(dir1, "current/finalized");
-      dir[1] = new File(dir2, "current/finalized"); 
-      return dir;
-    }
-    return new File[0];
-  }
-
   //
   // Delete/Corrupt specified block of file
   //
-  public static void corruptBlock(Path file, Block blockNum,
+  public static void corruptBlock(MiniDFSCluster dfs, Path file, ExtendedBlock blockNum,
                     int numDataNodes, boolean delete) throws IOException {
-    long id = blockNum.getBlockId();
-
-    // Now deliberately remove/truncate data blocks from the block.
+    // Now deliberately remove/truncate replicas of blocks
     int numDeleted = 0;
     int numCorrupted = 0;
     for (int i = 0; i < numDataNodes; i++) {
-      File[] dirs = getDataNodeDirs(i);
-
-      for (int j = 0; j < dirs.length; j++) {
-        File[] blocks = dirs[j].listFiles();
-        assertTrue("Blocks do not exist in data-dir", (blocks != null) && (blocks.length >= 0));
-        for (int idx = 0; idx < blocks.length; idx++) {
-          if (blocks[idx].getName().startsWith("blk_" + id) &&
-              !blocks[idx].getName().endsWith(".meta")) {
-            if (delete) {
-              blocks[idx].delete();
-              LOG.info("Deleted block " + blocks[idx]);
-              numDeleted++;
-            } else {
-              // Corrupt
-              File f = blocks[idx];
-              long seekPos = f.length()/2;
-              RandomAccessFile raf = new RandomAccessFile(f, "rw");
-              raf.seek(seekPos);
-              int data = raf.readInt();
-              raf.seek(seekPos);
-              raf.writeInt(data+1);
-              LOG.info("Corrupted block " + blocks[idx]);
-              numCorrupted++;
-            }
-          }
-        }
+      File block = MiniDFSCluster.getBlockFile(i, blockNum);
+      if (block == null || !block.exists()) {
+        continue;
+      }
+      if (delete) {
+        block.delete();
+        LOG.info("Deleted block " + block);
+        numDeleted++;
+      } else {
+        // Corrupt
+        long seekPos = block.length()/2;
+        RandomAccessFile raf = new RandomAccessFile(block, "rw");
+        raf.seek(seekPos);
+        int data = raf.readInt();
+        raf.seek(seekPos);
+        raf.writeInt(data+1);
+        LOG.info("Corrupted block " + block);
+        numCorrupted++;
       }
     }
     assertTrue("Nothing corrupted or deleted",
               (numCorrupted + numDeleted) > 0);
   }
 
-  public static void corruptBlock(Path file, Block blockNum,
+  public static void corruptBlock(Path file, ExtendedBlock blockNum,
                     int numDataNodes, long offset) throws IOException {
-    long id = blockNum.getBlockId();
-
-    // Now deliberately remove/truncate data blocks from the block.
-    //
+    // Now deliberately corrupt replicas of the the block.
     for (int i = 0; i < numDataNodes; i++) {
-      File[] dirs = getDataNodeDirs(i);
-      
-      for (int j = 0; j < dirs.length; j++) {
-        File[] blocks = dirs[j].listFiles();
-        assertTrue("Blocks do not exist in data-dir", (blocks != null) && (blocks.length >= 0));
-        for (int idx = 0; idx < blocks.length; idx++) {
-          if (blocks[idx].getName().startsWith("blk_" + id) &&
-              !blocks[idx].getName().endsWith(".meta")) {
-            // Corrupt
-            File f = blocks[idx];
-            RandomAccessFile raf = new RandomAccessFile(f, "rw");
-            raf.seek(offset);
-            int data = raf.readInt();
-            raf.seek(offset);
-            raf.writeInt(data+1);
-            LOG.info("Corrupted block " + blocks[idx]);
-          }
-        }
+      File block = MiniDFSCluster.getBlockFile(i, blockNum);
+      if (block == null || !block.exists()) {
+        continue;
       }
+      RandomAccessFile raf = new RandomAccessFile(block, "rw");
+      raf.seek(offset);
+      int data = raf.readInt();
+      raf.seek(offset);
+      raf.writeInt(data+1);
+      LOG.info("Corrupted block " + block);
     }
   }
 }

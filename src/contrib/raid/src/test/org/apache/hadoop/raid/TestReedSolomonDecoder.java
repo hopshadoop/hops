@@ -25,28 +25,17 @@ import junit.framework.TestCase;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.FilterFileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.apache.hadoop.hdfs.protocol.ClientProtocol;
-import org.apache.hadoop.hdfs.protocol.LocatedBlock;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
-import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
-import org.apache.hadoop.hdfs.DistributedRaidFileSystem;
 import org.apache.hadoop.hdfs.RaidDFSUtil;
-import org.apache.hadoop.hdfs.TestDatanodeBlockScanner;
 import org.apache.hadoop.hdfs.TestRaidDfs;
-import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.mapred.Reporter;
-import org.apache.hadoop.raid.RaidNode;
 
 
 public class TestReedSolomonDecoder extends TestCase {
@@ -93,8 +82,8 @@ public class TestReedSolomonDecoder extends TestCase {
       FileStatus srcStat = fileSys.getFileStatus(file1);
       LocatedBlocks locations = RaidDFSUtil.getBlockLocations(dfs,
           file1.toUri().getPath(), 0, srcStat.getLen());
-      corruptBlock(locations.get(5).getBlock().getBlockName());
-      corruptBlock(locations.get(6).getBlock().getBlockName());
+      corruptBlock(locations.get(5).getBlock());
+      corruptBlock(locations.get(6).getBlock());
       TestBlockFixer.reportCorruptBlocks(dfs, file1, new int[]{5, 6},
           srcStat.getBlockSize());
 
@@ -115,9 +104,9 @@ public class TestReedSolomonDecoder extends TestCase {
     }
   }
 
-  void corruptBlock(String blockName) throws IOException {
+  void corruptBlock(ExtendedBlock block) throws IOException {
     assertTrue("Could not corrupt block",
-        dfs.corruptBlockOnDataNodes(blockName) > 0);
+        dfs.corruptBlockOnDataNodes(block) > 0);
   }
 
   private void mySetup() throws Exception {
@@ -130,7 +119,7 @@ public class TestReedSolomonDecoder extends TestCase {
 
     conf.setBoolean("dfs.permissions", false);
 
-    dfs = new MiniDFSCluster(conf, NUM_DATANODES, true, null);
+    dfs = new MiniDFSCluster.Builder(conf).numDataNodes(NUM_DATANODES).build();
     dfs.waitActive();
     fileSys = dfs.getFileSystem();
     String namenode = fileSys.getUri().toString();

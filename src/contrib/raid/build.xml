@@ -34,7 +34,7 @@ to call at top-level: ant deploy-contrib compile-core-test
   <target name="test" depends="compile,compile-test,test-junit" description="Automated Test Framework" if="test.available"/>
 
   <target name="test-junit" depends="compile,compile-test" if="test.available">
-    <junit showoutput="${test.output}" fork="yes" printsummary="yes" errorProperty="tests.failed" 
+    <junit maxmemory="512m" showoutput="${test.output}" fork="yes" printsummary="yes" errorProperty="tests.failed" 
            haltonfailure="no" failureProperty="tests.failed" timeout="${test.timeout}">
 
         <classpath refid="test.classpath"/>

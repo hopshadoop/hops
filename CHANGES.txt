@@ -163,13 +163,13 @@ Trunk (unreleased changes)
     MAPREDUCE-2448. NoSuchMethodError:
     org.apache.hadoop.hdfs.TestDatanodeBlockScanner.corruptReplica(..) (eli)
 
-    MAPREDUCE-2465. Disable raid contrib which is unable to compile after
-    HDFS federation merge. (todd)
-
     MAPREDUCE-2460. Fix flaky test TestFairSchedulerSystem. (todd)
 
     MAPREDUCE-2451. Log the details from health check script at the
     JobTracker. (Thomas Graves via cdouglas)
+
+    MAPREDUCE-2467. HDFS-1052 changes break the raid contrib module in 
+    MapReduce. (suresh srinivas via mahadev)
 
 Release 0.22.0 - Unreleased
 

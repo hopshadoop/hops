@@ -17,51 +17,18 @@
  */
 package org.apache.hadoop.raid;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.GregorianCalendar;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Properties;
-import java.util.Random;
-import java.util.zip.CRC32;
-
 import org.junit.Test;
 import static org.junit.Assert.*;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.FilterFileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.apache.hadoop.mapred.MiniMRCluster;
-import org.apache.hadoop.hdfs.protocol.ClientProtocol;
-import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
-import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
-import org.apache.hadoop.hdfs.DistributedRaidFileSystem;
 import org.apache.hadoop.hdfs.RaidDFSUtil;
-import org.apache.hadoop.hdfs.TestDatanodeBlockScanner;
 import org.apache.hadoop.hdfs.TestRaidDfs;
-import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.raid.RaidNode;
-import org.apache.hadoop.raid.RaidUtils;
 
 public class TestBlockFixerDistConcurrency extends TestBlockFixer {
   /**
@@ -117,7 +84,7 @@ public class TestBlockFixerDistConcurrency extends TestBlockFixer {
       // corrupt file1
       int[] corruptBlockIdxs = new int[]{0, 4, 6};
       for (int idx: corruptBlockIdxs)
-        corruptBlock(file1Loc.get(idx).getBlock().getBlockName());
+        corruptBlock(file1Loc.get(idx).getBlock());
       reportCorruptBlocks(dfs, file1, corruptBlockIdxs, blockSize);
 
       cnode = RaidNode.createRaidNode(null, localConf);
@@ -133,7 +100,7 @@ public class TestBlockFixerDistConcurrency extends TestBlockFixer {
 
       // corrupt file2
       for (int idx: corruptBlockIdxs)
-        corruptBlock(file2Loc.get(idx).getBlock().getBlockName());
+        corruptBlock(file2Loc.get(idx).getBlock());
       reportCorruptBlocks(dfs, file2, corruptBlockIdxs, blockSize);
       
       while (blockFixer.jobsRunning() < 2 &&
@@ -224,7 +191,7 @@ public class TestBlockFixerDistConcurrency extends TestBlockFixer {
       // corrupt file1
       int[] corruptBlockIdxs = new int[]{0, 4, 6};
       for (int idx: corruptBlockIdxs)
-        corruptBlock(file1Loc.get(idx).getBlock().getBlockName());
+        corruptBlock(file1Loc.get(idx).getBlock());
       reportCorruptBlocks(dfs, file1, corruptBlockIdxs, blockSize);
       corruptFiles = RaidDFSUtil.getCorruptFiles(dfs);
 
@@ -241,7 +208,7 @@ public class TestBlockFixerDistConcurrency extends TestBlockFixer {
 
       // corrupt file2
       for (int idx: corruptBlockIdxs)
-        corruptBlock(file2Loc.get(idx).getBlock().getBlockName());
+        corruptBlock(file2Loc.get(idx).getBlock());
       reportCorruptBlocks(dfs, file2, corruptBlockIdxs, blockSize);
       corruptFiles = RaidDFSUtil.getCorruptFiles(dfs);
       
