@@ -321,7 +321,7 @@ public class TestDFSShell extends TestCase {
       argv[0] = "-cat";
       argv[1] = root.toUri().getPath();
       int ret = ToolRunner.run(new FsShell(), argv);
-      assertTrue(" -cat returned -1 ", 0>=ret);
+      assertEquals(" -cat returned 1 ", 1, ret);
       String returned = out.toString();
       assertTrue("cat does not print exceptions ",
           (returned.lastIndexOf("Exception") == -1));
@@ -389,7 +389,7 @@ public class TestDFSShell extends TestCase {
       argv[1] = "/testdir";
       ret = ToolRunner.run(shell, argv);
       returned = out.toString();
-      assertTrue(" -mkdir returned -1 ", (ret < 0));
+      assertEquals(" -mkdir returned 1 ", 1, ret);
       assertTrue(" -mkdir returned File exists", 
           (returned.lastIndexOf("File exists") != -1));
       Path testFile = new Path("/testfile");
@@ -401,7 +401,7 @@ public class TestDFSShell extends TestCase {
       argv[1] = "/testfile";
       ret = ToolRunner.run(shell, argv);
       returned = out.toString();
-      assertTrue(" -mkdir returned -1", (ret < 0));
+      assertEquals(" -mkdir returned 1", 1, ret);
       assertTrue(" -mkdir returned this is a file ",
           (returned.lastIndexOf("not a directory") != -1));
       out.reset();
