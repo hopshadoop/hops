@@ -713,6 +713,9 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2222. Ivy resolve force mode should be turned off by default.
     (Luke Lu via tomwhite)
 
+    MAPREDUCE-2486. Incorrect snapshot dependency published in .pom files
+    (todd)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES
