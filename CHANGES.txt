@@ -273,6 +273,9 @@ Trunk (unreleased changes)
     HDFS-1873. Federation: Add cluster management web console.
     (Tanping Wang via suresh)
 
+    HDFS 1911 HDFS tests for the newly added viewfs
+
+
   IMPROVEMENTS
 
     HDFS-1510. Added test-patch.properties required by test-patch.sh (nigel)
