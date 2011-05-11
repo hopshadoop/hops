@@ -100,6 +100,45 @@ public class TestDistributedFileSystem {
       if (cluster != null) {cluster.shutdown();}
     }
   }
+  
+  @Test
+  public void testDFSSeekExceptions() throws IOException {
+    Configuration conf = getTestConfiguration();
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
+    FileSystem fileSys = cluster.getFileSystem();
+
+    try {
+      String file = "/test/fileclosethenseek/file-0";
+      Path path = new Path(file);
+      // create file
+      FSDataOutputStream output = fileSys.create(path);
+      output.writeBytes("Some test data to write longer than 10 bytes");
+      output.close();
+      FSDataInputStream input = fileSys.open(path);
+      input.seek(10);
+      boolean threw = false;
+      try {
+        input.seek(100);
+      } catch (IOException e) {
+        // success
+        threw = true;
+      }
+      assertTrue("Failed to throw IOE when seeking past end", threw);
+      input.close();
+      threw = false;
+      try {
+        input.seek(1);
+      } catch (IOException e) {
+        //success
+        threw = true;
+      }
+      assertTrue("Failed to throw IOE when seeking after close", threw);
+      fileSys.close();
+    }
+    finally {
+      if (cluster != null) {cluster.shutdown();}
+    }
+  }
 
   @Test
   public void testDFSClient() throws Exception {

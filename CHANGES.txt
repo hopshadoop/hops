@@ -930,6 +930,9 @@ Release 0.22.0 - Unreleased
     HDFS-1544. Ivy resolve force mode should be turned off by default.
     (Luke Lu via tomwhite)
 
+    HDFS-1615. seek() on closed DFS input stream throws NullPointerException
+    (Scott Carey via todd)
+
 Release 0.21.1 - Unreleased
     HDFS-1466. TestFcHdfsSymlink relies on /tmp/test not existing. (eli)
 
