@@ -933,6 +933,9 @@ Release 0.22.0 - Unreleased
     HDFS-1615. seek() on closed DFS input stream throws NullPointerException
     (Scott Carey via todd)
 
+    HDFS-1897. Documentation refers to removed option dfs.network.script
+    (Andrew Whang via todd)
+
 Release 0.21.1 - Unreleased
     HDFS-1466. TestFcHdfsSymlink relies on /tmp/test not existing. (eli)
 

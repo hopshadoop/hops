@@ -480,7 +480,7 @@
       addition NameNode tries to place replicas of block on
       multiple racks for improved fault tolerance. Hadoop lets the
       cluster administrators decide which rack a node belongs to
-      through configuration variable <code>dfs.network.script</code>. When this
+      through configuration variable <code>net.topology.script.file.name</code>. When this
       script is configured, each node runs the script to determine its
       rack id. A default installation assumes all the nodes belong to
       the same rack. This feature and configuration is further described
