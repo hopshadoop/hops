@@ -90,6 +90,9 @@ Trunk (unreleased changes)
     MAPREDUCE-869. Documentation for config to set map/reduce task environment
     (Alejandro Abdelnur via todd)
 
+    MAPREDUCE-2410. Add entry to streaming FAQ about how streaming reducers
+    receive keys. (Harsh J Chouraria via todd)
+
   OPTIMIZATIONS
     
     MAPREDUCE-2026. Make JobTracker.getJobCounters() and

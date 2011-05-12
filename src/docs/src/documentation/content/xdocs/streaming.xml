@@ -785,6 +785,15 @@ For details see <a href="mapred_tutorial.html#Reducer">Reducer</a>.
 </p>
 </section>
 
+<!-- QUESTION -->
+<section>
+<title>How does the use of streaming differ from the Java MapReduce API?</title>
+<p>
+    The Java MapReduce API provides a higher level API that lets the developer focus on writing map and reduce functions that act upon a pair of key and associated value(s). The Java API takes care of the iteration over the data source behind the scenes.
+    In streaming, the framework pours in the input data over the stdin to the mapper/reduce program, and thus these programs ought to be written from the reading (via stdin) iteration level. A practical consequence of this is that reducers for streaming need to be able to deal with different input keys.
+    Some alternative interfaces for particular programming languages can be found <a href="http://wiki.apache.org/hadoop/HadoopStreaming/AlternativeInterfaces">here</a>.
+</p>
+</section>
 
 <!-- QUESTION -->
 <section>
