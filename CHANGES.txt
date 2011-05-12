@@ -401,6 +401,9 @@ Trunk (unreleased changes)
     HDFS-1906. Remove logging exception stack trace in client logs when one of
     the datanode targets to read from is not reachable. (suresh)
 
+    HDFS-1378. Edit log replay should track and report file offsets in case of
+    errors. (Aaron T. Myers and Todd Lipcon via todd)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image

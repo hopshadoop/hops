@@ -335,8 +335,10 @@ public class TestEditLog extends TestCase {
     try {
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(NUM_DATA_NODES).format(false).build();
       fail("should not be able to start");
-    } catch (ChecksumException e) {
+    } catch (IOException e) {
       // expected
+      assertEquals("Cause of exception should be ChecksumException",
+          e.getCause().getClass(), ChecksumException.class);
     }
   }
 }
