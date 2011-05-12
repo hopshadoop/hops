@@ -856,6 +856,11 @@ public class Job extends JobContextImpl implements JobContext {
    * Add an file path to the current set of classpath entries It adds the file
    * to cache as well.
    * 
+   * Files added with this method will not be unpacked while being added to the
+   * classpath.
+   * To add archives to classpath, use the {@link #addArchiveToClassPath(Path)}
+   * method instead.
+   *
    * @param file Path of the file to be added
    */
   public void addFileToClassPath(Path file)
@@ -868,6 +873,9 @@ public class Job extends JobContextImpl implements JobContext {
    * Add an archive path to the current set of classpath entries. It adds the
    * archive to cache as well.
    * 
+   * Archive files will be unpacked and added to the classpath
+   * when being distributed.
+   *
    * @param archive Path of the archive to be added
    */
   public void addArchiveToClassPath(Path archive)

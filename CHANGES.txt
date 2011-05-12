@@ -373,6 +373,9 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2337. Remove dependence of public MapReduce API on classes in
     server package. (tomwhite)
 
+    MAPREDUCE-2383. Improve documentation of DistributedCache methods (Harsh J
+    Chouraria via todd)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and
