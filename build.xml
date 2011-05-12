@@ -1202,7 +1202,6 @@
         <exclude name="CHANGES.txt"/>
         <exclude name="docs/"/>
         <exclude name="lib/jdiff/"/>
-        <exclude name="src/contrib/thriftfs/gen-*/" />
         <exclude name="**/conf/*" />
         <exclude name="webapps/**/WEB-INF/web.xml"/>
         <exclude name="src/docs/releasenotes.html" />
