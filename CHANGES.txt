@@ -541,6 +541,8 @@ Trunk (unreleased changes)
     HDFS-1903. Fix path display for rm/rmr in TestHDFSCLI and TestDFSShell.
     (Daryn Sharp via szetszwo)
 
+    HDFS-1627. Fix NullPointerException in Secondary NameNode. (hairong)
+
 Release 0.22.0 - Unreleased
 
   NEW FEATURES
