@@ -45,14 +45,7 @@ import org.apache.hadoop.util.StringUtils;
  *      String, String)
  * @see VerticaConfiguration#configureVertica(Configuration, String[], String,
  *      String, String, String[], String, String, String)
- * @see VerticaInputFormat#setInput(Job, String)
- * @see VerticaInputFormat#setInput(Job, String, Collection<List<Object>>)
- * @see VerticaInputFormat#setInput(Job, String, String)
- * @see VerticaInputFormat#setInput(Job, String, String...)
- * @see VerticaOutputFormat#setOutput(Job, String)
- * @see VerticaOutputFormat#setOutput(Job, String, Collection<VerticaTable>)
- * @see VerticaOutputFormat#setOutput(Job, String, boolean)
- * @see VerticaOutputFormat#setOutput(Job, String, boolean, String...)
+ * 
  */
 public class VerticaConfiguration {
   /** Vertica Version Constants */
@@ -309,7 +302,7 @@ public class VerticaConfiguration {
    * Sets a collection of lists. Each list is passed to an input split and used
    * as arguments to the input query.
    * 
-   * @param segmentParams
+   * @param segment_params
    * @throws IOException
    */
   public void setInputParams(Collection<List<Object>> segment_params)

@@ -69,9 +69,6 @@ public class JobStatistics implements JobStatisticsInterface {
    */
   private java.util.Hashtable<Enum, String> _job;
 
-  /**
-   * @param jobConf the jobConf to set
-   */
   public JobConf getJobConf() {
     return this._jobConf;
   }

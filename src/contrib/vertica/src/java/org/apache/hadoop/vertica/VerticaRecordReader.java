@@ -48,7 +48,6 @@ public class VerticaRecordReader extends
     results = split.executeQuery();
   }
 
-  /** {@inheritDoc} */
   public void initialize(InputSplit split, TaskAttemptContext context)
       throws IOException, InterruptedException {
     key = new LongWritable();
@@ -71,12 +70,10 @@ public class VerticaRecordReader extends
     }
   }
 
-  /** {@inheritDoc} */
   public long getPos() throws IOException {
     return pos;
   }
 
-  /** {@inheritDoc} */
   public float getProgress() throws IOException {
     // TODO: figure out why length would be 0
     if (length == 0)
@@ -84,7 +81,6 @@ public class VerticaRecordReader extends
     return pos / length;
   }
 
-  /** {@inheritDoc} */
   public boolean next(LongWritable key, VerticaRecord value) throws IOException {
     key.set(pos + start);
     pos++;

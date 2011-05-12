@@ -92,8 +92,8 @@ public class PostExPerformanceDiagnoser extends JobDiagnoser {
 
   /**
    * @param jobConfFile - URL pointing to job configuration (job_conf.xml) file
-   * @param jobHistoryLogFile - URL pointing to job history log file  
-   * @param testsConfFile - file path for test configuration file (optional). 
+   * @param jobHistoryFile - URL pointing to job history log file  
+   * @param testsConfFileIs - file path for test configuration file (optional). 
    * If not specified default path is:$HADOOP_HOME/contrib/vaidya/pxpd_tests_config.xml
    * @param reportFile - file path for storing report (optional)
    */

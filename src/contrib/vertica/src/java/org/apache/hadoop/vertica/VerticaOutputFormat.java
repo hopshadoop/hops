@@ -48,7 +48,7 @@ public class VerticaOutputFormat extends OutputFormat<Text, VerticaRecord> {
   /**
    * Set the output table
    * 
-   * @param conf
+   * @param job
    * @param tableName
    */
   public static void setOutput(Job job, String tableName) {
@@ -136,7 +136,6 @@ public class VerticaOutputFormat extends OutputFormat<Text, VerticaRecord> {
     }
   }
 
-  /** {@inheritDoc} */
   public static VerticaRecord getValue(Configuration conf) throws Exception {
     VerticaConfiguration config = new VerticaConfiguration(conf);
     String table = config.getOutputTableName();

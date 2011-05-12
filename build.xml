@@ -982,6 +982,8 @@
        <packageset dir="src/contrib/index/src/java"/>
        <packageset dir="src/contrib/mumak/src/java"/>
        <packageset dir="src/contrib/streaming/src/java"/>
+       <packageset dir="src/contrib/vaidya/src/java"/>
+       <packageset dir="src/contrib/vertica/src/java"/>
 
         <link href="${javadoc.link.java}"/>
 
@@ -1005,6 +1007,8 @@
        <group title="contrib: Gridmix" packages="org.apache.hadoop.mapred.gridmix*"/>
        <group title="contrib: Index" packages="org.apache.hadoop.contrib.index*"/>
        <group title="contrib: Streaming" packages="org.apache.hadoop.streaming*:org.apache.hadoop.typedbytes*"/>
+       <group title="contrib: Vaidya" packages="org.apache.hadoop.vaidya*"/>
+       <group title="contrib: Vertica" packages="org.apache.hadoop.vertica*"/>
     </javadoc>
   </target>	
 
@@ -1043,6 +1047,8 @@
        <packageset dir="src/contrib/gridmix/src/java"/>
        <packageset dir="src/contrib/index/src/java"/>
        <packageset dir="src/contrib/streaming/src/java"/>
+       <packageset dir="src/contrib/vaidya/src/java"/>
+       <packageset dir="src/contrib/vertica/src/java"/>
        <packageset dir="${tools.src}"/>
 	
         <link href="${javadoc.link.java}"/>
@@ -1067,6 +1073,9 @@
        <group title="contrib: Gridmix" packages="org.apache.hadoop.mapred.gridmix*"/>
        <group title="contrib: Index" packages="org.apache.hadoop.contrib.index*"/>
        <group title="contrib: Streaming" packages="org.apache.hadoop.streaming*:org.apache.hadoop.typedbytes*"/>
+       <group title="contrib: Vaidya" packages="org.apache.hadoop.vaidya*"/>
+       <group title="contrib: Vertica" packages="org.apache.hadoop.vertica*"/>
+
        <doclet name="org.apache.hadoop.classification.tools.ExcludePrivateAnnotationsStandardDoclet"
          path="${common.ivy.lib.dir}/hadoop-common-${hadoop-common.version}.jar"/>
     </javadoc>

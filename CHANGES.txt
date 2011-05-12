@@ -376,6 +376,9 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2383. Improve documentation of DistributedCache methods (Harsh J
     Chouraria via todd)
 
+    MAPREDUCE-2222. Ivy resolve force mode should be turned off by default.
+    (Luke Lu via tomwhite)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and

@@ -148,7 +148,6 @@ public class XMLUtils {
 
   /**
    * Parse the XML file and create Document
-   * @param fileName
    * @return Document
    */
   public static Document parse(InputStream fs) {

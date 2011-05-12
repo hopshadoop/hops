@@ -88,7 +88,6 @@ public class VerticaInputSplit extends InputSplit implements Writable {
   /**
    * Return the parameters used for input query
    * 
-   * @return
    */
   public List<Object> getSegmentParams() {
     return segmentParams;
@@ -97,7 +96,6 @@ public class VerticaInputSplit extends InputSplit implements Writable {
   /**
    * Run the query that, when executed returns input for the mapper
    * 
-   * @return
    * @throws Exception
    */
   public ResultSet executeQuery() throws Exception {

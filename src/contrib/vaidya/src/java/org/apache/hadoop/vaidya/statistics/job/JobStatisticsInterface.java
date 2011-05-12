@@ -61,7 +61,7 @@ public interface JobStatisticsInterface {
   /**
    * @return mapTaskList : ArrayList of MapTaskStatistics
    * @param mapTaskSortKey : Specific counter key used for sorting the task list
-   * @param datatype : indicates the data type of the counter key used for sorting
+   * @param dataType : indicates the data type of the counter key used for sorting
    * If sort key is null then by default map tasks are sorted using map task ids.
    */
   public ArrayList<MapTaskStatistics> getMapTaskList(Enum mapTaskSortKey, KeyDataType dataType);

@@ -71,12 +71,10 @@ public class VerticaStreamingRecordReader extends RecordReader<Text, Text> {
     }
   }
 
-  /** {@inheritDoc} */
   public long getPos() throws IOException {
     return pos;
   }
 
-  /** {@inheritDoc} */
   public float getProgress() throws IOException {
     // TODO: figure out why length would be 0
     if (length == 0)
