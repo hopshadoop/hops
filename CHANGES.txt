@@ -939,6 +939,9 @@ Release 0.22.0 - Unreleased
     HDFS-1897. Documentation refers to removed option dfs.network.script
     (Andrew Whang via todd)
 
+    HDFS-1621. Fix references to hadoop-common-${version} in build.xml
+    (Jolly Chen via todd)
+
 Release 0.21.1 - Unreleased
     HDFS-1466. TestFcHdfsSymlink relies on /tmp/test not existing. (eli)
 
