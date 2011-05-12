@@ -3164,7 +3164,7 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^Deleted hdfs://\w+[.a-z]*:[0-9]*/dir0/file0</expected-output>
+          <expected-output>^Deleted /dir0/file0</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -3181,7 +3181,7 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^Deleted hdfs://\w+[.a-z]*:[0-9]*/user/[a-z]*/file0</expected-output>
+          <expected-output>^Deleted file0</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -3262,7 +3262,7 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^rm: Cannot remove directory "hdfs://\w+[.a-z]*:[0-9]*/dir0", use -rmr instead</expected-output>
+          <expected-output>^rm: `/dir0': Is a directory</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -3328,7 +3328,7 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^Deleted hdfs://\w+[.a-z]*:[0-9]*/file0</expected-output>
+          <expected-output>^Deleted hdfs:///file0</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -3377,7 +3377,7 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^rm: Cannot remove directory "hdfs://\w+[.a-z]*:[0-9]*/dir0", use -rmr instead</expected-output>
+          <expected-output>^rm: `hdfs:///dir0': Is a directory</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -3394,7 +3394,7 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^rm: `hdfs:/file0': No such file or directory</expected-output>
+          <expected-output>^rm: `hdfs:///file0': No such file or directory</expected-output>
         </comparator>
      </comparators>
     </test>
@@ -3414,19 +3414,19 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^Deleted hdfs://\w+[.a-z]*:[0-9]*/file0</expected-output>
+          <expected-output>^Deleted hdfs:///file0</expected-output>
        </comparator>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^Deleted hdfs://\w+[.a-z]*:[0-9]*/file1</expected-output>
+          <expected-output>^Deleted hdfs:///file1</expected-output>
        </comparator>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^Deleted hdfs://\w+[.a-z]*:[0-9]*/file2</expected-output>
+          <expected-output>^Deleted hdfs:///file2</expected-output>
        </comparator>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^Deleted hdfs://\w+[.a-z]*:[0-9]*/file3</expected-output>
+          <expected-output>^Deleted hdfs:///file3</expected-output>
        </comparator>
       </comparators>
     </test>
@@ -3559,7 +3559,7 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^Deleted hdfs://\w+[.a-z]*:[0-9]*/dir0/file0</expected-output>
+          <expected-output>^Deleted /dir0/file0</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -3576,7 +3576,7 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^Deleted hdfs://\w+[.a-z]*:[0-9]*/user/[a-z]*/file0</expected-output>
+          <expected-output>^Deleted file0</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -3593,7 +3593,7 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^Deleted hdfs://\w+[.a-z]*:[0-9]*/dir0</expected-output>
+          <expected-output>^Deleted /dir0</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -3610,7 +3610,7 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^Deleted hdfs://\w+[.a-z]*:[0-9]*/user/[a-z]*/dir0</expected-output>
+          <expected-output>^Deleted dir0</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -3723,7 +3723,7 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^Deleted hdfs://\w+[.a-z]*:[0-9]*/file0</expected-output>
+          <expected-output>^Deleted hdfs:///file0</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -3740,7 +3740,7 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^Deleted hdfs://\w+[.a-z]*:[0-9]*/dir0</expected-output>
+          <expected-output>^Deleted hdfs:///dir0</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -3788,7 +3788,7 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^rmr: `hdfs:/file0': No such file or directory</expected-output>
+          <expected-output>^rmr: `hdfs:///file0': No such file or directory</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -3808,19 +3808,19 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^Deleted hdfs://\w+[.a-z]*:[0-9]*/dir0</expected-output>
+          <expected-output>^Deleted hdfs:///dir0</expected-output>
         </comparator>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^Deleted hdfs://\w+[.a-z]*:[0-9]*/dir1</expected-output>
+          <expected-output>^Deleted hdfs:///dir1</expected-output>
         </comparator>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^Deleted hdfs://\w+[.a-z]*:[0-9]*/dir2</expected-output>
+          <expected-output>^Deleted hdfs:///dir2</expected-output>
         </comparator>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^Deleted hdfs://\w+[.a-z]*:[0-9]*/dir3</expected-output>
+          <expected-output>^Deleted hdfs:///dir3</expected-output>
         </comparator>
       </comparators>
     </test>

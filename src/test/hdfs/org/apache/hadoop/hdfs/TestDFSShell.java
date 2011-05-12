@@ -331,7 +331,7 @@ public class TestDFSShell extends TestCase {
       FsShell shell = new FsShell();
       shell.setConf(conf);
       ret = ToolRunner.run(shell, argv);
-      assertTrue(" -rm returned -1 ", 0>=ret);
+      assertEquals(" -rm returned 1 ", 1, ret);
       returned = out.toString();
       out.reset();
       assertTrue("rm prints reasonable error ",
@@ -339,7 +339,7 @@ public class TestDFSShell extends TestCase {
       argv[0] = "-rmr";
       argv[1] = root.toString();
       ret = ToolRunner.run(shell, argv);
-      assertTrue(" -rmr returned -1", 0>=ret);
+      assertEquals(" -rmr returned 1", 1, ret);
       returned = out.toString();
       assertTrue("rmr prints reasonable error ",
     		  (returned.lastIndexOf("No such file or directory") != -1));
