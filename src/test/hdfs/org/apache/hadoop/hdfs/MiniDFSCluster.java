@@ -69,6 +69,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.ProxyUsers;
 import org.apache.hadoop.security.authorize.RefreshAuthorizationPolicyProtocol;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.tools.GetUserMappingsProtocol;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.ToolRunner;
 
@@ -485,6 +486,7 @@ public class MiniDFSCluster {
         setRpcEngine(conf, DatanodeProtocol.class, rpcEngine);
         setRpcEngine(conf, RefreshAuthorizationPolicyProtocol.class, rpcEngine);
         setRpcEngine(conf, RefreshUserMappingsProtocol.class, rpcEngine);
+        setRpcEngine(conf, GetUserMappingsProtocol.class, rpcEngine);
       } catch (ClassNotFoundException e) {
         throw new RuntimeException(e);
       }

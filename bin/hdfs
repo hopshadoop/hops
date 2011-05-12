@@ -35,6 +35,7 @@ function print_usage(){
   echo "  oev                  apply the offline edits viewer to an edits file"
   echo "  fetchdt              fetch a delegation token from the NameNode"
   echo "  getconf              get config values from configuration"
+  echo "  groups               get the groups which users belong to"
   echo "						Use -help to see options"
   echo ""
   echo "Most commands print help when invoked w/o parameters."
@@ -97,6 +98,8 @@ elif [ "$COMMAND" = "fetchdt" ] ; then
   CLASS=org.apache.hadoop.hdfs.tools.DelegationTokenFetcher
 elif [ "$COMMAND" = "getconf" ] ; then
   CLASS=org.apache.hadoop.hdfs.tools.GetConf
+elif [ "$COMMAND" = "groups" ] ; then
+  CLASS=org.apache.hadoop.hdfs.tools.GetGroups
 else
   echo $COMMAND - invalid command
   print_usage

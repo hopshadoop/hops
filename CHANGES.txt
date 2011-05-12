@@ -275,6 +275,9 @@ Trunk (unreleased changes)
 
     HDFS 1911 HDFS tests for the newly added viewfs
 
+    HDFS-1814. Add "hdfs groups" command to query the server-side groups
+    resolved for a user. (Aaron T. Myers via todd)
+
 
   IMPROVEMENTS
 
