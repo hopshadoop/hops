@@ -87,6 +87,9 @@ Trunk (unreleased changes)
     failed fetch notifications in the JobTracker log.
     (Jeffrey Naisbitt via cdouglas)
 
+    MAPREDUCE-869. Documentation for config to set map/reduce task environment
+    (Alejandro Abdelnur via todd)
+
   OPTIMIZATIONS
     
     MAPREDUCE-2026. Make JobTracker.getJobCounters() and

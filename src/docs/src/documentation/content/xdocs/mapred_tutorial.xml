@@ -1156,13 +1156,13 @@
         
         <p>The child-task inherits the environment of the parent 
         <code>TaskTracker</code>. The user can specify additional options to the
-        child-jvm via the <code>mapred.{map|reduce}.child.java.opts</code> 
+        child-jvm via the <code>mapreduce.{map|reduce}.java.opts</code>
         configuration parameter in the job configuration such as non-standard 
          paths for the run-time linker to search shared libraries via 
         <code>-Djava.library.path=&lt;&gt;</code> etc. If the 
-        <code>mapred.{map|reduce}.child.java.opts</code> parameters contains the 
+        <code>mapreduce.{map|reduce}.java.opts</code> parameters contains the
         symbol <em>@taskid@</em> it is interpolated with value of 
-        <code>taskid</code> of the MapReduce task.</p>
+        <code>taskid</code> of the Map or Reduce task.</p>
         
         <p>Here is an example with multiple arguments and substitutions, 
         showing jvm GC logging, and start of a passwordless JVM JMX agent so that
@@ -1200,6 +1200,10 @@
           <code>&lt;/property&gt;</code>
         </p>
         
+        <p>In addition the <code>mapreduce.{map|reduce}.env</code> properties can be used
+        to add environment variables to the Map or Reduce child process.
+        </p>
+
         <section>
          <title>Configuring Memory Requirements For A Job</title>
          
