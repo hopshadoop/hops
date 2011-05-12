@@ -6108,7 +6108,7 @@
       <comparators>
         <comparator>
           <type>TokenComparator</type>
-          <expected-output>touchz: data15bytes must be a zero-length file</expected-output>
+          <expected-output>touchz: `data15bytes': Not a zero-length file</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -6169,7 +6169,7 @@
       <comparators>
         <comparator>
           <type>TokenComparator</type>
-          <expected-output>touchz: hdfs:///data15bytes must be a zero-length file</expected-output>
+          <expected-output>touchz: `hdfs:///data15bytes': Not a zero-length file</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -6230,7 +6230,7 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>touchz: hdfs://\w+[.a-z]*:[0-9]+/data15bytes must be a zero-length file</expected-output>
+          <expected-output>touchz: `hdfs://\w+[.a-z]*:[0-9]+/data15bytes': Not a zero-length file</expected-output>
         </comparator>
       </comparators>
     </test>
