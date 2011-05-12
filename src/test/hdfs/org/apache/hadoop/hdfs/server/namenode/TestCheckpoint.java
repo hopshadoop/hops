@@ -684,6 +684,7 @@ public class TestCheckpoint extends TestCase {
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(numDatanodes).format(false).build();
     cluster.waitActive();
     fileSys = cluster.getFileSystem();
+    Path tmpDir = new Path("/tmp_tmp");
     try {
       // check that file1 still exists
       checkFile(fileSys, file1, replication);
@@ -698,6 +699,11 @@ public class TestCheckpoint extends TestCase {
       //
       SecondaryNameNode secondary = startSecondaryNameNode(conf);
       secondary.doCheckpoint();
+      
+      fileSys.delete(tmpDir, true);
+      fileSys.mkdirs(tmpDir);
+      secondary.doCheckpoint();
+      
       secondary.shutdown();
     } finally {
       fileSys.close();
@@ -713,6 +719,7 @@ public class TestCheckpoint extends TestCase {
     fileSys = cluster.getFileSystem();
 
     assertTrue(!fileSys.exists(file1));
+    assertTrue(fileSys.exists(tmpDir));
 
     try {
       // verify that file2 exists

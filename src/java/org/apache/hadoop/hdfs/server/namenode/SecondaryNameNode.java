@@ -98,6 +98,7 @@ public class SecondaryNameNode implements Runnable {
   private int imagePort;
   private String infoBindAddress;
 
+  private FSNamesystem namesystem;
   private Collection<URI> checkpointDirs;
   private Collection<URI> checkpointEditsDirs;
   private long checkpointPeriod;    // in seconds
@@ -481,8 +482,9 @@ public class SecondaryNameNode implements Runnable {
    */
   private void doMerge(CheckpointSignature sig, boolean loadImage)
   throws IOException {
-    FSNamesystem namesystem = 
-            new FSNamesystem(checkpointImage, conf);
+    if (loadImage) {
+      namesystem = new FSNamesystem(checkpointImage, conf);
+    }
     assert namesystem.dir.fsImage == checkpointImage;
     checkpointImage.doMerge(sig, loadImage);
   }
