@@ -263,7 +263,7 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-1868. Add a read and connection timeout to JobClient while
     pulling tasklogs. (Krishna Ramachandran via acmurthy)
 
-    MAPREDUCE-1788. Ensure failure to setup CompletedJobStatusStore is not
+    MAPREDUCE-1778. Ensure failure to setup CompletedJobStatusStore is not
     silently ignored by the JobTracker. (Krishna Ramachandran via acmurthy)
 
     MAPREDUCE-1850. Includes job submit host information (name and ip) in
