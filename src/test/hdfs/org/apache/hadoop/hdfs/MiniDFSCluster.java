@@ -595,7 +595,7 @@ public class MiniDFSCluster {
     
     // Format and clean out DataNode directories
     if (format) {
-      GenericTestUtils.formatNamenode(conf);
+      DFSTestUtil.formatNameNode(conf);
     }
     if (operation == StartupOption.UPGRADE){
       operation.setClusterId(clusterId);

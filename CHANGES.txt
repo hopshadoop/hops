@@ -410,6 +410,9 @@ Trunk (unreleased changes)
     HDFS-1917. Separate hdfs jars from common in ivy configuration.  (Eric Yang
     via szetszwo)
 
+    HDFS-1899. GenericTestUtils.formatNamenode should be moved to DFSTestUtil
+    (Ted Yu via todd)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image

@@ -18,7 +18,8 @@
 
 package org.apache.hadoop.hdfs.server.namenode;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -27,7 +28,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.DU;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.junit.Test;
 
 public class TestEditLogFileOutputStream {
@@ -37,7 +38,7 @@ public class TestEditLogFileOutputStream {
     Configuration conf = new Configuration();
     FileSystem.setDefaultUri(conf, "hdfs://localhost:0");
     conf.set("dfs.http.address", "127.0.0.1:0");
-    GenericTestUtils.formatNamenode(conf);
+    DFSTestUtil.formatNameNode(conf);
     NameNode nn = new NameNode(conf);
 
     File editLog = nn.getFSImage().getEditLog().getFsEditName();

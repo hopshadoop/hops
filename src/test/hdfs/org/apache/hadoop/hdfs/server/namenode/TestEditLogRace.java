@@ -32,6 +32,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.permission.*;
 
 import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.FSConstants.SafeModeAction;
@@ -320,7 +321,7 @@ public class TestEditLogRace {
   public void testSaveImageWhileSyncInProgress() throws Exception {
     Configuration conf = getConf();
     NameNode.initMetrics(conf, NamenodeRole.ACTIVE);
-    GenericTestUtils.formatNamenode(conf);
+    DFSTestUtil.formatNameNode(conf);
     final FSNamesystem namesystem = new FSNamesystem(conf);
 
     try {
@@ -410,7 +411,7 @@ public class TestEditLogRace {
   public void testSaveRightBeforeSync() throws Exception {
     Configuration conf = getConf();
     NameNode.initMetrics(conf, NamenodeRole.ACTIVE);
-    GenericTestUtils.formatNamenode(conf);
+    DFSTestUtil.formatNameNode(conf);
     final FSNamesystem namesystem = new FSNamesystem(conf);
 
     try {

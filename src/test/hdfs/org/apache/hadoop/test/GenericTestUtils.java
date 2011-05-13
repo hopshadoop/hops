@@ -34,17 +34,4 @@ public abstract class GenericTestUtils {
   public static String getMethodName() {
     return Thread.currentThread().getStackTrace()[2].getMethodName();
   }
-  
-  /**
-   * when formating a namenode - we must provide clusterid.
-   * @param conf
-   * @throws IOException
-   */
-  public static void formatNamenode(Configuration conf) throws IOException {
-    String clusterId = StartupOption.FORMAT.getClusterId();
-    if(clusterId == null || clusterId.isEmpty())
-      StartupOption.FORMAT.setClusterId("testClusterID");
-
-    NameNode.format(conf);
-  }
 }

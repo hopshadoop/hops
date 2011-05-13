@@ -105,7 +105,7 @@ public class UpgradeUtilities {
       createEmptyDirs(new String[] {datanodeStorage.toString()});
       
       // format and start NameNode and start DataNode
-      GenericTestUtils.formatNamenode(config);
+      DFSTestUtil.formatNameNode(config);
       cluster =  new MiniDFSCluster.Builder(config)
                                    .numDataNodes(1)
                                    .startupOption(StartupOption.REGULAR)

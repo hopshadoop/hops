@@ -56,10 +56,12 @@ import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
+import org.apache.hadoop.hdfs.server.common.HdfsConstants.StartupOption;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.datanode.TestTransferRbw;
 import org.apache.hadoop.hdfs.server.namenode.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
+import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.net.NetUtils;
@@ -93,6 +95,19 @@ public class DFSTestUtil {
     this.nFiles = nFiles;
     this.maxLevels = maxLevels;
     this.maxSize = maxSize;
+  }
+  
+  /**
+   * when formating a namenode - we must provide clusterid.
+   * @param conf
+   * @throws IOException
+   */
+  public static void formatNameNode(Configuration conf) throws IOException {
+    String clusterId = StartupOption.FORMAT.getClusterId();
+    if(clusterId == null || clusterId.isEmpty())
+      StartupOption.FORMAT.setClusterId("testClusterID");
+
+    NameNode.format(conf);
   }
   
   /** class MyFile contains enough information to recreate the contents of

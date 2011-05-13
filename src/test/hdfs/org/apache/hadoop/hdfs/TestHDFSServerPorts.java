@@ -104,7 +104,7 @@ public class TestHDFSServerPorts extends TestCase {
       NameNode.setServiceAddress(config, THIS_HOST);      
     }
     config.set(DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY, THIS_HOST);
-    GenericTestUtils.formatNamenode(config);
+    DFSTestUtil.formatNameNode(config);
 
     String[] args = new String[] {};
     // NameNode will modify config with the ports it bound to
@@ -262,7 +262,7 @@ public class TestHDFSServerPorts extends TestCase {
       Configuration conf2 = new HdfsConfiguration(config);
       conf2.set(DFSConfigKeys.DFS_NAMENODE_NAME_DIR_KEY,
           fileAsURI(new File(hdfsDir, "name2")).toString());
-      GenericTestUtils.formatNamenode(conf2);
+      DFSTestUtil.formatNameNode(conf2);
       boolean started = canStartNameNode(conf2);
       assertFalse(started); // should fail
 

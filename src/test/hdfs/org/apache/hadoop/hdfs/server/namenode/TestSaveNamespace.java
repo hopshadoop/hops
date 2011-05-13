@@ -35,6 +35,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.FSConstants.SafeModeAction;
@@ -99,7 +100,7 @@ public class TestSaveNamespace {
   private void saveNamespaceWithInjectedFault(Fault fault) throws IOException {
     Configuration conf = getConf();
     NameNode.initMetrics(conf, NamenodeRole.ACTIVE);
-    GenericTestUtils.formatNamenode(conf);
+    DFSTestUtil.formatNameNode(conf);
     FSNamesystem fsn = new FSNamesystem(conf);
 
     // Replace the FSImage with a spy
@@ -176,7 +177,7 @@ public class TestSaveNamespace {
     conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_NAME_DIR_RESTORE_KEY, true);
 
     NameNode.initMetrics(conf, NamenodeRole.ACTIVE);
-    GenericTestUtils.formatNamenode(conf);
+    DFSTestUtil.formatNameNode(conf);
     FSNamesystem fsn = new FSNamesystem(conf);
 
     // Replace the FSImage with a spy
@@ -265,7 +266,7 @@ public class TestSaveNamespace {
   public void testSaveWhileEditsRolled() throws Exception {
     Configuration conf = getConf();
     NameNode.initMetrics(conf, NamenodeRole.ACTIVE);
-    GenericTestUtils.formatNamenode(conf);
+    DFSTestUtil.formatNameNode(conf);
     FSNamesystem fsn = new FSNamesystem(conf);
 
     // Replace the FSImage with a spy
