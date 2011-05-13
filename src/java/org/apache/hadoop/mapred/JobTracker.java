@@ -114,6 +114,7 @@ import org.apache.hadoop.security.authorize.ProxyUsers;
 import org.apache.hadoop.security.authorize.RefreshAuthorizationPolicyProtocol;
 import org.apache.hadoop.security.authorize.ServiceAuthorizationManager;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.tools.GetUserMappingsProtocol;
 import org.apache.hadoop.util.HostsFileReader;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.StringUtils;
@@ -128,7 +129,8 @@ import org.apache.hadoop.util.VersionInfo;
 @InterfaceStability.Unstable
 public class JobTracker implements MRConstants, InterTrackerProtocol,
     ClientProtocol, TaskTrackerManager, RefreshUserMappingsProtocol,
-    RefreshAuthorizationPolicyProtocol, AdminOperationsProtocol, JTConfig {
+    RefreshAuthorizationPolicyProtocol, AdminOperationsProtocol, 
+    GetUserMappingsProtocol, JTConfig {
 
   static{
     ConfigUtil.loadResources();
@@ -321,6 +323,8 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
       return AdminOperationsProtocol.versionID;
     } else if (protocol.equals(RefreshUserMappingsProtocol.class.getName())){
       return RefreshUserMappingsProtocol.versionID;
+    } else if (protocol.equals(GetUserMappingsProtocol.class.getName())){
+      return GetUserMappingsProtocol.versionID;
     } else {
       throw new IOException("Unknown protocol to job tracker: " + protocol);
     }
@@ -4490,6 +4494,14 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     LOG.info("Refreshing superuser proxy groups mapping ");
 
     ProxyUsers.refreshSuperUserGroupsConfiguration();
+  }
+  
+  @Override
+  public String[] getGroupsForUser(String user) throws IOException {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Getting groups for user " + user);
+    }
+    return UserGroupInformation.createRemoteUser(user).getGroupNames();
   }
 
   @Override

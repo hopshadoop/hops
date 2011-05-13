@@ -6,6 +6,9 @@ Trunk (unreleased changes)
 
   NEW FEATURES
 
+    MAPREDUCE-2473. Add "mapred groups" command to query the server-side groups
+    resolved for a user. (Aaron T. Myers via todd)
+
   IMPROVEMENTS
 
     MAPREDUCE-2153. Bring in more job configuration properties in to the trace 

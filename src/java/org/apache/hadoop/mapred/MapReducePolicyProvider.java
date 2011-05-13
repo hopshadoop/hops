@@ -24,6 +24,7 @@ import org.apache.hadoop.security.RefreshUserMappingsProtocol;
 import org.apache.hadoop.security.authorize.PolicyProvider;
 import org.apache.hadoop.security.authorize.RefreshAuthorizationPolicyProtocol;
 import org.apache.hadoop.security.authorize.Service;
+import org.apache.hadoop.tools.GetUserMappingsProtocol;
 
 /**
  * {@link PolicyProvider} for Map-Reduce protocols.
@@ -45,6 +46,8 @@ public class MapReducePolicyProvider extends PolicyProvider {
                   RefreshUserMappingsProtocol.class),
       new Service("security.admin.operations.protocol.acl", 
                   AdminOperationsProtocol.class),
+      new Service("security.get.user.mappings.protocol.acl",
+                  GetUserMappingsProtocol.class)
   };
   
   @Override

@@ -29,6 +29,7 @@ function print_usage(){
   echo "  pipes                run a Pipes job"
   echo "  job                  manipulate MapReduce jobs"
   echo "  queue                get information regarding JobQueues"
+  echo "  groups               get the groups which users belong to"
   echo ""
   echo "Most commands print help when invoked w/o parameters."
 }
@@ -59,6 +60,9 @@ elif [ "$COMMAND" = "pipes" ] ; then
   HADOOP_OPTS="$HADOOP_OPTS $HADOOP_CLIENT_OPTS"
 elif [ "$COMMAND" = "sampler" ] ; then
   CLASS=org.apache.hadoop.mapred.lib.InputSampler
+  HADOOP_OPTS="$HADOOP_OPTS $HADOOP_CLIENT_OPTS"
+elif [ "$COMMAND" = "groups" ] ; then
+  CLASS=org.apache.hadoop.mapred.tools.GetGroups
   HADOOP_OPTS="$HADOOP_OPTS $HADOOP_CLIENT_OPTS"
 else
   echo $COMMAND - invalid command
