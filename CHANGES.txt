@@ -382,6 +382,9 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2222. Ivy resolve force mode should be turned off by default.
     (Luke Lu via tomwhite)
 
+    MAPREDUCE-2103. task-controller shouldn't require o-r permissions.
+    (todd via eli)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and
