@@ -407,6 +407,9 @@ Trunk (unreleased changes)
     HDFS-1378. Edit log replay should track and report file offsets in case of
     errors. (Aaron T. Myers and Todd Lipcon via todd)
 
+    HDFS-1917. Separate hdfs jars from common in ivy configuration.  (Eric Yang
+    via szetszwo)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image

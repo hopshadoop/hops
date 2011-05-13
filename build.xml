@@ -165,6 +165,7 @@
   <property name="build.ivy.dir" location="${build.dir}/ivy" />
   <property name="build.ivy.lib.dir" location="${build.ivy.dir}/lib" />
   <property name="common.ivy.lib.dir" location="${build.ivy.lib.dir}/${ant.project.name}/common"/>
+  <property name="hdfs.ivy.lib.dir" location="${build.ivy.lib.dir}/${ant.project.name}/hdfs"/>
   <property name="test.ivy.lib.dir" location="${build.ivy.lib.dir}/${ant.project.name}/test"/>
   <property name="build.ivy.report.dir" location="${build.ivy.dir}/report" />
   <property name="build.ivy.maven.dir" location="${build.ivy.dir}/maven" />
@@ -216,6 +217,7 @@
     <pathelement location="${build.classes}"/>
     <pathelement location="${conf.dir}"/>
     <path refid="ivy-common.classpath"/>
+    <path refid="ivy-hdfs.classpath"/>
   </path>
 
   <path id="test.classpath">
@@ -233,6 +235,7 @@
     <pathelement location="${build.classes}"/>
     <pathelement location="${test.conf.dir}"/>
     <path refid="ivy-common.classpath"/>
+    <path refid="ivy-hdfs.classpath"/>
   </path>
 
   <!-- the cluster test classpath: uses conf.dir for configuration -->
@@ -261,7 +264,7 @@
   <!-- ====================================================== -->
   <!-- Stuff needed by all targets                            -->
   <!-- ====================================================== -->
-  <target name="init" depends="ivy-retrieve-common">
+  <target name="init" depends="ivy-retrieve-common,ivy-retrieve-hdfs">
     <mkdir dir="${build.dir}"/>
     <mkdir dir="${build.classes}"/>
     <mkdir dir="${build.src}"/>
@@ -986,7 +989,7 @@
     <mkdir dir="${dist.dir}/docs/jdiff"/>
 
     <copy todir="${dist.dir}/lib" includeEmptyDirs="false" flatten="true">
-      <fileset dir="${common.ivy.lib.dir}"/>
+      <fileset dir="${hdfs.ivy.lib.dir}"/>
     </copy>
 
     <copy todir="${dist.dir}/lib" includeEmptyDirs="false">
@@ -1084,7 +1087,7 @@
   	<mkdir dir="${dist.dir}/bin"/>
 
     <copy todir="${dist.dir}/lib" includeEmptyDirs="false" flatten="true">
-      <fileset dir="${common.ivy.lib.dir}"/>
+      <fileset dir="${hdfs.ivy.lib.dir}"/>
     </copy>
 
     <copy todir="${dist.dir}/lib" includeEmptyDirs="false">
@@ -1483,7 +1486,7 @@
   </target>
   
   <target name="eclipse" 
-          depends="init,ant-eclipse-download,ivy-retrieve-common,ivy-retrieve-test"
+          depends="init,ant-eclipse-download,ivy-retrieve-hdfs,ivy-retrieve-common,ivy-retrieve-test"
           description="Create eclipse project files">
        <pathconvert property="eclipse.project">
          <path path="${basedir}"/>
@@ -1505,6 +1508,7 @@
                 output="${build.dir.eclipse-test-classes}" />
         <output path="${build.dir.eclipse-main-classes}" />
         <library pathref="ivy-common.classpath" exported="true" />
+        <library pathref="ivy-hdfs.classpath" exported="true" />
         <library pathref="ivy-test.classpath" exported="false" />
         <library path="${conf.dir}" exported="false" />
       </classpath>
@@ -1775,6 +1779,11 @@
       log="${ivyresolvelog}"/>
   </target>
 
+  <target name="ivy-resolve-hdfs" depends="ivy-init">
+    <ivy:resolve settingsRef="${ant.project.name}.ivy.settings" conf="hdfs"
+      log="${ivyresolvelog}"/>
+  </target>
+
   <target name="ivy-resolve-jdiff" depends="ivy-init">
     <ivy:resolve settingsRef="${ant.project.name}.ivy.settings" conf="jdiff"
       log="${ivyresolvelog}"/>
@@ -1835,6 +1844,14 @@
       pattern="${build.ivy.lib.dir}/${ivy.artifact.retrieve.pattern}"
         log="${ivyretrievelog}"/>
     <ivy:cachepath pathid="ivy-common.classpath" conf="common"/>
+  </target>
+
+  <target name="ivy-retrieve-hdfs" depends="ivy-resolve-hdfs"
+    description="Retrieve Ivy-managed artifacts for the hdfs configurations">
+    <ivy:retrieve settingsRef="${ant.project.name}.ivy.settings"
+      pattern="${build.ivy.lib.dir}/${ivy.artifact.retrieve.pattern}"
+        log="${ivyretrievelog}"/>
+    <ivy:cachepath pathid="ivy-hdfs.classpath" conf="hdfs"/>
   </target>
 
   <target name="ivy-retrieve-releaseaudit" depends="ivy-resolve-releaseaudit"
