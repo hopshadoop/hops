@@ -561,6 +561,9 @@ Trunk (unreleased changes)
     HDFS-1929. TestEditLogFileOutputStream fails if running on same host as NN
     (Aaron T. Myers via todd)
 
+    HDFS-1933. Update TestDFSShell for improved "test" shell command. (Daryn
+    Sharp via todd)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES

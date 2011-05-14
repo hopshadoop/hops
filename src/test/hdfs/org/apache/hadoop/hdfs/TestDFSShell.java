@@ -1028,17 +1028,8 @@ public class TestDFSShell extends TestCase {
 
       // Verify touch/test
       {
-        String[] args = new String[2];
-        args[0] = "-touchz";
-        args[1] = "/test/mkdirs/noFileHere";
-        int val = -1;
-        try {
-          val = shell.run(args);
-        } catch (Exception e) {
-          System.err.println("Exception raised from DFSShell.run " +
-                             e.getLocalizedMessage());
-        }
-        assertTrue(val == 0);
+        String[] args;
+        int val;
 
         args = new String[3];
         args[0] = "-test";
@@ -1051,7 +1042,62 @@ public class TestDFSShell extends TestCase {
           System.err.println("Exception raised from DFSShell.run " +
                              e.getLocalizedMessage());
         }
-        assertTrue(val == 0);
+        assertEquals(1, val);
+
+        args[1] = "-z";
+        val = -1;
+        try {
+          val = shell.run(args);
+        } catch (Exception e) {
+          System.err.println("Exception raised from DFSShell.run " +
+                             e.getLocalizedMessage());
+        }
+        assertEquals(1, val);
+
+        args = new String[2];
+        args[0] = "-touchz";
+        args[1] = "/test/mkdirs/noFileHere";
+        val = -1;
+        try {
+          val = shell.run(args);
+        } catch (Exception e) {
+          System.err.println("Exception raised from DFSShell.run " +
+                             e.getLocalizedMessage());
+        }
+        assertEquals(0, val);
+
+        args = new String[3];
+        args[0] = "-test";
+        args[1] = "-e";
+        args[2] = "/test/mkdirs/noFileHere";
+        val = -1;
+        try {
+          val = shell.run(args);
+        } catch (Exception e) {
+          System.err.println("Exception raised from DFSShell.run " +
+                             e.getLocalizedMessage());
+        }
+        assertEquals(0, val);
+
+        args[1] = "-d";
+        val = -1;
+        try {
+          val = shell.run(args);
+        } catch (Exception e) {
+          System.err.println("Exception raised from DFSShell.run " +
+                             e.getLocalizedMessage());
+        }
+        assertEquals(1, val);
+
+        args[1] = "-z";
+        val = -1;
+        try {
+          val = shell.run(args);
+        } catch (Exception e) {
+          System.err.println("Exception raised from DFSShell.run " +
+                             e.getLocalizedMessage());
+        }
+        assertEquals(0, val);
       }
 
       // Verify that cp from a directory to a subdirectory fails
