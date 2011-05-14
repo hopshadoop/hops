@@ -26,29 +26,30 @@ import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.DU;
-import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.hdfs.DFSTestUtil;
+import org.apache.hadoop.hdfs.HdfsConfiguration;
+import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.junit.Test;
 
 public class TestEditLogFileOutputStream {
 
   @Test
   public void testPreallocation() throws IOException {
-    Configuration conf = new Configuration();
-    FileSystem.setDefaultUri(conf, "hdfs://localhost:0");
-    conf.set("dfs.http.address", "127.0.0.1:0");
-    DFSTestUtil.formatNameNode(conf);
-    NameNode nn = new NameNode(conf);
+    Configuration conf = new HdfsConfiguration();
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(0)
+        .build();
 
-    File editLog = nn.getFSImage().getEditLog().getFsEditName();
+    File editLog = cluster.getNameNode().getFSImage().getEditLog()
+        .getFsEditName();
 
     assertEquals("Edit log should only be 4 bytes long",
         4, editLog.length());
     assertEquals("Edit log disk space used should be one block",
         4096, new DU(editLog, conf).getUsed());
 
-    nn.mkdirs("/tmp", new FsPermission((short)777), false);
+    cluster.getFileSystem().mkdirs(new Path("/tmp"),
+        new FsPermission((short)777));
 
     assertEquals("Edit log should be 1MB + 4 bytes long",
         (1024 * 1024) + 4, editLog.length());

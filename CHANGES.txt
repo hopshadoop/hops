@@ -558,6 +558,9 @@ Trunk (unreleased changes)
     HDFS-1938. Fix ivy-retrieve-hdfs dependence in build.xml and aop.xml.
     (Eric Yang via szetszwo)
 
+    HDFS-1929. TestEditLogFileOutputStream fails if running on same host as NN
+    (Aaron T. Myers via todd)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES
