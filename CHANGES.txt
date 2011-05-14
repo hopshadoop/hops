@@ -555,6 +555,9 @@ Trunk (unreleased changes)
     HDFS-1928. Fix path display for touchz in TestHDFSCLI.
     (Daryn Sharp via todd)
 
+    HDFS-1938. Fix ivy-retrieve-hdfs dependence in build.xml and aop.xml.
+    (Eric Yang via szetszwo)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES

@@ -124,7 +124,7 @@
   <!-- ================ -->
   <!-- run system tests -->
   <!-- ================ -->
-  <target name="test-system" depends="ivy-retrieve-common, ivy-retrieve-system"
+  <target name="test-system" depends="ivy-retrieve-common, ivy-retrieve-hdfs, ivy-retrieve-system"
     description="Run system tests">
     <subant buildpath="build.xml" target="jar-test-system"/>
     <macro-test-runner test.file="${test.hdfs.all.tests.file}"
@@ -185,7 +185,7 @@
     </subant>
   </target>
 
-  <target name="-compile-test-system.wrapper" depends="inject-system-faults, ivy-retrieve-common, ivy-retrieve-system">
+  <target name="-compile-test-system.wrapper" depends="inject-system-faults, ivy-retrieve-common, ivy-retrieve-hdfs, ivy-retrieve-system">
     <macro-compile-hdfs-test
       target.dir="${system-test-build-dir}/test/classes"
       source.dir="${test.src.dir}/system/test"

@@ -407,7 +407,7 @@
     </jar>
   </target>
 
-  <target name="compile-hdfs-test" depends="compile-hdfs-classes, ivy-retrieve-test">
+  <target name="compile-hdfs-test" depends="compile-hdfs-classes, ivy-retrieve-hdfs, ivy-retrieve-test">
     <macro-compile-hdfs-test
       target.dir="${test.hdfs.build.classes}"
       source.dir="${test.src.dir}/hdfs;${test.src.dir}/unit"
