@@ -797,6 +797,9 @@ Release 0.22.0 - Unreleased
     HDFS-1052. HDFS Federation - Merge of umbrella jira changes from
     HDFS-1052 branch into trunk.
 
+    HDFS-1835. DataNode should not depend on SHA1PRNG secure random generator
+    to generate a storage ID. (John Carrino via todd)
+
   OPTIMIZATIONS
 
     HDFS-1140. Speedup INode.getPathComponents. (Dmytro Molkov via shv)

@@ -1583,13 +1583,7 @@ public class DataNode extends Configured
       LOG.warn("Could not find ip address of \"default\" inteface.");
     }
     
-    int rand = 0;
-    try {
-      rand = SecureRandom.getInstance("SHA1PRNG").nextInt(Integer.MAX_VALUE);
-    } catch (NoSuchAlgorithmException e) {
-      LOG.warn("Could not use SecureRandom");
-      rand = R.nextInt(Integer.MAX_VALUE);
-    }
+    int rand = new SecureRandom().nextInt(Integer.MAX_VALUE);
     return "DS-" + rand + "-" + ip + "-" + port + "-"
         + System.currentTimeMillis();
   }
