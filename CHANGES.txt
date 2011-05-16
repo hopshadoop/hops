@@ -416,6 +416,8 @@ Trunk (unreleased changes)
 
     HDFS-1117. Metrics 2.0 HDFS instrumentation. (Luke Lu via suresh)
 
+    HDFS-1946. HDFS part of HADOOP-7291. (eli)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
