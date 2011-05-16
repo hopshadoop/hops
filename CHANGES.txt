@@ -96,6 +96,8 @@ Trunk (unreleased changes)
     MAPREDUCE-2410. Add entry to streaming FAQ about how streaming reducers
     receive keys. (Harsh J Chouraria via todd)
 
+    MAPREDUCE-2499. MR part of HADOOP-7291. (eli)
+
   OPTIMIZATIONS
     
     MAPREDUCE-2026. Make JobTracker.getJobCounters() and
