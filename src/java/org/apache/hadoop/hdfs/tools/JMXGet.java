@@ -126,7 +126,7 @@ public class JMXGet {
           continue;
         }
       }
-      err("Info: key = " + key + "; val = " + val);
+      err("Info: key = " + key + "; val = "+ val.getClass() +":"+ val);
       break;
     }
 
@@ -193,7 +193,7 @@ public class JMXGet {
     err("\nMBean count = " + mbsc.getMBeanCount());
 
     // Query MBean names for specific domain "hadoop" and service
-    ObjectName query = new ObjectName("hadoop:service=" + service + ",*");
+    ObjectName query = new ObjectName("Hadoop:service=" + service + ",*");
     hadoopObjectNames = new ArrayList<ObjectName>(5);
     err("\nQuery MBeanServer MBeans:");
     Set<ObjectName> names = new TreeSet<ObjectName>(mbsc
@@ -201,7 +201,7 @@ public class JMXGet {
 
     for (ObjectName name : names) {
       hadoopObjectNames.add(name);
-      err("hadoop services: " + name);
+      err("Hadoop service: " + name);
     }
 
   }

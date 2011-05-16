@@ -17,23 +17,22 @@
  */
 package org.apache.hadoop.hdfs.server.datanode.metrics;
 
+import java.util.Random;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.metrics.MetricsContext;
-import org.apache.hadoop.metrics.MetricsRecord;
-import org.apache.hadoop.metrics.MetricsUtil;
-import org.apache.hadoop.metrics.Updater;
-import org.apache.hadoop.metrics.jvm.JvmMetrics;
-import org.apache.hadoop.metrics.util.MetricsBase;
-import org.apache.hadoop.metrics.util.MetricsRegistry;
-import org.apache.hadoop.metrics.util.MetricsTimeVaryingInt;
-import org.apache.hadoop.metrics.util.MetricsTimeVaryingLong;
-import org.apache.hadoop.metrics.util.MetricsTimeVaryingRate;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
-
+import org.apache.hadoop.metrics2.MetricsSystem;
+import org.apache.hadoop.metrics2.annotation.Metric;
+import org.apache.hadoop.metrics2.annotation.Metrics;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.metrics2.lib.MetricsRegistry;
+import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.metrics2.source.JvmMetrics;
+import static org.apache.hadoop.metrics2.impl.MsInfo.*;
 
 /**
- * 
+ *
  * This class is for maintaining  the various DataNode statistics
  * and publishing them through the metrics interfaces.
  * This also registers the JMX MBean for RPC.
@@ -45,97 +44,125 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
  *
  */
 @InterfaceAudience.Private
-public class DataNodeMetrics implements Updater {
-  private final MetricsRecord metricsRecord;
-  private DataNodeActivityMBean datanodeActivityMBean;
-  public MetricsRegistry registry = new MetricsRegistry();
-  
-  
-  public MetricsTimeVaryingLong bytesWritten = 
-                      new MetricsTimeVaryingLong("bytes_written", registry);
-  public MetricsTimeVaryingLong bytesRead = 
-                      new MetricsTimeVaryingLong("bytes_read", registry);
-  public MetricsTimeVaryingInt blocksWritten = 
-                      new MetricsTimeVaryingInt("blocks_written", registry);
-  public MetricsTimeVaryingInt blocksRead = 
-                      new MetricsTimeVaryingInt("blocks_read", registry);
-  public MetricsTimeVaryingInt blocksReplicated =
-                      new MetricsTimeVaryingInt("blocks_replicated", registry);
-  public MetricsTimeVaryingInt blocksRemoved =
-                       new MetricsTimeVaryingInt("blocks_removed", registry);
-  public MetricsTimeVaryingInt blocksVerified = 
-                        new MetricsTimeVaryingInt("blocks_verified", registry);
-  public MetricsTimeVaryingInt blockVerificationFailures =
-                       new MetricsTimeVaryingInt("block_verification_failures", registry);
-  
-  public MetricsTimeVaryingInt readsFromLocalClient = 
-                new MetricsTimeVaryingInt("reads_from_local_client", registry);
-  public MetricsTimeVaryingInt readsFromRemoteClient = 
-                new MetricsTimeVaryingInt("reads_from_remote_client", registry);
-  public MetricsTimeVaryingInt writesFromLocalClient = 
-              new MetricsTimeVaryingInt("writes_from_local_client", registry);
-  public MetricsTimeVaryingInt writesFromRemoteClient = 
-              new MetricsTimeVaryingInt("writes_from_remote_client", registry);
+@Metrics(about="DataNode metrics", context="dfs")
+public class DataNodeMetrics {
 
-  public MetricsTimeVaryingInt volumeFailures =
-    new MetricsTimeVaryingInt("volumeFailures", registry);
+  @Metric MutableCounterLong bytesWritten;
+  @Metric MutableCounterLong bytesRead;
+  @Metric MutableCounterLong blocksWritten;
+  @Metric MutableCounterLong blocksRead;
+  @Metric MutableCounterLong blocksReplicated;
+  @Metric MutableCounterLong blocksRemoved;
+  @Metric MutableCounterLong blocksVerified;
+  @Metric MutableCounterLong blockVerificationFailures;
+  @Metric MutableCounterLong readsFromLocalClient;
+  @Metric MutableCounterLong readsFromRemoteClient;
+  @Metric MutableCounterLong writesFromLocalClient;
+  @Metric MutableCounterLong writesFromRemoteClient;
   
-  public MetricsTimeVaryingRate readBlockOp = 
-                new MetricsTimeVaryingRate("readBlockOp", registry);
-  public MetricsTimeVaryingRate writeBlockOp = 
-                new MetricsTimeVaryingRate("writeBlockOp", registry);
-  public MetricsTimeVaryingRate blockChecksumOp = 
-                new MetricsTimeVaryingRate("blockChecksumOp", registry);
-  public MetricsTimeVaryingRate copyBlockOp = 
-                new MetricsTimeVaryingRate("copyBlockOp", registry);
-  public MetricsTimeVaryingRate replaceBlockOp = 
-                new MetricsTimeVaryingRate("replaceBlockOp", registry);
-  public MetricsTimeVaryingRate heartbeats = 
-                    new MetricsTimeVaryingRate("heartBeats", registry);
-  public MetricsTimeVaryingRate blockReports = 
-                    new MetricsTimeVaryingRate("blockReports", registry);
+  @Metric MutableCounterLong volumeFailures;
 
-    
-  public DataNodeMetrics(Configuration conf, String datanodeName) {
-    String sessionId = conf.get(DFSConfigKeys.DFS_METRICS_SESSION_ID_KEY); 
-    // Initiate reporting of Java VM metrics
-    JvmMetrics.init("DataNode", sessionId);
-    
+  @Metric MutableRate readBlockOp;
+  @Metric MutableRate writeBlockOp;
+  @Metric MutableRate blockChecksumOp;
+  @Metric MutableRate copyBlockOp;
+  @Metric MutableRate replaceBlockOp;
+  @Metric MutableRate heartbeats;
+  @Metric MutableRate blockReports;
 
-    // Now the MBean for the data node
-    datanodeActivityMBean = new DataNodeActivityMBean(registry, datanodeName);
-    
-    // Create record for DataNode metrics
-    MetricsContext context = MetricsUtil.getContext("dfs");
-    metricsRecord = MetricsUtil.createRecord(context, "datanode");
-    metricsRecord.setTag("sessionId", sessionId);
-    context.registerUpdater(this);
+  final MetricsRegistry registry = new MetricsRegistry("datanode");
+  final String name;
+  static final Random rng = new Random();
+
+  public DataNodeMetrics(String name, String sessionId) {
+    this.name = name;
+    registry.tag(SessionId, sessionId);
   }
-  
+
+  public static DataNodeMetrics create(Configuration conf, String dnName) {
+    String sessionId = conf.get(DFSConfigKeys.DFS_METRICS_SESSION_ID_KEY);
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    JvmMetrics.create("DataNode", sessionId, ms);
+    String name = "DataNodeActivity-"+ (dnName.isEmpty()
+        ? "UndefinedDataNodeName"+ rng.nextInt() : dnName.replace(':', '-'));
+    return ms.register(name, null, new DataNodeMetrics(name, sessionId));
+  }
+
+  public String name() { return name; }
+
+  public void addHeartbeat(long latency) {
+    heartbeats.add(latency);
+  }
+
+  public void addBlockReport(long latency) {
+    blockReports.add(latency);
+  }
+
+  public void incrBlocksReplicated(int delta) {
+    blocksReplicated.incr(delta);
+  }
+
+  public void incrBlocksWritten() {
+    blocksWritten.incr();
+  }
+
+  public void incrBlocksRemoved(int delta) {
+    blocksRemoved.incr(delta);
+  }
+
+  public void incrBytesWritten(int delta) {
+    bytesWritten.incr(delta);
+  }
+
+  public void incrBlockVerificationFailures() {
+    blockVerificationFailures.incr();
+  }
+
+  public void incrBlocksVerified() {
+    blocksVerified.incr();
+  }
+
+  public void addReadBlockOp(long latency) {
+    readBlockOp.add(latency);
+  }
+
+  public void addWriteBlockOp(long latency) {
+    writeBlockOp.add(latency);
+  }
+
+  public void addReplaceBlockOp(long latency) {
+    replaceBlockOp.add(latency);
+  }
+
+  public void addCopyBlockOp(long latency) {
+    copyBlockOp.add(latency);
+  }
+
+  public void addBlockChecksumOp(long latency) {
+    blockChecksumOp.add(latency);
+  }
+
+  public void incrBytesRead(int delta) {
+    bytesRead.incr(delta);
+  }
+
+  public void incrBlocksRead() {
+    blocksRead.incr();
+  }
+
   public void shutdown() {
-    if (datanodeActivityMBean != null) 
-      datanodeActivityMBean.shutdown();
+    DefaultMetricsSystem.shutdown();
   }
-    
-  /**
-   * Since this object is a registered updater, this method will be called
-   * periodically, e.g. every 5 seconds.
-   */
-  public void doUpdates(MetricsContext unused) {
-    synchronized (this) {
-      for (MetricsBase m : registry.getMetricsList()) {
-        m.pushMetric(metricsRecord);
-      }
-    }
-    metricsRecord.update();
+
+  public void incrWritesFromClient(boolean local) {
+    (local ? writesFromLocalClient : writesFromRemoteClient).incr();
   }
-  public void resetAllMinMax() {
-    readBlockOp.resetMinMax();
-    writeBlockOp.resetMinMax();
-    blockChecksumOp.resetMinMax();
-    copyBlockOp.resetMinMax();
-    replaceBlockOp.resetMinMax();
-    heartbeats.resetMinMax();
-    blockReports.resetMinMax();
+
+  public void incrReadsFromClient(boolean local) {
+    (local ? readsFromLocalClient : readsFromRemoteClient).incr();
+  }
+  
+  public void incrVolumeFailures() {
+    volumeFailures.incr();
   }
 }

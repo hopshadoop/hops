@@ -628,7 +628,7 @@ class BlockReceiver implements Closeable, FSConstants {
             offsetInBlock, lastChunkChecksum
           );
           
-          datanode.myMetrics.bytesWritten.inc(len);
+          datanode.metrics.incrBytesWritten(len);
         }
       } catch (IOException iex) {
         datanode.checkDiskError(iex);
@@ -696,7 +696,7 @@ class BlockReceiver implements Closeable, FSConstants {
           // Finalize the block. Does this fsync()?
           datanode.data.finalizeBlock(block);
         }
-        datanode.myMetrics.blocksWritten.inc();
+        datanode.metrics.incrBlocksWritten();
       }
 
     } catch (IOException ioe) {

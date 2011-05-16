@@ -33,7 +33,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
  * 
  * <p>
  * Data Node runtime statistic  info is report in another MBean
- * @see org.apache.hadoop.hdfs.server.datanode.metrics.DataNodeActivityMBean
+ * @see org.apache.hadoop.hdfs.server.datanode.metrics.DataNodeMetrics
  *
  */
 @InterfaceAudience.Private

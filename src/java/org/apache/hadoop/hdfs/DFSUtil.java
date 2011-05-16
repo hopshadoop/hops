@@ -576,4 +576,13 @@ public class DFSUtil {
     return new InetSocketAddress(address.substring(0, colon), 
         Integer.parseInt(address.substring(colon + 1)));
   }
+
+  /**
+   * Round bytes to GiB (gibibyte)
+   * @param bytes number of bytes
+   * @return number of GiB
+   */
+  public static int roundBytesToGB(long bytes) {
+    return Math.round((float)bytes/ 1024 / 1024 / 1024);
+  }
 }

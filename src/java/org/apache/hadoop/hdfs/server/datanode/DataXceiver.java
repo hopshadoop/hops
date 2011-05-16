@@ -48,8 +48,8 @@ import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.metrics.util.MetricsTimeVaryingInt;
-import org.apache.hadoop.metrics.util.MetricsTimeVaryingRate;
+import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.security.token.Token;
@@ -183,11 +183,11 @@ class DataXceiver extends DataTransferProtocol.Receiver
       SUCCESS.write(out); // send op status
       long read = blockSender.sendBlock(out, baseStream, null); // send data
       
-      datanode.myMetrics.bytesRead.inc((int) read);
-      datanode.myMetrics.blocksRead.inc();
+      datanode.metrics.incrBytesRead((int) read);
+      datanode.metrics.incrBlocksRead();
     } catch ( SocketException ignored ) {
       // Its ok for remote side to close the connection anytime.
-      datanode.myMetrics.blocksRead.inc();
+      datanode.metrics.incrBlocksRead();
     } catch ( IOException ioe ) {
       /* What exactly should we do here?
        * Earlier version shutdown() datanode if there is disk error.
@@ -203,9 +203,8 @@ class DataXceiver extends DataTransferProtocol.Receiver
     }
 
     //update metrics
-    updateDuration(datanode.myMetrics.readBlockOp);
-    updateCounter(datanode.myMetrics.readsFromLocalClient,
-                  datanode.myMetrics.readsFromRemoteClient);
+    datanode.metrics.addReadBlockOp(elapsed());
+    datanode.metrics.incrReadsFromClient(isLocal);
   }
 
   /**
@@ -409,9 +408,8 @@ class DataXceiver extends DataTransferProtocol.Receiver
     }
 
     //update metrics
-    updateDuration(datanode.myMetrics.writeBlockOp);
-    updateCounter(datanode.myMetrics.writesFromLocalClient,
-                  datanode.myMetrics.writesFromRemoteClient);
+    datanode.metrics.addWriteBlockOp(elapsed());
+    datanode.metrics.incrWritesFromClient(isLocal);
   }
 
   @Override
@@ -482,7 +480,7 @@ class DataXceiver extends DataTransferProtocol.Receiver
     }
 
     //update metrics
-    updateDuration(datanode.myMetrics.blockChecksumOp);
+    datanode.metrics.addBlockChecksumOp(elapsed());
   }
 
   /**
@@ -535,8 +533,8 @@ class DataXceiver extends DataTransferProtocol.Receiver
       long read = blockSender.sendBlock(reply, baseStream, 
                                         dataXceiverServer.balanceThrottler);
 
-      datanode.myMetrics.bytesRead.inc((int) read);
-      datanode.myMetrics.blocksRead.inc();
+      datanode.metrics.incrBytesRead((int) read);
+      datanode.metrics.incrBlocksRead();
       
       LOG.info("Copied block " + block + " to " + s.getRemoteSocketAddress());
     } catch (IOException ioe) {
@@ -556,7 +554,7 @@ class DataXceiver extends DataTransferProtocol.Receiver
     }
 
     //update metrics    
-    updateDuration(datanode.myMetrics.copyBlockOp);
+    datanode.metrics.addCopyBlockOp(elapsed());
   }
 
   /**
@@ -670,16 +668,16 @@ class DataXceiver extends DataTransferProtocol.Receiver
     }
 
     //update metrics
-    updateDuration(datanode.myMetrics.replaceBlockOp);
+    datanode.metrics.addReplaceBlockOp(elapsed());
   }
 
-  private void updateDuration(MetricsTimeVaryingRate mtvr) {
-    mtvr.inc(now() - opStartTime);
+  private long elapsed() {
+    return now() - opStartTime;
   }
 
-  private void updateCounter(MetricsTimeVaryingInt localCounter,
-      MetricsTimeVaryingInt remoteCounter) {
-    (isLocal? localCounter: remoteCounter).inc();
+  private void updateCounter(MutableCounterLong localCounter,
+      MutableCounterLong remoteCounter) {
+    (isLocal? localCounter: remoteCounter).incr();
   }
 
   /**

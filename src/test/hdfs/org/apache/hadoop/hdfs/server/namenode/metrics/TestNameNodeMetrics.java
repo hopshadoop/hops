@@ -33,10 +33,11 @@ import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.server.namenode.BlockManager;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
-import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
+import org.apache.hadoop.metrics2.MetricsRecordBuilder;
+import static org.apache.hadoop.test.MetricsAsserts.*;
 
 /**
  * Test for metrics published by the Namenode
@@ -46,6 +47,8 @@ public class TestNameNodeMetrics extends TestCase {
   private static final int DFS_REPLICATION_INTERVAL = 1;
   private static final Path TEST_ROOT_DIR_PATH = 
     new Path(System.getProperty("test.build.data", "build/test/data"));
+  private static final String NN_METRICS = "NameNodeActivity";
+  private static final String NS_METRICS = "FSNamesystem";
   
   // Number of datanodes in the cluster
   private static final int DATANODE_COUNT = 3; 
@@ -59,11 +62,9 @@ public class TestNameNodeMetrics extends TestCase {
   }
   
   private MiniDFSCluster cluster;
-  private FSNamesystemMetrics metrics;
   private DistributedFileSystem fs;
   private Random rand = new Random();
   private FSNamesystem namesystem;
-  private NameNodeMetrics nnMetrics;
 
   private static Path getTestPath(String fileName) {
     return new Path(TEST_ROOT_DIR_PATH, fileName);
@@ -75,8 +76,6 @@ public class TestNameNodeMetrics extends TestCase {
     cluster.waitActive();
     namesystem = cluster.getNamesystem();
     fs = (DistributedFileSystem) cluster.getFileSystem();
-    metrics = namesystem.getFSNamesystemMetrics();
-    nnMetrics = NameNode.getNameNodeMetrics();
   }
   
   @Override
@@ -93,8 +92,6 @@ public class TestNameNodeMetrics extends TestCase {
     // Wait for metrics update (corresponds to dfs.replication.interval
     // for some block related metrics to get updated)
     Thread.sleep(1000);
-    metrics.doUpdates(null);
-    nnMetrics.doUpdates(null);
   }
 
   private void readFile(FileSystem fileSys,Path name) throws IOException {
@@ -110,15 +107,16 @@ public class TestNameNodeMetrics extends TestCase {
     // Add files with 100 blocks
     final Path file = getTestPath("testFileAdd");
     createFile(file, 3200, (short)3);
-    final int blockCount = 32;
+    final long blockCount = 32;
     int blockCapacity = namesystem.getBlockCapacity();
     updateMetrics();
-    assertEquals(blockCapacity, metrics.blockCapacity.get());
-    
+    assertGauge("BlockCapacity", blockCapacity, getMetrics(NS_METRICS));
+
+    MetricsRecordBuilder rb = getMetrics(NN_METRICS);
     // File create operations is 1
     // Number of files created is depth of <code>file</code> path
-    assertEquals(1, nnMetrics.numCreateFileOps.getPreviousIntervalValue());
-    assertEquals(file.depth(), nnMetrics.numFilesCreated.getPreviousIntervalValue());
+    assertCounter("CreateFileOps", 1L, rb);
+    assertCounter("FilesCreated", (long)file.depth(), rb);
 
     // Blocks are stored in a hashmap. Compute its capacity, which
     // doubles every time the number of entries reach the threshold.
@@ -127,10 +125,11 @@ public class TestNameNodeMetrics extends TestCase {
       blockCapacity <<= 1;
     }
     updateMetrics();
-    int filesTotal = file.depth() + 1; // Add 1 for root
-    assertEquals(filesTotal, metrics.filesTotal.get());
-    assertEquals(blockCount, metrics.blocksTotal.get());
-    assertEquals(blockCapacity, metrics.blockCapacity.get());
+    long filesTotal = file.depth() + 1; // Add 1 for root
+    rb = getMetrics(NS_METRICS);
+    assertGauge("FilesTotal", filesTotal, rb);
+    assertGauge("BlocksTotal", blockCount, rb);
+    assertGauge("BlockCapacity", blockCapacity, rb);
     fs.delete(file, true);
     filesTotal--; // reduce the filecount for deleted file
     
@@ -138,13 +137,15 @@ public class TestNameNodeMetrics extends TestCase {
     // the blocks pending deletion are sent for deletion to the datanodes.
     Thread.sleep(DFS_REPLICATION_INTERVAL * (DATANODE_COUNT + 1) * 1000);
     updateMetrics();
-    assertEquals(filesTotal, metrics.filesTotal.get());
-    assertEquals(0, metrics.blocksTotal.get());
-    assertEquals(0, metrics.pendingDeletionBlocks.get());
-    
+    rb = getMetrics(NS_METRICS);
+    assertGauge("FilesTotal", filesTotal, rb);
+    assertGauge("BlocksTotal", 0L, rb);
+    assertGauge("PendingDeletionBlocks", 0L, rb);
+
+    rb = getMetrics(NN_METRICS);
     // Delete file operations and number of files deleted must be 1
-    assertEquals(1, nnMetrics.numDeleteFileOps.getPreviousIntervalValue());
-    assertEquals(1, nnMetrics.numFilesDeleted.getPreviousIntervalValue());
+    assertCounter("DeleteFileOps", 1L, rb);
+    assertCounter("FilesDeleted", 1L, rb);
   }
   
   /** Corrupt a block and ensure metrics reflects it */
@@ -158,14 +159,16 @@ public class TestNameNodeMetrics extends TestCase {
         cluster.getNameNode(), file.toString(), 0, 1).get(0);
     namesystem.markBlockAsCorrupt(block.getBlock(), block.getLocations()[0]);
     updateMetrics();
-    assertEquals(1, metrics.corruptBlocks.get());
-    assertEquals(1, metrics.pendingReplicationBlocks.get());
-    assertEquals(1, metrics.scheduledReplicationBlocks.get());
+    MetricsRecordBuilder rb = getMetrics(NS_METRICS);
+    assertGauge("CorruptBlocks", 1L, rb);
+    assertGauge("PendingReplicationBlocks", 1L, rb);
+    assertGauge("ScheduledReplicationBlocks", 1L, rb);
     fs.delete(file, true);
     updateMetrics();
-    assertEquals(0, metrics.corruptBlocks.get());
-    assertEquals(0, metrics.pendingReplicationBlocks.get());
-    assertEquals(0, metrics.scheduledReplicationBlocks.get());
+    rb = getMetrics(NS_METRICS);
+    assertGauge("CorruptBlocks", 0L, rb);
+    assertGauge("PendingReplicationBlocks", 0L, rb);
+    assertGauge("ScheduledReplicationBlocks", 0L, rb);
   }
   
   /** Create excess blocks by reducing the replication factor for
@@ -174,10 +177,11 @@ public class TestNameNodeMetrics extends TestCase {
   public void testExcessBlocks() throws Exception {
     Path file = getTestPath("testExcessBlocks");
     createFile(file, 100, (short)2);
-    int totalBlocks = 1;
+    long totalBlocks = 1;
     namesystem.setReplication(file.toString(), (short)1);
     updateMetrics();
-    assertEquals(totalBlocks, metrics.excessBlocks.get());
+    MetricsRecordBuilder rb = getMetrics(NS_METRICS);
+    assertGauge("ExcessBlocks", totalBlocks, rb);
     fs.delete(file, true);
   }
   
@@ -192,11 +196,12 @@ public class TestNameNodeMetrics extends TestCase {
         cluster.getNameNode(), file.toString(), 0, 1).get(0);
     namesystem.markBlockAsCorrupt(block.getBlock(), block.getLocations()[0]);
     updateMetrics();
-    assertEquals(1, metrics.underReplicatedBlocks.get());
-    assertEquals(1, metrics.missingBlocks.get());
+    MetricsRecordBuilder rb = getMetrics(NS_METRICS);
+    assertGauge("UnderReplicatedBlocks", 1L, rb);
+    assertGauge("MissingBlocks", 1L, rb);
     fs.delete(file, true);
     updateMetrics();
-    assertEquals(0, metrics.underReplicatedBlocks.get());
+    assertGauge("UnderReplicatedBlocks", 0L, getMetrics(NS_METRICS));
   }
   
   public void testRenameMetrics() throws Exception {
@@ -206,8 +211,9 @@ public class TestNameNodeMetrics extends TestCase {
     createFile(target, 100, (short)1);
     fs.rename(src, target, Rename.OVERWRITE);
     updateMetrics();
-    assertEquals(1, nnMetrics.numFilesRenamed.getPreviousIntervalValue());
-    assertEquals(1, nnMetrics.numFilesDeleted.getPreviousIntervalValue());
+    MetricsRecordBuilder rb = getMetrics(NN_METRICS);
+    assertCounter("FilesRenamed", 1L, rb);
+    assertCounter("FilesDeleted", 1L, rb);
   }
   
   /**
@@ -226,13 +232,8 @@ public class TestNameNodeMetrics extends TestCase {
     Path file1_Path = new Path(TEST_ROOT_DIR_PATH, "file1.dat");
 
     // When cluster starts first time there are no file  (read,create,open)
-    // operations so metric numGetBlockLocations should be 0.
-    // Verify that numGetBlockLocations for current interval 
-    // and previous interval are 0
-    assertEquals("numGetBlockLocations for previous interval is incorrect",
-    0,nnMetrics.numGetBlockLocations.getPreviousIntervalValue());
-    assertEquals("numGetBlockLocations for current interval is incorrect",
-    0,nnMetrics.numGetBlockLocations.getCurrentIntervalValue());
+    // operations so metric GetBlockLocations should be 0.
+    assertCounter("GetBlockLocations", 0L, getMetrics(NN_METRICS));
 
     //Perform create file operation
     createFile(file1_Path,100,(short)2);
@@ -240,36 +241,23 @@ public class TestNameNodeMetrics extends TestCase {
   
     //Create file does not change numGetBlockLocations metric
     //expect numGetBlockLocations = 0 for previous and current interval 
-    assertEquals("numGetBlockLocations for previous interval is incorrect",
-    0,nnMetrics.numGetBlockLocations.getPreviousIntervalValue());
-    // Verify numGetBlockLocations for current interval is 0
-    assertEquals("numGetBlockLocations for current interval is incorrect",
-    0,nnMetrics.numGetBlockLocations.getCurrentIntervalValue());
+    assertCounter("GetBlockLocations", 0L, getMetrics(NN_METRICS));
   
-    // Open and read file operation increments numGetBlockLocations
+    // Open and read file operation increments GetBlockLocations
     // Perform read file operation on earlier created file
     readFile(fs, file1_Path);
     updateMetrics();
     // Verify read file operation has incremented numGetBlockLocations by 1
-    assertEquals("numGetBlockLocations for previous interval is incorrect",
-    1,nnMetrics.numGetBlockLocations.getPreviousIntervalValue());
-    // Verify numGetBlockLocations for current interval is 0
-    assertEquals("numGetBlockLocations for current interval is incorrect",
-    0,nnMetrics.numGetBlockLocations.getCurrentIntervalValue());
+    assertCounter("GetBlockLocations", 1L, getMetrics(NN_METRICS));
 
     // opening and reading file  twice will increment numGetBlockLocations by 2
     readFile(fs, file1_Path);
     readFile(fs, file1_Path);
     updateMetrics();
-    assertEquals("numGetBlockLocations for previous interval is incorrect",
-    2,nnMetrics.numGetBlockLocations.getPreviousIntervalValue());
-    // Verify numGetBlockLocations for current interval is 0
-    assertEquals("numGetBlockLocations for current interval is incorrect",
-    0,nnMetrics.numGetBlockLocations.getCurrentIntervalValue());
+    assertCounter("GetBlockLocations", 3L, getMetrics(NN_METRICS));
   
     // Verify total load metrics, total load = Data Node started.
     updateMetrics();
-    assertEquals("Metrics TotalLoad is incorrect"
-    ,DATANODE_COUNT,metrics.totalLoad.get());
+    assertGauge("TotalLoad" ,DATANODE_COUNT, getMetrics(NS_METRICS));
   }
 }

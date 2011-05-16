@@ -19,18 +19,17 @@ package org.apache.hadoop.hdfs.server.datanode;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.apache.hadoop.hdfs.server.datanode.metrics.DataNodeMetrics;
 import org.apache.hadoop.hdfs.server.namenode.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
+import static org.apache.hadoop.test.MetricsAsserts.*;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -149,15 +148,12 @@ public class TestDataNodeVolumeFailureReporting {
     /*
      * The metrics should confirm the volume failures.
      */
-    DataNodeMetrics metrics1 = dns.get(0).getMetrics();
-    DataNodeMetrics metrics2 = dns.get(1).getMetrics();
-    DataNodeMetrics metrics3 = dns.get(2).getMetrics();
-    assertEquals("Vol1 should report 1 failure",
-        1, metrics1.volumeFailures.getCurrentIntervalValue());
-    assertEquals("Vol2 should report 1 failure",
-        1, metrics2.volumeFailures.getCurrentIntervalValue());
-    assertEquals("Vol3 should have no failures",
-        0, metrics3.volumeFailures.getCurrentIntervalValue());
+    assertCounter("VolumeFailures", 1L, 
+        getMetrics(dns.get(0).getMetrics().name()));
+    assertCounter("VolumeFailures", 1L, 
+        getMetrics(dns.get(1).getMetrics().name()));
+    assertCounter("VolumeFailures", 0L, 
+        getMetrics(dns.get(2).getMetrics().name()));
 
     // Ensure we wait a sufficient amount of time
     assert (WAIT_FOR_HEARTBEATS * 10) > WAIT_FOR_DEATH;
@@ -175,8 +171,8 @@ public class TestDataNodeVolumeFailureReporting {
     DFSTestUtil.createFile(fs, file2, 1024, (short)3, 1L);
     DFSTestUtil.waitReplication(fs, file2, (short)3);
     assertTrue("DN3 should still be up", dns.get(2).isDatanodeUp());
-    assertEquals("Vol3 should report 1 failure",
-        1, metrics3.volumeFailures.getCurrentIntervalValue());
+    assertCounter("VolumeFailures", 1L, 
+        getMetrics(dns.get(2).getMetrics().name()));
 
     ArrayList<DatanodeDescriptor> live = new ArrayList<DatanodeDescriptor>();
     ArrayList<DatanodeDescriptor> dead = new ArrayList<DatanodeDescriptor>();
@@ -211,9 +207,8 @@ public class TestDataNodeVolumeFailureReporting {
     DFSTestUtil.waitForDatanodeDeath(dns.get(2));
 
     // And report two failed volumes
-    metrics3 = dns.get(2).getMetrics();
-    assertEquals("DN3 should report 2 vol failures",
-        2, metrics3.volumeFailures.getCurrentIntervalValue());
+    assertCounter("VolumeFailures", 2L, 
+        getMetrics(dns.get(2).getMetrics().name()));
 
     // The NN considers the DN dead
     DFSTestUtil.waitForDatanodeStatus(ns, 2, 1, 2, 

@@ -20,7 +20,6 @@ package org.apache.hadoop.hdfs.server.namenode;
 import junit.framework.TestCase;
 import java.io.*;
 import java.net.URI;
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -38,9 +37,7 @@ import org.apache.hadoop.hdfs.server.common.Storage.StorageDirectory;
 import org.apache.hadoop.hdfs.server.namenode.NNStorage.NameNodeDirType;
 import org.apache.hadoop.hdfs.server.namenode.NNStorage.NameNodeFile;
 import org.apache.hadoop.hdfs.server.namenode.metrics.NameNodeMetrics;
-import org.apache.hadoop.metrics.util.MetricsTimeVaryingInt;
- 
-import org.mockito.Mockito;
+import static org.apache.hadoop.test.MetricsAsserts.*;
 
 /**
  * This class tests the creation and validation of a checkpoint.
@@ -239,16 +236,13 @@ public class TestEditLog extends TestCase {
 
       // Now ask to sync edit from A, which was already batched in - thus
       // it should increment the batch count metric
-      NameNodeMetrics metrics = NameNode.getNameNodeMetrics();
-      metrics.transactionsBatchedInSync = Mockito.mock(MetricsTimeVaryingInt.class);
-
       doCallLogSync(threadA, editLog);
       assertEquals("logSync from first thread shouldn't change txid",
         2, editLog.getSyncTxId());
 
       //Should have incremented the batch count exactly once
-      Mockito.verify(metrics.transactionsBatchedInSync,
-                    Mockito.times(1)).inc();
+      assertCounter("TransactionsBatchedInSync", 1L, 
+        getMetrics("NameNodeActivity"));
     } finally {
       threadA.shutdown();
       threadB.shutdown();

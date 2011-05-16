@@ -440,13 +440,13 @@ class BlockPoolSliceScanner {
         
         if (second) {
           totalScanErrors++;
-          datanode.getMetrics().blockVerificationFailures.inc(); 
+          datanode.getMetrics().incrBlockVerificationFailures();
           handleScanFailure(block);
           return;
         } 
       } finally {
         IOUtils.closeStream(blockSender);
-        datanode.getMetrics().blocksVerified.inc();
+        datanode.getMetrics().incrBlocksVerified();
         totalScans++;
       }
     }

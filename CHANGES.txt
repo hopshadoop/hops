@@ -286,7 +286,8 @@ Trunk (unreleased changes)
     HDFS-1628. Display full path in AccessControlException.  (John George
     via szetszwo)
 
-    HDFS-1707. Federation: Failure in browsing data on new namenodes. (jitendra)
+    HDFS-1707. Federation: Failure in browsing data on new namenodes. 
+    (jitendra)
 
     HDFS-1683. Test Balancer with multiple NameNodes.  (szetszwo)
 
@@ -412,6 +413,8 @@ Trunk (unreleased changes)
 
     HDFS-1899. GenericTestUtils.formatNamenode should be moved to DFSTestUtil
     (Ted Yu via todd)
+
+    HDFS-1117. Metrics 2.0 HDFS instrumentation. (Luke Lu via suresh)
 
   OPTIMIZATIONS
 

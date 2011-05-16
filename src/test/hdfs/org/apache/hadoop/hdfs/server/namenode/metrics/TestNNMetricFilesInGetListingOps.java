@@ -28,15 +28,16 @@ import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
-import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
+import static org.apache.hadoop.test.MetricsAsserts.*;
 
 /**
  * Test case for FilesInGetListingOps metric in Namenode
  */
 public class TestNNMetricFilesInGetListingOps extends TestCase {
   private static final Configuration CONF = new HdfsConfiguration();
+  private static final String NN_METRICS = "NameNodeActivity";
   static {
     CONF.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, 100);
     CONF.setInt(DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY, 1);
@@ -45,7 +46,6 @@ public class TestNNMetricFilesInGetListingOps extends TestCase {
   }
      
   private MiniDFSCluster cluster;
-  private NameNodeMetrics nnMetrics;
   private DistributedFileSystem fs;
   private Random rand = new Random();
 
@@ -54,7 +54,6 @@ public class TestNNMetricFilesInGetListingOps extends TestCase {
     cluster = new MiniDFSCluster.Builder(CONF).build();
     cluster.waitActive();
     cluster.getNameNode();
-    nnMetrics = NameNode.getNameNodeMetrics();
     fs = (DistributedFileSystem) cluster.getFileSystem();
   }
 
@@ -76,9 +75,9 @@ public class TestNNMetricFilesInGetListingOps extends TestCase {
     createFile("/tmp2/t1", 3200, (short)3);
     createFile("/tmp2/t2", 3200, (short)3);
     cluster.getNameNode().getListing("/tmp1", HdfsFileStatus.EMPTY_NAME, false);
-    assertEquals(2,nnMetrics.numFilesInGetListingOps.getCurrentIntervalValue());
-    cluster.getNameNode().getListing("/tmp2", HdfsFileStatus.EMPTY_NAME, false) ;
-    assertEquals(4,nnMetrics.numFilesInGetListingOps.getCurrentIntervalValue());
+    assertCounter("FilesInGetListingOps", 2L, getMetrics(NN_METRICS));
+    cluster.getNameNode().getListing("/tmp2", HdfsFileStatus.EMPTY_NAME, false);
+    assertCounter("FilesInGetListingOps", 4L, getMetrics(NN_METRICS));
   }
 }
 

@@ -59,7 +59,7 @@ import org.apache.hadoop.hdfs.server.datanode.metrics.FSDatasetMBean;
 import org.apache.hadoop.hdfs.server.protocol.InterDatanodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.ReplicaRecoveryInfo;
 import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand.RecoveringBlock;
-import org.apache.hadoop.metrics.util.MBeanUtil;
+import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.util.DataChecksum;
 import org.apache.hadoop.util.DiskChecker;
 import org.apache.hadoop.util.StringUtils;
@@ -2186,18 +2186,17 @@ public class FSDataset implements FSConstants, FSDatasetInterface {
     }
     try {
       bean = new StandardMBean(this,FSDatasetMBean.class);
-      mbeanName = MBeanUtil.registerMBean("DataNode", "FSDatasetState-" + storageName, bean);
+      mbeanName = MBeans.register("DataNode", "FSDatasetState-" + storageName, bean);
     } catch (NotCompliantMBeanException e) {
-      e.printStackTrace();
+      DataNode.LOG.warn("Error registering FSDatasetState MBean", e);
     }
- 
-    DataNode.LOG.info("Registered FSDatasetStatusMBean");
+    DataNode.LOG.info("Registered FSDatasetState MBean");
   }
 
   @Override // FSDatasetInterface
   public void shutdown() {
     if (mbeanName != null)
-      MBeanUtil.unregisterMBean(mbeanName);
+      MBeans.unregister(mbeanName);
     
     if (asyncDiskService != null) {
       asyncDiskService.shutdown();

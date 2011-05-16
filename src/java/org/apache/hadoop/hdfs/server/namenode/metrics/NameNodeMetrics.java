@@ -17,128 +17,146 @@
  */
 package org.apache.hadoop.hdfs.server.namenode.metrics;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.server.common.HdfsConstants.NamenodeRole;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
-import org.apache.hadoop.metrics.*;
-import org.apache.hadoop.metrics.jvm.JvmMetrics;
-import org.apache.hadoop.metrics.util.MetricsBase;
-import org.apache.hadoop.metrics.util.MetricsIntValue;
-import org.apache.hadoop.metrics.util.MetricsRegistry;
-import org.apache.hadoop.metrics.util.MetricsTimeVaryingInt;
-import org.apache.hadoop.metrics.util.MetricsTimeVaryingRate;
+import org.apache.hadoop.metrics2.MetricsSystem;
+import org.apache.hadoop.metrics2.annotation.Metric;
+import org.apache.hadoop.metrics2.annotation.Metrics;
+import static org.apache.hadoop.metrics2.impl.MsInfo.*;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.metrics2.lib.MetricsRegistry;
+import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
+import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.metrics2.source.JvmMetrics;
 
 /**
- * 
  * This class is for maintaining  the various NameNode activity statistics
  * and publishing them through the metrics interfaces.
- * This also registers the JMX MBean for RPC.
- * <p>
- * This class has a number of metrics variables that are publicly accessible;
- * these variables (objects) have methods to update their values;
- *  for example:
- *  <p> {@link #syncs}.inc()
- *
  */
-@InterfaceAudience.Private
-public class NameNodeMetrics implements Updater {
-    private static Log log = LogFactory.getLog(NameNodeMetrics.class);
-    private final MetricsRecord metricsRecord;
-    public MetricsRegistry registry = new MetricsRegistry();
-    
-    private NameNodeActivityMBean namenodeActivityMBean;
-    
-    public MetricsTimeVaryingInt numCreateFileOps = 
-                    new MetricsTimeVaryingInt("CreateFileOps", registry);
-    public MetricsTimeVaryingInt numFilesCreated =
-                          new MetricsTimeVaryingInt("FilesCreated", registry);
-    public MetricsTimeVaryingInt numFilesAppended =
-                          new MetricsTimeVaryingInt("FilesAppended", registry);
-    public MetricsTimeVaryingInt numGetBlockLocations = 
-                    new MetricsTimeVaryingInt("GetBlockLocations", registry);
-    public MetricsTimeVaryingInt numFilesRenamed =
-                    new MetricsTimeVaryingInt("FilesRenamed", registry);
-    public MetricsTimeVaryingInt numGetListingOps = 
-                    new MetricsTimeVaryingInt("GetListingOps", registry);
-    public MetricsTimeVaryingInt numDeleteFileOps = 
-                          new MetricsTimeVaryingInt("DeleteFileOps", registry);
-    public MetricsTimeVaryingInt numFilesDeleted = new MetricsTimeVaryingInt(
-        "FilesDeleted", registry, 
-        "Number of files and directories deleted by delete or rename operation");
-    public MetricsTimeVaryingInt numFileInfoOps =
-                          new MetricsTimeVaryingInt("FileInfoOps", registry);
-    public MetricsTimeVaryingInt numAddBlockOps = 
-                          new MetricsTimeVaryingInt("AddBlockOps", registry);
-    public final MetricsTimeVaryingInt numGetAdditionalDatanodeOps
-        = new MetricsTimeVaryingInt("GetAdditionalDatanodeOps", registry);
-    public MetricsTimeVaryingInt numcreateSymlinkOps = 
-                          new MetricsTimeVaryingInt("CreateSymlinkOps", registry);
-    public MetricsTimeVaryingInt numgetLinkTargetOps = 
-                          new MetricsTimeVaryingInt("GetLinkTargetOps", registry);
+@Metrics(name="NameNodeActivity", about="NameNode metrics", context="dfs")
+public class NameNodeMetrics {
+  final MetricsRegistry registry = new MetricsRegistry("namenode");
 
-    public MetricsTimeVaryingRate transactions = new MetricsTimeVaryingRate(
-      "Transactions", registry, "Journal Transaction");
-    public MetricsTimeVaryingRate syncs =
-                    new MetricsTimeVaryingRate("Syncs", registry, "Journal Sync");
-    public MetricsTimeVaryingInt transactionsBatchedInSync = new MetricsTimeVaryingInt(
-      "JournalTransactionsBatchedInSync", registry,
-      "Journal Transactions Batched In Sync");
-    public MetricsTimeVaryingRate blockReport =
-                    new MetricsTimeVaryingRate("blockReport", registry, "Block Report");
-    public MetricsIntValue safeModeTime =
-                    new MetricsIntValue("SafemodeTime", registry, "Duration in SafeMode at Startup");
-    public MetricsIntValue fsImageLoadTime = 
-                    new MetricsIntValue("fsImageLoadTime", registry, "Time loading FS Image at Startup");
-    public MetricsIntValue numBlocksCorrupted =
-                    new MetricsIntValue("BlocksCorrupted", registry);
-    public MetricsTimeVaryingInt numFilesInGetListingOps = 
-                    new MetricsTimeVaryingInt("FilesInGetListingOps", registry);
+  @Metric MutableCounterLong createFileOps;
+  @Metric MutableCounterLong filesCreated;
+  @Metric MutableCounterLong filesAppended;
+  @Metric MutableCounterLong getBlockLocations;
+  @Metric MutableCounterLong filesRenamed;
+  @Metric MutableCounterLong getListingOps;
+  @Metric MutableCounterLong deleteFileOps;
+  @Metric("Number of files/dirs deleted by delete or rename operations")
+  MutableCounterLong filesDeleted;
+  @Metric MutableCounterLong fileInfoOps;
+  @Metric MutableCounterLong addBlockOps;
+  @Metric MutableCounterLong getAdditionalDatanodeOps;
+  @Metric MutableCounterLong createSymlinkOps;
+  @Metric MutableCounterLong getLinkTargetOps;
+  @Metric MutableCounterLong filesInGetListingOps;
 
-      
-    public NameNodeMetrics(Configuration conf, NamenodeRole nameNodeRole) {
-      String sessionId = conf.get(DFSConfigKeys.DFS_METRICS_SESSION_ID_KEY);
-      // Initiate Java VM metrics
-      String processName = nameNodeRole.toString();
-      JvmMetrics.init(processName, sessionId);
+  @Metric("Journal transactions") MutableRate transactions;
+  @Metric("Journal syncs") MutableRate syncs;
+  @Metric("Journal transactions batched in sync")
+  MutableCounterLong transactionsBatchedInSync;
+  @Metric("Block report") MutableRate blockReport;
 
-      // Now the Mbean for the name node - this also registers the MBean
-      namenodeActivityMBean = new NameNodeActivityMBean(registry);
-      
-      // Create a record for NameNode metrics
-      MetricsContext metricsContext = MetricsUtil.getContext("dfs");
-      metricsRecord = MetricsUtil.createRecord(metricsContext, processName.toLowerCase());
-      metricsRecord.setTag("sessionId", sessionId);
-      metricsContext.registerUpdater(this);
-      log.info("Initializing NameNodeMeterics using context object:" +
-                metricsContext.getClass().getName());
-    }
-    
+  @Metric("Duration in SafeMode at startup") MutableGaugeInt safeModeTime;
+  @Metric("Time loading FS Image at startup") MutableGaugeInt fsImageLoadTime;
 
-    
-    public void shutdown() {
-      if (namenodeActivityMBean != null) 
-        namenodeActivityMBean.shutdown();
-    }
-      
-    /**
-     * Since this object is a registered updater, this method will be called
-     * periodically, e.g. every 5 seconds.
-     */
-    public void doUpdates(MetricsContext unused) {
-      synchronized (this) {
-        for (MetricsBase m : registry.getMetricsList()) {
-          m.pushMetric(metricsRecord);
-        }
-      }
-      metricsRecord.update();
-    }
+  NameNodeMetrics(String processName, String sessionId) {
+    registry.tag(ProcessName, processName).tag(SessionId, sessionId);
+  }
 
-    public void resetAllMinMax() {
-      transactions.resetMinMax();
-      syncs.resetMinMax();
-      blockReport.resetMinMax();
-    }
+  public static NameNodeMetrics create(Configuration conf, NamenodeRole r) {
+    String sessionId = conf.get(DFSConfigKeys.DFS_METRICS_SESSION_ID_KEY);
+    String processName = r.toString();
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    JvmMetrics.create(processName, sessionId, ms);
+    return ms.register(new NameNodeMetrics(processName, sessionId));
+  }
+
+  public void shutdown() {
+    DefaultMetricsSystem.shutdown();
+  }
+
+  public void incrGetBlockLocations() {
+    getBlockLocations.incr();
+  }
+
+  public void incrFilesCreated() {
+    filesCreated.incr();
+  }
+
+  public void incrCreateFileOps() {
+    createFileOps.incr();
+  }
+
+  public void incrFilesAppended() {
+    filesAppended.incr();
+  }
+
+  public void incrAddBlockOps() {
+    addBlockOps.incr();
+  }
+  
+  public void incrGetAdditionalDatanodeOps() {
+    getAdditionalDatanodeOps.incr();
+  }
+
+  public void incrFilesRenamed() {
+    filesRenamed.incr();
+  }
+
+  public void incrFilesDeleted(int delta) {
+    filesDeleted.incr(delta);
+  }
+
+  public void incrDeleteFileOps() {
+    deleteFileOps.incr();
+  }
+
+  public void incrGetListingOps() {
+    getListingOps.incr();
+  }
+
+  public void incrFilesInGetListingOps(int delta) {
+    filesInGetListingOps.incr(delta);
+  }
+
+  public void incrFileInfoOps() {
+    fileInfoOps.incr();
+  }
+
+  public void incrCreateSymlinkOps() {
+    createSymlinkOps.incr();
+  }
+
+  public void incrGetLinkTargetOps() {
+    getLinkTargetOps.incr();
+  }
+
+  public void addTransaction(long latency) {
+    transactions.add(latency);
+  }
+
+  public void incrTransactionsBatchedInSync() {
+    transactionsBatchedInSync.incr();
+  }
+
+  public void addSync(long elapsed) {
+    syncs.add(elapsed);
+  }
+
+  public void setFsImageLoadTime(long elapsed) {
+    fsImageLoadTime.set((int) elapsed);
+  }
+
+  public void addBlockReport(long latency) {
+    blockReport.add(latency);
+  }
+
+  public void setSafeModeTime(long elapsed) {
+    safeModeTime.set((int) elapsed);
+  }
 }

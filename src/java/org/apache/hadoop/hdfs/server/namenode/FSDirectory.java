@@ -185,7 +185,7 @@ class FSDirectory implements Closeable {
 
   private void incrDeletedFileCount(int count) {
     if (getFSNamesystem() != null)
-      NameNode.getNameNodeMetrics().numFilesDeleted.inc(count);
+      NameNode.getNameNodeMetrics().incrFilesDeleted(count);
   }
     
   /**
@@ -1484,7 +1484,7 @@ class FSDirectory implements Closeable {
         // Directory creation also count towards FilesCreated
         // to match count of FilesDeleted metric.
         if (getFSNamesystem() != null)
-          NameNode.getNameNodeMetrics().numFilesCreated.inc();
+          NameNode.getNameNodeMetrics().incrFilesCreated();
         fsImage.getEditLog().logMkDir(cur, inodes[i]);
         if(NameNode.stateChangeLog.isDebugEnabled()) {
           NameNode.stateChangeLog.debug(

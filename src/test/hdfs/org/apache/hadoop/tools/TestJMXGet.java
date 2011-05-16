@@ -31,8 +31,8 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.tools.JMXGet;
+import static org.apache.hadoop.test.MetricsAsserts.*;
 
 
 /**
@@ -91,18 +91,18 @@ public class TestJMXGet extends TestCase {
     writeFile(cluster.getFileSystem(), new Path("/test1"), 2);
 
     JMXGet jmx = new JMXGet();
-    jmx.init();
+    //jmx.setService("*"); // list all hadoop services
+    //jmx.init();
+    //jmx = new JMXGet();
+    jmx.init(); // default lists namenode mbeans only
 
-
-    //get some data from different sources
-    int blocks_corrupted = NameNode.getNameNodeMetrics().
-    numBlocksCorrupted.get();
-    assertEquals(Integer.parseInt(
-        jmx.getValue("NumLiveDataNodes")), 2);
-    assertEquals(Integer.parseInt(
-        jmx.getValue("BlocksCorrupted")), blocks_corrupted);
-    assertEquals(Integer.parseInt(
-        jmx.getValue("NumOpenConnections")), 0);
+    //get some data from different source
+    assertEquals(numDatanodes, Integer.parseInt(
+        jmx.getValue("NumLiveDataNodes")));
+    assertGauge("CorruptBlocks", Long.parseLong(jmx.getValue("CorruptBlocks")),
+                getMetrics("FSNamesystem"));
+    assertEquals(numDatanodes, Integer.parseInt(
+        jmx.getValue("NumOpenConnections")));
 
     cluster.shutdown();
   }
@@ -119,9 +119,12 @@ public class TestJMXGet extends TestCase {
     writeFile(cluster.getFileSystem(), new Path("/test"), 2);
 
     JMXGet jmx = new JMXGet();
+    //jmx.setService("*"); // list all hadoop services
+    //jmx.init();
+    //jmx = new JMXGet();
     jmx.setService("DataNode");
     jmx.init();
-    assertEquals(Integer.parseInt(jmx.getValue("bytes_written")), 0);
+    assertEquals(fileSize, Integer.parseInt(jmx.getValue("BytesWritten")));
 
     cluster.shutdown();
   }

@@ -26,7 +26,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.FSConstants.DatanodeReportType;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
-import org.apache.hadoop.hdfs.server.namenode.metrics.FSNamesystemMetrics;
+import static org.apache.hadoop.test.MetricsAsserts.*;
 
 /**
  * This test ensures the all types of data node report work correctly.
@@ -77,9 +77,7 @@ public class TestDatanodeReport extends TestCase {
                    NUM_OF_DATANODES);
 
       Thread.sleep(5000);
-      FSNamesystemMetrics fsMetrics = 
-                     cluster.getNamesystem().getFSNamesystemMetrics();
-      assertEquals(1,fsMetrics.numExpiredHeartbeats.getCurrentIntervalValue());
+      assertCounter("ExpiredHeartbeats", 1, getMetrics("FSNamesystem"));
     }finally {
       cluster.shutdown();
     }

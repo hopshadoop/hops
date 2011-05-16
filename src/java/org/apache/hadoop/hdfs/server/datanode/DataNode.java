@@ -29,7 +29,6 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.lang.management.ManagementFactory;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -53,9 +52,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import javax.management.MBeanServer;
-import javax.management.ObjectName;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -118,6 +114,8 @@ import org.apache.hadoop.ipc.ProtocolSignature;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.DNS;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.SecurityUtil;
@@ -353,7 +351,7 @@ public class DataNode extends Configured
   long heartBeatInterval;
   private DataStorage storage = null;
   private HttpServer infoServer = null;
-  DataNodeMetrics myMetrics;
+  DataNodeMetrics metrics;
   private InetSocketAddress selfAddr;
   
   private static volatile DataNode datanodeObject = null;
@@ -925,7 +923,7 @@ public class DataNode extends Configured
         cmd = bpNamenode.blockReport(bpRegistration, blockPoolId, bReport
             .getBlockListAsLongs());
         long brTime = now() - brStartTime;
-        myMetrics.blockReports.inc(brTime);
+        metrics.addBlockReport(brTime);
         LOG.info("BlockReport of " + bReport.getNumberOfBlocks() +
             " blocks got processed in " + brTime + " msecs");
         //
@@ -1036,7 +1034,7 @@ public class DataNode extends Configured
             //
             lastHeartbeat = startTime;
             DatanodeCommand[] cmds = sendHeartBeat();
-            myMetrics.heartbeats.inc(now() - startTime);
+            metrics.addHeartbeat(now() - startTime);
             if (!processCommand(cmds))
               continue;
           }
@@ -1258,7 +1256,7 @@ public class DataNode extends Configured
       case DatanodeProtocol.DNA_TRANSFER:
         // Send a copy of a block to another datanode
         transferBlocks(bcmd.getBlockPoolId(), bcmd.getBlocks(), bcmd.getTargets());
-        myMetrics.blocksReplicated.inc(bcmd.getBlocks().length);
+        metrics.incrBlocksReplicated(bcmd.getBlocks().length);
         break;
       case DatanodeProtocol.DNA_INVALIDATE:
         //
@@ -1276,7 +1274,7 @@ public class DataNode extends Configured
           checkDiskError();
           throw e;
         }
-        myMetrics.blocksRemoved.inc(toDelete.length);
+        metrics.incrBlocksRemoved(toDelete.length);
         break;
       case DatanodeProtocol.DNA_SHUTDOWN:
         // shut down the data node
@@ -1377,7 +1375,7 @@ public class DataNode extends Configured
     this.blockPoolTokenSecretManager = new BlockPoolTokenSecretManager();
     initIpcServer(conf);
 
-    myMetrics = new DataNodeMetrics(conf, getMachineName());
+    metrics = DataNodeMetrics.create(conf, getMachineName());
 
     blockPoolManager = new BlockPoolManager(conf);
   }
@@ -1427,17 +1425,7 @@ public class DataNode extends Configured
   }
   
   private void registerMXBean() {
-    // register MXBean
-    MBeanServer mbs = ManagementFactory.getPlatformMBeanServer(); 
-    try {
-      ObjectName mxbeanName = new ObjectName("HadoopInfo:type=DataNodeInfo");
-      mbs.registerMBean(this, mxbeanName);
-    } catch ( javax.management.InstanceAlreadyExistsException iaee ) {
-      // in unit tests, we may have multiple datanodes in the same JVM
-      LOG.info("DataNode MXBean already registered");
-    } catch ( javax.management.JMException e ) {
-      LOG.warn("Failed to register DataNode MXBean", e);
-    }
+    MBeans.register("DataNode", "DataNodeInfo", this);
   }
   
   int getPort() {
@@ -1551,7 +1539,7 @@ public class DataNode extends Configured
   }
     
   DataNodeMetrics getMetrics() {
-    return myMetrics;
+    return metrics;
   }
   
   public static void setNewStorageID(DatanodeID dnId) {
@@ -1668,8 +1656,8 @@ public class DataNode extends Configured
     if (data != null) {
       data.shutdown();
     }
-    if (myMetrics != null) {
-      myMetrics.shutdown();
+    if (metrics != null) {
+      metrics.shutdown();
     }
   }
   
@@ -1709,7 +1697,7 @@ public class DataNode extends Configured
     // shutdown the DN completely.
     int dpError = hasEnoughResources ? DatanodeProtocol.DISK_ERROR  
                                      : DatanodeProtocol.FATAL_DISK_ERROR;  
-    myMetrics.volumeFailures.inc(1);
+    metrics.incrVolumeFailures();
 
     //inform NameNodes
     for(BPOfferService bpos: blockPoolManager.getAllNamenodeThreads()) {
@@ -2003,7 +1991,7 @@ public class DataNode extends Configured
    * @param delHint
    */
   void closeBlock(ExtendedBlock block, String delHint) {
-    myMetrics.blocksWritten.inc();
+    metrics.incrBlocksWritten();
     BPOfferService bpos = blockPoolManager.get(block.getBlockPoolId());
     if(bpos != null) {
       bpos.notifyNamenodeReceivedBlock(block, delHint);
@@ -2138,6 +2126,7 @@ public class DataNode extends Configured
         conf.get(DFS_DATANODE_DATA_DIR_PERMISSION_KEY,
                  DFS_DATANODE_DATA_DIR_PERMISSION_DEFAULT));
     ArrayList<File> dirs = getDataDirsFromURIs(dataDirs, localFS, permission);
+    DefaultMetricsSystem.initialize("DataNode");
 
     assert dirs.size() > 0 : "number of data directories should be > 0";
     return new DataNode(conf, dirs, resources);

@@ -34,6 +34,7 @@ import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.namenode.BackupNode;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.net.DNS;
 import org.apache.hadoop.test.GenericTestUtils;
 
@@ -52,6 +53,9 @@ public class TestHDFSServerPorts extends TestCase {
   
   // reset default 0.0.0.0 addresses in order to avoid IPv6 problem
   static final String THIS_HOST = getFullHostName() + ":0";
+  static {
+    DefaultMetricsSystem.setMiniClusterMode(true);
+  }
 
   Configuration config;
   File hdfsDir;
