@@ -1261,7 +1261,7 @@ public class Job extends JobContextImpl implements JobContext {
         input.close();
       }
     } catch(IOException ioe) {
-      LOG.warn("Error reading task output" + ioe.getMessage()); 
+      LOG.warn("Error reading task output " + ioe.getMessage()); 
     }
   }
   

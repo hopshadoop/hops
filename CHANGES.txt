@@ -101,6 +101,8 @@ Trunk (unreleased changes)
 
     MAPREDUCE-2499. MR part of HADOOP-7291. (eli)
 
+    MAPREDUCE-2497. Missing spaces in error messages. (eli)
+
   OPTIMIZATIONS
     
     MAPREDUCE-2026. Make JobTracker.getJobCounters() and
