@@ -427,6 +427,9 @@ Trunk (unreleased changes)
     HDFS-1730. Use DaemonFactory from common and delete it from HDFS.
     (Tanping via suresh)
 
+    HDFS-1573. Add useful tracing information to Lease Renewer thread names
+    (todd)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
