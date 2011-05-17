@@ -51,11 +51,10 @@ public interface DataTransferProtocol {
    * when protocol changes. It is not very obvious. 
    */
   /*
-   * Version 23:
-   *    Changed the protocol methods to use ExtendedBlock instead
-   *    of Block.
+   * Version 24:
+   *    Remove deprecated fields.
    */
-  public static final int DATA_TRANSFER_VERSION = 23;
+  public static final int DATA_TRANSFER_VERSION = 24;
 
   /** Operation */
   public enum Op {
@@ -184,49 +183,6 @@ public interface DataTransferProtocol {
       out.writeByte(ordinal());
     }
   }    
-
-  /** @deprecated Deprecated at 0.21.  Use Op.WRITE_BLOCK instead. */
-  @Deprecated
-  public static final byte OP_WRITE_BLOCK = Op.WRITE_BLOCK.code;
-  /** @deprecated Deprecated at 0.21.  Use Op.READ_BLOCK instead. */
-  @Deprecated
-  public static final byte OP_READ_BLOCK = Op.READ_BLOCK.code;
-  /** @deprecated As of version 15, OP_READ_METADATA is no longer supported. */
-  @Deprecated
-  public static final byte OP_READ_METADATA = Op.READ_METADATA.code;
-  /** @deprecated Deprecated at 0.21.  Use Op.REPLACE_BLOCK instead. */
-  @Deprecated
-  public static final byte OP_REPLACE_BLOCK = Op.REPLACE_BLOCK.code;
-  /** @deprecated Deprecated at 0.21.  Use Op.COPY_BLOCK instead. */
-  @Deprecated
-  public static final byte OP_COPY_BLOCK = Op.COPY_BLOCK.code;
-  /** @deprecated Deprecated at 0.21.  Use Op.BLOCK_CHECKSUM instead. */
-  @Deprecated
-  public static final byte OP_BLOCK_CHECKSUM = Op.BLOCK_CHECKSUM.code;
-
-
-  /** @deprecated Deprecated at 0.21.  Use Status.SUCCESS instead. */
-  @Deprecated
-  public static final int OP_STATUS_SUCCESS = Status.SUCCESS.code;  
-  /** @deprecated Deprecated at 0.21.  Use Status.ERROR instead. */
-  @Deprecated
-  public static final int OP_STATUS_ERROR = Status.ERROR.code;
-  /** @deprecated Deprecated at 0.21.  Use Status.ERROR_CHECKSUM instead. */
-  @Deprecated
-  public static final int OP_STATUS_ERROR_CHECKSUM = Status.ERROR_CHECKSUM.code;
-  /** @deprecated Deprecated at 0.21.  Use Status.ERROR_INVALID instead. */
-  @Deprecated
-  public static final int OP_STATUS_ERROR_INVALID = Status.ERROR_INVALID.code;
-  /** @deprecated Deprecated at 0.21.  Use Status.ERROR_EXISTS instead. */
-  @Deprecated
-  public static final int OP_STATUS_ERROR_EXISTS = Status.ERROR_EXISTS.code;
-  /** @deprecated Deprecated at 0.21.  Use Status.ERROR_ACCESS_TOKEN instead.*/
-  @Deprecated
-  public static final int OP_STATUS_ERROR_ACCESS_TOKEN = Status.ERROR_ACCESS_TOKEN.code;
-  /** @deprecated Deprecated at 0.21.  Use Status.CHECKSUM_OK instead. */
-  @Deprecated
-  public static final int OP_STATUS_CHECKSUM_OK = Status.CHECKSUM_OK.code;
-
 
   /** Sender */
   @InterfaceAudience.Private
