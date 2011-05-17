@@ -82,6 +82,10 @@ public class UpgradeUtilities {
   private static long datanodeStorageChecksum;
   // A checksum of the contents in blockpool storage directory
   private static long blockPoolStorageChecksum;
+  // A checksum of the contents in blockpool finalize storage directory
+  private static long blockPoolFinalizedStorageChecksum;
+  // A checksum of the contents in blockpool rbw storage directory
+  private static long blockPoolRbwStorageChecksum;
 
   /**
    * Initialize the data structures used by this class.  
@@ -155,6 +159,14 @@ public class UpgradeUtilities {
     File bpCurDir = new File(BlockPoolSliceStorage.getBpRoot(bpid, dnCurDir),
         "current");
     blockPoolStorageChecksum = checksumContents(DATA_NODE, bpCurDir);
+    
+    File bpCurFinalizeDir = new File(BlockPoolSliceStorage.getBpRoot(bpid, dnCurDir),
+        "current/"+DataStorage.STORAGE_DIR_FINALIZED);
+    blockPoolFinalizedStorageChecksum = checksumContents(DATA_NODE, bpCurFinalizeDir);
+    
+    File bpCurRbwDir = new File(BlockPoolSliceStorage.getBpRoot(bpid, dnCurDir),
+        "current/"+DataStorage.STORAGE_DIR_RBW);
+    blockPoolRbwStorageChecksum = checksumContents(DATA_NODE, bpCurRbwDir);
   }
   
   // Private helper method that writes a file to the given file system.
@@ -227,6 +239,22 @@ public class UpgradeUtilities {
    */
   public static long checksumMasterBlockPoolContents() {
     return blockPoolStorageChecksum;
+  }
+  
+  /**
+   * Return the checksum for the singleton master storage directory
+   * for finalized dir under block pool.
+   */
+  public static long checksumMasterBlockPoolFinalizedContents() {
+    return blockPoolFinalizedStorageChecksum;
+  }
+  
+  /**
+   * Return the checksum for the singleton master storage directory
+   * for rbw dir under block pool.
+   */
+  public static long checksumMasterBlockPoolRbwContents() {
+    return blockPoolRbwStorageChecksum;
   }
   
   /**

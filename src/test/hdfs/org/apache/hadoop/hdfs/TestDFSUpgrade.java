@@ -93,10 +93,22 @@ public class TestDFSUpgrade {
       assertEquals(UpgradeUtilities.checksumContents(DATA_NODE, current),
         UpgradeUtilities.checksumMasterDataNodeContents());
       
+      // block files are placed under <sd>/current/<bpid>/current/finalized
+      File currentFinalized = 
+        MiniDFSCluster.getFinalizedDir(new File(baseDirs[i]), bpid);
+      assertEquals(UpgradeUtilities.checksumContents(DATA_NODE, currentFinalized),
+          UpgradeUtilities.checksumMasterBlockPoolFinalizedContents());
+      
       File previous = new File(baseDirs[i], "current/" + bpid + "/previous");
       assertTrue(previous.isDirectory());
       assertEquals(UpgradeUtilities.checksumContents(DATA_NODE, previous),
           UpgradeUtilities.checksumMasterDataNodeContents());
+      
+      File previousFinalized = 
+        new File(baseDirs[i], "current/" + bpid + "/previous"+"/finalized");
+      assertEquals(UpgradeUtilities.checksumContents(DATA_NODE, previousFinalized),
+          UpgradeUtilities.checksumMasterBlockPoolFinalizedContents());
+      
     }
   }
   /**

@@ -578,6 +578,9 @@ Trunk (unreleased changes)
     HDFS-1931. Update TestDFSShell for improved "du" shell command. (Daryn
     Sharp via todd)
 
+    HDFS-1881. Federation: after taking snapshot the current directory 
+    of datanode is empty. (Tanping Wang via suresh)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES
