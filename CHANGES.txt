@@ -278,6 +278,9 @@ Trunk (unreleased changes)
     HDFS-1814. Add "hdfs groups" command to query the server-side groups
     resolved for a user. (Aaron T. Myers via todd)
 
+    HDFS-1914. Federation: namenode storage directories must be configurable
+    specific to name service. (suresh)
+
 
   IMPROVEMENTS
 

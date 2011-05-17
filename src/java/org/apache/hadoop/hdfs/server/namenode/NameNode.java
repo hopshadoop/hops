@@ -146,6 +146,34 @@ public class NameNode implements NamenodeProtocols, FSConstants {
     Configuration.addDefaultResource("hdfs-site.xml");
   }
   
+  /**
+   * HDFS federation configuration can have two types of parameters:
+   * <ol>
+   * <li>Parameter that is common for all the name services in the cluster.</li>
+   * <li>Parameters that are specific to a name service. This keys are suffixed
+   * with nameserviceId in the configuration. For example,
+   * "dfs.namenode.rpc-address.nameservice1".</li>
+   * </ol>
+   * 
+   * Following are nameservice specific keys.
+   */
+  public static final String[] NAMESERVICE_SPECIFIC_KEYS = {
+    DFSConfigKeys.DFS_NAMENODE_RPC_ADDRESS_KEY,
+    DFSConfigKeys.DFS_NAMENODE_NAME_DIR_KEY,
+    DFSConfigKeys.DFS_NAMENODE_EDITS_DIR_KEY,
+    DFSConfigKeys.DFS_NAMENODE_CHECKPOINT_DIR_KEY,
+    DFSConfigKeys.DFS_NAMENODE_CHECKPOINT_EDITS_DIR_KEY,
+    DFSConfigKeys.DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY,
+    DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY,
+    DFSConfigKeys.DFS_NAMENODE_HTTPS_ADDRESS_KEY,
+    DFSConfigKeys.DFS_NAMENODE_KEYTAB_FILE_KEY,
+    DFSConfigKeys.DFS_NAMENODE_SECONDARY_HTTP_ADDRESS_KEY,
+    DFSConfigKeys.DFS_SECONDARY_NAMENODE_KEYTAB_FILE_KEY,
+    DFSConfigKeys.DFS_NAMENODE_BACKUP_ADDRESS_KEY,
+    DFSConfigKeys.DFS_NAMENODE_BACKUP_HTTP_ADDRESS_KEY,
+    DFSConfigKeys.DFS_NAMENODE_BACKUP_SERVICE_RPC_ADDRESS_KEY
+  };
+  
   public long getProtocolVersion(String protocol, 
                                  long clientVersion) throws IOException {
     if (protocol.equals(ClientProtocol.class.getName())) {
@@ -1662,25 +1690,15 @@ public class NameNode implements NamenodeProtocols, FSConstants {
    * @param conf
    *          Configuration object to lookup specific key and to set the value
    *          to the key passed. Note the conf object is modified
-   * @see DFSUtil#setGenericConf()
+   * @see DFSUtil#setGenericConf(Configuration, String, String...)
    */
-  static void initializeGenericKeys(Configuration conf) {
+  public static void initializeGenericKeys(Configuration conf) {
     final String nameserviceId = DFSUtil.getNameServiceId(conf);
     if ((nameserviceId == null) || nameserviceId.isEmpty()) {
       return;
     }
     
-    DFSUtil.setGenericConf(conf, nameserviceId,
-        DFSConfigKeys.DFS_NAMENODE_RPC_ADDRESS_KEY,
-        DFSConfigKeys.DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY,
-        DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY,
-        DFSConfigKeys.DFS_NAMENODE_HTTPS_ADDRESS_KEY,
-        DFSConfigKeys.DFS_NAMENODE_KEYTAB_FILE_KEY,
-        DFSConfigKeys.DFS_NAMENODE_SECONDARY_HTTP_ADDRESS_KEY,
-        DFSConfigKeys.DFS_SECONDARY_NAMENODE_KEYTAB_FILE_KEY,
-        DFSConfigKeys.DFS_NAMENODE_BACKUP_ADDRESS_KEY,
-        DFSConfigKeys.DFS_NAMENODE_BACKUP_HTTP_ADDRESS_KEY,
-        DFSConfigKeys.DFS_NAMENODE_BACKUP_SERVICE_RPC_ADDRESS_KEY);
+    DFSUtil.setGenericConf(conf, nameserviceId, NAMESERVICE_SPECIFIC_KEYS);
     
     if (conf.get(DFSConfigKeys.DFS_NAMENODE_RPC_ADDRESS_KEY) != null) {
       URI defaultUri = URI.create(FSConstants.HDFS_URI_SCHEME + "://"
