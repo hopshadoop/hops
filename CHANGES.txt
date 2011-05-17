@@ -424,6 +424,9 @@ Trunk (unreleased changes)
     HDFS-1945. Removed the deprecated fields in DataTransferProtocol.
     (szetszwo)
 
+    HDFS-1730. Use DaemonFactory from common and delete it from HDFS.
+    (Tanping via suresh)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image

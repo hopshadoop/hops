@@ -42,7 +42,7 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.server.common.GenerationStamp;
 import org.apache.hadoop.hdfs.server.datanode.FSDataset.FSVolume;
-import org.apache.hadoop.hdfs.util.DaemonFactory;
+import org.apache.hadoop.util.Daemon;
 
 /**
  * Periodically scans the data directories for block and block metadata files.
@@ -228,8 +228,9 @@ public class DirectoryScanner implements Runnable {
                     DFSConfigKeys.DFS_DATANODE_DIRECTORYSCAN_THREADS_DEFAULT);
 
     reportCompileThreadPool = Executors.newFixedThreadPool(threads, 
-        new DaemonFactory());
-    masterThread = new ScheduledThreadPoolExecutor(1, new DaemonFactory());
+        new Daemon.DaemonFactory());
+    masterThread = new ScheduledThreadPoolExecutor(1,
+        new Daemon.DaemonFactory());
   }
 
   void start() {
