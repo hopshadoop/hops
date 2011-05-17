@@ -571,6 +571,9 @@ Trunk (unreleased changes)
 
     HDFS-1933. Update TestDFSShell for improved "test" shell command. (Daryn
     Sharp via todd)
+    
+    HDFS-1931. Update TestDFSShell for improved "du" shell command. (Daryn
+    Sharp via todd)
 
 Release 0.22.0 - Unreleased
 
