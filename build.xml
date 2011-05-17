@@ -264,7 +264,7 @@
   <!-- ====================================================== -->
   <!-- Stuff needed by all targets                            -->
   <!-- ====================================================== -->
-  <target name="init" depends="ivy-retrieve-common,ivy-retrieve-hdfs">
+  <target name="init" depends="ivy-retrieve-common,ivy-retrieve-hdfs,ivy-retrieve-test">
     <mkdir dir="${build.dir}"/>
     <mkdir dir="${build.classes}"/>
     <mkdir dir="${build.src}"/>
@@ -407,7 +407,7 @@
     </jar>
   </target>
 
-  <target name="compile-hdfs-test" depends="compile-hdfs-classes, ivy-retrieve-hdfs, ivy-retrieve-test">
+  <target name="compile-hdfs-test" depends="compile-hdfs-classes">
     <macro-compile-hdfs-test
       target.dir="${test.hdfs.build.classes}"
       source.dir="${test.src.dir}/hdfs;${test.src.dir}/unit"

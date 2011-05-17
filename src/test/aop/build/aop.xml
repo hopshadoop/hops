@@ -124,7 +124,7 @@
   <!-- ================ -->
   <!-- run system tests -->
   <!-- ================ -->
-  <target name="test-system" depends="ivy-retrieve-common, ivy-retrieve-hdfs, ivy-retrieve-system"
+  <target name="test-system" depends="init, ivy-retrieve-system"
     description="Run system tests">
     <subant buildpath="build.xml" target="jar-test-system"/>
     <macro-test-runner test.file="${test.hdfs.all.tests.file}"
@@ -143,7 +143,7 @@
     <delete file="${compile-inject.output}"/>
     <weave-injectfault-aspects dest.dir="${build-fi.dir}/classes"
                                src.dir="${test.src.dir}/aop"
-      aspects.jar="${build-fi.dir}/ivy/lib/${ant.project.name}/test/hadoop-common-${project.version}.jar">
+      aspects.jar="${build-fi.dir}/ivy/lib/${ant.project.name}/common/hadoop-common-${project.version}.jar">
     </weave-injectfault-aspects>
   </target>
 

@@ -430,6 +430,9 @@ Trunk (unreleased changes)
     HDFS-1573. Add useful tracing information to Lease Renewer thread names
     (todd)
 
+    HDFS-1939.  In ivy.xml, test conf should not extend common conf.
+    (Eric Yang via szetszwo)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
