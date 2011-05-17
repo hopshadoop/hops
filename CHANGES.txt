@@ -811,6 +811,8 @@ Release 0.22.0 - Unreleased
     HDFS-1835. DataNode should not depend on SHA1PRNG secure random generator
     to generate a storage ID. (John Carrino via todd)
 
+    HDFS-1947. DFSClient should use mapreduce.task.attempt.id. (eli)
+
   OPTIMIZATIONS
 
     HDFS-1140. Speedup INode.getPathComponents. (Dmytro Molkov via shv)

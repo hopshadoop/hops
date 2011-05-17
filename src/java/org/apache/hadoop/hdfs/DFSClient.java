@@ -259,7 +259,7 @@ public class DFSClient implements FSConstants, java.io.Closeable {
         nameNodeAddr.getHostName() + ":" + nameNodeAddr.getPort();
     this.leaserenewer = LeaseRenewer.getInstance(authority, ugi, this);
     
-    String taskId = conf.get("mapred.task.id", "NONMAPREDUCE");
+    String taskId = conf.get("mapreduce.task.attempt.id", "NONMAPREDUCE");
     this.clientName = leaserenewer.getClientName(taskId);
 
     defaultBlockSize = conf.getLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, DEFAULT_BLOCK_SIZE);
