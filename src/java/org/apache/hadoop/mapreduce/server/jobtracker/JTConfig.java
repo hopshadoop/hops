@@ -107,4 +107,6 @@ public interface JTConfig extends MRConfig {
   public static final String JT_USER_NAME = "mapreduce.jobtracker.kerberos.principal";
   public static final String JT_KEYTAB_FILE = 
     "mapreduce.jobtracker.keytab.file";
+  public static final String JT_PLUGINS = 
+    "mapreduce.jobtracker.plugins";
 }
