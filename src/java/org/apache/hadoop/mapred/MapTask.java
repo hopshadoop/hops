@@ -768,7 +768,8 @@ class MapTask extends Task {
     final ArrayList<SpillRecord> indexCacheList =
       new ArrayList<SpillRecord>();
     private int totalIndexCacheMemory;
-    private static final int INDEX_CACHE_MEMORY_LIMIT = 1024 * 1024;
+    private int indexCacheMemoryLimit;
+    private static final int INDEX_CACHE_MEMORY_LIMIT_DEFAULT = 1024 * 1024;
 
     @SuppressWarnings("unchecked")
     public MapOutputBuffer(TaskUmbilicalProtocol umbilical, JobConf job,
@@ -783,6 +784,8 @@ class MapTask extends Task {
       final float spillper =
         job.getFloat(JobContext.MAP_SORT_SPILL_PERCENT, (float)0.8);
       final int sortmb = job.getInt(JobContext.IO_SORT_MB, 100);
+      indexCacheMemoryLimit = job.getInt(JobContext.INDEX_CACHE_MEMORY_LIMIT,
+                                         INDEX_CACHE_MEMORY_LIMIT_DEFAULT);
       if (spillper > (float)1.0 || spillper <= (float)0.0) {
         throw new IOException("Invalid \"" + JobContext.MAP_SORT_SPILL_PERCENT +
             "\": " + spillper);
@@ -1466,7 +1469,7 @@ class MapTask extends Task {
           }
         }
 
-        if (totalIndexCacheMemory >= INDEX_CACHE_MEMORY_LIMIT) {
+        if (totalIndexCacheMemory >= indexCacheMemoryLimit) {
           // create spill index file
           Path indexFilename =
               mapOutputFile.getSpillIndexFileForWrite(numSpills, partitions
@@ -1531,7 +1534,7 @@ class MapTask extends Task {
             throw e;
           }
         }
-        if (totalIndexCacheMemory >= INDEX_CACHE_MEMORY_LIMIT) {
+        if (totalIndexCacheMemory >= indexCacheMemoryLimit) {
           // create spill index file
           Path indexFilename =
               mapOutputFile.getSpillIndexFileForWrite(numSpills, partitions
@@ -1647,8 +1650,7 @@ class MapTask extends Task {
       // read in paged indices
       for (int i = indexCacheList.size(); i < numSpills; ++i) {
         Path indexFileName = mapOutputFile.getSpillIndexFile(i);
-        indexCacheList.add(new SpillRecord(indexFileName, job,
-            UserGroupInformation.getCurrentUser().getShortUserName()));
+        indexCacheList.add(new SpillRecord(indexFileName, job));
       }
 
       //make correction in the length to include the sequence file header

@@ -736,6 +736,9 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2486. Incorrect snapshot dependency published in .pom files
     (todd)
 
+    MAPREDUCE-2327. MapTask doesn't need to put username information in
+    SpillRecord. (todd via tomwhite)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES

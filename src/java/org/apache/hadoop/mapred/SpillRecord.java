@@ -50,6 +50,10 @@ class SpillRecord {
     entries = buf.asLongBuffer();
   }
 
+  public SpillRecord(Path indexFileName, JobConf job) throws IOException {
+    this(indexFileName, job, null);
+  }
+
   public SpillRecord(Path indexFileName, JobConf job, String expectedIndexOwner)
     throws IOException {
     this(indexFileName, job, new PureJavaCrc32(), expectedIndexOwner);

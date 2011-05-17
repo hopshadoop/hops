@@ -128,6 +128,8 @@ public interface MRJobConfig {
 
   public static final String IO_SORT_MB = "mapreduce.task.io.sort.mb";
 
+  public static final String INDEX_CACHE_MEMORY_LIMIT = "mapreduce.task.index.cache.limit.bytes";
+
   public static final String PRESERVE_FAILED_TASK_FILES = "mapreduce.task.files.preserve.failedtasks";
 
   public static final String PRESERVE_FILES_PATTERN = "mapreduce.task.files.preserve.filepattern";

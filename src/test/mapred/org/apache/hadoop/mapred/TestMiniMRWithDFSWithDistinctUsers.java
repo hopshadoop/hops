@@ -120,4 +120,27 @@ public class TestMiniMRWithDFSWithDistinctUsers extends TestCase {
     runJobAsUser(job2, BOB_UGI);
   }
 
+  /**
+   * Regression test for MAPREDUCE-2327. Verifies that, even if a map
+   * task makes lots of spills (more than fit in the spill index cache)
+   * that it will succeed.
+   */
+  public void testMultipleSpills() throws Exception {
+    JobConf job1 = mr.createJobConf();
+
+    // Make sure it spills twice
+    job1.setFloat(MRJobConfig.MAP_SORT_SPILL_PERCENT, 0.0001f);
+    job1.setInt(MRJobConfig.IO_SORT_MB, 1);
+
+    // Make sure the spill records don't fit in index cache
+    job1.setInt(MRJobConfig.INDEX_CACHE_MEMORY_LIMIT, 0);
+
+    String input = "The quick brown fox\nhas many silly\n" 
+      + "red fox sox\n";
+    Path inDir = new Path("/testing/distinct/input");
+    Path outDir = new Path("/user/alice/output");
+    TestMiniMRClasspath.configureWordCount(fs, jobTrackerName, job1, 
+                                           input, 2, 1, inDir, outDir);
+    runJobAsUser(job1, ALICE_UGI);
+  }
 }
