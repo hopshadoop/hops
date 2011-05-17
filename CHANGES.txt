@@ -418,7 +418,8 @@ Trunk (unreleased changes)
 
     HDFS-1946. HDFS part of HADOOP-7291. (eli)
 
-    HDFS-1945. emoved deprecated fields in DataTransferProtocol.  (szetszwo)
+    HDFS-1945. Removed the deprecated fields in DataTransferProtocol.
+    (szetszwo)
 
   OPTIMIZATIONS
 
