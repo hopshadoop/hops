@@ -913,9 +913,21 @@ public class FSImage implements NNStorageListener, Closeable {
         errorSDs.add(sd);
       }
     }
-    storage.reportErrorsOnDirectories(errorSDs);
-    if(!editLog.isOpen()) editLog.open();
-    ckptState = CheckpointStates.UPLOAD_DONE;
+    
+    try {
+      storage.reportErrorsOnDirectories(errorSDs);
+      
+      // If there was an error in every storage dir, each one will have been
+      // removed from the list of storage directories.
+      if (storage.getNumStorageDirs(NameNodeDirType.IMAGE) == 0 ||
+          storage.getNumStorageDirs(NameNodeDirType.EDITS) == 0) {
+        throw new IOException("Failed to save any storage directories while saving namespace");
+      }
+      
+      if(!editLog.isOpen()) editLog.open();
+    } finally {
+      ckptState = CheckpointStates.UPLOAD_DONE;
+    }
   }
 
   /**

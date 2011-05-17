@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 import static org.apache.hadoop.hdfs.server.common.Util.fileAsURI;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import static org.mockito.Matchers.anyObject;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
@@ -43,6 +44,7 @@ import org.apache.hadoop.hdfs.server.common.HdfsConstants.NamenodeRole;
 import org.apache.hadoop.hdfs.server.common.Storage.StorageDirectory;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Test;
+import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
@@ -260,6 +262,65 @@ public class TestSaveNamespace {
   @Test
   public void testCrashWhileMoveLastCheckpoint() throws Exception {
     saveNamespaceWithInjectedFault(Fault.MOVE_LAST_CHECKPOINT);
+  }
+  
+  @Test
+  public void testFailedSaveNamespace() throws Exception {
+    Configuration conf = getConf();
+    NameNode.initMetrics(conf, NamenodeRole.ACTIVE);
+    DFSTestUtil.formatNameNode(conf);
+    FSNamesystem fsn = new FSNamesystem(conf);
+
+    // Replace the FSImage with a spy
+    final FSImage originalImage = fsn.dir.fsImage;
+    NNStorage storage = originalImage.getStorage();
+    storage.close(); // unlock any directories that FSNamesystem's initialization may have locked
+
+    NNStorage spyStorage = spy(storage);
+    originalImage.storage = spyStorage;
+    FSImage spyImage = spy(originalImage);
+    fsn.dir.fsImage = spyImage;
+    spyImage.storage.setStorageDirectories(
+        FSNamesystem.getNamespaceDirs(conf), 
+        FSNamesystem.getNamespaceEditsDirs(conf));
+
+    doThrow(new IOException("Injected fault: saveFSImage")).
+      when(spyImage).saveFSImage((File)anyObject());
+
+    try {
+      doAnEdit(fsn, 1);
+
+      // Save namespace
+      fsn.setSafeMode(SafeModeAction.SAFEMODE_ENTER);
+      try {
+        fsn.saveNamespace();
+        fail("saveNamespace did not fail even when all directories failed!");
+      } catch (IOException ioe) {
+        LOG.info("Got expected exception", ioe);
+      }
+      
+      // Ensure that, if storage dirs come back online, things work again.
+      Mockito.reset(spyImage);
+      spyStorage.setRestoreFailedStorage(true);
+      fsn.saveNamespace();
+      checkEditExists(fsn, 1);
+
+      // Now shut down and restart the NN
+      originalImage.close();
+      fsn.close();
+      fsn = null;
+
+      // Start a new namesystem, which should be able to recover
+      // the namespace from the previous incarnation.
+      fsn = new FSNamesystem(conf);
+
+      // Make sure the image loaded including our edits.
+      checkEditExists(fsn, 1);
+    } finally {
+      if (fsn != null) {
+        fsn.close();
+      }
+    }
   }
 
   @Test

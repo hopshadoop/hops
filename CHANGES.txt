@@ -1003,6 +1003,9 @@ Release 0.22.0 - Unreleased
     HDFS-1621. Fix references to hadoop-common-${version} in build.xml
     (Jolly Chen via todd)
 
+    HDFS-1505. saveNamespace appears to succeed even if all directories fail
+    to save. (Aaron T. Myers via todd)
+
 Release 0.21.1 - Unreleased
     HDFS-1466. TestFcHdfsSymlink relies on /tmp/test not existing. (eli)
 
