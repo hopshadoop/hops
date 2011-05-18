@@ -395,6 +395,9 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2103. task-controller shouldn't require o-r permissions.
     (todd via eli)
 
+    MAPREDUCE-2505. Explain how to use ACLs in the fair scheduler.
+    (matei via eli)
+
   OPTIMIZATIONS
 
     MAPREDUCE-1354. Enhancements to JobTracker for better performance and

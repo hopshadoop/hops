@@ -185,9 +185,9 @@
             Specify which jobconf property is used to determine the pool that a
             job belongs in. String, default: <em>mapreduce.job.user.name</em>
             (i.e. one pool for each user). 
-            Another useful value is <em>group.name</em> to create a
-            pool per Unix group.
-            mapred.fairscheduler. poolnameproperty is used only for jobs in which 
+            Another useful value is <em>mapreduce.job.queuename</em> to use MapReduce's "queue"
+            system for access control lists (see below).
+            mapred.fairscheduler.poolnameproperty is used only for jobs in which 
             mapred.fairscheduler.pool is not explicitly set.
           </td>
           </tr>
@@ -439,6 +439,29 @@
         capacity and no preemption timeout. Also, any pool or user with no max 
         running jobs set in the file will be allowed to run an unlimited 
         number of jobs.
+        </p>
+      </section>
+      <section>
+        <title>Access Control Lists (ACLs)</title>
+        <p>
+          The fair scheduler can be used in tandem with the "queue" based access
+          control system in MapReduce to restrict which pools each user can access.
+          To do this, first enable ACLs and set up some queues as described in the
+          <a href="mapred_tutorial.html#Job+Authorization">MapReduce usage guide</a>,
+          then set the fair scheduler to use one pool per queue by adding
+          the following property in <em>HADOOP_CONF_DIR/mapred-site.xml</em>:
+        </p>
+<source>
+&lt;property&gt;
+  &lt;name&gt;mapred.fairscheduler.poolnameproperty&lt;/name&gt;
+  &lt;value&gt;mapreduce.job.queuename&lt;/value&gt;
+&lt;/property&gt;
+</source>
+        <p>
+          You can then set the minimum share, weight, and internal scheduling mode
+          for each pool as described earlier.
+          In addition, make sure that users submit jobs to the right queue by setting
+          the <em>mapreduce.job.queuename</em> property in their jobs.
         </p>
       </section>
     </section>
