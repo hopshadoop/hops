@@ -453,13 +453,6 @@ public class IFile {
     }
     
     public void close() throws IOException {
-      // Return the decompressor
-      if (decompressor != null) {
-        decompressor.reset();
-        CodecPool.returnDecompressor(decompressor);
-        decompressor = null;
-      }
-      
       // Close the underlying stream
       in.close();
       
@@ -468,6 +461,13 @@ public class IFile {
       buffer = null;
       if(readRecordsCounter != null) {
         readRecordsCounter.increment(numRecordsRead);
+      }
+
+      // Return the decompressor
+      if (decompressor != null) {
+        decompressor.reset();
+        CodecPool.returnDecompressor(decompressor);
+        decompressor = null;
       }
     }
     

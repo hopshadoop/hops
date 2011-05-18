@@ -193,6 +193,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2467. HDFS-1052 changes break the raid contrib module in 
     MapReduce. (suresh srinivas via mahadev)
 
+    MAPREDUCE-2258. IFile reader closes stream and compressor in wrong order.
+    (todd via tomwhite)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES
