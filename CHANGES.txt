@@ -1015,6 +1015,9 @@ Release 0.22.0 - Unreleased
     HDFS-1921. saveNamespace can cause NN to be unable to come up on restart
     (Matt Foley via todd)
 
+    HDFS-1925. SafeModeInfo should use the correct constant instead of a
+    hard-coded value for its default. (Joey Echeverria via todd)
+
 Release 0.21.1 - Unreleased
     HDFS-1466. TestFcHdfsSymlink relies on /tmp/test not existing. (eli)
 
