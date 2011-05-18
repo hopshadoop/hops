@@ -356,7 +356,7 @@ class JobSubmitter {
       // Create the splits for the job
       LOG.debug("Creating splits at " + jtFs.makeQualified(submitJobDir));
       int maps = writeSplits(job, submitJobDir);
-      conf.setInt("mapred.map.tasks", maps);
+      conf.setInt(MRJobConfig.NUM_MAPS, maps);
       LOG.info("number of splits:" + maps);
 
       // write "queue admins of the queue to which job is being submitted"

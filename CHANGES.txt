@@ -103,6 +103,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-2497. Missing spaces in error messages. (eli)
 
+    MAPREDUCE-2502. JobSubmitter should use mapreduce.job.maps instead of
+    its deprecated equivalent. (eli via todd)
+
   OPTIMIZATIONS
     
     MAPREDUCE-2026. Make JobTracker.getJobCounters() and
