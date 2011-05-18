@@ -49,6 +49,9 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
   private boolean considerLoad; 
   private NetworkTopology clusterMap;
   private FSClusterStats stats;
+  static final String enableDebugLogging = "For more information, please enable"
+    + " DEBUG level logging on the "
+    + "org.apache.hadoop.hdfs.server.namenode.FSNamesystem logger.";
 
   BlockPlacementPolicyDefault(Configuration conf,  FSClusterStats stats,
                            NetworkTopology clusterMap) {
@@ -65,6 +68,14 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
     this.stats = stats;
     this.clusterMap = clusterMap;
   }
+
+  private ThreadLocal<StringBuilder> threadLocalBuilder =
+    new ThreadLocal<StringBuilder>() {
+    @Override
+    protected StringBuilder initialValue() {
+      return new StringBuilder();
+    }
+  };
 
   /** {@inheritDoc} */
   public DatanodeDescriptor[] chooseTarget(String srcPath,
@@ -157,6 +168,7 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
     if (numOfReplicas == 0 || clusterMap.getNumOfLeaves()==0) {
       return writer;
     }
+    int totalReplicasExpected = numOfReplicas;
       
     int numOfResults = results.size();
     boolean newBlock = (numOfResults==0);
@@ -198,7 +210,8 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
                    blocksize, maxNodesPerRack, results);
     } catch (NotEnoughReplicasException e) {
       FSNamesystem.LOG.warn("Not able to place enough replicas, still in need of "
-               + numOfReplicas);
+               + numOfReplicas + " to reach " + totalReplicasExpected + "\n"
+               + e.getMessage());
     }
     return writer;
   }
@@ -326,6 +339,13 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
     throws NotEnoughReplicasException {
     int numOfAvailableNodes =
       clusterMap.countNumOfAvailableNodes(nodes, excludedNodes.keySet());
+    StringBuilder builder = null;
+    if (FSNamesystem.LOG.isDebugEnabled()) {
+      builder = threadLocalBuilder.get();
+      builder.setLength(0);
+      builder.append("[");
+    }
+    boolean badTarget = false;
     while(numOfAvailableNodes > 0) {
       DatanodeDescriptor chosenNode = 
         (DatanodeDescriptor)(clusterMap.chooseRandom(nodes));
@@ -336,12 +356,20 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
         if (isGoodTarget(chosenNode, blocksize, maxNodesPerRack, results)) {
           results.add(chosenNode);
           return chosenNode;
+        } else {
+          badTarget = true;
         }
       }
     }
 
-    throw new NotEnoughReplicasException(
-        "Not able to place enough replicas");
+    String detail = enableDebugLogging;
+    if (FSNamesystem.LOG.isDebugEnabled()) {
+      if (badTarget && builder != null) {
+        detail = builder.append("]").toString();
+        builder.setLength(0);
+      } else detail = "";
+    }
+    throw new NotEnoughReplicasException(detail);
   }
     
   /* Randomly choose <i>numOfReplicas</i> targets from <i>nodes</i>.
@@ -356,6 +384,13 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
       
     int numOfAvailableNodes =
       clusterMap.countNumOfAvailableNodes(nodes, excludedNodes.keySet());
+    StringBuilder builder = null;
+    if (FSNamesystem.LOG.isDebugEnabled()) {
+      builder = threadLocalBuilder.get();
+      builder.setLength(0);
+      builder.append("[");
+    }
+    boolean badTarget = false;
     while(numOfReplicas > 0 && numOfAvailableNodes > 0) {
       DatanodeDescriptor chosenNode = 
         (DatanodeDescriptor)(clusterMap.chooseRandom(nodes));
@@ -366,13 +401,21 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
         if (isGoodTarget(chosenNode, blocksize, maxNodesPerRack, results)) {
           numOfReplicas--;
           results.add(chosenNode);
+        } else {
+          badTarget = true;
         }
       }
     }
       
     if (numOfReplicas>0) {
-      throw new NotEnoughReplicasException(
-                                           "Not able to place enough replicas");
+      String detail = enableDebugLogging;
+      if (FSNamesystem.LOG.isDebugEnabled()) {
+        if (badTarget && builder != null) {
+          detail = builder.append("]").toString();
+          builder.setLength(0);
+        } else detail = "";
+      }
+      throw new NotEnoughReplicasException(detail);
     }
   }
     
@@ -394,8 +437,9 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
     // check if the node is (being) decommissed
     if (node.isDecommissionInProgress() || node.isDecommissioned()) {
       if(FSNamesystem.LOG.isDebugEnabled()) {
-        FSNamesystem.LOG.debug("Node "+NodeBase.getPath(node)+
-            " is not chosen because the node is (being) decommissioned");
+        threadLocalBuilder.get().append(node.toString()).append(": ")
+          .append("Node ").append(NodeBase.getPath(node))
+          .append(" is not chosen because the node is (being) decommissioned ");
       }
       return false;
     }
@@ -405,8 +449,9 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
     // check the remaining capacity of the target machine
     if (blockSize* FSConstants.MIN_BLOCKS_FOR_WRITE>remaining) {
       if(FSNamesystem.LOG.isDebugEnabled()) {
-        FSNamesystem.LOG.debug("Node "+NodeBase.getPath(node)+
-            " is not chosen because the node does not have enough space");
+        threadLocalBuilder.get().append(node.toString()).append(": ")
+          .append("Node ").append(NodeBase.getPath(node))
+          .append(" is not chosen because the node does not have enough space ");
       }
       return false;
     }
@@ -420,8 +465,9 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
       }
       if (node.getXceiverCount() > (2.0 * avgLoad)) {
         if(FSNamesystem.LOG.isDebugEnabled()) {
-          FSNamesystem.LOG.debug("Node "+NodeBase.getPath(node)+
-              " is not chosen because the node is too busy");
+          threadLocalBuilder.get().append(node.toString()).append(": ")
+            .append("Node ").append(NodeBase.getPath(node))
+            .append(" is not chosen because the node is too busy ");
         }
         return false;
       }
@@ -439,8 +485,9 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
     }
     if (counter>maxTargetPerLoc) {
       if(FSNamesystem.LOG.isDebugEnabled()) {
-        FSNamesystem.LOG.debug("Node "+NodeBase.getPath(node)+
-            " is not chosen because the rack has too many chosen nodes");
+        threadLocalBuilder.get().append(node.toString()).append(": ")
+          .append("Node ").append(NodeBase.getPath(node))
+          .append(" is not chosen because the rack has too many chosen nodes ");
       }
       return false;
     }

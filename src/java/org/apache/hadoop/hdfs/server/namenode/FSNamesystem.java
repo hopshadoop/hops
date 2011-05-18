@@ -1642,7 +1642,10 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean,
     if (targets.length < blockManager.minReplication) {
       throw new IOException("File " + src + " could only be replicated to " +
                             targets.length + " nodes, instead of " +
-                            blockManager.minReplication);
+                            blockManager.minReplication + ". There are "
+                            +clusterMap.getNumOfLeaves()+" datanode(s) running"
+                            +" but "+excludedNodes.size() +
+                            " node(s) are excluded in this operation.");
     }
 
     // Allocate a new block and record it in the INode. 

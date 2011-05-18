@@ -433,6 +433,9 @@ Trunk (unreleased changes)
     HDFS-1939.  In ivy.xml, test conf should not extend common conf.
     (Eric Yang via szetszwo)
 
+    HDFS-1332.  Include more information in exceptions and debug messages
+    when BlockPlacementPolicy cannot be satisfied.  (Ted Yu via szetszwo)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
