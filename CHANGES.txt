@@ -1012,6 +1012,9 @@ Release 0.22.0 - Unreleased
     HDFS-1505. saveNamespace appears to succeed even if all directories fail
     to save. (Aaron T. Myers via todd)
 
+    HDFS-1921. saveNamespace can cause NN to be unable to come up on restart
+    (Matt Foley via todd)
+
 Release 0.21.1 - Unreleased
     HDFS-1466. TestFcHdfsSymlink relies on /tmp/test not existing. (eli)
 
