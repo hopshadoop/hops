@@ -106,6 +106,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2502. JobSubmitter should use mapreduce.job.maps instead of
     its deprecated equivalent. (eli via todd)
 
+    MAPREDUCE-2381. JobTracker instrumentation not consistent about error
+    handling. (Philip Zeyliger via tomwhite)
+
   OPTIMIZATIONS
     
     MAPREDUCE-2026. Make JobTracker.getJobCounters() and

@@ -1521,9 +1521,9 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
 
     // Initialize instrumentation
     JobTrackerInstrumentation tmp;
-    Class<? extends JobTrackerInstrumentation> metricsInst =
-      getInstrumentationClass(jobConf);
     try {
+      Class<? extends JobTrackerInstrumentation> metricsInst =
+        getInstrumentationClass(jobConf);
       java.lang.reflect.Constructor<? extends JobTrackerInstrumentation> c =
         metricsInst.getConstructor(new Class[] {JobTracker.class, JobConf.class} );
       tmp = c.newInstance(this, jobConf);
@@ -4728,9 +4728,9 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
 
     // Initialize instrumentation
     JobTrackerInstrumentation tmp;
-    Class<? extends JobTrackerInstrumentation> metricsInst =
-      getInstrumentationClass(conf);
     try {
+      Class<? extends JobTrackerInstrumentation> metricsInst =
+        getInstrumentationClass(conf);
       java.lang.reflect.Constructor<? extends JobTrackerInstrumentation> c =
         metricsInst.getConstructor(new Class[] {JobTracker.class, JobConf.class} );
       tmp = c.newInstance(this, conf);
