@@ -5415,12 +5415,11 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean,
   }
   
   /**
-   * If the remote IP for namenode method invokation is null, then the
-   * invocation is internal to the namenode. Client invoked methods are invoked
-   * over RPC and always have address != null.
+   * Client invoked methods are invoked over RPC and will be in 
+   * RPC call context even if the client exits.
    */
   private boolean isExternalInvocation() {
-    return Server.getRemoteIp() != null;
+    return Server.isRpcInvocation();
   }
   
   /**

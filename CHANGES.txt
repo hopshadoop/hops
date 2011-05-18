@@ -593,6 +593,9 @@ Trunk (unreleased changes)
     HDFS-1881. Federation: after taking snapshot the current directory 
     of datanode is empty. (Tanping Wang via suresh)
 
+    HDFS-1927. Fix a bug which causes ip=null in NameNode audit log.
+    (John George via szetszwo)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES
