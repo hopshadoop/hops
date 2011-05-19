@@ -460,9 +460,10 @@ abstract class TaskRunner extends Thread {
     vargs.add("-Dhadoop.log.dir=" + 
         new File(System.getProperty("hadoop.log.dir")).getAbsolutePath());
     vargs.add("-Dhadoop.root.logger=" + getLogLevel(conf).toString() + ",TLA");
-    vargs.add("-Dhadoop.tasklog.taskid=" + taskid);
-    vargs.add("-Dhadoop.tasklog.iscleanup=" + t.isTaskCleanupTask());
-    vargs.add("-Dhadoop.tasklog.totalLogFileSize=" + logSize);
+    vargs.add("-D" + TaskLogAppender.TASKID_PROPERTY +  "=" + taskid);
+    vargs.add("-D" + TaskLogAppender.ISCLEANUP_PROPERTY +
+              "=" + t.isTaskCleanupTask());
+    vargs.add("-D" + TaskLogAppender.LOGSIZE_PROPERTY + "=" + logSize);
   }
 
   /**

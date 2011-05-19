@@ -116,6 +116,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2483. Remove duplication of jars between Hadoop subprojects
     from build artifacts. (Eric Yang via omalley)
 
+    MAPREDUCE-2372. TaskLogAppender mechanism shouldn't be set up in
+    log4j.properties (todd)
+
   OPTIMIZATIONS
     
     MAPREDUCE-2026. Make JobTracker.getJobCounters() and
