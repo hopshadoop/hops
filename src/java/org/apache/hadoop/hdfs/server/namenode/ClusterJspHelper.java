@@ -291,7 +291,8 @@ class ClusterJspHelper {
       // Get an MBeanServerConnection on the remote VM.
       MBeanServerConnection remote = connector.getMBeanServerConnection();
       ObjectName mxbeanName = new ObjectName(
-          "HadoopInfo:type=NameNodeInfo");
+          "Hadoop:service=NameNode,name=NameNodeInfo");
+
       return JMX.newMXBeanProxy(remote, mxbeanName, NameNodeMXBean.class);
     }
     

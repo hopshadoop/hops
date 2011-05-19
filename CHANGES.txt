@@ -599,6 +599,9 @@ Trunk (unreleased changes)
     HDFS-1927. Fix a bug which causes ip=null in NameNode audit log.
     (John George via szetszwo)
 
+    HDFS-1953. Federation: Change name node mxbean name in cluster web 
+    console. (Tanping Wang via suresh)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES
