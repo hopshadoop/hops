@@ -586,12 +586,39 @@ public class JspHelper {
   }
 
   /**
-   * Returns the url parameter for the given bpid string.
+   * Returns the url parameter for the given string, prefixed with
+   * paramSeparator.
+   * 
+   * @param name parameter name
+   * @param val parameter value
+   * @param paramSeparator URL parameter prefix, i.e. either '?' or '&'
+   * @return url parameter
+   */
+  public static String getUrlParam(String name, String val, String paramSeparator) {
+    return val == null ? "" : paramSeparator + name + "=" + val;
+  }
+  
+  /**
+   * Returns the url parameter for the given string, prefixed with '?' if
+   * firstParam is true, prefixed with '&' if firstParam is false.
+   * 
+   * @param name parameter name
+   * @param val parameter value
+   * @param firstParam true if this is the first parameter in the list, false otherwise
+   * @return url parameter
+   */
+  public static String getUrlParam(String name, String val, boolean firstParam) {
+    return getUrlParam(name, val, firstParam ? "?" : "&");
+  }
+  
+  /**
+   * Returns the url parameter for the given string, prefixed with '&'.
+   * 
    * @param name parameter name
    * @param val parameter value
    * @return url parameter
    */
   public static String getUrlParam(String name, String val) {
-    return val == null ? "" : "&" + name + "=" + val;
+    return getUrlParam(name, val, false);
   }
 }
