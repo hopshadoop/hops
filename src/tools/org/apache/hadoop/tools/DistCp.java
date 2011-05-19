@@ -87,7 +87,7 @@ public class DistCp implements Tool {
   private static final String usage = NAME
     + " [OPTIONS] <srcurl>* <desturl>" +
     "\n\nOPTIONS:" +
-    "\n-p[rbugp]              Preserve status" +
+    "\n-p[rbugpt]             Preserve status" +
     "\n                       r: replication number" +
     "\n                       b: block size" +
     "\n                       u: user" + 

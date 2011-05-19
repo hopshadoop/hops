@@ -206,6 +206,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2258. IFile reader closes stream and compressor in wrong order.
     (todd via tomwhite)
 
+    MAPREDUCE-2518. The t flag is missing in distcp help message.  (Wei Yongjun
+    via szetszwo)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES
