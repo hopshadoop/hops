@@ -439,6 +439,9 @@ Trunk (unreleased changes)
     HDFS-1958. Confirmation should be more lenient of user input when
     formatting the NameNode. (todd)
 
+    HDFS-1905. Improve namenode -format command by not making -clusterId
+    parameter mandatory. (Bharath Mundlapudi via suresh)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image

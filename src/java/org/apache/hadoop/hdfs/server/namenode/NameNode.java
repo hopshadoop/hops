@@ -1494,23 +1494,16 @@ public class NameNode implements NamenodeProtocols, FSConstants {
       }
     }
 
-    FSImage fsImage = new FSImage(dirsToFormat, editDirsToFormat);
-    FSNamesystem nsys = new FSNamesystem(fsImage, conf);
-    
     // if clusterID is not provided - see if you can find the current one
     String clusterId = StartupOption.FORMAT.getClusterId();
     if(clusterId == null || clusterId.equals("")) {
-      // try to get one from the existing storage
-      clusterId = fsImage.getStorage().determineClusterId();
-      if (clusterId == null || clusterId.equals("")) {
-        throw new IllegalArgumentException("Format must be provided with clusterid");
-      }
-      if(isConfirmationNeeded) {
-        if (!confirmPrompt("Use existing cluster id=" + clusterId + "?")) {
-          throw new IllegalArgumentException("Format must be provided with clusterid");
-        }
-      }
+      //Generate a new cluster id
+      clusterId = NNStorage.newClusterID();
     }
+    System.out.println("Formatting using clusterid: " + clusterId);
+    
+    FSImage fsImage = new FSImage(dirsToFormat, editDirsToFormat);
+    FSNamesystem nsys = new FSNamesystem(fsImage, conf);
     nsys.dir.fsImage.getStorage().format(clusterId);
     return false;
   }
