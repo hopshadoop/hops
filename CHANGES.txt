@@ -608,6 +608,8 @@ Trunk (unreleased changes)
     HDFS-1953. Federation: Change name node mxbean name in cluster web 
     console. (Tanping Wang via suresh)
 
+    HDFS-1922. Fix recurring failure of TestJMXGet (Luke Lu via todd)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES

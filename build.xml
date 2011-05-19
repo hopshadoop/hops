@@ -300,6 +300,9 @@
       <fileset dir="${conf.dir}" includes="**/*.template"/>
       <mapper type="glob" from="*.template" to="*"/>
     </copy>
+    <copy todir="${test.conf.dir}" verbose="true">
+      <fileset dir="${conf.dir}" includes="**/*.properties"/>
+    </copy>
 
     <copy todir="${contrib.dir}" verbose="true">
       <fileset dir="${contrib.dir}" includes="**/*.template"/>
