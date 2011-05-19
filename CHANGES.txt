@@ -442,6 +442,9 @@ Trunk (unreleased changes)
     HDFS-1905. Improve namenode -format command by not making -clusterId
     parameter mandatory. (Bharath Mundlapudi via suresh)
 
+    HDFS-1941. Remove -genclusterid option from namenode command.
+    (Bharath Mundlapudi via suresh)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
