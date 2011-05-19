@@ -20,7 +20,8 @@ Trunk (unreleased changes)
     MAPREDUCE-1461. Feature to instruct rumen-folder utility to skip jobs worth 
     of specific duration. (Rajesh Balamohan via amarrk)
 
-    MAPREDUCE-2172. Added test-patch.properties required by test-patch.sh (nigel)
+    MAPREDUCE-2172. Added test-patch.properties required by test-patch.sh 
+    (nigel)
 
     MAPREDUCE-2156. Raid-aware FSCK. (Patrick Kling via dhruba)
 
@@ -111,6 +112,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-2449. Allow for command line arguments when performing
     "Run on Hadoop" action in Eclipse plugin. (Jeff Zemerick via todd)
+
+    MAPREDUCE-2483. Remove duplication of jars between Hadoop subprojects
+    from build artifacts. (Eric Yang via omalley)
 
   OPTIMIZATIONS
     

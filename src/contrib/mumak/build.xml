@@ -96,11 +96,6 @@ to call at top-level: ant deploy-contrib compile-core-test
     <copy todir="${dist.dir}/contrib/${name}/conf" includeEmptyDirs="true">
       <fileset dir="${root}/conf" />
     </copy>
-    <copy todir="${dist.dir}/lib" includeEmptyDirs="false">
-      <fileset dir="${common.ivy.lib.dir}">
-        <include name="*.jar"/>
-      </fileset>
-    </copy>
     <exec executable="sed">
       <arg value="-i"/>
       <arg value="-e"/>

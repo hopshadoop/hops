@@ -36,9 +36,10 @@
     -->
     <!--Private configurations. -->
 
-    <conf name="common" visibility="private" extends="compile,runtime" description="common artifacts"/>
+    <conf name="common" visibility="private" extends="compile" description="common artifacts"/>
+    <conf name="mapred" visibility="private" extends="compile,runtime" description="Mapred dependent artifacts"/>
     <conf name="javadoc" visibility="private" description="artiracts required while performing doc generation" extends="common"/>
-    <conf name="test" extends="common" visibility="private" description="the classpath needed to run tests"/>
+    <conf name="test" extends="master" visibility="private" description="the classpath needed to run tests"/>
     <conf name="system" extends="test" visibility="private" description="the classpath needed to run system tests"/>
 
     <conf name="test-hdfswithmr" extends="test" visibility="private" description="the classpath needed to run tests"/>
@@ -73,7 +74,7 @@
    <dependency org="org.slf4j" name="slf4j-api" rev="${slf4j-api.version}" 
                conf="common->master"/>
    <dependency org="org.slf4j" name="slf4j-log4j12" 
-               rev="${slf4j-log4j12.version}" conf="common->master"/>
+               rev="${slf4j-log4j12.version}" conf="mapred->master"/>
    <dependency org="org.apache.hadoop" name="hadoop-common-test" 
                rev="${hadoop-common.version}" conf="test->default"/>
    <dependency org="org.apache.hadoop" name="hadoop-hdfs-test" 
