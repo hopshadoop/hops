@@ -109,6 +109,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2381. JobTracker instrumentation not consistent about error
     handling. (Philip Zeyliger via tomwhite)
 
+    MAPREDUCE-2449. Allow for command line arguments when performing
+    "Run on Hadoop" action in Eclipse plugin. (Jeff Zemerick via todd)
+
   OPTIMIZATIONS
     
     MAPREDUCE-2026. Make JobTracker.getJobCounters() and

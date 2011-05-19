@@ -52,6 +52,7 @@ import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Table;
 import org.eclipse.swt.widgets.TableColumn;
+import org.eclipse.swt.widgets.Text;
 
 /**
  * Wizard for publishing a job to a Hadoop server.
@@ -184,6 +185,7 @@ public class RunOnHadoopWizard extends Wizard {
       classPath.add(0, cpEntry.getMemento());
       iConf.setAttribute(IJavaLaunchConfigurationConstants.ATTR_CLASSPATH,
           classPath);
+      iConf.setAttribute(IJavaLaunchConfigurationConstants.ATTR_PROGRAM_ARGUMENTS, mainPage.argumentsText.getText());
 
     } catch (CoreException e) {
       e.printStackTrace();
@@ -220,6 +222,7 @@ public class RunOnHadoopWizard extends Wizard {
     private Button createNew;
 
     private Table table;
+    private Text argumentsText;
 
     private Button chooseExisting;
 
@@ -238,8 +241,8 @@ public class RunOnHadoopWizard extends Wizard {
     /* @inheritDoc */
     public void createControl(Composite parent) {
       Composite panel = new Composite(parent, SWT.NONE);
-      panel.setLayout(new GridLayout(1, false));
-
+      panel.setLayout(new GridLayout(1, false));     
+      
       // Label
       Label label = new Label(panel, SWT.NONE);
       label.setText("Select a Hadoop Server to run on.");
@@ -319,6 +322,25 @@ public class RunOnHadoopWizard extends Wizard {
         }
       });
 
+      // Label
+      Label argumentsLabel = new Label(panel, SWT.NONE);
+      argumentsLabel.setText("Arguments:");
+      GridData gDataArgumentsLabel = new GridData(GridData.FILL_BOTH);
+      gDataArgumentsLabel.grabExcessVerticalSpace = false;
+      argumentsLabel.setLayoutData(gDataArgumentsLabel); 
+      
+      // Textbox
+      argumentsText = new Text(panel, SWT.NONE);
+      try {
+        argumentsText.setText(iConf.getAttribute(IJavaLaunchConfigurationConstants.ATTR_PROGRAM_ARGUMENTS, ""));
+      } catch (CoreException e1) {
+        e1.printStackTrace();
+      }
+      GridData gDataArgumentsText = new GridData(GridData.FILL_BOTH);
+      gDataArgumentsText.grabExcessVerticalSpace = false;
+      argumentsText.setLayoutData(gDataArgumentsText);      
+      
+      
       TableViewer viewer = new TableViewer(table);
       HadoopServerSelectionListContentProvider provider =
           new HadoopServerSelectionListContentProvider();

@@ -111,7 +111,10 @@ public class HadoopApplicationLaunchShortcut extends
       return null;
 
     try {
-      iConfWC.doSave();
+      
+      // Only save if some configuration is different.
+      if(!iConfWC.contentsEqual(iConf))
+        iConfWC.doSave();
 
     } catch (CoreException e) {
       e.printStackTrace();
