@@ -1487,12 +1487,10 @@ public class NameNode implements NamenodeProtocols, FSConstants {
       if (!curDir.exists())
         continue;
       if (isConfirmationNeeded) {
-        System.err.print("Re-format filesystem in " + curDir +" ? (Y or N) ");
-        if (System.in.read() != 'Y') {
+        if (!confirmPrompt("Re-format filesystem in " + curDir + " ?")) {
           System.err.println("Format aborted in "+ curDir);
           return true;
         }
-        while(System.in.read() != '\n'); // discard the enter-key
       }
     }
 
@@ -1508,11 +1506,9 @@ public class NameNode implements NamenodeProtocols, FSConstants {
         throw new IllegalArgumentException("Format must be provided with clusterid");
       }
       if(isConfirmationNeeded) {
-        System.err.print("Use existing cluster id=" + clusterId + "? (Y or N)");
-        if(System.in.read() != 'Y') {
+        if (!confirmPrompt("Use existing cluster id=" + clusterId + "?")) {
           throw new IllegalArgumentException("Format must be provided with clusterid");
         }
-        while(System.in.read() != '\n'); // discard the enter-key
       }
     }
     nsys.dir.fsImage.getStorage().format(clusterId);
@@ -1532,12 +1528,10 @@ public class NameNode implements NamenodeProtocols, FSConstants {
         + "Recent upgrade will become permanent.\n"
         + "Rollback option will not be available anymore.\n");
     if (isConfirmationNeeded) {
-      System.err.print("Finalize filesystem state ? (Y or N) ");
-      if (!(System.in.read() == 'Y')) {
+      if (!confirmPrompt("Finalize filesystem state?")) {
         System.err.println("Finalize aborted.");
         return true;
       }
-      while(System.in.read() != '\n'); // discard the enter-key
     }
     nsys.dir.fsImage.finalizeUpgrade();
     return false;
@@ -1638,6 +1632,34 @@ public class NameNode implements NamenodeProtocols, FSConstants {
   static StartupOption getStartupOption(Configuration conf) {
     return StartupOption.valueOf(conf.get("dfs.namenode.startup",
                                           StartupOption.REGULAR.toString()));
+  }
+
+  /**
+   * Print out a prompt to the user, and return true if the user
+   * responds with "Y" or "yes".
+   */
+  static boolean confirmPrompt(String prompt) throws IOException {
+    while (true) {
+      System.err.print(prompt + " (Y or N) ");
+      StringBuilder responseBuilder = new StringBuilder();
+      while (true) {
+        int c = System.in.read();
+        if (c == -1 || c == '\r' || c == '\n') {
+          break;
+        }
+        responseBuilder.append((char)c);
+      }
+  
+      String response = responseBuilder.toString();
+      if (response.equalsIgnoreCase("y") ||
+          response.equalsIgnoreCase("yes")) {
+        return true;
+      } else if (response.equalsIgnoreCase("n") ||
+          response.equalsIgnoreCase("no")) {
+        return false;
+      }
+      // else ask them again
+    }
   }
 
   public static NameNode createNameNode(String argv[], Configuration conf)
