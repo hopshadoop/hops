@@ -610,6 +610,9 @@ Trunk (unreleased changes)
 
     HDFS-1922. Fix recurring failure of TestJMXGet (Luke Lu via todd)
 
+    HDFS-1371. One bad node can incorrectly flag many files as corrupt.
+    (Tanping Wang via jitendra)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES

@@ -689,6 +689,9 @@ public class DistributedFileSystem extends FileSystem {
    * is corrupt but we will report both to the namenode.  In the future,
    * we can consider figuring out exactly which block is corrupt.
    */
+  // We do not see a need for user to report block checksum errors and do not  
+  // want to rely on user to report block corruptions.
+  @Deprecated
   public boolean reportChecksumFailure(Path f, 
     FSDataInputStream in, long inPos, 
     FSDataInputStream sums, long sumsPos) {

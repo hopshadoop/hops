@@ -341,16 +341,17 @@ public class TestFsck extends TestCase {
     int replicaCount = 0;
     Random random = new Random();
     String outStr = null;
+    short factor = 1;
 
     MiniDFSCluster cluster = null;
     try {
-    cluster = new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
+    cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
     cluster.waitActive();
     fs = cluster.getFileSystem();
     Path file1 = new Path("/testCorruptBlock");
-    DFSTestUtil.createFile(fs, file1, 1024, (short)3, 0);
+    DFSTestUtil.createFile(fs, file1, 1024, factor, 0);
     // Wait until file replication has completed
-    DFSTestUtil.waitReplication(fs, file1, (short)3);
+    DFSTestUtil.waitReplication(fs, file1, factor);
     ExtendedBlock block = DFSTestUtil.getFirstBlock(fs, file1);
 
     // Make sure filesystem is in healthy state
@@ -358,18 +359,16 @@ public class TestFsck extends TestCase {
     System.out.println(outStr);
     assertTrue(outStr.contains(NamenodeFsck.HEALTHY_STATUS));
     
-    // corrupt replicas 
-    for (int i=0; i < 3; i++) {
-      File blockFile = MiniDFSCluster.getBlockFile(i, block);
-      if (blockFile != null && blockFile.exists()) {
-        RandomAccessFile raFile = new RandomAccessFile(blockFile, "rw");
-        FileChannel channel = raFile.getChannel();
-        String badString = "BADBAD";
-        int rand = random.nextInt((int)channel.size()/2);
-        raFile.seek(rand);
-        raFile.write(badString.getBytes());
-        raFile.close();
-      }
+    // corrupt replicas
+    File blockFile = MiniDFSCluster.getBlockFile(0, block);
+    if (blockFile != null && blockFile.exists()) {
+      RandomAccessFile raFile = new RandomAccessFile(blockFile, "rw");
+      FileChannel channel = raFile.getChannel();
+      String badString = "BADBAD";
+      int rand = random.nextInt((int) channel.size()/2);
+      raFile.seek(rand);
+      raFile.write(badString.getBytes());
+      raFile.close();
     }
     // Read the file to trigger reportBadBlocks
     try {
@@ -384,7 +383,7 @@ public class TestFsck extends TestCase {
     blocks = dfsClient.getNamenode().
                getBlockLocations(file1.toString(), 0, Long.MAX_VALUE);
     replicaCount = blocks.get(0).getLocations().length;
-    while (replicaCount != 3) {
+    while (replicaCount != factor) {
       try {
         Thread.sleep(100);
       } catch (InterruptedException ignore) {
