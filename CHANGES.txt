@@ -756,6 +756,9 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2327. MapTask doesn't need to put username information in
     SpillRecord. (todd via tomwhite)
 
+    MAPREDUCE-2515. MapReduce code references some deprecated options
+    (Ari Rabkin via todd)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES

@@ -1655,8 +1655,10 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     infoServer.setAttribute("fileSys", historyFS);
 
     this.dnsToSwitchMapping = ReflectionUtils.newInstance(
-        conf.getClass("topology.node.switch.mapping.impl", ScriptBasedMapping.class,
-            DNSToSwitchMapping.class), conf);
+        conf.getClass(
+            CommonConfigurationKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY, 
+            ScriptBasedMapping.class, DNSToSwitchMapping.class),
+         conf);
     this.numTaskCacheLevels = conf.getInt(JT_TASKCACHE_LEVELS, 
         NetworkTopology.DEFAULT_HOST_LEVEL);
 
@@ -4673,8 +4675,8 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     
     secretManager = null;
     
-    this.hostsReader = new HostsFileReader(conf.get("mapred.hosts", ""),
-        conf.get("mapred.hosts.exclude", ""));
+    this.hostsReader = new HostsFileReader(conf.get(JTConfig.JT_HOSTS_FILENAME, ""),
+        conf.get(JTConfig.JT_HOSTS_EXCLUDE_FILENAME, ""));
     // queue manager
     Configuration clusterConf = new Configuration(this.conf);
     queueManager = new QueueManager(clusterConf);
@@ -4686,14 +4688,14 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
 
     // Create the scheduler
     Class<? extends TaskScheduler> schedulerClass
-      = conf.getClass("mapred.jobtracker.taskScheduler",
+      = conf.getClass(JTConfig.JT_TASK_SCHEDULER,
           JobQueueTaskScheduler.class, TaskScheduler.class);
     taskScheduler = 
       (TaskScheduler)ReflectionUtils.newInstance(schedulerClass, conf);
 
     // Create the jetty server
     InetSocketAddress infoSocAddr = NetUtils.createSocketAddr(
-        conf.get("mapred.job.tracker.http.address", "0.0.0.0:50030"));
+        conf.get(JTConfig.JT_HTTP_ADDRESS, "0.0.0.0:50030"));
     String infoBindAddress = infoSocAddr.getHostName();
     int tmpInfoPort = infoSocAddr.getPort();
     this.startTime = clock.getTime();
@@ -4746,8 +4748,10 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     recoveryManager = new RecoveryManager();
     
     this.dnsToSwitchMapping = ReflectionUtils.newInstance(
-        conf.getClass("topology.node.switch.mapping.impl", ScriptBasedMapping.class,
-            DNSToSwitchMapping.class), conf);
+        conf.getClass(
+            CommonConfigurationKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY, 
+            ScriptBasedMapping.class, DNSToSwitchMapping.class), 
+        conf);
     this.numTaskCacheLevels = conf.getInt("mapred.task.cache.levels", 
         NetworkTopology.DEFAULT_HOST_LEVEL);
 
