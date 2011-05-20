@@ -214,6 +214,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2518. The t flag is missing in distcp help message.  (Wei Yongjun
     via szetszwo)
 
+    MAPREDUCE-2470. Fix NPE in RunningJobs::getCounters. (Robert Joseph Evans
+    via cdouglas)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES
