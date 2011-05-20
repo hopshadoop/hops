@@ -445,6 +445,9 @@ Trunk (unreleased changes)
     HDFS-1941. Remove -genclusterid option from namenode command.
     (Bharath Mundlapudi via suresh)
 
+    HDFS-1877.  Add a new test for concurrent read and write.  (CW Chung
+    via szetszwo)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
