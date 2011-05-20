@@ -122,6 +122,8 @@ Trunk (unreleased changes)
     MAPREDUCE-2516. Rename webinterface.private.actions to
     mapreduce.jobtracker.webinterface.trusted (Ari Rabkin via todd)
 
+    MAPREDUCE-2459. Cache HAR filesystem metadata. (Mac Yang via mahadev)
+
   OPTIMIZATIONS
     
     MAPREDUCE-2026. Make JobTracker.getJobCounters() and
