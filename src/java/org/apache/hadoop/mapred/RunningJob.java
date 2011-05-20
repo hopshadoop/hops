@@ -193,7 +193,7 @@ public interface RunningJob {
   /**
    * Gets the counters for this job.
    * 
-   * @return the counters for this job or null if the job has been retired.
+   * @return the counters for this job.
    * @throws IOException
    */
   public Counters getCounters() throws IOException;

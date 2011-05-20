@@ -214,9 +214,6 @@ Trunk (unreleased changes)
     MAPREDUCE-2518. The t flag is missing in distcp help message.  (Wei Yongjun
     via szetszwo)
 
-    MAPREDUCE-2470. Fix NPE in RunningJobs::getCounters. (Robert Joseph Evans
-    via cdouglas)
-
     MAPREDUCE-2514. Fix typo in TaskTracker ReinitTrackerAction log message.
     (Jonathan Eagles via cdouglas)
 
