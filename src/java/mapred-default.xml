@@ -1004,6 +1004,16 @@
 </property>
 
 <property>
+  <name>mapreduce.jobtracker.webinterface.trusted</name>
+  <value>false</value>
+  <description> If set to true, the web interface of the JobTracker                       
+                will include actions such as kill job that are security sensitive.
+                Leave this option as false if untrusted users have access to the web interface.                              
+  </description>
+</property>
+
+
+<property>
   <name>mapreduce.tasktracker.indexcache.mb</name>
   <value>10</value>
   <description> The maximum memory that a task tracker allows for the 

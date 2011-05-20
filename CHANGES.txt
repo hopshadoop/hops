@@ -119,6 +119,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2372. TaskLogAppender mechanism shouldn't be set up in
     log4j.properties (todd)
 
+    MAPREDUCE-2516. Rename webinterface.private.actions to
+    mapreduce.jobtracker.webinterface.trusted (Ari Rabkin via todd)
+
   OPTIMIZATIONS
     
     MAPREDUCE-2026. Make JobTracker.getJobCounters() and

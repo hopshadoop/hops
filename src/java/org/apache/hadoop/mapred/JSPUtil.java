@@ -49,7 +49,6 @@ import org.apache.hadoop.util.ServletUtil;
 import org.apache.hadoop.util.StringUtils;
 
 class JSPUtil {
-  static final String PRIVATE_ACTIONS_KEY = "webinterface.private.actions";
 
   //LRU based cache
   private static final Map<String, JobInfo> jobHistoryCache = 
@@ -476,7 +475,7 @@ class JSPUtil {
   }
 
   static boolean privateActionsAllowed(JobConf conf) {
-    return conf.getBoolean(PRIVATE_ACTIONS_KEY, false);
+    return conf.getBoolean(JTConfig.PRIVATE_ACTIONS_KEY, false);
   }
 
   static Path getJobConfFilePath(Path logFile) {

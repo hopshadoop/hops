@@ -509,6 +509,9 @@ public class ConfigUtil {
       new String[] {org.apache.hadoop.mapred.pipes.Submitter.PARTITIONER});
     Configuration.addDeprecation("mapred.pipes.user.inputformat", 
       new String[] {org.apache.hadoop.mapred.pipes.Submitter.INPUT_FORMAT});
+    
+    Configuration.addDeprecation("webinterface.private.actions", 
+        new String[]{JTConfig.PRIVATE_ACTIONS_KEY});
   }
 }
 

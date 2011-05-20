@@ -674,7 +674,7 @@ public class TestWebUIAuthorization extends ClusterMapReduceTestCase {
 
     props.setProperty("dfs.permissions.enabled", "false");
     
-    props.setProperty(JSPUtil.PRIVATE_ACTIONS_KEY, "true");
+    props.setProperty(JTConfig.PRIVATE_ACTIONS_KEY, "true");
     props.setProperty(MRJobConfig.SETUP_CLEANUP_NEEDED, "false");
     props.setProperty(MRConfig.MR_SUPERGROUP, "superGroup");
     props.setProperty(MRConfig.MR_ADMINS, mrAdminUser + " " + mrAdminGroup);
