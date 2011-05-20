@@ -513,9 +513,11 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
   private void removeTracker(TaskTracker tracker) {
     lostTaskTracker(tracker);
     String trackerName = tracker.getStatus().getTrackerName();
+    String hostName = JobInProgress.convertTrackerNameToHostName(trackerName);
     // tracker is lost, and if it is blacklisted, remove 
     // it from the count of blacklisted trackers in the cluster
     if (isBlacklisted(trackerName)) {
+      LOG.info("Removing " + hostName + " from blacklist");
       faultyTrackers.decrBlackListedTrackers(1);
     }
     updateTaskTrackerStatus(trackerName, null);
@@ -723,11 +725,13 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
     }
 
     private void incrBlackListedTrackers(int count) {
+      LOG.info("Incrementing blacklisted trackers by " + count);
       numBlacklistedTrackers += count;
       getInstrumentation().addBlackListedTrackers(count);
     }
 
     private void decrBlackListedTrackers(int count) {
+      LOG.info("Decrementing blacklisted trackers by " + count);
       numBlacklistedTrackers -= count;
       getInstrumentation().decBlackListedTrackers(count);
     }
@@ -780,8 +784,8 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
       FaultInfo fi = getFaultInfo(hostName, false);
       if (fi.removeBlackListedReason(rfb)) {
         if (fi.getReasonforblacklisting().isEmpty()) {
-          addHostCapacity(hostName);
           LOG.info("Unblacklisting tracker : " + hostName);
+          addHostCapacity(hostName);
           fi.unBlacklist();
           //We have unBlackListed tracker, so tracker should
           //definitely be healthy. Check fault count if fault count
@@ -849,7 +853,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
       synchronized (potentiallyFaultyTrackers) {
         FaultInfo fi = potentiallyFaultyTrackers.remove(hostName);
         if (fi != null && fi.isBlacklisted()) {
-          LOG.info("Removing " + hostName + " from blacklist");
+          LOG.info("Marking " + hostName + " healthy from blacklist");
           addHostCapacity(hostName);
         }
       }
