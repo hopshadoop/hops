@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs.security.token.block;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
+import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.EnumSet;
@@ -32,12 +33,17 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.ClientDatanodeProtocol;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.DatanodeID;
+import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
+import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.io.TestWritable;
 import org.apache.hadoop.ipc.Client;
@@ -54,6 +60,7 @@ import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.log4j.Level;
 
 import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.Test;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeys.HADOOP_SECURITY_AUTHENTICATION;
@@ -89,6 +96,9 @@ public class TestBlockToken {
     ((Log4JLogger) SaslRpcServer.LOG).getLogger().setLevel(Level.ALL);
     ((Log4JLogger) SaslInputStream.LOG).getLogger().setLevel(Level.ALL);
   }
+  
+  /** Directory where we can count our open file descriptors under Linux */
+  static File FD_DIR = new File("/proc/self/fd/");  
 
   long blockKeyUpdateInterval = 10 * 60 * 1000; // 10 mins
   long blockTokenLifetime = 2 * 60 * 1000; // 2 mins
@@ -192,14 +202,9 @@ public class TestBlockToken {
     slaveHandler.setKeys(keys);
     tokenGenerationAndVerification(masterHandler, slaveHandler);
   }
-
-  @Test
-  public void testBlockTokenRpc() throws Exception {
-    BlockTokenSecretManager sm = new BlockTokenSecretManager(true,
-        blockKeyUpdateInterval, blockTokenLifetime);
-    Token<BlockTokenIdentifier> token = sm.generateToken(block3,
-        EnumSet.allOf(BlockTokenSecretManager.AccessMode.class));
-
+  
+  private Server createMockDatanode(BlockTokenSecretManager sm,
+      Token<BlockTokenIdentifier> token) throws IOException {
     ClientDatanodeProtocol mockDN = mock(ClientDatanodeProtocol.class);
     when(mockDN.getProtocolVersion(anyString(), anyLong())).thenReturn(
         ClientDatanodeProtocol.versionID);
@@ -214,8 +219,18 @@ public class TestBlockToken {
     doAnswer(new getLengthAnswer(sm, id)).when(mockDN).getReplicaVisibleLength(
         any(ExtendedBlock.class));
 
-    final Server server = RPC.getServer(ClientDatanodeProtocol.class, mockDN,
+    return RPC.getServer(ClientDatanodeProtocol.class, mockDN,
         ADDRESS, 0, 5, true, conf, sm);
+  }
+
+  @Test
+  public void testBlockTokenRpc() throws Exception {
+    BlockTokenSecretManager sm = new BlockTokenSecretManager(true,
+        blockKeyUpdateInterval, blockTokenLifetime);
+    Token<BlockTokenIdentifier> token = sm.generateToken(block3,
+        EnumSet.allOf(BlockTokenSecretManager.AccessMode.class));
+
+    final Server server = createMockDatanode(sm, token);
 
     server.start();
 
@@ -226,7 +241,7 @@ public class TestBlockToken {
 
     ClientDatanodeProtocol proxy = null;
     try {
-      proxy = (ClientDatanodeProtocol) RPC.getProxy(
+      proxy = RPC.getProxy(
           ClientDatanodeProtocol.class, ClientDatanodeProtocol.versionID, addr,
           ticket, conf, NetUtils.getDefaultSocketFactory(conf));
       assertEquals(block3.getBlockId(), proxy.getReplicaVisibleLength(block3));
@@ -237,7 +252,76 @@ public class TestBlockToken {
       }
     }
   }
-  
+
+  /**
+   * Test that fast repeated invocations of createClientDatanodeProtocolProxy
+   * will not end up using up thousands of sockets. This is a regression test for
+   * HDFS-1965.
+   */
+  @Test
+  public void testBlockTokenRpcLeak() throws Exception {
+    Assume.assumeTrue(FD_DIR.exists());
+    BlockTokenSecretManager sm = new BlockTokenSecretManager(true,
+        blockKeyUpdateInterval, blockTokenLifetime);
+    Token<BlockTokenIdentifier> token = sm.generateToken(block3,
+        EnumSet.allOf(BlockTokenSecretManager.AccessMode.class));
+
+    final Server server = createMockDatanode(sm, token);
+    server.start();
+
+    final InetSocketAddress addr = NetUtils.getConnectAddress(server);
+    DatanodeID fakeDnId = new DatanodeID(
+        "localhost:" + addr.getPort(), "fake-storage", 0, addr.getPort());
+    
+    ExtendedBlock b = new ExtendedBlock("fake-pool", new Block(12345L));
+    LocatedBlock fakeBlock = new LocatedBlock(b, new DatanodeInfo[0]);
+    fakeBlock.setBlockToken(token);
+
+    // Create another RPC proxy with the same configuration - this will never
+    // attempt to connect anywhere -- but it causes the refcount on the
+    // RPC "Client" object to stay above 0 such that RPC.stopProxy doesn't
+    // actually close the TCP connections to the real target DN.
+    ClientDatanodeProtocol proxyToNoWhere = RPC.getProxy(
+        ClientDatanodeProtocol.class, ClientDatanodeProtocol.versionID, 
+        new InetSocketAddress("1.1.1.1", 1),
+        UserGroupInformation.createRemoteUser("junk"),
+        conf, NetUtils.getDefaultSocketFactory(conf));
+    
+    ClientDatanodeProtocol proxy = null;
+
+    int fdsAtStart = countOpenFileDescriptors();
+    try {
+      long endTime = System.currentTimeMillis() + 3000;
+      while (System.currentTimeMillis() < endTime) {
+        proxy = DFSTestUtil.createClientDatanodeProtocolProxy(
+            fakeDnId, conf, 1000, fakeBlock);
+        assertEquals(block3.getBlockId(), proxy.getReplicaVisibleLength(block3));
+        if (proxy != null) {
+          RPC.stopProxy(proxy);
+        }
+        LOG.info("Num open fds:" + countOpenFileDescriptors());
+      }
+
+      int fdsAtEnd = countOpenFileDescriptors();
+      
+      if (fdsAtEnd - fdsAtStart > 50) {
+        fail("Leaked " + (fdsAtEnd - fdsAtStart) + " fds!");
+      }
+    } finally {
+      server.stop();
+    }
+    
+    RPC.stopProxy(proxyToNoWhere);
+  }
+
+  /**
+   * @return the current number of file descriptors open by this
+   * process.
+   */
+  private static int countOpenFileDescriptors() throws IOException {
+    return FD_DIR.list().length;
+  }
+
   /** 
    * Test {@link BlockPoolTokenSecretManager}
    */

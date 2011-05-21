@@ -45,6 +45,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -196,12 +197,24 @@ public class DFSClient implements FSConstants, java.io.Closeable {
     if (ClientDatanodeProtocol.LOG.isDebugEnabled()) {
       ClientDatanodeProtocol.LOG.debug("ClientDatanodeProtocol addr=" + addr);
     }
+    
+    // Since we're creating a new UserGroupInformation here, we know that no
+    // future RPC proxies will be able to re-use the same connection. And
+    // usages of this proxy tend to be one-off calls.
+    //
+    // This is a temporary fix: callers should really achieve this by using
+    // RPC.stopProxy() on the resulting object, but this is currently not
+    // working in trunk. See the discussion on HDFS-1965.
+    Configuration confWithNoIpcIdle = new Configuration(conf);
+    confWithNoIpcIdle.setInt(CommonConfigurationKeysPublic
+        .IPC_CLIENT_CONNECTION_MAXIDLETIME_KEY, 0);
+
     UserGroupInformation ticket = UserGroupInformation
         .createRemoteUser(locatedBlock.getBlock().getLocalBlock().toString());
     ticket.addToken(locatedBlock.getBlockToken());
     return (ClientDatanodeProtocol)RPC.getProxy(ClientDatanodeProtocol.class,
-        ClientDatanodeProtocol.versionID, addr, ticket, conf, NetUtils
-        .getDefaultSocketFactory(conf), socketTimeout);
+        ClientDatanodeProtocol.versionID, addr, ticket, confWithNoIpcIdle,
+        NetUtils.getDefaultSocketFactory(conf), socketTimeout);
   }
         
   /**

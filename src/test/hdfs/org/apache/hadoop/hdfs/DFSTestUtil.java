@@ -50,6 +50,8 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileSystem.Statistics;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSClient.DFSDataInputStream;
+import org.apache.hadoop.hdfs.protocol.ClientDatanodeProtocol;
+import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.DataTransferProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
@@ -64,6 +66,7 @@ import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
 import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.ShellBasedUnixGroupsMapping;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -518,6 +521,14 @@ public class DFSTestUtil {
   public static Token<BlockTokenIdentifier> getBlockToken(
       FSDataOutputStream out) {
     return ((DFSOutputStream) out.getWrappedStream()).getBlockToken();
+  }
+  
+  public static ClientDatanodeProtocol createClientDatanodeProtocolProxy(
+      DatanodeID datanodeid, Configuration conf, int socketTimeout,
+      LocatedBlock locatedBlock)
+      throws IOException {
+    return DFSClient.createClientDatanodeProtocolProxy(
+        datanodeid, conf, socketTimeout, locatedBlock);
   }
 
   static void setLogLevel2All(org.apache.commons.logging.Log log) {
