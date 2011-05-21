@@ -1041,6 +1041,9 @@ Release 0.22.0 - Unreleased
     hard-coded value for its default. (Joey Echeverria via todd)
 
     HDFS-1575. Viewing block from web UI is broken. (Aaron T. Myers via todd)
+    
+    HDFS-1932. Ensure that HDFS configuration deprecations are set up in every
+    spot that HDFS configurations are loaded. (Jolly Chen via todd)
 
     HDFS-1952. FSEditLog.open() appears to succeed even if all EDITS
     directories fail. (Andrew Wang via todd)

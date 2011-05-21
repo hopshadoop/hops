@@ -81,8 +81,7 @@ public class DistributedFileSystem extends FileSystem {
   private boolean verifyChecksum = true;
   
   static{
-    Configuration.addDefaultResource("hdfs-default.xml");
-    Configuration.addDefaultResource("hdfs-site.xml");
+    HdfsConfiguration.init();
   }
 
   public DistributedFileSystem() {

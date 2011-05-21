@@ -72,8 +72,7 @@ import org.apache.hadoop.util.ToolRunner;
 @InterfaceAudience.Private
 public class DFSck extends Configured implements Tool {
   static{
-    Configuration.addDefaultResource("hdfs-default.xml");
-    Configuration.addDefaultResource("hdfs-site.xml");
+    HdfsConfiguration.init();
   }
 
   private final UserGroupInformation ugi;

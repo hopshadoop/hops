@@ -99,8 +99,7 @@ public class GetConf extends Configured implements Tool {
   
   static final String USAGE;
   static {
-    Configuration.addDefaultResource("hdfs-default.xml");
-    Configuration.addDefaultResource("hdfs-site.xml");
+    HdfsConfiguration.init();
     
     /* Initialize USAGE based on Command values */
     StringBuilder usage = new StringBuilder(DESCRIPTION);

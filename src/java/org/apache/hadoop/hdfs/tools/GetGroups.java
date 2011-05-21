@@ -32,11 +32,11 @@ import org.apache.hadoop.util.ToolRunner;
  * belongs to.
  */
 public class GetGroups extends GetGroupsBase {
-  
-  static {
-    Configuration.addDefaultResource("hdfs-default.xml");
-    Configuration.addDefaultResource("hdfs-site.xml");
+
+  static{
+    HdfsConfiguration.init();
   }
+
   
   GetGroups(Configuration conf) {
     super(conf);

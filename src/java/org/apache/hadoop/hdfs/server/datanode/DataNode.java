@@ -172,8 +172,7 @@ public class DataNode extends Configured
   public static final Log LOG = LogFactory.getLog(DataNode.class);
   
   static{
-    Configuration.addDefaultResource("hdfs-default.xml");
-    Configuration.addDefaultResource("hdfs-site.xml");
+    HdfsConfiguration.init();
   }
 
   public static final String DN_CLIENTTRACE_FORMAT =
