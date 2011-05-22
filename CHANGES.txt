@@ -448,6 +448,8 @@ Trunk (unreleased changes)
     HDFS-1877.  Add a new test for concurrent read and write.  (CW Chung
     via szetszwo)
 
+    HDFS-1959. Better error message for missing namenode directory. (eli)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image

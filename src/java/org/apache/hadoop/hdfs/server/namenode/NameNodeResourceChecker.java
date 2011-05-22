@@ -81,7 +81,11 @@ public class NameNodeResourceChecker {
   private void addDirsToCheck(Collection<URI> directoriesToCheck)
       throws IOException {
     for (URI directoryUri : directoriesToCheck) {
-      DF df = new DF(new File(directoryUri.getPath()), conf);
+      File dir = new File(directoryUri.getPath());
+      if (!dir.exists()) {
+        throw new IOException("Missing directory "+dir.getAbsolutePath());
+      }
+      DF df = new DF(dir, conf);
       volumes.put(df.getFilesystem(), df);
     }
   }
