@@ -127,6 +127,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-2459. Cache HAR filesystem metadata. (Mac Yang via mahadev)
 
+    HADOOP-7259. Contrib modules should include the build.properties from
+    the enclosing hadoop directory. (omalley)
+
   OPTIMIZATIONS
     
     MAPREDUCE-2026. Make JobTracker.getJobCounters() and
