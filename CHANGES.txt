@@ -1053,6 +1053,8 @@ Release 0.22.0 - Unreleased
     HDFS-1965. IPCs done using block token-based tickets can't reuse
     connections (todd)
 
+    HDFS-1978. All but first option in LIBHDFS_OPTS is ignored. (eli)
+
 Release 0.21.1 - Unreleased
     HDFS-1466. TestFcHdfsSymlink relies on /tmp/test not existing. (eli)
 
