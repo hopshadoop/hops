@@ -28,6 +28,7 @@ import org.apache.hadoop.tools.rumen.Pre21JobHistoryConstants.Values;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapreduce.JobID;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.InputSplit;
 
@@ -209,9 +210,14 @@ public class DebugJobProducer implements JobStoryProducer {
 
    @Override
    public String getUser() {
-     String s = String.format("foobar%d", id);
-     GridmixTestUtils.createHomeAndStagingDirectory(s, (JobConf)conf);
-     return s;
+     // Obtain user name from job configuration, if available.
+     // Otherwise use dummy user names.
+     String user = conf.get(MRJobConfig.USER_NAME);
+     if (user == null) {
+       user = String.format("foobar%d", id);
+     }
+     GridmixTestUtils.createHomeAndStagingDirectory(user, (JobConf)conf);
+     return user;
    }
 
    @Override
@@ -289,7 +295,7 @@ public class DebugJobProducer implements JobStoryProducer {
 
     @Override
     public org.apache.hadoop.mapred.JobConf getJobConf() {
-      throw new UnsupportedOperationException();
+      return new JobConf(conf);
     }
 
     @Override

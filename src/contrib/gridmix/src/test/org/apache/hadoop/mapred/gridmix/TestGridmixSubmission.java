@@ -111,7 +111,7 @@ public class TestGridmixSubmission {
         GridmixTestUtils.mrCluster.createJobConf());
       for (Job job : succeeded) {
         final String jobname = job.getJobName();
-        if ("GRIDMIX_GENDATA".equals(jobname)) {
+        if (GenerateData.JOB_NAME.equals(jobname)) {
           if (!job.getConfiguration().getBoolean(
             GridmixJob.GRIDMIX_USE_QUEUE_IN_TRACE, true)) {
             assertEquals(" Improper queue for " + job.getJobName(),
