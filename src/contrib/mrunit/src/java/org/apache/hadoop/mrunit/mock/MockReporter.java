@@ -92,5 +92,9 @@ public class MockReporter implements Reporter {
 
     return counter;
   }
+  
+  public float getProgress() {
+    return 0;
+  };
 }
 

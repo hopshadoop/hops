@@ -386,6 +386,11 @@ public abstract static class Node extends ComposableInputFormat {
     }
 
     @Override
+    public float getProgress() {
+      return context.getProgress();
+    }
+    
+    @Override
     public void setStatus(String status) {
       context.setStatus(status);
     }

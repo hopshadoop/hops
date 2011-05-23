@@ -59,7 +59,6 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.map.WrappedMapper;
 import org.apache.hadoop.mapreduce.split.JobSplit.TaskSplitIndex;
 import org.apache.hadoop.mapreduce.task.MapContextImpl;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.IndexedSortable;
 import org.apache.hadoop.util.IndexedSorter;
 import org.apache.hadoop.util.Progress;
@@ -294,8 +293,16 @@ class MapTask extends Task {
     this.umbilical = umbilical;
 
     if (isMapTask()) {
-      mapPhase = getProgress().addPhase("map", 0.667f);
-      sortPhase  = getProgress().addPhase("sort", 0.333f);
+      // If there are no reducers then there won't be any sort. Hence the map 
+      // phase will govern the entire attempt's progress.
+      if (conf.getNumReduceTasks() == 0) {
+        mapPhase = getProgress().addPhase("map", 1.0f);
+      } else {
+        // If there are reducers then the entire attempt's progress will be 
+        // split between the map phase (67%) and the sort phase (33%).
+        mapPhase = getProgress().addPhase("map", 0.667f);
+        sortPhase  = getProgress().addPhase("sort", 0.333f);
+      }
     }
     TaskReporter reporter = startReporter(umbilical);
  
@@ -388,7 +395,10 @@ class MapTask extends Task {
     try {
       runner.run(in, new OldOutputCollector(collector, conf), reporter);
       mapPhase.complete();
-      setPhase(TaskStatus.Phase.SORT);
+      // start the sort phase only if there are reducers
+      if (numReduceTasks > 0) {
+        setPhase(TaskStatus.Phase.SORT);
+      }
       statusUpdate(umbilical);
       collector.flush();
     } finally {

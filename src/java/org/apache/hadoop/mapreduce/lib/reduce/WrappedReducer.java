@@ -321,5 +321,10 @@ public class WrappedReducer<KEYIN, VALUEIN, KEYOUT, VALUEOUT>
     public Credentials getCredentials() {
       return reduceContext.getCredentials();
     }
+    
+    @Override
+    public float getProgress() {
+      return reduceContext.getProgress();
+    }
   }
 }

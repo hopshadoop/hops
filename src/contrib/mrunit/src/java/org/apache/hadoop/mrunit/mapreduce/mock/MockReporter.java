@@ -58,5 +58,10 @@ public class MockReporter extends StatusReporter {
 
     return counter;
   }
+  
+  @Override
+  public float getProgress() {
+    return 0;
+  }
 }
 

@@ -308,4 +308,9 @@ class ChainReduceContextImpl<KEYIN, VALUEIN, KEYOUT, VALUEOUT> implements
   public Credentials getCredentials() {
     return base.getCredentials();
   }
+  
+  @Override
+  public float getProgress() {
+    return base.getProgress();
+  }
 }

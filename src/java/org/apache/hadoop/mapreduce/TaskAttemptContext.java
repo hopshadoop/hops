@@ -44,6 +44,13 @@ public interface TaskAttemptContext extends JobContext, Progressable {
    * @return the current status message
    */
   public String getStatus();
+  
+  /**
+   * The current progress of the task attempt.
+   * @return a number between 0.0 and 1.0 (inclusive) indicating the attempt's
+   * progress.
+   */
+  public abstract float getProgress();
 
   /**
    * Get the {@link Counter} for the given <code>counterName</code>.

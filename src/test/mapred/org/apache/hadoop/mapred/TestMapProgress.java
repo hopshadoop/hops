@@ -94,7 +94,7 @@ public class TestMapProgress extends TestCase {
       }
       // validate map task progress when the map task is in map phase
       assertTrue("Map progress is not the expected value.",
-                 Math.abs(mapTaskProgress - ((0.667/3)*recordNum)) < 0.001);
+                 Math.abs(mapTaskProgress - ((float)recordNum/3)) < 0.001);
     }
   }
 

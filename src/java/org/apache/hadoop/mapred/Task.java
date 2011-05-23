@@ -569,6 +569,11 @@ abstract public class Task implements Writable, Configurable {
       // indicate that progress update needs to be sent
       setProgressFlag();
     }
+    
+    public float getProgress() {
+      return taskProgress.getProgress();
+    };
+    
     public void progress() {
       // indicate that progress update needs to be sent
       setProgressFlag();

@@ -14,6 +14,9 @@ Trunk (unreleased changes)
 
   IMPROVEMENTS
 
+    MAPREDUCE-2492. The new MapReduce API should make available task's
+    progress to the task. (amarrk)
+
     MAPREDUCE-2153. Bring in more job configuration properties in to the trace 
     file. (Rajesh Balamohan via amarrk)
 

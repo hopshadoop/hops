@@ -361,6 +361,8 @@ public class ReduceTask extends Task {
                     taskStatus, copyPhase, sortPhase, this);
       rIter = shuffle.run();
     } else {
+      // local job runner doesn't have a copy phase
+      copyPhase.complete();
       final FileSystem rfs = FileSystem.getLocal(job).getRaw();
       rIter = Merger.merge(job, rfs, job.getMapOutputKeyClass(),
                            job.getMapOutputValueClass(), codec, 

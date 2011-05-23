@@ -316,4 +316,8 @@ class ChainMapContextImpl<KEYIN, VALUEIN, KEYOUT, VALUEOUT> implements
     return base.getCredentials();
   }
 
+  @Override
+  public float getProgress() {
+    return base.getProgress();
+  }
 }

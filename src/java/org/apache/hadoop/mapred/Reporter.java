@@ -64,6 +64,10 @@ public interface Reporter extends Progressable {
       public InputSplit getInputSplit() throws UnsupportedOperationException {
         throw new UnsupportedOperationException("NULL reporter has no input");
       }
+      @Override
+      public float getProgress() {
+        return 0;
+      }
     };
 
   /**
@@ -120,4 +124,10 @@ public interface Reporter extends Progressable {
    */
   public abstract InputSplit getInputSplit() 
     throws UnsupportedOperationException;
+  
+  /**
+   * Get the progress of the task. Progress is represented as a number between
+   * 0 and 1 (inclusive).
+   */
+  public float getProgress();
 }
