@@ -2139,14 +2139,11 @@ Release 0.21.0 - 2010-08-13
     HDFS-1750. ListPathsServlet should not use HdfsFileStatus.getLocalName()
     to get file name since it may return an empty string.  (szetszwo)
 
-Release 0.20.3 - 2011-1-5
+Release 0.20.3 - Unreleased
 
   IMPROVEMENTS
 
   BUG FIXES
-
-    HDFS-955. New implementation of saveNamespace() to avoid loss of edits 
-    when name-node fails during saving. (shv)
 
     HDFS-1041. DFSClient.getFileChecksum(..) should retry if connection to
     the first datanode fails.  (szetszwo)
@@ -2157,10 +2154,22 @@ Release 0.20.3 - 2011-1-5
     HDFS-1258. Clearing namespace quota on "/" corrupts fs image.
     (Aaron T. Myers via szetszwo)
 
+    HDFS-1406. TestCLI fails on Ubuntu with default /etc/hosts. (cos)
+
+Release 0.20.203.0 - 2011-5-11
+
+  IMPROVEMENTS
+
+    HADOOP-7259. Contrib modules should include the build.properties from
+    the enclosing hadoop directory. (omalley)
+
+  BUG FIXES
+
     HDFS-132. Fix namenode to not report files deleted metrics for deletions
     done while replaying edits during startup. (suresh & shv)
 
-    HDFS-1406. TestCLI fails on Ubuntu with default /etc/hosts. (cos)
+    HDFS-955. New implementation of saveNamespace() to avoid loss of edits 
+    when name-node fails during saving. (shv)
 
 Release 0.20.2 - 2009-09-01
 
