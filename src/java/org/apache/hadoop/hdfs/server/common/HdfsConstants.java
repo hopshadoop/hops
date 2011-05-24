@@ -42,6 +42,7 @@ public interface HdfsConstants {
   static public enum StartupOption{
     FORMAT  ("-format"),
     CLUSTERID ("-clusterid"),
+    GENCLUSTERID ("-genclusterid"),
     REGULAR ("-regular"),
     BACKUP  ("-backup"),
     CHECKPOINT("-checkpoint"),

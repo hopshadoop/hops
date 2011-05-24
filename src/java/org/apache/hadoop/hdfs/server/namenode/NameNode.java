@@ -1589,6 +1589,8 @@ public class NameNode implements NamenodeProtocols, FSConstants {
           i += 2;
           startOpt.setClusterId(args[i]);
         }
+      } else if (StartupOption.GENCLUSTERID.getName().equalsIgnoreCase(cmd)) {
+        startOpt = StartupOption.GENCLUSTERID;
       } else if (StartupOption.REGULAR.getName().equalsIgnoreCase(cmd)) {
         startOpt = StartupOption.REGULAR;
       } else if (StartupOption.BACKUP.getName().equalsIgnoreCase(cmd)) {
@@ -1668,6 +1670,11 @@ public class NameNode implements NamenodeProtocols, FSConstants {
         boolean aborted = format(conf, true);
         System.exit(aborted ? 1 : 0);
         return null; // avoid javac warning
+      case GENCLUSTERID:
+        System.err.println("Generating new cluster id:");
+        System.out.println(NNStorage.newClusterID());
+        System.exit(0);
+        return null;
       case FINALIZE:
         aborted = finalize(conf, true);
         System.exit(aborted ? 1 : 0);
