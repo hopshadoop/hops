@@ -232,6 +232,8 @@ Trunk (unreleased changes)
     MAPREDUCE-2495. exit() the TaskTracker when the distributed cache cleanup
     thread dies. (Robert Joseph Evans via cdouglas)
 
+    MAPREDUCE-2470. Fix NPE in RunningJobs::getCounters. (Robert Joseph Evans
+    via cdouglas)
 
 Release 0.22.0 - Unreleased
 

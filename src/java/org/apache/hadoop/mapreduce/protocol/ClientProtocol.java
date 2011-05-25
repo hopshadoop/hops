@@ -230,7 +230,7 @@ public interface ClientProtocol extends VersionedProtocol {
   
   /**
    * Get task completion events for the jobid, starting from fromEventId. 
-   * Returns empty aray if no events are available. 
+   * Returns empty array if no events are available. 
    * @param jobid job id 
    * @param fromEventId event id to start from.
    * @param maxEvents the max number of events we want to look at 

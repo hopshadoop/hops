@@ -129,7 +129,7 @@ public class TestTaskKilling {
     }
     Assert.assertTrue("Task has not been started for 1 min.", counter != 60);
 
-    NetworkedJob networkJob = jobClient.new NetworkedJob(jInfo.getStatus());
+    NetworkedJob networkJob = new JobClient.NetworkedJob(jInfo.getStatus(),jobClient.cluster);
     TaskID tID = TaskID.downgrade(taskInfo.getTaskID());
     TaskAttemptID taskAttID = new TaskAttemptID(tID, 0);
     networkJob.killTask(taskAttID, false);
@@ -245,7 +245,7 @@ public class TestTaskKilling {
       filesStatus = ttClient.listStatus(localTaskDir, true);
       if (filesStatus.length > 0) {
         isTempFolderExists = true;
-        NetworkedJob networkJob = jobClient.new NetworkedJob(jInfo.getStatus());
+        NetworkedJob networkJob = new JobClient.NetworkedJob(jInfo.getStatus(),jobClient.cluster);
         networkJob.killTask(taskAttID, false);
         break;
       }
@@ -558,7 +558,7 @@ public class TestTaskKilling {
             taskIdKilled = taskid.toString();
             taskAttemptID = new TaskAttemptID(taskid, i);
             LOG.info("taskAttemptid going to be killed is : " + taskAttemptID);
-            (jobClient.new NetworkedJob(jInfo.getStatus())).killTask(
+            (new JobClient.NetworkedJob(jInfo.getStatus(),jobClient.cluster)).killTask(
                 taskAttemptID, true);
             checkTaskCompletionEvent(taskAttemptID, jInfo);
             break;
@@ -568,7 +568,7 @@ public class TestTaskKilling {
               LOG
                   .info("taskAttemptid going to be killed is : "
                       + taskAttemptID);
-              (jobClient.new NetworkedJob(jInfo.getStatus())).killTask(
+              (new JobClient.NetworkedJob(jInfo.getStatus(),jobClient.cluster)).killTask(
                   taskAttemptID, true);
               checkTaskCompletionEvent(taskAttemptID, jInfo);
               break;
@@ -611,7 +611,7 @@ public class TestTaskKilling {
     int count = 0;
     while (!match) {
       TaskCompletionEvent[] taskCompletionEvents =
-          jobClient.new NetworkedJob(jInfo.getStatus())
+          new JobClient.NetworkedJob(jInfo.getStatus(),jobClient.cluster)
               .getTaskCompletionEvents(0);
       for (TaskCompletionEvent taskCompletionEvent : taskCompletionEvents) {
         if ((taskCompletionEvent.getTaskAttemptId().toString())

@@ -42,8 +42,6 @@ import org.apache.hadoop.mapreduce.util.ConfigUtil;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.ipc.RemoteException;
-import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.util.Tool;
@@ -149,7 +147,7 @@ public class JobClient extends CLI {
    * a JobProfile object to provide some info, and interacts with the
    * remote service to provide certain functionality.
    */
-  class NetworkedJob implements RunningJob {
+  static class NetworkedJob implements RunningJob {
     Job job;
     /**
      * We store a JobProfile and a timestamp for when we last
@@ -158,7 +156,7 @@ public class JobClient extends CLI {
      * has completely forgotten about the job.  (eg, 24 hours after the
      * job completes.)
      */
-    public NetworkedJob(JobStatus status) throws IOException {
+    public NetworkedJob(JobStatus status, Cluster cluster) throws IOException {
       job = Job.getInstance(cluster, status, new JobConf(status.getJobFile()));
     }
 
@@ -380,7 +378,12 @@ public class JobClient extends CLI {
      */
     public Counters getCounters() throws IOException {
       try { 
-        return Counters.downgrade(job.getCounters());
+        Counters result = null;
+        org.apache.hadoop.mapreduce.Counters temp = job.getCounters();
+        if(temp != null) {
+          result = Counters.downgrade(temp);
+        }
+        return result;
       } catch (InterruptedException ie) {
         throw new IOException(ie);
       }
@@ -557,7 +560,7 @@ public class JobClient extends CLI {
       if (job != null) {
         JobStatus status = JobStatus.downgrade(job.getStatus());
         if (status != null) {
-          return new NetworkedJob(status);
+          return new NetworkedJob(status, cluster);
         } 
       }
     } catch (InterruptedException ie) {
