@@ -99,4 +99,11 @@ public interface TTConfig extends MRConfig {
     "mapreduce.tasktracker.userlogcleanup.sleeptime";
   public static final String TT_DISTRIBUTED_CACHE_CHECK_PERIOD =
     "mapreduce.tasktracker.distributedcache.checkperiod";
+  /**
+   * Percentage of the local distributed cache that should be kept in between
+   * garbage collection.
+   */
+  public static final String TT_LOCAL_CACHE_KEEP_AROUND_PCT =
+    "mapreduce.tasktracker.cache.local.keep.pct";
+
 }

@@ -130,8 +130,11 @@ Trunk (unreleased changes)
     HADOOP-7259. Contrib modules should include the build.properties from
     the enclosing hadoop directory. (omalley)
 
+    MAPREDUCE-2494. Order distributed cache deletions by LRU. (Robert Joseph
+    Evans via cdouglas)
+
   OPTIMIZATIONS
-    
+
     MAPREDUCE-2026. Make JobTracker.getJobCounters() and
     JobInProgress.getCounters() aquire locks in a shorter time period.
     (Joydeep Sen Sarma via schen)
