@@ -83,7 +83,7 @@
         <command>-fs NAMENODE -ls file*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -112,7 +112,7 @@
         <command>-fs NAMENODE -ls /</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir1</command>
+        <command>-fs NAMENODE -rm -r /dir1</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -133,7 +133,7 @@
         <command>-fs NAMENODE -ls </command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr dir1</command>
+        <command>-fs NAMENODE -rm -r dir1</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -157,7 +157,7 @@
         <command>-fs NAMENODE -ls </command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -441,9 +441,9 @@
       </comparators>
     </test>
 
-    <!-- Tests for lsr -->
+    <!-- Tests for ls -R -->
     <test> <!-- TESTED -->
-      <description>lsr: files/directories using absolute path</description>
+      <description>ls: files/directories using absolute path</description>
       <test-commands>
         <command>-fs NAMENODE -mkdir /dir0</command>
         <command>-fs NAMENODE -mkdir /dir0/dir1</command>
@@ -461,10 +461,10 @@
         <command>-fs NAMENODE -touchz /dir0/dir1/dir1/file2</command>
         <command>-fs NAMENODE -touchz /dir0/dir2/dir2/file1</command>
         <command>-fs NAMENODE -touchz /dir0/dir2/dir2/file2</command>
-        <command>-fs NAMENODE -lsr /dir0</command>
+        <command>-fs NAMENODE -ls -R /dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir0</command>
+        <command>-fs NAMENODE -rm -r /dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -531,7 +531,7 @@
     </test>
     
     <test> <!-- TESTED -->
-      <description>lsr: files/directories using relative path</description>
+      <description>ls: files/directories using relative path</description>
       <test-commands>
         <command>-fs NAMENODE -mkdir dir0</command>
         <command>-fs NAMENODE -mkdir dir0/dir1</command>
@@ -549,10 +549,10 @@
         <command>-fs NAMENODE -touchz dir0/dir1/dir1/file2</command>
         <command>-fs NAMENODE -touchz dir0/dir2/dir2/file1</command>
         <command>-fs NAMENODE -touchz dir0/dir2/dir2/file2</command>
-        <command>-fs NAMENODE -lsr dir0</command>
+        <command>-fs NAMENODE -ls -R dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -619,7 +619,7 @@
     </test>
     
     <test> <!-- TESTED -->
-      <description>lsr: files/directories using globbing</description>
+      <description>ls: files/directories using globbing</description>
       <test-commands>
         <command>-fs NAMENODE -mkdir dir0</command>
         <command>-fs NAMENODE -mkdir dir0/dir1</command>
@@ -637,10 +637,10 @@
         <command>-fs NAMENODE -touchz dir0/dir1/dir1/file2</command>
         <command>-fs NAMENODE -touchz dir0/dir2/dir2/file1</command>
         <command>-fs NAMENODE -touchz dir0/dir2/dir2/file2</command>
-        <command>-fs NAMENODE -lsr dir0/*</command>
+        <command>-fs NAMENODE -ls -R dir0/*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <!-- JIRA?
@@ -709,44 +709,44 @@
     </test>
     
     <test> <!-- TESTED -->
-      <description>lsr: file/directory that does not exist in /</description>
+      <description>ls: file/directory that does not exist in /</description>
       <test-commands>
-        <command>-fs NAMENODE -lsr /file1</command>
+        <command>-fs NAMENODE -ls -R /file1</command>
       </test-commands>
       <cleanup-commands>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^lsr: `/file1': No such file or directory</expected-output>
+          <expected-output>^ls: `/file1': No such file or directory</expected-output>
         </comparator>
       </comparators>
     </test>
     
     <test> <!-- TESTED -->
-      <description>lsr: file/directory that does not exist in home directory (/user/username)</description>
+      <description>ls: file/directory that does not exist in home directory (/user/username)</description>
       <test-commands>
-        <command>-fs NAMENODE -lsr /user</command>
+        <command>-fs NAMENODE -ls -R /user</command>
       </test-commands>
       <cleanup-commands>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^lsr: `/user': No such file or directory</expected-output>
+          <expected-output>^ls: `/user': No such file or directory</expected-output>
         </comparator>
       </comparators>
     </test>
     
     <test> <!-- TESTED -->
-      <description>lsr: dir at hdfs:// path</description>
+      <description>ls: dir at hdfs:// path</description>
       <test-commands>
         <command>-fs NAMENODE -mkdir hdfs:///dir0</command>
         <command>-fs NAMENODE -mkdir hdfs:///dir0/dir1</command>
         <command>-fs NAMENODE -touchz hdfs:///file1</command>
         <command>-fs NAMENODE -touchz hdfs:///dir0/file1</command>
         <command>-fs NAMENODE -touchz hdfs:///dir0/dir1/file1</command>
-        <command>-fs NAMENODE -lsr hdfs:///</command>
+        <command>-fs NAMENODE -ls -R hdfs:///</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm hdfs:///dir0</command>
@@ -777,16 +777,16 @@
     </test>
 
     <test> <!-- TESTED -->
-      <description>lsr: files/directories in hdfs:// path using globbing</description>
+      <description>ls: files/directories in hdfs:// path using globbing</description>
       <test-commands>
         <command>-fs NAMENODE -mkdir hdfs:///dir0</command>
         <command>-fs NAMENODE -mkdir hdfs:///dir0/dir1</command>
         <command>-fs NAMENODE -touchz hdfs:///dir0/file1</command>
         <command>-fs NAMENODE -touchz hdfs:///dir0/dir1/file1</command>
-        <command>-fs NAMENODE -lsr hdfs:///dir0/*</command>
+        <command>-fs NAMENODE -ls -R hdfs:///dir0/*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir0</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -801,29 +801,29 @@
     </test>
      
     <test> <!-- TESTED -->
-      <description>lsr: Non-existent file/directory in hdfs:// path</description>
+      <description>ls: Non-existent file/directory in hdfs:// path</description>
       <test-commands>
-        <command>-fs NAMENODE -lsr hdfs:///file1</command>
+        <command>-fs NAMENODE -ls -R hdfs:///file1</command>
       </test-commands>
       <cleanup-commands>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^lsr: `hdfs:///file1': No such file or directory</expected-output>
+          <expected-output>^ls: `hdfs:///file1': No such file or directory</expected-output>
         </comparator>
       </comparators>
     </test>
     
     <test> <!-- TESTED -->
-      <description>lsr: dir at Namenode's path</description>
+      <description>ls: dir at Namenode's path</description>
       <test-commands>
         <command>-fs NAMENODE -mkdir NAMENODE/dir0</command>
         <command>-fs NAMENODE -mkdir NAMENODE/dir0/dir1</command>
         <command>-fs NAMENODE -touchz NAMENODE/file1</command>
         <command>-fs NAMENODE -touchz NAMENODE/dir0/file1</command>
         <command>-fs NAMENODE -touchz NAMENODE/dir0/dir1/file1</command>
-        <command>-fs NAMENODE -lsr NAMENODE/</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm hdfs:///dir0</command>
@@ -854,16 +854,16 @@
     </test>
 
     <test> <!-- TESTED -->
-      <description>lsr: Non-URI input files/directories in Namenode's path </description>
+      <description>ls: Non-URI input files/directories in Namenode's path </description>
       <test-commands>
         <command>-fs NAMENODE -mkdir NAMENODE/dir0</command>
         <command>-fs NAMENODE -mkdir NAMENODE/dir0/dir1</command>
         <command>-fs NAMENODE -touchz NAMENODE/dir0/file1</command>
         <command>-fs NAMENODE -touchz NAMENODE/dir0/dir1/file1</command>
-        <command>-fs NAMENODE -lsr NAMENODE/dir0/*</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/dir0/*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir0</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -878,30 +878,30 @@
     </test>
 
     <test> <!-- TESTED -->
-      <description>lsr: Non-URI input for non-existent file/directory in Namenode's path </description>
+      <description>ls: Non-URI input for non-existent file/directory in Namenode's path </description>
       <test-commands>
-        <command>-fs NAMENODE -lsr NAMENODE/file1</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/file1</command>
       </test-commands>
       <cleanup-commands>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^lsr: `hdfs://\w+[.a-z]*:[0-9]+/file1': No such file or directory</expected-output>
+          <expected-output>^ls: `hdfs://\w+[.a-z]*:[0-9]+/file1': No such file or directory</expected-output>
         </comparator>
       </comparators>
     </test>
 
     <test> <!-- TESTED -->
-      <description>lsr: Test for /*/* globbing </description>
+      <description>ls: Test for /*/* globbing </description>
       <test-commands>
         <command>-fs NAMENODE -mkdir /dir0</command>
         <command>-fs NAMENODE -mkdir /dir0/dir1</command>
         <command>-fs NAMENODE -touchz /dir0/dir1/file1</command>
-        <command>-fs NAMENODE -lsr /\*/\*</command>
+        <command>-fs NAMENODE -ls -R /\*/\*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir0</command>
+        <command>-fs NAMENODE -rm -r /dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -936,7 +936,7 @@
         <command>-fs NAMENODE -du data15bytes</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -956,7 +956,7 @@
         <command>-fs NAMENODE -du data*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -986,7 +986,7 @@
         <command>-fs NAMENODE -du /dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir0</command>
+        <command>-fs NAMENODE -rm -r /dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -1004,7 +1004,7 @@
         <command>-fs NAMENODE -du dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -1025,7 +1025,7 @@
         <command>-fs NAMENODE -du /dir0/*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir0</command>
+        <command>-fs NAMENODE -rm -r /dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -1074,7 +1074,7 @@
         <command>-fs NAMENODE -du hdfs:///data*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -1104,7 +1104,7 @@
         <command>-fs NAMENODE -du hdfs:///dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir0</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -1123,7 +1123,7 @@
         <command>-fs NAMENODE -du -h hdfs:///dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir0</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -1148,7 +1148,7 @@
         <command>-fs NAMENODE -du hdfs:///dir0/*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir0</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -1197,7 +1197,7 @@
         <command>-fs NAMENODE -du NAMENODE/data*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -1227,7 +1227,7 @@
         <command>-fs NAMENODE -du NAMENODE/dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir0</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -1248,7 +1248,7 @@
         <command>-fs NAMENODE -du NAMENODE/dir0/*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir0</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -1290,10 +1290,10 @@
         <command>-fs NAMENODE -put CLITEST_DATA/data120bytes /dir0/dir1/dir2/data120bytes</command>
         <command>-fs NAMENODE -put CLITEST_DATA/data60bytes /dir0/dir2/dir1/data60bytes</command>
         <command>-fs NAMENODE -put CLITEST_DATA/data120bytes /dir0/dir2/dir2/data120bytes</command>
-        <command>-fs NAMENODE -dus /dir0</command>
+        <command>-fs NAMENODE -du -s /dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir0</command>
+        <command>-fs NAMENODE -rm -r /dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -1322,10 +1322,10 @@
         <command>-fs NAMENODE -put CLITEST_DATA/data120bytes dir0/dir1/dir2/data120bytes</command>
         <command>-fs NAMENODE -put CLITEST_DATA/data60bytes dir0/dir2/dir1/data60bytes</command>
         <command>-fs NAMENODE -put CLITEST_DATA/data120bytes dir0/dir2/dir2/data120bytes</command>
-        <command>-fs NAMENODE -dus dir0</command>
+        <command>-fs NAMENODE -du -s dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -1359,11 +1359,11 @@
         <command>-fs NAMENODE -put CLITEST_DATA/data15bytes /donotcountdir0/data15bytes</command>
         <command>-fs NAMENODE -put CLITEST_DATA/data15bytes /donotcountdir0/data15bytes</command>
         <command>-fs NAMENODE -put CLITEST_DATA/data15bytes /donotcountdir0/data15bytes</command>
-        <command>-fs NAMENODE -dus /dir*</command>
+        <command>-fs NAMENODE -du -s /dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir0</command>
-        <command>-fs NAMENODE -rmr /donotcountdir0</command>
+        <command>-fs NAMENODE -rm -r /dir0</command>
+        <command>-fs NAMENODE -rm -r /donotcountdir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -1393,10 +1393,10 @@
         <command>-fs NAMENODE -put CLITEST_DATA/data120bytes hdfs:///dir0/dir1/dir2/data120bytes</command>
         <command>-fs NAMENODE -put CLITEST_DATA/data60bytes hdfs:///dir0/dir2/dir1/data60bytes</command>
         <command>-fs NAMENODE -put CLITEST_DATA/data120bytes hdfs:///dir0/dir2/dir2/data120bytes</command>
-        <command>-fs NAMENODE -dus hdfs:///dir0</command>
+        <command>-fs NAMENODE -du -s hdfs:///dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir0</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -1430,11 +1430,11 @@
         <command>-fs NAMENODE -put CLITEST_DATA/data15bytes hdfs:///donotcountdir0/data15bytes</command>
         <command>-fs NAMENODE -put CLITEST_DATA/data15bytes hdfs:///donotcountdir0/data15bytes</command>
         <command>-fs NAMENODE -put CLITEST_DATA/data15bytes hdfs:///donotcountdir0/data15bytes</command>
-        <command>-fs NAMENODE -dus hdfs:///dir*</command>
+        <command>-fs NAMENODE -du -s hdfs:///dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir0</command>
-        <command>-fs NAMENODE -rmr hdfs:///donotcountdir0</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir0</command>
+        <command>-fs NAMENODE -rm -r hdfs:///donotcountdir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -1463,10 +1463,10 @@
         <command>-fs NAMENODE -put CLITEST_DATA/data120bytes NAMENODE/dir0/dir1/dir2/data120bytes</command>
         <command>-fs NAMENODE -put CLITEST_DATA/data60bytes NAMENODE/dir0/dir2/dir1/data60bytes</command>
         <command>-fs NAMENODE -put CLITEST_DATA/data120bytes NAMENODE/dir0/dir2/dir2/data120bytes</command>
-        <command>-fs NAMENODE -dus NAMENODE/dir0</command>
+        <command>-fs NAMENODE -du -s NAMENODE/dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir0</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -1500,11 +1500,11 @@
         <command>-fs NAMENODE -put CLITEST_DATA/data15bytes NAMENODE/donotcountdir0/data15bytes</command>
         <command>-fs NAMENODE -put CLITEST_DATA/data15bytes NAMENODE/donotcountdir0/data15bytes</command>
         <command>-fs NAMENODE -put CLITEST_DATA/data15bytes NAMENODE/donotcountdir0/data15bytes</command>
-        <command>-fs NAMENODE -dus NAMENODE/dir*</command>
+        <command>-fs NAMENODE -du -s NAMENODE/dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir0</command>
-        <command>-fs NAMENODE -rmr NAMENODE/donotcountdir0</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir0</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/donotcountdir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -1548,12 +1548,12 @@
         <command>-fs NAMENODE -mv /file1 file2</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /file1</command>
+        <command>-fs NAMENODE -rm -r /file1</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^mv: Failed to rename hdfs://\w+[.a-z]*:[0-9]*/file1 to file2</expected-output>
+          <expected-output>^mv: `/file1' to `file2': Input/output error</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -1564,10 +1564,10 @@
         <command>-fs NAMENODE -touchz /file1</command>
         <command>-fs NAMENODE -mkdir /dir0</command>
         <command>-fs NAMENODE -mv /file1 /dir0</command>
-        <command>-fs NAMENODE -lsr /dir0</command>        
+        <command>-fs NAMENODE -ls -R /dir0</command>        
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir0</command>
+        <command>-fs NAMENODE -rm -r /dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -1601,7 +1601,7 @@
         <command>-fs NAMENODE -ls /dir0</command>        
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir0</command>
+        <command>-fs NAMENODE -rm -r /dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -1635,10 +1635,10 @@
         <command>-fs NAMENODE -touchz /file4</command>
         <command>-fs NAMENODE -mkdir /dir0</command>
         <command>-fs NAMENODE -mv /file* /dir0</command>
-        <command>-fs NAMENODE -lsr /*</command>        
+        <command>-fs NAMENODE -ls -R /*</command>        
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir0</command>
+        <command>-fs NAMENODE -rm -r /dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -1733,10 +1733,10 @@
         <command>-fs NAMENODE -touchz hdfs:///file1</command>
         <command>-fs NAMENODE -mkdir hdfs:///dir0</command>
         <command>-fs NAMENODE -mv hdfs:///file1 hdfs:///dir0</command>
-        <command>-fs NAMENODE -lsr hdfs:///dir0</command>        
+        <command>-fs NAMENODE -ls -R hdfs:///dir0</command>        
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir0</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -1771,7 +1771,7 @@
       <comparators>
         <comparator>
           <type>TokenComparator</type>
-          <expected-output>mv: `hdfs:/file1': No such file or directory</expected-output>
+          <expected-output>mv: `hdfs:///file1': No such file or directory</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -1785,7 +1785,7 @@
         <command>-fs NAMENODE -ls hdfs:///dir0</command>        
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir0</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -1818,10 +1818,10 @@
         <command>-fs NAMENODE -touchz hdfs:///file3</command>
         <command>-fs NAMENODE -mkdir hdfs:///dir0</command>
         <command>-fs NAMENODE -mv hdfs:///file* hdfs:///dir0</command>
-        <command>-fs NAMENODE -lsr hdfs:///*</command>        
+        <command>-fs NAMENODE -ls -R hdfs:///*</command>        
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir0</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -1886,10 +1886,10 @@
         <command>-fs NAMENODE -touchz NAMENODE/file1</command>
         <command>-fs NAMENODE -mkdir NAMENODE/dir0</command>
         <command>-fs NAMENODE -mv NAMENODE/file1 NAMENODE/dir0</command>
-        <command>-fs NAMENODE -lsr NAMENODE/dir0</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir0</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -1938,7 +1938,7 @@
         <command>-fs NAMENODE -ls NAMENODE/dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir0</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -1971,10 +1971,10 @@
         <command>-fs NAMENODE -touchz NAMENODE/file3</command>
         <command>-fs NAMENODE -mkdir NAMENODE/dir0</command>
         <command>-fs NAMENODE -mv NAMENODE/file* NAMENODE/dir0</command>
-        <command>-fs NAMENODE -lsr NAMENODE/*</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir0</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -2014,7 +2014,7 @@
 	<command>-fs NAMENODE -mkdir hdfs:///dir1</command>
         <command>-fs NAMENODE -touchz hdfs:///dir0/file1</command>
         <command>-fs NAMENODE -mv hdfs:///dir0 hdfs:///dir1</command>
-        <command>-fs NAMENODE -lsr hdfs:///dir1</command>        
+        <command>-fs NAMENODE -ls -R hdfs:///dir1</command>        
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm hdfs:///dir1</command>
@@ -2038,7 +2038,7 @@
         <command>-fs NAMENODE -mkdir NAMENODE/dir1</command>
         <command>-fs NAMENODE -touchz NAMENODE/dir0/file1</command>
         <command>-fs NAMENODE -mv NAMENODE/dir0 NAMENODE/dir1</command>
-        <command>-fs NAMENODE -lsr NAMENODE/dir1</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/dir1</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm NAMENODE/dir1</command>
@@ -2086,7 +2086,7 @@
         <command>-fs NAMENODE -ls /file1 file2</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /file1 file2</command>
+        <command>-fs NAMENODE -rm -r /file1 file2</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -2108,7 +2108,7 @@
         <command>-fs NAMENODE -ls file1 /file2</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr file1 /file2</command>
+        <command>-fs NAMENODE -rm -r file1 /file2</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -2130,7 +2130,7 @@
         <command>-fs NAMENODE -ls file1 file2</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr file1 file2</command>
+        <command>-fs NAMENODE -rm -r file1 file2</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -2153,7 +2153,7 @@
         <command>-fs NAMENODE -ls /file1 /dir0</command>        
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir0</command>
+        <command>-fs NAMENODE -rm -r /dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -2176,7 +2176,7 @@
         <command>-fs NAMENODE -ls /file1 /dir0</command>        
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir0</command>
+        <command>-fs NAMENODE -rm -r /dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -2199,10 +2199,10 @@
         <command>-fs NAMENODE -touchz /file4</command>
         <command>-fs NAMENODE -mkdir /dir0</command>
         <command>-fs NAMENODE -cp /file* /dir0</command>
-        <command>-fs NAMENODE -lsr /*</command>        
+        <command>-fs NAMENODE -ls -R /*</command>        
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir0</command>
+        <command>-fs NAMENODE -rm -r /dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -2249,10 +2249,10 @@
         <command>-fs NAMENODE -touchz /file4</command>
         <command>-fs NAMENODE -mkdir /dir0</command>
         <command>-fs NAMENODE -cp /file1 /file2 /file3 /file4 /dir0</command>
-        <command>-fs NAMENODE -lsr /*</command>
+        <command>-fs NAMENODE -ls -R /*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir0</command>
+        <command>-fs NAMENODE -rm -r /dir0 /file*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -2296,7 +2296,7 @@
         <command>-fs NAMENODE -cp /file /file1</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>:
       <comparators>
         <comparator>
@@ -2312,7 +2312,7 @@
         <command>-fs NAMENODE -cp file1 file2</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>:
       <comparators>
         <comparator>
@@ -2333,12 +2333,12 @@
         <command>-fs NAMENODE -cp /file* /file5</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^cp: When copying multiple files, destination should be a directory.</expected-output>
+          <expected-output>^cp: `/file5': Is not a directory</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -2354,12 +2354,12 @@
         <command>-fs NAMENODE -cp /file1 /file2 /file3 /file4 /file5</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^cp: When copying multiple files, destination /file5 should be a directory.</expected-output>
+          <expected-output>^cp: `/file5': Is not a directory</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -2374,12 +2374,12 @@
         <command>-fs NAMENODE -cp /file* dir</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^cp: When copying multiple files, destination should be a directory.</expected-output>
+          <expected-output>^cp: `dir': No such file or directory</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -2394,12 +2394,12 @@
         <command>-fs NAMENODE -cp /file1 /file2 /file3 /file4 dir</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^cp: When copying multiple files, destination dir should be a directory.</expected-output>
+          <expected-output>^cp: `dir': No such file or directory</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -2435,7 +2435,7 @@
         <command>-fs NAMENODE -ls hdfs:///file1 hdfs:///dir0</command>        
       </test-commands>
      <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir0/ hdfs://file1</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir0/ hdfs://file1</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -2458,7 +2458,7 @@
         <command>-fs NAMENODE -ls hdfs:///file1 hdfs:///dir0</command>        
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir0/</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir0/</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -2480,11 +2480,11 @@
         <command>-fs NAMENODE -touchz hdfs:///file3</command>
         <command>-fs NAMENODE -mkdir hdfs:///dir0</command>
         <command>-fs NAMENODE -cp hdfs:///file* hdfs:///dir0</command>
-        <command>-fs NAMENODE -lsr hdfs:///*</command>        
+        <command>-fs NAMENODE -ls -R hdfs:///*</command>        
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///file*</command>
-        <command>-fs NAMENODE -rmr hdfs:///dir0/</command>
+        <command>-fs NAMENODE -rm -r hdfs:///file*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir0/</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -2522,11 +2522,11 @@
         <command>-fs NAMENODE -touchz hdfs:///file3</command>
         <command>-fs NAMENODE -mkdir hdfs:///dir0</command>
         <command>-fs NAMENODE -cp hdfs:///file1 hdfs:///file2 hdfs:///file3 hdfs:///dir0</command>
-        <command>-fs NAMENODE -lsr hdfs:///*</command>
+        <command>-fs NAMENODE -ls -R hdfs:///*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///file*</command>
-        <command>-fs NAMENODE -rmr hdfs:///dir0/</command>
+        <command>-fs NAMENODE -rm -r hdfs:///file*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir0/</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -2566,7 +2566,7 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^cp: `hdfs:/file': No such file or directory</expected-output>
+          <expected-output>^cp: `hdfs:///file': No such file or directory</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -2582,12 +2582,12 @@
         <command>-fs NAMENODE -cp hdfs:///file* hdfs:///file5</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///file*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///file*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^cp: When copying multiple files, destination should be a directory.</expected-output>
+          <expected-output>^cp: `hdfs:///file5': Is not a directory</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -2603,12 +2603,12 @@
         <command>-fs NAMENODE -cp hdfs:///file1 hdfs:///file2 hdfs:///file3 hdfs:///file4 hdfs:///file5</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///file*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///file*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^cp: When copying multiple files, destination hdfs:///file5 should be a directory.</expected-output>
+          <expected-output>^cp: `hdfs:///file5': Is not a directory</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -2623,12 +2623,12 @@
         <command>-fs NAMENODE -cp hdfs:///file* hdfs:///dir</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///file*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///file*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^cp: When copying multiple files, destination should be a directory.</expected-output>
+          <expected-output>^cp: `hdfs:///dir': No such file or directory</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -2643,12 +2643,12 @@
         <command>-fs NAMENODE -cp hdfs:///file1 hdfs:///file2 hdfs:///file3 hdfs:///file4 hdfs:///dir</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///file*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///file*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^cp: When copying multiple files, destination hdfs:///dir should be a directory.</expected-output>
+          <expected-output>^cp: `hdfs:///dir': No such file or directory</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -2660,12 +2660,12 @@
         <command>-fs NAMENODE -cp hdfs:///dir0 hdfs:///dir1</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMNEODE -rmr hdfs:///dir1</command>
+        <command>-fs NAMNEODE -rm -r hdfs:///dir1</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^cp: `hdfs:/dir0': No such file or directory</expected-output>
+          <expected-output>^cp: `hdfs:///dir0': No such file or directory</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -2677,10 +2677,10 @@
         <command>-fs NAMENODE -mkdir hdfs:///dir1</command>
 	<command>-fs NAMENODE -touchz hdfs:///dir0/file1</command>
        <command>-fs NAMENODE -cp hdfs:///dir0 hdfs:///dir1</command>
-	<command>-fs NAMENODE -lsr hdfs:///dir*</command>
+	<command>-fs NAMENODE -ls -R hdfs:///dir*</command>
       </test-commands>
       <cleanup-commands>
-	<command>-fs NAMENODE -rmr hdfs:///*</command>
+	<command>-fs NAMENODE -rm -r hdfs:///*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -2706,10 +2706,10 @@
         <command>-fs NAMENODE -mkdir hdfs:///dir2</command>
         <command>-fs NAMENODE -mkdir hdfs:///dest</command>
         <command>-fs NAMENODE -cp hdfs:///dir* hdfs:///dest</command>
-        <command>-fs NAMENODE -lsr hdfs:///d*</command>
+        <command>-fs NAMENODE -ls -R hdfs:///d*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMNEODE -rmr hdfs:///d*</command>
+        <command>-fs NAMNEODE -rm -r hdfs:///d*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -2735,10 +2735,10 @@
         <command>-fs NAMENODE -mkdir hdfs:///dir2</command>
         <command>-fs NAMENODE -mkdir hdfs:///dest</command>
         <command>-fs NAMENODE -cp hdfs:///dir0 hdfs:///dir1 hdfs:///dir2 hdfs:///dest</command>
-        <command>-fs NAMENODE -lsr hdfs:///d*</command>
+        <command>-fs NAMENODE -ls -R hdfs:///d*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMNEODE -rmr hdfs:///*</command>
+        <command>-fs NAMNEODE -rm -r hdfs:///*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -2787,7 +2787,7 @@
         <command>-fs NAMENODE -ls NAMENODE/file1 NAMENODE/dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir0/ NAMENODE/file1</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir0/ NAMENODE/file1</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -2810,7 +2810,7 @@
         <command>-fs NAMENODE -ls NAMENODE/file1 NAMENODE/dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir0/</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir0/</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -2832,11 +2832,11 @@
         <command>-fs NAMENODE -touchz NAMENODE/file3</command>
         <command>-fs NAMENODE -mkdir NAMENODE/dir0</command>
         <command>-fs NAMENODE -cp NAMENODE/file* NAMENODE/dir0</command>
-        <command>-fs NAMENODE -lsr NAMENODE/*</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/file*</command>
-        <command>-fs NAMENODE -rmr NAMENODE/dir0/</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/file*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir0/</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -2874,11 +2874,11 @@
         <command>-fs NAMENODE -touchz NAMENODE/file3</command>
         <command>-fs NAMENODE -mkdir NAMENODE/dir0</command>
         <command>-fs NAMENODE -cp NAMENODE/file1 NAMENODE/file2 NAMENODE/file3 NAMENODE/dir0</command>
-        <command>-fs NAMENODE -lsr NAMENODE/*</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/file*</command>
-        <command>-fs NAMENODE -rmr NAMENODE/dir0/</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/file*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir0/</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -2934,12 +2934,12 @@
         <command>-fs NAMENODE -cp NAMENODE/file* NAMENODE/file5</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/file*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/file*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^cp: When copying multiple files, destination should be a directory.</expected-output>
+          <expected-output>^cp: `hdfs://\w+[.a-z]*:[0-9]+/file5': Is not a directory</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -2955,12 +2955,12 @@
         <command>-fs NAMENODE -cp NAMENODE/file1 NAMENODE/file2 NAMENODE/file3 NAMENODE/file4 NAMENODE/file5</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/file*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/file*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^cp: When copying multiple files, destination hdfs://\w+[.a-z]*:[0-9]+/file5 should be a directory.</expected-output>
+          <expected-output>^cp: `hdfs://\w+[.a-z]*:[0-9]+/file5': Is not a directory</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -2975,12 +2975,12 @@
         <command>-fs NAMENODE -cp NAMENODE/file* NAMENODE/dir</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/file*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/file*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^cp: When copying multiple files, destination should be a directory.</expected-output>
+          <expected-output>^cp: `hdfs://\w+[.a-z]*:[0-9]+/dir': No such file or directory</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -2995,12 +2995,12 @@
         <command>-fs NAMENODE -cp NAMENODE/file1 NAMENODE/file2 NAMENODE/file3 NAMENODE/file4 NAMENODE/dir</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/file*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/file*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^cp: When copying multiple files, destination hdfs://\w+[.a-z]*:[0-9]+/dir should be a directory.</expected-output>
+          <expected-output>^cp: `hdfs://\w+[.a-z]*:[0-9]+/dir': No such file or directory</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -3012,10 +3012,10 @@
         <command>-fs NAMENODE -mkdir NAMENODE/dir1</command>
         <command>-fs NAMENODE -touchz NAMENODE/dir0/file1</command>
         <command>-fs NAMENODE -cp NAMENODE/dir0 NAMENODE/dir1</command>
-        <command>-fs NAMENODE -lsr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -3041,10 +3041,10 @@
         <command>-fs NAMENODE -mkdir NAMENODE/dir2</command>
         <command>-fs NAMENODE -mkdir NAMENODE/dest</command>
         <command>-fs NAMENODE -cp NAMENODE/dir* NAMENODE/dest</command>
-        <command>-fs NAMENODE -lsr NAMENODE/d*</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/d*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMNEODE -rmr NAMENODE/d*</command>
+        <command>-fs NAMNEODE -rm -r NAMENODE/d*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -3070,10 +3070,10 @@
         <command>-fs NAMENODE -mkdir NAMENODE/dir2</command>
         <command>-fs NAMENODE -mkdir NAMENODE/dest</command>
         <command>-fs NAMENODE -cp NAMENODE/dir0 NAMENODE/dir1 NAMENODE/dir2 NAMENODE/dest</command>
-        <command>-fs NAMENODE -lsr NAMENODE/d*</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/d*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMNEODE -rmr NAMENODE/*</command>
+        <command>-fs NAMNEODE -rm -r NAMENODE/*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -3312,7 +3312,7 @@
         <command>-fs NAMENODE -rm hdfs:///dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -3427,7 +3427,7 @@
         <command>-fs NAMENODE -rm NAMENODE/dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -3488,13 +3488,13 @@
     
     <!--Tests for rmr-->
     <test> <!-- TESTED -->
-      <description>rmr: removing a file (absolute path) </description>
+      <description>rm: removing a file (absolute path) </description>
       <test-commands>
         <command>-fs NAMENODE -touchz /dir0/file0</command>
-        <command>-fs NAMENODE -rmr /dir0/file0</command>
+        <command>-fs NAMENODE -rm -r /dir0/file0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -3505,13 +3505,13 @@
     </test>
     
     <test> <!-- TESTED -->
-      <description>rmr: removing a file (relative path) </description>
+      <description>rm: removing a file (relative path) </description>
       <test-commands>
         <command>-fs NAMENODE -touchz file0</command>
-        <command>-fs NAMENODE -rmr file0</command>
+        <command>-fs NAMENODE -rm -r file0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -3522,13 +3522,13 @@
     </test>
     
     <test> <!-- TESTED -->
-      <description>rmr: removing a directory (absolute path) </description>
+      <description>rm: removing a directory (absolute path) </description>
       <test-commands>
         <command>-fs NAMENODE -touchz /dir0</command>
-        <command>-fs NAMENODE -rmr /dir0</command>
+        <command>-fs NAMENODE -rm -r /dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -3539,13 +3539,13 @@
     </test>
     
     <test> <!-- TESTED -->
-      <description>rmr: removing a directory (relative path) </description>
+      <description>rm: removing a directory (relative path) </description>
       <test-commands>
         <command>-fs NAMENODE -mkdir dir0</command>
-        <command>-fs NAMENODE -rmr dir0</command>
+        <command>-fs NAMENODE -rm -r dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -3556,13 +3556,13 @@
     </test>
     
     <test> <!-- TESTED -->
-      <description>rmr: removing directories by globbing (absolute path) </description>
+      <description>rm: removing directories by globbing (absolute path) </description>
       <test-commands>
         <command>-fs NAMENODE -mkdir /dir0</command>
         <command>-fs NAMENODE -mkdir /dir1</command>
         <command>-fs NAMENODE -mkdir /dir2</command>
         <command>-fs NAMENODE -mkdir /dir3</command>
-        <command>-fs NAMENODE -rmr /dir*</command>
+        <command>-fs NAMENODE -rm -r /dir*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm /user</command>
@@ -3588,13 +3588,13 @@
     </test>
     
     <test> <!-- TESTED -->
-      <description>rmr: removing directories by globbing (relative path) </description>
+      <description>rm: removing directories by globbing (relative path) </description>
       <test-commands>
         <command>-fs NAMENODE -mkdir dir0</command>
         <command>-fs NAMENODE -mkdir dir1</command>
         <command>-fs NAMENODE -mkdir dir2</command>
         <command>-fs NAMENODE -mkdir dir3</command>
-        <command>-fs NAMENODE -rmr dir*</command>
+        <command>-fs NAMENODE -rm -r dir*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm /user</command>
@@ -3620,45 +3620,45 @@
     </test>
     
     <test> <!--TESTED-->
-      <description>rmr: removing a nonexistent file (absolute path) </description>
+      <description>rm: removing a nonexistent file (absolute path) </description>
       <test-commands>
-        <command>-fs NAMENODE -rmr /dir0/file0</command>
+        <command>-fs NAMENODE -rm -r /dir0/file0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^rmr: `/dir0/file0': No such file or directory</expected-output>
+          <expected-output>^rm: `/dir0/file0': No such file or directory</expected-output>
         </comparator>
       </comparators>
     </test>
     
     <test> <!-- TESTED -->
-      <description>rmr: removing a nonexistent file (relative path) </description>
+      <description>rm: removing a nonexistent file (relative path) </description>
       <test-commands>
-        <command>-fs NAMENODE -rmr file0</command>
+        <command>-fs NAMENODE -rm -r file0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^rmr: `file0': No such file or directory</expected-output>
+          <expected-output>^rm: `file0': No such file or directory</expected-output>
         </comparator>
       </comparators>
     </test>
 
     <test> <!-- TESTED -->
-      <description>rmr: removing a file in hdfs:// path </description>
+      <description>rm: removing a file in hdfs:// path </description>
       <test-commands>
         <command>-fs NAMENODE -touchz hdfs:///file0</command>
-        <command>-fs NAMENODE -rmr hdfs:///file0</command>
+        <command>-fs NAMENODE -rm -r hdfs:///file0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -3669,13 +3669,13 @@
     </test>
     
     <test> <!-- TESTED -->
-      <description>rmr: removing a directory in hdfs:// path </description>
+      <description>rm: removing a directory in hdfs:// path </description>
       <test-commands>
         <command>-fs NAMENODE -touchz hdfs:///dir0</command>
-        <command>-fs NAMENODE -rmr hdfs:///dir0</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -3686,16 +3686,16 @@
     </test>
     
     <test> <!-- TESTED -->
-      <description>rmr: removing directories by globbing in hdfs:// path </description>
+      <description>rm: removing directories by globbing in hdfs:// path </description>
       <test-commands>
         <command>-fs NAMENODE -mkdir hdfs:///dir0</command>
         <command>-fs NAMENODE -mkdir hdfs:///dir1</command>
         <command>-fs NAMENODE -mkdir hdfs:///dir2</command>
         <command>-fs NAMENODE -mkdir hdfs:///dir3</command>
-        <command>-fs NAMENODE -rmr hdfs:///dir*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -3718,32 +3718,32 @@
     </test>
     
     <test> <!--TESTED-->
-      <description>rmr: removing a nonexistent file or directory in hdfs:// path </description>
+      <description>rm: removing a nonexistent file or directory in hdfs:// path </description>
       <test-commands>
-        <command>-fs NAMENODE -rmr hdfs:///file0</command>
+        <command>-fs NAMENODE -rm -r hdfs:///file0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^rmr: `hdfs:///file0': No such file or directory</expected-output>
+          <expected-output>^rm: `hdfs:///file0': No such file or directory</expected-output>
         </comparator>
       </comparators>
     </test>
     
    <test> <!-- TESTED -->
-      <description>rmr: removing directories without globbing in hdfs:// path </description>
+      <description>rm: removing directories without globbing in hdfs:// path </description>
       <test-commands>
         <command>-fs NAMENODE -mkdir hdfs:///dir0</command>
         <command>-fs NAMENODE -mkdir hdfs:///dir1</command>
         <command>-fs NAMENODE -mkdir hdfs:///dir2</command>
         <command>-fs NAMENODE -mkdir hdfs:///dir3</command>
-        <command>-fs NAMENODE -rmr hdfs:///dir0 hdfs:///dir1 hdfs:///dir2 hdfs:///dir3</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir0 hdfs:///dir1 hdfs:///dir2 hdfs:///dir3</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -3766,13 +3766,13 @@
     </test>
 
     <test> <!-- TESTED -->
-      <description>rmr: Test for Namenode's path - removing a file</description>
+      <description>rm: Test for Namenode's path - removing a file</description>
       <test-commands>
         <command>-fs NAMENODE -touchz NAMENODE/file0</command>
-        <command>-fs NAMENODE -rmr NAMENODE/file0</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/file0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -3783,13 +3783,13 @@
     </test>
 
     <test> <!-- TESTED -->
-      <description>rmr: Test for Namenode's path - removing a directory</description>
+      <description>rm: Test for Namenode's path - removing a directory</description>
       <test-commands>
         <command>-fs NAMENODE -touchz NAMENODE/dir0</command>
-        <command>-fs NAMENODE -rmr NAMENODE/dir0</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -3800,16 +3800,16 @@
     </test>
 
     <test> <!-- TESTED -->
-      <description>rmr: removing directories by globbing in Namenode's path </description>
+      <description>rm: removing directories by globbing in Namenode's path </description>
       <test-commands>
         <command>-fs NAMENODE -mkdir NAMENODE/dir0</command>
         <command>-fs NAMENODE -mkdir NAMENODE/dir1</command>
         <command>-fs NAMENODE -mkdir NAMENODE/dir2</command>
         <command>-fs NAMENODE -mkdir NAMENODE/dir3</command>
-        <command>-fs NAMENODE -rmr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -3832,32 +3832,32 @@
     </test>
 
     <test> <!--TESTED-->
-      <description>rmr: removing a nonexistent file or directory in Namenode's path </description>
+      <description>rm: removing a nonexistent file or directory in Namenode's path </description>
       <test-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/file0</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/file0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^rmr: `hdfs://\w+[.a-z]*:[0-9]*/file0': No such file or directory</expected-output>
+          <expected-output>^rm: `hdfs://\w+[.a-z]*:[0-9]*/file0': No such file or directory</expected-output>
         </comparator>
       </comparators>
     </test>
 
     <test> <!-- TESTED -->
-      <description>rmr: removing directories without globbing in Namenode's path </description>
+      <description>rm: removing directories without globbing in Namenode's path </description>
       <test-commands>
         <command>-fs NAMENODE -mkdir NAMENODE/dir0</command>
         <command>-fs NAMENODE -mkdir NAMENODE/dir1</command>
         <command>-fs NAMENODE -mkdir NAMENODE/dir2</command>
         <command>-fs NAMENODE -mkdir NAMENODE/dir3</command>
-        <command>-fs NAMENODE -rmr NAMENODE/dir0 NAMENODE/dir1 NAMENODE/dir2 NAMENODE/dir3</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir0 NAMENODE/dir1 NAMENODE/dir2 NAMENODE/dir3</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -3907,7 +3907,7 @@
         <command>-fs NAMENODE -du data15bytes</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -3924,7 +3924,7 @@
         <command>-fs NAMENODE -du /dir0/dir1/data</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir0</command>
+        <command>-fs NAMENODE -rm -r /dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -3957,7 +3957,7 @@
         <command>-fs NAMENODE -du dir0/dir1/data</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -3991,7 +3991,7 @@
         <command>-fs NAMENODE -du /dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -4013,7 +4013,7 @@
         <command>-fs NAMENODE -du dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -4033,7 +4033,7 @@
         <command>-fs NAMENODE -put /user/wrongdata file</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -4049,7 +4049,7 @@
         <command>-fs NAMENODE -put wrongdata file</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -4066,12 +4066,12 @@
         <command>-fs NAMENODE -put CLITEST_DATA/data15bytes /user/file0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>TokenComparator</type>
-          <expected-output>put: Target /user/file0 already exists</expected-output>
+          <expected-output>put: `/user/file0': File exists</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -4083,12 +4083,12 @@
         <command>-fs NAMENODE -put CLITEST_DATA/data15bytes file0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>TokenComparator</type>
-          <expected-output>put: Target file0 already exists</expected-output>
+          <expected-output>put: `file0': File exists</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -4102,12 +4102,12 @@
         <command>-fs NAMENODE -put /data15bytes /data30bytes file0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^put: copying multiple files, but last argument `file0' is not a directory</expected-output>
+          <expected-output>^put: `file0': Is not a directory</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -4120,7 +4120,7 @@
         <command>-fs NAMENODE -put /data15bytes /data30bytes wrongdir</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -4154,7 +4154,7 @@
         <command>-fs NAMENODE -du hdfs:///dir1/data</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir1/data</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir1/data</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -4188,7 +4188,7 @@
         <command>-fs NAMENODE -du hdfs:///dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir0</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -4208,7 +4208,7 @@
         <command>-fs NAMENODE -put /user/wrongdata hdfs:///file</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -4225,12 +4225,12 @@
         <command>-fs NAMENODE -put CLITEST_DATA/data15bytes hdfs:///user/file0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///user</command>
+        <command>-fs NAMENODE -rm -r hdfs:///user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>TokenComparator</type>
-          <expected-output>put: Target hdfs:/user/file0 already exists</expected-output>
+          <expected-output>put: `hdfs:///user/file0': File exists</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -4242,12 +4242,12 @@
         <command>-fs NAMENODE -put CLITEST_DATA/data15bytes CLITEST_DATA/data30bytes hdfs:///file0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^put: copying multiple files, but last argument `hdfs:/file0' is not a directory</expected-output>
+          <expected-output>^put: `hdfs:///file0': Is not a directory</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -4258,12 +4258,12 @@
         <command>-fs NAMENODE -put CLITEST_DATA/data15bytes CLITEST_DATA/data30bytes hdfs:///wrongdir</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^put: `hdfs:/wrongdir': No such file or directory</expected-output>
+          <expected-output>^put: `hdfs:///wrongdir': No such file or directory</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -4292,7 +4292,7 @@
         <command>-fs NAMENODE -du NAMENODE/dir1/data</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir1/data</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir1/data</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -4326,7 +4326,7 @@
         <command>-fs NAMENODE -du NAMENODE/dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir0</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -4346,7 +4346,7 @@
         <command>-fs NAMENODE -put /user/wrongdata NAMENODE/file</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -4363,12 +4363,12 @@
         <command>-fs NAMENODE -put CLITEST_DATA/data15bytes NAMENODE/user/file0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/user</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^put: Target hdfs://\w+[.a-z]*:[0-9]+/user/file0 already exists</expected-output>
+          <expected-output>^put: `hdfs://\w+[.a-z]*:[0-9]+/user/file0': File exists</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -4380,12 +4380,12 @@
         <command>-fs NAMENODE -put CLITEST_DATA/data15bytes CLITEST_DATA/data30bytes NAMENODE/file0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^put: copying multiple files, but last argument `hdfs://\w+[.a-z]*:[0-9]+/file0' is not a directory</expected-output>
+          <expected-output>^put: `hdfs://\w+[.a-z]*:[0-9]+/file0': Is not a directory</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -4396,7 +4396,7 @@
         <command>-fs NAMENODE -put CLITEST_DATA/data15bytes CLITEST_DATA/data30bytes NAMENODE/wrongdir</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -4431,7 +4431,7 @@
         <command>-fs NAMENODE -du data15bytes</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -4448,7 +4448,7 @@
         <command>-fs NAMENODE -du /dir0/dir1/data</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir0</command>
+        <command>-fs NAMENODE -rm -r /dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -4477,7 +4477,7 @@
         <command>-fs NAMENODE -du dir0/dir1/data</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -4507,7 +4507,7 @@
         <command>-fs NAMENODE -du /dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -4529,7 +4529,7 @@
         <command>-fs NAMENODE -du dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -4549,7 +4549,7 @@
         <command>-fs NAMENODE -copyFromLocal /user/wrongdata file</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -4565,7 +4565,7 @@
         <command>-fs NAMENODE -copyFromLocal wrongdata file</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -4582,12 +4582,12 @@
         <command>-fs NAMENODE -copyFromLocal CLITEST_DATA/data15bytes /user/file0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>TokenComparator</type>
-          <expected-output>copyFromLocal: Target /user/file0 already exists</expected-output>
+          <expected-output>copyFromLocal: `/user/file0': File exists</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -4599,12 +4599,12 @@
         <command>-fs NAMENODE -copyFromLocal CLITEST_DATA/data15bytes file0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>TokenComparator</type>
-          <expected-output>copyFromLocal: Target file0 already exists</expected-output>
+          <expected-output>copyFromLocal: `file0': File exists</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -4618,12 +4618,12 @@
         <command>-fs NAMENODE -copyFromLocal /data15bytes /data30bytes file0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^copyFromLocal: copying multiple files, but last argument `file0' is not a directory</expected-output>
+          <expected-output>^copyFromLocal: `file0': Is not a directory</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -4636,7 +4636,7 @@
         <command>-fs NAMENODE -copyFromLocal /data15bytes /data30bytes wrongdir</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -4673,7 +4673,7 @@
         <command>-fs NAMENODE -du hdfs:///dir0/dir1/data/data15bytes</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir0</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -4691,7 +4691,7 @@
         <command>-fs NAMENODE -du hdfs:///dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir0</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -4711,7 +4711,7 @@
         <command>-fs NAMENODE -copyFromLocal /user/wrongdata hdfs:///file</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -4728,12 +4728,12 @@
         <command>-fs NAMENODE -copyFromLocal CLITEST_DATA/data15bytes hdfs:///user/file0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///user</command>
+        <command>-fs NAMENODE -rm -r hdfs:///user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>TokenComparator</type>
-          <expected-output>copyFromLocal: Target hdfs:/user/file0 already exists</expected-output>
+          <expected-output>copyFromLocal: `hdfs:///user/file0': File exists</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -4745,12 +4745,12 @@
         <command>-fs NAMENODE -copyFromLocal CLITEST_DATA/data15bytes CLITEST_DATA/data30bytes hdfs:///file0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^copyFromLocal: copying multiple files, but last argument `hdfs:/file0' is not a directory</expected-output>
+          <expected-output>^copyFromLocal: `hdfs:///file0': Is not a directory</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -4761,12 +4761,12 @@
         <command>-fs NAMENODE -copyFromLocal CLITEST_DATA/data15bytes CLITEST_DATA/data30bytes hdfs:///wrongdir</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^copyFromLocal: `hdfs:/wrongdir': No such file or directory</expected-output>
+          <expected-output>^copyFromLocal: `hdfs:///wrongdir': No such file or directory</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -4799,7 +4799,7 @@
         <command>-fs NAMENODE -du NAMENODE/dir0/dir1/data/data15bytes</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir0</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -4817,7 +4817,7 @@
         <command>-fs NAMENODE -du NAMENODE/dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir0</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -4837,7 +4837,7 @@
         <command>-fs NAMENODE -copyFromLocal /user/wrongdata NAMENODE/file</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -4854,12 +4854,12 @@
         <command>-fs NAMENODE -copyFromLocal CLITEST_DATA/data15bytes NAMENODE/user/file0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/user</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>copyFromLocal: Target hdfs://\w+[.a-z]*:[0-9]+/user/file0 already exists</expected-output>
+          <expected-output>copyFromLocal: `hdfs://\w+[.a-z]*:[0-9]+/user/file0': File exists</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -4871,12 +4871,12 @@
         <command>-fs NAMENODE -copyFromLocal CLITEST_DATA/data15bytes CLITEST_DATA/data30bytes NAMENODE/file0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^copyFromLocal: copying multiple files, but last argument `hdfs://\w+[.a-z]*:[0-9]+/file0' is not a directory</expected-output>
+          <expected-output>^copyFromLocal: `hdfs://\w+[.a-z]*:[0-9]+/file0': Is not a directory</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -4887,7 +4887,7 @@
         <command>-fs NAMENODE -copyFromLocal CLITEST_DATA/data15bytes CLITEST_DATA/data30bytes NAMENODE/wrongdir</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -4904,7 +4904,7 @@
         <command>-fs NAMENODE -get /user/file CLITEST_DATA/file</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -4920,7 +4920,7 @@
         <command>-fs NAMENODE -get file CLITEST_DATA/file</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -4936,7 +4936,7 @@
         <command>-fs NAMENODE -get hdfs:///user/file CLITEST_DATA/file</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///user</command>
+        <command>-fs NAMENODE -rm -r hdfs:///user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -4952,7 +4952,7 @@
         <command>-fs NAMENODE -get NAMENODE/user/file CLITEST_DATA/file</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/user</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -4990,7 +4990,7 @@
         <command>-fs NAMENODE -cat data15bytes</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr  /user</command>
+        <command>-fs NAMENODE -rm -r  /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -5011,7 +5011,7 @@
         <command>-fs NAMENODE -cat /dir0/data*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir0</command>
+        <command>-fs NAMENODE -rm -r /dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -5032,7 +5032,7 @@
         <command>-fs NAMENODE -cat dir0/data*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -5053,7 +5053,7 @@
         <command>-fs NAMENODE -cat /dir0/data15bytes /dir0/data30bytes /dir0/data60bytes /dir0/data120bytes</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir0</command>
+        <command>-fs NAMENODE -rm -r /dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -5074,7 +5074,7 @@
         <command>-fs NAMENODE -cat dir0/data15bytes dir0/data30bytes dir0/data60bytes dir0/data120bytes</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -5122,7 +5122,7 @@
         <command>-fs NAMENODE -cat /dir1</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir1</command>
+        <command>-fs NAMENODE -rm -r /dir1</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -5139,7 +5139,7 @@
         <command>-fs NAMENODE -cat dir1</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr dir1</command>
+        <command>-fs NAMENODE -rm -r dir1</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -5177,7 +5177,7 @@
         <command>-fs NAMENODE -cat hdfs:///dir0/data*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir0</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -5198,7 +5198,7 @@
         <command>-fs NAMENODE -cat hdfs:///dir0/data15bytes hdfs:///dir0/data30bytes hdfs:///dir0/data60bytes hdfs:///dir0/data120bytes</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir0</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -5230,7 +5230,7 @@
         <command>-fs NAMENODE -cat hdfs:///dir1</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir1</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir1</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -5269,7 +5269,7 @@
         <command>-fs NAMENODE -cat NAMENODE/dir0/data*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir0</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -5290,7 +5290,7 @@
         <command>-fs NAMENODE -cat NAMENODE/dir0/data15bytes NAMENODE/dir0/data30bytes NAMENODE/dir0/data60bytes NAMENODE/dir0/data120bytes</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir0</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -5322,7 +5322,7 @@
         <command>-fs NAMENODE -cat NAMENODE/dir1</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir1</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir1</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -5339,7 +5339,7 @@
         <command>-fs NAMENODE -copyToLocal file CLITEST_DATA/file</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -5355,7 +5355,7 @@
         <command>-fs NAMENODE -copyToLocal /user/file CLITEST_DATA/file</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -5371,7 +5371,7 @@
         <command>-fs NAMENODE -copyToLocal hdfs:///file CLITEST_DATA/file</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -5387,7 +5387,7 @@
         <command>-fs NAMENODE -copyToLocal NAMENODE/file CLITEST_DATA/file</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -5405,7 +5405,7 @@
       <description>mkdir: creating directory (absolute path) </description>
       <test-commands>
         <command>-fs NAMENODE -mkdir /dir0</command>
-        <command>-fs NAMENODE -dus /dir0</command>
+        <command>-fs NAMENODE -du -s /dir0</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm /user</command>
@@ -5422,7 +5422,7 @@
       <description>mkdir: creating directory (relative path) </description>
       <test-commands>
         <command>-fs NAMENODE -mkdir dir0 </command>
-        <command>-fs NAMENODE -dus dir0</command>
+        <command>-fs NAMENODE -du -s dir0</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm /user</command>
@@ -5442,7 +5442,7 @@
         <command>-fs NAMENODE -mkdir /dir1 </command>        
         <command>-fs NAMENODE -mkdir /dir2 </command>
         <command>-fs NAMENODE -mkdir /dir3 </command>
-        <command>-fs NAMENODE -dus /dir*</command>
+        <command>-fs NAMENODE -du -s /dir*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm /dir*</command>
@@ -5474,7 +5474,7 @@
         <command>-fs NAMENODE -mkdir dir1 </command>
         <command>-fs NAMENODE -mkdir dir2 </command>
         <command>-fs NAMENODE -mkdir dir3 </command>
-        <command>-fs NAMENODE -dus dir*</command>
+        <command>-fs NAMENODE -du -s dir*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm /user</command>
@@ -5506,7 +5506,7 @@
         <command>-fs NAMENODE -mkdir /dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir0</command>
+        <command>-fs NAMENODE -rm -r /dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -5523,7 +5523,7 @@
         <command>-fs NAMENODE -mkdir data15bytes</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr data15bytes</command>
+        <command>-fs NAMENODE -rm -r data15bytes</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -5537,7 +5537,7 @@
       <description>mkdir: Test for hdfs:// path - creating directory</description>
       <test-commands>
         <command>-fs NAMENODE -mkdir hdfs:///dir0</command>
-        <command>-fs NAMENODE -dus hdfs:///dir0</command>
+        <command>-fs NAMENODE -du -s hdfs:///dir0</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm hdfs:///*</command>
@@ -5554,7 +5554,7 @@
       <description>mkdir: Test for hdfs:// path - creating many directories</description>
       <test-commands>
         <command>-fs NAMENODE -mkdir hdfs:///dir0 hdfs:///dir1 hdfs:///dir2 hdfs:///dir3 </command>
-        <command>-fs NAMENODE -dus hdfs:///dir*</command>
+        <command>-fs NAMENODE -du -s hdfs:///dir*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm hdfs:///dir*</command>
@@ -5586,7 +5586,7 @@
         <command>-fs NAMENODE -mkdir hdfs:///dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir0</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -5603,7 +5603,7 @@
         <command>-fs NAMENODE -mkdir hdfs:///data15bytes</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///data15bytes</command>
+        <command>-fs NAMENODE -rm -r hdfs:///data15bytes</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -5617,7 +5617,7 @@
       <description>mkdir: Test for Namenode's path - creating directory</description>
       <test-commands>
         <command>-fs NAMENODE -mkdir NAMENODE/dir0</command>
-        <command>-fs NAMENODE -dus NAMENODE/dir0</command>
+        <command>-fs NAMENODE -du -s NAMENODE/dir0</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm NAMENODE/*</command>
@@ -5634,7 +5634,7 @@
       <description>mkdir: Test for Namenode's path - creating many directories</description>
       <test-commands>
         <command>-fs NAMENODE -mkdir NAMENODE/dir0 NAMENODE/dir1 NAMENODE/dir2 NAMENODE/dir3</command>
-        <command>-fs NAMENODE -dus NAMENODE/dir*</command>
+        <command>-fs NAMENODE -du -s NAMENODE/dir*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm NAMENODE/dir*</command>
@@ -5666,7 +5666,7 @@
         <command>-fs NAMENODE -mkdir NAMENODE/dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir0</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -5683,7 +5683,7 @@
         <command>-fs NAMENODE -mkdir NAMENODE/data15bytes</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/data15bytes</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/data15bytes</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -5701,7 +5701,7 @@
         <command>-fs NAMENODE -setrep 2 /dir0/file0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -5718,7 +5718,7 @@
         <command>-fs NAMENODE -setrep 2 file0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -5736,7 +5736,7 @@
         <command>-fs NAMENODE -setrep -R 2 /dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -5758,7 +5758,7 @@
         <command>-fs NAMENODE -setrep -R 2 dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -5778,7 +5778,7 @@
         <command>-fs NAMENODE -setrep 2 /dir0/file</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -5794,7 +5794,7 @@
         <command>-fs NAMENODE -setrep 2 file0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -5811,7 +5811,7 @@
         <command>-fs NAMENODE -setrep 2 hdfs:///dir0/file0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -5829,7 +5829,7 @@
         <command>-fs NAMENODE -setrep -R 2 hdfs:///dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -5849,7 +5849,7 @@
         <command>-fs NAMENODE -setrep 2 hdfs:///dir0/file</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -5866,7 +5866,7 @@
         <command>-fs NAMENODE -setrep 2 NAMENODE/dir0/file0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -5884,7 +5884,7 @@
         <command>-fs NAMENODE -setrep -R 2 NAMENODE/dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -5904,7 +5904,7 @@
         <command>-fs NAMENODE -setrep 2 NAMENODE/dir0/file</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -6098,7 +6098,7 @@
         <command>-fs NAMENODE -test -z /dir0/file</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -6114,7 +6114,7 @@
         <command>-fs NAMENODE -test -z file</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -6130,7 +6130,7 @@
         <command>-fs NAMENODE -test -d /dir</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -6146,7 +6146,7 @@
         <command>-fs NAMENODE -test -d dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -6162,7 +6162,7 @@
         <command>-fs NAMENODE -test -z hdfs:///dir0/file</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir0</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -6178,7 +6178,7 @@
         <command>-fs NAMENODE -test -d hdfs:///dir</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -6194,7 +6194,7 @@
         <command>-fs NAMENODE -test -z NAMENODE/dir0/file</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir0</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -6210,7 +6210,7 @@
         <command>-fs NAMENODE -test -d NAMENODE/dir</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -6228,7 +6228,7 @@
         <command>-fs NAMENODE -stat "%n-%b" /data60bytes</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /data60bytes</command>
+        <command>-fs NAMENODE -rm -r /data60bytes</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -6245,7 +6245,7 @@
         <command>-fs NAMENODE -stat "%n-%b" data60bytes</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -6262,7 +6262,7 @@
         <command>-fs NAMENODE -stat "%n-%b-%o" /dirtest</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dirtest</command>
+        <command>-fs NAMENODE -rm -r /dirtest</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -6279,7 +6279,7 @@
         <command>-fs NAMENODE -stat "%n-%b-%o" dirtest</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -6301,7 +6301,7 @@
         <command>-fs NAMENODE -stat "%n-%b" /dir0/data*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir0</command>
+        <command>-fs NAMENODE -rm -r /dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -6338,7 +6338,7 @@
         <command>-fs NAMENODE -stat "%n-%b" data*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -6401,7 +6401,7 @@
         <command>-fs NAMENODE -stat "%n-%b" hdfs:///data60bytes</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///data60bytes</command>
+        <command>-fs NAMENODE -rm -r hdfs:///data60bytes</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -6418,7 +6418,7 @@
         <command>-fs NAMENODE -stat "%n-%b-%o" hdfs:///dirtest</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dirtest</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dirtest</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -6440,7 +6440,7 @@
         <command>-fs NAMENODE -stat "%n-%b" hdfs:///dir0/data*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir0</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -6488,7 +6488,7 @@
         <command>-fs NAMENODE -stat "%n-%b" NAMENODE/data60bytes</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/data60bytes</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/data60bytes</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -6505,7 +6505,7 @@
         <command>-fs NAMENODE -stat "%n-%b-%o" NAMENODE/dirtest</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dirtest</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dirtest</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -6527,7 +6527,7 @@
         <command>-fs NAMENODE -stat "%n-%b" NAMENODE/dir0/data*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir0</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -6593,7 +6593,7 @@
         <command>-fs NAMENODE -tail data15bytes</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr  /user</command>
+        <command>-fs NAMENODE -rm -r  /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -6613,7 +6613,7 @@
         <command>-fs NAMENODE -tail /file*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -6633,7 +6633,7 @@
         <command>-fs NAMENODE -tail file*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -6680,7 +6680,7 @@
         <command>-fs NAMENODE -tail /dir1</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir1</command>
+        <command>-fs NAMENODE -rm -r /dir1</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -6697,7 +6697,7 @@
         <command>-fs NAMENODE -tail dir1</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr dir1</command>
+        <command>-fs NAMENODE -rm -r dir1</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -6734,7 +6734,7 @@
         <command>-fs NAMENODE -tail hdfs:///file*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -6766,7 +6766,7 @@
         <command>-fs NAMENODE -tail hdfs:///dir1</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir1</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir1</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -6803,7 +6803,7 @@
         <command>-fs NAMENODE -tail NAMENODE/file*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -6835,7 +6835,7 @@
         <command>-fs NAMENODE -tail NAMENODE/dir1</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir1</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir1</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -6887,7 +6887,7 @@
         <command>-fs NAMENODE -count /dir1</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir1</command>
+        <command>-fs NAMENODE -rm -r /dir1</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -6904,7 +6904,7 @@
         <command>-fs NAMENODE -count dir1</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr dir1</command>
+        <command>-fs NAMENODE -rm -r dir1</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -6954,7 +6954,7 @@
         <command>-fs NAMENODE -count /file*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /file*</command>
+        <command>-fs NAMENODE -rm -r /file*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -6986,7 +6986,7 @@
         <command>-fs NAMENODE -count file*</command>
       </test-commands>
       <cleanup-commands>
-       <command>-fs NAMENODE -rmr /user</command>
+       <command>-fs NAMENODE -rm -r /user</command>
      </cleanup-commands>
      <comparators>
        <comparator>
@@ -7018,7 +7018,7 @@
         <command>-fs NAMENODE -count /file1 /file2 /file3 /file4</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /file*</command>
+        <command>-fs NAMENODE -rm -r /file*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -7050,7 +7050,7 @@
         <command>-fs NAMENODE -count file1 file2 file3 file4</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -7082,7 +7082,7 @@
         <command>-fs NAMENODE -count /dir* </command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir*</command>
+        <command>-fs NAMENODE -rm -r /dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -7114,7 +7114,7 @@
         <command>-fs NAMENODE -count dir* </command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -7146,7 +7146,7 @@
         <command>-fs NAMENODE -count /dir1 /dir2 /dir3 /dir4 </command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir*</command>
+        <command>-fs NAMENODE -rm -r /dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -7178,7 +7178,7 @@
         <command>-fs NAMENODE -count dir1 dir2 dir3 dir4 </command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -7243,7 +7243,7 @@
         <command>-fs NAMENODE -count -q /dir1</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir1</command>
+        <command>-fs NAMENODE -rm -r /dir1</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -7262,7 +7262,7 @@
         <command>-fs NAMENODE -count -q dir1</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr dir1</command>
+        <command>-fs NAMENODE -rm -r dir1</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -7312,7 +7312,7 @@
         <command>-fs NAMENODE -count -q /file*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /file*</command>
+        <command>-fs NAMENODE -rm -r /file*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -7344,7 +7344,7 @@
         <command>-fs NAMENODE -count -q file*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -7376,7 +7376,7 @@
         <command>-fs NAMENODE -count -q /file1 /file2 /file3 /file4</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /file*</command>
+        <command>-fs NAMENODE -rm -r /file*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -7408,7 +7408,7 @@
         <command>-fs NAMENODE -count -q file1 file2 file3 file4</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -7448,7 +7448,7 @@
         <command>-fs NAMENODE -count -q /dir* </command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir*</command>
+        <command>-fs NAMENODE -rm -r /dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -7488,7 +7488,7 @@
         <command>-fs NAMENODE -count -q dir* </command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -7528,7 +7528,7 @@
         <command>-fs NAMENODE -count -q /dir1 /dir2 /dir3 /dir4 </command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir*</command>
+        <command>-fs NAMENODE -rm -r /dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -7568,7 +7568,7 @@
         <command>-fs NAMENODE -count -q dir1 dir2 dir3 dir4 </command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
       <comparator>
@@ -7614,7 +7614,7 @@
         <command>-fs NAMENODE -count hdfs:///dir1</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir1</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir1</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -7649,7 +7649,7 @@
         <command>-fs NAMENODE -count hdfs:///file*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///file*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///file*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -7681,7 +7681,7 @@
         <command>-fs NAMENODE -count hdfs:///file1 hdfs:///file2 hdfs:///file3 hdfs:///file4</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///file*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///file*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -7713,7 +7713,7 @@
         <command>-fs NAMENODE -count hdfs:///dir* </command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -7745,7 +7745,7 @@
         <command>-fs NAMENODE -count hdfs:///dir1 hdfs:///dir2 hdfs:///dir3 hdfs:///dir4 </command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -7793,7 +7793,7 @@
         <command>-fs NAMENODE -count -q hdfs:///dir1</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir1</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir1</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -7828,7 +7828,7 @@
         <command>-fs NAMENODE -count -q hdfs:///file*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///file*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///file*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -7860,7 +7860,7 @@
         <command>-fs NAMENODE -count -q hdfs:///file1 hdfs:///file2 hdfs:///file3 hdfs:///file4</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///file*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///file*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -7900,7 +7900,7 @@
         <command>-fs NAMENODE -count -q hdfs:///dir* </command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -7940,7 +7940,7 @@
         <command>-fs NAMENODE -count -q hdfs:///dir1 hdfs:///dir2 hdfs:///dir3 hdfs:///dir4 </command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir*</command>
+        <command>-fs NAMENODE -rm -r /dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -7986,7 +7986,7 @@
         <command>-fs NAMENODE -count NAMENODE/dir1</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir1</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir1</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -8021,7 +8021,7 @@
         <command>-fs NAMENODE -count NAMENODE/file*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/file*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/file*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -8053,7 +8053,7 @@
         <command>-fs NAMENODE -count NAMENODE/file1 NAMENODE/file2 NAMENODE/file3 NAMENODE/file4</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/file*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/file*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -8085,7 +8085,7 @@
         <command>-fs NAMENODE -count NAMENODE/dir* </command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -8117,7 +8117,7 @@
         <command>-fs NAMENODE -count NAMENODE/dir1 NAMENODE/dir2 NAMENODE/dir3 NAMENODE/dir4 </command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -8165,7 +8165,7 @@
         <command>-fs NAMENODE -count -q NAMENODE/dir1</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir1</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir1</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -8200,7 +8200,7 @@
         <command>-fs NAMENODE -count -q NAMENODE/file*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/file*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/file*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -8232,7 +8232,7 @@
         <command>-fs NAMENODE -count -q NAMENODE/file1 NAMENODE/file2 NAMENODE/file3 NAMENODE/file4</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/file*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/file*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -8272,7 +8272,7 @@
         <command>-fs NAMENODE -count -q NAMENODE/dir* </command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -8312,7 +8312,7 @@
         <command>-fs NAMENODE -count -q NAMENODE/dir1 NAMENODE/dir2 NAMENODE/dir3 NAMENODE/dir4 </command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -8388,10 +8388,10 @@
         <command>-fs NAMENODE -touchz /dir0/dir1/file1</command>
         <command>-fs NAMENODE -touchz /dir0/dir1/file2</command>
         <command>-fs NAMENODE -chmod 777 /dir0/dir1</command>
-        <command>-fs NAMENODE -lsr /dir0</command>
+        <command>-fs NAMENODE -ls -R /dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir0</command>
+        <command>-fs NAMENODE -rm -r /dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -8422,10 +8422,10 @@
         <command>-fs NAMENODE -touchz dir0/dir1/file1</command>
         <command>-fs NAMENODE -touchz dir0/dir1/file2</command>
         <command>-fs NAMENODE -chmod 777 dir0/dir1</command>
-        <command>-fs NAMENODE -lsr dir0</command>
+        <command>-fs NAMENODE -ls -R dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr dir0</command>
+        <command>-fs NAMENODE -rm -r dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -8500,10 +8500,10 @@
         <command>-fs NAMENODE -touchz /dir0/dir1/file1</command>
         <command>-fs NAMENODE -touchz /dir0/dir1/file2</command>
         <command>-fs NAMENODE -chmod a+rwx /dir0/dir1</command>
-        <command>-fs NAMENODE -lsr /dir0</command>
+        <command>-fs NAMENODE -ls -R /dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir0</command>
+        <command>-fs NAMENODE -rm -r /dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -8534,10 +8534,10 @@
         <command>-fs NAMENODE -touchz dir0/dir1/file1</command>
         <command>-fs NAMENODE -touchz dir0/dir1/file2</command>
         <command>-fs NAMENODE -chmod a+rwx dir0/dir1</command>
-        <command>-fs NAMENODE -lsr dir0</command>
+        <command>-fs NAMENODE -ls -R dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr dir0</command>
+        <command>-fs NAMENODE -rm -r dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -8568,10 +8568,10 @@
         <command>-fs NAMENODE -touchz /dir0/dir1/file1</command>
         <command>-fs NAMENODE -touchz /dir0/dir1/file2</command>
         <command>-fs NAMENODE -chmod -R 777 /dir0/dir1</command>
-        <command>-fs NAMENODE -lsr /dir0</command>
+        <command>-fs NAMENODE -ls -R /dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir0</command>
+        <command>-fs NAMENODE -rm -r /dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -8602,10 +8602,10 @@
         <command>-fs NAMENODE -touchz dir0/dir1/file1</command>
         <command>-fs NAMENODE -touchz dir0/dir1/file2</command>
         <command>-fs NAMENODE -chmod -R 777 dir0/dir1</command>
-        <command>-fs NAMENODE -lsr dir0</command>
+        <command>-fs NAMENODE -ls -R dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr dir0</command>
+        <command>-fs NAMENODE -rm -r dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -8636,10 +8636,10 @@
         <command>-fs NAMENODE -touchz /dir0/dir1/file1</command>
         <command>-fs NAMENODE -touchz /dir0/dir1/file2</command>
         <command>-fs NAMENODE -chmod -R a+rwx /dir0/dir1</command>
-        <command>-fs NAMENODE -lsr /dir0</command>
+        <command>-fs NAMENODE -ls -R /dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir0</command>
+        <command>-fs NAMENODE -rm -r /dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -8670,10 +8670,10 @@
         <command>-fs NAMENODE -touchz dir0/dir1/file1</command>
         <command>-fs NAMENODE -touchz dir0/dir1/file2</command>
         <command>-fs NAMENODE -chmod -R a+rwx dir0/dir1</command>
-        <command>-fs NAMENODE -lsr dir0</command>
+        <command>-fs NAMENODE -ls -R dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr dir0</command>
+        <command>-fs NAMENODE -rm -r dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -8767,7 +8767,7 @@
         <command>-fs NAMENODE -touchz /file3</command>
         <command>-fs NAMENODE -touchz /file4</command>
         <command>-fs NAMENODE -chmod 777 /file* </command>
-        <command>-fs NAMENODE -lsr /file*</command>
+        <command>-fs NAMENODE -ls -R /file*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm /file*</command>
@@ -8800,7 +8800,7 @@
         <command>-fs NAMENODE -touchz file3</command>
         <command>-fs NAMENODE -touchz file4</command>
         <command>-fs NAMENODE -chmod 777 file* </command>
-        <command>-fs NAMENODE -lsr file*</command>
+        <command>-fs NAMENODE -ls -R file*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm file*</command>
@@ -8839,10 +8839,10 @@
         <command>-fs NAMENODE -touchz /dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz /dir2/dir1/file2</command>
         <command>-fs NAMENODE -chmod 777 /dir*</command>
-        <command>-fs NAMENODE -lsr /dir*</command>
+        <command>-fs NAMENODE -ls -R /dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir*</command>
+        <command>-fs NAMENODE -rm -r /dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -8894,10 +8894,10 @@
         <command>-fs NAMENODE -touchz dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz dir2/dir1/file2</command>
         <command>-fs NAMENODE -chmod 777 dir*</command>
-        <command>-fs NAMENODE -lsr dir*</command>
+        <command>-fs NAMENODE -ls -R dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr dir*</command>
+        <command>-fs NAMENODE -rm -r dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -8943,7 +8943,7 @@
         <command>-fs NAMENODE -touchz /file3</command>
         <command>-fs NAMENODE -touchz /file4</command>
         <command>-fs NAMENODE -chmod 777 /file1 /file2 /file3 /file4 </command>
-        <command>-fs NAMENODE -lsr /file*</command>
+        <command>-fs NAMENODE -ls -R /file*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm /file*</command>
@@ -8976,7 +8976,7 @@
         <command>-fs NAMENODE -touchz file3</command>
         <command>-fs NAMENODE -touchz file4</command>
         <command>-fs NAMENODE -chmod 777 file1 file2 file3 file4 </command>
-        <command>-fs NAMENODE -lsr file*</command>
+        <command>-fs NAMENODE -ls -R file*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm file*</command>
@@ -9015,10 +9015,10 @@
         <command>-fs NAMENODE -touchz /dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz /dir2/dir1/file2</command>
         <command>-fs NAMENODE -chmod 777 /dir0 /dir2</command>
-        <command>-fs NAMENODE -lsr /dir*</command>
+        <command>-fs NAMENODE -ls -R /dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir*</command>
+        <command>-fs NAMENODE -rm -r /dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -9070,10 +9070,10 @@
         <command>-fs NAMENODE -touchz dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz dir2/dir1/file2</command>
         <command>-fs NAMENODE -chmod 777 dir0 dir2</command>
-        <command>-fs NAMENODE -lsr dir*</command>
+        <command>-fs NAMENODE -ls -R dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr dir*</command>
+        <command>-fs NAMENODE -rm -r dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -9119,7 +9119,7 @@
         <command>-fs NAMENODE -touchz /file3</command>
         <command>-fs NAMENODE -touchz /file4</command>
         <command>-fs NAMENODE -chmod a+rw /file* </command>
-        <command>-fs NAMENODE -lsr /file*</command>
+        <command>-fs NAMENODE -ls -R /file*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm /file*</command>
@@ -9152,7 +9152,7 @@
         <command>-fs NAMENODE -touchz file3</command>
         <command>-fs NAMENODE -touchz file4</command>
         <command>-fs NAMENODE -chmod a+rw file* </command>
-        <command>-fs NAMENODE -lsr file*</command>
+        <command>-fs NAMENODE -ls -R file*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm file*</command>
@@ -9191,10 +9191,10 @@
         <command>-fs NAMENODE -touchz /dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz /dir2/dir1/file2</command>
         <command>-fs NAMENODE -chmod a+rwx /dir*</command>
-        <command>-fs NAMENODE -lsr /dir*</command>
+        <command>-fs NAMENODE -ls -R /dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir*</command>
+        <command>-fs NAMENODE -rm -r /dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -9246,10 +9246,10 @@
         <command>-fs NAMENODE -touchz dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz dir2/dir1/file2</command>
         <command>-fs NAMENODE -chmod a+rwx dir*</command>
-        <command>-fs NAMENODE -lsr dir*</command>
+        <command>-fs NAMENODE -ls -R dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr dir*</command>
+        <command>-fs NAMENODE -rm -r dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -9295,7 +9295,7 @@
         <command>-fs NAMENODE -touchz /file3</command>
         <command>-fs NAMENODE -touchz /file4</command>
         <command>-fs NAMENODE -chmod a+rw /file1 /file2 /file3 /file4 </command>
-        <command>-fs NAMENODE -lsr /file*</command>
+        <command>-fs NAMENODE -ls -R /file*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm /file*</command>
@@ -9328,7 +9328,7 @@
         <command>-fs NAMENODE -touchz file3</command>
         <command>-fs NAMENODE -touchz file4</command>
         <command>-fs NAMENODE -chmod a+rw file1 file2 file3 file4 </command>
-        <command>-fs NAMENODE -lsr file*</command>
+        <command>-fs NAMENODE -ls -R file*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm file*</command>
@@ -9367,10 +9367,10 @@
         <command>-fs NAMENODE -touchz /dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz /dir2/dir1/file2</command>
         <command>-fs NAMENODE -chmod a+rwx /dir0 /dir2</command>
-        <command>-fs NAMENODE -lsr /dir*</command>
+        <command>-fs NAMENODE -ls -R /dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir*</command>
+        <command>-fs NAMENODE -rm -r /dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -9422,10 +9422,10 @@
         <command>-fs NAMENODE -touchz dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz dir2/dir1/file2</command>
         <command>-fs NAMENODE -chmod a+rwx dir0 dir2</command>
-        <command>-fs NAMENODE -lsr dir*</command>
+        <command>-fs NAMENODE -ls -R dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr dir*</command>
+        <command>-fs NAMENODE -rm -r dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -9477,10 +9477,10 @@
         <command>-fs NAMENODE -touchz /dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz /dir2/dir1/file2</command>
         <command>-fs NAMENODE -chmod -R 777 /dir*</command>
-        <command>-fs NAMENODE -lsr /dir*</command>
+        <command>-fs NAMENODE -ls -R /dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir*</command>
+        <command>-fs NAMENODE -rm -r /dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -9532,10 +9532,10 @@
         <command>-fs NAMENODE -touchz dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz dir2/dir1/file2</command>
         <command>-fs NAMENODE -chmod -R 777 dir*</command>
-        <command>-fs NAMENODE -lsr dir*</command>
+        <command>-fs NAMENODE -ls -R dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr dir*</command>
+        <command>-fs NAMENODE -rm -r dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -9587,10 +9587,10 @@
         <command>-fs NAMENODE -touchz /dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz /dir2/dir1/file2</command>
         <command>-fs NAMENODE -chmod -R 777 /dir0 /dir2</command>
-        <command>-fs NAMENODE -lsr /dir*</command>
+        <command>-fs NAMENODE -ls -R /dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir*</command>
+        <command>-fs NAMENODE -rm -r /dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -9642,10 +9642,10 @@
         <command>-fs NAMENODE -touchz dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz dir2/dir1/file2</command>
         <command>-fs NAMENODE -chmod -R 777 dir0 dir2</command>
-        <command>-fs NAMENODE -lsr dir*</command>
+        <command>-fs NAMENODE -ls -R dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr dir*</command>
+        <command>-fs NAMENODE -rm -r dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -9697,10 +9697,10 @@
         <command>-fs NAMENODE -touchz /dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz /dir2/dir1/file2</command>
         <command>-fs NAMENODE -chmod -R a+rwx /dir*</command>
-        <command>-fs NAMENODE -lsr /dir*</command>
+        <command>-fs NAMENODE -ls -R /dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir*</command>
+        <command>-fs NAMENODE -rm -r /dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -9752,10 +9752,10 @@
         <command>-fs NAMENODE -touchz dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz dir2/dir1/file2</command>
         <command>-fs NAMENODE -chmod -R a+rwx dir*</command>
-        <command>-fs NAMENODE -lsr dir*</command>
+        <command>-fs NAMENODE -ls -R dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr dir*</command>
+        <command>-fs NAMENODE -rm -r dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -9807,10 +9807,10 @@
         <command>-fs NAMENODE -touchz /dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz /dir2/dir1/file2</command>
         <command>-fs NAMENODE -chmod -R a+rwx /dir0 /dir2</command>
-        <command>-fs NAMENODE -lsr /dir*</command>
+        <command>-fs NAMENODE -ls -R /dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir*</command>
+        <command>-fs NAMENODE -rm -r /dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -9862,10 +9862,10 @@
         <command>-fs NAMENODE -touchz dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz dir2/dir1/file2</command>
         <command>-fs NAMENODE -chmod -R a+rwx dir0 dir2</command>
-        <command>-fs NAMENODE -lsr dir*</command>
+        <command>-fs NAMENODE -ls -R dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr dir*</command>
+        <command>-fs NAMENODE -rm -r dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -10002,10 +10002,10 @@
         <command>-fs NAMENODE -touchz hdfs:///dir0/dir1/file1</command>
         <command>-fs NAMENODE -touchz hdfs:///dir0/dir1/file2</command>
         <command>-fs NAMENODE -chmod 777 hdfs:///dir0/dir1</command>
-        <command>-fs NAMENODE -lsr hdfs:///dir0</command>
+        <command>-fs NAMENODE -ls -R hdfs:///dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir0</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -10058,10 +10058,10 @@
         <command>-fs NAMENODE -touchz hdfs:///dir0/dir1/file1</command>
         <command>-fs NAMENODE -touchz hdfs:///dir0/dir1/file2</command>
         <command>-fs NAMENODE -chmod a+rwx hdfs:///dir0/dir1</command>
-        <command>-fs NAMENODE -lsr hdfs:///dir0</command>
+        <command>-fs NAMENODE -ls -R hdfs:///dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir0</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -10092,10 +10092,10 @@
         <command>-fs NAMENODE -touchz hdfs:///dir0/dir1/file1</command>
         <command>-fs NAMENODE -touchz hdfs:///dir0/dir1/file2</command>
         <command>-fs NAMENODE -chmod -R 777 hdfs:///dir0/dir1</command>
-        <command>-fs NAMENODE -lsr hdfs:///dir0</command>
+        <command>-fs NAMENODE -ls -R hdfs:///dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir0</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -10126,10 +10126,10 @@
         <command>-fs NAMENODE -touchz hdfs:///dir0/dir1/file1</command>
         <command>-fs NAMENODE -touchz hdfs:///dir0/dir1/file2</command>
         <command>-fs NAMENODE -chmod -R a+rwx hdfs:///dir0/dir1</command>
-        <command>-fs NAMENODE -lsr hdfs:///dir0</command>
+        <command>-fs NAMENODE -ls -R hdfs:///dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir0</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -10191,7 +10191,7 @@
         <command>-fs NAMENODE -touchz hdfs:///file3</command>
         <command>-fs NAMENODE -touchz hdfs:///file4</command>
         <command>-fs NAMENODE -chmod 777 hdfs:///file* </command>
-        <command>-fs NAMENODE -lsr hdfs:///file*</command>
+        <command>-fs NAMENODE -ls -R hdfs:///file*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm hdfs:///file*</command>
@@ -10230,10 +10230,10 @@
         <command>-fs NAMENODE -touchz hdfs:///dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz hdfs:///dir2/dir1/file2</command>
         <command>-fs NAMENODE -chmod 777 hdfs:///dir*</command>
-        <command>-fs NAMENODE -lsr hdfs:///dir*</command>
+        <command>-fs NAMENODE -ls -R hdfs:///dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -10279,7 +10279,7 @@
         <command>-fs NAMENODE -touchz hdfs:///file3</command>
         <command>-fs NAMENODE -touchz hdfs:///file4</command>
         <command>-fs NAMENODE -chmod 777 hdfs:///file1 hdfs:///file2 hdfs:///file3 hdfs:///file4 </command>
-        <command>-fs NAMENODE -lsr hdfs:///file*</command>
+        <command>-fs NAMENODE -ls -R hdfs:///file*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm hdfs:///file*</command>
@@ -10318,10 +10318,10 @@
         <command>-fs NAMENODE -touchz hdfs:///dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz hdfs:///dir2/dir1/file2</command>
         <command>-fs NAMENODE -chmod 777 hdfs:///dir0 hdfs:///dir2</command>
-        <command>-fs NAMENODE -lsr hdfs:///dir*</command>
+        <command>-fs NAMENODE -ls -R hdfs:///dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -10367,7 +10367,7 @@
         <command>-fs NAMENODE -touchz hdfs:///file3</command>
         <command>-fs NAMENODE -touchz hdfs:///file4</command>
         <command>-fs NAMENODE -chmod a+rw hdfs:///file* </command>
-        <command>-fs NAMENODE -lsr hdfs:///file*</command>
+        <command>-fs NAMENODE -ls -R hdfs:///file*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm hdfs:///file*</command>
@@ -10406,10 +10406,10 @@
         <command>-fs NAMENODE -touchz hdfs:///dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz hdfs:///dir2/dir1/file2</command>
         <command>-fs NAMENODE -chmod a+rwx hdfs:///dir*</command>
-        <command>-fs NAMENODE -lsr hdfs:///dir*</command>
+        <command>-fs NAMENODE -ls -R hdfs:///dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -10455,7 +10455,7 @@
         <command>-fs NAMENODE -touchz hdfs:///file3</command>
         <command>-fs NAMENODE -touchz hdfs:///file4</command>
         <command>-fs NAMENODE -chmod a+rw hdfs:///file1 hdfs:///file2 hdfs:///file3 hdfs:///file4 </command>
-        <command>-fs NAMENODE -lsr hdfs:///file*</command>
+        <command>-fs NAMENODE -ls -R hdfs:///file*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm hdfs:///file*</command>
@@ -10494,10 +10494,10 @@
         <command>-fs NAMENODE -touchz hdfs:///dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz hdfs:///dir2/dir1/file2</command>
         <command>-fs NAMENODE -chmod a+rwx hdfs:///dir0 hdfs:///dir2</command>
-        <command>-fs NAMENODE -lsr hdfs:///dir*</command>
+        <command>-fs NAMENODE -ls -R hdfs:///dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -10549,10 +10549,10 @@
         <command>-fs NAMENODE -touchz hdfs:///dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz hdfs:///dir2/dir1/file2</command>
         <command>-fs NAMENODE -chmod -R 777 hdfs:///dir*</command>
-        <command>-fs NAMENODE -lsr hdfs:///dir*</command>
+        <command>-fs NAMENODE -ls -R hdfs:///dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -10604,10 +10604,10 @@
         <command>-fs NAMENODE -touchz hdfs:///dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz hdfs:///dir2/dir1/file2</command>
         <command>-fs NAMENODE -chmod -R 777 hdfs:///dir0 hdfs:///dir2</command>
-        <command>-fs NAMENODE -lsr hdfs:///dir*</command>
+        <command>-fs NAMENODE -ls -R hdfs:///dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -10659,10 +10659,10 @@
         <command>-fs NAMENODE -touchz hdfs:///dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz hdfs:///dir2/dir1/file2</command>
         <command>-fs NAMENODE -chmod -R a+rwx hdfs:///dir*</command>
-        <command>-fs NAMENODE -lsr hdfs:///dir*</command>
+        <command>-fs NAMENODE -ls -R hdfs:///dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -10714,10 +10714,10 @@
         <command>-fs NAMENODE -touchz hdfs:///dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz hdfs:///dir2/dir1/file2</command>
         <command>-fs NAMENODE -chmod -R a+rwx hdfs:///dir0 hdfs:///dir2</command>
-        <command>-fs NAMENODE -lsr hdfs:///dir*</command>
+        <command>-fs NAMENODE -ls -R hdfs:///dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -10821,10 +10821,10 @@
         <command>-fs NAMENODE -touchz NAMENODE/dir0/dir1/file1</command>
         <command>-fs NAMENODE -touchz NAMENODE/dir0/dir1/file2</command>
         <command>-fs NAMENODE -chmod 777 NAMENODE/dir0/dir1</command>
-        <command>-fs NAMENODE -lsr NAMENODE/dir0</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir0</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -10877,10 +10877,10 @@
         <command>-fs NAMENODE -touchz NAMENODE/dir0/dir1/file1</command>
         <command>-fs NAMENODE -touchz NAMENODE/dir0/dir1/file2</command>
         <command>-fs NAMENODE -chmod a+rwx NAMENODE/dir0/dir1</command>
-        <command>-fs NAMENODE -lsr NAMENODE/dir0</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir0</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -10911,10 +10911,10 @@
         <command>-fs NAMENODE -touchz NAMENODE/dir0/dir1/file1</command>
         <command>-fs NAMENODE -touchz NAMENODE/dir0/dir1/file2</command>
         <command>-fs NAMENODE -chmod -R 777 NAMENODE/dir0/dir1</command>
-        <command>-fs NAMENODE -lsr NAMENODE/dir0</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir0</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -10945,10 +10945,10 @@
         <command>-fs NAMENODE -touchz NAMENODE/dir0/dir1/file1</command>
         <command>-fs NAMENODE -touchz NAMENODE/dir0/dir1/file2</command>
         <command>-fs NAMENODE -chmod -R a+rwx NAMENODE/dir0/dir1</command>
-        <command>-fs NAMENODE -lsr NAMENODE/dir0</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir0</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -11010,7 +11010,7 @@
         <command>-fs NAMENODE -touchz NAMENODE/file3</command>
         <command>-fs NAMENODE -touchz NAMENODE/file4</command>
         <command>-fs NAMENODE -chmod 777 NAMENODE/file* </command>
-        <command>-fs NAMENODE -lsr NAMENODE/file*</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/file*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm NAMENODE/file*</command>
@@ -11049,10 +11049,10 @@
         <command>-fs NAMENODE -touchz NAMENODE/dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz NAMENODE/dir2/dir1/file2</command>
         <command>-fs NAMENODE -chmod 777 NAMENODE/dir*</command>
-        <command>-fs NAMENODE -lsr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -11098,7 +11098,7 @@
         <command>-fs NAMENODE -touchz NAMENODE/file3</command>
         <command>-fs NAMENODE -touchz NAMENODE/file4</command>
         <command>-fs NAMENODE -chmod 777 NAMENODE/file1 NAMENODE/file2 NAMENODE/file3 NAMENODE/file4 </command>
-        <command>-fs NAMENODE -lsr NAMENODE/file*</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/file*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm NAMENODE/file*</command>
@@ -11137,10 +11137,10 @@
         <command>-fs NAMENODE -touchz NAMENODE/dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz NAMENODE/dir2/dir1/file2</command>
         <command>-fs NAMENODE -chmod 777 NAMENODE/dir0 NAMENODE/dir2</command>
-        <command>-fs NAMENODE -lsr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -11186,7 +11186,7 @@
         <command>-fs NAMENODE -touchz NAMENODE/file3</command>
         <command>-fs NAMENODE -touchz NAMENODE/file4</command>
         <command>-fs NAMENODE -chmod a+rw NAMENODE/file* </command>
-        <command>-fs NAMENODE -lsr NAMENODE/file*</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/file*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm NAMENODE/file*</command>
@@ -11225,10 +11225,10 @@
         <command>-fs NAMENODE -touchz NAMENODE/dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz NAMENODE/dir2/dir1/file2</command>
         <command>-fs NAMENODE -chmod a+rwx NAMENODE/dir*</command>
-        <command>-fs NAMENODE -lsr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -11274,7 +11274,7 @@
         <command>-fs NAMENODE -touchz NAMENODE/file3</command>
         <command>-fs NAMENODE -touchz NAMENODE/file4</command>
         <command>-fs NAMENODE -chmod a+rw NAMENODE/file1 NAMENODE/file2 NAMENODE/file3 NAMENODE/file4 </command>
-        <command>-fs NAMENODE -lsr NAMENODE/file*</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/file*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm NAMENODE/file*</command>
@@ -11313,10 +11313,10 @@
         <command>-fs NAMENODE -touchz NAMENODE/dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz NAMENODE/dir2/dir1/file2</command>
         <command>-fs NAMENODE -chmod a+rwx NAMENODE/dir0 NAMENODE/dir2</command>
-        <command>-fs NAMENODE -lsr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -11368,10 +11368,10 @@
         <command>-fs NAMENODE -touchz NAMENODE/dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz NAMENODE/dir2/dir1/file2</command>
         <command>-fs NAMENODE -chmod -R 777 NAMENODE/dir*</command>
-        <command>-fs NAMENODE -lsr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -11423,10 +11423,10 @@
         <command>-fs NAMENODE -touchz NAMENODE/dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz NAMENODE/dir2/dir1/file2</command>
         <command>-fs NAMENODE -chmod -R 777 NAMENODE/dir0 NAMENODE/dir2</command>
-        <command>-fs NAMENODE -lsr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -11478,10 +11478,10 @@
         <command>-fs NAMENODE -touchz NAMENODE/dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz NAMENODE/dir2/dir1/file2</command>
         <command>-fs NAMENODE -chmod -R a+rwx NAMENODE/dir*</command>
-        <command>-fs NAMENODE -lsr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -11533,10 +11533,10 @@
         <command>-fs NAMENODE -touchz NAMENODE/dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz NAMENODE/dir2/dir1/file2</command>
         <command>-fs NAMENODE -chmod -R a+rwx NAMENODE/dir0 NAMENODE/dir2</command>
-        <command>-fs NAMENODE -lsr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -11640,10 +11640,10 @@
         <command>-fs NAMENODE -touchz hdfs:///dir0/dir1/file1</command>
         <command>-fs NAMENODE -touchz hdfs:///dir0/dir1/file2</command>
         <command>-fs NAMENODE -chown newowner:newgroup hdfs:///dir0/dir1</command>
-        <command>-fs NAMENODE -lsr hdfs:///dir0</command>
+        <command>-fs NAMENODE -ls -R hdfs:///dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir0</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -11674,10 +11674,10 @@
         <command>-fs NAMENODE -touchz hdfs:///dir0/dir1/file1</command>
         <command>-fs NAMENODE -touchz hdfs:///dir0/dir1/file2</command>
         <command>-fs NAMENODE -chown -R newowner:newgroup hdfs:///dir0/dir1</command>
-        <command>-fs NAMENODE -lsr hdfs:///dir0</command>
+        <command>-fs NAMENODE -ls -R hdfs:///dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir0</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -11723,7 +11723,7 @@
         <command>-fs NAMENODE -touchz hdfs:///file3</command>
         <command>-fs NAMENODE -touchz hdfs:///file4</command>
         <command>-fs NAMENODE -chown newowner:newgroup hdfs:///file* </command>
-        <command>-fs NAMENODE -lsr hdfs:///file*</command>
+        <command>-fs NAMENODE -ls -R hdfs:///file*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm hdfs:///file*</command>
@@ -11762,10 +11762,10 @@
         <command>-fs NAMENODE -touchz hdfs:///dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz hdfs:///dir2/dir1/file2</command>
         <command>-fs NAMENODE -chown newowner:newgroup hdfs:///dir*</command>
-        <command>-fs NAMENODE -lsr hdfs:///dir*</command>
+        <command>-fs NAMENODE -ls -R hdfs:///dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -11811,7 +11811,7 @@
         <command>-fs NAMENODE -touchz hdfs:///file3</command>
         <command>-fs NAMENODE -touchz hdfs:///file4</command>
         <command>-fs NAMENODE -chown newowner:newgroup hdfs:///file1 hdfs:///file2 hdfs:///file3 hdfs:///file4 </command>
-        <command>-fs NAMENODE -lsr hdfs:///file*</command>
+        <command>-fs NAMENODE -ls -R hdfs:///file*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm hdfs:///file*</command>
@@ -11850,10 +11850,10 @@
         <command>-fs NAMENODE -touchz hdfs:///dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz hdfs:///dir2/dir1/file2</command>
         <command>-fs NAMENODE -chown newowner:newgroup hdfs:///dir0 hdfs:///dir2</command>
-        <command>-fs NAMENODE -lsr hdfs:///dir*</command>
+        <command>-fs NAMENODE -ls -R hdfs:///dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -11905,10 +11905,10 @@
         <command>-fs NAMENODE -touchz hdfs:///dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz hdfs:///dir2/dir1/file2</command>
         <command>-fs NAMENODE -chown -R newowner:newgroup hdfs:///dir*</command>
-        <command>-fs NAMENODE -lsr hdfs:///dir*</command>
+        <command>-fs NAMENODE -ls -R hdfs:///dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -11960,10 +11960,10 @@
         <command>-fs NAMENODE -touchz hdfs:///dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz hdfs:///dir2/dir1/file2</command>
         <command>-fs NAMENODE -chown -R newowner:newgroup hdfs:///dir0 hdfs:///dir2</command>
-        <command>-fs NAMENODE -lsr hdfs:///dir*</command>
+        <command>-fs NAMENODE -ls -R hdfs:///dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -12089,10 +12089,10 @@
         <command>-fs NAMENODE -touchz /dir0/dir1/file1</command>
         <command>-fs NAMENODE -touchz /dir0/dir1/file2</command>
         <command>-fs NAMENODE -chown newowner:newgroup /dir0/dir1</command>
-        <command>-fs NAMENODE -lsr /dir0</command>
+        <command>-fs NAMENODE -ls -R /dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir0</command>
+        <command>-fs NAMENODE -rm -r /dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -12123,10 +12123,10 @@
         <command>-fs NAMENODE -touchz dir0/dir1/file1</command>
         <command>-fs NAMENODE -touchz dir0/dir1/file2</command>
         <command>-fs NAMENODE -chown newowner:newgroup dir0/dir1</command>
-        <command>-fs NAMENODE -lsr dir0</command>
+        <command>-fs NAMENODE -ls -R dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr dir0</command>
+        <command>-fs NAMENODE -rm -r dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -12157,10 +12157,10 @@
         <command>-fs NAMENODE -touchz /dir0/dir1/file1</command>
         <command>-fs NAMENODE -touchz /dir0/dir1/file2</command>
         <command>-fs NAMENODE -chown -R newowner:newgroup /dir0/dir1</command>
-        <command>-fs NAMENODE -lsr /dir0</command>
+        <command>-fs NAMENODE -ls -R /dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir0</command>
+        <command>-fs NAMENODE -rm -r /dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -12191,10 +12191,10 @@
         <command>-fs NAMENODE -touchz dir0/dir1/file1</command>
         <command>-fs NAMENODE -touchz dir0/dir1/file2</command>
         <command>-fs NAMENODE -chown -R newowner:newgroup dir0/dir1</command>
-        <command>-fs NAMENODE -lsr dir0</command>
+        <command>-fs NAMENODE -ls -R dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr dir0</command>
+        <command>-fs NAMENODE -rm -r dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -12256,7 +12256,7 @@
         <command>-fs NAMENODE -touchz /file3</command>
         <command>-fs NAMENODE -touchz /file4</command>
         <command>-fs NAMENODE -chown newowner:newgroup /file* </command>
-        <command>-fs NAMENODE -lsr /file*</command>
+        <command>-fs NAMENODE -ls -R /file*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm /file*</command>
@@ -12289,7 +12289,7 @@
         <command>-fs NAMENODE -touchz file3</command>
         <command>-fs NAMENODE -touchz file4</command>
         <command>-fs NAMENODE -chown newowner:newgroup file* </command>
-        <command>-fs NAMENODE -lsr file*</command>
+        <command>-fs NAMENODE -ls -R file*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm file*</command>
@@ -12328,10 +12328,10 @@
         <command>-fs NAMENODE -touchz /dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz /dir2/dir1/file2</command>
         <command>-fs NAMENODE -chown newowner:newgroup /dir*</command>
-        <command>-fs NAMENODE -lsr /dir*</command>
+        <command>-fs NAMENODE -ls -R /dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir*</command>
+        <command>-fs NAMENODE -rm -r /dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -12383,10 +12383,10 @@
         <command>-fs NAMENODE -touchz dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz dir2/dir1/file2</command>
         <command>-fs NAMENODE -chown newowner:newgroup dir*</command>
-        <command>-fs NAMENODE -lsr dir*</command>
+        <command>-fs NAMENODE -ls -R dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr dir*</command>
+        <command>-fs NAMENODE -rm -r dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -12432,7 +12432,7 @@
         <command>-fs NAMENODE -touchz /file3</command>
         <command>-fs NAMENODE -touchz /file4</command>
         <command>-fs NAMENODE -chown newowner:newgroup /file1 /file2 /file3 /file4 </command>
-        <command>-fs NAMENODE -lsr /file*</command>
+        <command>-fs NAMENODE -ls -R /file*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm /file*</command>
@@ -12465,7 +12465,7 @@
         <command>-fs NAMENODE -touchz file3</command>
         <command>-fs NAMENODE -touchz file4</command>
         <command>-fs NAMENODE -chown newowner:newgroup file1 file2 file3 file4 </command>
-        <command>-fs NAMENODE -lsr file*</command>
+        <command>-fs NAMENODE -ls -R file*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm file*</command>
@@ -12504,10 +12504,10 @@
         <command>-fs NAMENODE -touchz /dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz /dir2/dir1/file2</command>
         <command>-fs NAMENODE -chown newowner:newgroup /dir0 /dir2</command>
-        <command>-fs NAMENODE -lsr /dir*</command>
+        <command>-fs NAMENODE -ls -R /dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir*</command>
+        <command>-fs NAMENODE -rm -r /dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -12559,10 +12559,10 @@
         <command>-fs NAMENODE -touchz dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz dir2/dir1/file2</command>
         <command>-fs NAMENODE -chown newowner:newgroup dir0 dir2</command>
-        <command>-fs NAMENODE -lsr dir*</command>
+        <command>-fs NAMENODE -ls -R dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr dir*</command>
+        <command>-fs NAMENODE -rm -r dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -12614,10 +12614,10 @@
         <command>-fs NAMENODE -touchz /dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz /dir2/dir1/file2</command>
         <command>-fs NAMENODE -chown -R newowner:newgroup /dir*</command>
-        <command>-fs NAMENODE -lsr /dir*</command>
+        <command>-fs NAMENODE -ls -R /dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir*</command>
+        <command>-fs NAMENODE -rm -r /dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -12669,10 +12669,10 @@
         <command>-fs NAMENODE -touchz dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz dir2/dir1/file2</command>
         <command>-fs NAMENODE -chown -R newowner:newgroup dir*</command>
-        <command>-fs NAMENODE -lsr dir*</command>
+        <command>-fs NAMENODE -ls -R dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr dir*</command>
+        <command>-fs NAMENODE -rm -r dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -12724,10 +12724,10 @@
         <command>-fs NAMENODE -touchz /dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz /dir2/dir1/file2</command>
         <command>-fs NAMENODE -chown -R newowner:newgroup /dir0 /dir2</command>
-        <command>-fs NAMENODE -lsr /dir*</command>
+        <command>-fs NAMENODE -ls -R /dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir*</command>
+        <command>-fs NAMENODE -rm -r /dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -12779,10 +12779,10 @@
         <command>-fs NAMENODE -touchz dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz dir2/dir1/file2</command>
         <command>-fs NAMENODE -chown -R newowner:newgroup dir0 dir2</command>
-        <command>-fs NAMENODE -lsr dir*</command>
+        <command>-fs NAMENODE -ls -R dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr dir*</command>
+        <command>-fs NAMENODE -rm -r dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -12919,10 +12919,10 @@
         <command>-fs NAMENODE -touchz NAMENODE/dir0/dir1/file1</command>
         <command>-fs NAMENODE -touchz NAMENODE/dir0/dir1/file2</command>
         <command>-fs NAMENODE -chown newowner:newgroup NAMENODE/dir0/dir1</command>
-        <command>-fs NAMENODE -lsr NAMENODE/dir0</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir0</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -12953,10 +12953,10 @@
         <command>-fs NAMENODE -touchz NAMENODE/dir0/dir1/file1</command>
         <command>-fs NAMENODE -touchz NAMENODE/dir0/dir1/file2</command>
         <command>-fs NAMENODE -chown -R newowner:newgroup NAMENODE/dir0/dir1</command>
-        <command>-fs NAMENODE -lsr NAMENODE/dir0</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir0</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -13002,7 +13002,7 @@
         <command>-fs NAMENODE -touchz NAMENODE/file3</command>
         <command>-fs NAMENODE -touchz NAMENODE/file4</command>
         <command>-fs NAMENODE -chown newowner:newgroup NAMENODE/file* </command>
-        <command>-fs NAMENODE -lsr NAMENODE/file*</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/file*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm NAMENODE/file*</command>
@@ -13041,10 +13041,10 @@
         <command>-fs NAMENODE -touchz NAMENODE/dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz NAMENODE/dir2/dir1/file2</command>
         <command>-fs NAMENODE -chown newowner:newgroup NAMENODE/dir*</command>
-        <command>-fs NAMENODE -lsr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -13090,7 +13090,7 @@
         <command>-fs NAMENODE -touchz NAMENODE/file3</command>
         <command>-fs NAMENODE -touchz NAMENODE/file4</command>
         <command>-fs NAMENODE -chown newowner:newgroup NAMENODE/file1 NAMENODE/file2 NAMENODE/file3 NAMENODE/file4 </command>
-        <command>-fs NAMENODE -lsr NAMENODE/file*</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/file*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm NAMENODE/file*</command>
@@ -13129,10 +13129,10 @@
         <command>-fs NAMENODE -touchz NAMENODE/dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz NAMENODE/dir2/dir1/file2</command>
         <command>-fs NAMENODE -chown newowner:newgroup NAMENODE/dir0 NAMENODE/dir2</command>
-        <command>-fs NAMENODE -lsr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -13184,10 +13184,10 @@
         <command>-fs NAMENODE -touchz NAMENODE/dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz NAMENODE/dir2/dir1/file2</command>
         <command>-fs NAMENODE -chown -R newowner:newgroup NAMENODE/dir*</command>
-        <command>-fs NAMENODE -lsr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -13239,10 +13239,10 @@
         <command>-fs NAMENODE -touchz NAMENODE/dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz NAMENODE/dir2/dir1/file2</command>
         <command>-fs NAMENODE -chown -R newowner:newgroup NAMENODE/dir0 NAMENODE/dir2</command>
-        <command>-fs NAMENODE -lsr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -13368,10 +13368,10 @@
         <command>-fs NAMENODE -touchz /dir0/dir1/file1</command>
         <command>-fs NAMENODE -touchz /dir0/dir1/file2</command>
         <command>-fs NAMENODE -chgrp newgroup /dir0/dir1</command>
-        <command>-fs NAMENODE -lsr /dir0</command>
+        <command>-fs NAMENODE -ls -R /dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir0</command>
+        <command>-fs NAMENODE -rm -r /dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -13402,10 +13402,10 @@
         <command>-fs NAMENODE -touchz dir0/dir1/file1</command>
         <command>-fs NAMENODE -touchz dir0/dir1/file2</command>
         <command>-fs NAMENODE -chgrp newgroup dir0/dir1</command>
-        <command>-fs NAMENODE -lsr dir0</command>
+        <command>-fs NAMENODE -ls -R dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr dir0</command>
+        <command>-fs NAMENODE -rm -r dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -13436,10 +13436,10 @@
         <command>-fs NAMENODE -touchz /dir0/dir1/file1</command>
         <command>-fs NAMENODE -touchz /dir0/dir1/file2</command>
         <command>-fs NAMENODE -chgrp -R newgroup /dir0/dir1</command>
-        <command>-fs NAMENODE -lsr /dir0</command>
+        <command>-fs NAMENODE -ls -R /dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir0</command>
+        <command>-fs NAMENODE -rm -r /dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -13470,10 +13470,10 @@
         <command>-fs NAMENODE -touchz dir0/dir1/file1</command>
         <command>-fs NAMENODE -touchz dir0/dir1/file2</command>
         <command>-fs NAMENODE -chgrp -R newgroup dir0/dir1</command>
-        <command>-fs NAMENODE -lsr dir0</command>
+        <command>-fs NAMENODE -ls -R dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr dir0</command>
+        <command>-fs NAMENODE -rm -r dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -13535,7 +13535,7 @@
         <command>-fs NAMENODE -touchz /file3</command>
         <command>-fs NAMENODE -touchz /file4</command>
         <command>-fs NAMENODE -chgrp newgroup /file* </command>
-        <command>-fs NAMENODE -lsr /file*</command>
+        <command>-fs NAMENODE -ls -R /file*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm /file*</command>
@@ -13568,7 +13568,7 @@
         <command>-fs NAMENODE -touchz file3</command>
         <command>-fs NAMENODE -touchz file4</command>
         <command>-fs NAMENODE -chgrp newgroup file* </command>
-        <command>-fs NAMENODE -lsr file*</command>
+        <command>-fs NAMENODE -ls -R file*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm file*</command>
@@ -13607,10 +13607,10 @@
         <command>-fs NAMENODE -touchz /dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz /dir2/dir1/file2</command>
         <command>-fs NAMENODE -chgrp newgroup /dir*</command>
-        <command>-fs NAMENODE -lsr /dir*</command>
+        <command>-fs NAMENODE -ls -R /dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir*</command>
+        <command>-fs NAMENODE -rm -r /dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -13662,10 +13662,10 @@
         <command>-fs NAMENODE -touchz dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz dir2/dir1/file2</command>
         <command>-fs NAMENODE -chgrp newgroup dir*</command>
-        <command>-fs NAMENODE -lsr dir*</command>
+        <command>-fs NAMENODE -ls -R dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr dir*</command>
+        <command>-fs NAMENODE -rm -r dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -13711,7 +13711,7 @@
         <command>-fs NAMENODE -touchz /file3</command>
         <command>-fs NAMENODE -touchz /file4</command>
         <command>-fs NAMENODE -chgrp newgroup /file1 /file2 /file3 /file4 </command>
-        <command>-fs NAMENODE -lsr /file*</command>
+        <command>-fs NAMENODE -ls -R /file*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm /file*</command>
@@ -13744,7 +13744,7 @@
         <command>-fs NAMENODE -touchz file3</command>
         <command>-fs NAMENODE -touchz file4</command>
         <command>-fs NAMENODE -chgrp newgroup file1 file2 file3 file4 </command>
-        <command>-fs NAMENODE -lsr file*</command>
+        <command>-fs NAMENODE -ls -R file*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm file*</command>
@@ -13783,10 +13783,10 @@
         <command>-fs NAMENODE -touchz /dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz /dir2/dir1/file2</command>
         <command>-fs NAMENODE -chgrp newgroup /dir0 /dir2</command>
-        <command>-fs NAMENODE -lsr /dir*</command>
+        <command>-fs NAMENODE -ls -R /dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir*</command>
+        <command>-fs NAMENODE -rm -r /dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -13838,10 +13838,10 @@
         <command>-fs NAMENODE -touchz dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz dir2/dir1/file2</command>
         <command>-fs NAMENODE -chgrp newgroup dir0 dir2</command>
-        <command>-fs NAMENODE -lsr dir*</command>
+        <command>-fs NAMENODE -ls -R dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr dir*</command>
+        <command>-fs NAMENODE -rm -r dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -13893,10 +13893,10 @@
         <command>-fs NAMENODE -touchz /dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz /dir2/dir1/file2</command>
         <command>-fs NAMENODE -chgrp -R newgroup /dir*</command>
-        <command>-fs NAMENODE -lsr /dir*</command>
+        <command>-fs NAMENODE -ls -R /dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir*</command>
+        <command>-fs NAMENODE -rm -r /dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -13948,10 +13948,10 @@
         <command>-fs NAMENODE -touchz dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz dir2/dir1/file2</command>
         <command>-fs NAMENODE -chgrp -R newgroup dir*</command>
-        <command>-fs NAMENODE -lsr dir*</command>
+        <command>-fs NAMENODE -ls -R dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr dir*</command>
+        <command>-fs NAMENODE -rm -r dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -14003,10 +14003,10 @@
         <command>-fs NAMENODE -touchz /dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz /dir2/dir1/file2</command>
         <command>-fs NAMENODE -chgrp -R newgroup /dir0 /dir2</command>
-        <command>-fs NAMENODE -lsr /dir*</command>
+        <command>-fs NAMENODE -ls -R /dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir*</command>
+        <command>-fs NAMENODE -rm -r /dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -14058,10 +14058,10 @@
         <command>-fs NAMENODE -touchz dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz dir2/dir1/file2</command>
         <command>-fs NAMENODE -chgrp -R newgroup dir0 dir2</command>
-        <command>-fs NAMENODE -lsr dir*</command>
+        <command>-fs NAMENODE -ls -R dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr dir*</command>
+        <command>-fs NAMENODE -rm -r dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -14164,10 +14164,10 @@
         <command>-fs NAMENODE -touchz hdfs:///dir0/dir1/file1</command>
         <command>-fs NAMENODE -touchz hdfs:///dir0/dir1/file2</command>
         <command>-fs NAMENODE -chgrp newgroup hdfs:///dir0/dir1</command>
-        <command>-fs NAMENODE -lsr hdfs:///dir0</command>
+        <command>-fs NAMENODE -ls -R hdfs:///dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir0</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -14198,10 +14198,10 @@
         <command>-fs NAMENODE -touchz hdfs:///dir0/dir1/file1</command>
         <command>-fs NAMENODE -touchz hdfs:///dir0/dir1/file2</command>
         <command>-fs NAMENODE -chgrp -R newgroup hdfs:///dir0/dir1</command>
-        <command>-fs NAMENODE -lsr hdfs:///dir0</command>
+        <command>-fs NAMENODE -ls -R hdfs:///dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir0</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -14247,7 +14247,7 @@
         <command>-fs NAMENODE -touchz hdfs:///file3</command>
         <command>-fs NAMENODE -touchz hdfs:///file4</command>
         <command>-fs NAMENODE -chgrp newgroup hdfs:///file* </command>
-        <command>-fs NAMENODE -lsr hdfs:///file*</command>
+        <command>-fs NAMENODE -ls -R hdfs:///file*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm hdfs:///file*</command>
@@ -14286,10 +14286,10 @@
         <command>-fs NAMENODE -touchz hdfs:///dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz hdfs:///dir2/dir1/file2</command>
         <command>-fs NAMENODE -chgrp newgroup hdfs:///dir*</command>
-        <command>-fs NAMENODE -lsr hdfs:///dir*</command>
+        <command>-fs NAMENODE -ls -R hdfs:///dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -14335,7 +14335,7 @@
         <command>-fs NAMENODE -touchz hdfs:///file3</command>
         <command>-fs NAMENODE -touchz hdfs:///file4</command>
         <command>-fs NAMENODE -chgrp newgroup hdfs:///file1 hdfs:///file2 hdfs:///file3 hdfs:///file4 </command>
-        <command>-fs NAMENODE -lsr hdfs:///file*</command>
+        <command>-fs NAMENODE -ls -R hdfs:///file*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm hdfs:///file*</command>
@@ -14374,10 +14374,10 @@
         <command>-fs NAMENODE -touchz hdfs:///dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz hdfs:///dir2/dir1/file2</command>
         <command>-fs NAMENODE -chgrp newgroup hdfs:///dir0 hdfs:///dir2</command>
-        <command>-fs NAMENODE -lsr hdfs:///dir*</command>
+        <command>-fs NAMENODE -ls -R hdfs:///dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -14429,10 +14429,10 @@
         <command>-fs NAMENODE -touchz hdfs:///dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz hdfs:///dir2/dir1/file2</command>
         <command>-fs NAMENODE -chgrp -R newgroup hdfs:///dir*</command>
-        <command>-fs NAMENODE -lsr hdfs:///dir*</command>
+        <command>-fs NAMENODE -ls -R hdfs:///dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -14484,10 +14484,10 @@
         <command>-fs NAMENODE -touchz hdfs:///dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz hdfs:///dir2/dir1/file2</command>
         <command>-fs NAMENODE -chgrp -R newgroup hdfs:///dir0 hdfs:///dir2</command>
-        <command>-fs NAMENODE -lsr hdfs:///dir*</command>
+        <command>-fs NAMENODE -ls -R hdfs:///dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///dir*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -14574,10 +14574,10 @@
         <command>-fs NAMENODE -touchz NAMENODE/dir0/dir1/file1</command>
         <command>-fs NAMENODE -touchz NAMENODE/dir0/dir1/file2</command>
         <command>-fs NAMENODE -chgrp newgroup NAMENODE/dir0/dir1</command>
-        <command>-fs NAMENODE -lsr NAMENODE/dir0</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir0</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -14608,10 +14608,10 @@
         <command>-fs NAMENODE -touchz NAMENODE/dir0/dir1/file1</command>
         <command>-fs NAMENODE -touchz NAMENODE/dir0/dir1/file2</command>
         <command>-fs NAMENODE -chgrp -R newgroup NAMENODE/dir0/dir1</command>
-        <command>-fs NAMENODE -lsr NAMENODE/dir0</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/dir0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir0</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir0</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -14657,7 +14657,7 @@
         <command>-fs NAMENODE -touchz NAMENODE/file3</command>
         <command>-fs NAMENODE -touchz NAMENODE/file4</command>
         <command>-fs NAMENODE -chgrp newgroup NAMENODE/file* </command>
-        <command>-fs NAMENODE -lsr NAMENODE/file*</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/file*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm NAMENODE/file*</command>
@@ -14696,10 +14696,10 @@
         <command>-fs NAMENODE -touchz NAMENODE/dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz NAMENODE/dir2/dir1/file2</command>
         <command>-fs NAMENODE -chgrp newgroup NAMENODE/dir*</command>
-        <command>-fs NAMENODE -lsr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -14745,7 +14745,7 @@
         <command>-fs NAMENODE -touchz NAMENODE/file3</command>
         <command>-fs NAMENODE -touchz NAMENODE/file4</command>
         <command>-fs NAMENODE -chgrp newgroup NAMENODE/file1 NAMENODE/file2 NAMENODE/file3 NAMENODE/file4 </command>
-        <command>-fs NAMENODE -lsr NAMENODE/file*</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/file*</command>
       </test-commands>
       <cleanup-commands>
         <command>-fs NAMENODE -rm NAMENODE/file*</command>
@@ -14784,10 +14784,10 @@
         <command>-fs NAMENODE -touchz NAMENODE/dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz NAMENODE/dir2/dir1/file2</command>
         <command>-fs NAMENODE -chgrp newgroup NAMENODE/dir0 NAMENODE/dir2</command>
-        <command>-fs NAMENODE -lsr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -14839,10 +14839,10 @@
         <command>-fs NAMENODE -touchz NAMENODE/dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz NAMENODE/dir2/dir1/file2</command>
         <command>-fs NAMENODE -chgrp -R newgroup NAMENODE/dir*</command>
-        <command>-fs NAMENODE -lsr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -14894,10 +14894,10 @@
         <command>-fs NAMENODE -touchz NAMENODE/dir2/dir1/file1</command>
         <command>-fs NAMENODE -touchz NAMENODE/dir2/dir1/file2</command>
         <command>-fs NAMENODE -chgrp -R newgroup NAMENODE/dir0 NAMENODE/dir2</command>
-        <command>-fs NAMENODE -lsr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -ls -R NAMENODE/dir*</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/dir*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/dir*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -15415,7 +15415,7 @@
         <dfs-admin-command>-fs NAMENODE -clrQuota /test1 </dfs-admin-command>
       </test-commands>
       <cleanup-commands>
-      	<command>-fs NAMENODE -rmr /test </command>
+      	<command>-fs NAMENODE -rm -r /test </command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -15435,7 +15435,7 @@
         <command>-fs NAMENODE -put CLITEST_DATA/data15bytes /dir1/</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir* </command>
+        <command>-fs NAMENODE -rm -r /dir* </command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -15455,7 +15455,7 @@
         <command>-fs NAMENODE -mkdir /dir1/dir4</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /dir* </command>
+        <command>-fs NAMENODE -rm -r /dir* </command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -15819,7 +15819,7 @@
         <dfs-admin-command>-fs NAMENODE -clrSpaceQuota test</dfs-admin-command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr test</command>
+        <command>-fs NAMENODE -rm -r test</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -15865,7 +15865,7 @@
         <command>-fs NAMENODE -moveFromLocal /user/wrongdata file</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -15881,7 +15881,7 @@
         <command>-fs NAMENODE -moveFromLocal wrongdata file</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -15900,12 +15900,12 @@
         <command>-fs NAMENODE -moveFromLocal /data15bytes /data30bytes file0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^moveFromLocal: copying multiple files, but last argument `file0' is not a directory</expected-output>
+          <expected-output>^moveFromLocal: `file0': Is not a directory</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -15918,7 +15918,7 @@
         <command>-fs NAMENODE -moveFromLocal /data15bytes /data30bytes wrongdir</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -15934,7 +15934,7 @@
         <command>-fs NAMENODE -moveFromLocal /user/wrongdata hdfs:///file</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -15951,12 +15951,12 @@
         <command>-fs NAMENODE -moveFromLocal CLITEST_DATA/data15bytes CLITEST_DATA/data30bytes hdfs:///file0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr hdfs:///*</command>
+        <command>-fs NAMENODE -rm -r hdfs:///*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^moveFromLocal: copying multiple files, but last argument `hdfs:/file0' is not a directory</expected-output>
+          <expected-output>^moveFromLocal: `hdfs:///file0': Is not a directory</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -15967,12 +15967,12 @@
         <command>-fs NAMENODE -moveFromLocal CLITEST_DATA/data15bytes CLITEST_DATA/data30bytes hdfs:///wrongdir</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^moveFromLocal: `hdfs:/wrongdir': No such file or directory</expected-output>
+          <expected-output>^moveFromLocal: `hdfs:///wrongdir': No such file or directory</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -15983,7 +15983,7 @@
         <command>-fs NAMENODE -moveFromLocal /user/wrongdata NAMENODE/file</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -16000,12 +16000,12 @@
         <command>-fs NAMENODE -moveFromLocal CLITEST_DATA/data15bytes CLITEST_DATA/data30bytes NAMENODE/file0</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr NAMENODE/*</command>
+        <command>-fs NAMENODE -rm -r NAMENODE/*</command>
       </cleanup-commands>
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^moveFromLocal: copying multiple files, but last argument `hdfs://\w+[.a-z]*:[0-9]+/file0' is not a directory</expected-output>
+          <expected-output>^moveFromLocal: `hdfs://\w+[.a-z]*:[0-9]+/file0': Is not a directory</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -16016,7 +16016,7 @@
         <command>-fs NAMENODE -moveFromLocal CLITEST_DATA/data15bytes CLITEST_DATA/data30bytes NAMENODE/wrongdir</command>
       </test-commands>
       <cleanup-commands>
-        <command>-fs NAMENODE -rmr /user</command>
+        <command>-fs NAMENODE -rm -r /user</command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -16037,7 +16037,7 @@
       </test-commands>
       <cleanup-commands>
         <dfs-admin-command>-fs NAMENODE -safemode leave </dfs-admin-command>
-       <dfs-admin-command>-fs NAMENODE -rmr  /test </dfs-admin-command>
+       <dfs-admin-command>-fs NAMENODE -rm -r  /test </dfs-admin-command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -16056,7 +16056,7 @@
       </test-commands>
       <cleanup-commands>
         <dfs-admin-command>-fs NAMENODE -safemode leave </dfs-admin-command>
-       <dfs-admin-command>-fs NAMENODE -rmr  /test </dfs-admin-command>
+       <dfs-admin-command>-fs NAMENODE -rm -r  /test </dfs-admin-command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -16076,7 +16076,7 @@
      </test-commands>
       <cleanup-commands>
         <dfs-admin-command>-fs NAMENODE -safemode leave </dfs-admin-command>
-       <dfs-admin-command>-fs NAMENODE -rmr  /test </dfs-admin-command>
+       <dfs-admin-command>-fs NAMENODE -rm -r  /test </dfs-admin-command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -16096,7 +16096,7 @@
       </test-commands>
       <cleanup-commands>
         <dfs-admin-command>-fs NAMENODE -safemode leave </dfs-admin-command>
-       <dfs-admin-command>-fs NAMENODE -rmr  /test </dfs-admin-command>
+       <dfs-admin-command>-fs NAMENODE -rm -r  /test </dfs-admin-command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -16115,7 +16115,7 @@
       </test-commands>
       <cleanup-commands>
         <dfs-admin-command>-fs NAMENODE -safemode leave </dfs-admin-command>
-       <dfs-admin-command>-fs NAMENODE -rmr  /test </dfs-admin-command>
+       <dfs-admin-command>-fs NAMENODE -rm -r  /test </dfs-admin-command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -16135,7 +16135,7 @@
       </test-commands>
       <cleanup-commands>
         <dfs-admin-command>-fs NAMENODE -safemode leave </dfs-admin-command>
-       <dfs-admin-command>-fs NAMENODE -rmr  /test </dfs-admin-command>
+       <dfs-admin-command>-fs NAMENODE -rm -r  /test </dfs-admin-command>
       </cleanup-commands>
       <comparators>
         <comparator>
@@ -16154,7 +16154,7 @@
       </test-commands>
       <cleanup-commands>
         <dfs-admin-command>-fs NAMENODE -safemode leave </dfs-admin-command>
-       <dfs-admin-command>-fs NAMENODE -rmr  /test </dfs-admin-command>
+       <dfs-admin-command>-fs NAMENODE -rm -r  /test </dfs-admin-command>
       </cleanup-commands>
       <comparators>
         <comparator>

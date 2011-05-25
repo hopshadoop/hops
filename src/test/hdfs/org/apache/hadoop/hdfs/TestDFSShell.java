@@ -368,8 +368,7 @@ public class TestDFSShell extends TestCase {
       argv[0] = "-ls";
       argv[1] = "/nonexistentfile";
       ret = ToolRunner.run(shell, argv);
-      assertTrue(" -lsr should fail ",
-          (ret < 0));
+      assertEquals(" -lsr should fail ", 1, ret);
       out.reset();
       srcFs.mkdirs(new Path("/testdir"));
       argv[0] = "-ls";
@@ -382,8 +381,7 @@ public class TestDFSShell extends TestCase {
       argv[0] = "-ls";
       argv[1] = "/user/nonxistant/*";
       ret = ToolRunner.run(shell, argv);
-      assertTrue(" -ls on nonexistent glob returns -1",
-          (ret < 0));
+      assertEquals(" -ls on nonexistent glob returns 1", 1, ret);
       out.reset();
       argv[0] = "-mkdir";
       argv[1] = "/testdir";
@@ -410,7 +408,7 @@ public class TestDFSShell extends TestCase {
       argv[1] = "/testfile";
       argv[2] = "file";
       ret = ToolRunner.run(shell, argv);
-      assertTrue("mv failed to rename", ret == -1);
+      assertEquals("mv failed to rename", 1,  ret);
       out.reset();
       argv = new String[3];
       argv[0] = "-mv";
@@ -434,7 +432,7 @@ public class TestDFSShell extends TestCase {
       srcFs.mkdirs(srcFs.getHomeDirectory());
       ret = ToolRunner.run(shell, argv);
       returned = out.toString();
-      assertTrue(" no error ", (ret == 0));
+      assertEquals(" no error ", 0, ret);
       assertTrue("empty path specified",
           (returned.lastIndexOf("empty string") == -1));
     } finally {
@@ -468,19 +466,19 @@ public class TestDFSShell extends TestCase {
       argv[0] = "-ls";
       argv[1] = dstFs.getUri().toString() + "/";
       int ret = ToolRunner.run(shell, argv);
-      assertTrue("ls works on remote uri ", (ret==0));
+      assertEquals("ls works on remote uri ", 0, ret);
       //check for rm -r 
       dstFs.mkdirs(new Path("/hadoopdir"));
       argv = new String[2];
       argv[0] = "-rmr";
       argv[1] = dstFs.getUri().toString() + "/hadoopdir";
       ret = ToolRunner.run(shell, argv);
-      assertTrue("-rmr works on remote uri " + argv[1], (ret==0));
+      assertEquals("-rmr works on remote uri " + argv[1], 0, ret);
       //check du 
       argv[0] = "-du";
       argv[1] = dstFs.getUri().toString() + "/";
       ret = ToolRunner.run(shell, argv);
-      assertTrue("du works on remote uri ", (ret ==0));
+      assertEquals("du works on remote uri ", 0, ret);
       //check put
       File furi = new File(TEST_ROOT_DIR, "furi");
       createLocalFile(furi);
@@ -489,20 +487,20 @@ public class TestDFSShell extends TestCase {
       argv[1] = furi.toString();
       argv[2] = dstFs.getUri().toString() + "/furi";
       ret = ToolRunner.run(shell, argv);
-      assertTrue(" put is working ", (ret==0));
+      assertEquals(" put is working ", 0, ret);
       //check cp 
       argv[0] = "-cp";
       argv[1] = dstFs.getUri().toString() + "/furi";
       argv[2] = srcFs.getUri().toString() + "/furi";
       ret = ToolRunner.run(shell, argv);
-      assertTrue(" cp is working ", (ret==0));
+      assertEquals(" cp is working ", 0, ret);
       assertTrue(srcFs.exists(new Path("/furi")));
       //check cat 
       argv = new String[2];
       argv[0] = "-cat";
       argv[1] = dstFs.getUri().toString() + "/furi";
       ret = ToolRunner.run(shell, argv);
-      assertTrue(" cat is working ", (ret == 0));
+      assertEquals(" cat is working ", 0, ret);
       //check chown
       dstFs.delete(new Path("/furi"), true);
       dstFs.delete(new Path("/hadoopdir"), true);
@@ -519,15 +517,15 @@ public class TestDFSShell extends TestCase {
       argv[0] = "-cat";
       argv[1] = "hdfs:///furi";
       ret = ToolRunner.run(shell, argv);
-      assertTrue(" default works for cat", (ret == 0));
+      assertEquals(" default works for cat", 0, ret);
       argv[0] = "-ls";
       argv[1] = "hdfs:///";
       ret = ToolRunner.run(shell, argv);
-      assertTrue("default works for ls ", (ret == 0));
+      assertEquals("default works for ls ", 0, ret);
       argv[0] = "-rmr";
       argv[1] = "hdfs:///furi";
       ret = ToolRunner.run(shell, argv);
-      assertTrue("default works for rm/rmr", (ret ==0));
+      assertEquals("default works for rm/rmr", 0, ret);
     } finally {
       System.setProperty("test.build.data", bak);
       if (null != srcCluster) {
@@ -651,7 +649,7 @@ public class TestDFSShell extends TestCase {
       {
         String[] args = {"-copyToLocal", "nosuchfile", TEST_ROOT_DIR};
         try {   
-          assertEquals(-1, shell.run(args));
+          assertEquals(1, shell.run(args));
         } catch (Exception e) {
           System.err.println("Exception raised from DFSShell.run " +
                             e.getLocalizedMessage());
@@ -750,13 +748,22 @@ public class TestDFSShell extends TestCase {
 
   //throws IOException instead of Exception as shell.run() does.
   private int runCmd(FsShell shell, String... args) throws IOException {
+    StringBuilder cmdline = new StringBuilder("RUN:");
+    for (String arg : args) cmdline.append(" " + arg);
+    LOG.info(cmdline.toString());
     try {
-      return shell.run(args);
+      int exitCode;
+      exitCode = shell.run(args);
+      LOG.info("RUN: "+args[0]+" exit=" + exitCode);
+      return exitCode;
     } catch (IOException e) {
+      LOG.error("RUN: "+args[0]+" IOException="+e.getMessage());
       throw e;
     } catch (RuntimeException e) {
+      LOG.error("RUN: "+args[0]+" RuntimeException="+e.getMessage());
       throw e;
     } catch (Exception e) {
+      LOG.error("RUN: "+args[0]+" Exception="+e.getMessage());
       throw new IOException(StringUtils.stringifyException(e));
     }
   }
@@ -1112,7 +1119,7 @@ public class TestDFSShell extends TestCase {
           System.err.println("Exception raised from DFSShell.run " +
                              e.getLocalizedMessage());
         }
-        assertTrue(val == 0);
+        assertEquals(0, val);
 
         // this should fail
         String[] args1 = new String[3];
@@ -1126,7 +1133,7 @@ public class TestDFSShell extends TestCase {
           System.err.println("Exception raised from DFSShell.run " +
                              e.getLocalizedMessage());
         }
-        assertTrue(val == -1);
+        assertEquals(1, val);
 
         // this should succeed
         args1[0] = "-cp";
@@ -1139,7 +1146,7 @@ public class TestDFSShell extends TestCase {
           System.err.println("Exception raised from DFSShell.run " +
                              e.getLocalizedMessage());
         }
-        assertTrue(val == 0);
+        assertEquals(0, val);
       }
         
     } finally {
@@ -1206,7 +1213,7 @@ public class TestDFSShell extends TestCase {
           args[0] = "-ls";
           args[1] = "/foo";
           int ret = ToolRunner.run(fshell, args);
-          assertEquals("returned should be -1", -1, ret);
+          assertEquals("returned should be 1", 1, ret);
           String str = out.toString();
           assertTrue("permission denied printed", 
                      str.indexOf("Permission denied") != -1);
@@ -1271,7 +1278,7 @@ public class TestDFSShell extends TestCase {
       show("files=" + files);
       corrupt(files);
 
-      assertEquals(null, runner.run(-1));
+      assertEquals(null, runner.run(1));
       String corruptedcontent = runner.run(0, "-ignoreCrc");
       assertEquals(localfcontent.substring(1), corruptedcontent.substring(1));
       assertEquals(localfcontent.charAt(0)+1, corruptedcontent.charAt(0));
@@ -1304,7 +1311,7 @@ public class TestDFSShell extends TestCase {
       String results = tmpUGI.doAs(new PrivilegedExceptionAction<String>() {
         @Override
         public String run() throws Exception {
-          return runLsr(new FsShell(conf), root, -1);
+          return runLsr(new FsShell(conf), root, 1);
         }
       });
       assertTrue(results.contains("zzz"));

@@ -618,6 +618,9 @@ Trunk (unreleased changes)
     HDFS-1943. Fail to start datanode while start-dfs.sh is executed by 
     root user. (Wei Yongjun via jghoman)
 
+    HDFS-1983. Fix path display for copy and rm commands in TestHDFSCLI and
+    TestDFSShell. (Daryn Sharp via todd)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES
