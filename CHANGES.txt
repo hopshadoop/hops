@@ -615,6 +615,9 @@ Trunk (unreleased changes)
     HDFS-1371. One bad node can incorrectly flag many files as corrupt.
     (Tanping Wang via jitendra)
 
+    HDFS-1943. Fail to start datanode while start-dfs.sh is executed by 
+    root user. (Wei Yongjun via jghoman)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES
