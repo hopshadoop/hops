@@ -38,27 +38,36 @@ public class TestDatanodeJsp {
   
   private static final String FILE_DATA = "foo bar baz biz buz";
   
-  private static void testViewingFile(MiniDFSCluster cluster, String filePath) throws IOException {
+  private static void testViewingFile(MiniDFSCluster cluster, String filePath,
+      boolean doTail) throws IOException {
     FileSystem fs = cluster.getFileSystem();
     
     Path testPath = new Path(filePath);
-    DFSTestUtil.writeFile(fs, testPath, FILE_DATA);
+    if (!fs.exists(testPath)) {
+      DFSTestUtil.writeFile(fs, testPath, FILE_DATA);
+    }
     
     InetSocketAddress nnIpcAddress = cluster.getNameNode().getNameNodeAddress();
     InetSocketAddress nnHttpAddress = cluster.getNameNode().getHttpAddress();
     int dnInfoPort = cluster.getDataNodes().get(0).getInfoPort();
     
-    URL url = new URL("http://localhost:" + dnInfoPort + "/browseDirectory.jsp" +
-        JspHelper.getUrlParam("dir", URLEncoder.encode(testPath.toString(), "UTF-8"), true) +
-        JspHelper.getUrlParam("namenodeInfoPort", nnHttpAddress.getPort() + 
-        JspHelper.getUrlParam("nnaddr", "localhost:" + nnIpcAddress.getPort())));
+    String jspName = doTail ? "tail.jsp" : "browseDirectory.jsp";
+    String fileParamName = doTail ? "filename" : "dir";
+    
+    URL url = new URL("http://localhost:" + dnInfoPort + "/" + jspName +
+        JspHelper.getUrlParam(fileParamName, URLEncoder.encode(testPath.toString(), "UTF-8"), true) +
+        JspHelper.getUrlParam("namenodeInfoPort", Integer.toString(nnHttpAddress.getPort())) + 
+        JspHelper.getUrlParam("nnaddr", "localhost:" + nnIpcAddress.getPort()));
     
     String viewFilePage = DFSTestUtil.urlGet(url);
     
     assertTrue("page should show preview of file contents", viewFilePage.contains(FILE_DATA));
-    assertTrue("page should show link to download file", viewFilePage
-        .contains("/streamFile" + URIUtil.encodePath(testPath.toString()) +
-            "?nnaddr=localhost:" + nnIpcAddress.getPort()));
+    
+    if (!doTail) {
+      assertTrue("page should show link to download file", viewFilePage
+          .contains("/streamFile" + URIUtil.encodePath(testPath.toString()) +
+              "?nnaddr=localhost:" + nnIpcAddress.getPort()));
+    }
   }
   
   @Test
@@ -69,9 +78,13 @@ public class TestDatanodeJsp {
       cluster = new MiniDFSCluster.Builder(conf).build();
       cluster.waitActive();
       
-      testViewingFile(cluster, "/test-file");
-      testViewingFile(cluster, "/tmp/test-file");
-      testViewingFile(cluster, "/tmp/test-file%with goofy&characters");
+      testViewingFile(cluster, "/test-file", false);
+      testViewingFile(cluster, "/tmp/test-file", false);
+      testViewingFile(cluster, "/tmp/test-file%with goofy&characters", false);
+      
+      testViewingFile(cluster, "/test-file", true);
+      testViewingFile(cluster, "/tmp/test-file", true);
+      testViewingFile(cluster, "/tmp/test-file%with goofy&characters", true);
       
     } finally {
       if (cluster != null) {

@@ -1052,6 +1052,9 @@ Release 0.22.0 - Unreleased
 
     HDFS-1978. All but first option in LIBHDFS_OPTS is ignored. (eli)
 
+    HDFS-1964. Fix incorrect HTML unescaping in DatanodeJspHelper
+    (Aaron T. Myers via todd)
+
 Release 0.21.1 - Unreleased
     HDFS-1466. TestFcHdfsSymlink relies on /tmp/test not existing. (eli)
 

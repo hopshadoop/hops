@@ -84,8 +84,8 @@ public class DatanodeJspHelper {
                                          Configuration conf
                                          ) throws IOException,
                                                   InterruptedException {
-    final String dir = StringEscapeUtils.unescapeHtml(
-        JspHelper.validatePath(req.getParameter("dir")));
+    final String dir = JspHelper.validatePath(
+        StringEscapeUtils.unescapeHtml(req.getParameter("dir")));
     if (dir == null) {
       out.print("Invalid input");
       return;
@@ -621,7 +621,7 @@ public class DatanodeJspHelper {
     }
 
     final String filename = JspHelper
-        .validatePath(req.getParameter(StringEscapeUtils.unescapeHtml("filename")));
+        .validatePath(StringEscapeUtils.unescapeHtml(req.getParameter("filename")));
     if (filename == null) {
       out.print("Invalid input (file name absent)");
       return;
