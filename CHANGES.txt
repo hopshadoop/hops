@@ -226,6 +226,10 @@ Trunk (unreleased changes)
     MAPREDUCE-2490. Add logging to graylist and blacklist activity to aid
     diagnosis of related issues. (Jonathan Eagles via cdouglas)
 
+    MAPREDUCE-2495. exit() the TaskTracker when the distributed cache cleanup
+    thread dies. (Robert Joseph Evans via cdouglas)
+
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES
