@@ -447,6 +447,9 @@ Trunk (unreleased changes)
 
     HDFS-1959. Better error message for missing namenode directory. (eli)
 
+    HDFS-1996.  ivy: hdfs test jar should be independent to common test jar.
+    (Eric Yang via szetszwo)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image

@@ -74,6 +74,8 @@
     <dependency org="org.aspectj" name="aspectjrt" rev="${aspectj.version}" conf="common->default"/>
     <dependency org="org.aspectj" name="aspectjtools" rev="${aspectj.version}" conf="common->default"/>
 
+    <dependency org="junit" name="junit" rev="${junit.version}" conf="test->master"/>
+
     <dependency org="org.slf4j" name="slf4j-api" rev="${slf4j-api.version}" conf="test->master"/>
     <dependency org="org.slf4j" name="slf4j-log4j12" rev="${slf4j-log4j12.version}" conf="test->master"/>
     <dependency org="org.apache.hadoop" name="hadoop-common-test" rev="${hadoop-common.version}" conf="test->master"/>
@@ -89,7 +91,7 @@
 
     <dependency org="org.apache.lucene" name="lucene-core" rev="${lucene-core.version}" conf="javadoc->default"/> 
 
-    <dependency org="org.mockito" name="mockito-all" rev="${mockito-all.version}" conf="common->master"/>
+    <dependency org="org.mockito" name="mockito-all" rev="${mockito-all.version}" conf="test->master"/>
 
    </dependencies>
   
