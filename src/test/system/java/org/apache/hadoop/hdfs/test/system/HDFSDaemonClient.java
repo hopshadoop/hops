@@ -21,6 +21,7 @@ package org.apache.hadoop.hdfs.test.system;
 import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.test.system.AbstractDaemonClient;
 import org.apache.hadoop.test.system.DaemonProtocol;
 import org.apache.hadoop.test.system.process.RemoteProcess;
