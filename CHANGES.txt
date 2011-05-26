@@ -624,6 +624,8 @@ Trunk (unreleased changes)
     HDFS-1983. Fix path display for copy and rm commands in TestHDFSCLI and
     TestDFSShell. (Daryn Sharp via todd)
 
+    HDFS-1999. Tests use deprecated configs. (Aaron T. Myers via eli)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES

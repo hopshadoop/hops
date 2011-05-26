@@ -110,7 +110,7 @@ public class TestDFSStorageStateRecovery extends TestCase {
   
   /**
    * Sets up the storage directories for namenode as defined by
-   * dfs.name.dir. For each element in dfs.name.dir, the subdirectories 
+   * dfs.namenode.name.dir. For each element in dfs.namenode.name.dir, the subdirectories 
    * represented by the first four elements of the <code>state</code> array
    * will be created and populated.
    * 
@@ -139,7 +139,7 @@ public class TestDFSStorageStateRecovery extends TestCase {
   
   /**
    * Sets up the storage directories for a datanode under
-   * dfs.data.dir. For each element in dfs.data.dir, the subdirectories 
+   * dfs.datanode.data.dir. For each element in dfs.datanode.data.dir, the subdirectories 
    * represented by the first four elements of the <code>state</code> array 
    * will be created and populated. 
    * See {@link UpgradeUtilities#createDataNodeStorageDirs()}
@@ -167,7 +167,7 @@ public class TestDFSStorageStateRecovery extends TestCase {
   
   /**
    * Sets up the storage directories for a block pool under
-   * dfs.data.dir. For each element in dfs.data.dir, the subdirectories 
+   * dfs.datanode.data.dir. For each element in dfs.datanode.data.dir, the subdirectories 
    * represented by the first four elements of the <code>state</code> array 
    * will be created and populated. 
    * See {@link UpgradeUtilities#createBlockPoolStorageDirs()}

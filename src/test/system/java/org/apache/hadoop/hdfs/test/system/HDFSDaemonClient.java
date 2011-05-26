@@ -34,10 +34,12 @@ public abstract class HDFSDaemonClient<PROXY extends DaemonProtocol>
   }
 
   public String[] getHDFSDataDirs() throws IOException {
-    return getProxy().getDaemonConf().getStrings("dfs.data.dir");
+    return getProxy().getDaemonConf().getStrings(
+        DFSConfigKeys.DFS_DATANODE_DATA_DIR_KEY);
   }
 
   public String getHDFSNameDirs() throws IOException {
-    return getProxy().getDaemonConf().getStrings("dfs.name.dir")[0];
+    return getProxy().getDaemonConf().getStrings(
+        DFSConfigKeys.DFS_NAMENODE_NAME_DIR_KEY)[0];
   }
 }

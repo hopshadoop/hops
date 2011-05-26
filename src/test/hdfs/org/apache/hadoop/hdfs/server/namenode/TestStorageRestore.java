@@ -340,7 +340,7 @@ public class TestStorageRestore extends TestCase {
 
       FSImage fsi = cluster.getNameNode().getFSImage();
 
-      // it is started with dfs.name.dir.restore set to true (in SetUp())
+      // it is started with dfs.namenode.name.dir.restore set to true (in SetUp())
       boolean restore = fsi.getStorage().getRestoreFailedStorage();
       LOG.info("Restore is " + restore);
       assertEquals(restore, true);

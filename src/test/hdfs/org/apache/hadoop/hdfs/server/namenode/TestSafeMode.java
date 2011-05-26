@@ -49,7 +49,7 @@ public class TestSafeMode extends TestCase {
    * Name-node should stay in automatic safe-mode.</li>
    * <li>Enter safe mode manually.</li>
    * <li>Start the data-node.</li>
-   * <li>Wait longer than <tt>dfs.safemode.extension</tt> and 
+   * <li>Wait longer than <tt>dfs.namenode.safemode.extension</tt> and 
    * verify that the name-node is still in safe mode.</li>
    * </ol>
    *  
@@ -96,7 +96,7 @@ public class TestSafeMode extends TestCase {
       
       LOG.info("Datanode is started.");
 
-      // wait longer than dfs.safemode.extension
+      // wait longer than dfs.namenode.safemode.extension
       try {
         Thread.sleep(2000);
       } catch (InterruptedException ignored) {}

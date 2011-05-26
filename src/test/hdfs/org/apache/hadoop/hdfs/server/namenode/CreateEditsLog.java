@@ -36,7 +36,7 @@ import org.apache.hadoop.hdfs.server.common.Storage;
  *   
  *   Create a name node's edits log in /tmp/EditsLogOut.
  *   The file /tmp/EditsLogOut/current/edits can be copied to a name node's
- *   dfs.name.dir/current direcotry and the name node can be started as usual.
+ *   dfs.namenode.name.dir/current direcotry and the name node can be started as usual.
  *   
  *   The files are created in /createdViaInjectingInEditsLog
  *   The file names contain the starting and ending blockIds; hence once can 

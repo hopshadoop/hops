@@ -30,8 +30,8 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 
 /**
- * This class tests various combinations of dfs.name.dir 
- * and dfs.name.edits.dir configurations.
+ * This class tests various combinations of dfs.namenode.name.dir 
+ * and dfs.namenode.edits.dir configurations.
  */
 public class TestNameEditsConfigs extends TestCase {
   static final long SEED = 0xDEADBEEFL;
@@ -100,7 +100,7 @@ public class TestNameEditsConfigs extends TestCase {
   }
 
   /**
-   * Test various configuration options of dfs.name.dir and dfs.name.edits.dir
+   * Test various configuration options of dfs.namenode.name.dir and dfs.namenode.edits.dir
    * The test creates files and restarts cluster with different configs.
    * 1. Starts cluster with shared name and edits dirs
    * 2. Restarts cluster by adding additional (different) name and edits dirs
@@ -127,7 +127,7 @@ public class TestNameEditsConfigs extends TestCase {
     File checkpointEditsDir = new File(base_dir, "secondedits");
     File checkpointNameAndEdits = new File(base_dir, "second_name_and_edits");
     
-    // Start namenode with same dfs.name.dir and dfs.name.edits.dir
+    // Start namenode with same dfs.namenode.name.dir and dfs.namenode.edits.dir
     conf = new HdfsConfiguration();
     conf.set(DFSConfigKeys.DFS_NAMENODE_NAME_DIR_KEY, nameAndEdits.getPath());
     conf.set(DFSConfigKeys.DFS_NAMENODE_EDITS_DIR_KEY, nameAndEdits.getPath());
@@ -154,7 +154,7 @@ public class TestNameEditsConfigs extends TestCase {
       secondary.shutdown();
     }
 
-    // Start namenode with additional dfs.name.dir and dfs.name.edits.dir
+    // Start namenode with additional dfs.namenode.name.dir and dfs.namenode.edits.dir
     conf =  new HdfsConfiguration();
     assertTrue(newNameDir.mkdir());
     assertTrue(newEditsDir.mkdir());
@@ -282,7 +282,7 @@ public class TestNameEditsConfigs extends TestCase {
   }
 
   /**
-   * Test various configuration options of dfs.name.dir and dfs.name.edits.dir
+   * Test various configuration options of dfs.namenode.name.dir and dfs.namenode.edits.dir
    * This test tries to simulate failure scenarios.
    * 1. Start cluster with shared name and edits dir
    * 2. Restart cluster by adding separate name and edits dirs
@@ -303,7 +303,7 @@ public class TestNameEditsConfigs extends TestCase {
     File newEditsDir = new File(base_dir, "edits");
     File nameAndEdits = new File(base_dir, "name_and_edits");
     
-    // Start namenode with same dfs.name.dir and dfs.name.edits.dir
+    // Start namenode with same dfs.namenode.name.dir and dfs.namenode.edits.dir
     conf = new HdfsConfiguration();
     conf.set(DFSConfigKeys.DFS_NAMENODE_NAME_DIR_KEY, nameAndEdits.getPath());
     conf.set(DFSConfigKeys.DFS_NAMENODE_EDITS_DIR_KEY, nameAndEdits.getPath());
@@ -325,7 +325,7 @@ public class TestNameEditsConfigs extends TestCase {
       cluster.shutdown();
     }
 
-    // Start namenode with additional dfs.name.dir and dfs.name.edits.dir
+    // Start namenode with additional dfs.namenode.name.dir and dfs.namenode.edits.dir
     conf =  new HdfsConfiguration();
     assertTrue(newNameDir.mkdir());
     assertTrue(newEditsDir.mkdir());

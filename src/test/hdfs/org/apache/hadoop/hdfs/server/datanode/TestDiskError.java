@@ -181,7 +181,7 @@ public class TestDiskError {
       DFSConfigKeys.DFS_DATANODE_DATA_DIR_PERMISSION_KEY);
     FsPermission expected = new FsPermission(permStr);
 
-    // Check permissions on directories in 'dfs.data.dir'
+    // Check permissions on directories in 'dfs.datanode.data.dir'
     FileSystem localFS = FileSystem.getLocal(conf);
     for (DataNode dn : cluster.getDataNodes()) {
       String[] dataDirs =

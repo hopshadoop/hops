@@ -135,7 +135,8 @@ public class TestHDFSServerPorts extends TestCase {
     
     conf.set(DFSConfigKeys.DFS_NAMENODE_NAME_DIR_KEY,
         fileAsURI(new File(hdfsDir, "name2")).toString());
-    conf.set(DFSConfigKeys.DFS_NAMENODE_EDITS_DIR_KEY, "${dfs.name.dir}");
+    conf.set(DFSConfigKeys.DFS_NAMENODE_EDITS_DIR_KEY,
+        "${" + DFSConfigKeys.DFS_NAMENODE_NAME_DIR_KEY + "}");
     
     // Start BackupNode
     String[] args = new String [] { StartupOption.BACKUP.getName() };

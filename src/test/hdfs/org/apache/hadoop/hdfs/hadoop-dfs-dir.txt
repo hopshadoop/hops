@@ -40,7 +40,7 @@
 # some recoverable errors (i.e. corrupt or missing .crc files).
 #
 # A similar set of files exist in two different DFS directories. 
-# For e.g. "top-dir-1Mb-512" contains files created with dfs.block.size of 1Mb 
+# For e.g. "top-dir-1Mb-512" contains files created with dfs.blocksize of 1Mb 
 # and io.bytes.per.checksum of 512.
 #
 # In the future, when Hadoop project no longer supports upgrade from

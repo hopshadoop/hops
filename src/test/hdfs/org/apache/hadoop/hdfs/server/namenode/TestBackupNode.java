@@ -85,7 +85,8 @@ public class TestBackupNode extends TestCase {
     Configuration c = new HdfsConfiguration(conf);
     String dirs = getBackupNodeDir(t, i);
     c.set(DFSConfigKeys.DFS_NAMENODE_NAME_DIR_KEY, dirs);
-    c.set(DFSConfigKeys.DFS_NAMENODE_EDITS_DIR_KEY, "${dfs.name.dir}");
+    c.set(DFSConfigKeys.DFS_NAMENODE_EDITS_DIR_KEY,
+        "${" + DFSConfigKeys.DFS_NAMENODE_NAME_DIR_KEY + "}");
     return (BackupNode)NameNode.createNameNode(new String[]{t.getName()}, c);
   }
 

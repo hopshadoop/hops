@@ -89,7 +89,7 @@ public class TestNameNodeMetrics extends TestCase {
   }
 
   private void updateMetrics() throws Exception {
-    // Wait for metrics update (corresponds to dfs.replication.interval
+    // Wait for metrics update (corresponds to dfs.namenode.replication.interval
     // for some block related metrics to get updated)
     Thread.sleep(1000);
   }
