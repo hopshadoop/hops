@@ -1064,6 +1064,9 @@ Release 0.22.0 - Unreleased
     HDFS-1964. Fix incorrect HTML unescaping in DatanodeJspHelper
     (Aaron T. Myers via todd)
 
+    HDFS-1997. Image transfer process misreports client side exceptions.
+    (todd via eli)
+    
 Release 0.21.1 - Unreleased
     HDFS-1466. TestFcHdfsSymlink relies on /tmp/test not existing. (eli)
 

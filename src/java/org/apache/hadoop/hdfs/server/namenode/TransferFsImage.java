@@ -206,6 +206,7 @@ class TransferFsImage implements FSConstants {
       stream = new DigestInputStream(stream, digester);
     }
     FileOutputStream[] output = null;
+    boolean finishedReceiving = false;
 
     try {
       if (localPath != null) {
@@ -224,6 +225,7 @@ class TransferFsImage implements FSConstants {
           }
         }
       }
+      finishedReceiving = true;
     } finally {
       stream.close();
       if (output != null) {
@@ -234,7 +236,10 @@ class TransferFsImage implements FSConstants {
           }
         }
       }
-      if (received != advertisedSize) {
+      if (finishedReceiving && received != advertisedSize) {
+        // only throw this exception if we think we read all of it on our end
+        // -- otherwise a client-side IOException would be masked by this
+        // exception that makes it look like a server-side problem!
         throw new IOException("File " + str + " received length " + received +
                               " is not of the advertised size " +
                               advertisedSize);
