@@ -450,6 +450,9 @@ Trunk (unreleased changes)
     HDFS-1996.  ivy: hdfs test jar should be independent to common test jar.
     (Eric Yang via szetszwo)
 
+    HDFS-1812. TestHDFSCLI should clean up cluster in teardown method.
+    (Uma Maheswara Rao G via todd)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image

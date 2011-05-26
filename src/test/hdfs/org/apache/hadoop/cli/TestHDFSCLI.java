@@ -34,7 +34,7 @@ import org.junit.Test;
 public class TestHDFSCLI extends CLITestHelperDFS {
 
   protected MiniDFSCluster dfsCluster = null;
-  protected DistributedFileSystem dfs = null;
+  protected FileSystem fs = null;
   protected String namenode = null;
   
   @Before
@@ -61,10 +61,9 @@ public class TestHDFSCLI extends CLITestHelperDFS {
     
     username = System.getProperty("user.name");
 
-    FileSystem fs = dfsCluster.getFileSystem();
+    fs = dfsCluster.getFileSystem();
     assertTrue("Not a HDFS: "+fs.getUri(),
                fs instanceof DistributedFileSystem);
-    dfs = (DistributedFileSystem) fs;
   }
 
   @Override
@@ -75,7 +74,8 @@ public class TestHDFSCLI extends CLITestHelperDFS {
   @After
   @Override
   public void tearDown() throws Exception {
-    dfs.close();
+    if (null != fs)
+      fs.close();
     dfsCluster.shutdown();
     Thread.sleep(2000);
     super.tearDown();
