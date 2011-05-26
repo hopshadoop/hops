@@ -235,6 +235,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2470. Fix NPE in RunningJobs::getCounters. (Robert Joseph Evans
     via cdouglas)
 
+    MAPREDUCE-2536. Update FsShell -mv command usage in TestMRCLI.  (Daryn
+    Sharp via cdouglas)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES

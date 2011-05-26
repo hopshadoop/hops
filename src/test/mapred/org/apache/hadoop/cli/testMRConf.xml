@@ -223,7 +223,7 @@
         </comparator>
         <comparator>
           <type>TokenComparator</type>
-          <expected-output>Usage: java FsShell [-mv &lt;src&gt; &lt;dst&gt;]</expected-output>
+          <expected-output>Usage: java FsShell [-mv &lt;src&gt; ... &lt;dst&gt;]</expected-output>
         </comparator>
       </comparators>
     </test>
