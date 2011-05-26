@@ -53,6 +53,7 @@ import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.DiskChecker;
+import org.apache.hadoop.util.StringUtils;
 
 /** 
  * Data storage information file.
@@ -170,14 +171,17 @@ public class DataStorage extends Storage {
         }
       } catch (IOException ioe) {
         sd.unlock();
-        throw ioe;
+        LOG.warn("Ignoring storage directory "+ dataDir
+        		+ " due to an exception: " + StringUtils.stringifyException(ioe));
+        //continue with other good dirs
+        continue;
       }
       // add to the storage list
       addStorageDir(sd);
       dataDirStates.add(curState);
     }
 
-    if (dataDirs.size() == 0)  // none of the data dirs exist
+    if (dataDirs.size() == 0 || dataDirStates.size() == 0)  // none of the data dirs exist
       throw new IOException(
           "All specified directories are not accessible or do not exist.");
 

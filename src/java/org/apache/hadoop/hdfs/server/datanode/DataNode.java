@@ -998,9 +998,14 @@ public class DataNode extends Configured
       if (blockScanner != null) {
         blockScanner.removeBlockPool(this.getBlockPoolId());
       }
-     
-      data.shutdownBlockPool(this.getBlockPoolId());
-      storage.removeBlockPoolStorage(this.getBlockPoolId());
+    
+      if (data != null) { 
+        data.shutdownBlockPool(this.getBlockPoolId());
+      }
+
+      if (storage != null) {
+        storage.removeBlockPoolStorage(this.getBlockPoolId());
+      }
     }
 
     /**
