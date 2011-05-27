@@ -16,6 +16,9 @@ Trunk (unreleased changes)
 
   IMPROVEMENTS
 
+    MAPREDUCE-2517. [Gridmix] Add system tests to Gridmix. 
+    (Vinay Kumar Thota via amarrk)
+
     MAPREDUCE-2492. The new MapReduce API should make available task's
     progress to the task. (amarrk)
 
