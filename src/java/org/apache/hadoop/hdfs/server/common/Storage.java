@@ -33,6 +33,8 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.protocol.FSConstants;
+import org.apache.hadoop.hdfs.protocol.LayoutVersion;
+import org.apache.hadoop.hdfs.protocol.LayoutVersion.Feature;
 import org.apache.hadoop.hdfs.server.common.HdfsConstants.NodeType;
 import org.apache.hadoop.hdfs.server.common.HdfsConstants.StartupOption;
 import org.apache.hadoop.fs.FileUtil;
@@ -74,12 +76,6 @@ public abstract class Storage extends StorageInfo {
   /* this should be removed when LAST_UPGRADABLE_LV goes beyond -13.
    * any upgrade code that uses this constant should also be removed. */
   public static final int PRE_GENERATIONSTAMP_LAYOUT_VERSION = -13;
-  
-  // last layout version that did not support persistent rbw replicas
-  public static final int PRE_RBW_LAYOUT_VERSION = -19;
-  
-  // last layout version that is before federation
-  public static final int LAST_PRE_FEDERATION_LAYOUT_VERSION = -30;
   
   /** Layout versions of 0.20.203 release */
   public static final int[] LAYOUT_VERSIONS_203 = {-19, -31};
@@ -781,8 +777,8 @@ public abstract class Storage extends StorageInfo {
     props.setProperty("layoutVersion", String.valueOf(layoutVersion));
     props.setProperty("storageType", storageType.toString());
     props.setProperty("namespaceID", String.valueOf(namespaceID));
-    // Set clusterID in version LAST_PRE_FEDERATION_LAYOUT_VERSION or before
-    if (layoutVersion < LAST_PRE_FEDERATION_LAYOUT_VERSION) {
+    // Set clusterID in version with federation support
+    if (LayoutVersion.supports(Feature.FEDERATION, layoutVersion)) {
       props.setProperty("clusterID", clusterID);
     }
     props.setProperty("cTime", String.valueOf(cTime));
@@ -902,8 +898,8 @@ public abstract class Storage extends StorageInfo {
   /** Validate and set clusterId from {@link Properties}*/
   protected void setClusterId(Properties props, int layoutVersion,
       StorageDirectory sd) throws InconsistentFSStateException {
-    // No Cluster ID in version LAST_PRE_FEDERATION_LAYOUT_VERSION or before
-    if (layoutVersion < Storage.LAST_PRE_FEDERATION_LAYOUT_VERSION) {
+    // Set cluster ID in version that supports federation
+    if (LayoutVersion.supports(Feature.FEDERATION, layoutVersion)) {
       String cid = getProperty(props, sd, "clusterID");
       if (!(clusterID.equals("") || cid.equals("") || clusterID.equals(cid))) {
         throw new InconsistentFSStateException(sd.getRoot(),

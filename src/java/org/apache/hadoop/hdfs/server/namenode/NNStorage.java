@@ -44,6 +44,8 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.protocol.FSConstants;
+import org.apache.hadoop.hdfs.protocol.LayoutVersion;
+import org.apache.hadoop.hdfs.protocol.LayoutVersion.Feature;
 import org.apache.hadoop.hdfs.server.common.Storage;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
 import org.apache.hadoop.hdfs.server.common.UpgradeManager;
@@ -196,8 +198,8 @@ public class NNStorage extends Storage implements Closeable {
     RandomAccessFile oldFile = new RandomAccessFile(oldF, "rws");
     try {
       oldFile.seek(0);
-      int odlVersion = oldFile.readInt();
-      if (odlVersion < LAST_PRE_UPGRADE_LAYOUT_VERSION)
+      int oldVersion = oldFile.readInt();
+      if (oldVersion < LAST_PRE_UPGRADE_LAYOUT_VERSION)
         return false;
     } finally {
       oldFile.close();
@@ -674,8 +676,8 @@ public class NNStorage extends Storage implements Closeable {
                             + sd.getRoot() + " is not formatted.");
     }
 
-    // No Block pool ID in version LAST_PRE_FEDERATION_LAYOUT_VERSION or before
-    if (layoutVersion < LAST_PRE_FEDERATION_LAYOUT_VERSION) {
+    // Set Block pool ID in version with federation support
+    if (LayoutVersion.supports(Feature.FEDERATION, layoutVersion)) {
       String sbpid = props.getProperty("blockpoolID");
       setBlockPoolID(sd.getRoot(), sbpid);
     }
@@ -688,7 +690,7 @@ public class NNStorage extends Storage implements Closeable {
         sDUV == null? getLayoutVersion() : Integer.parseInt(sDUV));
 
     String sMd5 = props.getProperty(MESSAGE_DIGEST_PROPERTY);
-    if (layoutVersion <= -26) {
+    if (LayoutVersion.supports(Feature.FSIMAGE_CHECKSUM, layoutVersion)) {
       if (sMd5 == null) {
         throw new InconsistentFSStateException(sd.getRoot(),
             "file " + STORAGE_FILE_VERSION
@@ -719,8 +721,8 @@ public class NNStorage extends Storage implements Closeable {
                            StorageDirectory sd
                            ) throws IOException {
     super.setFields(props, sd);
-    // Set blockpoolID in version LAST_PRE_FEDERATION_LAYOUT_VERSION or before
-    if (layoutVersion < LAST_PRE_FEDERATION_LAYOUT_VERSION) {
+    // Set blockpoolID in version with federation support
+    if (LayoutVersion.supports(Feature.FEDERATION, layoutVersion)) {
       props.setProperty("blockpoolID", blockpoolID);
     }
     boolean uState = getDistributedUpgradeState();
@@ -1019,7 +1021,7 @@ public class NNStorage extends Storage implements Closeable {
       throw new InconsistentFSStateException(storage,
           "Unexepcted blockpoolID " + bpid + " . Expected " + blockpoolID);
     }
-    blockpoolID = bpid;
+    setBlockPoolID(bpid);
   }
   
   public String getBlockPoolID() {
