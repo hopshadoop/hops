@@ -36,7 +36,7 @@
 bin=`dirname "$0"`
 bin=`cd "$bin"; pwd`
 
-. "$bin/hdfs-config.sh"
+. "$bin/../libexec/hdfs-config.sh"
 
 if [ "$1" = '' ] ; then
   "Error: please specify local exclude file as a first argument"
@@ -50,8 +50,8 @@ if [ ! -f "$excludeFilenameLocal" ] ; then
   exit 1
 fi
 
-namenodes=$("$HADOOP_HDFS_HOME/bin/hdfs" getconf -namenodes)
-excludeFilenameRemote=$("$HADOOP_HDFS_HOME/bin/hdfs" getconf -excludeFile)
+namenodes=$("$HADOOP_PREFIX/bin/hdfs" getconf -namenodes)
+excludeFilenameRemote=$("$HADOOP_PREFIX/bin/hdfs" getconf -excludeFile)
 
 if [ "$excludeFilenameRemote" = '' ] ; then
   echo \

@@ -23,13 +23,13 @@
 bin=`dirname "$0"`
 bin=`cd "$bin"; pwd`
 
-. "$bin/hdfs-config.sh"
+. "$bin/../libexec/hdfs-config.sh"
 
-namenodes=$("$HADOOP_HDFS_HOME/bin/hdfs" getconf -namenodes)
+namenodes=$("$HADOOP_PREFIX/bin/hdfs" getconf -namenodes)
 
 for namenode in $namenodes ; do
   echo "Refreshing namenode [$namenode]"
-  "$HADOOP_HDFS_HOME/bin/hdfs" dfsadmin -refreshNodes
+  "$HADOOP_PREFIX/bin/hdfs" dfsadmin -refreshNodes
   if [ "$?" != '0' ] ; then errorFlag='1' ; fi
 done
 

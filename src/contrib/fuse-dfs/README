@@ -33,9 +33,9 @@ Requirements
 
 BUILDING
 
-   1. in HADOOP_HOME: `ant compile-libhdfs -Dlibhdfs=1
-   2. in HADOOP_HOME: `ant package` to deploy libhdfs
-   3. in HADOOP_HOME: `ant compile-contrib -Dlibhdfs=1 -Dfusedfs=1`
+   1. in HADOOP_PREFIX: `ant compile-libhdfs -Dlibhdfs=1
+   2. in HADOOP_PREFIX: `ant package` to deploy libhdfs
+   3. in HADOOP_PREFIX: `ant compile-contrib -Dlibhdfs=1 -Dfusedfs=1`
 
 NOTE: for amd64 architecture, libhdfs will not compile unless you edit
 the Makefile in src/c++/libhdfs/Makefile and set OS_ARCH=amd64
@@ -111,7 +111,7 @@ NOTE - you cannot export this with a FUSE module built into the kernel
 
 RECOMMENDATIONS
 
-1. From /bin, `ln -s $HADOOP_HOME/contrib/fuse-dfs/fuse_dfs* .`
+1. From /bin, `ln -s $HADOOP_PREFIX/contrib/fuse-dfs/fuse_dfs* .`
 
 2. Always start with debug on so you can see if you are missing a classpath or something like that.
 

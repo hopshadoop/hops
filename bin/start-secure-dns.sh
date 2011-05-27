@@ -22,10 +22,10 @@ usage="Usage (run as root in order to start secure datanodes): start-secure-dns.
 bin=`dirname "${BASH_SOURCE-$0}"`
 bin=`cd "$bin"; pwd`
 
-. "$bin"/hdfs-config.sh
+. "$bin"/../libexec/hdfs-config.sh
 
 if [ "$EUID" -eq 0 ] && [ -n "$HADOOP_SECURE_DN_USER" ]; then
-  "$HADOOP_COMMON_HOME"/bin/hadoop-daemons.sh --config $HADOOP_CONF_DIR --script "$bin"/hdfs start datanode $dataStartOpt
+  "$HADOOP_PREFIX"/bin/hadoop-daemons.sh --config $HADOOP_CONF_DIR --script "$bin"/hdfs start datanode $dataStartOpt
 else
   echo $usage
 fi

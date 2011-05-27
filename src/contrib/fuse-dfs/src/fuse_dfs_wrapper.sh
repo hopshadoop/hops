@@ -16,8 +16,8 @@
 # limitations under the License.
 #
 
-if [ "$HADOOP_HOME" = "" ]; then
-export HADOOP_HOME=/usr/local/share/hadoop
+if [ "$HADOOP_PREFIX" = "" ]; then
+export HADOOP_PREFIX=/usr/local/share/hadoop
 fi
 
 if [ "$OS_ARCH" = "" ]; then
@@ -33,16 +33,16 @@ export LD_LIBRARY_PATH=$JAVA_HOME/jre/lib/$OS_ARCH/server:/usr/local/share/hdfs/
 fi
 
 # If dev build set paths accordingly
-if [ -d $HADOOP_HDFS_HOME/build ]; then
-  export HADOOP_HOME=$HADOOP_HDFS_HOME
-  for f in ${HADOOP_HOME}/build/*.jar ; do
+if [ -d $HADOOP_PREFIX/build ]; then
+  export HADOOP_PREFIX=$HADOOP_PREFIX
+  for f in ${HADOOP_PREFIX}/build/*.jar ; do
     export CLASSPATH=$CLASSPATH:$f
   done
-  for f in $HADOOP_HOME/build/ivy/lib/Hadoop-Hdfs/common/*.jar ; do
+  for f in $HADOOP_PREFIX/build/ivy/lib/Hadoop-Hdfs/common/*.jar ; do
     export CLASSPATH=$CLASSPATH:$f
   done
-  export PATH=$HADOOP_HOME/build/contrib/fuse-dfs:$PATH
-  export LD_LIBRARY_PATH=$HADOOP_HOME/build/c++/lib:$JAVA_HOME/jre/lib/$OS_ARCH/server
+  export PATH=$HADOOP_PREFIX/build/contrib/fuse-dfs:$PATH
+  export LD_LIBRARY_PATH=$HADOOP_PREFIX/build/c++/lib:$JAVA_HOME/jre/lib/$OS_ARCH/server
 fi
 
 fuse_dfs $@

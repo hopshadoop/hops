@@ -18,9 +18,9 @@
 bin=`dirname "${BASH_SOURCE-$0}"`
 bin=`cd "$bin"; pwd`
 
-. "$bin"/hdfs-config.sh
+. "$bin"/../libexec/hdfs-config.sh
 
 # Stop balancer daemon.
 # Run this on the machine where the balancer is running
 
-"$HADOOP_COMMON_HOME"/bin/hadoop-daemon.sh --config $HADOOP_CONF_DIR --script "$bin"/hdfs stop balancer
+"$HADOOP_PREFIX"/bin/hadoop-daemon.sh --config $HADOOP_CONF_DIR --script "$bin"/hdfs stop balancer

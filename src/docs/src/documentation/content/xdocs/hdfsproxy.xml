@@ -272,11 +272,11 @@
       </section>
       <section>
         <title> Build Process </title>        
-        <p>Under <code>$HADOOP_HDFS_HOME</code> do the following <br/>
+        <p>Under <code>$HADOOP_PREFIX</code> do the following <br/>
           <code> $ ant clean tar</code> <br/>
           <code> $ cd src/contrib/hdfsproxy/</code> <br/>
           <code> $ ant clean tar</code> <br/>
-          The <code>hdfsproxy-*.tar.gz</code> file will be generated under <code>$HADOOP_HDFS_HOME/build/contrib/hdfsproxy/</code>. Use this tar ball to proceed for the server start-up/shutdown process after necessary configuration. 
+          The <code>hdfsproxy-*.tar.gz</code> file will be generated under <code>$HADOOP_PREFIX/build/contrib/hdfsproxy/</code>. Use this tar ball to proceed for the server start-up/shutdown process after necessary configuration. 
         </p>
       </section>  
       <section>
@@ -494,22 +494,22 @@
           <title> Build and Deployment Process </title>  
           <section>
             <title> Build forwarding war (ROOT.war) </title>
-            <p>Suppose hdfsproxy-default.xml has been properly configured and it is under ${user.home}/proxy-root-conf dir. Under <code>$HADOOP_HDFS_HOME</code> do the following <br/>
+            <p>Suppose hdfsproxy-default.xml has been properly configured and it is under ${user.home}/proxy-root-conf dir. Under <code>$HADOOP_PREFIX</code> do the following <br/>
               <code> $ export HDFSPROXY_CONF_DIR=${user.home}/proxy-root-conf</code> <br/>
               <code> $ ant clean tar</code> <br/>
               <code> $ cd src/contrib/hdfsproxy/</code> <br/>
               <code> $ ant clean forward</code> <br/>
-              The <code>hdfsproxy-forward-*.war</code> file will be generated under <code>$HADOOP_HDFS_HOME/build/contrib/hdfsproxy/</code>. Copy this war file to tomcat's webapps directory and rename it at ROOT.war (if ROOT dir already exists, remove it first) for deployment. 
+              The <code>hdfsproxy-forward-*.war</code> file will be generated under <code>$HADOOP_PREFIX/build/contrib/hdfsproxy/</code>. Copy this war file to tomcat's webapps directory and rename it at ROOT.war (if ROOT dir already exists, remove it first) for deployment. 
             </p>
           </section>
           <section>
             <title> Build cluster client war (client.war) </title>
-            <p>Suppose hdfsproxy-default.xml has been properly configured and it is under ${user.home}/proxy-client-conf dir. Under <code>$HADOOP_HDFS_HOME</code> do the following <br/>
+            <p>Suppose hdfsproxy-default.xml has been properly configured and it is under ${user.home}/proxy-client-conf dir. Under <code>$HADOOP_PREFIX</code> do the following <br/>
               <code> $ export HDFSPROXY_CONF_DIR=${user.home}/proxy-client-conf</code> <br/>
               <code> $ ant clean tar</code> <br/>
               <code> $ cd src/contrib/hdfsproxy/</code> <br/>
               <code> $ ant clean war</code> <br/>
-              The <code>hdfsproxy-*.war</code> file will be generated under <code>$HADOOP_HDFS_HOME/build/contrib/hdfsproxy/</code>. Copy this war file to tomcat's webapps directory and rename it properly for deployment. 
+              The <code>hdfsproxy-*.war</code> file will be generated under <code>$HADOOP_PREFIX/build/contrib/hdfsproxy/</code>. Copy this war file to tomcat's webapps directory and rename it properly for deployment. 
             </p>
           </section>
           <section>

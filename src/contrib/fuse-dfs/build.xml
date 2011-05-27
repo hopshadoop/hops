@@ -46,7 +46,7 @@
     <exec executable="make" failonerror="true">
       <env key="OS_NAME" value="${os.name}"/>
       <env key="OS_ARCH" value="${os.arch}"/>
-      <env key="HADOOP_HOME" value="${hadoop.root}"/>
+      <env key="HADOOP_PREFIX" value="${hadoop.root}"/>
       <env key="PACKAGE_VERSION" value="0.1.0"/>
       <env key="BUILD_PLATFORM" value="${build.platform}" />
       <env key="PERMS" value="${perms}"/>

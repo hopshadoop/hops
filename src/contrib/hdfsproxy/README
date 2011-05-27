@@ -38,10 +38,10 @@ B) With Tomcat-based Installation, supporting features include:
 > Standard HTTPS Get Support for file transfer
 
 The detailed configuration/set-up guide is in the Forrest 
-documentation, which can be found at $HADOOP_HDFS_HOME/docs. In order to build the 
+documentation, which can be found at $HADOOP_PREFIX/docs. In order to build the 
 documentation on your own from source please use the following command in 
 the downloaded source folder:
 
 ant docs -Dforrest.home=path to forrest -Djava5.home= path to jdk5. 
 
-The documentation so built would be under $HADOOP_HDFS_HOME/build/docs
+The documentation so built would be under $HADOOP_PREFIX/build/docs

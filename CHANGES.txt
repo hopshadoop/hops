@@ -101,8 +101,8 @@ Trunk (unreleased changes)
     HDFS-1663. Federation: Rename getPoolId() everywhere to 
     getBlockPoolId() (tanping via boryas)
 
-    HDFS-1652. FederationL Add support for multiple namenodes in MiniDFSCluster.
-    (suresh)
+    HDFS-1652. FederationL Add support for multiple namenodes in 
+    MiniDFSCluster. (suresh)
 
     HDFS-1672. Federation: refactor stopDatanode(name) to work 
     with multiple Block Pools (boryas)
@@ -243,8 +243,8 @@ Trunk (unreleased changes)
 
     HDFS-1754. Federation: testFsck fails. (boryas)
 
-    HDFS-1755. Federation: The BPOfferService must always connect to namenode as 
-    the login user. (jitendra)
+    HDFS-1755. Federation: The BPOfferService must always connect to namenode
+    as the login user. (jitendra)
 
     HDFS-1675. Support transferring RBW between datanodes. (szetszwo)
 
@@ -281,6 +281,9 @@ Trunk (unreleased changes)
     HDFS-1914. Federation: namenode storage directories must be configurable
     specific to name service. (suresh)
 
+    HDFS-1963. Create RPM and Debian packages for HDFS. Changes deployment
+    layout to be consistent across the binary tgz, rpm, and deb.
+    (Eric Yang via omalley)
 
   IMPROVEMENTS
 

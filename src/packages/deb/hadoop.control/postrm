@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
@@ -15,20 +15,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# included in all the hdfs scripts with source command
-# should not be executed directly
-
-bin=`which "$0"`
-bin=`dirname "${bin}"`
-bin=`cd "$bin"; pwd`
-
-export HADOOP_PREFIX="${HADOOP_PREFIX:-$bin/..}"
-
-if [ -d "$bin" ]; then
-  . $bin/../libexec/hadoop-config.sh
-elif [ -e "${HADOOP_HDFS_HOME}"/bin/hadoop-config.sh ]; then
-  . "$HADOOP_HDFS_HOME"/bin/hadoop-config.sh
-else
-  echo "Hadoop common not found."
-  exit
-fi
+/usr/sbin/groupdel hadoop 2> /dev/null >dev/null
+exit 0

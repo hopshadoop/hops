@@ -19,7 +19,7 @@
 #
 # Note: This script depends on 8 environment variables to function correctly:
 # a) CLASSPATH
-# b) HADOOP_HOME
+# b) HADOOP_PREFIX
 # c) HADOOP_CONF_DIR 
 # d) HADOOP_LOG_DIR 
 # e) LIBHDFS_BUILD_DIR
@@ -30,10 +30,10 @@
 #
 
 HDFS_TEST=hdfs_test
-HADOOP_LIB_DIR=$HADOOP_HOME/lib
-HADOOP_BIN_DIR=$HADOOP_HOME/bin
+HADOOP_LIB_DIR=$HADOOP_PREFIX/lib
+HADOOP_BIN_DIR=$HADOOP_PREFIX/bin
 
-COMMON_BUILD_DIR=$HADOOP_HOME/build/ivy/lib/Hadoop-Hdfs/common
+COMMON_BUILD_DIR=$HADOOP_PREFIX/build/ivy/lib/Hadoop-Hdfs/common
 COMMON_JAR=$COMMON_BUILD_DIR/hadoop-common-0.22.0-SNAPSHOT.jar
 
 cat > $HADOOP_CONF_DIR/core-site.xml <<EOF
@@ -77,9 +77,9 @@ EOF
 # If we are running from the hdfs repo we need to make sure
 # HADOOP_BIN_DIR contains the common scripts.  
 # If the bin directory does not and we've got a common jar extract its
-# bin directory to HADOOP_HOME/bin. The bin scripts hdfs-config.sh and
+# bin directory to HADOOP_PREFIX/bin. The bin scripts hdfs-config.sh and
 # hadoop-config.sh assume the bin directory is named "bin" and that it
-# is located in HADOOP_HOME.
+# is located in HADOOP_PREFIX.
 unpacked_common_bin_dir=0
 if [ ! -f $HADOOP_BIN_DIR/hadoop-config.sh ]; then
   if [ -f $COMMON_JAR ]; then
@@ -91,7 +91,7 @@ fi
 
 # Manipulate HADOOP_CONF_DIR too
 # which is necessary to circumvent bin/hadoop
-HADOOP_CONF_DIR=$HADOOP_CONF_DIR:$HADOOP_HOME/conf
+HADOOP_CONF_DIR=$HADOOP_CONF_DIR:$HADOOP_PREFIX/conf
 
 # set pid file dir so they are not written to /tmp
 export HADOOP_PID_DIR=$HADOOP_LOG_DIR
@@ -101,14 +101,14 @@ CLASSPATH="${HADOOP_CONF_DIR}"
 CLASSPATH=${CLASSPATH}:$JAVA_HOME/lib/tools.jar
 
 # for developers, add Hadoop classes to CLASSPATH
-if [ -d "$HADOOP_HOME/build/classes" ]; then
-  CLASSPATH=${CLASSPATH}:$HADOOP_HOME/build/classes
+if [ -d "$HADOOP_PREFIX/build/classes" ]; then
+  CLASSPATH=${CLASSPATH}:$HADOOP_PREFIX/build/classes
 fi
-if [ -d "$HADOOP_HOME/build/webapps" ]; then
-  CLASSPATH=${CLASSPATH}:$HADOOP_HOME/build
+if [ -d "$HADOOP_PREFIX/build/webapps" ]; then
+  CLASSPATH=${CLASSPATH}:$HADOOP_PREFIX/build
 fi
-if [ -d "$HADOOP_HOME/build/test/classes" ]; then
-  CLASSPATH=${CLASSPATH}:$HADOOP_HOME/build/test/classes
+if [ -d "$HADOOP_PREFIX/build/test/classes" ]; then
+  CLASSPATH=${CLASSPATH}:$HADOOP_PREFIX/build/test/classes
 fi
 
 # add Clover jar file needed for code coverage runs
@@ -118,14 +118,14 @@ CLASSPATH=${CLASSPATH}:${CLOVER_JAR};
 IFS=
 
 # add libs to CLASSPATH
-for f in $HADOOP_HOME/lib/*.jar; do
+for f in $HADOOP_PREFIX/lib/*.jar; do
   CLASSPATH=${CLASSPATH}:$f;
 done
 
-for f in $HADOOP_HOME/*.jar; do 
+for f in $HADOOP_PREFIX/*.jar; do 
   CLASSPATH=${CLASSPATH}:$f
 done
-for f in $HADOOP_HOME/lib/jsp-2.1/*.jar; do
+for f in $HADOOP_PREFIX/lib/jsp-2.1/*.jar; do
   CLASSPATH=${CLASSPATH}:$f;
 done
 
@@ -176,7 +176,7 @@ echo  LIB_JVM_DIR = $LIB_JVM_DIR
 echo  "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 # Put delays to ensure hdfs is up and running and also shuts down 
 # after the tests are complete
-cd $HADOOP_HOME
+cd $HADOOP_PREFIX
 echo Y | $HADOOP_BIN_DIR/hdfs namenode -format &&
 $HADOOP_BIN_DIR/hadoop-daemon.sh --script $HADOOP_BIN_DIR/hdfs start namenode && sleep 2
 $HADOOP_BIN_DIR/hadoop-daemon.sh --script $HADOOP_BIN_DIR/hdfs start datanode && sleep 2

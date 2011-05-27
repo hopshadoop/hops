@@ -40,6 +40,7 @@
     <conf name="hdfs" visibility="private" extends="compile,runtime" description="HDFS dependent artifacts"/>
     <conf name="javadoc" visibility="private" description="artiracts required while performing doc generation" extends="common"/>
     <conf name="test" extends="master" visibility="private" description="the classpath needed to run tests"/>
+    <conf name="package" extends="master" description="the classpath needed for packaging"/>
     <conf name="system" extends="test" visibility="private" description="the classpath needed to run system tests"/>
 
     <conf name="test-hdfswithmr" extends="test, common" visibility="private" description="the classpath needed to run tests"/>
@@ -63,16 +64,16 @@
     <dependency org="org.apache.hadoop" name="hadoop-common-instrumented" rev="${hadoop-common.version}" conf="system->default">
       <exclude module="ant"/>
     </dependency>
-    <dependency org="commons-logging" name="commons-logging" rev="${commons-logging.version}" conf="common->master"/>
+    <dependency org="commons-logging" name="commons-logging" rev="${commons-logging.version}" conf="compile->master"/>
     <dependency org="commons-daemon" name="commons-daemon" rev="${commons-daemon.version}" conf="hdfs->default" />
     <dependency org="log4j" name="log4j" rev="${log4j.version}" conf="common->master"/>
-    <dependency org="org.apache.hadoop" name="avro" rev="${avro.version}" conf="common->default">
+    <dependency org="org.apache.hadoop" name="avro" rev="${avro.version}" conf="compile->master">
       <exclude module="ant"/>
       <exclude module="jetty"/>
       <exclude module="slf4j-simple"/>
     </dependency>
-    <dependency org="org.aspectj" name="aspectjrt" rev="${aspectj.version}" conf="common->default"/>
-    <dependency org="org.aspectj" name="aspectjtools" rev="${aspectj.version}" conf="common->default"/>
+    <dependency org="org.aspectj" name="aspectjrt" rev="${aspectj.version}" conf="compile->master"/>
+    <dependency org="org.aspectj" name="aspectjtools" rev="${aspectj.version}" conf="compile->master"/>
 
     <dependency org="junit" name="junit" rev="${junit.version}" conf="test->master"/>
 
@@ -93,6 +94,7 @@
 
     <dependency org="org.mockito" name="mockito-all" rev="${mockito-all.version}" conf="test->master"/>
 
+    <dependency org="org.vafer" name="jdeb" rev="${jdeb.version}" conf="package->master"/>
    </dependencies>
   
 </ivy-module>
