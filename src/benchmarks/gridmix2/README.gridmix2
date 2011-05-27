@@ -96,7 +96,7 @@ copy gridmix.jar to gridmix dir.
 
 One must modify gridmix-env-2 to set the following variables:
 
-HADOOP_HOME     The hadoop install location
+HADOOP_PREFIX     The hadoop install location
 HADOOP_VERSION  The exact hadoop version to be used. e.g. hadoop-0.18.2-dev
 HADOOP_CONF_DIR The dir containing the hadoop-site.xml for teh cluster to be used.
 USE_REAL_DATA   A large data-set will be created and used by the benchmark if it is set to true.

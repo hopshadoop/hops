@@ -89,20 +89,20 @@ spills.
   > ant -Dcompile.c++=yes examples
 2) Copy the pipe sort example to a location in the default filesystem
    (usually HDFS, default /gridmix/programs)
-  > $HADOOP_HOME/hadoop dfs -mkdir $GRID_MIX_PROG
-  > $HADOOP_HOME/hadoop dfs -put build/c++-examples/$PLATFORM_STR/bin/pipes-sort $GRID_MIX_PROG
+  > $HADOOP_PREFIX/hadoop dfs -mkdir $GRID_MIX_PROG
+  > $HADOOP_PREFIX/hadoop dfs -put build/c++-examples/$PLATFORM_STR/bin/pipes-sort $GRID_MIX_PROG
 
 1.1 Configure
 
 One must modify hadoop-env to supply the following information:
 
-HADOOP_HOME     The hadoop install location
+HADOOP_PREFIX     The hadoop install location
 GRID_MIX_HOME   The location of these scripts
 APP_JAR         The location of the hadoop example
 GRID_MIX_DATA   The location of the datsets for these benchmarks
 GRID_MIX_PROG   The location of the pipe-sort example
 
-Reasonable defaults are provided for all but HADOOP_HOME. The datasets used
+Reasonable defaults are provided for all but HADOOP_PREFIX. The datasets used
 by each of the respective benchmarks are recorded in the Input::hadoop-env
 comment in section 0 and their location may be changed in hadoop-env. Note
 that each job expects particular input data and the parameters given to it

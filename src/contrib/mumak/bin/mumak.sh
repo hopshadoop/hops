@@ -38,13 +38,13 @@ this="$bin/$script"
 
 MUMAK_HOME=`dirname $bin`
 if [ -d "$MUMAK_HOME/../../../build/classes" ]; then
-  HADOOP_HOME=`cd $MUMAK_HOME/../../.. ; pwd`
+  HADOOP_PREFIX=`cd $MUMAK_HOME/../../.. ; pwd`
   IN_RELEASE=0
 else
-  HADOOP_HOME=`cd $MUMAK_HOME/../.. ; pwd`
+  HADOOP_PREFIX=`cd $MUMAK_HOME/../.. ; pwd`
   IN_RELEASE=1
   
-  MAPRED_JAR=$HADOOP_HOME/hadoop-mapred-${HADOOP_VERSION}.jar
+  MAPRED_JAR=$HADOOP_PREFIX/hadoop-mapred-${HADOOP_VERSION}.jar
   if [ ! -e $MAPRED_JAR ]; then
     echo "Error: Cannot find $MAPRED_JAR."
     exit 1
@@ -64,15 +64,15 @@ then
 fi
 
 # Allow alternate conf dir location.
-HADOOP_CONF_DIR="${HADOOP_CONF_DIR:-$HADOOP_HOME/conf}"
+HADOOP_CONF_DIR="${HADOOP_CONF_DIR:-$HADOOP_PREFIX/conf}"
 
 if [ -f "${HADOOP_CONF_DIR}/hadoop-env.sh" ]; then
   . "${HADOOP_CONF_DIR}/hadoop-env.sh"
 fi
 
-# Define HADOOP_COMMON_HOME
+# Define HADOOP_PREFIX
 if [ "$HADOP_CORE_HOME" = "" ]; then
-  HADOOP_COMMON_HOME=$HADOOP_HOME
+  HADOOP_PREFIX=$HADOOP_PREFIX
 fi
 
 if [ "$JAVA_HOME" = "" ]; then
@@ -99,30 +99,30 @@ JAVA_HEAP_MAX=-Xmx1200m
 CLASSPATH=${MUMAK_HOME}/conf:${HADOOP_CONF_DIR}:$JAVA_HOME/lib/tools.jar
 
 if [ $IN_RELEASE = 0 ]; then
-  CLASSPATH=${CLASSPATH}:${HADOOP_HOME}/build/contrib/${project}/classes
-  CLASSPATH=${CLASSPATH}:${HADOOP_HOME}/build/classes
-  CLASSPATH=${CLASSPATH}:${HADOOP_HOME}/build
-  CLASSPATH=${CLASSPATH}:${HADOOP_HOME}/build/tools
+  CLASSPATH=${CLASSPATH}:${HADOOP_PREFIX}/build/contrib/${project}/classes
+  CLASSPATH=${CLASSPATH}:${HADOOP_PREFIX}/build/classes
+  CLASSPATH=${CLASSPATH}:${HADOOP_PREFIX}/build
+  CLASSPATH=${CLASSPATH}:${HADOOP_PREFIX}/build/tools
   # add libs to CLASSPATH
-  for f in $HADOOP_HOME/lib/hadoop-core-*.jar; do
+  for f in $HADOOP_PREFIX/lib/hadoop-core-*.jar; do
     CLASSPATH=${CLASSPATH}:$f;
   done
 
-  for f in $HADOOP_HOME/build/ivy/lib/${project}/common/*.jar; do
+  for f in $HADOOP_PREFIX/build/ivy/lib/${project}/common/*.jar; do
     CLASSPATH=${CLASSPATH}:$f;
   done
 
-  for f in $HADOOP_HOME/build/ivy/lib/${project}/test/*.jar; do
+  for f in $HADOOP_PREFIX/build/ivy/lib/${project}/test/*.jar; do
     CLASSPATH=${CLASSPATH}:$f;
   done
 else
-  CLASSPATH=${CLASSPATH}:$HADOOP_HOME;
-  for f in $HADOOP_HOME/lib/*.jar; do
+  CLASSPATH=${CLASSPATH}:$HADOOP_PREFIX;
+  for f in $HADOOP_PREFIX/lib/*.jar; do
     CLASSPATH=${CLASSPATH}:$f;
   done
   CLASSPATH=${CLASSPATH}:$MUMAK_HOME/hadoop-${HADOOP_VERSION}-${project}.jar
-  CLASSPATH=${CLASSPATH}:$HADOOP_HOME/hadoop-mapred-${HADOOP_VERSION}.jar
-  CLASSPATH=${CLASSPATH}:$HADOOP_HOME/hadoop-mapred-tools-${HADOOP_VERSION}.jar
+  CLASSPATH=${CLASSPATH}:$HADOOP_PREFIX/hadoop-mapred-${HADOOP_VERSION}.jar
+  CLASSPATH=${CLASSPATH}:$HADOOP_PREFIX/hadoop-mapred-tools-${HADOOP_VERSION}.jar
 fi
 
 # check envvars which might override default args
@@ -134,7 +134,7 @@ fi
 
 # default log directory & file
 if [ "$HADOOP_LOG_DIR" = "" ]; then
-  HADOOP_LOG_DIR="$HADOOP_HOME/logs"
+  HADOOP_LOG_DIR="$HADOOP_PREFIX/logs"
 fi
 
 # default policy file for service-level authorization
@@ -144,18 +144,18 @@ fi
 
 # setup 'java.library.path' for native-hadoop code if necessary
 JAVA_LIBRARY_PATH=''
-if [ -d "${HADOOP_COMMON_HOME}/build/native" -o -d "${HADOOP_COMMON_HOME}/lib/native" ]; then
+if [ -d "${HADOOP_PREFIX}/build/native" -o -d "${HADOOP_PREFIX}/lib/native" ]; then
   JAVA_PLATFORM=`CLASSPATH=${CLASSPATH} ${JAVA} -Xmx32m org.apache.hadoop.util.PlatformName | sed -e "s/ /_/g"`
   
-  if [ -d "$HADOOP_COMMON_HOME/build/native" ]; then
-    JAVA_LIBRARY_PATH=${HADOOP_COMMON_HOME}/build/native/${JAVA_PLATFORM}/lib
+  if [ -d "$HADOOP_PREFIX/build/native" ]; then
+    JAVA_LIBRARY_PATH=${HADOOP_PREFIX}/build/native/${JAVA_PLATFORM}/lib
   fi
   
-  if [ -d "${HADOOP_COMMON_HOME}/lib/native" ]; then
+  if [ -d "${HADOOP_PREFIX}/lib/native" ]; then
     if [ "x$JAVA_LIBRARY_PATH" != "x" ]; then
-      JAVA_LIBRARY_PATH=${JAVA_LIBRARY_PATH}:${HADOOP_COMMON_HOME}/lib/native/${JAVA_PLATFORM}
+      JAVA_LIBRARY_PATH=${JAVA_LIBRARY_PATH}:${HADOOP_PREFIX}/lib/native/${JAVA_PLATFORM}
     else
-      JAVA_LIBRARY_PATH=${HADOOP_COMMON_HOME}/lib/native/${JAVA_PLATFORM}
+      JAVA_LIBRARY_PATH=${HADOOP_PREFIX}/lib/native/${JAVA_PLATFORM}
     fi
   fi
 fi

@@ -40,6 +40,7 @@
     <conf name="mapred" visibility="private" extends="compile,runtime" description="Mapred dependent artifacts"/>
     <conf name="javadoc" visibility="private" description="artiracts required while performing doc generation" extends="common"/>
     <conf name="test" extends="master" visibility="private" description="the classpath needed to run tests"/>
+    <conf name="package" extends="master" description="the classpath needed for packaging"/>
     <conf name="system" extends="test" visibility="private" description="the classpath needed to run system tests"/>
 
     <conf name="test-hdfswithmr" extends="test" visibility="private" description="the classpath needed to run tests"/>
@@ -57,22 +58,22 @@
   </publications>
  <dependencies>
    <dependency org="org.apache.hadoop" name="hadoop-common" 
-               rev="${hadoop-common.version}" conf="common->default"/> 
+               rev="${hadoop-common.version}" conf="compile->default"/> 
    <dependency org="org.apache.hadoop" name="hadoop-common-test" 
-               rev="${hadoop-common.version}" conf="common->default"/> 
+               rev="${hadoop-common.version}" conf="compile->default"/> 
    <dependency org="org.apache.hadoop" name="hadoop-hdfs" 
-               rev="${hadoop-hdfs.version}" conf="common->default"/> 
+               rev="${hadoop-hdfs.version}" conf="compile->default"/> 
    <dependency org="org.apache.hadoop" name="hadoop-common-instrumented"
                rev="${hadoop-common.version}" conf="system->default"/>
    <dependency org="org.apache.hadoop" name="hadoop-hdfs-instrumented"
                rev="${hadoop-common.version}" conf="system->default"/>
    <dependency org="commons-logging" name="commons-logging" 
-               rev="${commons-logging.version}" conf="common->master"/>
+               rev="${commons-logging.version}" conf="compile->master"/>
    <dependency org="log4j" name="log4j" rev="${log4j.version}" 
-               conf="common->master"/>
+               conf="compile->master"/>
 
    <dependency org="org.slf4j" name="slf4j-api" rev="${slf4j-api.version}" 
-               conf="common->master"/>
+               conf="compile->master"/>
    <dependency org="org.slf4j" name="slf4j-log4j12" 
                rev="${slf4j-log4j12.version}" conf="mapred->master"/>
    <dependency org="org.apache.hadoop" name="hadoop-common-test" 
@@ -99,20 +100,21 @@
    <dependency org="org.apache.lucene" name="lucene-core" 
                rev="${lucene-core.version}" conf="javadoc->default"/>
    <dependency org="org.apache.hadoop" name="avro" rev="${avro.version}" 
-               conf="common->default">
+               conf="compile->default">
       <exclude module="ant"/>
       <exclude module="jetty"/>
       <exclude module="slf4j-simple"/>
     </dependency>
    <dependency org="org.mockito" name="mockito-all" rev="${mockito-all.version}" 
                conf="test->default"/>
+   <dependency org="org.vafer" name="jdeb" rev="${jdeb.version}" conf="package->master"/>
    <dependency org="org.mortbay.jetty" name="jetty-servlet-tester" rev="${jetty.version}"
                conf="test->default"/>
    <!-- dependency addition for the fault injection -->
    <dependency org="org.aspectj" name="aspectjrt" rev="${aspectj.version}"
-               conf="common->default"/>
+               conf="compile->default"/>
    <dependency org="org.aspectj" name="aspectjtools" rev="${aspectj.version}"
-               conf="common->default"/>
+               conf="compile->default"/>
 
  </dependencies>
   

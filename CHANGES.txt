@@ -14,6 +14,10 @@ Trunk (unreleased changes)
     MAPREDUCE-461. Enable ServicePlugins for the JobTracker.
     (Fredrik Hedberg via tomwhite)
 
+    MAPREDUCE-2521. Create RPM and Debian packages for MapReduce. Changes 
+    deployment layout to be consistent across the binary tgz, rpm, and deb.
+    (Eric Yang via omalley)
+
   IMPROVEMENTS
 
     MAPREDUCE-2517. [Gridmix] Add system tests to Gridmix. 

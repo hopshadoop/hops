@@ -23,13 +23,13 @@
 ## Environment configuration
 # Hadoop installation
 export HADOOP_VERSION=hadoop-0.18.2-dev
-export HADOOP_HOME=${HADOOP_INSTALL_HOME}/${HADOOP_VERSION}
+export HADOOP_PREFIX=${HADOOP_INSTALL_HOME}/${HADOOP_VERSION}
 export HADOOP_CONF_DIR=
 export USE_REAL_DATASET=TRUE
 
-export APP_JAR=${HADOOP_HOME}/${HADOOP_VERSION}-test.jar
-export EXAMPLE_JAR=${HADOOP_HOME}/${HADOOP_VERSION}-examples.jar
-export STREAMING_JAR=${HADOOP_HOME}/contrib/streaming/${HADOOP_VERSION}-streaming.jar
+export APP_JAR=${HADOOP_PREFIX}/${HADOOP_VERSION}-test.jar
+export EXAMPLE_JAR=${HADOOP_PREFIX}/${HADOOP_VERSION}-examples.jar
+export STREAMING_JAR=${HADOOP_PREFIX}/contrib/streaming/${HADOOP_VERSION}-streaming.jar
 
 
 

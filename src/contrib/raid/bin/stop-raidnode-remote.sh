@@ -34,7 +34,7 @@ fi
 if [ -f "${HADOOP_CONF_DIR}/raidnode" ]; then
   export HADOOP_SLAVES="${HADOOP_CONF_DIR}/raidnode"
   echo "Stopping raidnode at "`cat ${HADOOP_SLAVES}`
-  "$bin"/slaves.sh --config $HADOOP_CONF_DIR cd "$HADOOP_HOME" \; "$bin/stop-raidnode.sh"
+  "$bin"/slaves.sh --config $HADOOP_CONF_DIR cd "$HADOOP_PREFIX" \; "$bin/stop-raidnode.sh"
 else
   echo "No raidnode file in ${HADOOP_CONF_DIR}/raidnode"
 fi

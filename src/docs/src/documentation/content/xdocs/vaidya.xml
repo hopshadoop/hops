@@ -46,7 +46,7 @@
       <p>Ensure that Hadoop is installed and configured. More details:</p> 
       <ul>
         <li>
-          Make sure HADOOP_HOME environment variable is set.
+          Make sure HADOOP_PREFIX environment variable is set.
         </li>
         <li>
           Make sure Java is installed and configured as a part of the Hadoop installation.
@@ -82,7 +82,7 @@
 			     a set of counters for each Map and Reduce task.</li>
 			<li> <em>Diagnostic Test/Rule</em>: This is a program logic that detects the inefficiency of M/R job based on the job statistics. The
 				 description of the Test is specified as an XML element (DiagnosticTest) in a test description file e.g. 
-				 default tests description file, <em>$HADOOP_HOME/contrib/vaidya/conf/postex_diagnosis_tests.xml</em>. The actual logic is coded as
+				 default tests description file, <em>$HADOOP_PREFIX/contrib/vaidya/conf/postex_diagnosis_tests.xml</em>. The actual logic is coded as
 				 a java class and referenced in the DiagnosticTest XML element. </li>
 		</ul>
 	<p></p>
@@ -122,18 +122,18 @@
 	<section>
 		<title>How to Execute the Hadoop Vaidya Tool</title>
 		  
-      	<p>Script to execute Hadoop Vaidya is in <code>$HADOOP_HOME/contrib/vaidya/bin/</code> directory.
+      	<p>Script to execute Hadoop Vaidya is in <code>$HADOOP_PREFIX/contrib/vaidya/bin/</code> directory.
 		   It comes with a default set of rules defined in file: 
-           <code>$HADOOP_HOME/contrib/vaidya/conf/postex_diagnosis_tests.xml</code> </p>
+           <code>$HADOOP_PREFIX/contrib/vaidya/conf/postex_diagnosis_tests.xml</code> </p>
 		  <ul>
-			<li>Make sure HADOOP_HOME environment variable is set and Java is installed and configured.</li>
+			<li>Make sure HADOOP_PREFIX environment variable is set and Java is installed and configured.</li>
 			<li>Execute the Hadoop Vaidya script with -help (or without any arguments) to get the command line help. e.g. 
-                       <code>=>sh $HADOOP_HOME/contrib/vaidya/bin/vaidya.sh -help</code></li>
+                       <code>=>sh $HADOOP_PREFIX/contrib/vaidya/bin/vaidya.sh -help</code></li>
 			<li>User needs to 
 				 supply job's configuration file (<code>-jobconf job_conf.xml</code>), job history log file (<code>-joblog job_history_log_file</code>), and optionally the test description
-				 file (<code>-testconf postex_diagonostic_tests.xml</code>). If test description file is not specified then the default one is picked up from the Hadoop Vaidya Jar (<code>$HADOOP_HOME/contrib/vaidya/hadoop-{version}-vaidya.jar</code>).
+				 file (<code>-testconf postex_diagonostic_tests.xml</code>). If test description file is not specified then the default one is picked up from the Hadoop Vaidya Jar (<code>$HADOOP_PREFIX/contrib/vaidya/hadoop-{version}-vaidya.jar</code>).
 				 This default test description file is also available at following location for users to make a local copy, modify and add new test rules: 
-			     <code>$HADOOP_HOME/contrib/vaidya/conf/postex_diagnostic_tests.xml</code></li>
+			     <code>$HADOOP_PREFIX/contrib/vaidya/conf/postex_diagnostic_tests.xml</code></li>
 			<li> Use <code>-report report_file</code> option to store the xml report into specified report_file. </li>  
 		 </ul>
 	</section>
@@ -152,11 +152,11 @@
  				<li> getReferenceDetails() </li> 
               </ul>
           </li>
-		  <li>Make a local copy of the <code>$HADOOP_HOME/contrib/vaidya/conf/postex_diagnostic_tests.xml</code> file or create a new test description XML file.</li>
+		  <li>Make a local copy of the <code>$HADOOP_PREFIX/contrib/vaidya/conf/postex_diagnostic_tests.xml</code> file or create a new test description XML file.</li>
 		  <li>Add the test description element for your new test case to this test description file.</li>
 		  <li>Compile your new test class (or multiple classes), archive them into a Jar file and add it to the CLASSPATH e.g. (<code>export CLASSPATH=$CLASSPATH:newtests.jar</code>)</li>
 		  <li>Execute the Hadoop Vaidya script with the job configuration, job history log and reference to newly created test description file using <em>--testconf</em> option. 
-		  <code>=>sh $HADOOP_HOME/contrib/vaidya/bin/vaidya.sh -joblog job_history_log_file -jobconf job.xml -testconf new_test_description_file -report report.xml</code></li>
+		  <code>=>sh $HADOOP_PREFIX/contrib/vaidya/bin/vaidya.sh -joblog job_history_log_file -jobconf job.xml -testconf new_test_description_file -report report.xml</code></li>
 		</ul>
 	</section>
 	

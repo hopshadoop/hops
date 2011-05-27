@@ -37,7 +37,7 @@ ${LIBRECORDIO_TEST_DIR}/test.jr.o: test.jr.cc
 	g++ ${COPTS} -c -I..  -o ${LIBRECORDIO_TEST_DIR}/test.jr.o test.jr.cc
 
 %.jr.cc %.jr.hh: %.jr
-	${HADOOP_HOME}/bin/rcc --language c++ $<
+	${HADOOP_PREFIX}/bin/rcc --language c++ $<
 
 %: %.o
 %: %.cc

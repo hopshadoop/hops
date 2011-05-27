@@ -104,7 +104,7 @@
         To run the fair scheduler in your Hadoop installation, you need to put
         it on the CLASSPATH. The easiest way is to copy the 
         <em>hadoop-*-fairscheduler.jar</em> from
-        <em>HADOOP_HOME/build/contrib/fairscheduler</em> to <em>HADOOP_HOME/lib</em>.
+        <em>HADOOP_PREFIX/build/contrib/fairscheduler</em> to <em>HADOOP_PREFIX/lib</em>.
         Alternatively you can modify <em>HADOOP_CLASSPATH</em> to include this jar, in
         <em>HADOOP_CONF_DIR/hadoop-env.sh</em>
       </p>
@@ -127,7 +127,7 @@
       </p>
       <p>
         If you wish to compile the fair scheduler from source, run <em> ant 
-        package</em> in your HADOOP_HOME directory. This will build
+        package</em> in your HADOOP_PREFIX directory. This will build
         <em>build/contrib/fair-scheduler/hadoop-*-fairscheduler.jar</em>.
       </p>
     </section>
@@ -349,7 +349,7 @@
         Only users/pools whose values differ from the defaults need to be
         explicitly configured in this file.
         The allocation file is located in
-        <em>HADOOP_HOME/conf/fair-scheduler.xml</em>.
+        <em>HADOOP_PREFIX/conf/fair-scheduler.xml</em>.
         It can contain the following types of elements:
         </p>
         <ul>

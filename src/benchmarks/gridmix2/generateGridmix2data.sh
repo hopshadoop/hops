@@ -51,7 +51,7 @@ export VARINFLTEXT=${GRID_MIX_DATA}/SortUncompressed
 # Fixed length key, value compressed Text File
 export FIXCOMPTEXT=${GRID_MIX_DATA}/EntropySimulationCompressed
 
-${HADOOP_HOME}/bin/hadoop jar \
+${HADOOP_PREFIX}/bin/hadoop jar \
   ${EXAMPLE_JAR} randomtextwriter \
   -D mapreduce.randomtextwriter.totalbytes=${COMPRESSED_DATA_BYTES} \
   -D mapreduce.randomtextwriter.bytespermap=$((${COMPRESSED_DATA_BYTES} / ${NUM_MAPS})) \
@@ -65,7 +65,7 @@ ${HADOOP_HOME}/bin/hadoop jar \
   ${VARCOMPSEQ} &
 
 
-${HADOOP_HOME}/bin/hadoop jar \
+${HADOOP_PREFIX}/bin/hadoop jar \
   ${EXAMPLE_JAR} randomtextwriter \
   -D mapreduce.randomtextwriter.totalbytes=${COMPRESSED_DATA_BYTES} \
   -D mapreduce.randomtextwriter.bytespermap=$((${COMPRESSED_DATA_BYTES} / ${NUM_MAPS})) \
@@ -79,7 +79,7 @@ ${HADOOP_HOME}/bin/hadoop jar \
   ${FIXCOMPSEQ} &
 
 
-${HADOOP_HOME}/bin/hadoop jar \
+${HADOOP_PREFIX}/bin/hadoop jar \
   ${EXAMPLE_JAR} randomtextwriter \
   -D mapreduce.randomtextwriter.totalbytes=${UNCOMPRESSED_DATA_BYTES} \
   -D mapreduce.randomtextwriter.bytespermap=$((${UNCOMPRESSED_DATA_BYTES} / ${NUM_MAPS})) \

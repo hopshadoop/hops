@@ -71,9 +71,9 @@ class LinuxTaskController extends TaskController {
   private static String taskControllerExe;
   
   static {
-    // the task-controller is expected to be under the $HADOOP_HOME/bin
+    // the task-controller is expected to be under the $HADOOP_PREFIX/bin
     // directory.
-    File hadoopBin = new File(System.getenv("HADOOP_HOME"), "bin");
+    File hadoopBin = new File(System.getenv("HADOOP_PREFIX"), "bin");
     taskControllerExe = 
         new File(hadoopBin, "task-controller").getAbsolutePath();
   }

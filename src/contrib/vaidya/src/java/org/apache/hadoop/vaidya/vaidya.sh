@@ -31,9 +31,9 @@ script=`basename "$this"`
 bin=`cd "$bin"; pwd`
 this="$bin/$script"
 
-# Check if HADOOP_HOME AND JAVA_HOME is set.
-if [ -z $HADOOP_HOME ] ; then
-  echo "HADOOP_HOME environment variable not defined"
+# Check if HADOOP_PREFIX AND JAVA_HOME is set.
+if [ -z $HADOOP_PREFIX ] ; then
+  echo "HADOOP_PREFIX environment variable not defined"
   exit -1;
 fi
 
@@ -42,6 +42,6 @@ if [ -z $JAVA_HOME ] ; then
   exit -1;
 fi
 
-hadoopVersion=`$HADOOP_HOME/bin/hadoop version | grep Hadoop | awk '{print $2}'`
+hadoopVersion=`$HADOOP_PREFIX/bin/hadoop version | grep Hadoop | awk '{print $2}'`
 
-$JAVA_HOME/bin/java -Xmx1024m -classpath $HADOOP_HOME/hadoop-${hadoopVersion}-core.jar:$HADOOP_HOME/contrib/vaidya/hadoop-${hadoopVersion}-vaidya.jar:$HADOOP_HOME/lib/commons-logging-1.0.4.jar:${CLASSPATH} org.apache.hadoop.vaidya.postexdiagnosis.PostExPerformanceDiagnoser $@
+$JAVA_HOME/bin/java -Xmx1024m -classpath $HADOOP_PREFIX/hadoop-${hadoopVersion}-core.jar:$HADOOP_PREFIX/contrib/vaidya/hadoop-${hadoopVersion}-vaidya.jar:$HADOOP_PREFIX/lib/commons-logging-1.0.4.jar:${CLASSPATH} org.apache.hadoop.vaidya.postexdiagnosis.PostExPerformanceDiagnoser $@

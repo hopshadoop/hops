@@ -72,7 +72,7 @@ public class BlockForensics {
   // runs hadoop command and prints output to stdout
   public static void runHadoopCmd(String ... args)
   throws IOException {
-    String hadoop_home = System.getenv("HADOOP_HOME");
+    String hadoop_home = System.getenv("HADOOP_PREFIX");
     
     List<String> l = new LinkedList<String>();
     l.add("bin/hadoop");
@@ -103,8 +103,8 @@ public class BlockForensics {
     throws SAXException, ParserConfigurationException, 
            InterruptedException, IOException {
 
-    if (System.getenv("HADOOP_HOME") == null) {
-      System.err.println("The environmental variable HADOOP_HOME is undefined");
+    if (System.getenv("HADOOP_PREFIX") == null) {
+      System.err.println("The environmental variable HADOOP_PREFIX is undefined");
       System.exit(1);
     }
 

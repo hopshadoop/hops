@@ -15,10 +15,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-bin=`dirname "$0"`
+bin=`which $0`
+bin=`dirname ${bin}`
 bin=`cd "$bin"; pwd`
 
-. $bin/mapred-config.sh
+. $bin/../libexec/mapred-config.sh
 
 function print_usage(){
   echo "Usage: mapred [--config confdir] COMMAND"
@@ -85,10 +86,10 @@ if [ -d "$HADOOP_MAPRED_HOME/build/tools" ]; then
 fi
 
 # for releases, add core mapred jar & webapps to CLASSPATH
-if [ -d "$HADOOP_MAPRED_HOME/webapps" ]; then
-  CLASSPATH=${CLASSPATH}:$HADOOP_MAPRED_HOME
+if [ -d "$HADOOP_PREFIX/share/hadoop/mapreduce/webapps" ]; then
+  CLASSPATH=${CLASSPATH}:$HADOOP_PREFIX/share/hadoop/mapreduce
 fi
-for f in $HADOOP_MAPRED_HOME/hadoop-mapred-*.jar; do
+for f in $HADOOP_MAPRED_HOME/share/hadoop-mapreduce/*.jar; do
   CLASSPATH=${CLASSPATH}:$f;
 done
 

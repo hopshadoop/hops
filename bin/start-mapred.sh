@@ -21,9 +21,9 @@
 bin=`dirname "${BASH_SOURCE-$0}"`
 bin=`cd "$bin"; pwd`
 
-. $bin/mapred-config.sh
+. $bin/../libexec/mapred-config.sh
 
 # start mapred daemons
 # start jobtracker first to minimize connection errors at startup
-"$HADOOP_COMMON_HOME"/bin/hadoop-daemon.sh --config $HADOOP_CONF_DIR --script "$bin"/mapred start jobtracker
-"$HADOOP_COMMON_HOME"/bin/hadoop-daemons.sh --config $HADOOP_CONF_DIR --script "$bin"/mapred start tasktracker
+"$HADOOP_PREFIX"/bin/hadoop-daemon.sh --config $HADOOP_CONF_DIR --script "$bin"/mapred start jobtracker
+"$HADOOP_PREFIX"/bin/hadoop-daemons.sh --config $HADOOP_CONF_DIR --script "$bin"/mapred start tasktracker

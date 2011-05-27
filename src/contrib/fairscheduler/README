@@ -20,10 +20,10 @@ support for guaranteed shares and job limits.
 
 The functionality of this scheduler is described in the Forrest 
 documentation at http://hadoop.apache.org/core/ or alternatively, in the 
-hadoop release it can be found at $HADOOP_HOME/docs. In order to build the 
+hadoop release it can be found at $HADOOP_PREFIX/docs. In order to build the 
 documentation on your own from source please use the following command in 
 the downloaded source folder:
 
 ant docs -Dforrest.home=path to forrest -Djava5.home= path to jdk5. 
 
-The documentation so built would be under $HADOOP_HOME/build/docs
+The documentation so built would be under $HADOOP_PREFIX/build/docs

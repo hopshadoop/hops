@@ -192,7 +192,7 @@
         <p>To run the Capacity Scheduler in your Hadoop installation, you need 
         to put it on the <em>CLASSPATH</em>. The easiest way is to copy the 
         <code>hadoop-*-capacity-scheduler.jar</code> from 
-        to <code>HADOOP_HOME/lib</code>. Alternatively, you can modify 
+        to <code>HADOOP_PREFIX/lib</code>. Alternatively, you can modify 
         <em>HADOOP_CLASSPATH</em> to include this jar, in 
         <code>conf/hadoop-env.sh</code>.</p>
     </section>

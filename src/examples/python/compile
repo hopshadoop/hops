@@ -12,19 +12,19 @@
 #   limitations under the License.
 
 
-export HADOOP_HOME=../../..
+export HADOOP_PREFIX=../../..
 
-export CLASSPATH="$HADOOP_HOME/build/classes"
+export CLASSPATH="$HADOOP_PREFIX/build/classes"
 
 # so that filenames w/ spaces are handled correctly in loops below
 IFS=
 
 # add libs to CLASSPATH
-for f in $HADOOP_HOME/lib/*.jar; do
+for f in $HADOOP_PREFIX/lib/*.jar; do
   CLASSPATH=${CLASSPATH}:$f;
 done
 
-for f in $HADOOP_HOME/lib/jetty-ext/*.jar; do
+for f in $HADOOP_PREFIX/lib/jetty-ext/*.jar; do
   CLASSPATH=${CLASSPATH}:$f;
 done
 

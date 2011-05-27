@@ -456,7 +456,7 @@
         <li><code>Jackson Core</code> (<code>jackson-core-asl-1.4.2.jar</code>)</li>
       </ul>
       
-      <note>One simple way to run Rumen is to use '$HADOOP_HOME/bin/hadoop jar' 
+      <note>One simple way to run Rumen is to use '$HADOOP_PREFIX/bin/hadoop jar' 
               option  to run it.
       </note>
     </section>

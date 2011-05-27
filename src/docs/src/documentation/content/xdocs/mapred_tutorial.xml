@@ -320,14 +320,14 @@
       <section>
         <title>Usage</title>
         
-        <p>Assuming <code>HADOOP_HOME</code> is the root of the installation and 
+        <p>Assuming <code>HADOOP_PREFIX</code> is the root of the installation and 
         <code>HADOOP_VERSION</code> is the Hadoop version installed, compile 
         <code>WordCount.java</code> and create a jar:</p>
         <p>
           <code>$ mkdir wordcount_classes</code><br/>
           <code>
             $ javac -classpath
-            ${HADOOP_HOME}/hadoop-core-${HADOOP_VERSION}.jar:${HADOOP_HOME}/hadoop-mapred-${HADOOP_VERSION}.jar:${HADOOP_HOME}/hadoop-hdfs-${HADOOP_VERSION}.jar
+            ${HADOOP_PREFIX}/hadoop-core-${HADOOP_VERSION}.jar:${HADOOP_PREFIX}/hadoop-mapred-${HADOOP_VERSION}.jar:${HADOOP_PREFIX}/hadoop-hdfs-${HADOOP_VERSION}.jar
               -d wordcount_classes WordCount.java
           </code><br/>
           <code>$ jar -cvf /user/joe/wordcount.jar -C wordcount_classes/ .</code> 

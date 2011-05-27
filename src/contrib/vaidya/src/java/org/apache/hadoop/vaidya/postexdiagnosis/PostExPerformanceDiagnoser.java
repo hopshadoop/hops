@@ -94,7 +94,7 @@ public class PostExPerformanceDiagnoser extends JobDiagnoser {
    * @param jobConfFile - URL pointing to job configuration (job_conf.xml) file
    * @param jobHistoryFile - URL pointing to job history log file  
    * @param testsConfFileIs - file path for test configuration file (optional). 
-   * If not specified default path is:$HADOOP_HOME/contrib/vaidya/pxpd_tests_config.xml
+   * If not specified default path is:$HADOOP_PREFIX/contrib/vaidya/pxpd_tests_config.xml
    * @param reportFile - file path for storing report (optional)
    */
   public PostExPerformanceDiagnoser (String jobConfFile, String jobHistoryFile, InputStream testsConfFileIs,
@@ -168,7 +168,7 @@ public class PostExPerformanceDiagnoser extends JobDiagnoser {
     System.out.println("                       : on local file system and be specified as as an absolute file path.");
     System.out.println("                       : e.g. => /Users/hadoop-user/postex_diagnosis_tests.xml. If not specified default file will be used");
     System.out.println("                       : from the hadoop-{ver}-vaidya.jar in a classpath.");
-    System.out.println("                       : For user to view or make local copy of default tests, file is available at $HADOOP_HOME/contrib/vaidya/conf/postex_diagnosis_tests.xml");
+    System.out.println("                       : For user to view or make local copy of default tests, file is available at $HADOOP_PREFIX/contrib/vaidya/conf/postex_diagnosis_tests.xml");
     System.out.println();
     System.out.println("-report <filepath>     : Optional file path for for storing diagnostic report in a XML format. Path should be available");
     System.out.println("                       : on local file system and be specified as as an absolute file path.");

@@ -38,7 +38,7 @@ if [ ! -z ${USE_REAL_DATASET} ] ; then
   INDIRECT_DATA_BYTES=58720256000 
 fi
 
-${HADOOP_HOME}/bin/hadoop jar \
+${HADOOP_PREFIX}/bin/hadoop jar \
   ${EXAMPLE_JAR} randomtextwriter \
   -D mapreduce.randomtextwriter.totalbytes=${COMPRESSED_DATA_BYTES} \
   -D mapreduce.randomtextwriter.bytespermap=$((${COMPRESSED_DATA_BYTES} / ${NUM_MAPS})) \
@@ -51,7 +51,7 @@ ${HADOOP_HOME}/bin/hadoop jar \
   -outFormat org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat \
   ${VARCOMPSEQ} &
 
-${HADOOP_HOME}/bin/hadoop jar \
+${HADOOP_PREFIX}/bin/hadoop jar \
   ${EXAMPLE_JAR} randomtextwriter \
   -D mapreduce.randomtextwriter.totalbytes=${COMPRESSED_DATA_BYTES} \
   -D mapreduce.randomtextwriter.bytespermap=$((${COMPRESSED_DATA_BYTES} / ${NUM_MAPS})) \
@@ -64,7 +64,7 @@ ${HADOOP_HOME}/bin/hadoop jar \
   -outFormat org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat \
   ${FIXCOMPSEQ} &
 
-${HADOOP_HOME}/bin/hadoop jar \
+${HADOOP_PREFIX}/bin/hadoop jar \
   ${EXAMPLE_JAR} randomtextwriter \
   -D mapreduce.randomtextwriter.totalbytes=${UNCOMPRESSED_DATA_BYTES} \
   -D mapreduce.randomtextwriter.bytespermap=$((${UNCOMPRESSED_DATA_BYTES} / ${NUM_MAPS})) \
@@ -76,7 +76,7 @@ ${HADOOP_HOME}/bin/hadoop jar \
   -outFormat org.apache.hadoop.mapreduce.lib.output.TextOutputFormat \
   ${VARINFLTEXT} &
 
-${HADOOP_HOME}/bin/hadoop jar \
+${HADOOP_PREFIX}/bin/hadoop jar \
   ${EXAMPLE_JAR} randomtextwriter \
   -D mapreduce.randomtextwriter.totalbytes=${INDIRECT_DATA_BYTES} \
   -D mapreduce.randomtextwriter.bytespermap=$((${INDIRECT_DATA_BYTES} / ${INDIRECT_DATA_FILES})) \

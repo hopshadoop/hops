@@ -34,7 +34,7 @@ results in saving 25% to 30% of storage space in a HDFS cluster.
 
 BUILDING:
 
-In HADOOP_HOME, run ant package to build Hadoop and its contrib packages.
+In HADOOP_PREFIX, run ant package to build Hadoop and its contrib packages.
 
 --------------------------------------------------------------------------------
 
@@ -43,7 +43,7 @@ INSTALLING and CONFIGURING:
 The entire code is packaged in the form of a single jar file hadoop-*-raid.jar.
 To use HDFS Raid, you need to put the above mentioned jar file on
 the CLASSPATH. The easiest way is to copy the hadoop-*-raid.jar
-from HADOOP_HOME/build/contrib/raid to HADOOP_HOME/lib. Alternatively
+from HADOOP_PREFIX/build/contrib/raid to HADOOP_PREFIX/lib. Alternatively
 you can modify HADOOP_CLASSPATH to include this jar, in conf/hadoop-env.sh.
 
 There is a single configuration file named raid.xml that describes the HDFS 
@@ -150,15 +150,15 @@ reload within seconds and the new contents will take effect immediately.
 Designate one machine in your cluster to run the RaidNode software. You can run this daemon
 on any machine irrespective of whether that machine is running any other hadoop daemon or not. 
 You can start the RaidNode by running the following on the selected machine:
-nohup $HADOOP_HOME/bin/hadoop org.apache.hadoop.raid.RaidNode >> /xxx/logs/hadoop-root-raidnode-hadoop.xxx.com.log &
+nohup $HADOOP_PREFIX/bin/hadoop org.apache.hadoop.raid.RaidNode >> /xxx/logs/hadoop-root-raidnode-hadoop.xxx.com.log &
 
 Optionally, we provide two scripts to start and stop the RaidNode. Copy the scripts
-start-raidnode.sh and stop-raidnode.sh to the directory $HADOOP_HOME/bin in the machine
+start-raidnode.sh and stop-raidnode.sh to the directory $HADOOP_PREFIX/bin in the machine
 you would like to deploy the daemon. You can start or stop the RaidNode by directly 
 callying the scripts from that machine. If you want to deploy the RaidNode remotely,
-copy start-raidnode-remote.sh and stop-raidnode-remote.sh to $HADOOP_HOME/bin at 
+copy start-raidnode-remote.sh and stop-raidnode-remote.sh to $HADOOP_PREFIX/bin at 
 the machine from which you want to trigger the remote deployment and create a text
-file $HADOOP_HOME/conf/raidnode at the same machine containing the name of the server
+file $HADOOP_PREFIX/conf/raidnode at the same machine containing the name of the server
 where the RaidNode should run. These scripts run ssh to the specified machine and 
 invoke start/stop-raidnode.sh there. As an example, you might want to change
 start-mapred.sh in the JobTracker machine so that it automatically calls 
@@ -166,7 +166,7 @@ start-raidnode-remote.sh (and do the equivalent thing for stop-mapred.sh and
 stop-raidnode-remote.sh).
 
 To validate the integrity of a file system, run RaidFSCK as follows:
-$HADOOP_HOME/bin/hadoop org.apache.hadoop.raid.RaidShell -fsck [path]
+$HADOOP_PREFIX/bin/hadoop org.apache.hadoop.raid.RaidShell -fsck [path]
 
 This will print a list of corrupt files (i.e., files which have lost too many
 blocks and can no longer be fixed by Raid).

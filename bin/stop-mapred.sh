@@ -21,7 +21,7 @@
 bin=`dirname "${BASH_SOURCE-$0}"`
 bin=`cd "$bin"; pwd`
 
-. $bin/mapred-config.sh
+. $bin/../libexec/mapred-config.sh
 
-"$HADOOP_COMMON_HOME"/bin/hadoop-daemon.sh --config $HADOOP_CONF_DIR --script "$bin"/mapred stop jobtracker
-"$HADOOP_COMMON_HOME"/bin/hadoop-daemons.sh --config $HADOOP_CONF_DIR --script "$bin"/mapred stop tasktracker
+"$HADOOP_PREFIX"/bin/hadoop-daemon.sh --config $HADOOP_CONF_DIR --script "$bin"/mapred stop jobtracker
+"$HADOOP_PREFIX"/bin/hadoop-daemons.sh --config $HADOOP_CONF_DIR --script "$bin"/mapred stop tasktracker

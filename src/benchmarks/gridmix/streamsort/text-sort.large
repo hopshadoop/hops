@@ -20,8 +20,8 @@ export INDIR=${VARINFLTEXT}
 Date=`date +%F-%H-%M-%S-%N`
 
 export OUTDIR=perf-out/stream-out-dir-large_$Date
-${HADOOP_HOME}/bin/hadoop dfs -rmr $OUTDIR
+${HADOOP_PREFIX}/bin/hadoop dfs -rmr $OUTDIR
 
 
-${HADOOP_HOME}/bin/hadoop jar ${STREAM_JAR} -input $INDIR -output $OUTDIR -mapper cat -reducer cat -numReduceTasks $NUM_OF_REDUCERS
+${HADOOP_PREFIX}/bin/hadoop jar ${STREAM_JAR} -input $INDIR -output $OUTDIR -mapper cat -reducer cat -numReduceTasks $NUM_OF_REDUCERS
 
