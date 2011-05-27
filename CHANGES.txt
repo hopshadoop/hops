@@ -236,7 +236,7 @@ Trunk (unreleased changes)
     via cdouglas)
 
     MAPREDUCE-2536. Update FsShell -mv command usage in TestMRCLI.  (Daryn
-    Sharp via cdouglas)
+    Sharp via szetszwo)
 
 Release 0.22.0 - Unreleased
 
