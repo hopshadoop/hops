@@ -635,6 +635,9 @@ Trunk (unreleased changes)
     HDFS-1592. Datanode startup doesn't honor volumes.tolerated. 
     (Bharath Mundlapudi via jitendra)
 
+    HDFS-1920. libhdfs does not build for ARM processors.
+    (Trevor Robinson via eli)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES

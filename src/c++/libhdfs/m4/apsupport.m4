@@ -118,6 +118,10 @@ AC_DEFUN([AP_SUPPORTED_HOST],[
     CFLAGS="$CFLAGS -DCPU=\\\"s390\\\""
     supported_os="s390"
     HOST_CPU=s390;;
+  arm*)
+    CFLAGS="$CFLAGS -DCPU=\\\"arm\\\""
+    supported_os="arm"
+    HOST_CPU=arm;;
   *)
     AC_MSG_RESULT([failed])
     AC_MSG_ERROR([Unsupported CPU architecture "$host_cpu"]);;

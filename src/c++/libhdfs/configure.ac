@@ -82,9 +82,16 @@ AP_PROG_JAR()
 AP_JVM_LIBDIR()
 if test "$supported_os" != "darwin"
 then
-  CFLAGS="$CFLAGS -m${JVM_ARCH} -I$JAVA_HOME/include -I$JAVA_HOME/include/$supported_os"
-  LDFLAGS="$LDFLAGS -m${JVM_ARCH} -L$LIB_JVM_DIR -ljvm -Wl,-x"
+  case $host_cpu in
+  arm*) ;;
+  *)
+    CFLAGS="$CFLAGS -m${JVM_ARCH}"
+    LDFLAGS="$LDFLAGS -m${JVM_ARCH}"
+    ;;
+  esac
   AC_MSG_RESULT([VALUE OF JVM_ARCH IS :$JVM_ARCH])
+  CFLAGS="$CFLAGS -I$JAVA_HOME/include -I$JAVA_HOME/include/$supported_os"
+  LDFLAGS="$LDFLAGS -L$LIB_JVM_DIR -ljvm -Wl,-x"
 fi
 
 dnl -------------------------------------------------------------------------
