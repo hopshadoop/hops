@@ -92,6 +92,20 @@ public class Gridmix extends Configured implements Tool {
    */
   public static final String GRIDMIX_USR_RSV = "gridmix.user.resolve.class";
 
+  /**
+   * Configuration property set in simulated job's configuration whose value is
+   * set to the corresponding original job's name. This is not configurable by
+   * gridmix user.
+   */
+  public static final String ORIGINAL_JOB_NAME =
+      "gridmix.job.original-job-name";
+  /**
+   * Configuration property set in simulated job's configuration whose value is
+   * set to the corresponding original job's id. This is not configurable by
+   * gridmix user.
+   */
+  public static final String ORIGINAL_JOB_ID = "gridmix.job.original-job-id";
+
   private DistributedCacheEmulator distCacheEmulator;
 
   // Submit data structures

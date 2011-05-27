@@ -17,9 +17,9 @@
  */
 package org.apache.hadoop.mapred.gridmix;
 
-import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.IOException;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -41,6 +41,7 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.JobID;
 import org.apache.hadoop.mapred.TaskReport;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.tools.rumen.JobStory;
 import org.apache.hadoop.tools.rumen.JobStoryProducer;
@@ -110,18 +111,10 @@ public class TestGridmixSubmission {
       final JobClient client = new JobClient(
         GridmixTestUtils.mrCluster.createJobConf());
       for (Job job : succeeded) {
-        final String jobname = job.getJobName();
-        if (GenerateData.JOB_NAME.equals(jobname)) {
-          if (!job.getConfiguration().getBoolean(
-            GridmixJob.GRIDMIX_USE_QUEUE_IN_TRACE, true)) {
-            assertEquals(" Improper queue for " + job.getJobName(),
-                         job.getConfiguration().get("mapred.job.queue.name"), 
-                         "q1");
-          } else {
-            assertEquals(" Improper queue for " + job.getJobName(),
-                         job.getConfiguration().get("mapred.job.queue.name"), 
-                         "default");
-          }
+        final String jobName = job.getJobName();
+        Configuration conf = job.getConfiguration();
+        if (GenerateData.JOB_NAME.equals(jobName)) {
+          verifyQueue(conf, jobName);
           final Path in = new Path("foo").makeQualified(GridmixTestUtils.dfs);
           final Path out = new Path("/gridmix").makeQualified(GridmixTestUtils.dfs);
           final ContentSummary generated = GridmixTestUtils.dfs.getContentSummary(in);
@@ -131,29 +124,48 @@ public class TestGridmixSubmission {
           FileStatus[] outstat = GridmixTestUtils.dfs.listStatus(out);
           assertEquals("Mismatched job count", NJOBS, outstat.length);
           continue;
+        } else if (GenerateDistCacheData.JOB_NAME.equals(jobName)) {
+          verifyQueue(conf, jobName);
+          continue;
         }
         
-        if (!job.getConfiguration().getBoolean(
+        if (!conf.getBoolean(
           GridmixJob.GRIDMIX_USE_QUEUE_IN_TRACE, true)) {
-          assertEquals(" Improper queue for  " + job.getJobName() + " " ,
-          job.getConfiguration().get("mapred.job.queue.name"),"q1" );
+          assertEquals(" Improper queue for  " + jobName + " " ,
+              conf.get(MRJobConfig.QUEUE_NAME), "q1" );
         } else {
-          assertEquals(" Improper queue for  " + job.getJobName() + " ",
-                       job.getConfiguration().get("mapred.job.queue.name"), 
-                       sub.get(job.getConfiguration().get(GridmixJob.ORIGNAME))
-                          .getQueueName());
+          assertEquals(" Improper queue for  " + jobName + " ",
+              conf.get(MRJobConfig.QUEUE_NAME),
+              sub.get(conf.get(Gridmix.ORIGINAL_JOB_ID)).getQueueName());
         }
 
-        final JobStory spec =
-          sub.get(job.getConfiguration().get(GridmixJob.ORIGNAME));
-        assertNotNull("No spec for " + job.getJobName(), spec);
-        assertNotNull("No counters for " + job.getJobName(), job.getCounters());
-        final String specname = spec.getName();
+        final String originalJobId = conf.get(Gridmix.ORIGINAL_JOB_ID);
+        final JobStory spec = sub.get(originalJobId);
+        assertNotNull("No spec for " + jobName, spec);
+        assertNotNull("No counters for " + jobName, job.getCounters());
+        final String originalJobName = spec.getName();
+        System.out.println("originalJobName=" + originalJobName
+            + ";GridmixJobName=" + jobName + ";originalJobID=" + originalJobId);
+        assertTrue("Original job name is wrong.", originalJobName.equals(
+            conf.get(Gridmix.ORIGINAL_JOB_NAME)));
+
+        // Gridmix job seqNum contains 6 digits
+        int seqNumLength = 6;
+        String jobSeqNum = new DecimalFormat("000000").format(
+            conf.getInt(GridmixJob.GRIDMIX_JOB_SEQ, -1));
+        // Original job name is of the format MOCKJOB<6 digit sequence number>
+        // because MockJob jobNames are of this format.
+        assertTrue(originalJobName.substring(
+            originalJobName.length() - seqNumLength).equals(jobSeqNum));
+
+        assertTrue("Gridmix job name is not in the expected format.",
+            jobName.equals(
+            GridmixJob.JOB_NAME_PREFIX + jobSeqNum));
+
         final FileStatus stat = 
           GridmixTestUtils.dfs.getFileStatus(
-            new Path(GridmixTestUtils.DEST, 
-            "" + Integer.valueOf(specname.substring(specname.length() - 5))));
-        assertEquals("Wrong owner for " + job.getJobName(), spec.getUser(),
+            new Path(GridmixTestUtils.DEST, "" + Integer.valueOf(jobSeqNum)));
+        assertEquals("Wrong owner for " + jobName, spec.getUser(),
                      stat.getOwner());
 
         final int nMaps = spec.getNumberMaps();
@@ -162,7 +174,7 @@ public class TestGridmixSubmission {
         // TODO Blocked by MAPREDUCE-118
         if (true) return;
         // TODO
-        System.out.println(jobname + ": " + nMaps + "/" + nReds);
+        System.out.println(jobName + ": " + nMaps + "/" + nReds);
         final TaskReport[] mReports =
           client.getMapTaskReports(JobID.downgrade(job.getJobID()));
         assertEquals("Mismatched map count", nMaps, mReports.length);
@@ -174,6 +186,18 @@ public class TestGridmixSubmission {
         assertEquals("Mismatched reduce count", nReds, rReports.length);
         check(TaskType.REDUCE, job, spec, rReports,
             nMaps * SLOPBYTES, 2 * nMaps, 0, 0);
+      }
+    }
+
+    // Verify if correct job queue is used
+    private void verifyQueue(Configuration conf, String jobName) {
+      if (!conf.getBoolean(
+          GridmixJob.GRIDMIX_USE_QUEUE_IN_TRACE, true)) {
+        assertEquals(" Improper queue for " + jobName,
+            conf.get("mapred.job.queue.name"), "q1");
+      } else {
+        assertEquals(" Improper queue for " + jobName,
+            conf.get("mapred.job.queue.name"), "default");
       }
     }
 

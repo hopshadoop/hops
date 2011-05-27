@@ -146,7 +146,7 @@ public class DebugJobProducer implements JobStoryProducer {
       final long seed = r.nextLong();
       r.setSeed(seed);
       id = seq.getAndIncrement();
-      name = String.format("MOCKJOB%05d", id);
+      name = String.format("MOCKJOB%06d", id);
 
       this.conf = conf;
       LOG.info(name + " (" + seed + ")");

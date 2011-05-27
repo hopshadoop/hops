@@ -56,8 +56,8 @@
 	<li>Use GridMix with the job trace on the benchmark cluster.</li>
       </ol>
       <p>Jobs submitted by GridMix have names of the form
-      &quot;<code>GRIDMIXnnnnn</code>&quot;, where
-      &quot;<code>nnnnn</code>&quot; is a sequence number padded with leading
+      &quot;<code>GRIDMIXnnnnnn</code>&quot;, where
+      &quot;<code>nnnnnn</code>&quot; is a sequence number padded with leading
       zeroes.</p>
     </section>
     <section id="usage">
@@ -539,6 +539,36 @@ hadoop jar &lt;gridmix-jar&gt; org.apache.hadoop.mapred.gridmix.Gridmix \
     cache directory) doesn't have execute permission for others.</li>
     </ul>
   </section>
+
+    <section id="simulatedjobconf">
+      <title>Configuration of Simulated Jobs</title>
+      <p> Gridmix3 sets some configuration properties in the simulated Jobs
+      submitted by it so that they can be mapped back to the corresponding Job
+      in the input Job trace. These configuration parameters include:
+      </p>
+      <table>
+        <tr>
+          <th>Parameter</th>
+          <th>Description</th>
+        </tr>
+        <tr>
+          <td>
+            <code>gridmix.job.original-job-id</code>
+          </td>
+          <td> The job id of the original cluster's job corresponding to this
+          simulated job.
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <code>gridmix.job.original-job-name</code>
+          </td>
+          <td> The job name of the original cluster's job corresponding to this
+          simulated job.
+          </td>
+        </tr>
+      </table>
+    </section>
 
     <section id="assumptions">
       <title>Simplifying Assumptions</title>

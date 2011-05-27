@@ -54,16 +54,17 @@ import org.apache.commons.logging.LogFactory;
  */
 abstract class GridmixJob implements Callable<Job>, Delayed {
 
-  public static final String JOBNAME = "GRIDMIX";
-  public static final String ORIGNAME = "gridmix.job.name.original";
+  // Gridmix job name format is GRIDMIX<6 digit sequence number>
+  public static final String JOB_NAME_PREFIX = "GRIDMIX";
   public static final Log LOG = LogFactory.getLog(GridmixJob.class);
 
   private static final ThreadLocal<Formatter> nameFormat =
     new ThreadLocal<Formatter>() {
       @Override
       protected Formatter initialValue() {
-        final StringBuilder sb = new StringBuilder(JOBNAME.length() + 5);
-        sb.append(JOBNAME);
+        final StringBuilder sb =
+            new StringBuilder(JOB_NAME_PREFIX.length() + 6);
+        sb.append(JOB_NAME_PREFIX);
         return new Formatter(sb);
       }
     };
@@ -95,18 +96,21 @@ abstract class GridmixJob implements Callable<Job>, Delayed {
     this.jobdesc = jobdesc;
     this.seq = seq;
 
-    ((StringBuilder)nameFormat.get().out()).setLength(JOBNAME.length());
+    ((StringBuilder)nameFormat.get().out()).setLength(JOB_NAME_PREFIX.length());
     try {
       job = this.ugi.doAs(new PrivilegedExceptionAction<Job>() {
         public Job run() throws IOException {
-          Job ret = 
-            new Job(conf, 
-                    nameFormat.get().format("%05d", seq).toString());
-          ret.getConfiguration().setInt(GRIDMIX_JOB_SEQ, seq);
+
           String jobId = null == jobdesc.getJobID() 
                          ? "<unknown>" 
                          : jobdesc.getJobID().toString();
-          ret.getConfiguration().set(ORIGNAME, jobId);
+          Job ret = new Job(conf,
+                            nameFormat.get().format("%06d", seq).toString());
+          ret.getConfiguration().setInt(GRIDMIX_JOB_SEQ, seq);
+
+          ret.getConfiguration().set(Gridmix.ORIGINAL_JOB_ID, jobId);
+          ret.getConfiguration().set(Gridmix.ORIGINAL_JOB_NAME,
+                                     jobdesc.getName());
           if (conf.getBoolean(GRIDMIX_USE_QUEUE_IN_TRACE, false)) {
             setJobQueue(ret, jobdesc.getQueueName());
           } else {
