@@ -117,15 +117,24 @@ public class Gridmix extends Configured implements Tool {
   // Shutdown hook
   private final Shutdown sdh = new Shutdown();
 
+  // Get the input data directory for Gridmix. Input directory is 
+  // <io-path>/input
+  static Path getGridmixInputDataPath(Path ioPath) {
+    return new Path(ioPath, "input");
+  }
+  
   /**
-   * Write random bytes at the path &lt;ioPath&gt;/input/
+   * Write random bytes at the path &lt;inputDir&gt;.
    * @see org.apache.hadoop.mapred.gridmix.GenerateData
    */
-  protected void writeInputData(long genbytes, Path ioPath)
+  protected void writeInputData(long genbytes, Path inputDir)
       throws IOException, InterruptedException {
-    Path inputDir = new Path(ioPath, "input");
     final Configuration conf = getConf();
-    final GridmixJob genData = new GenerateData(conf, inputDir, genbytes);
+    
+    // configure the compression ratio if needed
+    CompressionEmulationUtil.setupDataGeneratorConfig(conf);
+    
+    final GenerateData genData = new GenerateData(conf, inputDir, genbytes);
     LOG.info("Generating " + StringUtils.humanReadableInt(genbytes) +
         " of test data...");
     launchGridmixJob(genData);
@@ -138,6 +147,8 @@ public class Gridmix extends Configured implements Tool {
       LOG.error("Couldnt change the file permissions " , e);
       throw new IOException(e);
     }
+    
+    LOG.info("Input data generation successful.");
   }
 
   /**
@@ -209,7 +220,7 @@ public class Gridmix extends Configured implements Tool {
       Path scratchDir, CountDownLatch startFlag, UserResolver userResolver)
       throws IOException {
     try {
-      Path inputDir = new Path(ioPath, "input");
+      Path inputDir = getGridmixInputDataPath(ioPath);
       GridmixJobSubmissionPolicy policy = GridmixJobSubmissionPolicy.getPolicy(
         conf, GridmixJobSubmissionPolicy.STRESS);
       LOG.info(" Submission policy is " + policy.name());
@@ -375,10 +386,17 @@ public class Gridmix extends Configured implements Tool {
         // Create, start job submission threads
         startThreads(conf, traceIn, ioPath, scratchDir, startFlag,
                      userResolver);
+        
+        Path inputDir = getGridmixInputDataPath(ioPath);
+        
         // Write input data if specified
         if (genbytes > 0) {
-          writeInputData(genbytes, ioPath);
+          writeInputData(genbytes, inputDir);
         }
+        
+        // publish the data statistics
+        GenerateData.publishDataStatistics(inputDir, genbytes, conf);
+        
         // scan input dir contents
         submitter.refreshFilePool();
 
@@ -660,3 +678,4 @@ public class Gridmix extends Configured implements Tool {
   }
 
 }
+

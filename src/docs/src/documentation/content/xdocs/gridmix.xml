@@ -518,7 +518,7 @@ hadoop jar &lt;gridmix-jar&gt; org.apache.hadoop.mapred.gridmix.Gridmix \
     </section>
 
   <section id="distributedcacheload">
-  <title>Emulation of Distributed Cache Load</title>
+  <title>Emulating Distributed Cache Load</title>
     <p>Gridmix emulates Distributed Cache load by default for LOADJOB type of
     jobs. This is done by precreating the needed Distributed Cache files for all
     the simulated jobs as part of a separate MapReduce job.</p>
@@ -570,6 +570,75 @@ hadoop jar &lt;gridmix-jar&gt; org.apache.hadoop.mapred.gridmix.Gridmix \
       </table>
     </section>
 
+  <section id="compression-emulation">
+      <title>Emulating Compression/Decompression</title>
+      <p>MapReduce supports data compression and decompression. 
+         Input to a MapReduce job can be compressed. Similarly, output of Map
+         and Reduce tasks can also be compressed. Compression/Decompression 
+         emulation in GridMix is important because emulating 
+         compression/decompression will effect the CPU and Memory usage of the 
+         task. A task emulating compression/decompression will affect other 
+         tasks and daemons running on the same node.
+       </p>
+       <p>Compression emulation is enabled if 
+         <code>gridmix.compression-emulation.enable</code> is set to
+         <code>true</code>. By default compression emulation is enabled for 
+         jobs of type <em>LOADJOB</em>. With compression emulation enabled, 
+         GridMix will now generate compressed text data with a constant 
+         compression ratio. Hence a simulated GridMix job will now emulate 
+         compression/decompression using compressible text data (having a 
+         constant compression ratio), irrespective of the compression ratio 
+         observed in the actual job.
+      </p>
+      <p>A typical MapReduce Job deals with data compression/decompression in 
+         the following phases </p>
+      <ul>
+        <li><code>Job input data decompression: </code> GridMix generates 
+            compressible input data when compression emulation is enabled. 
+            Based on the original job's configuration, a simulated GridMix job 
+            will use a decompressor to read the compressed input data. 
+            Currently, GridMix uses
+            <code>mapreduce.input.fileinputformat.inputdir</code> to determine 
+            if the original job used compressed input data or 
+            not. If the original job input files are uncompressed then the 
+            simulated job will read the compressed input file with using a 
+            decompressor. 
+        </li>
+        <li><code>Intermediate data compression and decompression: </code>
+            If the original job has map output compression enabled then GridMix 
+            too will enable map output compression for the simulated job. 
+            Accordingly, the reducers will use a decompressor to read the map 
+            output data.
+        </li>
+        <li><code>Job output data compression: </code>
+            If the original job's output is compressed then GridMix 
+            too will enable job output compression for the simulated job. 
+        </li>
+      </ul>
+       
+      <p>The following configuration parameters affect compression emulation
+      </p>
+      <table>
+        <tr>
+          <th>Parameter</th>
+          <th>Description</th>
+        </tr>
+        <tr>
+          <td>gridmix.compression-emulation.enable</td>
+          <td>Enables compression emulation in simulated GridMix jobs. 
+              Default is true.</td>
+        </tr>
+      </table>
+      
+      <p>With compression emulation turned on, GridMix will generate compressed
+         input data. Hence the total size of the input 
+         data will be lesser than the expected size. Set 
+         <code>gridmix.min.file.size</code> to a smaller value (roughly 10% of
+         <code>gridmix.gen.bytes.per.file</code>) for enabling GridMix to 
+         correctly emulate compression.
+      </p>
+    </section>
+
     <section id="assumptions">
       <title>Simplifying Assumptions</title>
       <p>GridMix will be developed in stages, incorporating feedback and
@@ -587,9 +656,8 @@ hadoop jar &lt;gridmix-jar&gt; org.apache.hadoop.mapred.gridmix.Gridmix \
 	sizes, namespace hierarchies, or any property of input, intermediate
 	or output data other than the bytes/records consumed and emitted from
 	a given task. This implies that some of the most heavily-used parts of
-	the system - the compression libraries, text processing, streaming,
-	etc. - cannot be meaningfully tested with the current
-	implementation.</li>
+	the system - text processing, streaming, etc. - cannot be meaningfully tested 
+	with the current implementation.</li>
 	<li><em>I/O Rates</em> - The rate at which records are
 	consumed/emitted is assumed to be limited only by the speed of the
 	reader/writer and constant throughout the task.</li>

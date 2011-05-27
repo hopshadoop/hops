@@ -458,7 +458,7 @@ class DistributedCacheEmulator {
 
     conf.setInt(GenerateDistCacheData.GRIDMIX_DISTCACHE_FILE_COUNT, fileCount);
     conf.setLong(GenerateDistCacheData.GRIDMIX_DISTCACHE_BYTE_COUNT, byteCount);
-    LOG.info("Number of HDFS based distributed cache files to be generated is"
+    LOG.info("Number of HDFS based distributed cache files to be generated is "
         + fileCount + ". Total size of HDFS based distributed cache files "
         + "to be generated is " + byteCount);
 

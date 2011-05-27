@@ -116,6 +116,11 @@ class GenerateDistCacheData extends GridmixJob {
     return job;
   }
 
+  @Override
+  protected boolean canEmulateCompression() {
+    return false;
+  }
+
   public static class GenDCDataMapper
       extends Mapper<LongWritable, BytesWritable, NullWritable, BytesWritable> {
 

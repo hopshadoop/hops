@@ -6,6 +6,8 @@ Trunk (unreleased changes)
 
   NEW FEATURES
 
+    MAPREDUCE-2408. [Gridmix] Compression emulation in Gridmix. (amarrk)
+
     MAPREDUCE-2473. Add "mapred groups" command to query the server-side groups
     resolved for a user. (Aaron T. Myers via todd)
 
