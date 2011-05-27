@@ -34,9 +34,7 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.protocol.FSConstants;
-import org.apache.hadoop.hdfs.protocol.LayoutVersion;
 import org.apache.hadoop.hdfs.protocol.FSConstants.SafeModeAction;
-import org.apache.hadoop.hdfs.protocol.LayoutVersion.Feature;
 import org.apache.hadoop.hdfs.server.common.HdfsConstants.NodeType;
 import org.apache.hadoop.hdfs.server.common.HdfsConstants.StartupOption;
 
@@ -50,6 +48,7 @@ import org.apache.hadoop.hdfs.server.datanode.BlockPoolSliceStorage;
 import org.apache.hadoop.hdfs.server.datanode.DataStorage;
 import org.apache.hadoop.hdfs.server.namenode.NNStorage;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
+import org.apache.hadoop.test.GenericTestUtils;
 
 /**
  * This class defines a number of static helper methods used by the
@@ -462,7 +461,7 @@ public class UpgradeUtilities {
   public static void createBlockPoolVersionFile(File bpDir,
       StorageInfo version, String bpid) throws IOException {
     // Create block pool version files
-    if (LayoutVersion.supports(Feature.FEDERATION, version.layoutVersion)) {
+    if (version.layoutVersion < Storage.LAST_PRE_FEDERATION_LAYOUT_VERSION) {
       File bpCurDir = new File(bpDir, Storage.STORAGE_DIR_CURRENT);
       BlockPoolSliceStorage bpStorage = new BlockPoolSliceStorage(version,
           bpid);

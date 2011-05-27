@@ -26,8 +26,6 @@ import java.util.Date;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo.AdminStates;
-import org.apache.hadoop.hdfs.protocol.LayoutVersion;
-import org.apache.hadoop.hdfs.protocol.LayoutVersion.Feature;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.server.namenode.FSImageSerialization;
 import org.apache.hadoop.hdfs.tools.offlineImageViewer.ImageVisitor.ImageElement;
@@ -157,7 +155,7 @@ class ImageLoaderCurrent implements ImageLoader {
 
       v.visit(ImageElement.GENERATION_STAMP, in.readLong());
 
-      if (LayoutVersion.supports(Feature.FSIMAGE_COMPRESSION, imageVersion)) {
+      if (imageVersion <= -25) {
         boolean isCompressed = in.readBoolean();
         v.visit(ImageElement.IS_COMPRESSED, imageVersion);
         if (isCompressed) {
@@ -177,7 +175,7 @@ class ImageLoaderCurrent implements ImageLoader {
 
       processINodesUC(in, v, skipBlocks);
 
-      if (LayoutVersion.supports(Feature.DELEGATION_TOKEN, imageVersion)) {
+      if (imageVersion <= -24) {
         processDelegationTokens(in, v);
       }
       
@@ -336,7 +334,7 @@ class ImageLoaderCurrent implements ImageLoader {
     v.visitEnclosingElement(ImageElement.INODES,
         ImageElement.NUM_INODES, numInodes);
     
-    if (LayoutVersion.supports(Feature.FSIMAGE_NAME_OPTIMIZATION, imageVersion)) {
+    if (imageVersion <= -30) { // local file name
       processLocalNameINodes(in, v, numInodes, skipBlocks);
     } else { // full path name
       processFullNameINodes(in, v, numInodes, skipBlocks);
@@ -398,6 +396,7 @@ class ImageLoaderCurrent implements ImageLoader {
     * @param v visitor
     * @param skipBlocks skip blocks or not
     * @param parentName the name of its parent node
+    * @return the number of Children
     * @throws IOException
     */
   private void processINode(DataInputStream in, ImageVisitor v,
@@ -414,7 +413,7 @@ class ImageLoaderCurrent implements ImageLoader {
     v.visit(ImageElement.INODE_PATH, pathName);
     v.visit(ImageElement.REPLICATION, in.readShort());
     v.visit(ImageElement.MODIFICATION_TIME, formatDate(in.readLong()));
-    if(LayoutVersion.supports(Feature.FILE_ACCESS_TIME, imageVersion))
+    if(imageVersion <= -17) // added in version -17
       v.visit(ImageElement.ACCESS_TIME, formatDate(in.readLong()));
     v.visit(ImageElement.BLOCK_SIZE, in.readLong());
     int numBlocks = in.readInt();
@@ -424,10 +423,10 @@ class ImageLoaderCurrent implements ImageLoader {
     // File or directory
     if (numBlocks > 0 || numBlocks == -1) {
       v.visit(ImageElement.NS_QUOTA, numBlocks == -1 ? in.readLong() : -1);
-      if (LayoutVersion.supports(Feature.DISKSPACE_QUOTA, imageVersion))
+      if(imageVersion <= -18) // added in version -18
         v.visit(ImageElement.DS_QUOTA, numBlocks == -1 ? in.readLong() : -1);
     }
-    if (numBlocks == -2) {
+    if (imageVersion <= -23 && numBlocks == -2) {
       v.visit(ImageElement.SYMLINK, Text.readString(in));
     }
 

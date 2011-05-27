@@ -40,8 +40,6 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.protocol.FSConstants;
-import org.apache.hadoop.hdfs.protocol.LayoutVersion;
-import org.apache.hadoop.hdfs.protocol.LayoutVersion.Feature;
 import org.apache.hadoop.hdfs.server.common.InconsistentFSStateException;
 import org.apache.hadoop.hdfs.server.common.Storage;
 import org.apache.hadoop.hdfs.server.common.Storage.StorageDirectory;
@@ -253,13 +251,12 @@ public class FSImage implements NNStorageListener, Closeable {
     if (!isFormatted && startOpt != StartupOption.ROLLBACK 
                      && startOpt != StartupOption.IMPORT)
       throw new IOException("NameNode is not formatted.");
-    int layoutVersion = storage.getLayoutVersion();
-    if (layoutVersion < Storage.LAST_PRE_UPGRADE_LAYOUT_VERSION) {
+    if (storage.getLayoutVersion() < Storage.LAST_PRE_UPGRADE_LAYOUT_VERSION) {
       NNStorage.checkVersionUpgradable(storage.getLayoutVersion());
     }
     if (startOpt != StartupOption.UPGRADE
-        && layoutVersion < Storage.LAST_PRE_UPGRADE_LAYOUT_VERSION
-        && layoutVersion != FSConstants.LAYOUT_VERSION) {
+        && storage.getLayoutVersion() < Storage.LAST_PRE_UPGRADE_LAYOUT_VERSION
+        && storage.getLayoutVersion() != FSConstants.LAYOUT_VERSION) {
       throw new IOException(
           "\nFile system image contains an old layout version " 
           + storage.getLayoutVersion() + ".\nAn upgrade to version "
@@ -268,12 +265,12 @@ public class FSImage implements NNStorageListener, Closeable {
     }
     
     // Upgrade to federation requires -upgrade -clusterid <clusterID> option
-    if (startOpt == StartupOption.UPGRADE && 
-        !LayoutVersion.supports(Feature.FEDERATION, layoutVersion)) {
+    if (startOpt == StartupOption.UPGRADE
+        && storage.getLayoutVersion() > Storage.LAST_PRE_FEDERATION_LAYOUT_VERSION) {
       if (startOpt.getClusterId() == null) {
         throw new IOException(
             "\nFile system image contains an old layout version "
-                + layoutVersion + ".\nAn upgrade to version "
+                + storage.getLayoutVersion() + ".\nAn upgrade to version "
                 + FSConstants.LAYOUT_VERSION
                 + " is required.\nPlease restart NameNode with "
                 + "-upgrade -clusterid <clusterID> option.");

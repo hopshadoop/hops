@@ -37,6 +37,7 @@ import java.net.URI;
 import java.net.UnknownHostException;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.security.NoSuchAlgorithmException;
 import java.security.PrivilegedExceptionAction;
 import java.security.SecureRandom;
 import java.util.AbstractList;
@@ -1432,11 +1433,11 @@ public class DataNode extends Configured
   }
   
   int getPort() {
-    return selfAddr == null ? -1 : selfAddr.getPort();
+    return selfAddr.getPort();
   }
   
   String getStorageId() {
-    return storage == null ? null : storage.getStorageID();
+    return storage.getStorageID();
   }
   
   /** 
@@ -1449,7 +1450,7 @@ public class DataNode extends Configured
   }
   
   public int getIpcPort() {
-    return ipcServer == null ? -1 : ipcServer.getListenerAddress().getPort();
+    return ipcServer.getListenerAddress().getPort();
   }
   
   /**

@@ -47,7 +47,8 @@ public class OfflineImageViewer {
     "saving the results in OUTPUTFILE.\n" +
     "\n" +
     "The oiv utility will attempt to parse correctly formed image files\n" +
-    "and will abort fail with mal-formed image files.\n" +
+    "and will abort fail with mal-formed image files. Currently the\n" +
+    "supports FSImage layout versions -16 through -23.\n" +
     "\n" +
     "The tool works offline and does not require a running cluster in\n" +
     "order to process an image file.\n" +

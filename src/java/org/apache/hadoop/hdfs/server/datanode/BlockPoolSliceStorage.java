@@ -30,8 +30,6 @@ import java.util.regex.Pattern;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.HardLink;
 import org.apache.hadoop.hdfs.protocol.FSConstants;
-import org.apache.hadoop.hdfs.protocol.LayoutVersion;
-import org.apache.hadoop.hdfs.protocol.LayoutVersion.Feature;
 import org.apache.hadoop.hdfs.server.common.InconsistentFSStateException;
 import org.apache.hadoop.hdfs.server.common.Storage;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
@@ -293,7 +291,7 @@ public class BlockPoolSliceStorage extends Storage {
    */
   void doUpgrade(StorageDirectory bpSd, NamespaceInfo nsInfo) throws IOException {
     // Upgrading is applicable only to release with federation or after
-    if (!LayoutVersion.supports(Feature.FEDERATION, layoutVersion)) {
+    if (!(this.getLayoutVersion() < LAST_PRE_FEDERATION_LAYOUT_VERSION)) {
       return;
     }
     LOG.info("Upgrading block pool storage directory " + bpSd.getRoot()
@@ -348,8 +346,8 @@ public class BlockPoolSliceStorage extends Storage {
    * @throws IOException if the directory is not empty or it can not be removed
    */
   private void cleanupDetachDir(File detachDir) throws IOException {
-    if (!LayoutVersion.supports(Feature.APPEND_RBW_DIR, layoutVersion)
-        && detachDir.exists() && detachDir.isDirectory()) {
+    if (layoutVersion >= PRE_RBW_LAYOUT_VERSION && detachDir.exists()
+        && detachDir.isDirectory()) {
 
       if (detachDir.list().length != 0) {
         throw new IOException("Detached directory " + detachDir
