@@ -878,6 +878,9 @@ Release 0.22.0 - Unreleased
 
     HDFS-1957. Add documentation for HFTP. (Ari Rabkin via todd)
 
+    HDFS-1954. Improve corrupt files warning message on NameNode web UI.
+    (Patrick Hunt via todd)
+
   OPTIMIZATIONS
 
     HDFS-1140. Speedup INode.getPathComponents. (Dmytro Molkov via shv)

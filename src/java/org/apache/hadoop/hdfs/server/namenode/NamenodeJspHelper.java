@@ -142,12 +142,29 @@ class NamenodeJspHelper {
         + "\n</table></div>";
   }
 
-  static String getWarningText(FSNamesystem fsn) {
-    // Ideally this should be displayed in RED
+  /**
+   * Generate warning text if there are corrupt files.
+   * @return a warning (incl. link to detail page) if files are corrupt,
+   * otherwise return an empty string.
+   */
+  static String getCorruptFilesWarning(FSNamesystem fsn) {
     long missingBlocks = fsn.getMissingBlocksCount();
     if (missingBlocks > 0) {
-      return "<br> WARNING :" + " There are " + missingBlocks
-          + " missing blocks. Please check the log or run fsck. <br><br>";
+      StringBuilder result = new StringBuilder();
+
+      // Warning class is typically displayed in RED
+      result.append("<br/><a class=\"warning\" href=\"/corrupt_files.jsp\" title=\"List corrupt files\">\n");
+      result.append("<b>WARNING : There are " + missingBlocks
+          + " missing blocks. Please check the log or run fsck.</b>");
+      result.append("</a>");
+
+      result.append("<br/><div class=\"small\">Hint: A common mis-configuration is not ");
+      result.append("overriding \"" + DFSConfigKeys.DFS_DATANODE_DATA_DIR_KEY
+          + "\" on all datanodes");
+      result.append("(the default is typically /tmp which is not persistent)</div>");
+      result.append("<br/><br/>\n");
+
+      return result.toString();
     }
     return "";
   }
