@@ -376,12 +376,8 @@ public class TestDFSStorageStateRecovery extends TestCase {
             cluster.startDataNodes(conf, 1, false, StartupOption.REGULAR, null);
             checkResultDataNode(baseDirs, curAfterRecover, prevAfterRecover);
           } else {
-            try {
-              cluster.startDataNodes(conf, 1, false, StartupOption.REGULAR, null);
-              assertFalse(cluster.getDataNodes().get(0).isDatanodeUp());
-            } catch (Exception expected) {
-              // expected
-            }
+            cluster.startDataNodes(conf, 1, false, StartupOption.REGULAR, null);
+            assertFalse(cluster.getDataNodes().get(0).isDatanodeUp());
           }
         }
         cluster.shutdown();
@@ -421,12 +417,8 @@ public class TestDFSStorageStateRecovery extends TestCase {
             cluster.startDataNodes(conf, 1, false, StartupOption.REGULAR, null);
             checkResultBlockPool(baseDirs, curAfterRecover, prevAfterRecover);
           } else {
-            try {
-              cluster.startDataNodes(conf, 1, false, StartupOption.REGULAR, null);
-              assertFalse(cluster.getDataNodes().get(0).isBPServiceAlive(bpid));
-            } catch (Exception expected) {
-              // expected
-            }
+            cluster.startDataNodes(conf, 1, false, StartupOption.REGULAR, null);
+            assertFalse(cluster.getDataNodes().get(0).isBPServiceAlive(bpid));
           }
         }
         cluster.shutdown();

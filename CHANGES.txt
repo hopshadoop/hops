@@ -456,6 +456,9 @@ Trunk (unreleased changes)
     HDFS-1812. TestHDFSCLI should clean up cluster in teardown method.
     (Uma Maheswara Rao G via todd)
 
+    HDFS-1884. Improve TestDFSStorageStateRecovery to properly throw in the
+    case of errors. (Aaron T. Myers via todd)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
