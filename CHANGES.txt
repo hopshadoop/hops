@@ -1087,6 +1087,9 @@ Release 0.22.0 - Unreleased
     HDFS-2000. Missing deprecation for io.bytes.per.checksum.
     (Aaron T. Myers vie eli)
 
+    HDFS-977. DataNode.createInterDataNodeProtocolProxy() guards a log
+    at the wrong level. (Harsh J Chouraria via todd)
+
 Release 0.21.1 - Unreleased
     HDFS-1466. TestFcHdfsSymlink relies on /tmp/test not existing. (eli)
 

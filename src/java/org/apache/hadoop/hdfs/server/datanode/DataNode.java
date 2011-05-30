@@ -1506,7 +1506,7 @@ public class DataNode extends Configured
     final InetSocketAddress addr = NetUtils.createSocketAddr(
         datanodeid.getHost() + ":" + datanodeid.getIpcPort());
     if (InterDatanodeProtocol.LOG.isDebugEnabled()) {
-      InterDatanodeProtocol.LOG.info("InterDatanodeProtocol addr=" + addr);
+      InterDatanodeProtocol.LOG.debug("InterDatanodeProtocol addr=" + addr);
     }
     UserGroupInformation loginUgi = UserGroupInformation.getLoginUser();
     try {
