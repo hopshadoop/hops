@@ -506,5 +506,40 @@ public class TestFsck extends TestCase {
       if (cluster != null) {cluster.shutdown();}
     }
   }
+  
+  /**
+   * Test for checking fsck command on illegal arguments should print the proper
+   * usage.
+   */
+  public void testToCheckTheFsckCommandOnIllegalArguments() throws Exception {
+    MiniDFSCluster cluster = null;
+    try {
+      // bring up a one-node cluster
+      Configuration conf = new HdfsConfiguration();
+      cluster = new MiniDFSCluster.Builder(conf).build();
+      String fileName = "/test.txt";
+      Path filePath = new Path(fileName);
+      FileSystem fs = cluster.getFileSystem();
 
+      // create a one-block file
+      DFSTestUtil.createFile(fs, filePath, 1L, (short) 1, 1L);
+      DFSTestUtil.waitReplication(fs, filePath, (short) 1);
+
+      // passing illegal option
+      String outStr = runFsck(conf, -1, true, fileName, "-thisIsNotAValidFlag");
+      System.out.println(outStr);
+      assertTrue(!outStr.contains(NamenodeFsck.HEALTHY_STATUS));
+
+      // passing multiple paths are arguments
+      outStr = runFsck(conf, -1, true, "/", fileName);
+      System.out.println(outStr);
+      assertTrue(!outStr.contains(NamenodeFsck.HEALTHY_STATUS));
+      // clean up file system
+      fs.delete(filePath, true);
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
 }

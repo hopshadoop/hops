@@ -250,13 +250,8 @@ public class DFSck extends Configured implements Tool {
     url.append(namenodeAddress);
     System.err.println("Connecting to namenode via " + url.toString());
     
-    url.append("/fsck?ugi=").append(ugi.getShortUserName()).append("&path=");
-    String dir = "/";
-    // find top-level dir first
-    for (int idx = 0; idx < args.length; idx++) {
-      if (!args[idx].startsWith("-")) { dir = args[idx]; break; }
-    }
-    url.append(URLEncoder.encode(dir, "UTF-8"));
+    url.append("/fsck?ugi=").append(ugi.getShortUserName());
+    String dir = null;
     boolean doListCorruptFileBlocks = false;
     for (int idx = 0; idx < args.length; idx++) {
       if (args[idx].equals("-move")) { url.append("&move=1"); }
@@ -269,8 +264,25 @@ public class DFSck extends Configured implements Tool {
       else if (args[idx].equals("-list-corruptfileblocks")) {
         url.append("&listcorruptfileblocks=1");
         doListCorruptFileBlocks = true;
+      } else if (!args[idx].startsWith("-")) {
+        if (null == dir) {
+          dir = args[idx];
+        } else {
+          System.err.println("fsck: can only operate on one path at a time '"
+              + args[idx] + "'");
+          printUsage();
+          return -1;
+        }
+      } else {
+        System.err.println("fsck: Illegal option '" + args[idx] + "'");
+        printUsage();
+        return -1;
       }
     }
+    if (null == dir) {
+      dir = "/";
+    }
+    url.append("&path=").append(URLEncoder.encode(dir, "UTF-8"));
     if (doListCorruptFileBlocks) {
       return listCorruptFileBlocks(dir, url.toString());
     }
