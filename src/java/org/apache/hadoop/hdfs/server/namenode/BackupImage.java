@@ -28,6 +28,8 @@ import java.util.zip.CheckedInputStream;
 import java.util.zip.Checksum;
 
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdfs.protocol.LayoutVersion;
+import org.apache.hadoop.hdfs.protocol.LayoutVersion.Feature;
 import org.apache.hadoop.hdfs.server.common.HdfsConstants;
 import org.apache.hadoop.hdfs.server.common.Storage.StorageDirectory;
 import org.apache.hadoop.hdfs.server.common.Storage.StorageState;
@@ -233,7 +235,7 @@ public class BackupImage extends FSImage {
           BufferedInputStream bin = new BufferedInputStream(backupInputStream);
           DataInputStream in = new DataInputStream(bin);
           Checksum checksum = null;
-          if (logVersion <= -28) { // support fsedits checksum
+          if (LayoutVersion.supports(Feature.EDITS_CHESKUM, logVersion)) {
             checksum = FSEditLog.getChecksum();
             in = new DataInputStream(new CheckedInputStream(bin, checksum));
           }
@@ -361,7 +363,7 @@ public class BackupImage extends FSImage {
       FSEditLogLoader logLoader = new FSEditLogLoader(namesystem);
       int logVersion = logLoader.readLogVersion(in);
       Checksum checksum = null;
-      if (logVersion <= -28) { // support fsedits checksum
+      if (LayoutVersion.supports(Feature.EDITS_CHESKUM, logVersion)) {
         checksum = FSEditLog.getChecksum();
         in = new DataInputStream(new CheckedInputStream(bin, checksum));
       }

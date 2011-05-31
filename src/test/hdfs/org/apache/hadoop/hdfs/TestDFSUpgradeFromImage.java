@@ -47,10 +47,13 @@ import org.apache.commons.logging.LogFactory;
  */
 public class TestDFSUpgradeFromImage extends TestCase {
   
-  private static final Log LOG = LogFactory.getLog(
-                    "org.apache.hadoop.hdfs.TestDFSUpgradeFromImage");
+  private static final Log LOG = LogFactory
+      .getLog(TestDFSUpgradeFromImage.class);
   private static File TEST_ROOT_DIR =
                       new File(MiniDFSCluster.getBaseDirectory());
+  private static final String HADOOP14_IMAGE = "hadoop-14-dfs-dir.tgz";
+  private static final String HADOOP_DFS_DIR_TXT = "hadoop-dfs-dir.txt";
+  private static final String HADOOP22_IMAGE = "hadoop-22-dfs-dir.tgz";
   
   public int numDataNodes = 4;
   
@@ -64,24 +67,26 @@ public class TestDFSUpgradeFromImage extends TestCase {
   
   boolean printChecksum = false;
   
-  protected void setUp() throws IOException {
-    unpackStorage();
+  public void unpackStorage() throws IOException {
+    unpackStorage(HADOOP14_IMAGE);
   }
 
-  public void unpackStorage() throws IOException {
-    String tarFile = System.getProperty("test.cache.data", "build/test/cache") +
-                     "/hadoop-14-dfs-dir.tgz";
+  private void unpackStorage(String tarFileName)
+      throws IOException {
+    String tarFile = System.getProperty("test.cache.data", "build/test/cache")
+        + "/" + tarFileName;
     String dataDir = System.getProperty("test.build.data", "build/test/data");
     File dfsDir = new File(dataDir, "dfs");
     if ( dfsDir.exists() && !FileUtil.fullyDelete(dfsDir) ) {
       throw new IOException("Could not delete dfs directory '" + dfsDir + "'");
     }
+    LOG.info("Unpacking " + tarFile);
     FileUtil.unTar(new File(tarFile), new File(dataDir));
     //Now read the reference info
     
-    BufferedReader reader = new BufferedReader( 
-                        new FileReader(System.getProperty("test.cache.data", "build/test/cache") +
-                                       "/hadoop-dfs-dir.txt"));
+    BufferedReader reader = new BufferedReader(new FileReader(
+        System.getProperty("test.cache.data", "build/test/cache")
+            + "/" + HADOOP_DFS_DIR_TXT));
     String line;
     while ( (line = reader.readLine()) != null ) {
       
@@ -177,7 +182,8 @@ public class TestDFSUpgradeFromImage extends TestCase {
     }
   }
   
-  public void testUpgradeFromImage() throws IOException {
+  public void testUpgradeFromRel14Image() throws IOException {
+    unpackStorage();
     MiniDFSCluster cluster = null;
     try {
       Configuration conf = new HdfsConfiguration();
@@ -246,8 +252,40 @@ public class TestDFSUpgradeFromImage extends TestCase {
         .build();
       fail("Was able to start NN from 0.3.0 image");
     } catch (IOException ioe) {
-      LOG.info("Got expected exception", ioe);
       assertTrue(ioe.toString().contains("Old layout version is 'too old'"));
+    }
+  }
+  
+  /**
+   * Test upgrade from 0.22 image
+   */
+  public void testUpgradeFromRel22Image() throws IOException {
+    unpackStorage(HADOOP22_IMAGE);
+    MiniDFSCluster cluster = null;
+    try {
+      Configuration conf = new HdfsConfiguration();
+      if (System.getProperty("test.build.data") == null) { // to allow test to be run outside of Ant
+        System.setProperty("test.build.data", "build/test/data");
+      }
+      conf.setInt(DFSConfigKeys.DFS_DATANODE_SCAN_PERIOD_HOURS_KEY, -1); // block scanning off
+      cluster = new MiniDFSCluster.Builder(conf)
+                                  .numDataNodes(numDataNodes)
+                                  .format(false)
+                                  .startupOption(StartupOption.UPGRADE)
+                                  .clusterId("testClusterId")
+                                  .build();
+      cluster.waitActive();
+      DistributedFileSystem dfs = (DistributedFileSystem)cluster.getFileSystem();
+      DFSClient dfsClient = dfs.dfs;
+      //Safemode will be off only after upgrade is complete. Wait for it.
+      while ( dfsClient.setSafeMode(FSConstants.SafeModeAction.SAFEMODE_GET) ) {
+        LOG.info("Waiting for SafeMode to be OFF.");
+        try {
+          Thread.sleep(1000);
+        } catch (InterruptedException ignored) {}
+      }
+    } finally {
+      if (cluster != null) { cluster.shutdown(); }
     }
   }
 }

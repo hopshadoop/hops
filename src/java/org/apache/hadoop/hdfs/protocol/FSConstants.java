@@ -84,11 +84,9 @@ public interface FSConstants {
    */
   public static final String HDFS_URI_SCHEME = "hdfs";
 
-  // Version is reflected in the dfs image and edit log files.
-  // Version is reflected in the data storage file.
-  // Versions are negative.
-  // Decrement LAYOUT_VERSION to define a new version.
-  public static final int LAYOUT_VERSION = -35;
-  // Current version: 
-  // -35: Adding support for block pools and multiple namenodes
+  /**
+   * Please see {@link LayoutVersion} on adding new layout version.
+   */
+  public static final int LAYOUT_VERSION = 
+    LayoutVersion.getCurrentLayoutVersion();
 }

@@ -434,6 +434,7 @@
     <delete dir="${test.cache.data}"/>
     <mkdir dir="${test.cache.data}"/>
     <copy file="${test.src.dir}/hdfs/org/apache/hadoop/hdfs/hadoop-14-dfs-dir.tgz" todir="${test.cache.data}"/>
+    <copy file="${test.src.dir}/hdfs/org/apache/hadoop/hdfs/hadoop-22-dfs-dir.tgz" todir="${test.cache.data}"/>
     <copy file="${test.src.dir}/hdfs/org/apache/hadoop/hdfs/hadoop-dfs-dir.txt" todir="${test.cache.data}"/>
     <copy file="${test.src.dir}/hdfs/org/apache/hadoop/cli/testHDFSConf.xml" todir="${test.cache.data}"/>
     <copy file="${test.src.dir}/hdfs/org/apache/hadoop/cli/clitest_data/data15bytes" todir="${test.cache.data}"/>

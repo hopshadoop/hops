@@ -40,6 +40,8 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.FSConstants;
+import org.apache.hadoop.hdfs.protocol.LayoutVersion;
+import org.apache.hadoop.hdfs.protocol.LayoutVersion.Feature;
 import org.apache.hadoop.hdfs.server.common.GenerationStamp;
 import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.io.Text;
@@ -169,7 +171,7 @@ class FSImageFormat {
 
         // read compression related info
         FSImageCompression compression;
-        if (imgVersion <= -25) {  // -25: 1st version providing compression option
+        if (LayoutVersion.supports(Feature.FSIMAGE_COMPRESSION, imgVersion)) {
           compression = FSImageCompression.readCompressionHeader(conf, in);
         } else {
           compression = FSImageCompression.createNoopCompression();
@@ -180,7 +182,8 @@ class FSImageFormat {
 
         // load all inodes
         LOG.info("Number of files = " + numFiles);
-        if (imgVersion <= -30) {
+        if (LayoutVersion.supports(Feature.FSIMAGE_NAME_OPTIMIZATION,
+            imgVersion)) {
           loadLocalNameINodes(numFiles, in);
         } else {
           loadFullNameINodes(numFiles, in);
@@ -229,7 +232,8 @@ class FSImageFormat {
    */  
    private void loadLocalNameINodes(long numFiles, DataInputStream in) 
    throws IOException {
-     assert imgVersion <= -30; // -30: store only local name in image
+     assert LayoutVersion.supports(Feature.FSIMAGE_NAME_OPTIMIZATION,
+         imgVersion);
      assert numFiles > 0;
 
      // load root
@@ -327,7 +331,7 @@ class FSImageFormat {
     short replication = in.readShort();
     replication = namesystem.adjustReplication(replication);
     modificationTime = in.readLong();
-    if (imgVersion <= -17) {
+    if (LayoutVersion.supports(Feature.FILE_ACCESS_TIME, imgVersion)) {
       atime = in.readLong();
     }
     if (imgVersion <= -8) {
@@ -366,17 +370,19 @@ class FSImageFormat {
     
     // get quota only when the node is a directory
     long nsQuota = -1L;
-    if (imgVersion <= -16 && blocks == null  && numBlocks == -1) {
+      if (LayoutVersion.supports(Feature.NAMESPACE_QUOTA, imgVersion)
+          && blocks == null && numBlocks == -1) {
         nsQuota = in.readLong();
       }
       long dsQuota = -1L;
-      if (imgVersion <= -18 && blocks == null && numBlocks == -1) {
+      if (LayoutVersion.supports(Feature.DISKSPACE_QUOTA, imgVersion)
+          && blocks == null && numBlocks == -1) {
         dsQuota = in.readLong();
       }
   
       // Read the symlink only when the node is a symlink
       String symlink = "";
-      if (imgVersion <= -23 && numBlocks == -2) {
+      if (numBlocks == -2) {
         symlink = Text.readString(in);
       }
       
@@ -431,7 +437,7 @@ class FSImageFormat {
     }
 
     private void loadSecretManagerState(DataInputStream in) throws IOException {
-      if (imgVersion > -23) {
+      if (!LayoutVersion.supports(Feature.DELEGATION_TOKEN, imgVersion)) {
         //SecretManagerState is not available.
         //This must not happen if security is turned on.
         return; 
@@ -441,7 +447,7 @@ class FSImageFormat {
 
 
     private long readNumFiles(DataInputStream in) throws IOException {
-      if (imgVersion <= -16) {
+      if (LayoutVersion.supports(Feature.NAMESPACE_QUOTA, imgVersion)) {
         return in.readLong();
       } else {
         return in.readInt();

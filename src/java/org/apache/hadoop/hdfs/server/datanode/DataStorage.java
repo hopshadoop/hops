@@ -43,6 +43,8 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.protocol.FSConstants;
+import org.apache.hadoop.hdfs.protocol.LayoutVersion;
+import org.apache.hadoop.hdfs.protocol.LayoutVersion.Feature;
 import org.apache.hadoop.hdfs.server.common.GenerationStamp;
 import org.apache.hadoop.hdfs.server.common.InconsistentFSStateException;
 import org.apache.hadoop.hdfs.server.common.Storage;
@@ -287,8 +289,8 @@ public class DataStorage extends Storage {
     props.setProperty("cTime", String.valueOf(cTime));
     props.setProperty("layoutVersion", String.valueOf(layoutVersion));
     props.setProperty("storageID", getStorageID());
-    // Set NamespaceID in version LAST_PRE_FEDERATION_LAYOUT_VERSION or before
-    if (layoutVersion >= LAST_PRE_FEDERATION_LAYOUT_VERSION) {
+    // Set NamespaceID in version before federation
+    if (!LayoutVersion.supports(Feature.FEDERATION, layoutVersion)) {
       props.setProperty("namespaceID", String.valueOf(namespaceID));
     }
   }
@@ -305,8 +307,8 @@ public class DataStorage extends Storage {
     setStorageType(props, sd);
     setClusterId(props, layoutVersion, sd);
     
-    // Read NamespaceID in version LAST_PRE_FEDERATION_LAYOUT_VERSION or before
-    if (layoutVersion >= LAST_PRE_FEDERATION_LAYOUT_VERSION) {
+    // Read NamespaceID in version before federation
+    if (!LayoutVersion.supports(Feature.FEDERATION, layoutVersion)) {
       setNamespaceID(props, sd);
     }
     
@@ -373,8 +375,10 @@ public class DataStorage extends Storage {
     assert this.layoutVersion >= FSConstants.LAYOUT_VERSION :
       "Future version is not allowed";
     
+    boolean federationSupported = 
+      LayoutVersion.supports(Feature.FEDERATION, layoutVersion);
     // For pre-federation version - validate the namespaceID
-    if (layoutVersion >= Storage.LAST_PRE_FEDERATION_LAYOUT_VERSION &&
+    if (!federationSupported &&
         getNamespaceID() != nsInfo.getNamespaceID()) {
       throw new IOException("Incompatible namespaceIDs in "
           + sd.getRoot().getCanonicalPath() + ": namenode namespaceID = "
@@ -382,8 +386,8 @@ public class DataStorage extends Storage {
           + getNamespaceID());
     }
     
-    // For post federation version, validate clusterID
-    if (layoutVersion < Storage.LAST_PRE_FEDERATION_LAYOUT_VERSION
+    // For version that supports federation, validate clusterID
+    if (federationSupported
         && !getClusterID().equals(nsInfo.getClusterID())) {
       throw new IOException("Incompatible clusterIDs in "
           + sd.getRoot().getCanonicalPath() + ": namenode clusterID = "
@@ -435,7 +439,7 @@ public class DataStorage extends Storage {
    * @throws IOException on error
    */
   void doUpgrade(StorageDirectory sd, NamespaceInfo nsInfo) throws IOException {
-    if (layoutVersion < Storage.LAST_PRE_FEDERATION_LAYOUT_VERSION) {
+    if (LayoutVersion.supports(Feature.FEDERATION, layoutVersion)) {
       clusterID = nsInfo.getClusterID();
       layoutVersion = nsInfo.getLayoutVersion();
       sd.write();
@@ -493,7 +497,7 @@ public class DataStorage extends Storage {
    * @throws IOException if the directory is not empty or it can not be removed
    */
   private void cleanupDetachDir(File detachDir) throws IOException {
-    if (layoutVersion >= PRE_RBW_LAYOUT_VERSION &&
+    if (!LayoutVersion.supports(Feature.APPEND_RBW_DIR, layoutVersion) &&
         detachDir.exists() && detachDir.isDirectory() ) {
       
         if (detachDir.list().length != 0 ) {
@@ -626,7 +630,7 @@ public class DataStorage extends Storage {
     HardLink hardLink = new HardLink();
     // do the link
     int diskLayoutVersion = this.getLayoutVersion();
-    if (diskLayoutVersion < PRE_RBW_LAYOUT_VERSION) { // RBW version
+    if (LayoutVersion.supports(Feature.APPEND_RBW_DIR, diskLayoutVersion)) {
       // hardlink finalized blocks in tmpDir/finalized
       linkBlocks(new File(fromDir, STORAGE_DIR_FINALIZED), 
           new File(toDir, STORAGE_DIR_FINALIZED), diskLayoutVersion, hardLink);

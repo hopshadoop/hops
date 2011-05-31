@@ -644,6 +644,9 @@ Trunk (unreleased changes)
     HDFS-1920. libhdfs does not build for ARM processors.
     (Trevor Robinson via eli)
 
+    HDFS-1936. Layout version change from HDFS-1822 causes upgrade failure.
+    (suresh)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES
