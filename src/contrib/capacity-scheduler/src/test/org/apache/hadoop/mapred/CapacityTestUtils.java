@@ -37,6 +37,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.BytesWritable;
+import org.apache.hadoop.mapreduce.Cluster.JobTrackerStatus;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.QueueState;
 import static org.apache.hadoop.mapred.QueueManager.toFullPropertyName;
@@ -670,7 +671,7 @@ public class CapacityTestUtils {
         ttExpiryInterval, maps, reduces,
         numTrackers * maxMapTasksPerTracker,
         numTrackers * maxReduceTasksPerTracker,
-        JobTracker.State.RUNNING);
+        JobTrackerStatus.RUNNING);
     }
 
     public int getNumberOfUniqueHosts() {

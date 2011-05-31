@@ -41,6 +41,7 @@ import org.apache.hadoop.mapred.FakeObjectUtilities.FakeJobInProgress;
 import org.apache.hadoop.mapred.FakeObjectUtilities.FakeJobTracker;
 import org.apache.hadoop.mapred.TaskStatus.Phase;
 import org.apache.hadoop.mapred.UtilsForTests.FakeClock;
+import org.apache.hadoop.mapreduce.Cluster.JobTrackerStatus;
 import org.apache.hadoop.mapreduce.JobCounter;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
@@ -317,7 +318,7 @@ public class TestJobInProgress extends TestCase {
     verify(jspy, times(4)).setFirstTaskLaunchTime(any(TaskInProgress.class));
 
     ClusterStatus cspy = spy(new ClusterStatus(4, 0, 0, 0, 0, 4, 4,
-                                               JobTracker.State.RUNNING, 0));
+        JobTrackerStatus.RUNNING, 0));
 
     JobInProgress.JobSummary.logJobSummary(jspy, cspy);
 

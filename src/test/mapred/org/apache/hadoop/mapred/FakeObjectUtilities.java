@@ -29,6 +29,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.TaskStatus.Phase;
+import org.apache.hadoop.mapreduce.Cluster.JobTrackerStatus;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.jobhistory.HistoryEvent;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistory;
@@ -66,7 +67,7 @@ public class FakeObjectUtilities {
       return new ClusterStatus(
           taskTrackers().size() - getBlacklistedTrackerCount(),
           getBlacklistedTrackerCount(), 0, 0, 0, totalSlots/2, totalSlots/2, 
-           JobTracker.State.RUNNING, 0);
+           JobTrackerStatus.RUNNING, 0);
     }
 
     public void setNumSlots(int totalSlots) {

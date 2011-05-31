@@ -4,6 +4,9 @@ Trunk (unreleased changes)
 
   INCOMPATIBLE CHANGES
 
+    MAPREDUCE-2455. Remove deprecated JobTracker.State in favour of
+    JobTrackerStatus. (tomwhite)
+
   NEW FEATURES
 
     MAPREDUCE-2408. [Gridmix] Compression emulation in Gridmix. (amarrk)

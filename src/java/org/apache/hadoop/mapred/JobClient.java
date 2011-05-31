@@ -686,7 +686,7 @@ public class JobClient extends CLI {
         metrics.getOccupiedMapSlots(),
         metrics.getOccupiedReduceSlots(), metrics.getMapSlotCapacity(),
         metrics.getReduceSlotCapacity(),
-        JobTracker.State.valueOf(cluster.getJobTrackerState().name()),
+        cluster.getJobTrackerStatus(),
         metrics.getDecommissionedTaskTrackerCount());
     } catch (InterruptedException ie) {
       throw new IOException(ie);
@@ -730,7 +730,7 @@ public class JobClient extends CLI {
         cluster.getTaskTrackerExpiryInterval(), metrics.getOccupiedMapSlots(),
         metrics.getOccupiedReduceSlots(), metrics.getMapSlotCapacity(),
         metrics.getReduceSlotCapacity(), 
-        JobTracker.State.valueOf(cluster.getJobTrackerState().name()));
+        cluster.getJobTrackerStatus());
     } catch (InterruptedException ie) {
       throw new IOException(ie);
     }

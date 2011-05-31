@@ -49,7 +49,7 @@
     <tracker_name><jsp:expression>trackerName</jsp:expression></tracker_name>
 
     <tracker>
-      <state><jsp:expression>tracker.getClusterStatus().getJobTrackerState()</jsp:expression></state>
+      <state><jsp:expression>tracker.getClusterStatus().getJobTrackerStatus()</jsp:expression></state>
       <started><jsp:expression>new Date(tracker.getStartTime())</jsp:expression></started>
       <version><jsp:expression>VersionInfo.getVersion()</jsp:expression></version>
       <revision><jsp:expression>VersionInfo.getRevision()</jsp:expression></revision>

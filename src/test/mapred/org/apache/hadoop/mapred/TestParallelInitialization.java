@@ -30,6 +30,7 @@ import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.mapred.FakeObjectUtilities.FakeJobHistory;
 import org.apache.hadoop.mapred.JobInProgress.KillInterruptedException;
 import org.apache.hadoop.mapred.JobStatusChangeEvent.EventType;
+import org.apache.hadoop.mapreduce.Cluster.JobTrackerStatus;
 import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 
 public class TestParallelInitialization extends TestCase {
@@ -107,7 +108,7 @@ public class TestParallelInitialization extends TestCase {
                                maps, reduces,
                                numTrackers * maxMapTasksPerTracker,
                                numTrackers * maxReduceTasksPerTracker,
-                               JobTracker.State.RUNNING);
+                               JobTrackerStatus.RUNNING);
     }
     
     public int getNumberOfUniqueHosts() {

@@ -3255,7 +3255,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
             totalReduces,
             totalMapTaskCapacity,
             totalReduceTaskCapacity, 
-            state, getExcludedNodes().size()
+            JobTrackerStatus.valueOf(state.name()), getExcludedNodes().size()
             );
       } else {
         return new ClusterStatus(taskTrackers.size() - 
@@ -3266,7 +3266,7 @@ public class JobTracker implements MRConstants, InterTrackerProtocol,
             totalReduces,
             totalMapTaskCapacity,
             totalReduceTaskCapacity, 
-            state, getExcludedNodes().size());          
+            JobTrackerStatus.valueOf(state.name()), getExcludedNodes().size());
       }
     }
   }

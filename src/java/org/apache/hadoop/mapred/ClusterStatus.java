@@ -185,7 +185,7 @@ public class ClusterStatus implements Writable {
   private int reduce_tasks;
   private int max_map_tasks;
   private int max_reduce_tasks;
-  private JobTracker.State state;
+  private JobTrackerStatus status;
   private Collection<BlackListInfo> blacklistedTrackersInfo =
     new ArrayList<BlackListInfo>();
 
@@ -201,13 +201,13 @@ public class ClusterStatus implements Writable {
    * @param reduces no. of currently running reduce-tasks in the cluster
    * @param maxMaps the maximum no. of map tasks in the cluster
    * @param maxReduces the maximum no. of reduce tasks in the cluster
-   * @param state the {@link JobTracker.State} of the <code>JobTracker</code>
+   * @param status the {@link JobTrackerStatus} of the <code>JobTracker</code>
    */
   ClusterStatus(int trackers, int blacklists, long ttExpiryInterval, 
                 int maps, int reduces,
-                int maxMaps, int maxReduces, JobTracker.State state) {
+                int maxMaps, int maxReduces, JobTrackerStatus status) {
     this(trackers, blacklists, ttExpiryInterval, maps, reduces, maxMaps, 
-         maxReduces, state, 0);
+         maxReduces, status, 0);
   }
 
   /**
@@ -220,12 +220,12 @@ public class ClusterStatus implements Writable {
    * @param reduces no. of currently running reduce-tasks in the cluster
    * @param maxMaps the maximum no. of map tasks in the cluster
    * @param maxReduces the maximum no. of reduce tasks in the cluster
-   * @param state the {@link JobTracker.State} of the <code>JobTracker</code>
+   * @param status the {@link JobTrackerStatus} of the <code>JobTracker</code>
    * @param numDecommissionedNodes number of decommission trackers
    */
   ClusterStatus(int trackers, int blacklists, long ttExpiryInterval, 
                 int maps, int reduces, int maxMaps, int maxReduces, 
-                JobTracker.State state, int numDecommissionedNodes) {
+                JobTrackerStatus status, int numDecommissionedNodes) {
     numActiveTrackers = trackers;
     numBlacklistedTrackers = blacklists;
     this.numExcludedNodes = numDecommissionedNodes;
@@ -234,7 +234,7 @@ public class ClusterStatus implements Writable {
     reduce_tasks = reduces;
     max_map_tasks = maxMaps;
     max_reduce_tasks = maxReduces;
-    this.state = state;
+    this.status = status;
   }
 
   /**
@@ -247,15 +247,15 @@ public class ClusterStatus implements Writable {
    * @param reduces no. of currently running reduce-tasks in the cluster
    * @param maxMaps the maximum no. of map tasks in the cluster
    * @param maxReduces the maximum no. of reduce tasks in the cluster
-   * @param state the {@link JobTracker.State} of the <code>JobTracker</code>
+   * @param status the {@link JobTrackerStatus} of the <code>JobTracker</code>
    */
   ClusterStatus(Collection<String> activeTrackers, 
       Collection<BlackListInfo> blacklistedTrackers,
       long ttExpiryInterval,
       int maps, int reduces, int maxMaps, int maxReduces, 
-      JobTracker.State state) {
+      JobTrackerStatus status) {
     this(activeTrackers, blacklistedTrackers, ttExpiryInterval, maps, reduces, 
-         maxMaps, maxReduces, state, 0);
+         maxMaps, maxReduces, status, 0);
   }
 
 
@@ -270,16 +270,16 @@ public class ClusterStatus implements Writable {
    * @param reduces no. of currently running reduce-tasks in the cluster
    * @param maxMaps the maximum no. of map tasks in the cluster
    * @param maxReduces the maximum no. of reduce tasks in the cluster
-   * @param state the {@link JobTracker.State} of the <code>JobTracker</code>
+   * @param status the {@link JobTrackerStatus} of the <code>JobTracker</code>
    * @param numDecommissionNodes number of decommission trackers
    */
   
   ClusterStatus(Collection<String> activeTrackers,
       Collection<BlackListInfo> blackListedTrackerInfo, long ttExpiryInterval,
       int maps, int reduces, int maxMaps, int maxReduces,
-      JobTracker.State state, int numDecommissionNodes) {
+      JobTrackerStatus status, int numDecommissionNodes) {
     this(activeTrackers.size(), blackListedTrackerInfo.size(),
-        ttExpiryInterval, maps, reduces, maxMaps, maxReduces, state,
+        ttExpiryInterval, maps, reduces, maxMaps, maxReduces, status,
         numDecommissionNodes);
     this.activeTrackers = activeTrackers;
     this.blacklistedTrackersInfo = blackListedTrackerInfo;
@@ -378,24 +378,12 @@ public class ClusterStatus implements Writable {
   }
   
   /**
-   * Get the current state of the <code>JobTracker</code>, 
-   * as {@link JobTracker.State}
-   * 
-   * @return the current state of the <code>JobTracker</code>.
-   * @deprecated Use {@link #getJobTrackerStatus()} instead.
-   */
-  @Deprecated
-  public JobTracker.State getJobTrackerState() {
-    return state;
-  }
-  
-  /**
    * Get the JobTracker's status.
    * 
    * @return {@link JobTrackerStatus} of the JobTracker
    */
   public JobTrackerStatus getJobTrackerStatus() {
-    return JobTrackerStatus.valueOf(state.name());
+    return status;
   }
 
   /**
@@ -435,7 +423,7 @@ public class ClusterStatus implements Writable {
     out.writeInt(reduce_tasks);
     out.writeInt(max_map_tasks);
     out.writeInt(max_reduce_tasks);
-    WritableUtils.writeEnum(out, state);
+    WritableUtils.writeEnum(out, status);
   }
 
   public void readFields(DataInput in) throws IOException {
@@ -462,6 +450,6 @@ public class ClusterStatus implements Writable {
     reduce_tasks = in.readInt();
     max_map_tasks = in.readInt();
     max_reduce_tasks = in.readInt();
-    state = WritableUtils.readEnum(in, JobTracker.State.class);
+    status = WritableUtils.readEnum(in, JobTrackerStatus.class);
   }
 }

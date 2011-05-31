@@ -38,6 +38,7 @@ import junit.framework.TestCase;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.mapred.FairScheduler.JobInfo;
+import org.apache.hadoop.mapreduce.Cluster.JobTrackerStatus;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapred.FakeObjectUtilities.FakeJobHistory;
 import org.apache.hadoop.mapred.JobInProgress.KillInterruptedException;
@@ -374,7 +375,7 @@ public class TestFairScheduler extends TestCase {
           ttExpiryInterval, maps, reduces,
           numTrackers * maxMapTasksPerTracker,
           numTrackers * maxReduceTasksPerTracker,
-          JobTracker.State.RUNNING);
+          JobTrackerStatus.RUNNING);
     }
 
     @Override
