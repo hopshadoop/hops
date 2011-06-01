@@ -287,6 +287,9 @@ Trunk (unreleased changes)
 
   IMPROVEMENTS
 
+    HDFS-1934. Fix NullPointerException when certain File APIs return null
+    (Bharath Mundlapudi via mattf)
+
     HDFS-1510. Added test-patch.properties required by test-patch.sh (nigel)
 
     HDFS-1628. Display full path in AccessControlException.  (John George

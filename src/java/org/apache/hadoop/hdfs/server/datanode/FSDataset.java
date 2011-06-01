@@ -99,7 +99,7 @@ public class FSDataset implements FSConstants, FSDatasetInterface {
                                 dir.toString());
         }
       } else {
-        File[] files = dir.listFiles();
+        File[] files = FileUtil.listFiles(dir); 
         int numChildren = 0;
         for (int idx = 0; idx < files.length; idx++) {
           if (files[idx].isDirectory()) {
@@ -187,7 +187,7 @@ public class FSDataset implements FSConstants, FSDatasetInterface {
      * original file name; otherwise the tmp file is deleted.
      */
     private void recoverTempUnlinkedBlock() throws IOException {
-      File files[] = dir.listFiles();
+      File files[] = FileUtil.listFiles(dir);
       for (File file : files) {
         if (!FSDataset.isUnlinkTmpFile(file)) {
           continue;
@@ -420,9 +420,9 @@ public class FSDataset implements FSConstants, FSDatasetInterface {
      * @param isFinalized true if the directory has finalized replicas;
      *                    false if the directory has rbw replicas
      */
-    private void addToReplicasMap(ReplicasMap volumeMap, 
-        File dir, boolean isFinalized) {
-      File blockFiles[] = dir.listFiles();
+    private void addToReplicasMap(ReplicasMap volumeMap, File dir,
+        boolean isFinalized) throws IOException {
+      File blockFiles[] = FileUtil.listFiles(dir);
       for (File blockFile : blockFiles) {
         if (!Block.isBlockFilename(blockFile))
           continue;
@@ -756,7 +756,7 @@ public class FSDataset implements FSConstants, FSDatasetInterface {
           throw new IOException("Failed to delete " + finalizedDir);
         }
         FileUtil.fullyDelete(tmpDir);
-        for (File f : bpCurrentDir.listFiles()) {
+        for (File f : FileUtil.listFiles(bpCurrentDir)) {
           if (!f.delete()) {
             throw new IOException("Failed to delete " + f);
           }
@@ -764,7 +764,7 @@ public class FSDataset implements FSConstants, FSDatasetInterface {
         if (!bpCurrentDir.delete()) {
           throw new IOException("Failed to delete " + bpCurrentDir);
         }
-        for (File f : bpDir.listFiles()) {
+        for (File f : FileUtil.listFiles(bpDir)) {
           if (!f.delete()) {
             throw new IOException("Failed to delete " + f);
           }
