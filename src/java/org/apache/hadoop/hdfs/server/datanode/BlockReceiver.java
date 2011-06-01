@@ -1009,6 +1009,10 @@ class BlockReceiver implements Closeable, FSConstants {
             }
             PipelineAck replyAck = new PipelineAck(expected, replies);
             
+            if (replyAck.isSuccess() && 
+                 pkt.offsetInBlock > replicaInfo.getBytesAcked())
+                replicaInfo.setBytesAcked(pkt.offsetInBlock);
+
             // send my ack back to upstream datanode
             replyAck.write(upstreamOut);
             upstreamOut.flush();
@@ -1019,10 +1023,6 @@ class BlockReceiver implements Closeable, FSConstants {
               // remove the packet from the ack queue
               removeAckHead();
               // update bytes acked
-              if (replyAck.isSuccess() && 
-                  pkt.offsetInBlock > replicaInfo.getBytesAcked()) {
-                replicaInfo.setBytesAcked(pkt.offsetInBlock);
-              }
             }
         } catch (IOException e) {
           LOG.warn("IOException in BlockReceiver.run(): ", e);

@@ -42,8 +42,8 @@ import org.junit.Test;
 public class TestWriteRead {
   
   // junit test settings
-  private static final int WR_NTIMES = 4;
-  private static final int WR_CHUNK_SIZE = 1000;
+  private static final int WR_NTIMES = 350;
+  private static final int WR_CHUNK_SIZE = 10000;
 
   
   private static final int BUFFER_SIZE = 8192  * 100;

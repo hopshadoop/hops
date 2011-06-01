@@ -653,6 +653,9 @@ Trunk (unreleased changes)
     HDFS-1936. Layout version change from HDFS-1822 causes upgrade failure.
     (suresh)
 
+    HDFS-2021. Update numBytesAcked before sending the ack in PacketResponder.
+    (John George via szetszwo)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES
