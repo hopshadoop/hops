@@ -100,6 +100,30 @@ public class GridMixConfig {
       "gridmix.distributed-cache-emulation.enable";
 
   /**
+   * Gridmix input decompression enable.
+   */
+  public static final String GRIDMIX_INPUT_DECOMPRESS_ENABLE = 
+    "gridmix.compression-emulation.input-decompression.enable";
+
+  /**
+   * Gridmix input compression ratio.
+   */
+  public static final String GRIDMIX_INPUT_COMPRESS_RATIO = 
+    "gridmix.compression-emulation.map-input.decompression-ratio";
+
+  /**
+   * Gridmix intermediate compression ratio.
+   */
+  public static final String GRIDMIX_INTERMEDIATE_COMPRESSION_RATIO = 
+    "gridmix.compression-emulation.map-output.compression-ratio";
+
+  /**
+   * Gridmix output compression ratio.
+   */
+  public static final String GRIDMIX_OUTPUT_COMPRESSION_RATIO = 
+      "gridmix.compression-emulation.reduce-output.compression-ratio";
+
+  /**
    *  Gridmix logger mode.
    */
   public static final String GRIDMIX_LOG_MODE =

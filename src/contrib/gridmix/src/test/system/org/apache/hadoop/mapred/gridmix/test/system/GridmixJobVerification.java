@@ -37,6 +37,8 @@ import org.apache.hadoop.mapreduce.CounterGroup;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser;
 import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.TaskType;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.test.system.JTClient;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.tools.rumen.LoggedJob;
@@ -61,6 +63,17 @@ public class GridmixJobVerification {
   static final String jobTypeKey = GridMixConfig.GRIDMIX_JOB_TYPE;
   static final String mapTaskKey = GridMixConfig.GRIDMIX_SLEEPJOB_MAPTASK_ONLY;
   static final String usrResolver = GridMixConfig.GRIDMIX_USER_RESOLVER;
+  static final String fileOutputFormatKey = FileOutputFormat.COMPRESS;
+  static final String fileInputFormatKey = FileInputFormat.INPUT_DIR;
+  static final String compEmulKey = GridMixConfig.GRIDMIX_COMPRESSION_ENABLE;
+  static final String inputDecompKey = 
+      GridMixConfig.GRIDMIX_INPUT_DECOMPRESS_ENABLE;
+  static final String mapInputCompRatio = 
+      GridMixConfig.GRIDMIX_INPUT_COMPRESS_RATIO;
+  static final String mapOutputCompRatio = 
+      GridMixConfig.GRIDMIX_INTERMEDIATE_COMPRESSION_RATIO;
+  static final String reduceOutputCompRatio = 
+      GridMixConfig.GRIDMIX_OUTPUT_COMPRESSION_RATIO;
 
   /**
    * Gridmix job verification constructor
@@ -118,6 +131,8 @@ public class GridmixJobVerification {
       verifySimulatedJobSummary(zombieJob, jhInfo, simuJobConf);
       verifyJobMapCounters(counters, mapJobCounters, simuJobConf);
       verifyJobReduceCounters(counters, reduceJobCounters, simuJobConf); 
+      verifyCompressionEmulation(zombieJob.getJobConf(), simuJobConf, counters, 
+                                 reduceJobCounters, mapJobCounters);
       LOG.info("Done.");
     }
   }
@@ -327,6 +342,159 @@ public class GridmixJobVerification {
    */
   public String getJobUserResolver() {
     return userResolverVal;
+  }
+
+  /**
+   * It verifies the compression ratios of mapreduce jobs.
+   * @param origJobConf - original job configuration.
+   * @param simuJobConf - simulated job configuration.
+   * @param counters  - simulated job counters.
+   * @param origReduceCounters - original job reduce counters.
+   * @param origMapCounters - original job map counters.
+   * @throws ParseException - if a parser error occurs.
+   * @throws IOException - if an I/O error occurs.
+   */
+  public void verifyCompressionEmulation(JobConf origJobConf, 
+                                         JobConf simuJobConf,Counters counters, 
+                                         Map<String, Long> origReduceCounters, 
+                                         Map<String, Long> origMapJobCounters) 
+                                         throws ParseException,IOException { 
+    if (simuJobConf.getBoolean(compEmulKey, false)) {
+      String inputDir = origJobConf.get(fileInputFormatKey);
+      Assert.assertNotNull(fileInputFormatKey + " is Null",inputDir);
+      // Verify input compression whether it's enable or not.
+      if (inputDir.contains(".gz") || inputDir.contains(".tgz") 
+         || inputDir.contains(".bz")) { 
+        Assert.assertTrue("Input decompression attribute has been not set for " 
+                         + "for compressed input",
+                         simuJobConf.getBoolean(inputDecompKey, false));
+
+        float INPUT_COMP_RATIO = 
+            getExpectedCompressionRatio(simuJobConf, mapInputCompRatio);
+        float INTERMEDIATE_COMP_RATIO = 
+            getExpectedCompressionRatio(simuJobConf, mapOutputCompRatio);
+
+        // Verify Map Input Compression Ratio.
+        long simMapInputBytes = getCounterValue(counters, "HDFS_BYTES_READ");
+        long uncompressedInputSize = origMapJobCounters.get("MAP_INPUT_BYTES"); 
+        assertMapInputCompressionRatio(simMapInputBytes, uncompressedInputSize, 
+                                       INPUT_COMP_RATIO);
+
+        // Verify Map Output Compression Ratio.
+        long simReduceInputBytes = 
+            getCounterValue(counters, "REDUCE_SHUFFLE_BYTES");
+        long simMapOutputBytes = getCounterValue(counters, "MAP_OUTPUT_BYTES");
+        assertMapOuputCompressionRatio(simReduceInputBytes, simMapOutputBytes, 
+                                       INTERMEDIATE_COMP_RATIO);
+      } else {
+        Assert.assertFalse("Input decompression attribute has been enabled " 
+                          + "for uncompressed input. ", 
+                          Boolean.valueOf(
+                          simuJobConf.getBoolean(inputDecompKey, false)));
+      }
+
+      Assert.assertEquals("Simulated job output format has not matched with " 
+                         + "original job output format.",
+                         origJobConf.getBoolean(fileOutputFormatKey,false), 
+                         simuJobConf.getBoolean(fileOutputFormatKey,false));
+
+      if (simuJobConf.getBoolean(fileOutputFormatKey,false)) { 
+        float OUTPUT_COMP_RATIO = 
+            getExpectedCompressionRatio(simuJobConf, reduceOutputCompRatio);
+
+         //Verify reduce output compression ratio.
+         long simReduceOutputBytes = 
+             getCounterValue(counters, "HDFS_BYTES_WRITTEN");
+         long origReduceOutputBytes = 
+             origReduceCounters.get("REDUCE_OUTPUT_BYTES");
+         assertReduceOutputCompressionRatio(simReduceOutputBytes, 
+                                            origReduceOutputBytes, 
+                                            OUTPUT_COMP_RATIO);
+      }
+    }
+  }
+
+  private void assertMapInputCompressionRatio(long simMapInputBytes, 
+                                   long origMapInputBytes, 
+                                   float expInputCompRatio) { 
+    LOG.info("***Verify the map input bytes compression ratio****");
+    LOG.info("Simulated job's map input bytes(REDUCE_SHUFFLE_BYTES): " 
+            + simMapInputBytes);
+    LOG.info("Original job's map input bytes: " + origMapInputBytes);
+
+    final float actInputCompRatio = 
+        getActualCompressionRatio(simMapInputBytes, origMapInputBytes);
+    LOG.info("Expected Map Input Compression Ratio:" + expInputCompRatio);
+    LOG.info("Actual Map Input Compression Ratio:" + actInputCompRatio);
+
+    float diffVal = (float)(expInputCompRatio * 0.06);
+    LOG.info("Expected Difference of Map Input Compression Ratio is <= " + 
+            + diffVal);
+    float delta = Math.abs(expInputCompRatio - actInputCompRatio);
+    LOG.info("Actual Difference of Map Iput Compression Ratio:" + delta);
+    Assert.assertTrue("Simulated job input compression ratio has mismatched.", 
+                      delta <= diffVal);
+    LOG.info("******Done******");
+  }
+
+  private void assertMapOuputCompressionRatio(long simReduceInputBytes, 
+                                              long simMapoutputBytes, 
+                                              float expMapOuputCompRatio) { 
+    LOG.info("***Verify the map output bytes compression ratio***");
+    LOG.info("Simulated job reduce input bytes:" + simReduceInputBytes);
+    LOG.info("Simulated job map output bytes:" + simMapoutputBytes);
+
+    final float actMapOutputCompRatio = 
+        getActualCompressionRatio(simReduceInputBytes, simMapoutputBytes);
+    LOG.info("Expected Map Output Compression Ratio:" + expMapOuputCompRatio);
+    LOG.info("Actual Map Output Compression Ratio:" + actMapOutputCompRatio);
+
+    float diffVal = 0.05f;
+    LOG.info("Expected Difference Of Map Output Compression Ratio is <= " 
+            + diffVal);
+    float delta = Math.abs(expMapOuputCompRatio - actMapOutputCompRatio);
+    LOG.info("Actual Difference Of Map Ouput Compression Ratio :" + delta);
+
+    Assert.assertTrue("Simulated job map output compression ratio " 
+                     + "has not been matched.", delta <= diffVal);
+    LOG.info("******Done******");
+  }
+
+  private void assertReduceOutputCompressionRatio(long simReduceOutputBytes, 
+      long origReduceOutputBytes , float expOutputCompRatio ) {
+      LOG.info("***Verify the reduce output bytes compression ratio***");
+      final float actOuputputCompRatio = 
+          getActualCompressionRatio(simReduceOutputBytes, origReduceOutputBytes);
+      LOG.info("Simulated job's reduce output bytes:" + simReduceOutputBytes);
+      LOG.info("Original job's reduce output bytes:" + origReduceOutputBytes);
+      LOG.info("Expected output compression ratio:" + expOutputCompRatio);
+      LOG.info("Actual output compression ratio:" + actOuputputCompRatio);
+      long diffVal = (long)(origReduceOutputBytes * 0.15);
+      long delta = Math.abs(origReduceOutputBytes - simReduceOutputBytes);
+      LOG.info("Expected difference of output compressed bytes is <= " 
+              + diffVal);
+      LOG.info("Actual difference of compressed ouput bytes:" + delta);
+      Assert.assertTrue("Simulated job reduce output compression ratio " +
+         "has not been matched.", delta <= diffVal);
+      LOG.info("******Done******");
+  }
+
+  private float getExpectedCompressionRatio(JobConf simuJobConf, 
+                                            String RATIO_TYPE) {
+    // Default decompression ratio is 0.50f irrespective of original 
+    //job compression ratio.
+    if (simuJobConf.get(RATIO_TYPE) != null) {
+      return Float.parseFloat(simuJobConf.get(RATIO_TYPE));
+    } else {
+      return 0.50f;
+    }
+  }
+
+  private float getActualCompressionRatio(long compressBytes, 
+                                          long uncompessBytes) {
+    double ratio = ((double)compressBytes) / uncompessBytes; 
+    int significant = (int)Math.round(ratio * 100);
+    return ((float)significant)/100; 
   }
 
   private String convertJobStatus(String jobStatus) {

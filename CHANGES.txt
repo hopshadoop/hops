@@ -23,6 +23,9 @@ Trunk (unreleased changes)
 
   IMPROVEMENTS
 
+    MAPREDUCE-2544. [Gridmix] Add compression emulation system tests to 
+    Gridmix. (Vinay Kumar Thota via amarrk)
+
     MAPREDUCE-2517. [Gridmix] Add system tests to Gridmix. 
     (Vinay Kumar Thota via amarrk)
 
