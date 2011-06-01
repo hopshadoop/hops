@@ -62,8 +62,20 @@ public class TestAllowFormat {
       throw new IOException("Could not delete hdfs directory '" + hdfsDir +
                             "'");
     }
+
+    // Test has multiple name directories.
+    // Format should not really prompt us if one of the directories exist,
+    // but is empty. So in case the test hangs on an input, it means something
+    // could be wrong in the format prompting code. (HDFS-1636)
     LOG.info("hdfsdir is " + hdfsDir.getAbsolutePath());
-    config.set(DFS_NAMENODE_NAME_DIR_KEY, new File(hdfsDir, "name").getPath());
+    File nameDir1 = new File(hdfsDir, "name1");
+    File nameDir2 = new File(hdfsDir, "name2");
+
+    // To test multiple directory handling, we pre-create one of the name directories.
+    nameDir1.mkdirs();
+
+    // Set multiple name directories.
+    config.set(DFS_NAMENODE_NAME_DIR_KEY, nameDir1.getPath() + "," + nameDir2.getPath());
     config.set(DFS_DATANODE_DATA_DIR_KEY, new File(hdfsDir, "data").getPath());
 
     config.set(DFS_NAMENODE_CHECKPOINT_DIR_KEY,new File(hdfsDir, "secondary").getPath());

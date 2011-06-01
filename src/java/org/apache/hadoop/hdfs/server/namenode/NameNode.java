@@ -36,6 +36,7 @@ import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.FsServerDefaults;
 import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Path;
@@ -1483,7 +1484,10 @@ public class NameNode implements NamenodeProtocols, FSConstants {
                  FSNamesystem.getNamespaceEditsDirs(conf);
     for(Iterator<URI> it = dirsToFormat.iterator(); it.hasNext();) {
       File curDir = new File(it.next().getPath());
-      if (!curDir.exists())
+      // Its alright for a dir not to exist, or to exist (properly accessible)
+      // and be completely empty.
+      if (!curDir.exists() ||
+          (curDir.isDirectory() && FileUtil.listFiles(curDir).length == 0))
         continue;
       if (isConfirmationNeeded) {
         if (!confirmPrompt("Re-format filesystem in " + curDir + " ?")) {
