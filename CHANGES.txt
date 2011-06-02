@@ -468,6 +468,9 @@ Trunk (unreleased changes)
     HDFS-1636. If dfs.name.dir points to an empty dir, namenode format
     shouldn't require confirmation. (Harsh J Chouraria via todd)
 
+    HDFS-1966.  Encapsulate individual DataTransferProtocol op headers.
+    (szetszwo)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
