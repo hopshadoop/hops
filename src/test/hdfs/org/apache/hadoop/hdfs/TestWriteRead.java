@@ -23,7 +23,6 @@ import java.util.EnumSet;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -32,8 +31,6 @@ import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
-import org.apache.log4j.Level;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -41,14 +38,14 @@ import org.junit.Test;
 
 public class TestWriteRead {
 
-  // junit test settings
-  private static final int WR_NTIMES = 350;
+  // Junit test settings. 
+  private static final int WR_NTIMES = 350; 
   private static final int WR_CHUNK_SIZE = 10000;
 
   private static final int BUFFER_SIZE = 8192 * 100;
   private static final String ROOT_DIR = "/tmp/";
 
-  // command-line options
+  // command-line options. Different defaults for unit test vs real cluster
   String filenameOption = ROOT_DIR + "fileX1";
   int chunkSizeOption = 10000;
   int loopOption = 10;
@@ -59,9 +56,11 @@ public class TestWriteRead {
   private FileContext mfc; // = FileContext.getFileContext();
 
   // configuration
-  final boolean positionRead = false; // position read vs sequential read
   private boolean useFCOption = false; // use either FileSystem or FileContext
   private boolean verboseOption = true;
+  private boolean positionReadOption = false;
+  private boolean truncateOption = false;
+  private boolean abortTestOnFailure = true; 
 
   static private Log LOG = LogFactory.getLog(TestWriteRead.class);
 
@@ -70,7 +69,8 @@ public class TestWriteRead {
     LOG.info("initJunitModeTest");
 
     conf = new HdfsConfiguration();
-    conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, 1024 * 100); //100K blocksize
+    conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, 1024 * 100); // 100K
+                                                                // blocksize
 
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
     cluster.waitActive();
@@ -91,8 +91,6 @@ public class TestWriteRead {
   private void initClusterModeTest() throws IOException {
 
     LOG = LogFactory.getLog(TestWriteRead.class);
-    ((Log4JLogger) FSNamesystem.LOG).getLogger().setLevel(Level.INFO);
-    ((Log4JLogger) DFSClient.LOG).getLogger().setLevel(Level.INFO);
     LOG.info("initClusterModeTest");
 
     conf = new Configuration();
@@ -101,15 +99,19 @@ public class TestWriteRead {
   }
 
   /** Junit Test reading while writing. */
+  
   @Test
   public void TestWriteRead1() throws IOException {
+    useFCOption = false; 
+    positionReadOption = false;
     String fname = filenameOption;
-
+    
     // need to run long enough to fail: takes 25 to 35 seec on Mac
     int stat = testWriteAndRead(fname, WR_NTIMES, WR_CHUNK_SIZE);
+    LOG.info("Summary status from test1: status= " + stat);
     Assert.assertTrue(stat == 0);
   }
-
+      
   // equivalent of TestWriteRead1
   private int clusterTestWriteRead1() throws IOException {
     int stat = testWriteAndRead(filenameOption, loopOption, chunkSizeOption);
@@ -117,8 +119,8 @@ public class TestWriteRead {
   }
 
   /**
-   * Open the file to read from begin to end. Then close the file.
-   * Return number of bytes read.
+   * Open the file to read from begin to end. Then close the file. 
+   * Return number of bytes read. 
    * Support both sequential read and position read.
    */
   private long readData(String fname, byte[] buffer, long byteExpected)
@@ -134,9 +136,14 @@ public class TestWriteRead {
       long visibleLenFromReadStream = getVisibleFileLength(in);
 
       totalByteRead = readUntilEnd(in, buffer, buffer.length, fname,
-          beginPosition, visibleLenFromReadStream, positionRead);
+          beginPosition, visibleLenFromReadStream, positionReadOption);
       in.close();
 
+      // reading more data than visibleLeng is OK, but not less
+      if (totalByteRead + beginPosition < byteExpected ){
+        throw new IOException("readData mismatch in byte read: expected=" 
+            + byteExpected + " ; got " +  (totalByteRead + beginPosition));
+      }
       return totalByteRead + beginPosition;
 
     } catch (IOException e) {
@@ -150,11 +157,11 @@ public class TestWriteRead {
   }
 
   /**
-   * read chunks into buffer repeatedly until total of VisibleLen byte are read 
+   * read chunks into buffer repeatedly until total of VisibleLen byte are read.
    * Return total number of bytes read
    */
   private long readUntilEnd(FSDataInputStream in, byte[] buffer, long size,
-      String fname, long pos, long visibleLen, boolean positionRead)
+      String fname, long pos, long visibleLen, boolean positionReadOption)
       throws IOException {
 
     if (pos >= visibleLen || visibleLen <= 0)
@@ -167,7 +174,7 @@ public class TestWriteRead {
     long byteLeftToRead = visibleLen - pos;
     int byteToReadThisRound = 0;
 
-    if (!positionRead) {
+    if (!positionReadOption) {
       in.seek(pos);
       currentPosition = in.getPos();
     }
@@ -179,7 +186,7 @@ public class TestWriteRead {
       while (byteLeftToRead > 0 && currentPosition < visibleLen) {
         byteToReadThisRound = (int) (byteLeftToRead >= buffer.length 
             ? buffer.length : byteLeftToRead);
-        if (positionRead) {
+        if (positionReadOption) {
           byteRead = in.read(currentPosition, buffer, 0, byteToReadThisRound);
         } else {
           byteRead = in.read(buffer, 0, byteToReadThisRound);
@@ -193,7 +200,7 @@ public class TestWriteRead {
 
         if (verboseOption) {
           LOG.info("reader: Number of byte read: " + byteRead
-              + " ; toatlByteRead = " + totalByteRead + " ; currentPosition="
+              + " ; totalByteRead = " + totalByteRead + " ; currentPosition="
               + currentPosition + " ; chunkNumber =" + chunkNumber
               + "; File name = " + fname);
         }
@@ -215,7 +222,7 @@ public class TestWriteRead {
     return totalByteRead;
   }
 
-  private int writeData(FSDataOutputStream out, byte[] buffer, int length)
+  private void writeData(FSDataOutputStream out, byte[] buffer, int length)
       throws IOException {
 
     int totalByteWritten = 0;
@@ -228,12 +235,15 @@ public class TestWriteRead {
       totalByteWritten += toWriteThisRound;
       remainToWrite -= toWriteThisRound;
     }
-    return totalByteWritten;
+    if (totalByteWritten != length) {
+      throw new IOException("WriteData: failure in write. Attempt to write " 
+          + length + " ; written=" + totalByteWritten);
+    }
   }
 
-  /** 
-   * Common routine to do position read while open the file for write.
-   * After each iteration of write, do a read of the file from begin to end.
+  /**
+   * Common routine to do position read while open the file for write. 
+   * After each iteration of write, do a read of the file from begin to end. 
    * Return 0 on success, else number of failure.
    */
   private int testWriteAndRead(String fname, int loopN, int chunkSize)
@@ -252,50 +262,68 @@ public class TestWriteRead {
 
     try {
       Path path = getFullyQualifiedPath(fname);
+      long fileLengthBeforeOpen = 0;
 
-      out = useFCOption ? mfc.create(path, EnumSet.of(CreateFlag.CREATE)) 
-          : mfs.create(path);
+      if (ifExists(path)) {
+        if (truncateOption) {
+          out = useFCOption ? mfc.create(path,EnumSet.of(CreateFlag.OVERWRITE)): 
+                mfs.create(path, truncateOption);
+          LOG.info("File already exists. File open with Truncate mode: "+ path);
+        } else {
+          out = useFCOption ? mfc.create(path, EnumSet.of(CreateFlag.APPEND))
+              : mfs.append(path);
+          fileLengthBeforeOpen = getFileLengthFromNN(path);
+          LOG.info("File already exists of size " + fileLengthBeforeOpen
+              + " File open for Append mode: " + path);
+        }
+      } else {
+        out = useFCOption ? mfc.create(path, EnumSet.of(CreateFlag.CREATE))
+            : mfs.create(path);
+      }
 
-      long totalByteWritten = 0;
-      long totalByteVisible = 0;
+      long totalByteWritten = fileLengthBeforeOpen;
+      long totalByteVisible = fileLengthBeforeOpen;
       long totalByteWrittenButNotVisible = 0;
-      int byteWrittenThisTime;
 
       boolean toFlush;
       for (int i = 0; i < loopN; i++) {
         toFlush = (i % 2) == 0;
 
-        byteWrittenThisTime = writeData(out, outBuffer, chunkSize);
+        writeData(out, outBuffer, chunkSize);
 
-        totalByteWritten += byteWrittenThisTime;
+        totalByteWritten += chunkSize;
 
         if (toFlush) {
           out.hflush();
-          totalByteVisible += byteWrittenThisTime
-              + totalByteWrittenButNotVisible;
+          totalByteVisible += chunkSize + totalByteWrittenButNotVisible;
           totalByteWrittenButNotVisible = 0;
         } else {
-          totalByteWrittenButNotVisible += byteWrittenThisTime;
+          totalByteWrittenButNotVisible += chunkSize;
         }
 
         if (verboseOption) {
-          LOG.info("TestReadWrite - Written " + byteWrittenThisTime
+          LOG.info("TestReadWrite - Written " + chunkSize
               + ". Total written = " + totalByteWritten
               + ". TotalByteVisible = " + totalByteVisible + " to file "
               + fname);
         }
         byteVisibleToRead = readData(fname, inBuffer, totalByteVisible);
 
-        String readmsg;
+        String readmsg = "Written=" + totalByteWritten + " ; Expected Visible="
+            + totalByteVisible + " ; Got Visible=" + byteVisibleToRead
+            + " of file " + fname;
 
         if (byteVisibleToRead >= totalByteVisible
             && byteVisibleToRead <= totalByteWritten) {
-          readmsg = "pass: reader sees expected number of visible byte "
-              + byteVisibleToRead + " of file " + fname + " [pass]";
+          readmsg = "pass: reader sees expected number of visible byte. "
+              + readmsg + " [pass]";
         } else {
           countOfFailures++;
-          readmsg = "fail: reader does not see expected number of visible byte "
-              + byteVisibleToRead + " of file " + fname + " [fail]";
+          readmsg = "fail: reader see different number of visible byte. "
+              + readmsg + " [fail]";
+          if (abortTestOnFailure) {
+            throw new IOException(readmsg);
+          }
         }
         LOG.info(readmsg);
       }
@@ -309,19 +337,32 @@ public class TestWriteRead {
       out.close();
 
       byteVisibleToRead = readData(fname, inBuffer, totalByteVisible);
-      long lenFromFc = getFileLengthFromNN(path);
 
+      String readmsg2 = "Written=" + totalByteWritten + " ; Expected Visible="
+          + totalByteVisible + " ; Got Visible=" + byteVisibleToRead
+          + " of file " + fname;
       String readmsg;
-      if (byteVisibleToRead == totalByteVisible) {
-        readmsg = "PASS: reader sees expected size of file " + fname
-            + " after close. File Length from NN: " + lenFromFc + " [Pass]";
+      
+      if (byteVisibleToRead >= totalByteVisible
+          && byteVisibleToRead <= totalByteWritten) {
+        readmsg = "pass: reader sees expected number of visible byte on close. "
+            + readmsg2 + " [pass]";
       } else {
         countOfFailures++;
-        readmsg = "FAIL: reader sees is different size of file " + fname
-            + " after close. File Length from NN: " + lenFromFc + " [Fail]";
+        readmsg = "fail: reader sees different number of visible byte on close. "
+            + readmsg2 + " [fail]";
+        LOG.info(readmsg);
+        if (abortTestOnFailure)
+          throw new IOException(readmsg);
       }
-      LOG.info(readmsg);
 
+      // now check if NN got the same length 
+      long lenFromFc = getFileLengthFromNN(path);
+      if (lenFromFc != byteVisibleToRead){
+        readmsg = "fail: reader sees different number of visible byte from NN "
+          + readmsg2 + " [fail]";
+        throw new IOException(readmsg);   
+      }
     } catch (IOException e) {
       throw new IOException(
           "##### Caught Exception in testAppendWriteAndRead. Close file. "
@@ -343,8 +384,8 @@ public class TestWriteRead {
 
   // length of a file (path name) from NN.
   private long getFileLengthFromNN(Path path) throws IOException {
-    FileStatus fileStatus = useFCOption ? mfc.getFileStatus(path) 
-        : mfs.getFileStatus(path);
+    FileStatus fileStatus = useFCOption ? mfc.getFileStatus(path) : 
+        mfs.getFileStatus(path);
     return fileStatus.getLen();
   }
 
@@ -363,8 +404,22 @@ public class TestWriteRead {
   }
 
   private void usage() {
-    System.out.println("Usage: -chunkSize nn -loop ntime  -f filename");
+    LOG.info("Usage: [-useSeqRead | -usePosRead] [-append|truncate]"
+        + " -chunkSize nn -loop ntimes  -f filename");
+    System.out.println("Usage: [-useSeqRead | -usePosRead] [-append|truncate]"
+        + " -chunkSize nn -loop ntimes  -f filename");
+    System.out.println("Defaults: -chunkSize=10000, -loop=10, -f=/tmp/fileX1, "
+        + "use sequential read, use append mode if file already exists");
     System.exit(0);
+  }
+
+  private void dumpOptions() {
+    LOG.info("  Option setting: filenameOption = " + filenameOption);
+    LOG.info("  Option setting: chunkSizeOption = " + chunkSizeOption);
+    LOG.info("  Option setting: loopOption = " + loopOption);
+    LOG.info("  Option setting: posReadOption = " + positionReadOption);
+    LOG.info("  Option setting: truncateOption = " + truncateOption);
+    LOG.info("  Option setting: verboseOption = " + verboseOption);
   }
 
   private void getCmdLineOption(String[] args) {
@@ -375,32 +430,53 @@ public class TestWriteRead {
         chunkSizeOption = Integer.parseInt(args[++i]);
       } else if (args[i].equals("-loop")) {
         loopOption = Integer.parseInt(args[++i]);
+      } else if (args[i].equals("-usePosRead")) {
+        positionReadOption = true;
+      } else if (args[i].equals("-useSeqRead")) {
+        positionReadOption = false;
+      } else if (args[i].equals("-truncate")) {
+        truncateOption = true;
+      } else if (args[i].equals("-append")) {
+        truncateOption = false;
+      } else if (args[i].equals("-verbose")) {
+        verboseOption = true;
+      } else if (args[i].equals("-noVerbose")) {
+        verboseOption = false;
       } else {
         usage();
       }
     }
+    if (verboseOption)
+      dumpOptions();
     return;
   }
 
   /**
-   * Entry point of the test when using a real cluster.
-   * Usage: [-loop ntimes] [-chunkSize nn]  [-f filename]
-   * -loop: iterate ntimes: each iteration consists of a write, then a read
+   * Entry point of the test when using a real cluster. 
+   * Usage: [-loop ntimes] [-chunkSize nn] [-f filename] 
+   *     [-useSeqRead |-usePosRead] [-append |-truncate] [-verbose |-noVerbose]
+   * -loop: iterate ntimes: each iteration consists of a write, then a read 
    * -chunkSize: number of byte for each write
-   * -f filename: filename to write and read
-   * Default: ntimes = 10; chunkSize = 10000; filename = /tmp/fileX1
+   * -f filename: filename to write and read 
+   * [-useSeqRead | -usePosRead]: use Position Read, or default Sequential Read 
+   * [-append | -truncate]: if file already exist, Truncate or default Append 
+   * [-verbose | -noVerbose]: additional debugging messages if verbose is on
+   * Default: -loop = 10; -chunkSize = 10000; -f filename = /tmp/fileX1
+   *     Use Sequential Read, Append Mode, verbose on.
    */
   public static void main(String[] args) {
     try {
       TestWriteRead trw = new TestWriteRead();
       trw.initClusterModeTest();
       trw.getCmdLineOption(args);
+
       int stat = trw.clusterTestWriteRead1();
 
       if (stat == 0) {
         System.out.println("Status: clusterTestWriteRead1 test PASS");
       } else {
-        System.out.println("Status: clusterTestWriteRead1 test FAIL");
+        System.out.println("Status: clusterTestWriteRead1 test FAIL with "
+                + stat + " failures");
       }
       System.exit(stat);
     } catch (IOException e) {

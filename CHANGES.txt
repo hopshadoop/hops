@@ -473,6 +473,9 @@ Trunk (unreleased changes)
 
     HDFS-2024.  Format TestWriteRead source codes.  (CW Chung via szetszwo)
 
+    HDFS-1968.  Enhance TestWriteRead to support position/sequential read,
+    append, truncate and verbose options.  (CW Chung via szetszwo)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
