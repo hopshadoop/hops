@@ -471,6 +471,8 @@ Trunk (unreleased changes)
     HDFS-1966.  Encapsulate individual DataTransferProtocol op headers.
     (szetszwo)
 
+    HDFS-2024.  Format TestWriteRead source codes.  (CW Chung via szetszwo)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image

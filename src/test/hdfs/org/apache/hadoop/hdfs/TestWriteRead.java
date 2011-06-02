@@ -40,29 +40,27 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class TestWriteRead {
-  
+
   // junit test settings
   private static final int WR_NTIMES = 350;
   private static final int WR_CHUNK_SIZE = 10000;
 
-  
-  private static final int BUFFER_SIZE = 8192  * 100;
+  private static final int BUFFER_SIZE = 8192 * 100;
   private static final String ROOT_DIR = "/tmp/";
-      
+
   // command-line options
   String filenameOption = ROOT_DIR + "fileX1";
   int chunkSizeOption = 10000;
   int loopOption = 10;
- 
-  
+
   private MiniDFSCluster cluster;
-  private Configuration conf;   // = new HdfsConfiguration();
-  private FileSystem mfs;       // = cluster.getFileSystem();
-  private FileContext mfc;      // = FileContext.getFileContext();
-  
-   // configuration
-  final boolean positionRead = false;   // position read vs sequential read
-  private boolean useFCOption = false;  // use either FileSystem or FileContext
+  private Configuration conf; // = new HdfsConfiguration();
+  private FileSystem mfs; // = cluster.getFileSystem();
+  private FileContext mfc; // = FileContext.getFileContext();
+
+  // configuration
+  final boolean positionRead = false; // position read vs sequential read
+  private boolean useFCOption = false; // use either FileSystem or FileContext
   private boolean verboseOption = true;
 
   static private Log LOG = LogFactory.getLog(TestWriteRead.class);
@@ -70,13 +68,13 @@ public class TestWriteRead {
   @Before
   public void initJunitModeTest() throws Exception {
     LOG.info("initJunitModeTest");
-   
+
     conf = new HdfsConfiguration();
     conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, 1024 * 100); //100K blocksize
 
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
     cluster.waitActive();
-   
+
     mfs = cluster.getFileSystem();
     mfc = FileContext.getFileContext();
 
@@ -91,7 +89,7 @@ public class TestWriteRead {
 
   // Equivalence of @Before for cluster mode testing.
   private void initClusterModeTest() throws IOException {
-    
+
     LOG = LogFactory.getLog(TestWriteRead.class);
     ((Log4JLogger) FSNamesystem.LOG).getLogger().setLevel(Level.INFO);
     ((Log4JLogger) DFSClient.LOG).getLogger().setLevel(Level.INFO);
@@ -106,7 +104,7 @@ public class TestWriteRead {
   @Test
   public void TestWriteRead1() throws IOException {
     String fname = filenameOption;
- 
+
     // need to run long enough to fail: takes 25 to 35 seec on Mac
     int stat = testWriteAndRead(fname, WR_NTIMES, WR_CHUNK_SIZE);
     Assert.assertTrue(stat == 0);
@@ -114,17 +112,17 @@ public class TestWriteRead {
 
   // equivalent of TestWriteRead1
   private int clusterTestWriteRead1() throws IOException {
-    int stat =   testWriteAndRead(filenameOption, loopOption, chunkSizeOption);
+    int stat = testWriteAndRead(filenameOption, loopOption, chunkSizeOption);
     return stat;
   }
-  
+
   /**
    * Open the file to read from begin to end. Then close the file.
    * Return number of bytes read.
    * Support both sequential read and position read.
    */
   private long readData(String fname, byte[] buffer, long byteExpected)
-  throws IOException {
+      throws IOException {
     long totalByteRead = 0;
     long beginPosition = 0;
     Path path = getFullyQualifiedPath(fname);
@@ -139,14 +137,14 @@ public class TestWriteRead {
           beginPosition, visibleLenFromReadStream, positionRead);
       in.close();
 
-      return  totalByteRead + beginPosition;
+      return totalByteRead + beginPosition;
 
     } catch (IOException e) {
       throw new IOException("##### Caught Exception in readData. "
-          + "Total Byte Read so far = " + totalByteRead 
-          + " beginPosition = " + beginPosition, e);  
+          + "Total Byte Read so far = " + totalByteRead + " beginPosition = "
+          + beginPosition, e);
     } finally {
-      if (in != null) 
+      if (in != null)
         in.close();
     }
   }
@@ -155,35 +153,36 @@ public class TestWriteRead {
    * read chunks into buffer repeatedly until total of VisibleLen byte are read 
    * Return total number of bytes read
    */
-  private long readUntilEnd(FSDataInputStream in, byte[] buffer, long size,String fname, 
-      long pos, long visibleLen, boolean positionRead) throws IOException {
+  private long readUntilEnd(FSDataInputStream in, byte[] buffer, long size,
+      String fname, long pos, long visibleLen, boolean positionRead)
+      throws IOException {
 
-    if (pos >= visibleLen || visibleLen <= 0 )
+    if (pos >= visibleLen || visibleLen <= 0)
       return 0;
-    
+
     int chunkNumber = 0;
     long totalByteRead = 0;
     long currentPosition = pos;
     int byteRead = 0;
     long byteLeftToRead = visibleLen - pos;
     int byteToReadThisRound = 0;
-    
-    if (!positionRead){
+
+    if (!positionRead) {
       in.seek(pos);
       currentPosition = in.getPos();
-    } 
+    }
     if (verboseOption)
-      LOG.info("reader begin: position: " + pos
-          + " ; currentOffset = " + currentPosition + " ; bufferSize ="
-          + buffer.length + " ; Filename = " + fname);
+      LOG.info("reader begin: position: " + pos + " ; currentOffset = "
+          + currentPosition + " ; bufferSize =" + buffer.length
+          + " ; Filename = " + fname);
     try {
-      while (byteLeftToRead > 0 && currentPosition < visibleLen ) {
-        byteToReadThisRound = (int) (byteLeftToRead >=  buffer.length ? 
-            buffer.length : byteLeftToRead);
+      while (byteLeftToRead > 0 && currentPosition < visibleLen) {
+        byteToReadThisRound = (int) (byteLeftToRead >= buffer.length 
+            ? buffer.length : byteLeftToRead);
         if (positionRead) {
           byteRead = in.read(currentPosition, buffer, 0, byteToReadThisRound);
         } else {
-          byteRead = in.read(buffer, 0, byteToReadThisRound);  
+          byteRead = in.read(buffer, 0, byteToReadThisRound);
         }
         if (byteRead <= 0)
           break;
@@ -191,7 +190,7 @@ public class TestWriteRead {
         totalByteRead += byteRead;
         currentPosition += byteRead;
         byteLeftToRead -= byteRead;
-        
+
         if (verboseOption) {
           LOG.info("reader: Number of byte read: " + byteRead
               + " ; toatlByteRead = " + totalByteRead + " ; currentPosition="
@@ -202,16 +201,16 @@ public class TestWriteRead {
     } catch (IOException e) {
       throw new IOException(
           "#### Exception caught in readUntilEnd: reader  currentOffset = "
-          + currentPosition + " ; totalByteRead =" + totalByteRead
-          + " ; latest byteRead = " + byteRead + "; visibleLen= "
-          + visibleLen + " ; bufferLen = " + buffer.length
-          + " ; Filename = " + fname, e);
+              + currentPosition + " ; totalByteRead =" + totalByteRead
+              + " ; latest byteRead = " + byteRead + "; visibleLen= "
+              + visibleLen + " ; bufferLen = " + buffer.length
+              + " ; Filename = " + fname, e);
     }
 
     if (verboseOption)
-      LOG.info("reader end:   position: " + pos
-          + " ; currentOffset = " + currentPosition + " ; totalByteRead ="
-          + totalByteRead + " ; Filename = " + fname);
+      LOG.info("reader end:   position: " + pos + " ; currentOffset = "
+          + currentPosition + " ; totalByteRead =" + totalByteRead
+          + " ; Filename = " + fname);
 
     return totalByteRead;
   }
@@ -239,14 +238,14 @@ public class TestWriteRead {
    */
   private int testWriteAndRead(String fname, int loopN, int chunkSize)
       throws IOException {
-    
+
     int countOfFailures = 0;
     long byteVisibleToRead = 0;
     FSDataOutputStream out = null;
 
     byte[] outBuffer = new byte[BUFFER_SIZE];
     byte[] inBuffer = new byte[BUFFER_SIZE];
-    
+
     for (int i = 0; i < BUFFER_SIZE; i++) {
       outBuffer[i] = (byte) (i & 0x00ff);
     }
@@ -254,8 +253,8 @@ public class TestWriteRead {
     try {
       Path path = getFullyQualifiedPath(fname);
 
-      out = useFCOption ? mfc.create(path, EnumSet.of(CreateFlag.CREATE)) : 
-           mfs.create(path);
+      out = useFCOption ? mfc.create(path, EnumSet.of(CreateFlag.CREATE)) 
+          : mfs.create(path);
 
       long totalByteWritten = 0;
       long totalByteVisible = 0;
@@ -280,25 +279,25 @@ public class TestWriteRead {
         }
 
         if (verboseOption) {
-         LOG.info("TestReadWrite - Written " + byteWrittenThisTime
+          LOG.info("TestReadWrite - Written " + byteWrittenThisTime
               + ". Total written = " + totalByteWritten
               + ". TotalByteVisible = " + totalByteVisible + " to file "
               + fname);
         }
-        byteVisibleToRead = readData(fname, inBuffer, totalByteVisible); 
-        
+        byteVisibleToRead = readData(fname, inBuffer, totalByteVisible);
+
         String readmsg;
-         
+
         if (byteVisibleToRead >= totalByteVisible
             && byteVisibleToRead <= totalByteWritten) {
-          readmsg = "pass: reader sees expected number of visible byte " 
-              + byteVisibleToRead + " of file " + fname  + " [pass]";
+          readmsg = "pass: reader sees expected number of visible byte "
+              + byteVisibleToRead + " of file " + fname + " [pass]";
         } else {
           countOfFailures++;
-          readmsg = "fail: reader does not see expected number of visible byte " 
-            + byteVisibleToRead + " of file " + fname  + " [fail]";
-      }
-       LOG.info(readmsg);
+          readmsg = "fail: reader does not see expected number of visible byte "
+              + byteVisibleToRead + " of file " + fname + " [fail]";
+        }
+        LOG.info(readmsg);
       }
 
       // test the automatic flush after close
@@ -315,17 +314,17 @@ public class TestWriteRead {
       String readmsg;
       if (byteVisibleToRead == totalByteVisible) {
         readmsg = "PASS: reader sees expected size of file " + fname
-            + " after close. File Length from NN: " + lenFromFc + " [Pass]"; 
+            + " after close. File Length from NN: " + lenFromFc + " [Pass]";
       } else {
         countOfFailures++;
         readmsg = "FAIL: reader sees is different size of file " + fname
-            + " after close. File Length from NN: " + lenFromFc + " [Fail]"; 
+            + " after close. File Length from NN: " + lenFromFc + " [Fail]";
       }
-     LOG.info(readmsg);
+      LOG.info(readmsg);
 
     } catch (IOException e) {
       throw new IOException(
-          "##### Caught Exception in testAppendWriteAndRead. Close file. " 
+          "##### Caught Exception in testAppendWriteAndRead. Close file. "
               + "Total Byte Read so far = " + byteVisibleToRead, e);
     } finally {
       if (out != null)
@@ -344,8 +343,8 @@ public class TestWriteRead {
 
   // length of a file (path name) from NN.
   private long getFileLengthFromNN(Path path) throws IOException {
-    FileStatus fileStatus = useFCOption ? 
-        mfc.getFileStatus(path) : mfs.getFileStatus(path);
+    FileStatus fileStatus = useFCOption ? mfc.getFileStatus(path) 
+        : mfs.getFileStatus(path);
     return fileStatus.getLen();
   }
 
@@ -359,25 +358,24 @@ public class TestWriteRead {
   }
 
   private Path getFullyQualifiedPath(String pathString) {
-    return useFCOption ?  
-      mfc.makeQualified(new Path(ROOT_DIR, pathString)) :
-      mfs.makeQualified(new Path(ROOT_DIR, pathString));
+    return useFCOption ? mfc.makeQualified(new Path(ROOT_DIR, pathString))
+        : mfs.makeQualified(new Path(ROOT_DIR, pathString));
   }
 
-  private void usage(){
+  private void usage() {
     System.out.println("Usage: -chunkSize nn -loop ntime  -f filename");
     System.exit(0);
   }
-  
-  private void getCmdLineOption(String[] args){
-    for (int i = 0; i < args.length; i++){
+
+  private void getCmdLineOption(String[] args) {
+    for (int i = 0; i < args.length; i++) {
       if (args[i].equals("-f")) {
         filenameOption = args[++i];
-      } else if (args[i].equals("-chunkSize")){
+      } else if (args[i].equals("-chunkSize")) {
         chunkSizeOption = Integer.parseInt(args[++i]);
-      } else if (args[i].equals("-loop")){
+      } else if (args[i].equals("-loop")) {
         loopOption = Integer.parseInt(args[++i]);
-      } else { 
+      } else {
         usage();
       }
     }
@@ -398,15 +396,15 @@ public class TestWriteRead {
       trw.initClusterModeTest();
       trw.getCmdLineOption(args);
       int stat = trw.clusterTestWriteRead1();
-      
-      if (stat == 0){
-        System.out.println("Status: clusterTestWriteRead1 test PASS"); 
+
+      if (stat == 0) {
+        System.out.println("Status: clusterTestWriteRead1 test PASS");
       } else {
-        System.out.println("Status: clusterTestWriteRead1 test FAIL");    
+        System.out.println("Status: clusterTestWriteRead1 test FAIL");
       }
       System.exit(stat);
     } catch (IOException e) {
-     LOG.info("#### Exception in Main");
+      LOG.info("#### Exception in Main");
       e.printStackTrace();
       System.exit(-2);
     }
