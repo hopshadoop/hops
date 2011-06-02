@@ -64,7 +64,6 @@ import org.apache.hadoop.mapreduce.util.ResourceCalculatorPlugin;
 import org.apache.hadoop.mapreduce.util.ResourceCalculatorPlugin.*;
 import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.util.Progress;
 import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.ReflectionUtils;
@@ -731,6 +730,10 @@ abstract public class Task implements Writable, Configurable {
    * Update resource information counters
    */
   void updateResourceCounters() {
+    // Update generic resource counters
+    updateHeapUsageCounter();
+
+    // Updating resources specified in ResourceCalculatorPlugin
     if (resourceCalculator == null) {
       return;
     }
@@ -845,6 +848,17 @@ abstract public class Task implements Writable, Configurable {
 
     gcUpdater.incrementGcCounter();
     updateResourceCounters();
+  }
+
+  /**
+   * Updates the {@link TaskCounter#COMMITTED_HEAP_BYTES} counter to reflect the
+   * current total committed heap space usage of this JVM.
+   */
+  @SuppressWarnings("deprecation")
+  private void updateHeapUsageCounter() {
+    long currentHeapUsage = Runtime.getRuntime().totalMemory();
+    counters.findCounter(TaskCounter.COMMITTED_HEAP_BYTES)
+            .setValue(currentHeapUsage);
   }
 
   public void done(TaskUmbilicalProtocol umbilical,
