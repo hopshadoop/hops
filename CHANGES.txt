@@ -672,6 +672,9 @@ Trunk (unreleased changes)
     HDFS-2014. Change HDFS scripts to work in developer enviroment post
     RPM packaging changes. (Eric Yang via suresh)
 
+    HDFS-1995. Federation: Minor bug fixes and modification cluster web UI.
+    (Tanping Wang via suresh)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES

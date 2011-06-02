@@ -268,7 +268,7 @@ class NamenodeJspHelper {
       long nonDFS = total - remaining - used;
       nonDFS = nonDFS < 0 ? 0 : nonDFS;
       float percentUsed = DFSUtil.getPercentUsed(used, total);
-      float percentRemaining = DFSUtil.getPercentRemaining(used, total);
+      float percentRemaining = DFSUtil.getPercentRemaining(remaining, total);
       float median = 0;
       float max = 0;
       float min = 0;

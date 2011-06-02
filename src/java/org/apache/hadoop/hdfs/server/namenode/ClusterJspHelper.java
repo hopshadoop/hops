@@ -369,11 +369,10 @@ class ClusterJspHelper {
       nn.filesAndDirectories = mxbeanProxy.getTotalFiles();
       nn.capacity = mxbeanProxy.getTotal();
       nn.free = mxbeanProxy.getFree();
-      nn.dfsUsed = mxbeanProxy.getUsed();
+      nn.bpUsed = mxbeanProxy.getBlockPoolUsedSpace();
       nn.nonDfsUsed = mxbeanProxy.getNonDfsUsedSpace();
       nn.blocksCount = mxbeanProxy.getTotalBlocks();
       nn.missingBlocksCount = mxbeanProxy.getNumberOfMissingBlocks();
-      nn.capacity = mxbeanProxy.getTotal();
       nn.free = mxbeanProxy.getFree();
       nn.httpAddress = DFSUtil.getInfoServer(rpcAddress, conf);
       getLiveNodeCount(mxbeanProxy.getLiveNodes(), nn);
@@ -535,9 +534,9 @@ class ClusterJspHelper {
     String clusterid = "";
     long total_sum = 0;
     long free_sum = 0;
-    long used = 0;
+    long clusterDfsUsed = 0;
     long nonDfsUsed_sum = 0;
-    long totalFilesAndBlocks = 0;
+    long totalFilesAndDirectories = 0;
     
     /** List of namenodes in the cluster */
     final List<NamenodeStatus> nnList = new ArrayList<NamenodeStatus>();
@@ -553,10 +552,10 @@ class ClusterJspHelper {
       nnList.add(nn);
       
       // Add namenode status to cluster status
-      totalFilesAndBlocks += nn.filesAndDirectories;
+      totalFilesAndDirectories += nn.filesAndDirectories;
       total_sum += nn.capacity;
       free_sum += nn.free;
-      used += nn.dfsUsed;
+      clusterDfsUsed += nn.bpUsed;
       nonDfsUsed_sum += nn.nonDfsUsed;
     }
 
@@ -580,7 +579,7 @@ class ClusterJspHelper {
         total = total_sum / size;
         free = free_sum / size;
         nonDfsUsed = nonDfsUsed_sum / size;
-        dfsUsedPercent = DFSUtil.getPercentUsed(used, total_sum);
+        dfsUsedPercent = DFSUtil.getPercentUsed(clusterDfsUsed, total);
         dfsRemainingPercent = DFSUtil.getPercentRemaining(free, total);
       }
     
@@ -589,23 +588,23 @@ class ClusterJspHelper {
     
       doc.startTag("storage");
     
-      toXmlItemBlock(doc, "Total Files And Blocks",
-          Long.toString(totalFilesAndBlocks));
+      toXmlItemBlock(doc, "Total Files And Directories",
+          Long.toString(totalFilesAndDirectories));
     
       toXmlItemBlock(doc, "Configured Capacity", StringUtils.byteDesc(total));
     
-      toXmlItemBlock(doc, "Used", StringUtils.byteDesc(used));
+      toXmlItemBlock(doc, "DFS Used", StringUtils.byteDesc(clusterDfsUsed));
     
       toXmlItemBlock(doc, "Non DFS Used", StringUtils.byteDesc(nonDfsUsed));
     
-      toXmlItemBlock(doc, "Remaining", StringUtils.byteDesc(free));
+      toXmlItemBlock(doc, "DFS Remaining", StringUtils.byteDesc(free));
     
       // dfsUsedPercent
-      toXmlItemBlock(doc, "Used%", StringUtils.limitDecimalTo2(dfsUsedPercent)
-          + "%");
+      toXmlItemBlock(doc, "DFS Used%", 
+          StringUtils.limitDecimalTo2(dfsUsedPercent)+ "%");
     
       // dfsRemainingPercent
-      toXmlItemBlock(doc, "Remaining%",
+      toXmlItemBlock(doc, "DFS Remaining%",
           StringUtils.limitDecimalTo2(dfsRemainingPercent) + "%");
     
       doc.endTag(); // storage
@@ -617,8 +616,8 @@ class ClusterJspHelper {
       for (NamenodeStatus nn : nnList) {
         doc.startTag("node");
         toXmlItemBlockWithLink(doc, nn.host, nn.httpAddress, "NameNode");
-        toXmlItemBlock(doc, "Used",
-            StringUtils.byteDesc(nn.dfsUsed));
+        toXmlItemBlock(doc, "Blockpool Used",
+            StringUtils.byteDesc(nn.bpUsed));
         toXmlItemBlock(doc, "Files And Directories",
             Long.toString(nn.filesAndDirectories));
         toXmlItemBlock(doc, "Blocks", Long.toString(nn.blocksCount));
@@ -648,7 +647,7 @@ class ClusterJspHelper {
     String host = "";
     long capacity = 0L;
     long free = 0L;
-    long dfsUsed = 0L;
+    long bpUsed = 0L;
     long nonDfsUsed = 0L;
     long filesAndDirectories = 0L;
     long blocksCount = 0L;

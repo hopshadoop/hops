@@ -29,6 +29,7 @@
     <html>
       <head>
         <link rel="stylesheet" type="text/css" href="static/hadoop.css" />
+        <style type="text/css">th,span {width:8em;}</style>
         <title>
           Hadoop cluster
           <xsl:value-of select="cluster/@clusterId" />
@@ -102,7 +103,7 @@
               <thead>
                 <xsl:for-each select="cluster/namenodes/node[1]/item">
                   <th>
-                    <xsl:value-of select="@label" />
+                    <SPAN><xsl:value-of select="@label" /></SPAN>
                   </th>
                 </xsl:for-each>
               </thead>
