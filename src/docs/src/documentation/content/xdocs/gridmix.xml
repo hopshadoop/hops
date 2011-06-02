@@ -639,6 +639,35 @@ hadoop jar &lt;gridmix-jar&gt; org.apache.hadoop.mapred.gridmix.Gridmix \
       </p>
     </section>
 
+    <section id="highram-emulation">
+      <title>Emulating High-Ram jobs</title>
+      <p>MapReduce allows users to define a job as a High-Ram job. Tasks from a 
+         High-Ram job can occupy multiple slots on the task-trackers. 
+         Task-tracker assigns fixed virtual memory for each slot. Tasks from 
+         High-Ram jobs can occupy multiple slots and thus can use up more 
+         virtual memory as compared to a default task.
+      </p>
+      <p>Emulating this behavior is important because of the following reasons
+      </p>
+     <ul>
+       <li>Impact on scheduler:  Scheduling of tasks from High-Ram jobs 
+           impacts the scheduling behavior as it might result into slot 
+           reservation and slot/resource utilization.
+       </li>
+       <li>Impact on the node : Since High-Ram tasks occupy multiple slots,
+           trackers do some bookkeeping for allocating extra resources for 
+           these tasks. Thus this becomes a precursor for memory emulation
+           where tasks with high memory requirements needs to be considered
+           as a High-Ram task.
+       </li>
+     </ul>
+     <p>High-Ram feature emulation can be disabled by setting  
+        <code>gridmix.highram-emulation.enable</code> to
+        <code>false</code>. By default High-Ram feature emulation is enabled.
+        Note that this feature works only for jobs of type <em>LOADJOB</em>.
+     </p>
+    </section>
+    
     <section id="assumptions">
       <title>Simplifying Assumptions</title>
       <p>GridMix will be developed in stages, incorporating feedback and

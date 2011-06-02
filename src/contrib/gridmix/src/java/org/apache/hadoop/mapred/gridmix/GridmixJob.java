@@ -37,10 +37,12 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.Partitioner;
 import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.tools.rumen.JobStory;
@@ -81,6 +83,9 @@ abstract class GridmixJob implements Callable<Job>, Delayed {
       "gridmix.job-submission.use-queue-in-trace";
   protected static final String GRIDMIX_DEFAULT_QUEUE = 
       "gridmix.job-submission.default-queue";
+  // configuration key to enable/disable High-Ram feature emulation
+  static final String GRIDMIX_HIGHRAM_EMULATION_ENABLE = 
+    "gridmix.highram-emulation.enable";
 
   private static void setJobQueue(Job job, String queue) {
     if (queue != null) {
@@ -126,6 +131,12 @@ abstract class GridmixJob implements Callable<Job>, Delayed {
             }
           }
           
+          // configure high ram properties if enabled
+          if (conf.getBoolean(GRIDMIX_HIGHRAM_EMULATION_ENABLE, true)) {
+            configureHighRamProperties(jobdesc.getJobConf(), 
+                                       ret.getConfiguration());
+          }
+          
           return ret;
         }
       });
@@ -138,6 +149,108 @@ abstract class GridmixJob implements Callable<Job>, Delayed {
     outdir = new Path(outRoot, "" + seq);
   }
 
+  // Scales the desired job-level configuration parameter. This API makes sure 
+  // that the ratio of the job level configuration parameter to the cluster 
+  // level configuration parameter is maintained in the simulated run. Hence 
+  // the values are scaled from the original cluster's configuration to the 
+  // simulated cluster's configuration for higher emulation accuracy.
+  // This kind of scaling is useful for memory parameters.
+  private static void scaleConfigParameter(Configuration sourceConf, 
+                        Configuration destConf, String clusterValueKey, 
+                        String jobValueKey, long defaultValue) {
+    long simulatedClusterDefaultValue = 
+           destConf.getLong(clusterValueKey, defaultValue);
+    
+    long originalClusterDefaultValue = 
+           sourceConf.getLong(clusterValueKey, defaultValue);
+    
+    long originalJobValue = 
+           sourceConf.getLong(jobValueKey, defaultValue);
+    
+    double scaleFactor = (double)originalJobValue/originalClusterDefaultValue;
+    
+    long simulatedJobValue = (long)(scaleFactor * simulatedClusterDefaultValue);
+    
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("For the job configuration parameter '" + jobValueKey 
+                + "' and the cluster configuration parameter '" 
+                + clusterValueKey + "', the original job's configuration value"
+                + " is scaled from '" + originalJobValue + "' to '" 
+                + simulatedJobValue + "' using the default (unit) value of "
+                + "'" + originalClusterDefaultValue + "' for the original "
+                + " cluster and '" + simulatedClusterDefaultValue + "' for the"
+                + " simulated cluster.");
+    }
+    
+    destConf.setLong(jobValueKey, simulatedJobValue);
+  }
+  
+  // Checks if the scaling of original job's memory parameter value is 
+  // valid
+  @SuppressWarnings("deprecation")
+  private static boolean checkMemoryUpperLimits(String jobKey, String limitKey,  
+                                                Configuration conf, 
+                                                boolean convertLimitToMB) {
+    if (conf.get(limitKey) != null) {
+      long limit = conf.getLong(limitKey, JobConf.DISABLED_MEMORY_LIMIT);
+      // scale only if the max memory limit is set.
+      if (limit >= 0) {
+        if (convertLimitToMB) {
+          limit /= (1024 * 1024); //Converting to MB
+        }
+        
+        long scaledConfigValue = 
+               conf.getLong(jobKey, JobConf.DISABLED_MEMORY_LIMIT);
+        
+        // check now
+        if (scaledConfigValue > limit) {
+          throw new RuntimeException("Simulated job's configuration" 
+              + " parameter '" + jobKey + "' got scaled to a value '" 
+              + scaledConfigValue + "' which exceeds the upper limit of '" 
+              + limit + "' defined for the simulated cluster by the key '" 
+              + limitKey + "'. To disable High-Ram feature emulation, set '" 
+              + GRIDMIX_HIGHRAM_EMULATION_ENABLE + "' to 'false'.");
+        }
+        return true;
+      }
+    }
+    return false;
+  }
+  
+  // Check if the parameter scaling does not exceed the cluster limits.
+  @SuppressWarnings("deprecation")
+  private static void validateTaskMemoryLimits(Configuration conf, 
+                        String jobKey, String clusterMaxKey) {
+    if (!checkMemoryUpperLimits(jobKey, 
+        JobConf.UPPER_LIMIT_ON_TASK_VMEM_PROPERTY, conf, true)) {
+      checkMemoryUpperLimits(jobKey, clusterMaxKey, conf, false);
+    }
+  }
+
+  /**
+   * Sets the high ram job properties in the simulated job's configuration.
+   */
+  @SuppressWarnings("deprecation")
+  static void configureHighRamProperties(Configuration sourceConf, 
+                                         Configuration destConf) {
+    // set the memory per map task
+    scaleConfigParameter(sourceConf, destConf, 
+                         MRConfig.MAPMEMORY_MB, MRJobConfig.MAP_MEMORY_MB, 
+                         JobConf.DISABLED_MEMORY_LIMIT);
+    
+    // validate and fail early
+    validateTaskMemoryLimits(destConf, MRJobConfig.MAP_MEMORY_MB, 
+                             JTConfig.JT_MAX_MAPMEMORY_MB);
+    
+    // set the memory per reduce task
+    scaleConfigParameter(sourceConf, destConf, 
+                         MRConfig.REDUCEMEMORY_MB, MRJobConfig.REDUCE_MEMORY_MB,
+                         JobConf.DISABLED_MEMORY_LIMIT);
+    // validate and fail early
+    validateTaskMemoryLimits(destConf, MRJobConfig.REDUCE_MEMORY_MB, 
+                             JTConfig.JT_MAX_REDUCEMEMORY_MB);
+  }
+  
   /**
    * Indicates whether this {@link GridmixJob} supports compression emulation.
    */

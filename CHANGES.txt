@@ -9,6 +9,8 @@ Trunk (unreleased changes)
 
   NEW FEATURES
 
+    MAPREDUCE-2543. [Gridmix] High-Ram feature emulation in Gridmix. (amarrk)
+
     MAPREDUCE-2408. [Gridmix] Compression emulation in Gridmix. (amarrk)
 
     MAPREDUCE-2473. Add "mapred groups" command to query the server-side groups
