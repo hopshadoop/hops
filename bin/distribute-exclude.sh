@@ -36,7 +36,11 @@
 bin=`dirname "$0"`
 bin=`cd "$bin"; pwd`
 
-. "$bin/../libexec/hdfs-config.sh"
+if [ -e "$bin/../libexec/hdfs-config.sh" ]; then
+  . "$bin/../libexec/hdfs-config.sh"
+else
+  . "$bin/hdfs-config.sh" 
+fi
 
 if [ "$1" = '' ] ; then
   "Error: please specify local exclude file as a first argument"

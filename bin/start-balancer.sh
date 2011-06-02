@@ -18,7 +18,11 @@
 bin=`dirname "${BASH_SOURCE-$0}"`
 bin=`cd "$bin"; pwd`
 
-. "$bin"/../libexec/hdfs-config.sh
+if [ -e "$bin/../libexec/hdfs-config.sh" ]; then
+  . "$bin"/../libexec/hdfs-config.sh
+else
+  . "$bin/hdfs-config.sh"
+fi
 
 # Start balancer daemon.
 

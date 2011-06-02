@@ -25,7 +25,11 @@ usage="Usage: start-dfs.sh [-upgrade|-rollback]"
 bin=`dirname "${BASH_SOURCE-$0}"`
 bin=`cd "$bin"; pwd`
 
-. "$bin"/../libexec/hdfs-config.sh
+if [ -e "$bin/../libexec/hdfs-config.sh" ]; then
+  . "$bin"/../libexec/hdfs-config.sh
+else
+  . "$bin/hdfs-config.sh"
+fi
 
 # get arguments
 if [ $# -ge 1 ]; then

@@ -19,7 +19,11 @@ bin=`which $0`
 bin=`dirname ${bin}`
 bin=`cd "$bin"; pwd`
 
-. "$bin"/../libexec/hdfs-config.sh
+if [ -e "$bin/../libexec/hdfs-config.sh" ]; then
+  . "$bin"/../libexec/hdfs-config.sh
+else
+  . "$bin/hdfs-config.sh"
+fi
 
 function print_usage(){
   echo "Usage: hdfs [--config confdir] COMMAND"
@@ -108,17 +112,17 @@ else
 fi
 
 # for developers, add hdfs classes to CLASSPATH
-if [ -d "$HADOOP_PREFIX/build/classes" ]; then
-  CLASSPATH=${CLASSPATH}:$HADOOP_PREFIX/build/classes
+if [ -d "$HADOOP_HDFS_HOME/build/classes" ]; then
+  CLASSPATH=${CLASSPATH}:$HADOOP_HDFS_HOME/build/classes
 fi
-if [ -d "$HADOOP_PREFIX/build/webapps" ]; then
-  CLASSPATH=${CLASSPATH}:$HADOOP_PREFIX/build
+if [ -d "$HADOOP_HDFS_HOME/build/webapps" ]; then
+  CLASSPATH=${CLASSPATH}:$HADOOP_HDFS_HOME/build
 fi
-if [ -d "$HADOOP_PREFIX/build/test/classes" ]; then
-  CLASSPATH=${CLASSPATH}:$HADOOP_PREFIX/build/test/classes
+if [ -d "$HADOOP_HDFS_HOME/build/test/classes" ]; then
+  CLASSPATH=${CLASSPATH}:$HADOOP_HDFS_HOME/build/test/classes
 fi
-if [ -d "$HADOOP_PREFIX/build/tools" ]; then
-  CLASSPATH=${CLASSPATH}:$HADOOP_PREFIX/build/tools
+if [ -d "$HADOOP_HDFS_HOME/build/tools" ]; then
+  CLASSPATH=${CLASSPATH}:$HADOOP_HDFS_HOME/build/tools
 fi
 
 # for releases, add core hdfs jar & webapps to CLASSPATH

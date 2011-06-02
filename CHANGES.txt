@@ -669,6 +669,9 @@ Trunk (unreleased changes)
 
     HDFS-2022. ant binary should build libhdfs. (Eric Yang via eli)
 
+    HDFS-2014. Change HDFS scripts to work in developer enviroment post
+    RPM packaging changes. (Eric Yang via suresh)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES

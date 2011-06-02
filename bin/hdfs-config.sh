@@ -24,9 +24,13 @@ bin=`cd "$bin"; pwd`
 
 export HADOOP_PREFIX="${HADOOP_PREFIX:-$bin/..}"
 
-if [ -d "$bin" ]; then
+if [ -e "$bin/../libexec/hadoop-config.sh" ]; then
   . $bin/../libexec/hadoop-config.sh
-elif [ -e "${HADOOP_HDFS_HOME}"/bin/hadoop-config.sh ]; then
+elif [ -e "${HADOOP_COMMON_HOME}/bin/hadoop-config.sh" ]; then
+  . "$HADOOP_COMMON_HOME"/bin/hadoop-config.sh
+elif [ -e "${HADOOP_HOME}/bin/hadoop-config.sh" ]; then
+  . "$HADOOP_HOME"/bin/hadoop-config.sh
+elif [ -e "${HADOOP_HDFS_HOME}/bin/hadoop-config.sh" ]; then
   . "$HADOOP_HDFS_HOME"/bin/hadoop-config.sh
 else
   echo "Hadoop common not found."

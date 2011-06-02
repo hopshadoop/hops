@@ -23,7 +23,11 @@
 bin=`dirname "$0"`
 bin=`cd "$bin"; pwd`
 
-. "$bin/../libexec/hdfs-config.sh"
+if [ -e "$bin/../libexec/hdfs-config.sh" ]; then
+  . "$bin/../libexec/hdfs-config.sh"
+else
+  . "$bin/hdfs-config.sh"
+fi
 
 namenodes=$("$HADOOP_PREFIX/bin/hdfs" getconf -namenodes)
 
