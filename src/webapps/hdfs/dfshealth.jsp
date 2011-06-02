@@ -50,7 +50,9 @@
 <b> <%= NamenodeJspHelper.getSecurityModeText()%> </b>
 <b> <%= NamenodeJspHelper.getSafeModeText(fsn)%> </b>
 <b> <%= NamenodeJspHelper.getInodeLimitText(fsn)%> </b>
-<%= NamenodeJspHelper.getCorruptFilesWarning(fsn)%>
+<a class="warning" href="/corrupt_files.jsp" title="List corrupt files">
+  <%= NamenodeJspHelper.getWarningText(fsn)%>
+</a>
 
 <% healthjsp.generateHealthReport(out, nn, request); %>
 <hr>
