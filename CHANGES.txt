@@ -25,6 +25,8 @@ Trunk (unreleased changes)
 
   IMPROVEMENTS
 
+    MAPREDUCE-2543. [Gridmix] High-Ram feature emulation testcase. (amarrk)
+
     MAPREDUCE-2469. Task counters should also report the total heap usage of 
     the task. (Ravi Gummadi and Amar Ramesh Kamat via amarrk)
 
