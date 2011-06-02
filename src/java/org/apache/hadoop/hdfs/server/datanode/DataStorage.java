@@ -109,11 +109,11 @@ public class DataStorage extends Storage {
     this.storageID = newStorageID;
   }
   
-  synchronized void createStorageID() {
+  synchronized void createStorageID(int datanodePort) {
     if (storageID != null && !storageID.isEmpty()) {
       return;
     }
-    storageID = DataNode.createNewStorageId();
+    storageID = DataNode.createNewStorageId(datanodePort);
   }
   
   /**
@@ -130,10 +130,9 @@ public class DataStorage extends Storage {
    * @param startOpt startup option
    * @throws IOException
    */
-  synchronized void recoverTransitionRead(NamespaceInfo nsInfo,
-                             Collection<File> dataDirs,
-                             StartupOption startOpt
-                             ) throws IOException {
+  synchronized void recoverTransitionRead(DataNode datanode,
+      NamespaceInfo nsInfo, Collection<File> dataDirs, StartupOption startOpt)
+      throws IOException {
     if (initilized) {
       // DN storage has been initialized, no need to do anything
       return;
@@ -192,13 +191,13 @@ public class DataStorage extends Storage {
     // During startup some of them can upgrade or rollback 
     // while others could be uptodate for the regular startup.
     for(int idx = 0; idx < getNumStorageDirs(); idx++) {
-      doTransition(getStorageDir(idx), nsInfo, startOpt);
+      doTransition(datanode, getStorageDir(idx), nsInfo, startOpt);
       assert this.getLayoutVersion() == nsInfo.getLayoutVersion() :
         "Data-node and name-node layout versions must be the same.";
     }
     
     // make sure we have storage id set - if not - generate new one
-    createStorageID();
+    createStorageID(datanode.getPort());
     
     // 3. Update all storages. Some of them might have just been formatted.
     this.writeAll();
@@ -210,16 +209,17 @@ public class DataStorage extends Storage {
   /**
    * recoverTransitionRead for a specific block pool
    * 
+   * @param datanode DataNode
    * @param bpID Block pool Id
    * @param nsInfo Namespace info of namenode corresponding to the block pool
    * @param dataDirs Storage directories
    * @param startOpt startup option
    * @throws IOException on error
    */
-  void recoverTransitionRead(String bpID, NamespaceInfo nsInfo,
+  void recoverTransitionRead(DataNode datanode, String bpID, NamespaceInfo nsInfo,
       Collection<File> dataDirs, StartupOption startOpt) throws IOException {
     // First ensure datanode level format/snapshot/rollback is completed
-    recoverTransitionRead(nsInfo, dataDirs, startOpt);
+    recoverTransitionRead(datanode, nsInfo, dataDirs, startOpt);
     
     // Create list of storage directories for the block pool
     Collection<File> bpDataDirs = new ArrayList<File>();
@@ -234,7 +234,7 @@ public class DataStorage extends Storage {
     BlockPoolSliceStorage bpStorage = new BlockPoolSliceStorage(
         nsInfo.getNamespaceID(), bpID, nsInfo.getCTime(), nsInfo.getClusterID());
     
-    bpStorage.recoverTransitionRead(nsInfo, bpDataDirs, startOpt);
+    bpStorage.recoverTransitionRead(datanode, nsInfo, bpDataDirs, startOpt);
     addBlockPoolStorage(bpID, bpStorage);
   }
 
@@ -358,12 +358,14 @@ public class DataStorage extends Storage {
    * Upgrade if this.LV > LAYOUT_VERSION || this.cTime < namenode.cTime
    * Regular startup if this.LV = LAYOUT_VERSION && this.cTime = namenode.cTime
    * 
+   * @param datanode Datanode to which this storage belongs to
    * @param sd  storage directory
    * @param nsInfo  namespace info
    * @param startOpt  startup option
    * @throws IOException
    */
-  private void doTransition( StorageDirectory sd, 
+  private void doTransition( DataNode datanode,
+                             StorageDirectory sd, 
                              NamespaceInfo nsInfo, 
                              StartupOption startOpt
                              ) throws IOException {
@@ -399,7 +401,10 @@ public class DataStorage extends Storage {
         && this.cTime == nsInfo.getCTime())
       return; // regular startup
     // verify necessity of a distributed upgrade
-    verifyDistributedUpgradeProgress(nsInfo);
+    UpgradeManagerDatanode um = 
+      datanode.getUpgradeManagerDatanode(nsInfo.getBlockPoolID());
+    verifyDistributedUpgradeProgress(um, nsInfo);
+    
     // do upgrade
     if (this.layoutVersion > FSConstants.LAYOUT_VERSION
         || this.cTime < nsInfo.getCTime()) {
@@ -729,11 +734,9 @@ public class DataStorage extends Storage {
     }
   }
 
-  private void verifyDistributedUpgradeProgress(
+  private void verifyDistributedUpgradeProgress(UpgradeManagerDatanode um,
                   NamespaceInfo nsInfo
                 ) throws IOException {
-    UpgradeManagerDatanode um = 
-      DataNode.getUpgradeManagerDatanode(nsInfo.getBlockPoolID());
     assert um != null : "DataNode.upgradeManager is null.";
     um.setUpgradeState(false, getLayoutVersion());
     um.initializeUpgrade(nsInfo);

@@ -231,7 +231,8 @@ public class TestDirectoryScanner extends TestCase {
       fds = (FSDataset) cluster.getDataNodes().get(0).getFSDataset();
       CONF.setInt(DFSConfigKeys.DFS_DATANODE_DIRECTORYSCAN_THREADS_KEY,
                   parallelism);
-      scanner = new DirectoryScanner(fds, CONF);
+      DataNode dn = cluster.getDataNodes().get(0);
+      scanner = new DirectoryScanner(dn, fds, CONF);
       scanner.setRetainDiffs(true);
 
       // Add files with 100 blocks

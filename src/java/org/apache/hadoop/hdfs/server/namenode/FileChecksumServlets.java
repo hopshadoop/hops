@@ -89,8 +89,10 @@ public class FileChecksumServlets {
       final XMLOutputter xml = new XMLOutputter(out, "UTF-8");
       xml.declaration();
 
+      final ServletContext context = getServletContext();
+      final DataNode datanode = (DataNode) context.getAttribute("datanode");
       final Configuration conf = 
-        new HdfsConfiguration(DataNode.getDataNode().getConf());
+        new HdfsConfiguration(datanode.getConf());
       final int socketTimeout = conf.getInt(
           DFSConfigKeys.DFS_CLIENT_SOCKET_TIMEOUT_KEY,
           HdfsConstants.READ_TIMEOUT);
@@ -99,7 +101,7 @@ public class FileChecksumServlets {
       
       try {
         final DFSClient dfs = DatanodeJspHelper.getDFSClient(request, 
-            DataNode.getDataNode(), conf, getUGI(request, conf));
+            datanode, conf, getUGI(request, conf));
         final ClientProtocol nnproxy = dfs.getNamenode();
         final MD5MD5CRC32FileChecksum checksum = DFSClient.getFileChecksum(
             filename, nnproxy, socketFactory, socketTimeout);

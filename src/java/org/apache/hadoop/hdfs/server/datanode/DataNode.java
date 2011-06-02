@@ -37,7 +37,6 @@ import java.net.URI;
 import java.net.UnknownHostException;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.security.NoSuchAlgorithmException;
 import java.security.PrivilegedExceptionAction;
 import java.security.SecureRandom;
 import java.util.AbstractList;
@@ -353,7 +352,6 @@ public class DataNode extends Configured
   DataNodeMetrics metrics;
   private InetSocketAddress selfAddr;
   
-  private static volatile DataNode datanodeObject = null;
   private volatile String hostName; // Host name of this datanode
   
   private static String dnThreadName;
@@ -398,8 +396,6 @@ public class DataNode extends Configured
            final SecureResources resources) throws IOException {
     super(conf);
 
-    DataNode.setDataNode(this);
-    
     try {
       hostName = getHostName(conf);
       startDataNode(conf, dataDirs, resources);
@@ -590,7 +586,7 @@ public class DataNode extends Configured
       reason = "verification is supported only with FSDataset";
     } 
     if (reason == null) {
-      directoryScanner = new DirectoryScanner((FSDataset) data, conf);
+      directoryScanner = new DirectoryScanner(this, (FSDataset) data, conf);
       directoryScanner.start();
     } else {
       LOG.info("Periodic Directory Tree Verification scan is disabled because " +
@@ -793,7 +789,8 @@ public class DataNode extends Configured
         bpRegistration.storageInfo.clusterID = bpNSInfo.clusterID;
       } else {
         // read storage info, lock data dirs and transition fs state if necessary          
-        storage.recoverTransitionRead(blockPoolId, bpNSInfo, dataDirs, startOpt);
+        storage.recoverTransitionRead(DataNode.this, blockPoolId, bpNSInfo,
+            dataDirs, startOpt);
         LOG.info("setting up storage: nsid=" + storage.namespaceID + ";bpid="
             + blockPoolId + ";lv=" + storage.layoutVersion + ";nsInfo="
             + bpNSInfo);
@@ -1324,7 +1321,7 @@ public class DataNode extends Configured
     synchronized UpgradeManagerDatanode getUpgradeManager() {
       if(upgradeManager == null)
         upgradeManager = 
-          new UpgradeManagerDatanode(DataNode.getDataNode(), blockPoolId);
+          new UpgradeManagerDatanode(DataNode.this, blockPoolId);
       
       return upgradeManager;
     }
@@ -1403,7 +1400,7 @@ public class DataNode extends Configured
       conf.getBoolean("dfs.datanode.simulateddatastorage", false);
 
     if (simulatedFSDataset) {
-      storage.createStorageID();
+      storage.createStorageID(getPort());
       // it would have been better to pass storage as a parameter to
       // constructor below - need to augment ReflectionUtils used below.
       conf.set(DFS_DATANODE_STORAGEID_KEY, getStorageId());
@@ -1416,7 +1413,7 @@ public class DataNode extends Configured
         throw new IOException(StringUtils.stringifyException(e));
       }
     } else {
-      data = new FSDataset(storage, conf);
+      data = new FSDataset(this, storage, conf);
     }
   }
 
@@ -1491,15 +1488,6 @@ public class DataNode extends Configured
            SocketChannel.open().socket() : new Socket();                                   
   }
 
-  private static void setDataNode(DataNode node) {
-    datanodeObject = node;
-  }
-
-  /** Return the DataNode object */
-  public static DataNode getDataNode() {
-    return datanodeObject;
-  } 
-
   public static InterDatanodeProtocol createInterDataNodeProtocolProxy(
       DatanodeID datanodeid, final Configuration conf, final int socketTimeout)
     throws IOException {
@@ -1551,11 +1539,7 @@ public class DataNode extends Configured
     dnId.storageID = createNewStorageId(dnId.getPort());
   }
   
-  static String createNewStorageId() {
-    return createNewStorageId(datanodeObject.getPort());
-  }
-  
-  private static String createNewStorageId(int port) {
+  static String createNewStorageId(int port) {
     /* Return 
      * "DS-randInt-ipaddr-currentTimeMillis"
      * It is considered extermely rare for all these numbers to match
@@ -1728,9 +1712,8 @@ public class DataNode extends Configured
     return threadGroup == null ? 0 : threadGroup.activeCount();
   }
     
-  static UpgradeManagerDatanode getUpgradeManagerDatanode(String bpid) {
-    DataNode dn = getDataNode();
-    BPOfferService bpos = dn.blockPoolManager.get(bpid);
+  UpgradeManagerDatanode getUpgradeManagerDatanode(String bpid) {
+    BPOfferService bpos = blockPoolManager.get(bpid);
     if(bpos==null) {
       return null;
     }

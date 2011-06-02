@@ -20,10 +20,10 @@ package org.apache.hadoop.hdfs.server.namenode;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintWriter;
-import java.net.InetSocketAddress;
 import java.util.Enumeration;
 import java.util.List;
 
+import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -46,14 +46,14 @@ public class StreamFile extends DfsServlet {
 
   public static final String CONTENT_LENGTH = "Content-Length";
 
-  static DataNode datanode = DataNode.getDataNode();
-  
   /** getting a client for connecting to dfs */
   protected DFSClient getDFSClient(HttpServletRequest request)
       throws IOException, InterruptedException {
     final Configuration conf =
       (Configuration) getServletContext().getAttribute(JspHelper.CURRENT_CONF);
     UserGroupInformation ugi = getUGI(request, conf);
+    final ServletContext context = getServletContext();
+    final DataNode datanode = (DataNode) context.getAttribute("datanode");
     return DatanodeJspHelper.getDFSClient(request, datanode, conf, ugi);
   }
   

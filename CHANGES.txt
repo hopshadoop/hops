@@ -659,6 +659,9 @@ Trunk (unreleased changes)
     HDFS-2021. Update numBytesAcked before sending the ack in PacketResponder.
     (John George via szetszwo)
 
+    HDFS-2020. Fix TestDFSUpgradeFromImage by removing the use of DataNode
+    as a singleton. (suresh via todd)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES

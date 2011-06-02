@@ -63,10 +63,6 @@ public class BlockPoolSliceStorage extends Storage {
 
   private String blockpoolID = ""; // id of the blockpool
 
-  BlockPoolSliceStorage() {
-    super(NodeType.DATA_NODE);
-  }
-
   public BlockPoolSliceStorage(StorageInfo storageInfo, String bpid) {
     super(NodeType.DATA_NODE, storageInfo);
     blockpoolID = bpid;
@@ -84,13 +80,14 @@ public class BlockPoolSliceStorage extends Storage {
   /**
    * Analyze storage directories. Recover from previous transitions if required.
    * 
+   * @param datanode Datanode to which this storage belongs to
    * @param nsInfo namespace information
    * @param dataDirs storage directories of block pool
    * @param startOpt startup option
    * @throws IOException on error
    */
-  void recoverTransitionRead(NamespaceInfo nsInfo, Collection<File> dataDirs,
-      StartupOption startOpt) throws IOException {
+  void recoverTransitionRead(DataNode datanode, NamespaceInfo nsInfo,
+      Collection<File> dataDirs, StartupOption startOpt) throws IOException {
     assert FSConstants.LAYOUT_VERSION == nsInfo.getLayoutVersion() 
         : "Block-pool and name-node layout versions must be the same.";
 
@@ -140,7 +137,7 @@ public class BlockPoolSliceStorage extends Storage {
     // During startup some of them can upgrade or roll back
     // while others could be up-to-date for the regular startup.
     for (int idx = 0; idx < getNumStorageDirs(); idx++) {
-      doTransition(getStorageDir(idx), nsInfo, startOpt);
+      doTransition(datanode, getStorageDir(idx), nsInfo, startOpt);
       assert getLayoutVersion() == nsInfo.getLayoutVersion() 
           : "Data-node and name-node layout versions must be the same.";
       assert getCTime() == nsInfo.getCTime() 
@@ -228,12 +225,13 @@ public class BlockPoolSliceStorage extends Storage {
    * Upgrade if this.LV > LAYOUT_VERSION || this.cTime < namenode.cTime Regular
    * startup if this.LV = LAYOUT_VERSION && this.cTime = namenode.cTime
    * 
-   * @param sd storage directory,
+   * @param dn DataNode to which this storage belongs to
+   * @param sd storage directory <SD>/current/<bpid>
    * @param nsInfo namespace info
    * @param startOpt startup option
    * @throws IOException
    */
-  private void doTransition(StorageDirectory sd, // i.e. <SD>/current/<bpid>
+  private void doTransition(DataNode datanode, StorageDirectory sd,
       NamespaceInfo nsInfo, StartupOption startOpt) throws IOException {
     if (startOpt == StartupOption.ROLLBACK)
       doRollback(sd, nsInfo); // rollback if applicable
@@ -259,7 +257,9 @@ public class BlockPoolSliceStorage extends Storage {
       return; // regular startup
     
     // verify necessity of a distributed upgrade
-    verifyDistributedUpgradeProgress(nsInfo);
+    UpgradeManagerDatanode um = 
+      datanode.getUpgradeManagerDatanode(nsInfo.getBlockPoolID());
+    verifyDistributedUpgradeProgress(um, nsInfo);
     if (this.layoutVersion > FSConstants.LAYOUT_VERSION
         || this.cTime < nsInfo.getCTime()) {
       doUpgrade(sd, nsInfo); // upgrade
@@ -474,10 +474,8 @@ public class BlockPoolSliceStorage extends Storage {
     LOG.info( hardLink.linkStats.report() );
   }
 
-  private void verifyDistributedUpgradeProgress(NamespaceInfo nsInfo)
-      throws IOException {
-    UpgradeManagerDatanode um = 
-      DataNode.getUpgradeManagerDatanode(nsInfo.getBlockPoolID());
+  private void verifyDistributedUpgradeProgress(UpgradeManagerDatanode um,
+      NamespaceInfo nsInfo) throws IOException {
     assert um != null : "DataNode.upgradeManager is null.";
     um.setUpgradeState(false, getLayoutVersion());
     um.initializeUpgrade(nsInfo);

@@ -125,7 +125,7 @@ public abstract class UpgradeObjectDatanode extends UpgradeObject implements Run
     // Complete the upgrade by calling the manager method
     try {
       UpgradeManagerDatanode upgradeManager = 
-        DataNode.getUpgradeManagerDatanode(bpid);
+        dataNode.getUpgradeManagerDatanode(bpid);
       if(upgradeManager != null)
         upgradeManager.completeUpgrade();
     } catch(IOException e) {
