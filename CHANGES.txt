@@ -667,6 +667,8 @@ Trunk (unreleased changes)
     HDFS-2020. Fix TestDFSUpgradeFromImage by removing the use of DataNode
     as a singleton. (suresh via todd)
 
+    HDFS-2022. ant binary should build libhdfs. (Eric Yang via eli)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES

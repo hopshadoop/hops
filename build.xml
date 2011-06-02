@@ -325,6 +325,10 @@
 
   </target>
 
+  <target name="set-c++-libhdfs">
+    <property name="libhdfs" value="true"/>
+  </target>
+
   <import file="${test.src.dir}/aop/build/aop.xml"/>
 
   <target name="compile-hdfs-classes" depends="init">
@@ -1097,7 +1101,7 @@
     </macro_tar>
   </target>
 
-  <target name="bin-package" depends="compile, jar, jar-test, ant-tasks, jsvc" 
+  <target name="bin-package" depends="set-c++-libhdfs, compile, compile-c++-libhdfs, jar, jar-test, ant-tasks, jsvc" 
 		description="assembles artifacts for binary target">
     <mkdir dir="${dist.dir}"/>
     <mkdir dir="${dist.dir}/lib"/>
@@ -1435,7 +1439,7 @@
      </subant>  	
   </target>
 
- <target name="test-c++-libhdfs" depends="compile-c++-libhdfs, compile-core" if="islibhdfs" unless="clover.enabled">
+ <target name="test-c++-libhdfs" depends="compile-c++-libhdfs, compile-core" if="libhdfs" unless="clover.enabled">
     <delete dir="${test.libhdfs.dir}"/>
     <mkdir dir="${test.libhdfs.dir}"/>
     <mkdir dir="${test.libhdfs.dir}/conf"/>
@@ -1459,16 +1463,7 @@
     </exec>
   </target>
 
-  <target name="check-c++-libhdfs">
-    <condition property="islibhdfs">
-      <and>
-        <isset property="compile.c++"/>
-        <isset property="libhdfs"/>
-      </and>
-    </condition>
-  </target>
-
-  <target name="check-libhdfs-configure" depends="init,check-c++-libhdfs" if="islibhdfs">
+  <target name="check-libhdfs-configure" depends="init" if="libhdfs">
     <condition property="need.libhdfs.configure">
        <not> <available file="${c++.libhdfs.src}/configure"/> </not>
     </condition>
@@ -1482,7 +1477,7 @@
     </exec>
   </target>
 
-  <target name="check-libhdfs-makefile" depends="init,check-c++-libhdfs" if="islibhdfs">
+  <target name="check-libhdfs-makefile" depends="init" if="libhdfs">
     <condition property="need.libhdfs.makefile">
        <not> <available file="${c++.libhdfs.src}/Makefile"/> </not>
     </condition>
@@ -1501,7 +1496,7 @@
     </exec>
   </target>
 
-  <target name="compile-c++-libhdfs" depends="create-libhdfs-makefile" if="islibhdfs">
+  <target name="compile-c++-libhdfs" depends="create-libhdfs-makefile" if="libhdfs">
     <exec executable="${make.cmd}" dir="${build.c++.libhdfs}" searchpath="yes"
           failonerror="yes">
       <env key="ac_cv_func_malloc_0_nonnull" value="yes"/>
