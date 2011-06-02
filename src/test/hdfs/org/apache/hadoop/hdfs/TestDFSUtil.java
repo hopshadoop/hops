@@ -29,14 +29,19 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 
+import junit.framework.Assert;
+
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
+import static org.apache.hadoop.fs.CommonConfigurationKeys.HADOOP_SECURITY_AUTHENTICATION;
+
 
 public class TestDFSUtil {
   /**
@@ -233,4 +238,16 @@ public class TestDFSUtil {
     } catch (IOException expected) {
     }
   }
+  
+  @Test
+  public void testGetServerInfo(){
+    HdfsConfiguration conf = new HdfsConfiguration();
+    conf.set(HADOOP_SECURITY_AUTHENTICATION, "kerberos");
+    UserGroupInformation.setConfiguration(conf);
+    String httpsport = DFSUtil.getInfoServer(null, conf, true);
+    Assert.assertEquals("0.0.0.0:50470", httpsport);
+    String httpport = DFSUtil.getInfoServer(null, conf, false);
+    Assert.assertEquals("0.0.0.0:50070", httpport);
+  }
+
 }

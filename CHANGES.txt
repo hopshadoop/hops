@@ -476,6 +476,9 @@ Trunk (unreleased changes)
     HDFS-1968.  Enhance TestWriteRead to support position/sequential read,
     append, truncate and verbose options.  (CW Chung via szetszwo)
 
+    HDFS-1986. Add option to get http/https address from 
+    DFSUtil#getInfoServer(). (Tanping via suresh)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image

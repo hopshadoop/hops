@@ -229,7 +229,7 @@ public class DFSck extends Configured implements Tool {
     InetSocketAddress namenode = 
       NameNode.getAddress(dfs.getUri().getAuthority());
     
-    return DFSUtil.getInfoServer(namenode, conf);
+    return DFSUtil.getInfoServer(namenode, conf, true);
   }
 
   private int doWork(final String[] args) throws IOException {

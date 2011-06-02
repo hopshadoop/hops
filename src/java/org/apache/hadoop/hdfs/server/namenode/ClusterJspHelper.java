@@ -374,7 +374,7 @@ class ClusterJspHelper {
       nn.blocksCount = mxbeanProxy.getTotalBlocks();
       nn.missingBlocksCount = mxbeanProxy.getNumberOfMissingBlocks();
       nn.free = mxbeanProxy.getFree();
-      nn.httpAddress = DFSUtil.getInfoServer(rpcAddress, conf);
+      nn.httpAddress = DFSUtil.getInfoServer(rpcAddress, conf, false);
       getLiveNodeCount(mxbeanProxy.getLiveNodes(), nn);
       getDeadNodeCount(mxbeanProxy.getDeadNodes(), nn);
       return nn;

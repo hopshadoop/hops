@@ -444,22 +444,23 @@ public class DFSUtil {
   }
 
   /**
-   * return HTTP server info from the configuration
+   * return server http or https address from the configuration
    * @param conf
    * @param namenode - namenode address
-   * @return http server info
+   * @param httpsAddress -If true, and if security is enabled, returns server 
+   *                      https address. If false, returns server http address.
+   * @return server http or https address
    */
   public static String getInfoServer(
-      InetSocketAddress namenode, Configuration conf) {
+      InetSocketAddress namenode, Configuration conf, boolean httpsAddress) {
     String httpAddress = null;
     
-    String httpAddressKey = UserGroupInformation.isSecurityEnabled() ?
-        DFSConfigKeys.DFS_NAMENODE_HTTPS_ADDRESS_KEY
+    String httpAddressKey = (UserGroupInformation.isSecurityEnabled() 
+        && httpsAddress) ? DFSConfigKeys.DFS_NAMENODE_HTTPS_ADDRESS_KEY
         : DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY;
-    String httpAddressDefault = UserGroupInformation.isSecurityEnabled() ?
-        DFSConfigKeys.DFS_NAMENODE_HTTPS_ADDRESS_DEFAULT 
-        :DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_DEFAULT;
-    
+    String httpAddressDefault = (UserGroupInformation.isSecurityEnabled() 
+        && httpsAddress) ? DFSConfigKeys.DFS_NAMENODE_HTTPS_ADDRESS_DEFAULT
+        : DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_DEFAULT;
     if(namenode != null) {
       // if non-default namenode, try reverse look up 
       // the nameServiceID if it is available
