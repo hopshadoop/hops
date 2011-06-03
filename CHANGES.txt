@@ -163,6 +163,9 @@ Trunk (unreleased changes)
 
   BUG FIXES
 
+    MAPREDUCE-2531. Fixed jobcontrol to downgrade JobID. (Robert Evans via
+    acmurthy) 
+
     MAPREDUCE-1978. Rumen TraceBuilder should provide recursive
     input folder scanning.
 
