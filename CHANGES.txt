@@ -155,6 +155,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2494. Order distributed cache deletions by LRU. (Robert Joseph
     Evans via cdouglas)
 
+    MAPREDUCE-2452. Makes the cancellation of delegation tokens happen in a 
+    separate thread. (ddas)
+
   OPTIMIZATIONS
 
     MAPREDUCE-2026. Make JobTracker.getJobCounters() and
