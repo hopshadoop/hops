@@ -479,6 +479,9 @@ Trunk (unreleased changes)
     HDFS-1986. Add option to get http/https address from 
     DFSUtil#getInfoServer(). (Tanping via suresh)
 
+    HDFS-2029.  In TestWriteRead, check visible length immediately after
+    openning the file and fix code style.  (John George via szetszwo)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image

@@ -101,12 +101,11 @@ public class TestWriteRead {
   /** Junit Test reading while writing. */
   
   @Test
-  public void TestWriteRead1() throws IOException {
+  public void testWriteReadSeq() throws IOException {
     useFCOption = false; 
     positionReadOption = false;
     String fname = filenameOption;
     
-    positionReadOption = false;   // sequential read
     // need to run long enough to fail: takes 25 to 35 seec on Mac
     int stat = testWriteAndRead(fname, WR_NTIMES, WR_CHUNK_SIZE);
     LOG.info("Summary status from test1: status= " + stat);
@@ -115,7 +114,7 @@ public class TestWriteRead {
 
   /** Junit Test position read while writing. */
   @Test
-  public void TestWriteReadPos() throws IOException {
+  public void testWriteReadPos() throws IOException {
     String fname = filenameOption;
     positionReadOption = true;   // position read
     int stat = testWriteAndRead(fname, WR_NTIMES, WR_CHUNK_SIZE);
@@ -145,6 +144,13 @@ public class TestWriteRead {
       in = openInputStream(path);
 
       long visibleLenFromReadStream = getVisibleFileLength(in);
+
+      if (visibleLenFromReadStream < byteExpected)
+      {
+        throw new IOException(visibleLenFromReadStream
+            + " = visibleLenFromReadStream < bytesExpected= "
+            + byteExpected);
+      }
 
       totalByteRead = readUntilEnd(in, buffer, buffer.length, fname,
           beginPosition, visibleLenFromReadStream, positionReadOption);
