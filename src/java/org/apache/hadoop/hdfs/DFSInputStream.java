@@ -306,11 +306,22 @@ public class DFSInputStream extends FSInputStream {
       blocks = getFinalizedBlockRange(offset, length);
     }
     else {
-      if (length + offset > locatedBlocks.getFileLength()) {
+      final boolean readPastEnd = offset + length > locatedBlocks.getFileLength();
+      /* if requested length is greater than current file length
+       * then, it could possibly be from the current block being
+       * written to. First get the finalized block range and then
+       * if necessary, get the length of last block being written
+       * to.
+       */
+      if (readPastEnd)
         length = locatedBlocks.getFileLength() - offset;
-      }
+
       blocks = getFinalizedBlockRange(offset, length);
-      blocks.add(locatedBlocks.getLastLocatedBlock());
+      /* requested length is greater than what finalized blocks 
+       * have.
+       */
+      if (readPastEnd)
+        blocks.add(locatedBlocks.getLastLocatedBlock());
     }
     return blocks;
   }

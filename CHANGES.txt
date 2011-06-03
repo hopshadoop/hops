@@ -678,6 +678,9 @@ Trunk (unreleased changes)
     HDFS-1995. Federation: Minor bug fixes and modification cluster web UI.
     (Tanping Wang via suresh)
 
+    HDFS-1907. Fix position read for reading still-being-written file in
+    DFSInputStream.  (John George via szetszwo)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES

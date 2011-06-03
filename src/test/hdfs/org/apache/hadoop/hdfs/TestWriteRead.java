@@ -106,12 +106,23 @@ public class TestWriteRead {
     positionReadOption = false;
     String fname = filenameOption;
     
+    positionReadOption = false;   // sequential read
     // need to run long enough to fail: takes 25 to 35 seec on Mac
     int stat = testWriteAndRead(fname, WR_NTIMES, WR_CHUNK_SIZE);
     LOG.info("Summary status from test1: status= " + stat);
-    Assert.assertTrue(stat == 0);
+    Assert.assertEquals(0, stat);
   }
-      
+
+  /** Junit Test position read while writing. */
+  @Test
+  public void TestWriteReadPos() throws IOException {
+    String fname = filenameOption;
+    positionReadOption = true;   // position read
+    int stat = testWriteAndRead(fname, WR_NTIMES, WR_CHUNK_SIZE);
+    Assert.assertEquals(0, stat);
+  }
+
+   
   // equivalent of TestWriteRead1
   private int clusterTestWriteRead1() throws IOException {
     int stat = testWriteAndRead(filenameOption, loopOption, chunkSizeOption);
