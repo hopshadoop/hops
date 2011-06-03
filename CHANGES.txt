@@ -921,6 +921,9 @@ Release 0.22.0 - Unreleased
 
     HDFS-1957. Add documentation for HFTP. (Ari Rabkin via todd)
 
+    HDFS-1454. Update the documentation to reflect that clients don't write
+    blocks to local disk before copying to HDFS. (Harsh J Chouraria via todd)
+
   OPTIMIZATIONS
 
     HDFS-1140. Speedup INode.getPathComponents. (Dmytro Molkov via shv)
