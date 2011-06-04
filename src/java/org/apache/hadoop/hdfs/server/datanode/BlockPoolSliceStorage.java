@@ -28,6 +28,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.HardLink;
 import org.apache.hadoop.hdfs.protocol.FSConstants;
 import org.apache.hadoop.hdfs.protocol.LayoutVersion;
@@ -351,7 +352,7 @@ public class BlockPoolSliceStorage extends Storage {
     if (!LayoutVersion.supports(Feature.APPEND_RBW_DIR, layoutVersion)
         && detachDir.exists() && detachDir.isDirectory()) {
 
-      if (detachDir.list().length != 0) {
+      if (FileUtil.list(detachDir).length != 0) {
         throw new IOException("Detached directory " + detachDir
             + " is not empty. Please manually move each file under this "
             + "directory to the finalized directory if the finalized "

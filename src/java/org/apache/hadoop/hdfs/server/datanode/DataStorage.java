@@ -39,6 +39,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.HardLink;
+import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
@@ -505,7 +506,7 @@ public class DataStorage extends Storage {
     if (!LayoutVersion.supports(Feature.APPEND_RBW_DIR, layoutVersion) &&
         detachDir.exists() && detachDir.isDirectory() ) {
       
-        if (detachDir.list().length != 0 ) {
+        if (FileUtil.list(detachDir).length != 0 ) {
           throw new IOException("Detached directory " + detachDir +
               " is not empty. Please manually move each file under this " +
               "directory to the finalized directory if the finalized " +

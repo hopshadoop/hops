@@ -724,10 +724,10 @@ public class FSDataset implements FSConstants, FSDatasetInterface {
       File finalizedDir = new File(bpCurrentDir,
           DataStorage.STORAGE_DIR_FINALIZED);
       File rbwDir = new File(bpCurrentDir, DataStorage.STORAGE_DIR_RBW);
-      if (finalizedDir.exists() && finalizedDir.list().length != 0) {
+      if (finalizedDir.exists() && FileUtil.list(finalizedDir).length != 0) {
         return false;
       }
-      if (rbwDir.exists() && rbwDir.list().length != 0) {
+      if (rbwDir.exists() && FileUtil.list(rbwDir).length != 0) {
         return false;
       }
       return true;
