@@ -25,11 +25,18 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.Collections;
+import java.util.Set;
+import java.util.ArrayList;
+import java.util.Arrays;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.Counter;
@@ -47,6 +54,7 @@ import org.apache.hadoop.tools.rumen.TaskInfo;
 import org.junit.Assert;
 import java.text.ParseException;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.mapred.gridmix.GridmixSystemTestCase;
 
 /**
  * Verifying each Gridmix job with corresponding job story in a trace file.
@@ -74,6 +82,8 @@ public class GridmixJobVerification {
       GridMixConfig.GRIDMIX_INTERMEDIATE_COMPRESSION_RATIO;
   static final String reduceOutputCompRatio = 
       GridMixConfig.GRIDMIX_OUTPUT_COMPRESSION_RATIO;
+  private Map<String, List<JobConf>> simuAndOrigJobsInfo = 
+      new HashMap<String, List<JobConf>>();
 
   /**
    * Gridmix job verification constructor
@@ -133,12 +143,16 @@ public class GridmixJobVerification {
       verifyJobReduceCounters(counters, reduceJobCounters, simuJobConf); 
       verifyCompressionEmulation(zombieJob.getJobConf(), simuJobConf, counters, 
                                  reduceJobCounters, mapJobCounters);
+      verifyDistributeCache(zombieJob,simuJobConf);
+      setJobDistributedCacheInfo(simuJobId.toString(), simuJobConf, 
+         zombieJob.getJobConf());
       LOG.info("Done.");
     }
+    verifyDistributedCacheBetweenJobs(simuAndOrigJobsInfo);
   }
 
   /**
-   * Verify the job subimssion order between the jobs in replay mode.
+   * Verify the job submission order between the jobs in replay mode.
    * @param origSubmissionTime - sorted map of original jobs submission times.
    * @param simuSubmissionTime - sorted map of simulated jobs submission times.
    */
@@ -362,6 +376,12 @@ public class GridmixJobVerification {
     if (simuJobConf.getBoolean(compEmulKey, false)) {
       String inputDir = origJobConf.get(fileInputFormatKey);
       Assert.assertNotNull(fileInputFormatKey + " is Null",inputDir);
+      long simMapInputBytes = getCounterValue(counters, "HDFS_BYTES_READ");
+      long uncompressedInputSize = origMapJobCounters.get("MAP_INPUT_BYTES"); 
+      long simReduceInputBytes =
+            getCounterValue(counters, "REDUCE_SHUFFLE_BYTES");
+        long simMapOutputBytes = getCounterValue(counters, "MAP_OUTPUT_BYTES");
+
       // Verify input compression whether it's enable or not.
       if (inputDir.contains(".gz") || inputDir.contains(".tgz") 
          || inputDir.contains(".bz")) { 
@@ -375,22 +395,16 @@ public class GridmixJobVerification {
             getExpectedCompressionRatio(simuJobConf, mapOutputCompRatio);
 
         // Verify Map Input Compression Ratio.
-        long simMapInputBytes = getCounterValue(counters, "HDFS_BYTES_READ");
-        long uncompressedInputSize = origMapJobCounters.get("MAP_INPUT_BYTES"); 
         assertMapInputCompressionRatio(simMapInputBytes, uncompressedInputSize, 
                                        INPUT_COMP_RATIO);
 
         // Verify Map Output Compression Ratio.
-        long simReduceInputBytes = 
-            getCounterValue(counters, "REDUCE_SHUFFLE_BYTES");
-        long simMapOutputBytes = getCounterValue(counters, "MAP_OUTPUT_BYTES");
         assertMapOuputCompressionRatio(simReduceInputBytes, simMapOutputBytes, 
                                        INTERMEDIATE_COMP_RATIO);
       } else {
-        Assert.assertFalse("Input decompression attribute has been enabled " 
-                          + "for uncompressed input. ", 
-                          Boolean.valueOf(
-                          simuJobConf.getBoolean(inputDecompKey, false)));
+        Assert.assertEquals("MAP input bytes has not matched.", 
+                            convertBytes(uncompressedInputSize), 
+                            convertBytes(simMapInputBytes));
       }
 
       Assert.assertEquals("Simulated job output format has not matched with " 
@@ -495,6 +509,235 @@ public class GridmixJobVerification {
     double ratio = ((double)compressBytes) / uncompessBytes; 
     int significant = (int)Math.round(ratio * 100);
     return ((float)significant)/100; 
+  }
+
+  /**
+   * Verify the distributed cache files between the jobs in a gridmix run.
+   * @param jobsInfo - jobConfs of simulated and original jobs as a map.
+   */
+  public void verifyDistributedCacheBetweenJobs(
+      Map<String,List<JobConf>> jobsInfo) {
+     if (jobsInfo.size() > 1) {
+       Map<String, Integer> simJobfilesOccurBtnJobs = 
+           getDistcacheFilesOccurenceBetweenJobs(jobsInfo, 0);
+       Map<String, Integer> origJobfilesOccurBtnJobs = 
+           getDistcacheFilesOccurenceBetweenJobs(jobsInfo, 1);
+       List<Integer> simuOccurList = 
+           getMapValuesAsList(simJobfilesOccurBtnJobs);
+       Collections.sort(simuOccurList);
+       List<Integer> origOccurList = 
+           getMapValuesAsList(origJobfilesOccurBtnJobs);
+       Collections.sort(origOccurList);
+       Assert.assertEquals("The unique count of distibuted cache files in " 
+                        + "simulated jobs have not matched with the unique "
+                        + "count of original jobs distributed files ", 
+                        simuOccurList.size(), origOccurList.size());
+       int index = 0;
+       for (Integer origDistFileCount : origOccurList) {
+         Assert.assertEquals("Distributed cache file reused in simulated " 
+                            + "jobs has not matched with reused of distributed"
+                            + "cache file in original jobs.",
+                            origDistFileCount, simuOccurList.get(index));
+         index ++;
+       }
+     }
+  }
+
+  /**
+   * Get the unique distributed cache files and occurrence between the jobs.
+   * @param jobsInfo - job's configurations as a map.
+   * @param jobConfIndex - 0 for simulated job configuration and 
+   *                       1 for original jobs configuration.
+   * @return  - unique distributed cache files and occurrences as map.
+   */
+  private Map<String, Integer> getDistcacheFilesOccurenceBetweenJobs(
+      Map<String, List<JobConf>> jobsInfo, int jobConfIndex) {
+    Map<String,Integer> filesOccurBtnJobs = new HashMap <String,Integer>();
+    Set<String> jobIds = jobsInfo.keySet();
+    Iterator<String > ite = jobIds.iterator();
+    while (ite.hasNext()) {
+      String jobId = ite.next();
+      List<JobConf> jobconfs = jobsInfo.get(jobId);
+      String [] distCacheFiles = jobconfs.get(jobConfIndex).get(
+          GridMixConfig.GRIDMIX_DISTCACHE_FILES).split(",");
+      String [] distCacheFileTimeStamps = jobconfs.get(jobConfIndex).get(
+          GridMixConfig.GRIDMIX_DISTCACHE_TIMESTAMP).split(",");
+      String [] distCacheFileVisib = jobconfs.get(jobConfIndex).get(
+          GridMixConfig.GRIDMIX_DISTCACHE_VISIBILITIES).split(",");
+      int indx = 0;
+      for (String distCacheFile : distCacheFiles) {
+        String fileAndSize = distCacheFile + "^" 
+                           + distCacheFileTimeStamps[indx] + "^" 
+                           + jobconfs.get(jobConfIndex).getUser();
+        if (filesOccurBtnJobs.get(fileAndSize) != null) {
+          int count = filesOccurBtnJobs.get(fileAndSize);
+          count ++;
+          filesOccurBtnJobs.put(fileAndSize, count);
+        } else {
+          filesOccurBtnJobs.put(fileAndSize, 1);
+        }
+      }
+    }
+    return filesOccurBtnJobs;
+  }
+
+  /**
+   * It verifies the distributed cache emulation of  a job.
+   * @param zombieJob - Original job story.
+   * @param simuJobConf - Simulated job configuration.
+   */
+  public void verifyDistributeCache(ZombieJob zombieJob, 
+                                    JobConf simuJobConf) throws IOException {
+    if (simuJobConf.getBoolean(GridMixConfig.GRIDMIX_DISTCACHE_ENABLE, false)) {
+      JobConf origJobConf = zombieJob.getJobConf();
+      assertFileVisibility(simuJobConf);
+      assertDistcacheFiles(simuJobConf,origJobConf);
+      assertFileSizes(simuJobConf,origJobConf);
+      assertFileStamps(simuJobConf,origJobConf);
+    } else {
+      Assert.assertNull("Configuration has distributed cache visibilites" 
+          + "without enabled distributed cache emulation.", 
+          simuJobConf.get(GridMixConfig.GRIDMIX_DISTCACHE_VISIBILITIES));
+      Assert.assertNull("Configuration has distributed cache files time " 
+          + "stamps without enabled distributed cache emulation.", 
+          simuJobConf.get(GridMixConfig.GRIDMIX_DISTCACHE_TIMESTAMP));
+      Assert.assertNull("Configuration has distributed cache files paths" 
+          + "without enabled distributed cache emulation.", 
+          simuJobConf.get(GridMixConfig.GRIDMIX_DISTCACHE_FILES));
+      Assert.assertNull("Configuration has distributed cache files sizes" 
+          + "without enabled distributed cache emulation.", 
+          simuJobConf.get(GridMixConfig.GRIDMIX_DISTCACHE_FILESSIZE));
+    }
+  }
+
+  private void assertFileStamps(JobConf simuJobConf, JobConf origJobConf) {
+    //Verify simulated jobs against distributed cache files time stamps.
+    String [] origDCFTS = 
+        origJobConf.get(GridMixConfig.GRIDMIX_DISTCACHE_TIMESTAMP).split(",");
+    String [] simuDCFTS = 
+        simuJobConf.get(GridMixConfig.GRIDMIX_DISTCACHE_TIMESTAMP).split(",");
+    for (int index = 0; index < origDCFTS.length; index++) { 
+      Assert.assertTrue("Invalid time stamps between original "
+          +"and simulated job", Long.parseLong(origDCFTS[index]) 
+          < Long.parseLong(simuDCFTS[index]));
+    }
+  }
+
+  private void assertFileVisibility(JobConf simuJobConf ) {
+    // Verify simulated jobs against distributed cache files visibilities.
+    String [] distFiles = 
+        simuJobConf.get(GridMixConfig.GRIDMIX_DISTCACHE_FILES).split(",");
+    String [] simuDistVisibilities = 
+        simuJobConf.get(GridMixConfig.GRIDMIX_DISTCACHE_VISIBILITIES).split(",");
+    List<Boolean> expFileVisibility = new ArrayList<Boolean >();
+    int index = 0;
+    for (String distFile : distFiles) {
+      boolean isLocalDistCache = GridmixSystemTestCase.isLocalDistCache(
+                                 distFile, 
+                                 simuJobConf.getUser(), 
+                                 Boolean.valueOf(simuDistVisibilities[index]));
+      if (!isLocalDistCache) {
+        expFileVisibility.add(true);
+      } else {
+        expFileVisibility.add(false);
+      }
+      index ++;
+    }
+    index = 0;
+    for (String actFileVisibility :  simuDistVisibilities) {
+      Assert.assertEquals("Simulated job distributed cache file " 
+                         + "visibilities has not matched.", 
+                         expFileVisibility.get(index),
+                         Boolean.valueOf(actFileVisibility));
+      index ++;
+    }
+  }
+  
+  private void assertDistcacheFiles(JobConf simuJobConf, JobConf origJobConf) 
+      throws IOException {
+    //Verify simulated jobs against distributed cache files.
+    String [] origDistFiles = origJobConf.get(
+        GridMixConfig.GRIDMIX_DISTCACHE_FILES).split(",");
+    String [] simuDistFiles = simuJobConf.get(
+        GridMixConfig.GRIDMIX_DISTCACHE_FILES).split(",");
+    String [] simuDistVisibilities = simuJobConf.get(
+        GridMixConfig.GRIDMIX_DISTCACHE_VISIBILITIES).split(",");
+    Assert.assertEquals("No. of simulatued job's distcache files mismacted" 
+                       + "with no.of original job's distcache files", 
+                       origDistFiles.length, simuDistFiles.length);
+
+    int index = 0;
+    for (String simDistFile : simuDistFiles) {
+      Path distPath = new Path(simDistFile);
+      boolean isLocalDistCache = 
+          GridmixSystemTestCase.isLocalDistCache(simDistFile,
+              simuJobConf.getUser(),
+              Boolean.valueOf(simuDistVisibilities[index]));
+      if (!isLocalDistCache) {
+        FileSystem fs = distPath.getFileSystem(conf);
+        FileStatus fstat = fs.getFileStatus(distPath);
+        FsPermission permission = fstat.getPermission();
+        Assert.assertTrue("HDFS distributed cache file has wrong " 
+                         + "permissions for users.", 
+                         FsAction.READ_WRITE.SYMBOL 
+                         == permission.getUserAction().SYMBOL);
+        Assert.assertTrue("HDFS distributed cache file has wrong " 
+                         + "permissions for groups.", 
+                         FsAction.READ.SYMBOL 
+                         == permission.getGroupAction().SYMBOL);
+        Assert.assertTrue("HDSFS distributed cache file has wrong " 
+                         + "permissions for others.", 
+                         FsAction.READ.SYMBOL 
+                         == permission.getOtherAction().SYMBOL);
+      }
+      index++;
+    }
+  }
+
+  private void assertFileSizes(JobConf simuJobConf, JobConf origJobConf) { 
+    // Verify simulated jobs against distributed cache files size.
+    List<String> origDistFilesSize = 
+        Arrays.asList(origJobConf.get(
+            GridMixConfig.GRIDMIX_DISTCACHE_FILESSIZE).split(","));
+    Collections.sort(origDistFilesSize);
+
+    List<String> simuDistFilesSize = 
+        Arrays.asList(simuJobConf.get(
+            GridMixConfig.GRIDMIX_DISTCACHE_FILESSIZE).split(","));
+    Collections.sort(simuDistFilesSize);
+
+    Assert.assertEquals("Simulated job's file size list has not " 
+                       + "matched with the Original job's file size list.",
+                       origDistFilesSize.size(),
+                       simuDistFilesSize.size());
+
+    for (int index = 0; index < origDistFilesSize.size(); index ++) {
+       Assert.assertEquals("Simulated job distcache file size has not " 
+                          + "matched with original job distcache file size.", 
+                          origDistFilesSize.get(index), 
+                          simuDistFilesSize.get(index));
+    }
+  }
+
+  private void setJobDistributedCacheInfo(String jobId, JobConf simuJobConf, 
+     JobConf origJobConf) { 
+    if (simuJobConf.get(GridMixConfig.GRIDMIX_DISTCACHE_FILES) != null) {
+      List<JobConf> jobConfs = new ArrayList<JobConf>();
+      jobConfs.add(simuJobConf);
+      jobConfs.add(origJobConf);
+      simuAndOrigJobsInfo.put(jobId,jobConfs);
+    }
+  }
+
+  private List<Integer> getMapValuesAsList(Map<String,Integer> jobOccurs) { 
+    List<Integer> occursList = new ArrayList<Integer>();
+    Set<String> files = jobOccurs.keySet();
+    Iterator<String > ite = files.iterator();
+    while (ite.hasNext()) {
+      String file = ite.next(); 
+      occursList.add(jobOccurs.get(file));
+    }
+    return occursList;
   }
 
   private String convertJobStatus(String jobStatus) {

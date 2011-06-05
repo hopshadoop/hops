@@ -88,12 +88,12 @@ public class UtilsForGridmix {
   public static String [] getArgsList(Path gridmixDir, int gridmixRunMode, 
                                       String [] values, String [] otherArgs) {
     String [] runtimeArgs = { 
-        "-D", GridMixConfig.GRIDMIX_LOG_MODE + " = DEBUG", 
-        "-D", GridMixConfig.GRIDMIX_OUTPUT_DIR + " = gridmix", 
-        "-D", GridMixConfig.GRIDMIX_JOB_SUBMISSION_QUEUE_IN_TRACE + " = true", 
-        "-D", GridMixConfig.GRIDMIX_JOB_TYPE + " = " + values[0], 
-        "-D", GridMixConfig.GRIDMIX_USER_RESOLVER + " = " + values[1], 
-        "-D", GridMixConfig.GRIDMIX_SUBMISSION_POLICY + " = " + values[2]
+        "-D", GridMixConfig.GRIDMIX_LOG_MODE + "=DEBUG", 
+        "-D", GridMixConfig.GRIDMIX_OUTPUT_DIR + "=gridmix", 
+        "-D", GridMixConfig.GRIDMIX_JOB_SUBMISSION_QUEUE_IN_TRACE + "=true", 
+        "-D", GridMixConfig.GRIDMIX_JOB_TYPE + "=" + values[0], 
+        "-D", GridMixConfig.GRIDMIX_USER_RESOLVER + "=" + values[1], 
+        "-D", GridMixConfig.GRIDMIX_SUBMISSION_POLICY + "=" + values[2]
     };
 
     String [] classArgs;

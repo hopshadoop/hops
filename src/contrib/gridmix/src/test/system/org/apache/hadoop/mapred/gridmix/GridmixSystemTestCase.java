@@ -162,5 +162,11 @@ public class GridmixSystemTestCase {
     }
     return null;
   }
+
+  public static boolean isLocalDistCache(String fileName, String userName, 
+                                         boolean visibility) {
+    return DistributedCacheEmulator.isLocalDistCacheFile(fileName, 
+                                                         userName, visibility);
+  }
 }
 

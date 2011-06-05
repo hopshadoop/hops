@@ -20,6 +20,7 @@ package org.apache.hadoop.mapred.gridmix.test.system;
 import org.apache.hadoop.mapred.gridmix.Gridmix;
 import org.apache.hadoop.mapred.gridmix.JobCreator;
 import org.apache.hadoop.mapred.gridmix.SleepJob;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 
 public class GridMixConfig {
 
@@ -122,6 +123,30 @@ public class GridMixConfig {
    */
   public static final String GRIDMIX_OUTPUT_COMPRESSION_RATIO = 
       "gridmix.compression-emulation.reduce-output.compression-ratio";
+
+  /**
+   * Gridmix distributed cache visibilities.
+   */
+  public static final String GRIDMIX_DISTCACHE_VISIBILITIES = 
+      MRJobConfig.CACHE_FILE_VISIBILITIES;
+
+  /**
+   * Gridmix distributed cache files.
+   */
+  public static final String GRIDMIX_DISTCACHE_FILES = 
+      MRJobConfig.CACHE_FILES;
+  
+  /**
+   * Gridmix distributed cache files size.
+   */
+  public static final String GRIDMIX_DISTCACHE_FILESSIZE = 
+      MRJobConfig.CACHE_FILES_SIZES;
+
+  /**
+   * Gridmix distributed cache files time stamp.
+   */
+  public static final String GRIDMIX_DISTCACHE_TIMESTAMP =
+      MRJobConfig.CACHE_FILE_TIMESTAMPS;
 
   /**
    *  Gridmix logger mode.
