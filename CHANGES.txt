@@ -272,6 +272,9 @@ Trunk (unreleased changes)
     MAPREDUCE-2536. Update FsShell -mv command usage in TestMRCLI.  (Daryn
     Sharp via szetszwo)
 
+    MAPREDUCE-2529. Add support for regex-based shuffle metric counting
+    exceptions. (Thomas Graves via cdouglas)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES

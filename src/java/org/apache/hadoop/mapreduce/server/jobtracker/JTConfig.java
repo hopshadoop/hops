@@ -111,4 +111,9 @@ public interface JTConfig extends MRConfig {
      "mapreduce.jobtracker.webinterface.trusted";
   public static final String JT_PLUGINS = 
     "mapreduce.jobtracker.plugins";
+  public static final String SHUFFLE_EXCEPTION_STACK_REGEX =
+    "mapreduce.reduce.shuffle.catch.exception.stack.regex";
+  public static final String SHUFFLE_EXCEPTION_MSG_REGEX =
+    "mapreduce.reduce.shuffle.catch.exception.message.regex";
+
 }

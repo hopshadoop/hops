@@ -327,12 +327,13 @@ public class TaskTracker
    * the specific metrics for shuffle. The TaskTracker is actually a server for
    * the shuffle and hence the name ShuffleServerMetrics.
    */
-  private class ShuffleServerMetrics implements Updater {
+  class ShuffleServerMetrics implements Updater {
     private MetricsRecord shuffleMetricsRecord = null;
     private int serverHandlerBusy = 0;
     private long outputBytes = 0;
     private int failedOutputs = 0;
     private int successOutputs = 0;
+    private int exceptionsCaught = 0;
     ShuffleServerMetrics(JobConf conf) {
       MetricsContext context = MetricsUtil.getContext("mapred");
       shuffleMetricsRecord = 
@@ -355,6 +356,9 @@ public class TaskTracker
     synchronized void successOutput() {
       ++successOutputs;
     }
+    synchronized void exceptionsCaught() {
+      ++exceptionsCaught;
+    }
     public void doUpdates(MetricsContext unused) {
       synchronized (this) {
         if (workerThreads != 0) {
@@ -369,9 +373,12 @@ public class TaskTracker
                                         failedOutputs);
         shuffleMetricsRecord.incrMetric("shuffle_success_outputs", 
                                         successOutputs);
+        shuffleMetricsRecord.incrMetric("shuffle_exceptions_caught",
+                                        exceptionsCaught);
         outputBytes = 0;
         failedOutputs = 0;
         successOutputs = 0;
+        exceptionsCaught = 0;
       }
       shuffleMetricsRecord.update();
     }
@@ -1376,6 +1383,10 @@ public class TaskTracker
     server.setAttribute("log", LOG);
     server.setAttribute("localDirAllocator", localDirAllocator);
     server.setAttribute("shuffleServerMetrics", shuffleServerMetrics);
+    String exceptionStackRegex = conf.get(JTConfig.SHUFFLE_EXCEPTION_STACK_REGEX);
+    String exceptionMsgRegex = conf.get(JTConfig.SHUFFLE_EXCEPTION_MSG_REGEX);
+    server.setAttribute("exceptionStackRegex", exceptionStackRegex);
+    server.setAttribute("exceptionMsgRegex", exceptionMsgRegex);
     server.addInternalServlet("mapOutput", "/mapOutput", MapOutputServlet.class);
     server.addServlet("taskLog", "/tasklog", TaskLogServlet.class);
     server.start();
@@ -3660,6 +3671,10 @@ public class TaskTracker
         (ShuffleServerMetrics) context.getAttribute("shuffleServerMetrics");
       TaskTracker tracker = 
         (TaskTracker) context.getAttribute("task.tracker");
+      String exceptionStackRegex =
+        (String) context.getAttribute("exceptionStackRegex");
+      String exceptionMsgRegex =
+        (String) context.getAttribute("exceptionMsgRegex");
 
       verifyRequest(request, response, tracker, jobId);
       
@@ -3690,6 +3705,7 @@ public class TaskTracker
         String errorMsg = ("getMapOutputs(" + mapIds + "," + reduceId + 
                            ") failed");
         log.warn(errorMsg, ie);
+        checkException(ie, exceptionMsgRegex, exceptionStackRegex, shuffleMetrics);
         response.sendError(HttpServletResponse.SC_GONE, errorMsg);
         shuffleMetrics.failedOutput();
         throw ie;
@@ -3710,6 +3726,37 @@ public class TaskTracker
             numMaps, "MAPRED_SHUFFLE", reduceId,
             timeElapsed));
       }
+    }
+
+    protected void checkException(IOException ie, String exceptionMsgRegex,
+        String exceptionStackRegex, ShuffleServerMetrics shuffleMetrics) {
+      // parse exception to see if it looks like a regular expression you
+      // configure. If both msgRegex and StackRegex set then make sure both
+      // match, otherwise only the one set has to match.
+      if (exceptionMsgRegex != null) {
+        String msg = ie.getMessage();
+        if (msg == null || !msg.matches(exceptionMsgRegex)) {
+          return;
+        }
+      }
+      if (exceptionStackRegex != null
+          && !checkStackException(ie, exceptionStackRegex)) {
+        return;
+      }
+      shuffleMetrics.exceptionsCaught();
+    }
+
+    private boolean checkStackException(IOException ie,
+        String exceptionStackRegex) {
+      StackTraceElement[] stack = ie.getStackTrace();
+
+      for (StackTraceElement elem : stack) {
+        String stacktrace = elem.toString();
+        if (stacktrace.matches(exceptionStackRegex)) {
+          return true;
+        }
+      }
+      return false;
     }
 
     private void sendMapFile(String jobId, String mapId,
