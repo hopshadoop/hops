@@ -160,7 +160,7 @@ class Chain extends org.apache.hadoop.mapreduce.lib.chain.Chain {
 
     // store in the private reducer conf the input/output classes of the reducer
     // and if it works by value or by reference
-    reducerConf.setBoolean(MAPPER_BY_VALUE, byValue);
+    reducerConf.setBoolean(REDUCER_BY_VALUE, byValue);
 
     setReducerConf(jobConf, inputKeyClass, inputValueClass, outputKeyClass,
       outputValueClass, reducerConf, prefix);

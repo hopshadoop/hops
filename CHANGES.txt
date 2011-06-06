@@ -841,6 +841,9 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2515. MapReduce code references some deprecated options
     (Ari Rabkin via todd)
 
+    MAPREDUCE-2487. ChainReducer uses MAPPER_BY_VALUE instead of
+    REDUCER_BY_VALUE. (Devaraj K via todd)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES
