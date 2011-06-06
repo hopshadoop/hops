@@ -25,6 +25,9 @@ Trunk (unreleased changes)
 
   IMPROVEMENTS
 
+    MAPREDUCE-2104. [Rumen] Add Cpu, Memory and Heap usages to 
+    TraceBuilder's output. (amarrk)
+
     MAPREDUCE-2554. [Gridmix]  Add distributed cache emulation system tests 
     to Gridmix. (Vinay Kumar Thota via amarrk)
  

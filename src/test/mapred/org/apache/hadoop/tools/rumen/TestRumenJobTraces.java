@@ -33,11 +33,13 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.mapred.JobClient;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.MiniMRCluster;
+import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.MapReduceTestUtil;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
+import org.apache.hadoop.mapreduce.TaskCounter;
 import org.apache.hadoop.mapreduce.TaskID;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.TestNoJobSetupCleanup.MyOutputFormat;
@@ -230,7 +232,7 @@ public class TestRumenJobTraces {
       parser = new Hadoop20JHParser(ris);
       ArrayList<String> seenEvents = new ArrayList<String>(150);
 
-      getHistoryEvents(parser, seenEvents); // get events into seenEvents
+      getHistoryEvents(parser, seenEvents, null); // get events into seenEvents
 
       // Validate the events seen by history parser from
       // history file v20-single-input-log.gz
@@ -512,7 +514,11 @@ public class TestRumenJobTraces {
       // Test if the JobHistoryParserFactory can detect the parser correctly
       parser = JobHistoryParserFactory.getParser(ris);
 
-      getHistoryEvents(parser, seenEvents); // get events into seenEvents
+      // create a job builder
+      JobBuilder builder = new JobBuilder(id.toString());
+
+      // get events into seenEvents and also process them using builder
+      getHistoryEvents(parser, seenEvents, builder); 
 
       // Check against the gold standard
       System.out.println("testCurrentJHParser validating using gold std ");
@@ -523,6 +529,26 @@ public class TestRumenJobTraces {
       };
 
       validateSeenHistoryEvents(seenEvents, goldLinesExpected);
+      
+      // validate resource usage metrics
+      //  get the job counters
+      Counters counters = job.getTaskReports(TaskType.MAP)[0].getTaskCounters();
+      
+      //  get the logged job
+      LoggedJob loggedJob = builder.build();
+      //  get the logged attempts
+      LoggedTaskAttempt attempt = 
+        loggedJob.getMapTasks().get(0).getAttempts().get(0);
+      //  get the resource usage metrics
+      ResourceUsageMetrics metrics = attempt.getResourceUsageMetrics();
+      
+      //  check with the actual values
+      testResourceUsageMetricViaDeepCompare(metrics, 
+          counters.findCounter(TaskCounter.CPU_MILLISECONDS).getValue(), 
+          counters.findCounter(TaskCounter.VIRTUAL_MEMORY_BYTES).getValue(),
+          counters.findCounter(TaskCounter.PHYSICAL_MEMORY_BYTES).getValue(),
+          counters.findCounter(TaskCounter.COMMITTED_HEAP_BYTES).getValue(),
+          true);
     } finally {
       // stop the MR cluster
       mrCluster.shutdown();
@@ -687,6 +713,141 @@ public class TestRumenJobTraces {
     }
 
 
+  /**
+   * Test {@link ResourceUsageMetrics}.
+   */
+  @Test
+  public void testResourceUsageMetrics() throws Exception {
+    final long cpuUsage = 100;
+    final long pMemUsage = 200;
+    final long vMemUsage = 300;
+    final long heapUsage = 400;
+    
+    // test ResourceUsageMetrics's setters
+    ResourceUsageMetrics metrics = new ResourceUsageMetrics();
+    metrics.setCumulativeCpuUsage(cpuUsage);
+    metrics.setPhysicalMemoryUsage(pMemUsage);
+    metrics.setVirtualMemoryUsage(vMemUsage);
+    metrics.setHeapUsage(heapUsage);
+    // test cpu usage value
+    assertEquals("Cpu usage values mismatch via set", cpuUsage, 
+                 metrics.getCumulativeCpuUsage());
+    // test pMem usage value
+    assertEquals("Physical memory usage values mismatch via set", pMemUsage, 
+                 metrics.getPhysicalMemoryUsage());
+    // test vMem usage value
+    assertEquals("Virtual memory usage values mismatch via set", vMemUsage, 
+                 metrics.getVirtualMemoryUsage());
+    // test heap usage value
+    assertEquals("Heap usage values mismatch via set", heapUsage, 
+                 metrics.getHeapUsage());
+    
+    // test deepCompare() (pass case)
+    testResourceUsageMetricViaDeepCompare(metrics, cpuUsage, vMemUsage, 
+                                          pMemUsage, heapUsage, true);
+    
+    // test deepCompare (fail case)
+    // test cpu usage mismatch
+    testResourceUsageMetricViaDeepCompare(metrics, 0, vMemUsage, pMemUsage, 
+                                          heapUsage, false);
+    // test pMem usage mismatch
+    testResourceUsageMetricViaDeepCompare(metrics, cpuUsage, vMemUsage, 0, 
+                                          heapUsage, false);
+    // test vMem usage mismatch
+    testResourceUsageMetricViaDeepCompare(metrics, cpuUsage, 0, pMemUsage, 
+                                          heapUsage, false);
+    // test heap usage mismatch
+    testResourceUsageMetricViaDeepCompare(metrics, cpuUsage, vMemUsage, 
+                                          pMemUsage, 0, false);
+    
+    // define a metric with a fixed value of size()
+    ResourceUsageMetrics metrics2 = new ResourceUsageMetrics() {
+      @Override
+      public int size() {
+        return -1;
+      }
+    };
+    metrics2.setCumulativeCpuUsage(cpuUsage);
+    metrics2.setPhysicalMemoryUsage(pMemUsage);
+    metrics2.setVirtualMemoryUsage(vMemUsage);
+    metrics2.setHeapUsage(heapUsage);
+    
+    // test with size mismatch
+    testResourceUsageMetricViaDeepCompare(metrics2, cpuUsage, vMemUsage, 
+                                          pMemUsage, heapUsage, false);
+  }
+  
+  // test ResourceUsageMetric's deepCompare() method
+  private static void testResourceUsageMetricViaDeepCompare(
+                        ResourceUsageMetrics metrics, long cpuUsage, 
+                        long vMemUsage, long pMemUsage, long heapUsage,
+                        boolean shouldPass) {
+    ResourceUsageMetrics testMetrics = new ResourceUsageMetrics();
+    testMetrics.setCumulativeCpuUsage(cpuUsage);
+    testMetrics.setPhysicalMemoryUsage(pMemUsage);
+    testMetrics.setVirtualMemoryUsage(vMemUsage);
+    testMetrics.setHeapUsage(heapUsage);
+    
+    Boolean passed = null;
+    try {
+      metrics.deepCompare(testMetrics, new TreePath(null, "<root>"));
+      passed = true;
+    } catch (DeepInequalityException die) {
+      passed = false;
+    }
+    
+    assertEquals("ResourceUsageMetrics deepCompare() failed!", 
+                 shouldPass, passed);
+  }
+  
+  /**
+   * Testing {@link ResourceUsageMetrics} using {@link HadoopLogsAnalyzer}.
+   */
+  @Test
+  @SuppressWarnings("deprecation")
+  public void testResourceUsageMetricsWithHadoopLogsAnalyzer() 
+  throws IOException {
+    Configuration conf = new Configuration();
+    // get the input trace file
+    Path rootInputDir =
+      new Path(System.getProperty("test.tools.input.dir", ""));
+    Path rootInputSubFolder = new Path(rootInputDir, "rumen/small-trace-test");
+    Path traceFile = new Path(rootInputSubFolder, "v20-resource-usage-log.gz");
+    
+    FileSystem lfs = FileSystem.getLocal(conf);
+    
+    // define the root test directory
+    Path rootTempDir =
+        new Path(System.getProperty("test.build.data", "/tmp"));
+
+    // define output directory
+    Path outputDir = 
+      new Path(rootTempDir, "testResourceUsageMetricsWithHadoopLogsAnalyzer");
+    lfs.delete(outputDir, true);
+    lfs.deleteOnExit(outputDir);
+    
+    // run HadoopLogsAnalyzer
+    HadoopLogsAnalyzer analyzer = new HadoopLogsAnalyzer();
+    analyzer.setConf(conf);
+    Path traceOutput = new Path(outputDir, "trace.json");
+    analyzer.run(new String[] {"-write-job-trace", traceOutput.toString(), 
+                               "-v1", traceFile.toString()});
+    
+    // test HadoopLogsAnalyzer's output w.r.t ResourceUsageMetrics
+    //  get the logged job
+    JsonObjectMapperParser<LoggedJob> traceParser =
+      new JsonObjectMapperParser<LoggedJob>(traceOutput, LoggedJob.class, 
+                                            conf);
+    
+    //  get the logged job from the output trace file
+    LoggedJob job = traceParser.getNext();
+    LoggedTaskAttempt attempt = job.getMapTasks().get(0).getAttempts().get(0);
+    ResourceUsageMetrics metrics = attempt.getResourceUsageMetrics();
+    
+    //  test via deepCompare()
+    testResourceUsageMetricViaDeepCompare(metrics, 200, 100, 75, 50, true);
+  }
+  
   @Test
   public void testTopologyBuilder() throws Exception {
     final TopologyBuilder subject = new TopologyBuilder();
@@ -795,12 +956,15 @@ public class TestRumenJobTraces {
    * @throws IOException
    */
   private void getHistoryEvents(JobHistoryParser parser,
-      ArrayList<String> events) throws IOException {
+      ArrayList<String> events, JobBuilder builder) throws IOException {
     HistoryEvent e;
     while ((e = parser.nextEvent()) != null) {
       String eventString = e.getClass().getSimpleName();
       System.out.println(eventString);
       events.add(eventString);
+      if (builder != null) {
+        builder.process(e);
+      }
     }
   }
 

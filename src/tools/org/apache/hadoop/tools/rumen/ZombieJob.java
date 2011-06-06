@@ -636,6 +636,7 @@ public class ZombieJob implements JobStory {
     long outputBytes = -1;
     long outputRecords = -1;
     long heapMegabytes = -1;
+    ResourceUsageMetrics metrics = new ResourceUsageMetrics();
 
     Values type = loggedTask.getTaskType();
     if ((type != Values.MAP) && (type != Values.REDUCE)) {
@@ -670,12 +671,15 @@ public class ZombieJob implements JobStory {
             (job.getJobReduceMB() > 0) ? job.getJobReduceMB() : job
                 .getHeapMegabytes();
       }
+      // set the resource usage metrics
+      metrics = attempt.getResourceUsageMetrics();
       break;
     }
 
     TaskInfo taskInfo =
         new TaskInfo(inputBytes, (int) inputRecords, outputBytes,
-            (int) outputRecords, (int) heapMegabytes);
+            (int) outputRecords, (int) heapMegabytes,
+            metrics);
     return taskInfo;
   }
 

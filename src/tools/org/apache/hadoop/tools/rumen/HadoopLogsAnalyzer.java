@@ -1208,6 +1208,38 @@ public class HadoopLogsAnalyzer extends Configured implements Tool {
         attempt.spilledRecords = val;
       }
     }, counterString, "SPILLED_RECORDS");
+    
+    // incorporate CPU usage
+    incorporateCounter(new SetField(attempt2) {
+      @Override
+      void set(long val) {
+        attempt.getResourceUsageMetrics().setCumulativeCpuUsage(val);
+      }
+    }, counterString, "CPU_MILLISECONDS");
+    
+    // incorporate virtual memory usage
+    incorporateCounter(new SetField(attempt2) {
+      @Override
+      void set(long val) {
+        attempt.getResourceUsageMetrics().setVirtualMemoryUsage(val);
+      }
+    }, counterString, "VIRTUAL_MEMORY_BYTES");
+    
+    // incorporate physical memory usage
+    incorporateCounter(new SetField(attempt2) {
+      @Override
+      void set(long val) {
+        attempt.getResourceUsageMetrics().setPhysicalMemoryUsage(val);
+      }
+    }, counterString, "PHYSICAL_MEMORY_BYTES");
+    
+    // incorporate heap usage
+    incorporateCounter(new SetField(attempt2) {
+      @Override
+      void set(long val) {
+        attempt.getResourceUsageMetrics().setHeapUsage(val);
+      }
+    }, counterString, "COMMITTED_HEAP_BYTES");
   }
 
   private ParsedHost getAndRecordParsedHost(String hostName) {
