@@ -40,7 +40,7 @@ import static org.apache.hadoop.hdfs.tools.offlineEditsViewer.Tokenizer.VIntToke
 class EditsLoaderCurrent implements EditsLoader {
 
   private static int[] supportedVersions = { -18, -19, -20, -21, -22, -23, -24,
-      -25, -26, -27, -28, -30, -31, -32, -33, -34, -35 };
+      -25, -26, -27, -28, -30, -31, -32, -33, -34, -35, -36 };
 
   private EditsVisitor v;
   private int editsVersion = 0;
@@ -319,6 +319,13 @@ class EditsLoaderCurrent implements EditsLoader {
       VIntToken blobLengthToken = v.visitVInt(EditsElement.KEY_LENGTH);
       v.visitBlob(EditsElement.KEY_BLOB, blobLengthToken.value);
   }
+  
+  private void visit_OP_REASSIGN_LEASE()
+    throws IOException {
+      v.visitStringUTF8(EditsElement.CLIENT_NAME);
+      v.visitStringUTF8(EditsElement.PATH);
+      v.visitStringUTF8(EditsElement.CLIENT_NAME);
+  }
 
   private void visitOpCode(FSEditLogOpCodes editsOpCode)
     throws IOException {
@@ -380,6 +387,9 @@ class EditsLoaderCurrent implements EditsLoader {
         break;
       case OP_UPDATE_MASTER_KEY: // 21
         visit_OP_UPDATE_MASTER_KEY();
+        break;
+      case OP_REASSIGN_LEASE: // 22
+        visit_OP_REASSIGN_LEASE();
         break;
       default:
       {

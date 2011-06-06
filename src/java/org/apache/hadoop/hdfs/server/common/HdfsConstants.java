@@ -172,5 +172,8 @@ public interface HdfsConstants {
      */
     COMMITTED;
   }
+  
+  public static final String NAMENODE_LEASE_HOLDER = "HDFS_NameNode";
+  public static final long NAMENODE_LEASE_RECHECK_INTERVAL = 2000;
 }
 

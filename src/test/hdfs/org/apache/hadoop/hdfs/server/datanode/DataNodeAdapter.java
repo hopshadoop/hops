@@ -37,4 +37,9 @@ public class DataNodeAdapter {
                                               final long blkId) {
     return ((FSDataset)dn.data).fetchReplicaInfo(bpid, blkId);
   }
+  
+  public static void setHeartbeatsDisabledForTests(DataNode dn,
+      boolean heartbeatsDisabledForTests) {
+    dn.setHeartbeatsDisabledForTests(heartbeatsDisabledForTests);
+  }
 }

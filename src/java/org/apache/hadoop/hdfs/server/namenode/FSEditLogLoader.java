@@ -43,6 +43,7 @@ import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifie
 import static org.apache.hadoop.hdfs.server.common.Util.now;
 import org.apache.hadoop.hdfs.server.common.GenerationStamp;
 import org.apache.hadoop.hdfs.server.common.Storage;
+import org.apache.hadoop.hdfs.server.namenode.LeaseManager.Lease;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Writable;
@@ -142,7 +143,7 @@ public class FSEditLogLoader {
         numOpTimes = 0, numOpRename = 0, numOpConcatDelete = 0, 
         numOpSymlink = 0, numOpGetDelegationToken = 0,
         numOpRenewDelegationToken = 0, numOpCancelDelegationToken = 0, 
-        numOpUpdateMasterKey = 0, numOpOther = 0;
+        numOpUpdateMasterKey = 0, numOpReassignLease = 0, numOpOther = 0;
 
     // Keep track of the file offsets of the last several opcodes.
     // This is handy when manually recovering corrupted edits files.
@@ -483,6 +484,17 @@ public class FSEditLogLoader {
                 delegationKey);
             break;
           }
+          case OP_REASSIGN_LEASE: {
+            numOpReassignLease++;
+            String leaseHolder = FSImageSerialization.readString(in);
+            path = FSImageSerialization.readString(in);
+            String newHolder = FSImageSerialization.readString(in);
+            Lease lease = fsNamesys.leaseManager.getLease(leaseHolder);
+            INodeFileUnderConstruction pendingFile =
+                (INodeFileUnderConstruction) fsDir.getFileINode(path);
+            fsNamesys.reassignLeaseInternal(lease, path, newHolder, pendingFile);
+            break;
+          }
           default: {
             throw new IOException("Never seen opCode " + opCode);
           }
@@ -528,6 +540,7 @@ public class FSEditLogLoader {
           + " numOpRenewDelegationToken = " + numOpRenewDelegationToken
           + " numOpCancelDelegationToken = " + numOpCancelDelegationToken
           + " numOpUpdateMasterKey = " + numOpUpdateMasterKey
+          + " numOpReassignLease = " + numOpReassignLease
           + " numOpOther = " + numOpOther);
     }
     return numEdits;

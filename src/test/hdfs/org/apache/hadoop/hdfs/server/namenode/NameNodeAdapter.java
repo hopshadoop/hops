@@ -73,4 +73,8 @@ public class NameNodeAdapter {
     ns.readUnlock();
     return r;
   }
+  
+  public static String getLeaseHolderForPath(NameNode namenode, String path) {
+    return namenode.getNamesystem().leaseManager.getLeaseByPath(path).getHolder();
+  }
 }

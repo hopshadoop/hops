@@ -30,6 +30,8 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 
+import org.apache.hadoop.hdfs.DFSClient;
+import org.apache.hadoop.hdfs.DFSClientAdapter;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.server.common.Util;
 import org.apache.hadoop.hdfs.server.namenode.FSImage;
@@ -38,6 +40,7 @@ import org.apache.hadoop.hdfs.server.namenode.NNStorage.NameNodeDirType;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.server.common.Storage.StorageDirectory;
 import org.apache.hadoop.hdfs.protocol.FSConstants;
+import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.DFSTestUtil;
@@ -222,5 +225,26 @@ public class OfflineEditsViewerHelper {
 
     // sync to disk, otherwise we parse partial edits
     cluster.getNameNode().getFSImage().getEditLog().logSync();
+    
+    // OP_REASSIGN_LEASE 22
+    String filePath = "/hard-lease-recovery-test";
+    byte[] bytes = "foo-bar-baz".getBytes();
+    DFSClientAdapter.stopLeaseRenewer(dfs.getClient());
+    FSDataOutputStream leaseRecoveryPath = dfs.create(new Path(filePath));
+    leaseRecoveryPath.write(bytes);
+    leaseRecoveryPath.hflush();
+    // Set the hard lease timeout to 1 second.
+    cluster.setLeasePeriod(60 * 1000, 1000);
+    // wait for lease recovery to complete
+    LocatedBlocks locatedBlocks;
+    do {
+      try {
+        Thread.sleep(1000);
+      } catch (InterruptedException e) {
+        LOG.info("Innocuous exception", e);
+      }
+      locatedBlocks = DFSClientAdapter.callGetBlockLocations(
+          cluster.getNameNode(), filePath, 0L, bytes.length);
+    } while (locatedBlocks.isUnderConstruction());
   }
 }

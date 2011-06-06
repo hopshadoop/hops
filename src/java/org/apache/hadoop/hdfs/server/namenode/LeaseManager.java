@@ -33,6 +33,8 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.hdfs.protocol.FSConstants;
+import org.apache.hadoop.hdfs.server.common.HdfsConstants;
+
 import static org.apache.hadoop.hdfs.server.common.Util.now;
 
 /**
@@ -45,8 +47,8 @@ import static org.apache.hadoop.hdfs.server.common.Util.now;
  * 2.1) Get the datanodes which contains b
  * 2.2) Assign one of the datanodes as the primary datanode p
 
- * 2.3) p obtains a new generation stamp form the namenode
- * 2.4) p get the block info from each datanode
+ * 2.3) p obtains a new generation stamp from the namenode
+ * 2.4) p gets the block info from each datanode
  * 2.5) p computes the minimum block length
  * 2.6) p updates the datanodes, which have a valid generation stamp,
  *      with the new generation stamp and the minimum block length 
@@ -377,7 +379,7 @@ public class LeaseManager {
 
 
         try {
-          Thread.sleep(2000);
+          Thread.sleep(HdfsConstants.NAMENODE_LEASE_RECHECK_INTERVAL);
         } catch(InterruptedException ie) {
           if (LOG.isDebugEnabled()) {
             LOG.debug(name + " is interrupted", ie);
@@ -406,13 +408,14 @@ public class LeaseManager {
       oldest.getPaths().toArray(leasePaths);
       for(String p : leasePaths) {
         try {
-          if(fsnamesystem.internalReleaseLease(oldest, p, "HDFS_NameNode")) {
+          if(fsnamesystem.internalReleaseLease(oldest, p, HdfsConstants.NAMENODE_LEASE_HOLDER)) {
             LOG.info("Lease recovery for file " + p +
                           " is complete. File closed.");
             removing.add(p);
-          } else
+          } else {
             LOG.info("Started block recovery for file " + p +
                           " lease " + oldest);
+          }
         } catch (IOException e) {
           LOG.error("Cannot release the path "+p+" in the lease "+oldest, e);
           removing.add(p);

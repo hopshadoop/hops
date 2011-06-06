@@ -690,6 +690,9 @@ Trunk (unreleased changes)
     HDFS-1923. In TestFiDataTransferProtocol2, reduce random sleep time period
     and increase the number of datanodes.  (szetszwo)
 
+    HDFS-1149. Lease reassignment should be persisted to the edit log.
+    (Aaron T. Myers via todd)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES

@@ -77,7 +77,8 @@ public class LayoutVersion {
     RESERVED_REL20_204(-32, "Reserved for release 0.20.204"),
     RESERVED_REL22(-33, -27, "Reserved for release 0.22"),
     RESERVED_REL23(-34, -30, "Reserved for release 0.23"),
-    FEDERATION(-35, "Support for namenode federation");
+    FEDERATION(-35, "Support for namenode federation"),
+    LEASE_REASSIGNMENT(-36, "Support for persisting lease holder reassignment");
     
     final int lv;
     final int ancestorLV;

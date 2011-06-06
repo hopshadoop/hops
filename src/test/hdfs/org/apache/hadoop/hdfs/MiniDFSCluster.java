@@ -1072,34 +1072,47 @@ public class MiniDFSCluster {
       nameNodes[nnIndex] = new NameNodeInfo(null, conf);
     }
   }
-
+  
   /**
-   * Restart namenode at a given index.
+   * Restart the namenode.
+   */
+  public synchronized void restartNameNode() throws IOException {
+    checkSingleNameNode();
+    restartNameNode(true);
+  }
+  
+  /**
+   * Restart the namenode. Optionally wait for the cluster to become active.
+   */
+  public synchronized void restartNameNode(boolean waitActive)
+      throws IOException {
+    checkSingleNameNode();
+    restartNameNode(0, waitActive);
+  }
+  
+  /**
+   * Restart the namenode at a given index.
    */
   public synchronized void restartNameNode(int nnIndex) throws IOException {
+    restartNameNode(nnIndex, true);
+  }
+
+  /**
+   * Restart the namenode at a given index. Optionally wait for the cluster
+   * to become active.
+   */
+  public synchronized void restartNameNode(int nnIndex, boolean waitActive)
+      throws IOException {
     Configuration conf = nameNodes[nnIndex].conf;
     shutdownNameNode(nnIndex);
     NameNode nn = NameNode.createNameNode(new String[] {}, conf);
     nameNodes[nnIndex] = new NameNodeInfo(nn, conf);
-    waitClusterUp();
-    System.out.println("Restarted the namenode");
-    int failedCount = 0;
-    while (true) {
-      try {
-        waitActive();
-        break;
-      } catch (IOException e) {
-        failedCount++;
-        // Cached RPC connection to namenode, if any, is expected to fail once
-        if (failedCount > 1) {
-          System.out.println("Tried waitActive() " + failedCount
-              + " time(s) and failed, giving up.  "
-              + StringUtils.stringifyException(e));
-          throw e;
-        }
-      }
+    if (waitActive) {
+      waitClusterUp();
+      System.out.println("Restarted the namenode");
+      waitActive();
+      System.out.println("Cluster is active");
     }
-    System.out.println("Cluster is active");
   }
 
   /**
@@ -1420,7 +1433,22 @@ public class MiniDFSCluster {
    */
   public void waitActive() throws IOException {
     for (int index = 0; index < nameNodes.length; index++) {
-      waitActive(index);
+      int failedCount = 0;
+      while (true) {
+        try {
+          waitActive(index);
+          break;
+        } catch (IOException e) {
+          failedCount++;
+          // Cached RPC connection to namenode, if any, is expected to fail once
+          if (failedCount > 1) {
+            System.out.println("Tried waitActive() " + failedCount
+                + " time(s) and failed, giving up.  "
+                + StringUtils.stringifyException(e));
+            throw e;
+          }
+        }
+      }
     }
   }
   
@@ -1565,7 +1593,7 @@ public class MiniDFSCluster {
   /**
    * Set the softLimit and hardLimit of client lease periods
    */
-  void setLeasePeriod(long soft, long hard) {
+  public void setLeasePeriod(long soft, long hard) {
     final FSNamesystem namesystem = getNamesystem();
     namesystem.leaseManager.setLeasePeriod(soft, hard);
     namesystem.lmthread.interrupt();

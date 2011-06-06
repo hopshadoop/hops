@@ -347,6 +347,7 @@ public class DataNode extends Configured
   boolean resetBlockReportTime = true;
   long initialBlockReportDelay = BLOCKREPORT_INITIAL_DELAY * 1000L;
   long heartBeatInterval;
+  private boolean heartbeatsDisabledForTests = false;
   private DataStorage storage = null;
   private HttpServer infoServer = null;
   DataNodeMetrics metrics;
@@ -642,6 +643,12 @@ public class DataNode extends Configured
       throw new IOException("cannot locate OfferService thread for bp="+block.getBlockPoolId());
     }
     bpos.reportBadBlocks(block);
+  }
+  
+  // used only for testing
+  void setHeartbeatsDisabledForTests(
+      boolean heartbeatsDisabledForTests) {
+    this.heartbeatsDisabledForTests = heartbeatsDisabledForTests;
   }
   
   /**
@@ -1034,10 +1041,12 @@ public class DataNode extends Configured
             // -- Bytes remaining
             //
             lastHeartbeat = startTime;
-            DatanodeCommand[] cmds = sendHeartBeat();
-            metrics.addHeartbeat(now() - startTime);
-            if (!processCommand(cmds))
-              continue;
+            if (!heartbeatsDisabledForTests) {
+              DatanodeCommand[] cmds = sendHeartBeat();
+              metrics.addHeartbeat(now() - startTime);
+              if (!processCommand(cmds))
+                continue;
+            }
           }
 
           reportReceivedBlocks();

@@ -23,6 +23,8 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -31,9 +33,12 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.protocol.AlreadyBeingCreatedException;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
+import org.apache.hadoop.hdfs.server.common.HdfsConstants;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
+import org.apache.hadoop.hdfs.server.datanode.DataNodeAdapter;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.LeaseManager;
+import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.log4j.Level;
@@ -42,6 +47,9 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 public class TestLeaseRecovery2 {
+  
+  public static final Log LOG = LogFactory.getLog(TestLeaseRecovery2.class);
+  
   {
     ((Log4JLogger)DataNode.LOG).getLogger().setLevel(Level.ALL);
     ((Log4JLogger)LeaseManager.LOG).getLogger().setLevel(Level.ALL);
@@ -231,5 +239,127 @@ public class TestLeaseRecovery2 {
     AppendTestUtil.LOG.info("File size is good. " +
                      "Now validating data and sizes from datanodes...");
     AppendTestUtil.checkFullFile(dfs, filepath, size, buffer, filestr);
+  }
+  
+  /**
+   * This test makes it so the client does not renew its lease and also
+   * set the hard lease expiration period to be short, thus triggering
+   * lease expiration to happen while the client is still alive. The test
+   * also causes the NN to restart after lease recovery has begun, but before
+   * the DNs have completed the blocks. This test verifies that when the NN
+   * comes back up, the client no longer holds the lease.
+   * 
+   * The test makes sure that the lease recovery completes and the client
+   * fails if it continues to write to the file, even after NN restart.
+   * 
+   * @throws Exception
+   */
+  @Test
+  public void testHardLeaseRecoveryAfterNameNodeRestart() throws Exception {
+    hardLeaseRecoveryRestartHelper(false);
+  }
+  
+  @Test
+  public void testHardLeaseRecoveryWithRenameAfterNameNodeRestart()
+      throws Exception {
+    hardLeaseRecoveryRestartHelper(true);
+  }
+  
+  public void hardLeaseRecoveryRestartHelper(boolean doRename)
+      throws Exception {
+    //create a file
+    String fileStr = "/hardLeaseRecovery";
+    AppendTestUtil.LOG.info("filestr=" + fileStr);
+    Path filePath = new Path(fileStr);
+    FSDataOutputStream stm = dfs.create(filePath, true,
+        BUF_SIZE, REPLICATION_NUM, BLOCK_SIZE);
+    assertTrue(dfs.dfs.exists(fileStr));
+
+    // write bytes into the file.
+    int size = AppendTestUtil.nextInt(FILE_SIZE);
+    AppendTestUtil.LOG.info("size=" + size);
+    stm.write(buffer, 0, size);
+    
+    String originalLeaseHolder = NameNodeAdapter.getLeaseHolderForPath(
+        cluster.getNameNode(), fileStr);
+    
+    assertFalse("original lease holder should not be the NN",
+        originalLeaseHolder.equals(HdfsConstants.NAMENODE_LEASE_HOLDER));
+
+    // hflush file
+    AppendTestUtil.LOG.info("hflush");
+    stm.hflush();
+    
+    if (doRename) {
+      fileStr += ".renamed";
+      Path renamedPath = new Path(fileStr);
+      assertTrue(dfs.rename(filePath, renamedPath));
+      filePath = renamedPath;
+    }
+    
+    // kill the lease renewal thread
+    AppendTestUtil.LOG.info("leasechecker.interruptAndJoin()");
+    dfs.dfs.leaserenewer.interruptAndJoin();
+    
+    // Make sure the DNs don't send a heartbeat for a while, so the blocks
+    // won't actually get completed during lease recovery.
+    for (DataNode dn : cluster.getDataNodes()) {
+      DataNodeAdapter.setHeartbeatsDisabledForTests(dn, true);
+    }
+    
+    // set the hard limit to be 1 second 
+    cluster.setLeasePeriod(LONG_LEASE_PERIOD, SHORT_LEASE_PERIOD);
+    
+    // Make sure lease recovery begins.
+    Thread.sleep(HdfsConstants.NAMENODE_LEASE_RECHECK_INTERVAL * 2);
+    
+    assertEquals("lease holder should now be the NN", HdfsConstants.NAMENODE_LEASE_HOLDER,
+        NameNodeAdapter.getLeaseHolderForPath(cluster.getNameNode(), fileStr));
+    
+    cluster.restartNameNode(false);
+    
+    assertEquals("lease holder should still be the NN after restart",
+        HdfsConstants.NAMENODE_LEASE_HOLDER,
+        NameNodeAdapter.getLeaseHolderForPath(cluster.getNameNode(), fileStr));
+    
+    // Let the DNs send heartbeats again.
+    for (DataNode dn : cluster.getDataNodes()) {
+      DataNodeAdapter.setHeartbeatsDisabledForTests(dn, false);
+    }
+
+    cluster.waitActive();
+
+    // set the hard limit to be 1 second, to initiate lease recovery. 
+    cluster.setLeasePeriod(LONG_LEASE_PERIOD, SHORT_LEASE_PERIOD);
+    
+    // wait for lease recovery to complete
+    LocatedBlocks locatedBlocks;
+    do {
+      Thread.sleep(SHORT_LEASE_PERIOD);
+      locatedBlocks = DFSClient.callGetBlockLocations(dfs.dfs.namenode,
+        fileStr, 0L, size);
+    } while (locatedBlocks.isUnderConstruction());
+    assertEquals(size, locatedBlocks.getFileLength());
+
+    // make sure that the client can't write data anymore.
+    stm.write('b');
+    try {
+      stm.hflush();
+      fail("Should not be able to flush after we've lost the lease");
+    } catch (IOException e) {
+      LOG.info("Expceted exception on hflush", e);
+    }
+    
+    try {
+      stm.close();
+      fail("Should not be able to close after we've lost the lease");
+    } catch (IOException e) {
+      LOG.info("Expected exception on close", e);
+    }
+
+    // verify data
+    AppendTestUtil.LOG.info(
+        "File size is good. Now validating sizes from datanodes...");
+    AppendTestUtil.checkFullFile(dfs, filePath, size, buffer, fileStr);
   }
 }
