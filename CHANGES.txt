@@ -258,7 +258,7 @@ Trunk (unreleased changes)
     HDFS-1813. Federation: Authentication using BlockToken in RPC to datanode 
                fails. (jitendra)
 
-    HDFS_1630. Support fsedits checksum. (hairong)
+    HDFS-1630. Support fsedits checksum. (hairong)
 
     HDFS-1606. Provide a stronger data guarantee in the write pipeline by
     adding a new datanode when an existing datanode failed.  (szetszwo)
@@ -692,6 +692,9 @@ Trunk (unreleased changes)
 
     HDFS-1149. Lease reassignment should be persisted to the edit log.
     (Aaron T. Myers via todd)
+
+    HDFS-1998. Federation: Make refresh-namenodes.sh refresh all the
+    namenode. (Tanping Wang via suresh)
 
 Release 0.22.0 - Unreleased
 

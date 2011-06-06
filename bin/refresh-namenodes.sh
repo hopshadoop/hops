@@ -29,19 +29,21 @@ else
   . "$bin/hdfs-config.sh"
 fi
 
-namenodes=$("$HADOOP_PREFIX/bin/hdfs" getconf -namenodes)
-
-for namenode in $namenodes ; do
-  echo "Refreshing namenode [$namenode]"
-  "$HADOOP_PREFIX/bin/hdfs" dfsadmin -refreshNodes
-  if [ "$?" != '0' ] ; then errorFlag='1' ; fi
-done
+namenodes=$("$HADOOP_PREFIX/bin/hdfs" getconf -nnRpcAddresses)
+if [ "$?" != '0' ] ; then errorFlag='1' ; 
+else
+  for namenode in $namenodes ; do
+    echo "Refreshing namenode [$namenode]"
+    "$HADOOP_PREFIX/bin/hdfs" dfsadmin -fs hdfs://$namenode -refreshNodes
+    if [ "$?" != '0' ] ; then errorFlag='1' ; fi
+  done
+fi
 
 if [ "$errorFlag" = '1' ] ; then
   echo "Error: refresh of namenodes failed, see error messages above."
   exit 1
 else
-  echo "Refresh of all namenodes succeeded."
+  echo "Refresh of namenodes done."
 fi
 
 

@@ -67,7 +67,10 @@ public class GetConf extends Configured implements Tool {
     EXCLUDE_FILE("-excludeFile",
         new CommandHandler("DFSConfigKeys.DFS_HOSTS_EXCLUDE"),
         "gets the exclude file path that defines the datanodes " +
-        "that need to decommissioned.");
+        "that need to decommissioned."),
+    NNRPCADDRESSES("-nnRpcAddresses", 
+    		new NNRpcAddressesCommandHandler(),
+        "gets the namenode rpc addresses");
 
     private final String cmd;
     private final CommandHandler handler;
@@ -176,6 +179,27 @@ public class GetConf extends Configured implements Tool {
     public int doWorkInternal(GetConf tool) throws IOException {
       tool.printList(DFSUtil.getSecondaryNameNodeAddresses(tool.getConf()));
       return 0;
+    }
+  }
+  
+  /**
+   * Handler for {@link Command#NNRPCADDRESSES}
+   * If rpc addresses are defined in configuration, we return them. Otherwise, 
+   * return empty string.
+   */
+  static class NNRpcAddressesCommandHandler extends CommandHandler {
+    @Override
+    public int doWorkInternal(GetConf tool) throws IOException {
+      Configuration config = tool.getConf();
+      List<InetSocketAddress> rpclist = DFSUtil.getNNServiceRpcAddresses(config);
+      if (rpclist != null) {
+        for (InetSocketAddress rpc : rpclist) {
+          tool.printOut(rpc.getHostName()+":"+rpc.getPort());
+        }
+        return 0;
+      }
+      tool.printError("Did not get namenode service rpc addresses.");
+      return -1;
     }
   }
   
