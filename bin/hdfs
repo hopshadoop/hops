@@ -115,8 +115,8 @@ fi
 if [ -d "$HADOOP_HDFS_HOME/build/classes" ]; then
   CLASSPATH=${CLASSPATH}:$HADOOP_HDFS_HOME/build/classes
 fi
-if [ -d "$HADOOP_HDFS_HOME/build/webapps" ]; then
-  CLASSPATH=${CLASSPATH}:$HADOOP_HDFS_HOME/build
+if [ -d "$HADOOP_HDFS_HOME/build/web/webapps" ]; then
+  CLASSPATH=${CLASSPATH}:$HADOOP_HDFS_HOME/build/web
 fi
 if [ -d "$HADOOP_HDFS_HOME/build/test/classes" ]; then
   CLASSPATH=${CLASSPATH}:$HADOOP_HDFS_HOME/build/test/classes

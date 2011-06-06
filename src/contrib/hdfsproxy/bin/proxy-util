@@ -85,8 +85,8 @@ CLASSPATH=${CLASSPATH}:$JAVA_HOME/lib/tools.jar
 if [ -d "$HDFSPROXY_HOME/build/classes" ]; then
   CLASSPATH=${CLASSPATH}:$HDFSPROXY_HOME/build/classes
 fi
-if [ -d "$HDFSPROXY_HOME/build/webapps" ]; then
-  CLASSPATH=${CLASSPATH}:$HDFSPROXY_HOME/build
+if [ -d "$HDFSPROXY_HOME/build/web/webapps" ]; then
+  CLASSPATH=${CLASSPATH}:$HDFSPROXY_HOME/build/web
 fi
 if [ -d "$HDFSPROXY_HOME/build/test/hdfs/classes" ]; then
   CLASSPATH=${CLASSPATH}:$HDFSPROXY_HOME/build/test/hdfs/classes

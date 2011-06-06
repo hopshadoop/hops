@@ -53,7 +53,8 @@
   <property name="build-fi.dir" value="${basedir}/build-fi"/>
   <property name="build.classes" value="${build.dir}/classes"/>
   <property name="build.src" value="${build.dir}/src"/>
-  <property name="build.webapps" value="${build.dir}/webapps"/>
+  <property name="build.webapps.root.dir" value="${build.dir}/web"/>
+  <property name="build.webapps" value="${build.webapps.root.dir}/webapps"/>
   <property name="build.anttasks" value="${build.dir}/ant"/>
 
   <!-- convert spaces to _ so that mac os doesn't break things -->
@@ -238,7 +239,7 @@
     <pathelement location="${test.build.extraconf}"/>
     <pathelement location="${test.hdfs.build.classes}" />
     <pathelement location="${test.src.dir}"/>
-    <pathelement location="${build.dir}"/>
+    <pathelement location="${build.webapps.root.dir}"/>
     <pathelement location="${build.tools}"/>
     <pathelement path="${clover.jar}"/>
     <path refid="ivy-test.classpath"/>
@@ -257,7 +258,7 @@
     <path refid="classpath"/>
     <pathelement location="${test.hdfs.build.classes}" />
     <pathelement location="${test.src.dir}"/>
-    <pathelement location="${build.dir}"/>
+    <pathelement location="${build.webapps.root.dir}"/>
   </path>
 
 
@@ -1661,6 +1662,7 @@
         <library pathref="ivy-common.classpath" exported="true" />
         <library pathref="ivy-hdfs.classpath" exported="true" />
         <library pathref="ivy-test.classpath" exported="false" />
+        <library path="${build.webapps.root.dir}" exported="false" />
         <library path="${conf.dir}" exported="false" />
       </classpath>
     </eclipse>
