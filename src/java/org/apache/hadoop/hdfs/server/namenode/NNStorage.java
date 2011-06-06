@@ -732,12 +732,16 @@ public class NNStorage extends Storage implements Closeable {
       props.setProperty("distributedUpgradeVersion",
                         Integer.toString(uVersion));
     }
-    if (imageDigest == null) {
-      imageDigest = MD5Hash.digest(
-          new FileInputStream(getStorageFile(sd, NameNodeFile.IMAGE)));
+    if (LayoutVersion.supports(Feature.FSIMAGE_CHECKSUM, layoutVersion)) {
+      // Though the current NN supports this feature, this function
+      // is called with old layoutVersions from the upgrade tests.
+      if (imageDigest == null) {
+        // May be null on the first save after an upgrade.
+        imageDigest = MD5Hash.digest(
+            new FileInputStream(getStorageFile(sd, NameNodeFile.IMAGE)));
+      }
+      props.setProperty(MESSAGE_DIGEST_PROPERTY, imageDigest.toString());
     }
-
-    props.setProperty(MESSAGE_DIGEST_PROPERTY, imageDigest.toString());
 
     writeCheckpointTime(sd);
   }

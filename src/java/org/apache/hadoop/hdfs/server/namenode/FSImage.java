@@ -438,6 +438,14 @@ public class FSImage implements NNStorageListener, Closeable {
 
       // read and verify consistency of the prev dir
       sdPrev.read(sdPrev.getPreviousVersionFile());
+      if (prevState.getLayoutVersion() != FSConstants.LAYOUT_VERSION) {
+        throw new IOException(
+          "Cannot rollback to storage version " +
+          prevState.getLayoutVersion() +
+          " using this version of the NameNode, which uses storage version " +
+          FSConstants.LAYOUT_VERSION + ". " +
+          "Please use the previous version of HDFS to perform the rollback.");
+      }
       canRollback = true;
     }
     if (!canRollback)
@@ -960,6 +968,11 @@ public class FSImage implements NNStorageListener, Closeable {
    * Save current image and empty journal into {@code current} directory.
    */
   protected void saveCurrent(StorageDirectory sd) throws IOException {
+    if (storage.getLayoutVersion() != FSConstants.LAYOUT_VERSION) {
+      throw new IllegalStateException(
+        "NN with storage version " + FSConstants.LAYOUT_VERSION  +
+        "cannot save an image with version " + storage.getLayoutVersion());
+    }
     File curDir = sd.getCurrentDir();
     NameNodeDirType dirType = (NameNodeDirType)sd.getStorageDirType();
     // save new image or new edits

@@ -873,7 +873,7 @@ public abstract class Storage extends StorageInfo {
     String property = props.getProperty(name);
     if (property == null) {
       throw new InconsistentFSStateException(sd.root, "file "
-          + STORAGE_FILE_VERSION + " has " + name + " mising.");
+          + STORAGE_FILE_VERSION + " has " + name + " missing.");
     }
     return property;
   }
