@@ -46,7 +46,7 @@ public class TestNameNodeMetrics extends TestCase {
   private static final Configuration CONF = new HdfsConfiguration();
   private static final int DFS_REPLICATION_INTERVAL = 1;
   private static final Path TEST_ROOT_DIR_PATH = 
-    new Path(System.getProperty("test.build.data", "build/test/data"));
+    new Path("/testNameNodeMetrics");
   private static final String NN_METRICS = "NameNodeActivity";
   private static final String NS_METRICS = "FSNamesystem";
   
