@@ -50,6 +50,8 @@ public class TestFiDataTransferProtocol2 {
   static final int MIN_N_PACKET = 3;
   static final int MAX_N_PACKET = 10;
 
+  static final int MAX_SLEEP = 1000;
+
   static final Configuration conf = new Configuration();
   static {
     conf.setInt(DFSConfigKeys.DFS_DATANODE_HANDLER_COUNT_KEY, 1);
@@ -89,7 +91,7 @@ public class TestFiDataTransferProtocol2 {
         + ", lastPacketSize=" + lastPacketSize);
 
     final MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf
-        ).numDataNodes(REPLICATION + 1).build();
+        ).numDataNodes(REPLICATION + 2).build();
     final FileSystem dfs = cluster.getFileSystem();
     try {
       final Path p = new Path("/" + methodName + "/foo");
@@ -128,12 +130,11 @@ public class TestFiDataTransferProtocol2 {
   private void runTest17_19(String methodName, int dnIndex)
       throws IOException {
     FiTestUtil.LOG.info("Running " + methodName + " ...");
-    final int maxSleep = 3000;
     final DataTransferTest t = (DataTransferTest) DataTransferTestUtil
         .initTest();
-    initSlowDatanodeTest(t, new SleepAction(methodName, 0, 0, maxSleep));
-    initSlowDatanodeTest(t, new SleepAction(methodName, 1, 0, maxSleep));
-    initSlowDatanodeTest(t, new SleepAction(methodName, 2, 0, maxSleep));
+    initSlowDatanodeTest(t, new SleepAction(methodName, 0, 0, MAX_SLEEP));
+    initSlowDatanodeTest(t, new SleepAction(methodName, 1, 0, MAX_SLEEP));
+    initSlowDatanodeTest(t, new SleepAction(methodName, 2, 0, MAX_SLEEP));
     t.fiCallWritePacketToDisk.set(new CountdownDoosAction(methodName, dnIndex, 3));
     t.fiPipelineErrorAfterInit.set(new VerificationAction(methodName, dnIndex));
     writeSeveralPackets(methodName);
@@ -142,12 +143,11 @@ public class TestFiDataTransferProtocol2 {
 
   private void runTest29_30(String methodName, int dnIndex) throws IOException {
     FiTestUtil.LOG.info("Running " + methodName + " ...");
-    final int maxSleep = 3000;
     final DataTransferTest t = (DataTransferTest) DataTransferTestUtil
         .initTest();
-    initSlowDatanodeTest(t, new SleepAction(methodName, 0, 0, maxSleep));
-    initSlowDatanodeTest(t, new SleepAction(methodName, 1, 0, maxSleep));
-    initSlowDatanodeTest(t, new SleepAction(methodName, 2, 0, maxSleep));
+    initSlowDatanodeTest(t, new SleepAction(methodName, 0, 0, MAX_SLEEP));
+    initSlowDatanodeTest(t, new SleepAction(methodName, 1, 0, MAX_SLEEP));
+    initSlowDatanodeTest(t, new SleepAction(methodName, 2, 0, MAX_SLEEP));
     t.fiAfterDownstreamStatusRead.set(new CountdownOomAction(methodName, dnIndex, 3));
     t.fiPipelineErrorAfterInit.set(new VerificationAction(methodName, dnIndex));
     writeSeveralPackets(methodName);
@@ -209,7 +209,7 @@ public class TestFiDataTransferProtocol2 {
     FiTestUtil.LOG.info("Running " + methodName + " ...");
     final DataTransferTest t = (DataTransferTest) DataTransferTestUtil
         .initTest();
-    initSlowDatanodeTest(t, new SleepAction(methodName, 0, 3000));
+    initSlowDatanodeTest(t, new SleepAction(methodName, 0, MAX_SLEEP));
     writeSeveralPackets(methodName);
   }
 
@@ -223,7 +223,7 @@ public class TestFiDataTransferProtocol2 {
     FiTestUtil.LOG.info("Running " + methodName + " ...");
     final DataTransferTest t = (DataTransferTest) DataTransferTestUtil
         .initTest();
-    initSlowDatanodeTest(t, new SleepAction(methodName, 1, 3000));
+    initSlowDatanodeTest(t, new SleepAction(methodName, 1, MAX_SLEEP));
     writeSeveralPackets(methodName);
   }
   
@@ -237,7 +237,7 @@ public class TestFiDataTransferProtocol2 {
     FiTestUtil.LOG.info("Running " + methodName + " ...");
     final DataTransferTest t = (DataTransferTest) DataTransferTestUtil
         .initTest();
-    initSlowDatanodeTest(t, new SleepAction(methodName, 2, 3000));
+    initSlowDatanodeTest(t, new SleepAction(methodName, 2, MAX_SLEEP));
     writeSeveralPackets(methodName);
   }
   

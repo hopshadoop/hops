@@ -439,10 +439,10 @@ Trunk (unreleased changes)
     HDFS-1573. Add useful tracing information to Lease Renewer thread names
     (todd)
 
-    HDFS-1939.  In ivy.xml, test conf should not extend common conf.
+    HDFS-1939. In ivy.xml, test conf should not extend common conf.
     (Eric Yang via szetszwo)
 
-    HDFS-1332.  Include more information in exceptions and debug messages
+    HDFS-1332  Include more information in exceptions and debug messages
     when BlockPlacementPolicy cannot be satisfied.  (Ted Yu via szetszwo)
 
     HDFS-1958. Confirmation should be more lenient of user input when
@@ -451,12 +451,12 @@ Trunk (unreleased changes)
     HDFS-1905. Improve namenode -format command by not making -clusterId
     parameter mandatory. (Bharath Mundlapudi via suresh)
 
-    HDFS-1877.  Add a new test for concurrent read and write.  (CW Chung
+    HDFS-1877. Add a new test for concurrent read and write.  (CW Chung
     via szetszwo)
 
     HDFS-1959. Better error message for missing namenode directory. (eli)
 
-    HDFS-1996.  ivy: hdfs test jar should be independent to common test jar.
+    HDFS-1996. ivy: hdfs test jar should be independent to common test jar.
     (Eric Yang via szetszwo)
 
     HDFS-1812. TestHDFSCLI should clean up cluster in teardown method.
@@ -471,18 +471,18 @@ Trunk (unreleased changes)
     HDFS-1636. If dfs.name.dir points to an empty dir, namenode format
     shouldn't require confirmation. (Harsh J Chouraria via todd)
 
-    HDFS-1966.  Encapsulate individual DataTransferProtocol op headers.
+    HDFS-1966. Encapsulate individual DataTransferProtocol op headers.
     (szetszwo)
 
-    HDFS-2024.  Format TestWriteRead source codes.  (CW Chung via szetszwo)
+    HDFS-2024. Format TestWriteRead source codes.  (CW Chung via szetszwo)
 
-    HDFS-1968.  Enhance TestWriteRead to support position/sequential read,
+    HDFS-1968. Enhance TestWriteRead to support position/sequential read,
     append, truncate and verbose options.  (CW Chung via szetszwo)
 
     HDFS-1986. Add option to get http/https address from 
     DFSUtil#getInfoServer(). (Tanping via suresh)
 
-    HDFS-2029.  In TestWriteRead, check visible length immediately after
+    HDFS-2029. In TestWriteRead, check visible length immediately after
     openning the file and fix code style.  (John George via szetszwo)
 
   OPTIMIZATIONS
@@ -686,6 +686,9 @@ Trunk (unreleased changes)
 
     HDFS-1907. Fix position read for reading still-being-written file in
     DFSInputStream.  (John George via szetszwo)
+
+    HDFS-1923. In TestFiDataTransferProtocol2, reduce random sleep time period
+    and increase the number of datanodes.  (szetszwo)
 
 Release 0.22.0 - Unreleased
 
