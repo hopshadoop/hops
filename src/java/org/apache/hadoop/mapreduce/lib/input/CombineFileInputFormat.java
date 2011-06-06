@@ -545,17 +545,28 @@ public abstract class CombineFileInputFormat<K, V>
           // add this block to the block --> node locations map
           blockToNodes.put(oneblock, oneblock.hosts);
 
+          // For blocks that do not have host/rack information,
+          // assign to default  rack.
+          String[] racks = null;
+          if (oneblock.hosts.length == 0) {
+            racks = new String[]{NetworkTopology.DEFAULT_RACK};
+          } else {
+            racks = oneblock.racks;
+          }
+
           // add this block to the rack --> block map
-          for (int j = 0; j < oneblock.racks.length; j++) {
-            String rack = oneblock.racks[j];
+          for (int j = 0; j < racks.length; j++) {
+            String rack = racks[j];
             List<OneBlockInfo> blklist = rackToBlocks.get(rack);
             if (blklist == null) {
               blklist = new ArrayList<OneBlockInfo>();
               rackToBlocks.put(rack, blklist);
             }
             blklist.add(oneblock);
-            // Add this host to rackToNodes map
-            addHostToRack(rackToNodes, oneblock.racks[j], oneblock.hosts[j]);
+            if (!racks[j].equals(NetworkTopology.DEFAULT_RACK)) {
+              // Add this host to rackToNodes map
+              addHostToRack(rackToNodes, racks[j], oneblock.hosts[j]);
+            }
           }
 
           // add this block to the node --> block map
@@ -619,6 +630,11 @@ public abstract class CombineFileInputFormat<K, V>
     }
   }
 
+  protected BlockLocation[] getFileBlockLocations(
+    FileSystem fs, FileStatus stat) throws IOException {
+    return fs.getFileBlockLocations(stat, 0, stat.getLen());
+  }
+
   private static void addHostToRack(HashMap<String, Set<String>> rackToNodes,
                                     String rack, String host) {
     Set<String> hosts = rackToNodes.get(rack);
@@ -632,7 +648,9 @@ public abstract class CombineFileInputFormat<K, V>
   private Set<String> getHosts(Set<String> racks) {
     Set<String> hosts = new HashSet<String>();
     for (String rack : racks) {
-      hosts.addAll(rackToNodes.get(rack));
+      if (rackToNodes.containsKey(rack)) {
+        hosts.addAll(rackToNodes.get(rack));
+      }
     }
     return hosts;
   }

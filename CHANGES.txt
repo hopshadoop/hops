@@ -844,6 +844,9 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2487. ChainReducer uses MAPPER_BY_VALUE instead of
     REDUCER_BY_VALUE. (Devaraj K via todd)
 
+    MAPREDUCE-2185. Fix infinite loop at creating splits using
+    CombineFileInputFormat. (Ramkumar Vadali via schen)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES

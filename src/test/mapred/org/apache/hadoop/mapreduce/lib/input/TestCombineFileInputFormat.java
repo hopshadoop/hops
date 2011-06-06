@@ -19,16 +19,14 @@ package org.apache.hadoop.mapreduce.lib.input;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.URI;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.zip.GZIPOutputStream;
 
 import junit.framework.TestCase;
 
-import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.*;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.DFSTestUtil;
@@ -100,6 +98,41 @@ public class TestCombineFileInputFormat extends TestCase {
         results.add(fs.getFileStatus(p));
       }
       return results;
+    }
+  }
+
+  /** Dummy class to extend CombineFileInputFormat. It allows
+   * testing with files having missing blocks without actually removing replicas.
+   */
+  public static class MissingBlockFileSystem extends DistributedFileSystem {
+    String fileWithMissingBlocks;
+
+    @Override
+    public void initialize(URI name, Configuration conf) throws IOException {
+      fileWithMissingBlocks = "";
+      super.initialize(name, conf);
+    }
+
+    @Override
+    public BlockLocation[] getFileBlockLocations(
+        FileStatus stat, long start, long len) throws IOException {
+      if (stat.isDir()) {
+        return null;
+      }
+      System.out.println("File " + stat.getPath());
+      String name = stat.getPath().toUri().getPath();
+      BlockLocation[] locs =
+        super.getFileBlockLocations(stat, start, len);
+      if (name.equals(fileWithMissingBlocks)) {
+        System.out.println("Returing missing blocks for " + fileWithMissingBlocks);
+        locs[0] = new BlockLocation(new String[0], new String[0],
+            locs[0].getOffset(), locs[0].getLength());
+      }
+      return locs;
+    }
+
+    public void setFileWithMissingBlocks(String f) {
+      fileWithMissingBlocks = f;
     }
   }
 
@@ -1014,6 +1047,64 @@ public class TestCombineFileInputFormat extends TestCase {
       System.out.println("Elapsed time for " + numPools + " pools " +
                          " and " + numFiles + " files is " + 
                          ((end - start)) + " milli seconds.");
+    } finally {
+      if (dfs != null) {
+        dfs.shutdown();
+      }
+    }
+  }
+
+  /**
+   * Test that CFIF can handle missing blocks.
+   */
+  public void testMissingBlocks() throws IOException {
+    String namenode = null;
+    MiniDFSCluster dfs = null;
+    FileSystem fileSys = null;
+    String testName = "testMissingBlocks";
+    try {
+      Configuration conf = new Configuration();
+      conf.set("fs.hdfs.impl", MissingBlockFileSystem.class.getName());
+      conf.setBoolean("dfs.replication.considerLoad", false);
+      dfs = new MiniDFSCluster(conf, 1, true, rack1, hosts1);
+      dfs.waitActive();
+
+      namenode = (dfs.getFileSystem()).getUri().getHost() + ":" +
+                 (dfs.getFileSystem()).getUri().getPort();
+
+      fileSys = dfs.getFileSystem();
+      if (!fileSys.mkdirs(inDir)) {
+        throw new IOException("Mkdirs failed to create " + inDir.toString());
+      }
+
+      Path file1 = new Path(dir1 + "/file1");
+      writeFile(conf, file1, (short)1, 1);
+      // create another file on the same datanode
+      Path file5 = new Path(dir5 + "/file5");
+      writeFile(conf, file5, (short)1, 1);
+
+      ((MissingBlockFileSystem)fileSys).setFileWithMissingBlocks(file1.toUri().getPath());
+      // split it using a CombinedFile input format
+      DummyInputFormat inFormat = new DummyInputFormat();
+      Job job = Job.getInstance(conf);
+      FileInputFormat.setInputPaths(job, dir1 + "," + dir5);
+      List<InputSplit> splits = inFormat.getSplits(job);
+      System.out.println("Made splits(Test0): " + splits.size());
+      for (InputSplit split : splits) {
+        System.out.println("File split(Test0): " + split);
+      }
+      assertEquals(splits.size(), 1);
+      CombineFileSplit fileSplit = (CombineFileSplit) splits.get(0);
+      assertEquals(2, fileSplit.getNumPaths());
+      assertEquals(1, fileSplit.getLocations().length);
+      assertEquals(file1.getName(), fileSplit.getPath(0).getName());
+      assertEquals(0, fileSplit.getOffset(0));
+      assertEquals(BLOCKSIZE, fileSplit.getLength(0));
+      assertEquals(file5.getName(), fileSplit.getPath(1).getName());
+      assertEquals(0, fileSplit.getOffset(1));
+      assertEquals(BLOCKSIZE, fileSplit.getLength(1));
+      assertEquals(hosts1[0], fileSplit.getLocations()[0]);
+
     } finally {
       if (dfs != null) {
         dfs.shutdown();
