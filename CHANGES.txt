@@ -942,6 +942,8 @@ Release 0.22.0 - Unreleased
     HDFS-1980. Move build/webapps deeper in the build directory heirarchy
     to aid eclipse users. (todd)
 
+    HDFS-1619. Remove AC_TYPE* from the libhdfs. (Roman Shaposhnik via eli)
+
   OPTIMIZATIONS
 
     HDFS-1140. Speedup INode.getPathComponents. (Dmytro Molkov via shv)
