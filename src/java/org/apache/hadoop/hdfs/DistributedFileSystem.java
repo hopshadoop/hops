@@ -218,6 +218,17 @@ public class DistributedFileSystem extends FileSystem {
     this.verifyChecksum = verifyChecksum;
   }
 
+  /** 
+   * Start the lease recovery of a file
+   *
+   * @param f a file
+   * @return true if the file is already closed
+   * @throws IOException if an error occurs
+   */
+  public boolean recoverLease(Path f) throws IOException {
+    return dfs.recoverLease(getPathName(f));
+  }
+
   @SuppressWarnings("deprecation")
   @Override
   public FSDataInputStream open(Path f, int bufferSize) throws IOException {

@@ -944,6 +944,9 @@ Release 0.22.0 - Unreleased
 
     HDFS-1619. Remove AC_TYPE* from the libhdfs. (Roman Shaposhnik via eli)
 
+    HDFS-1948  Forward port 'hdfs-1520 lightweight namenode operation to
+    trigger lease recovery' (stack)
+
   OPTIMIZATIONS
 
     HDFS-1140. Speedup INode.getPathComponents. (Dmytro Molkov via shv)

@@ -836,6 +836,12 @@ public class NameNode implements NamenodeProtocols, FSConstants {
   }
 
   /** {@inheritDoc} */
+  public boolean recoverLease(String src, String clientName) throws IOException {
+    String clientMachine = getClientMachine();
+    return namesystem.recoverLease(src, clientName, clientMachine);
+  }
+
+  /** {@inheritDoc} */
   public boolean setReplication(String src, short replication) 
     throws IOException {  
     return namesystem.setReplication(src, replication);

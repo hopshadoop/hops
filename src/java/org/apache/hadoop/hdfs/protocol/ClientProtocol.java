@@ -537,6 +537,17 @@ public interface ClientProtocol extends VersionedProtocol {
   public void renewLease(String clientName) throws AccessControlException,
       IOException;
 
+  /**
+   * Start lease recovery.
+   * Lightweight NameNode operation to trigger lease recovery
+   * 
+   * @param src path of the file to start lease recovery
+   * @param clientName name of the current client
+   * @return true if the file is already closed
+   * @throws IOException
+   */
+  public boolean recoverLease(String src, String clientName) throws IOException;
+
   public int GET_STATS_CAPACITY_IDX = 0;
   public int GET_STATS_USED_IDX = 1;
   public int GET_STATS_REMAINING_IDX = 2;
