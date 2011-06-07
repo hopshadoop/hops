@@ -752,7 +752,41 @@ public class MiniDFSCluster {
                              String[] racks, String[] hosts,
                              long[] simulatedCapacities,
                              boolean setupHostsFile) throws IOException {
+    startDataNodes(conf, numDataNodes, manageDfsDirs, operation, racks, hosts,
+                   simulatedCapacities, setupHostsFile, false);
+  }
 
+  /**
+   * Modify the config and start up additional DataNodes.  The info port for
+   * DataNodes is guaranteed to use a free port.
+   *  
+   *  Data nodes can run with the name node in the mini cluster or
+   *  a real name node. For example, running with a real name node is useful
+   *  when running simulated data nodes with a real name node.
+   *  If minicluster's name node is null assume that the conf has been
+   *  set with the right address:port of the name node.
+   *
+   * @param conf the base configuration to use in starting the DataNodes.  This
+   *          will be modified as necessary.
+   * @param numDataNodes Number of DataNodes to start; may be zero
+   * @param manageDfsDirs if true, the data directories for DataNodes will be
+   *          created and dfs.datanode.data.dir will be set in the conf
+   * @param operation the operation with which to start the DataNodes.  If null
+   *          or StartupOption.FORMAT, then StartupOption.REGULAR will be used.
+   * @param racks array of strings indicating the rack that each DataNode is on
+   * @param hosts array of strings indicating the hostnames for each DataNode
+   * @param simulatedCapacities array of capacities of the simulated data nodes
+   * @param setupHostsFile add new nodes to dfs hosts files
+   * @param checkDataNodeAddrConfig if true, only set DataNode port addresses if not already set in config
+   *
+   * @throws IllegalStateException if NameNode has been shutdown
+   */
+  public synchronized void startDataNodes(Configuration conf, int numDataNodes,
+                             boolean manageDfsDirs, StartupOption operation, 
+                             String[] racks, String[] hosts,
+                             long[] simulatedCapacities,
+                             boolean setupHostsFile,
+                             boolean checkDataNodeAddrConfig) throws IOException {
     int curDatanodesNum = dataNodes.size();
     // for mincluster's the default initialDelay for BRs is 0
     if (conf.get(DFSConfigKeys.DFS_BLOCKREPORT_INITIAL_DELAY_KEY) == null) {
@@ -792,7 +826,7 @@ public class MiniDFSCluster {
     for (int i = curDatanodesNum; i < curDatanodesNum+numDataNodes; i++) {
       Configuration dnConf = new HdfsConfiguration(conf);
       // Set up datanode address
-      setupDatanodeAddress(dnConf, setupHostsFile);
+      setupDatanodeAddress(dnConf, setupHostsFile, checkDataNodeAddrConfig);
       if (manageDfsDirs) {
         File dir1 = getStorageDir(i, 0);
         File dir2 = getStorageDir(i, 1);
@@ -1791,7 +1825,8 @@ public class MiniDFSCluster {
     return port;
   }
   
-  private void setupDatanodeAddress(Configuration conf, boolean setupHostsFile) throws IOException {
+  private void setupDatanodeAddress(Configuration conf, boolean setupHostsFile,
+                           boolean checkDataNodeAddrConfig) throws IOException {
     if (setupHostsFile) {
       String hostsFile = conf.get(DFSConfigKeys.DFS_HOSTS, "").trim();
       if (hostsFile.length() == 0) {
@@ -1799,13 +1834,23 @@ public class MiniDFSCluster {
       }
       // Setup datanode in the include file, if it is defined in the conf
       String address = "127.0.0.1:" + getFreeSocketPort();
-      conf.set("dfs.datanode.address", address);
+      if (checkDataNodeAddrConfig) {
+        conf.setIfUnset("dfs.datanode.address", address);
+      } else {
+        conf.set("dfs.datanode.address", address);
+      }
       addToFile(hostsFile, address);
       LOG.info("Adding datanode " + address + " to hosts file " + hostsFile);
     } else {
-      conf.set("dfs.datanode.address", "127.0.0.1:0");
-      conf.set("dfs.datanode.http.address", "127.0.0.1:0");
-      conf.set("dfs.datanode.ipc.address", "127.0.0.1:0");
+      if (checkDataNodeAddrConfig) {
+        conf.setIfUnset("dfs.datanode.address", "127.0.0.1:0");
+        conf.setIfUnset("dfs.datanode.http.address", "127.0.0.1:0");
+        conf.setIfUnset("dfs.datanode.ipc.address", "127.0.0.1:0");
+      } else {
+        conf.set("dfs.datanode.address", "127.0.0.1:0");
+        conf.set("dfs.datanode.http.address", "127.0.0.1:0");
+        conf.set("dfs.datanode.ipc.address", "127.0.0.1:0");
+      }
     }
   }
   

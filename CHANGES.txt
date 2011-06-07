@@ -287,6 +287,9 @@ Trunk (unreleased changes)
 
   IMPROVEMENTS
 
+    HDFS-1875. MiniDFSCluster hard-codes dfs.datanode.address to localhost
+    (Eric Payne via mattf)
+
     HDFS-2019. Fix all the places where Java method File.list is used with
     FileUtil.list API (Bharath Mundlapudi via mattf)
 

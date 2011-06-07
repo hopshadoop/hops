@@ -75,10 +75,12 @@ public class DataNodeCluster {
     " [-inject startingBlockId numBlocksPerDN]" +
     " [-r replicationFactorForInjectedBlocks]" +
     " [-d dataNodeDirs]\n" + 
+    " [-checkDataNodeAddrConfig]\n" +
     "      Default datanode direcory is " + DATANODE_DIRS + "\n" +
     "      Default replication factor for injected blocks is 1\n" +
     "      Defaul rack is used if -racks is not specified\n" +
-    "      Data nodes are simulated if -simulated OR conf file specifies simulated\n";
+    "      Data nodes are simulated if -simulated OR conf file specifies simulated\n" +
+    "      -checkDataNodeAddrConfig tells DataNodeConf to use data node addresses from conf file, if it is set. If not set, use .localhost'.";
   
   
   static void printUsageExit() {
@@ -97,6 +99,7 @@ public class DataNodeCluster {
     long startingBlockId = 1;
     int numBlocksPerDNtoInject = 0;
     int replication = 1;
+    boolean checkDataNodeAddrConfig = false;
     
     Configuration conf = new HdfsConfiguration();
 
@@ -139,6 +142,8 @@ public class DataNodeCluster {
          printUsageExit("Missing number of blocks to inject");
        }
        numBlocksPerDNtoInject = Integer.parseInt(args[i]);      
+      } else if (args[i].equals("-checkDataNodeAddrConfig")) {
+        checkDataNodeAddrConfig = true;
       } else {
         printUsageExit();
       }
@@ -186,7 +191,7 @@ public class DataNodeCluster {
     }
     try {
       mc.startDataNodes(conf, numDataNodes, true, StartupOption.REGULAR,
-          rack4DataNode);
+          rack4DataNode, null, null, false, checkDataNodeAddrConfig);
       if (inject) {
         long blockSize = 10;
         System.out.println("Injecting " + numBlocksPerDNtoInject +
