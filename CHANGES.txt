@@ -847,6 +847,9 @@ Release 0.22.0 - Unreleased
     MAPREDUCE-2185. Fix infinite loop at creating splits using
     CombineFileInputFormat. (Ramkumar Vadali via schen)
 
+    MAPREDUCE-2571. CombineFileInputFormat.getSplits throws a
+    java.lang.ArrayStoreException. (Bochun Bai via todd)
+
 Release 0.21.1 - Unreleased
 
   NEW FEATURES
