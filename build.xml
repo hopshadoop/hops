@@ -326,10 +326,6 @@
 
   </target>
 
-  <target name="set-c++-libhdfs">
-    <property name="libhdfs" value="true"/>
-  </target>
-
   <import file="${test.src.dir}/aop/build/aop.xml"/>
 
   <target name="compile-hdfs-classes" depends="init">
@@ -1102,7 +1098,7 @@
     </macro_tar>
   </target>
 
-  <target name="bin-package" depends="set-c++-libhdfs, compile, compile-c++-libhdfs, jar, jar-test, ant-tasks, jsvc" 
+  <target name="bin-package" depends="compile, compile-c++-libhdfs, jar, jar-test, ant-tasks, jsvc" 
 		description="assembles artifacts for binary target">
     <mkdir dir="${dist.dir}"/>
     <mkdir dir="${dist.dir}/lib"/>
@@ -1118,7 +1114,7 @@
     </copy>
 
     <copy todir="${dist.dir}/lib" includeEmptyDirs="false">
-      <fileset dir="${build.dir}/c++/${build.platform}/lib">
+      <fileset dir="${build.dir}/c++/${build.platform}/lib" erroronmissingdir="false">
         <include name="**"/>
       </fileset>
     </copy>

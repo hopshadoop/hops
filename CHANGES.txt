@@ -488,6 +488,8 @@ Trunk (unreleased changes)
     HDFS-2029. In TestWriteRead, check visible length immediately after
     openning the file and fix code style.  (John George via szetszwo)
 
+    HDFS-2040. Only build libhdfs if a flag is passed. (eli)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
