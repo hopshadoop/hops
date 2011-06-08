@@ -1308,13 +1308,15 @@
     </copy> -->
 
     <copy todir="${dist.dir}/include" includeEmptyDirs="false">
-      <fileset dir="${build.dir}/c++/${build.platform}/include">
+      <fileset dir="${build.dir}/c++/${build.platform}/include" 
+               erroronmissingdir="false">
         <include name="**"/>
       </fileset>
     </copy>
 
     <copy todir="${dist.dir}/lib" includeEmptyDirs="false">
-      <fileset dir="${build.dir}/c++/${build.platform}/lib">
+      <fileset dir="${build.dir}/c++/${build.platform}/lib"
+               erroronmissingdir="false">
         <include name="**"/>
       </fileset>
     </copy>

@@ -278,6 +278,8 @@ Trunk (unreleased changes)
     MAPREDUCE-2529. Add support for regex-based shuffle metric counting
     exceptions. (Thomas Graves via cdouglas)
 
+    MAPREDUCE-2559. ant binary fails due to missing c++ lib dir. (eli)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES
