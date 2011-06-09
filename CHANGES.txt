@@ -393,6 +393,7 @@ Trunk (unreleased changes)
 
     HDFS-1295. Improve namenode restart times by short-circuiting the
     first block reports from datanodes. (Matt Foley via suresh)
+    Corrected merge error in DataNode.java. (Matt Foley)
 
     HDFS-1843. Discover file not found early for file append. 
     (Bharath Mundlapudi via jitendra)

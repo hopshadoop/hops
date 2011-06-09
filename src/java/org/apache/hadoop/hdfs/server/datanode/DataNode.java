@@ -912,27 +912,30 @@ public class DataNode extends Configured
      * @throws IOException
      */
     DatanodeCommand blockReport() throws IOException {
-      // send block report
+      // send block report if timer has expired.
       DatanodeCommand cmd = null;
       long startTime = now();
       if (startTime - lastBlockReport > blockReportInterval) {
-        //
-        // Send latest block report if timer has expired.
-        // Get back a list of local block(s) that are obsolete
-        // and can be safely GC'ed.
-        //
-        long brStartTime = now();
+
+        // Create block report
+        long brCreateStartTime = now();
         BlockListAsLongs bReport = data.getBlockReport(blockPoolId);
+
+        // Send block report
+        long brSendStartTime = now();
         cmd = bpNamenode.blockReport(bpRegistration, blockPoolId, bReport
             .getBlockListAsLongs());
-        long brTime = now() - brStartTime;
-        metrics.addBlockReport(brTime);
-        LOG.info("BlockReport of " + bReport.getNumberOfBlocks() +
-            " blocks got processed in " + brTime + " msecs");
-        //
+
+        // Log the block report processing stats from Datanode perspective
+        long brSendCost = now() - brSendStartTime;
+        long brCreateCost = brSendStartTime - brCreateStartTime;
+        metrics.addBlockReport(brSendCost);
+        LOG.info("BlockReport of " + bReport.getNumberOfBlocks()
+            + " blocks took " + brCreateCost + " msec to generate and "
+            + brSendCost + " msecs for RPC and NN processing");
+
         // If we have sent the first block report, then wait a random
         // time before we start the periodic block reports.
-        //
         if (resetBlockReportTime) {
           lastBlockReport = startTime - R.nextInt((int)(blockReportInterval));
           resetBlockReportTime = false;
