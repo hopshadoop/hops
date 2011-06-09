@@ -493,6 +493,9 @@ Trunk (unreleased changes)
     HDFS-1586. Add InterfaceAudience and InterfaceStability annotations to 
     MiniDFSCluster. (suresh)
 
+    HDFS-2003. Separate FSEditLog reading logic from edit log memory state
+    building logic. (Ivan Kelly via todd)
+
   OPTIMIZATIONS
 
     HDFS-1458. Improve checkpoint performance by avoiding unnecessary image
