@@ -736,7 +736,7 @@ public class TrackerDistributedCacheManager {
     }
   }
 
-  private class CacheDir {
+  private static class CacheDir {
     long size;
     long subdirs;
   }

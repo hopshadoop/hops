@@ -280,6 +280,9 @@ Trunk (unreleased changes)
 
     MAPREDUCE-2559. ant binary fails due to missing c++ lib dir. (eli)
 
+    MAPREDUCE-2573. Fix new findbugs warning introduced by MAPREDUCE-2494.
+    (Robert Joseph Evans via todd)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES
