@@ -69,7 +69,8 @@ class BlockSender implements java.io.Closeable, FSConstants {
   private long seqno; // sequence number of packet
 
   private boolean transferToAllowed = true;
-  private boolean blockReadFully; //set when the whole block is read
+  // set once entire requested byte range has been sent to the client
+  private boolean sentEntireByteRange;
   private boolean verifyChecksum; //if true, check is verified while reading
   private DataTransferThrottler throttler;
   private final String clientTraceFmt; // format of client trace log message
@@ -493,6 +494,8 @@ class BlockSender implements java.io.Closeable, FSConstants {
       } catch (IOException e) { //socket error
         throw ioeToSocketException(e);
       }
+
+      sentEntireByteRange = true;
     } finally {
       if (clientTraceFmt != null) {
         final long endTime = System.nanoTime();
@@ -501,12 +504,10 @@ class BlockSender implements java.io.Closeable, FSConstants {
       close();
     }
 
-    blockReadFully = initialOffset == 0 && offset >= replicaVisibleLength;
-
     return totalRead;
   }
   
-  boolean isBlockReadFully() {
-    return blockReadFully;
+  boolean didSendEntireByteRange() {
+    return sentEntireByteRange;
   }
 }

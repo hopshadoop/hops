@@ -503,6 +503,9 @@ Trunk (unreleased changes)
     HDFS-1826. NameNode should save image to name directories in parallel
     during upgrade. (Matt Foley via hairong)
 
+    HDFS-941. The DFS client should cache and reuse open sockets to datanodes
+    while performing reads. (bc Wong and Todd Lipcon via todd)
+
   BUG FIXES
 
     HDFS-1449. Fix test failures - ExtendedBlock must return 

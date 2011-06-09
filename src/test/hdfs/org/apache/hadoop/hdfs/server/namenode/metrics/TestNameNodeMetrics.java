@@ -23,6 +23,7 @@ import java.util.Random;
 
 import junit.framework.TestCase;
 
+import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -37,6 +38,11 @@ import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
+import org.apache.hadoop.test.MetricsAsserts;
+import org.apache.log4j.Level;
+
+import org.apache.commons.logging.LogFactory;
+
 import static org.apache.hadoop.test.MetricsAsserts.*;
 
 /**
@@ -59,6 +65,9 @@ public class TestNameNodeMetrics extends TestCase {
         DFS_REPLICATION_INTERVAL);
     CONF.setInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_INTERVAL_KEY, 
         DFS_REPLICATION_INTERVAL);
+
+    ((Log4JLogger)LogFactory.getLog(MetricsAsserts.class))
+      .getLogger().setLevel(Level.DEBUG);
   }
   
   private MiniDFSCluster cluster;
@@ -255,9 +264,5 @@ public class TestNameNodeMetrics extends TestCase {
     readFile(fs, file1_Path);
     updateMetrics();
     assertCounter("GetBlockLocations", 3L, getMetrics(NN_METRICS));
-  
-    // Verify total load metrics, total load = Data Node started.
-    updateMetrics();
-    assertGauge("TotalLoad" ,DATANODE_COUNT, getMetrics(NS_METRICS));
   }
 }
