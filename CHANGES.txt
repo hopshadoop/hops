@@ -513,6 +513,8 @@ Trunk (unreleased changes)
     HDFS-2030. Improve usability of namenode -upgrade command.
     (Bharath Mundlapudi via suresh)
 
+    HDFS-2056. Update fetchdt usage. (Tanping Wang via jitendra)
+
   BUG FIXES
 
     HDFS-1449. Fix test failures - ExtendedBlock must return 
