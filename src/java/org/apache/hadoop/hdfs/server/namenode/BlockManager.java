@@ -1258,7 +1258,7 @@ public class BlockManager {
     // Ignore replicas already scheduled to be removed from the DN
     if(belongsToInvalidates(dn.getStorageID(), block)) {
       assert storedBlock.findDatanode(dn) < 0 : "Block " + block
-        + " in recentInvalidatesSet should not appear in DN " + this;
+        + " in recentInvalidatesSet should not appear in DN " + dn;
       return storedBlock;
     }
 
@@ -1394,7 +1394,7 @@ public class BlockManager {
   throws IOException {
     assert (block != null && namesystem.hasWriteLock());
     BlockInfo storedBlock;
-    if (block.getClass() == BlockInfoUnderConstruction.class) {
+    if (block instanceof BlockInfoUnderConstruction) {
       //refresh our copy in case the block got completed in another thread
       storedBlock = blocksMap.getStoredBlock(block);
     } else {

@@ -517,6 +517,8 @@ Trunk (unreleased changes)
 
   BUG FIXES
 
+    HDFS-2061. Two minor bugs in BlockManager block report processing. (mattf)
+
     HDFS-1449. Fix test failures - ExtendedBlock must return 
     block file name in #getBlockName(). (suresh)
 
