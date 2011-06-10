@@ -283,6 +283,8 @@ Trunk (unreleased changes)
     MAPREDUCE-2573. Fix new findbugs warning introduced by MAPREDUCE-2494.
     (Robert Joseph Evans via todd)
 
+    MAPREDUCE-2581. Spelling errors in log messages. (Tim Sell via eli)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES

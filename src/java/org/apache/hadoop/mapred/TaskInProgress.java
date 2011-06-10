@@ -600,7 +600,7 @@ class TaskInProgress {
       TaskStatus.State oldState = oldStatus.getRunState();
       TaskStatus.State newState = status.getRunState();
           
-      // We should never recieve a duplicate success/failure/killed
+      // We should never receive a duplicate success/failure/killed
       // status update for the same taskid! This is a safety check, 
       // and is addressed better at the TaskTracker to ensure this.
       // @see {@link TaskTracker.transmitHeartbeat()}

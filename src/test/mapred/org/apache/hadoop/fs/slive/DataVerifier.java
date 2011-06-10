@@ -182,11 +182,11 @@ class DataVerifier {
       cmpBuf.put(buf.get());
       if (!cmpBuf.hasRemaining()) {
         cmpBuf.rewind();
-        long recievedData = cmpBuf.getLong();
+        long receivedData = cmpBuf.getLong();
         cmpBuf.rewind();
         long expected = hasher.generate(hashOffset);
         hashOffset += BYTES_PER_LONG;
-        if (recievedData == expected) {
+        if (receivedData == expected) {
           ++chunksSame;
         } else {
           ++chunksDifferent;

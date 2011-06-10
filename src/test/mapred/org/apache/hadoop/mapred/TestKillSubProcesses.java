@@ -472,7 +472,7 @@ public class TestKillSubProcesses extends TestCase {
   }
   
   /**
-   * Mapper that fails when recieves a signal. Signal is existence of a file.
+   * Mapper that fails when receives a signal. Signal is existence of a file.
    */
   static class FailingMapperWithChildren extends MapperWithChildren {
     public void configure(JobConf conf) {

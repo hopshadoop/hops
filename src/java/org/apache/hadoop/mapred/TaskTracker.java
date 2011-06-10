@@ -185,7 +185,7 @@ public class TaskTracker
 
   private TrackerDistributedCacheManager distributedCacheManager;
     
-  // last heartbeat response recieved
+  // last heartbeat response received
   short heartbeatResponseId = -1;
   
   static final String TASK_CLEANUP_SUFFIX = ".cleanup";
@@ -1859,7 +1859,7 @@ public class TaskTracker
       for (TaskTrackerAction action : actions) {
         if (action.getActionId() == 
             TaskTrackerAction.ActionType.REINIT_TRACKER) {
-          LOG.info("Recieved ReinitTrackerAction from JobTracker");
+          LOG.info("Received ReinitTrackerAction from JobTracker");
           return true;
         }
       }

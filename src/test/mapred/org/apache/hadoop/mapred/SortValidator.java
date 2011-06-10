@@ -247,7 +247,7 @@ public class SortValidator extends Configured implements Tool {
             // Sanity check
             if (keyClass != key.getClass()) {
               throw new IOException("Type mismatch in key: expected " +
-                                    keyClass.getName() + ", recieved " +
+                                    keyClass.getName() + ", received " +
                                     key.getClass().getName());
             }
             

@@ -894,12 +894,12 @@ class MapTask extends Task {
       reporter.progress();
       if (key.getClass() != keyClass) {
         throw new IOException("Type mismatch in key from map: expected "
-                              + keyClass.getName() + ", recieved "
+                              + keyClass.getName() + ", received "
                               + key.getClass().getName());
       }
       if (value.getClass() != valClass) {
         throw new IOException("Type mismatch in value from map: expected "
-                              + valClass.getName() + ", recieved "
+                              + valClass.getName() + ", received "
                               + value.getClass().getName());
       }
       if (partition < 0 || partition >= partitions) {

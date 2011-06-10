@@ -102,7 +102,7 @@ public class SimulatorTaskTracker implements SimulatorEventListener {
    */
   private boolean firstHeartbeat = true;
 
-  // last heartbeat response recieved
+  // last heartbeat response received
   private short heartbeatResponseId = -1;
 
   /**

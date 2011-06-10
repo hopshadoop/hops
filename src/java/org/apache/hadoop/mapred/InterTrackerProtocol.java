@@ -92,7 +92,7 @@ interface InterTrackerProtocol extends VersionedProtocol {
    * 
    * {@link TaskTracker} must also indicate whether this is the first 
    * interaction (since state refresh) and acknowledge the last response
-   * it recieved from the {@link JobTracker} 
+   * it received from the {@link JobTracker} 
    * 
    * @param status the status update
    * @param restarted <code>true</code> if the process has just started or 
