@@ -510,6 +510,9 @@ Trunk (unreleased changes)
     HDFS-941. The DFS client should cache and reuse open sockets to datanodes
     while performing reads. (bc Wong and Todd Lipcon via todd)
 
+    HDFS-2030. Improve usability of namenode -upgrade command.
+    (Bharath Mundlapudi via suresh)
+
   BUG FIXES
 
     HDFS-1449. Fix test failures - ExtendedBlock must return 
