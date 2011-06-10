@@ -238,7 +238,8 @@ public class FSEditLogLoader {
             numOpConcatDelete++;
 
             ConcatDeleteOp concatDeleteOp = (ConcatDeleteOp)op;
-            fsDir.unprotectedConcat(concatDeleteOp.trg, concatDeleteOp.srcs);
+            fsDir.unprotectedConcat(concatDeleteOp.trg, concatDeleteOp.srcs,
+                concatDeleteOp.timestamp);
             break;
           }
           case OP_RENAME_OLD: {

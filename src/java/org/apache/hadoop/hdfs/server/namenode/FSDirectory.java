@@ -930,10 +930,10 @@ class FSDirectory implements Closeable {
     try {
       // actual move
       waitForReady();
-
-      unprotectedConcat(target, srcs);
+      long timestamp = now();
+      unprotectedConcat(target, srcs, timestamp);
       // do the commit
-      fsImage.getEditLog().logConcat(target, srcs, now());
+      fsImage.getEditLog().logConcat(target, srcs, timestamp);
     } finally {
       writeUnlock();
     }
@@ -948,7 +948,7 @@ class FSDirectory implements Closeable {
    * Must be public because also called from EditLogs
    * NOTE: - it does not update quota (not needed for concat)
    */
-  public void unprotectedConcat(String target, String [] srcs) 
+  public void unprotectedConcat(String target, String [] srcs, long timestamp) 
       throws UnresolvedLinkException {
     if (NameNode.stateChangeLog.isDebugEnabled()) {
       NameNode.stateChangeLog.debug("DIR* FSNamesystem.concat to "+target);
@@ -979,9 +979,8 @@ class FSDirectory implements Closeable {
       count++;
     }
     
-    long now = now();
-    trgInode.setModificationTimeForce(now);
-    trgParent.setModificationTime(now);
+    trgInode.setModificationTimeForce(timestamp);
+    trgParent.setModificationTime(timestamp);
     // update quota on the parent directory ('count' files removed, 0 space)
     unprotectedUpdateCount(trgINodes, trgINodes.length-1, - count, 0);
   }

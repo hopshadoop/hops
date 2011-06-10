@@ -716,6 +716,9 @@ Trunk (unreleased changes)
     HDFS-1998. Federation: Make refresh-namenodes.sh refresh all the
     namenode. (Tanping Wang via suresh)
 
+    HDFS-2041. OP_CONCAT_DELETE doesn't properly restore modification time
+    of the concatenated file when edit logs are replayed. (todd)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES
