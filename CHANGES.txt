@@ -970,6 +970,9 @@ Release 0.22.0 - Unreleased
     HDFS-1948  Forward port 'hdfs-1520 lightweight namenode operation to
     trigger lease recovery' (stack)
 
+    HDFS-1954. Improved corrupt files warning on NameNode web UI.
+    (Patrick Hunt via shv)
+
   OPTIMIZATIONS
 
     HDFS-1140. Speedup INode.getPathComponents. (Dmytro Molkov via shv)
