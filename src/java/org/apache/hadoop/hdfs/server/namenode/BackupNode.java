@@ -192,7 +192,7 @@ public class BackupNode extends NameNode {
   @Override // NamenodeProtocol
   public NamenodeRegistration register(NamenodeRegistration registration
   ) throws IOException {
-    throw new UnsupportedActionException("journal");
+    throw new UnsupportedActionException("register");
   }
 
   @Override // NamenodeProtocol

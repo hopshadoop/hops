@@ -973,6 +973,10 @@ Release 0.22.0 - Unreleased
     HDFS-1954. Improved corrupt files warning on NameNode web UI.
     (Patrick Hunt via shv)
 
+    HDFS-1409. BackupNode registration throwing  
+    UnsupportedActionException("register") instead of "journal".
+    (Ching-Shen Chen via shv)
+
   OPTIMIZATIONS
 
     HDFS-1140. Speedup INode.getPathComponents. (Dmytro Molkov via shv)
