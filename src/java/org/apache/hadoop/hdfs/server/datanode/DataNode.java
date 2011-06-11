@@ -19,8 +19,6 @@ package org.apache.hadoop.hdfs.server.datanode;
 
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
-import static org.apache.hadoop.hdfs.protocol.DataTransferProtocol.Status.ERROR_ACCESS_TOKEN;
-import static org.apache.hadoop.hdfs.protocol.DataTransferProtocol.Status.SUCCESS;
 import static org.apache.hadoop.hdfs.server.common.Util.now;
 
 import java.io.BufferedOutputStream;
@@ -75,8 +73,11 @@ import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.FSConstants;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
+import org.apache.hadoop.hdfs.protocol.HdfsProtoUtil;
 import org.apache.hadoop.hdfs.protocol.RecoveryInProgressException;
 import org.apache.hadoop.hdfs.protocol.UnregisteredNodeException;
+import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.DNTransferAckProto;
+import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status;
 import org.apache.hadoop.hdfs.security.token.block.BlockPoolTokenSecretManager;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager;
@@ -132,6 +133,7 @@ import org.apache.hadoop.util.ServicePlugin;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.VersionInfo;
 import org.mortbay.util.ajax.JSON;
+
 
 /**********************************************************
  * DataNode is a class (and program) that stores a set of
@@ -1958,12 +1960,13 @@ public class DataNode extends Configured
         // read ack
         if (isClient) {
           in = new DataInputStream(NetUtils.getInputStream(sock));
-          final DataTransferProtocol.Status s = DataTransferProtocol.Status.read(in);
+          DNTransferAckProto closeAck = DNTransferAckProto.parseFrom(
+              HdfsProtoUtil.vintPrefixed(in));
           if (LOG.isDebugEnabled()) {
-            LOG.debug(getClass().getSimpleName() + ": close-ack=" + s);
+            LOG.debug(getClass().getSimpleName() + ": close-ack=" + closeAck);
           }
-          if (s != SUCCESS) {
-            if (s == ERROR_ACCESS_TOKEN) {
+          if (closeAck.getStatus() != Status.SUCCESS) {
+            if (closeAck.getStatus() == Status.ERROR_ACCESS_TOKEN) {
               throw new InvalidBlockTokenException(
                   "Got access token error for connect ack, targets="
                    + Arrays.asList(targets));

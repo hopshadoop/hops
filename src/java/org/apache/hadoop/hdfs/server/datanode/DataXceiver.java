@@ -17,9 +17,8 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
-import static org.apache.hadoop.hdfs.protocol.DataTransferProtocol.Status.ERROR;
-import static org.apache.hadoop.hdfs.protocol.DataTransferProtocol.Status.ERROR_ACCESS_TOKEN;
-import static org.apache.hadoop.hdfs.protocol.DataTransferProtocol.Status.SUCCESS;
+import static org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status.*;
+import static org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status;
 import static org.apache.hadoop.hdfs.server.common.Util.now;
 import static org.apache.hadoop.hdfs.server.datanode.DataNode.DN_CLIENTTRACE_FORMAT;
 
@@ -44,6 +43,11 @@ import org.apache.hadoop.hdfs.protocol.DataTransferProtocol.BlockConstructionSta
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.FSConstants;
+import org.apache.hadoop.hdfs.protocol.HdfsProtoUtil;
+import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.BlockOpResponseProto;
+import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.ClientReadStatusProto;
+import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.OpBlockChecksumResponseProto;
+
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager;
 import org.apache.hadoop.hdfs.server.common.HdfsConstants;
@@ -51,7 +55,6 @@ import org.apache.hadoop.hdfs.server.datanode.FSDatasetInterface.MetaDataInputSt
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.MD5Hash;
-import org.apache.hadoop.io.Text;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.net.NetUtils;
@@ -59,6 +62,9 @@ import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.DataChecksum;
 import org.apache.hadoop.util.StringUtils;
+
+import com.google.protobuf.ByteString;
+
 
 /**
  * Thread for processing incoming/outgoing data stream.
@@ -224,16 +230,19 @@ class DataXceiver extends DataTransferProtocol.Receiver
         sendResponse(s, ERROR, datanode.socketWriteTimeout);
         throw e;
       }
+      
+      // send op status
+      sendResponse(s, SUCCESS, datanode.socketWriteTimeout);
 
-      SUCCESS.write(out); // send op status
       long read = blockSender.sendBlock(out, baseStream, null); // send data
 
       if (blockSender.didSendEntireByteRange()) {
         // If we sent the entire range, then we should expect the client
         // to respond with a Status enum.
         try {
-          DataTransferProtocol.Status stat = DataTransferProtocol.Status.read(in);
-          if (stat == null) {
+          ClientReadStatusProto stat = ClientReadStatusProto.parseFrom(
+              HdfsProtoUtil.vintPrefixed(in));
+          if (!stat.hasStatus()) {
             LOG.warn("Client " + s.getInetAddress() + " did not send a valid status " +
                      "code after reading. Will close connection.");
             IOUtils.closeStream(out);
@@ -329,7 +338,7 @@ class DataXceiver extends DataTransferProtocol.Receiver
     BlockReceiver blockReceiver = null; // responsible for data handling
     String mirrorNode = null;           // the name:port of next target
     String firstBadLink = "";           // first datanode that failed in connection setup
-    DataTransferProtocol.Status mirrorInStatus = SUCCESS;
+    Status mirrorInStatus = SUCCESS;
     try {
       if (isDatanode || 
           stage != BlockConstructionStage.PIPELINE_CLOSE_RECOVERY) {
@@ -377,8 +386,10 @@ class DataXceiver extends DataTransferProtocol.Receiver
 
           // read connect ack (only for clients, not for replication req)
           if (isClient) {
-            mirrorInStatus = DataTransferProtocol.Status.read(mirrorIn);
-            firstBadLink = Text.readString(mirrorIn);
+            BlockOpResponseProto connectAck =
+              BlockOpResponseProto.parseFrom(HdfsProtoUtil.vintPrefixed(mirrorIn));
+            mirrorInStatus = connectAck.getStatus();
+            firstBadLink = connectAck.getFirstBadLink();
             if (LOG.isDebugEnabled() || mirrorInStatus != SUCCESS) {
               LOG.info("Datanode " + targets.length +
                        " got response for connect ack " +
@@ -389,8 +400,11 @@ class DataXceiver extends DataTransferProtocol.Receiver
 
         } catch (IOException e) {
           if (isClient) {
-            ERROR.write(replyOut);
-            Text.writeString(replyOut, mirrorNode);
+            BlockOpResponseProto.newBuilder()
+              .setStatus(ERROR)
+              .setFirstBadLink(mirrorNode)
+              .build()
+              .writeDelimitedTo(replyOut);
             replyOut.flush();
           }
           IOUtils.closeStream(mirrorOut);
@@ -417,8 +431,11 @@ class DataXceiver extends DataTransferProtocol.Receiver
                    " forwarding connect ack to upstream firstbadlink is " +
                    firstBadLink);
         }
-        mirrorInStatus.write(replyOut);
-        Text.writeString(replyOut, firstBadLink);
+        BlockOpResponseProto.newBuilder()
+          .setStatus(mirrorInStatus)
+          .setFirstBadLink(firstBadLink)
+          .build()
+          .writeDelimitedTo(replyOut);
         replyOut.flush();
       }
 
@@ -433,7 +450,7 @@ class DataXceiver extends DataTransferProtocol.Receiver
           if (LOG.isTraceEnabled()) {
             LOG.trace("TRANSFER: send close-ack");
           }
-          SUCCESS.write(replyOut);
+          writeResponse(SUCCESS, replyOut);
         }
       }
 
@@ -489,12 +506,12 @@ class DataXceiver extends DataTransferProtocol.Receiver
         NetUtils.getOutputStream(s, datanode.socketWriteTimeout));
     try {
       datanode.transferReplicaForPipelineRecovery(blk, targets, client);
-      SUCCESS.write(out);
+      writeResponse(Status.SUCCESS, out);
     } finally {
       IOUtils.closeStream(out);
     }
   }
-
+  
   /**
    * Get block checksum (MD5 of CRC32).
    */
@@ -530,10 +547,15 @@ class DataXceiver extends DataTransferProtocol.Receiver
       }
 
       //write reply
-      SUCCESS.write(out);
-      out.writeInt(bytesPerCRC);
-      out.writeLong(crcPerBlock);
-      md5.write(out);
+      BlockOpResponseProto.newBuilder()
+        .setStatus(SUCCESS)
+        .setChecksumResponse(OpBlockChecksumResponseProto.newBuilder()             
+          .setBytesPerCrc(bytesPerCRC)
+          .setCrcPerBlock(crcPerBlock)
+          .setMd5(ByteString.copyFrom(md5.getDigest()))
+          )
+        .build()
+        .writeDelimitedTo(out);
       out.flush();
     } finally {
       IOUtils.closeStream(out);
@@ -590,7 +612,7 @@ class DataXceiver extends DataTransferProtocol.Receiver
           baseStream, SMALL_BUFFER_SIZE));
 
       // send status first
-      SUCCESS.write(reply);
+      writeResponse(SUCCESS, reply);
       // send block content to the target
       long read = blockSender.sendBlock(reply, baseStream, 
                                         dataXceiverServer.balanceThrottler);
@@ -653,7 +675,7 @@ class DataXceiver extends DataTransferProtocol.Receiver
 
     Socket proxySock = null;
     DataOutputStream proxyOut = null;
-    DataTransferProtocol.Status opStatus = SUCCESS;
+    Status opStatus = SUCCESS;
     BlockReceiver blockReceiver = null;
     DataInputStream proxyReply = null;
     
@@ -676,10 +698,11 @@ class DataXceiver extends DataTransferProtocol.Receiver
       // receive the response from the proxy
       proxyReply = new DataInputStream(new BufferedInputStream(
           NetUtils.getInputStream(proxySock), BUFFER_SIZE));
-      final DataTransferProtocol.Status status
-          = DataTransferProtocol.Status.read(proxyReply);
-      if (status != SUCCESS) {
-        if (status == ERROR_ACCESS_TOKEN) {
+      BlockOpResponseProto copyResponse = BlockOpResponseProto.parseFrom(
+          HdfsProtoUtil.vintPrefixed(proxyReply));
+
+      if (copyResponse.getStatus() != SUCCESS) {
+        if (copyResponse.getStatus() == ERROR_ACCESS_TOKEN) {
           throw new IOException("Copy block " + block + " from "
               + proxySock.getRemoteSocketAddress()
               + " failed due to access token error");
@@ -748,13 +771,24 @@ class DataXceiver extends DataTransferProtocol.Receiver
    * @param opStatus status message to write
    * @param timeout send timeout
    **/
-  private void sendResponse(Socket s, DataTransferProtocol.Status opStatus,
+  private void sendResponse(Socket s, Status status,
       long timeout) throws IOException {
     DataOutputStream reply = 
       new DataOutputStream(NetUtils.getOutputStream(s, timeout));
-    opStatus.write(reply);
-    reply.flush();
+    
+    writeResponse(status, reply);
   }
+  
+  private void writeResponse(Status status, OutputStream out)
+  throws IOException {
+    BlockOpResponseProto response = BlockOpResponseProto.newBuilder()
+      .setStatus(status)
+      .build();
+    
+    response.writeDelimitedTo(out);
+    out.flush();
+  }
+  
 
   private void checkAccess(DataOutputStream out, final boolean reply, 
       final ExtendedBlock blk,
@@ -771,12 +805,15 @@ class DataXceiver extends DataTransferProtocol.Receiver
               out = new DataOutputStream(
                   NetUtils.getOutputStream(s, datanode.socketWriteTimeout));
             }
-            ERROR_ACCESS_TOKEN.write(out);
+            
+            BlockOpResponseProto.Builder resp = BlockOpResponseProto.newBuilder()
+              .setStatus(ERROR_ACCESS_TOKEN);
             if (mode == BlockTokenSecretManager.AccessMode.WRITE) {
               DatanodeRegistration dnR = 
                 datanode.getDNRegistrationForBP(blk.getBlockPoolId());
-              Text.writeString(out, dnR.getName());
+              resp.setFirstBadLink(dnR.getName());
             }
+            resp.build().writeDelimitedTo(out);
             out.flush();
           }
           LOG.warn("Block token verification failed: op=" + op

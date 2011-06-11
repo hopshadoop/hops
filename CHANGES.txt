@@ -285,6 +285,9 @@ Trunk (unreleased changes)
     layout to be consistent across the binary tgz, rpm, and deb.
     (Eric Yang via omalley)
 
+    HDFS-2058. Change Data Transfer wire protocol to use protocol buffers.
+    (todd)
+
   IMPROVEMENTS
 
     HDFS-1875. MiniDFSCluster hard-codes dfs.datanode.address to localhost

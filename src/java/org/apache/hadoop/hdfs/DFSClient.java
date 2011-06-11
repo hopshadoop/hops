@@ -19,8 +19,6 @@
 package org.apache.hadoop.hdfs;
 
 import static org.apache.hadoop.hdfs.protocol.DataTransferProtocol.Op.BLOCK_CHECKSUM;
-import static org.apache.hadoop.hdfs.protocol.DataTransferProtocol.Status.ERROR_ACCESS_TOKEN;
-import static org.apache.hadoop.hdfs.protocol.DataTransferProtocol.Status.SUCCESS;
 
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
@@ -75,7 +73,11 @@ import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.protocol.NSQuotaExceededException;
+import org.apache.hadoop.hdfs.protocol.HdfsProtoUtil;
 import org.apache.hadoop.hdfs.protocol.UnresolvedPathException;
+import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.BlockOpResponseProto;
+import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.OpBlockChecksumResponseProto;
+import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.server.common.HdfsConstants;
 import org.apache.hadoop.hdfs.server.common.UpgradeStatusReport;
@@ -1118,9 +1120,11 @@ public class DFSClient implements FSConstants, java.io.Closeable {
           DataTransferProtocol.Sender.opBlockChecksum(out, block,
               lb.getBlockToken());
 
-          final DataTransferProtocol.Status reply = DataTransferProtocol.Status.read(in);
-          if (reply != SUCCESS) {
-            if (reply == ERROR_ACCESS_TOKEN
+          final BlockOpResponseProto reply =
+            BlockOpResponseProto.parseFrom(HdfsProtoUtil.vintPrefixed(in));
+
+          if (reply.getStatus() != Status.SUCCESS) {
+            if (reply.getStatus() == Status.ERROR_ACCESS_TOKEN
                 && i > lastRetriedIndex) {
               if (LOG.isDebugEnabled()) {
                 LOG.debug("Got access token error in response to OP_BLOCK_CHECKSUM "
@@ -1138,9 +1142,12 @@ public class DFSClient implements FSConstants, java.io.Closeable {
                   + block + " from datanode " + datanodes[j].getName());
             }
           }
+          
+          OpBlockChecksumResponseProto checksumData =
+            reply.getChecksumResponse();
 
           //read byte-per-checksum
-          final int bpc = in.readInt(); 
+          final int bpc = checksumData.getBytesPerCrc();
           if (i == 0) { //first block
             bytesPerCRC = bpc;
           }
@@ -1150,13 +1157,14 @@ public class DFSClient implements FSConstants, java.io.Closeable {
           }
           
           //read crc-per-block
-          final long cpb = in.readLong();
+          final long cpb = checksumData.getCrcPerBlock();
           if (locatedblocks.size() > 1 && i == 0) {
             crcPerBlock = cpb;
           }
 
           //read md5
-          final MD5Hash md5 = MD5Hash.read(in);
+          final MD5Hash md5 = new MD5Hash(
+              checksumData.getMd5().toByteArray());
           md5.write(md5out);
           
           done = true;
