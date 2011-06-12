@@ -7,6 +7,8 @@ Trunk (unreleased changes)
     MAPREDUCE-2455. Remove deprecated JobTracker.State in favour of
     JobTrackerStatus. (tomwhite)
 
+    MAPREDUCE-2430. Remove mrunit contrib. (nigel via eli)
+
   NEW FEATURES
 
     MAPREDUCE-2543. [Gridmix] High-Ram feature emulation in Gridmix. (amarrk)

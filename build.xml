@@ -2144,10 +2144,6 @@
                 output="${build.dir.eclipse-contrib-classes}/gridmix/main" />
         <source path="${contrib.dir}/gridmix/src/test"
                 output="${build.dir.eclipse-contrib-classes}/gridmix/test" />
-        <source path="${contrib.dir}/mrunit/src/java"
-                output="${build.dir.eclipse-contrib-classes}/mrunit/main" />
-        <source path="${contrib.dir}/mrunit/src/test"
-                output="${build.dir.eclipse-contrib-classes}/mrunit/test" />
         <source path="${contrib.dir}/mumak/src/java"
                 output="${build.dir.eclipse-contrib-classes}/mumak/main" />
         <source path="${contrib.dir}/mumak/src/test"
