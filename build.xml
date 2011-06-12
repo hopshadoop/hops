@@ -1459,6 +1459,7 @@
         <env key="JVM_ARCH" value="${jvm.arch}"/>
         <env key="LIBHDFS_BUILD_DIR" value="${build.c++.libhdfs}"/>
         <env key="HADOOP_PREFIX" value="${basedir}"/>
+        <env key="HADOOP_HDFS_HOME" value="${basedir}"/>
         <env key="HADOOP_CONF_DIR" value="${test.libhdfs.dir}/conf"/>
         <env key="HADOOP_LOG_DIR" value="${test.libhdfs.dir}/logs"/>
         <env key="LIBHDFS_TEST_DIR" value="${test.libhdfs.dir}"/>
@@ -1466,6 +1467,7 @@
         <env key="LIBHDFS_INSTALL_DIR" value="${install.c++}/lib"/>  
         <env key="LIB_DIR" value="${common.ivy.lib.dir}"/>
         <env key="CLOVER_JAR" value="${clover.jar}"/>
+        <env key="HADOOP_VERSION" value="${version}"/>
 		<arg value="test"/>
     </exec>
   </target>

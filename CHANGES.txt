@@ -724,6 +724,8 @@ Trunk (unreleased changes)
     HDFS-2041. OP_CONCAT_DELETE doesn't properly restore modification time
     of the concatenated file when edit logs are replayed. (todd)
 
+    HDFS-2063. libhdfs test is broken. (Eric Yang via eli)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES
