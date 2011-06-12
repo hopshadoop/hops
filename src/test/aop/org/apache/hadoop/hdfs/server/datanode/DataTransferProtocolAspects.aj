@@ -27,8 +27,8 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fi.DataTransferTestUtil;
 import org.apache.hadoop.fi.DataTransferTestUtil.DataTransferTest;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.BlockOpResponseProto;
-import org.apache.hadoop.hdfs.protocol.DataTransferProtocol.Op;
-import org.apache.hadoop.hdfs.protocol.DataTransferProtocol.Receiver;
+import org.apache.hadoop.hdfs.protocol.datatransfer.Op;
+import org.apache.hadoop.hdfs.protocol.datatransfer.Receiver;
 
 /** Aspect for DataTransferProtocol */
 public aspect DataTransferProtocolAspects {

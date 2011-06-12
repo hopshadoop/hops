@@ -15,10 +15,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdfs.protocol;
+package org.apache.hadoop.hdfs.protocol.datatransfer;
 
 
-import org.apache.hadoop.hdfs.protocol.DataTransferProtocol.BlockConstructionStage;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
+import org.apache.hadoop.hdfs.protocol.HdfsProtoUtil;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.BaseHeaderProto;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.ClientOperationHeaderProto;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.OpWriteBlockProto;
@@ -30,9 +33,11 @@ import org.apache.hadoop.security.token.Token;
  * Static utilities for dealing with the protocol buffers used by the
  * Data Transfer Protocol.
  */
+@InterfaceAudience.Private
+@InterfaceStability.Evolving
 abstract class DataTransferProtoUtil {
 
-  static DataTransferProtocol.BlockConstructionStage fromProto(
+  static BlockConstructionStage fromProto(
       OpWriteBlockProto.BlockConstructionStage stage) {
     return BlockConstructionStage.valueOf(BlockConstructionStage.class,
         stage.name());

@@ -17,10 +17,6 @@
  */
 package org.apache.hadoop.hdfs;
 
-import static org.apache.hadoop.hdfs.protocol.DataTransferProtocol.Op.WRITE_BLOCK;
-import static org.apache.hadoop.hdfs.protocol.DataTransferProtocol.PacketHeader;
-import static org.apache.hadoop.hdfs.protocol.DataTransferProtocol.PipelineAck;
-
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -42,22 +38,23 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.protocol.DataTransferProtocol;
-import org.apache.hadoop.hdfs.protocol.DataTransferProtocol.BlockConstructionStage;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.FSConstants.DatanodeReportType;
-import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos;
+import org.apache.hadoop.hdfs.protocol.datatransfer.BlockConstructionStage;
+import org.apache.hadoop.hdfs.protocol.datatransfer.DataTransferProtocol;
+import org.apache.hadoop.hdfs.protocol.datatransfer.Op;
+import org.apache.hadoop.hdfs.protocol.datatransfer.PacketHeader;
+import org.apache.hadoop.hdfs.protocol.datatransfer.PipelineAck;
+import org.apache.hadoop.hdfs.protocol.datatransfer.Sender;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.BlockOpResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.BlockOpResponseProto.Builder;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager;
 import org.apache.hadoop.hdfs.server.common.HdfsConstants;
 import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
-import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.io.Text;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.util.DataChecksum;
 import org.apache.hadoop.util.StringUtils;
@@ -188,7 +185,7 @@ public class TestDataTransferProtocol extends TestCase {
       String description, Boolean eofExcepted) throws IOException {
     sendBuf.reset();
     recvBuf.reset();
-    DataTransferProtocol.Sender.opWriteBlock(sendOut, block, 0,
+    Sender.opWriteBlock(sendOut, block, 0,
         stage, newGS, block.getNumBytes(), block.getNumBytes(), "cl", null,
         new DatanodeInfo[1], BlockTokenSecretManager.DUMMY_TOKEN);
     if (eofExcepted) {
@@ -370,12 +367,12 @@ public class TestDataTransferProtocol extends TestCase {
     // bad ops
     sendBuf.reset();
     sendOut.writeShort((short)DataTransferProtocol.DATA_TRANSFER_VERSION);
-    sendOut.writeByte(WRITE_BLOCK.code - 1);
+    sendOut.writeByte(Op.WRITE_BLOCK.code - 1);
     sendRecvData("Wrong Op Code", true);
     
     /* Test OP_WRITE_BLOCK */
     sendBuf.reset();
-    DataTransferProtocol.Sender.opWriteBlock(sendOut, 
+    Sender.opWriteBlock(sendOut, 
         new ExtendedBlock(poolId, newBlockId), 0,
         BlockConstructionStage.PIPELINE_SETUP_CREATE, 0L, 0L, 0L, "cl", null,
         new DatanodeInfo[1], BlockTokenSecretManager.DUMMY_TOKEN);
@@ -389,7 +386,7 @@ public class TestDataTransferProtocol extends TestCase {
 
     sendBuf.reset();
     recvBuf.reset();
-    DataTransferProtocol.Sender.opWriteBlock(sendOut,
+    Sender.opWriteBlock(sendOut,
         new ExtendedBlock(poolId, ++newBlockId), 0,
         BlockConstructionStage.PIPELINE_SETUP_CREATE, 0L, 0L, 0L, "cl", null,
         new DatanodeInfo[1], BlockTokenSecretManager.DUMMY_TOKEN);
@@ -412,7 +409,7 @@ public class TestDataTransferProtocol extends TestCase {
     // test for writing a valid zero size block
     sendBuf.reset();
     recvBuf.reset();
-    DataTransferProtocol.Sender.opWriteBlock(sendOut, 
+    Sender.opWriteBlock(sendOut, 
         new ExtendedBlock(poolId, ++newBlockId), 0,
         BlockConstructionStage.PIPELINE_SETUP_CREATE, 0L, 0L, 0L, "cl", null,
         new DatanodeInfo[1], BlockTokenSecretManager.DUMMY_TOKEN);
@@ -442,21 +439,21 @@ public class TestDataTransferProtocol extends TestCase {
     sendBuf.reset();
     recvBuf.reset();
     blk.setBlockId(blkid-1);
-    DataTransferProtocol.Sender.opReadBlock(sendOut, blk, 0L, fileLen, "cl",
+    Sender.opReadBlock(sendOut, blk, 0L, fileLen, "cl",
           BlockTokenSecretManager.DUMMY_TOKEN);
     sendRecvData("Wrong block ID " + newBlockId + " for read", false); 
 
     // negative block start offset -1L
     sendBuf.reset();
     blk.setBlockId(blkid);
-    DataTransferProtocol.Sender.opReadBlock(sendOut, blk, -1L, fileLen, "cl",
+    Sender.opReadBlock(sendOut, blk, -1L, fileLen, "cl",
           BlockTokenSecretManager.DUMMY_TOKEN);
     sendRecvData("Negative start-offset for read for block " + 
                  firstBlock.getBlockId(), false);
 
     // bad block start offset
     sendBuf.reset();
-    DataTransferProtocol.Sender.opReadBlock(sendOut, blk, fileLen, fileLen, "cl",
+    Sender.opReadBlock(sendOut, blk, fileLen, fileLen, "cl",
           BlockTokenSecretManager.DUMMY_TOKEN);
     sendRecvData("Wrong start-offset for reading block " +
                  firstBlock.getBlockId(), false);
@@ -465,7 +462,7 @@ public class TestDataTransferProtocol extends TestCase {
     recvBuf.reset();
     sendResponse(Status.SUCCESS, null, recvOut);
     sendBuf.reset();
-    DataTransferProtocol.Sender.opReadBlock(sendOut, blk, 0L, 
+    Sender.opReadBlock(sendOut, blk, 0L, 
         -1 - random.nextInt(oneMil), "cl", BlockTokenSecretManager.DUMMY_TOKEN);
     sendRecvData("Negative length for reading block " +
                  firstBlock.getBlockId(), false);
@@ -474,14 +471,14 @@ public class TestDataTransferProtocol extends TestCase {
     recvBuf.reset();
     sendResponse(Status.ERROR, null, recvOut);
     sendBuf.reset();
-    DataTransferProtocol.Sender.opReadBlock(sendOut, blk, 0L, 
+    Sender.opReadBlock(sendOut, blk, 0L, 
         fileLen + 1, "cl", BlockTokenSecretManager.DUMMY_TOKEN);
     sendRecvData("Wrong length for reading block " +
                  firstBlock.getBlockId(), false);
     
     //At the end of all this, read the file to make sure that succeeds finally.
     sendBuf.reset();
-    DataTransferProtocol.Sender.opReadBlock(sendOut, blk, 0L, 
+    Sender.opReadBlock(sendOut, blk, 0L, 
         fileLen, "cl", BlockTokenSecretManager.DUMMY_TOKEN);
     readFile(fileSys, file, fileLen);
     } finally {
@@ -511,14 +508,6 @@ public class TestDataTransferProtocol extends TestCase {
     readBack = new PacketHeader();
     readBack.readFields(ByteBuffer.wrap(baos.toByteArray()));
     assertEquals(hdr, readBack);
-
-    // Test sanity check for good header
-    PacketHeader goodHeader = new PacketHeader(
-      4,                   // size of packet
-      0,                   // OffsetInBlock
-      100,                 // sequencenumber
-      true,                // lastPacketInBlock
-      0);                  // chunk length
 
     assertTrue(hdr.sanityCheck(99));
     assertFalse(hdr.sanityCheck(100));

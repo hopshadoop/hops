@@ -17,8 +17,9 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
-import static org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status.*;
-import static org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status;
+import static org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status.ERROR;
+import static org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status.ERROR_ACCESS_TOKEN;
+import static org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status.SUCCESS;
 import static org.apache.hadoop.hdfs.server.common.Util.now;
 import static org.apache.hadoop.hdfs.server.datanode.DataNode.DN_CLIENTTRACE_FORMAT;
 
@@ -38,16 +39,18 @@ import java.util.Arrays;
 
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
-import org.apache.hadoop.hdfs.protocol.DataTransferProtocol;
-import org.apache.hadoop.hdfs.protocol.DataTransferProtocol.BlockConstructionStage;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.FSConstants;
 import org.apache.hadoop.hdfs.protocol.HdfsProtoUtil;
+import org.apache.hadoop.hdfs.protocol.datatransfer.BlockConstructionStage;
+import org.apache.hadoop.hdfs.protocol.datatransfer.Op;
+import org.apache.hadoop.hdfs.protocol.datatransfer.Receiver;
+import org.apache.hadoop.hdfs.protocol.datatransfer.Sender;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.BlockOpResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.ClientReadStatusProto;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.OpBlockChecksumResponseProto;
-
+import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager;
 import org.apache.hadoop.hdfs.server.common.HdfsConstants;
@@ -55,8 +58,6 @@ import org.apache.hadoop.hdfs.server.datanode.FSDatasetInterface.MetaDataInputSt
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.MD5Hash;
-import org.apache.hadoop.metrics2.lib.MutableCounterLong;
-import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.security.token.Token;
@@ -69,8 +70,7 @@ import com.google.protobuf.ByteString;
 /**
  * Thread for processing incoming/outgoing data stream.
  */
-class DataXceiver extends DataTransferProtocol.Receiver
-    implements Runnable, FSConstants {
+class DataXceiver extends Receiver implements Runnable, FSConstants {
   public static final Log LOG = DataNode.LOG;
   static final Log ClientTraceLog = DataNode.ClientTraceLog;
   
@@ -139,7 +139,7 @@ class DataXceiver extends DataTransferProtocol.Receiver
       // This optimistic behaviour allows the other end to reuse connections.
       // Setting keepalive timeout to 0 disable this behavior.
       do {
-        DataTransferProtocol.Op op;
+        Op op;
         try {
           if (opsProcessed != 0) {
             assert socketKeepaliveTimeout > 0;
@@ -206,8 +206,7 @@ class DataXceiver extends DataTransferProtocol.Receiver
     DataOutputStream out = new DataOutputStream(
                  new BufferedOutputStream(baseStream, SMALL_BUFFER_SIZE));
     checkAccess(out, true, block, blockToken,
-        DataTransferProtocol.Op.READ_BLOCK,
-        BlockTokenSecretManager.AccessMode.READ);
+        Op.READ_BLOCK, BlockTokenSecretManager.AccessMode.READ);
   
     // send the block
     BlockSender blockSender = null;
@@ -329,8 +328,7 @@ class DataXceiver extends DataTransferProtocol.Receiver
             NetUtils.getOutputStream(s, datanode.socketWriteTimeout),
             SMALL_BUFFER_SIZE));
     checkAccess(replyOut, isClient, block, blockToken,
-        DataTransferProtocol.Op.WRITE_BLOCK,
-        BlockTokenSecretManager.AccessMode.WRITE);
+        Op.WRITE_BLOCK, BlockTokenSecretManager.AccessMode.WRITE);
 
     DataOutputStream mirrorOut = null;  // stream to next target
     DataInputStream mirrorIn = null;    // reply from next target
@@ -375,7 +373,7 @@ class DataXceiver extends DataTransferProtocol.Receiver
                          SMALL_BUFFER_SIZE));
           mirrorIn = new DataInputStream(NetUtils.getInputStream(mirrorSock));
 
-          DataTransferProtocol.Sender.opWriteBlock(mirrorOut, originalBlock,
+          Sender.opWriteBlock(mirrorOut, originalBlock,
               pipelineSize, stage, newGs, minBytesRcvd, maxBytesRcvd, clientname,
               srcDataNode, targets, blockToken);
 
@@ -497,10 +495,9 @@ class DataXceiver extends DataTransferProtocol.Receiver
       final DatanodeInfo[] targets,
       final Token<BlockTokenIdentifier> blockToken) throws IOException {
     checkAccess(null, true, blk, blockToken,
-        DataTransferProtocol.Op.TRANSFER_BLOCK,
-        BlockTokenSecretManager.AccessMode.COPY);
+        Op.TRANSFER_BLOCK, BlockTokenSecretManager.AccessMode.COPY);
 
-    updateCurrentThreadName(DataTransferProtocol.Op.TRANSFER_BLOCK + " " + blk);
+    updateCurrentThreadName(Op.TRANSFER_BLOCK + " " + blk);
 
     final DataOutputStream out = new DataOutputStream(
         NetUtils.getOutputStream(s, datanode.socketWriteTimeout));
@@ -521,8 +518,7 @@ class DataXceiver extends DataTransferProtocol.Receiver
     final DataOutputStream out = new DataOutputStream(
         NetUtils.getOutputStream(s, datanode.socketWriteTimeout));
     checkAccess(out, true, block, blockToken,
-        DataTransferProtocol.Op.BLOCK_CHECKSUM,
-        BlockTokenSecretManager.AccessMode.READ);
+        Op.BLOCK_CHECKSUM, BlockTokenSecretManager.AccessMode.READ);
     updateCurrentThreadName("Reading metadata for block " + block);
     final MetaDataInputStream metadataIn = 
       datanode.data.getMetaDataInputStream(block);
@@ -693,7 +689,7 @@ class DataXceiver extends DataTransferProtocol.Receiver
                      new BufferedOutputStream(baseStream, SMALL_BUFFER_SIZE));
 
       /* send request to the proxy */
-      DataTransferProtocol.Sender.opCopyBlock(proxyOut, block, blockToken);
+      Sender.opCopyBlock(proxyOut, block, blockToken);
 
       // receive the response from the proxy
       proxyReply = new DataInputStream(new BufferedInputStream(
@@ -760,11 +756,6 @@ class DataXceiver extends DataTransferProtocol.Receiver
     return now() - opStartTime;
   }
 
-  private void updateCounter(MutableCounterLong localCounter,
-      MutableCounterLong remoteCounter) {
-    (isLocal? localCounter: remoteCounter).incr();
-  }
-
   /**
    * Utility function for sending a response.
    * @param s socket to write to
@@ -793,7 +784,7 @@ class DataXceiver extends DataTransferProtocol.Receiver
   private void checkAccess(DataOutputStream out, final boolean reply, 
       final ExtendedBlock blk,
       final Token<BlockTokenIdentifier> t,
-      final DataTransferProtocol.Op op,
+      final Op op,
       final BlockTokenSecretManager.AccessMode mode) throws IOException {
     if (datanode.isBlockTokenEnabled) {
       try {
