@@ -72,10 +72,10 @@ public interface DataTransferProtocol {
    * when protocol changes. It is not very obvious. 
    */
   /*
-   * Version 25:
-   *    Encapsulate individual operation headers.
+   * Version 26:
+   *    Use protobuf.
    */
-  public static final int DATA_TRANSFER_VERSION = 25;
+  public static final int DATA_TRANSFER_VERSION = 26;
 
   /** Operation */
   public enum Op {

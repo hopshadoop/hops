@@ -726,6 +726,9 @@ Trunk (unreleased changes)
 
     HDFS-2063. libhdfs test is broken. (Eric Yang via eli)
 
+    HDFS-2067. Bump DATA_TRANSFER_VERSION constant in trunk after introduction
+    of protocol buffers in the protocol. (szetszwo via todd)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES
