@@ -732,6 +732,9 @@ Trunk (unreleased changes)
     HDFS-2067. Bump DATA_TRANSFER_VERSION constant in trunk after introduction
     of protocol buffers in the protocol. (szetszwo via todd)
 
+    HDFS-2069. Incorrect default trash interval value in the docs.
+    (Harsh J Chouraria via eli)
+
 Release 0.22.0 - Unreleased
 
   INCOMPATIBLE CHANGES
