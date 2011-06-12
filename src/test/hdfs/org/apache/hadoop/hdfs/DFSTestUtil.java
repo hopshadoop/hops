@@ -555,6 +555,15 @@ public class DFSTestUtil {
     IOUtils.copyBytes(is, os, s.length(), true);
   }
 
+  /* Append the given string to the given file */
+  public static void appendFile(FileSystem fs, Path p, String s) 
+      throws IOException {
+    assert fs.exists(p);
+    InputStream is = new ByteArrayInputStream(s.getBytes());
+    FSDataOutputStream os = fs.append(p);
+    IOUtils.copyBytes(is, os, s.length(), true);
+  }
+  
   // Returns url content as string.
   public static String urlGet(URL url) throws IOException {
     URLConnection conn = url.openConnection();

@@ -129,6 +129,9 @@ public class FSEditLogLoader {
         numOpRenewDelegationToken = 0, numOpCancelDelegationToken = 0, 
         numOpUpdateMasterKey = 0, numOpReassignLease = 0, numOpOther = 0;
 
+    fsNamesys.writeLock();
+    fsDir.writeLock();
+
     // Keep track of the file offsets of the last several opcodes.
     // This is handy when manually recovering corrupted edits files.
     PositionTrackingInputStream tracker = new PositionTrackingInputStream(in);
@@ -248,7 +251,7 @@ public class FSEditLogLoader {
             HdfsFileStatus dinfo = fsDir.getFileInfo(renameOp.dst, false);
             fsDir.unprotectedRenameTo(renameOp.src, renameOp.dst,
                                       renameOp.timestamp);
-            fsNamesys.changeLease(renameOp.src, renameOp.dst, dinfo);
+            fsNamesys.unprotectedChangeLease(renameOp.src, renameOp.dst, dinfo);
             break;
           }
           case OP_DELETE: {
@@ -339,7 +342,7 @@ public class FSEditLogLoader {
             HdfsFileStatus dinfo = fsDir.getFileInfo(renameOp.dst, false);
             fsDir.unprotectedRenameTo(renameOp.src, renameOp.dst,
                                       renameOp.timestamp, renameOp.options);
-            fsNamesys.changeLease(renameOp.src, renameOp.dst, dinfo);
+            fsNamesys.unprotectedChangeLease(renameOp.src, renameOp.dst, dinfo);
             break;
           }
           case OP_GET_DELEGATION_TOKEN: {
@@ -423,6 +426,9 @@ public class FSEditLogLoader {
       String errorMessage = sb.toString();
       FSImage.LOG.error(errorMessage);
       throw new IOException(errorMessage, t);
+    } finally {
+      fsDir.writeUnlock();
+      fsNamesys.writeUnlock();
     }
     if (FSImage.LOG.isDebugEnabled()) {
       FSImage.LOG.debug("numOpAdd = " + numOpAdd + " numOpClose = " + numOpClose 

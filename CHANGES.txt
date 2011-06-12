@@ -1205,6 +1205,8 @@ Release 0.22.0 - Unreleased
     HDFS-2039. TestNameNodeMetrics uses a bad test root path, preventing it
     from running inside Eclipse. (todd)
 
+    HDFS-988. saveNamespace race can corrupt the edits log. (eli)
+
 Release 0.21.1 - Unreleased
     HDFS-1466. TestFcHdfsSymlink relies on /tmp/test not existing. (eli)
 

@@ -1410,9 +1410,8 @@ class DFSOutputStream extends FSOutputSummer implements Syncable {
   }
   
   /**
-   * flushes out to all replicas of the block. 
-   * The data is in the buffers of the DNs 
-   * but not neccessary on the DN's OS buffers. 
+   * Flushes out to all replicas of the block. The data is in the buffers
+   * of the DNs but not necessarily in the DN's OS buffers.
    *
    * It is a synchronous operation. When it returns,
    * it guarantees that flushed data become visible to new readers. 
