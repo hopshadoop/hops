@@ -237,9 +237,9 @@ class UnderReplicatedBlocks implements Iterable<Block> {
       throws StorageException, TransactionContextException {
     assert curReplicas >= 0 : "Negative replicas!";
     int priLevel = getPriority(block, curReplicas, decomissionedReplicas,
-        expectedReplicas);
-    if (priLevel != LEVEL && add(block, priLevel)) {
-      if (NameNode.blockStateChangeLog.isDebugEnabled()) {
+                               expectedReplicas);
+    if(add(block, priLevel)) {
+      if(NameNode.blockStateChangeLog.isDebugEnabled()) {
         NameNode.blockStateChangeLog.debug(
             "BLOCK* NameSystem.UnderReplicationBlock.add:" + block +
                 " has only " + curReplicas + " replicas and need " +
@@ -339,11 +339,11 @@ class UnderReplicatedBlocks implements Iterable<Block> {
           " curPri  " + curPri +
           " oldPri  " + oldPri);
     }
-    if (oldPri != LEVEL && oldPri != curPri) {
+    if(oldPri != curPri) {
       remove(block, oldPri);
     }
-    if (curPri != LEVEL && add(block, curPri)) {
-      if (NameNode.blockStateChangeLog.isDebugEnabled()) {
+    if(add(block, curPri)) {
+      if(NameNode.blockStateChangeLog.isDebugEnabled()) {
         NameNode.blockStateChangeLog.debug(
             "BLOCK* NameSystem.UnderReplicationBlock.update:" + block +
                 " has only " + curReplicas + " replicas and needs " +
