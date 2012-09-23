@@ -1069,10 +1069,10 @@ public class DistributedFileSystem extends FileSystem {
   @Override
   public void close() throws IOException {
     try {
-      super.processDeleteOnExit();
-      dfs.close();
-    } finally {
+      dfs.closeOutputStreams(false);
       super.close();
+    } finally {
+      dfs.close();
     }
   }
 
