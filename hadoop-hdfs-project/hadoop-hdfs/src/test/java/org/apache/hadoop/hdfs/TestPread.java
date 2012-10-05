@@ -65,12 +65,13 @@ public class TestPread {
   }
 
   private void writeFile(FileSystem fileSys, Path name) throws IOException {
-     int replication = 3;// We need > 1 blocks to test out the hedged reads.
+    int replication = 3;// We need > 1 blocks to test out the hedged reads.
     // create and write a file that contains three blocks of data
     DataOutputStream stm = fileSys.create(name, true, 4096,
       (short)replication, blockSize);
     // test empty file open and read
-    stm.close();
+    DFSTestUtil.createFile(fileSys, name, 12 * blockSize, 0,
+        blockSize, (short) replication, seed);
     FSDataInputStream in = fileSys.open(name);
     byte[] buffer = new byte[12 * blockSize];
     in.readFully(0, buffer, 0, 0);
