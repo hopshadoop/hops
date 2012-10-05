@@ -334,29 +334,8 @@ public class DFSTestUtil {
   
   public static void createFile(FileSystem fs, Path fileName, long fileLen,
       short replFactor, long seed) throws IOException {
-    if (!fs.mkdirs(fileName.getParent())) {
-      throw new IOException(
-          "Mkdirs failed to create " + fileName.getParent().toString());
-    }
-    FSDataOutputStream out = null;
-    try {
-      out = fs.create(fileName, replFactor);
-      byte[] toWrite = new byte[1024];
-      Random rb = new Random(seed);
-      long bytesToWrite = fileLen;
-      while (bytesToWrite > 0) {
-        rb.nextBytes(toWrite);
-        int bytesToWriteNext =
-            (1024 < bytesToWrite) ? 1024 : (int) bytesToWrite;
-
-        out.write(toWrite, 0, bytesToWriteNext);
-        bytesToWrite -= bytesToWriteNext;
-      }
-      out.close();
-      out = null;
-    } finally {
-      IOUtils.closeStream(out);
-    }
+    createFile(fs, fileName, 1024, fileLen, fs.getDefaultBlockSize(fileName),
+        replFactor, seed);
   }
 
   public static void createFile(FileSystem fs, Path fileName, int bufferLen,
