@@ -1946,10 +1946,10 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     }
 
     // sanity check
-    if ((nsQuota < 0 && nsQuota != HdfsConstants.QUOTA_DONT_SET &&
-        nsQuota < HdfsConstants.QUOTA_RESET) ||
-        (dsQuota < 0 && dsQuota != HdfsConstants.QUOTA_DONT_SET &&
-            dsQuota < HdfsConstants.QUOTA_RESET)) {
+    if ((nsQuota < 0 && nsQuota != HdfsConstants.QUOTA_DONT_SET && 
+         nsQuota != HdfsConstants.QUOTA_RESET) || 
+        (dsQuota < 0 && dsQuota != HdfsConstants.QUOTA_DONT_SET && 
+          dsQuota != HdfsConstants.QUOTA_RESET)) {
       throw new IllegalArgumentException("Illegal value for nsQuota or " +
           "dsQuota : " + nsQuota + " and " +
           dsQuota);
