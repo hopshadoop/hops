@@ -8768,7 +8768,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             QuotaCounts quota = new QuotaCounts.Builder().build();
             INode leafInode = iip.getLastINode();
             if(leafInode != null){  // complete path resolved
-              if(leafInode instanceof INodeFile ){
+              if(leafInode instanceof INodeFile ||  leafInode instanceof INodeSymlink){
                 isDir = false;
                 //do ns and ds counts for file only
                 leafInode.computeQuotaUsage(getBlockManager().getStoragePolicySuite(), usage);
