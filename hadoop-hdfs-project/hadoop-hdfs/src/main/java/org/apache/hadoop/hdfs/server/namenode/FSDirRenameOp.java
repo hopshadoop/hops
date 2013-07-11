@@ -527,6 +527,8 @@ class FSDirRenameOp {
           srcCounts = new QuotaCounts.Builder().quotaCount(srcFileTree.getQuotaCount()).build();
 
           fsd.getFSNamesystem().delayAfterBbuildingTree("Built Tree for "+src+" for rename. ");
+        } else {
+          isUsingSubTreeLocks=false;
         }
       } else {
         //permissions are checked in the transaction
@@ -644,7 +646,9 @@ class FSDirRenameOp {
           }
         }
 
-        removeSubTreeLocksForRenameInternal(fsd, src, isUsingSubTreeLocks);
+        if (isUsingSubTreeLocks) {
+          removeSubTreeLocksForRenameInternal(fsd, src, isUsingSubTreeLocks);
+        }
 
         // Ensure dst has quota to accommodate rename
         verifyFsLimitsForRename(fsd, srcIIP, dstIIP);

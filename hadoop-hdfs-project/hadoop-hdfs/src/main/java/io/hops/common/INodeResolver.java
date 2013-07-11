@@ -62,7 +62,7 @@ public class INodeResolver {
   public INode next() throws UnresolvedPathException, StorageException,
       TransactionContextException {
     boolean lastComp = (count == components.length - 1);
-    if (currentInode.isSymlink() && (!lastComp || (lastComp && resolveLink))) {
+    if (currentInode.isSymlink() && (!lastComp || resolveLink)) {
       final String symPath =
           INodeUtil.constructPath(components, 0, components.length);
       final String preceding = INodeUtil.constructPath(components, 0, count);
