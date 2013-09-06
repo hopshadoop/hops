@@ -32,6 +32,7 @@ import org.apache.hadoop.hdfs.web.WebHdfsFileSystem;
 import org.apache.hadoop.hdfs.web.WebHdfsTestUtil;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.test.PathUtils;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.PatternLayout;
@@ -68,8 +69,7 @@ import org.junit.runners.Parameterized;
  */
 @RunWith(Parameterized.class)
 public class TestAuditLogs {
-  static final String auditLogFile =
-      System.getProperty("test.build.dir", "build/test") + "/audit.log";
+  static final String auditLogFile = PathUtils.getTestDirName(TestAuditLogs.class) + "/TestAuditLogs-audit.log";
   boolean useAsyncLog;
   
   @Parameterized.Parameters

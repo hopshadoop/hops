@@ -23,7 +23,6 @@ import java.util.List;
 import com.google.common.base.Supplier;
 import com.google.common.collect.Lists;
 import io.hops.exception.StorageException;
-import io.hops.exception.TransactionContextException;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.INodeLock;

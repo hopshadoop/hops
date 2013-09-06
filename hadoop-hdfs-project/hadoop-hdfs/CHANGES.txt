@@ -4801,6 +4801,8 @@ Release 2.2.0 - 2013-10-13
     HDFS-5308. Replace HttpConfig#getSchemePrefix with implicit schemes in HDFS 
     JSP. (Haohui Mai via jing9)
 
+    HDFS-4491. Parallel testing HDFS. (Andrey Klochkov via cnauroth)
+
   OPTIMIZATIONS
 
   BUG FIXES

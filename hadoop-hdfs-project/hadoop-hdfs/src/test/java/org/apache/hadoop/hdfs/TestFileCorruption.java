@@ -102,26 +102,26 @@ public class TestFileCorruption {
    */
   @Test
   public void testLocalFileCorruption() throws Exception {
-      Configuration conf = new HdfsConfiguration();
-      Path file = new Path(PathUtils.getTestDirName(getClass()), "corruptFile");
-      FileSystem fs = FileSystem.getLocal(conf);
-      DataOutputStream dos = fs.create(file);
-      dos.writeBytes("original bytes");
-      dos.close();
-      // Now deliberately corrupt the file
-      dos = new DataOutputStream(new FileOutputStream(file.toString()));
-      dos.writeBytes("corruption");
-      dos.close();
-      // Now attempt to read the file
-      DataInputStream dis = fs.open(file, 512);
-      try {
-        System.out.println("A ChecksumException is expected to be logged.");
-        dis.readByte();
-      } catch (ChecksumException ignore) {
-        //expect this exception but let any NPE get thrown
-      }
-      fs.delete(file, true);
+    Configuration conf = new HdfsConfiguration();
+    Path file = new Path(PathUtils.getTestDirName(getClass()), "corruptFile");
+    FileSystem fs = FileSystem.getLocal(conf);
+    DataOutputStream dos = fs.create(file);
+    dos.writeBytes("original bytes");
+    dos.close();
+    // Now deliberately corrupt the file
+    dos = new DataOutputStream(new FileOutputStream(file.toString()));
+    dos.writeBytes("corruption");
+    dos.close();
+    // Now attempt to read the file
+    DataInputStream dis = fs.open(file, 512);
+    try {
+      System.out.println("A ChecksumException is expected to be logged.");
+      dis.readByte();
+    } catch (ChecksumException ignore) {
+      //expect this exception but let any NPE get thrown
     }
+    fs.delete(file, true);
+  }
   
   /**
    * Test the case that a replica is reported corrupt while it is not
