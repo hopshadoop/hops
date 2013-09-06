@@ -704,14 +704,13 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
             <artifactId>maven-antrun-plugin</artifactId>
             <executions>
               <execution>
-                <id>create-parallel-tests-dirs</id>
+                <id>create-parallel-tests-dirs</id>               
                 <phase>test-compile</phase>
                 <configuration>
                   <target>
                     <exec executable="sh">
                       <arg value="-c"/>
-                      <arg
-                          value="for i in {1..${testsThreadCount}}; do mkdir -p ${test.build.data}/$i; mkdir -p ${hadoop.tmp.dir}/$i; done"/>
+                      <arg value="for i in {1..${testsThreadCount}}; do mkdir -p ${test.build.data}/$i; mkdir -p ${hadoop.tmp.dir}/$i; done"/>
                     </exec>
                   </target>
                 </configuration>
@@ -726,14 +725,10 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
             <artifactId>maven-surefire-plugin</artifactId>
             <configuration>
               <forkCount>${testsThreadCount}</forkCount>
-              <argLine>-Xmx4096m -XX:+HeapDumpOnOutOfMemoryError
-                -DminiClusterDedicatedDirs=true
-              </argLine>
+              <argLine>-Xmx4096m -XX:+HeapDumpOnOutOfMemoryError -DminiClusterDedicatedDirs=true</argLine>
               <systemPropertyVariables>
-                <test.build.data>${test.build.data}/${surefire.forkNumber}
-                </test.build.data>
-                <hadoop.tmp.dir>${hadoop.tmp.dir}/${surefire.forkNumber}
-                </hadoop.tmp.dir>
+                <test.build.data>${test.build.data}/${surefire.forkNumber}</test.build.data>
+                <hadoop.tmp.dir>${hadoop.tmp.dir}/${surefire.forkNumber}</hadoop.tmp.dir>
               </systemPropertyVariables>
             </configuration>
           </plugin>

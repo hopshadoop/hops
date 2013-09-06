@@ -17,11 +17,6 @@
  */
 package org.apache.hadoop.fs;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdfs.HdfsConfiguration;
-import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.junit.Test;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -32,12 +27,19 @@ import java.net.URL;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdfs.HdfsConfiguration;
+import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.test.PathUtils;
+import org.junit.Test;
 
 /**
  * Test of the URL stream handler factory.
  */
 public class TestUrlStreamHandler {
 
+  private static File TEST_ROOT_DIR = PathUtils.getTestDir(TestUrlStreamHandler.class);
+    
   /**
    * Test opening and reading from an InputStream through a hdfs:// URL.
    * <p/>
@@ -113,14 +115,12 @@ public class TestUrlStreamHandler {
     Configuration conf = new HdfsConfiguration();
 
     // Locate the test temporary directory.
-    File tmpDir = new File(conf.get("hadoop.tmp.dir"));
-    if (!tmpDir.exists()) {
-      if (!tmpDir.mkdirs()) {
-        throw new IOException("Cannot create temporary directory: " + tmpDir);
-      }
+    if (!TEST_ROOT_DIR.exists()) {
+      if (!TEST_ROOT_DIR.mkdirs())
+        throw new IOException("Cannot create temporary directory: " + TEST_ROOT_DIR);
     }
 
-    File tmpFile = new File(tmpDir, "thefile");
+    File tmpFile = new File(TEST_ROOT_DIR, "thefile");
     URI uri = tmpFile.toURI();
 
     FileSystem fs = FileSystem.get(uri, conf);

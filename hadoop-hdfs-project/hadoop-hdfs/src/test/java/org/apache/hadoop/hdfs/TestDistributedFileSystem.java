@@ -625,11 +625,11 @@ public class TestDistributedFileSystem {
   public void testAllWithDualPort() throws Exception {
     dualPortTesting = true;
 
-    testFileSystemCloseAll();
-    testDFSClose();
-    testDFSClient();
-    testFileChecksum();
-  }
+      testFileSystemCloseAll();
+      testDFSClose();
+      testDFSClient();
+      testFileChecksum();
+    }
 
   /**
    * Tests the normal path of batching up BlockLocation[]s to be passed to a

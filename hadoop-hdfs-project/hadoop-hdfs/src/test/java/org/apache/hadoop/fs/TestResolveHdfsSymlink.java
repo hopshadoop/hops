@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs;
 
+import java.io.File;
 import static org.junit.Assert.fail;
 
 import java.io.FileNotFoundException;
@@ -37,6 +38,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.hadoop.hdfs.DFSClient;
+import org.apache.hadoop.test.PathUtils;
 import org.apache.hadoop.test.GenericTestUtils;
 
 /**
@@ -45,6 +47,7 @@ import org.apache.hadoop.test.GenericTestUtils;
  * underlying file system as Hdfs.
  */
 public class TestResolveHdfsSymlink {
+  private static File TEST_ROOT_DIR = PathUtils.getTestDir(TestResolveHdfsSymlink.class);
   private static MiniDFSCluster cluster = null;
 
   @BeforeClass
@@ -77,15 +80,13 @@ public class TestResolveHdfsSymlink {
     FileContext fcHdfs =
         FileContext.getFileContext(cluster.getFileSystem().getUri());
 
-    Path alphaLocalPath =
-        new Path(fcLocal.getDefaultFileSystem().getUri().toString(),
-            "/tmp/alpha");
-    DFSTestUtil
-        .createFile(FileSystem.getLocal(conf), alphaLocalPath, 16, (short) 1,
-            2);
+    Path alphaLocalPath = new Path(fcLocal.getDefaultFileSystem().getUri()
+        .toString(), new File(TEST_ROOT_DIR, "alpha").getAbsolutePath());
+    DFSTestUtil.createFile(FileSystem.getLocal(conf), alphaLocalPath, 16,
+        (short) 1, 2);
 
-    Path linkTarget =
-        new Path(fcLocal.getDefaultFileSystem().getUri().toString(), "/tmp");
+    Path linkTarget = new Path(fcLocal.getDefaultFileSystem().getUri()
+        .toString(), TEST_ROOT_DIR.getAbsolutePath());
     Path hdfsLink = new Path(fcHdfs.getDefaultFileSystem().getUri().toString(),
         "/tmp/link");
     fcHdfs.createSymlink(linkTarget, hdfsLink, true);
