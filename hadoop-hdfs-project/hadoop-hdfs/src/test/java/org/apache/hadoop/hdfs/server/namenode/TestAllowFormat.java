@@ -34,6 +34,7 @@ import java.io.IOException;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DATA_DIR_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SUPPORT_ALLOW_FORMAT_KEY;
+import org.apache.hadoop.test.PathUtils;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -46,29 +47,26 @@ public class TestAllowFormat {
   public static final String NAME_NODE_HTTP_HOST = "0.0.0.0:";
   private static final Log LOG =
       LogFactory.getLog(TestAllowFormat.class.getName());
+  private static final File DFS_BASE_DIR = new File(PathUtils.getTestDir(TestAllowFormat.class), "dfs");
   private static Configuration config;
   private static MiniDFSCluster cluster = null;
-  private static File hdfsDir = null;
 
   @BeforeClass
   public static void setUp() throws Exception {
     config = new Configuration();
-    String baseDir = System.getProperty("test.build.data", "build/test/data");
-
-    hdfsDir = new File(baseDir, "dfs");
-    if (hdfsDir.exists() && !FileUtil.fullyDelete(hdfsDir)) {
-      throw new IOException("Could not delete hdfs directory '" + hdfsDir +
+    if ( DFS_BASE_DIR.exists() && !FileUtil.fullyDelete(DFS_BASE_DIR) ) {
+      throw new IOException("Could not delete hdfs directory '" + DFS_BASE_DIR +
           "'");
     }
-
+    
     // Test has multiple name directories.
     // Format should not really prompt us if one of the directories exist,
     // but is empty. So in case the test hangs on an input, it means something
     // could be wrong in the format prompting code. (HDFS-1636)
-    LOG.info("hdfsdir is " + hdfsDir.getAbsolutePath());
+    LOG.info("hdfsdir is " + DFS_BASE_DIR.getAbsolutePath());
 
     // Set multiple name directories.
-    config.set(DFS_DATANODE_DATA_DIR_KEY, new File(hdfsDir, "data").getPath());
+    config.set(DFS_DATANODE_DATA_DIR_KEY, new File(DFS_BASE_DIR, "data").getPath());
 
     FileSystem.setDefaultUri(config, "hdfs://" + NAME_NODE_HOST + "0");
   }
@@ -83,9 +81,10 @@ public class TestAllowFormat {
       LOG.info("Stopping mini cluster");
     }
     
-    if (hdfsDir.exists() && !FileUtil.fullyDelete(hdfsDir)) {
+    if (DFS_BASE_DIR.exists() && !FileUtil.fullyDelete(DFS_BASE_DIR)) {
       throw new IOException(
-          "Could not delete hdfs directory in tearDown '" + hdfsDir + "'");
+          "Could not delete hdfs directory in tearDown '" 
+              + DFS_BASE_DIR + "'");
     }
   }
 
