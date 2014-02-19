@@ -17,8 +17,21 @@
  */
 package org.apache.hadoop.fs.permission;
 
+import static org.apache.hadoop.fs.permission.AclEntryScope.*;
+import static org.apache.hadoop.fs.permission.AclEntryType.*;
+import static org.apache.hadoop.fs.permission.FsAction.*;
+import static org.apache.hadoop.hdfs.server.namenode.AclTestHelpers.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import java.io.IOException;
+import java.util.Arrays;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
@@ -26,11 +39,16 @@ import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.junit.AfterClass;
+import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.util.Arrays;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -186,13 +204,81 @@ public class TestStickyBit {
       }
     }
   }
-
+  
+  @Test
+  public void testAclGeneralSBBehavior() throws Exception {
+    MiniDFSCluster cluster = null;
+  
+    try {
+      // Set up cluster for testing
+      Configuration conf = new HdfsConfiguration();
+      conf.setBoolean(DFSConfigKeys.DFS_PERMISSIONS_ENABLED_KEY, true);
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(4).build();
+      initUsers();
+    
+      FileSystem hdfs = cluster.getFileSystem();
+    
+      assertTrue(hdfs instanceof DistributedFileSystem);
+    
+      Path baseDir = new Path("/mcgann");
+    
+      hdfs.mkdirs(baseDir);
+  
+      // Create a tmp directory with wide-open permissions and sticky bit
+      Path p = new Path(baseDir, "tmp");
+  
+      hdfs.mkdirs(p);
+      hdfs.setPermission(p, new FsPermission((short) 01777));
+      applyAcl(p);
+      confirmCanAppend(conf, hdfs,  p);
+  
+      baseDir = new Path("/eccleston");
+      hdfs.mkdirs(baseDir);
+      p = new Path(baseDir, "roguetraders");
+  
+      hdfs.mkdirs(p);
+      applyAcl(p);
+      confirmSettingAndGetting(hdfs, p);
+  
+      baseDir = new Path("/tennant");
+      hdfs.mkdirs(baseDir);
+      p = new Path(baseDir, "contemporary");
+      hdfs.mkdirs(p);
+      hdfs.setPermission(p, new FsPermission((short) 01777));
+      applyAcl(p);
+      confirmDeletingFiles(conf, hdfs, p);
+  
+      baseDir = new Path("/smith");
+      hdfs.mkdirs(baseDir);
+      p = new Path(baseDir, "scissorsisters");
+  
+      // Turn on its sticky bit
+      hdfs.mkdirs(p, new FsPermission((short) 01666));
+      applyAcl(p);
+      confirmStickyBitDoesntPropagate(hdfs, p);
+  
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+  
   /**
    * Test that one user can't rename/move another user's file when the sticky
    * bit is set.
    */
   @Test
-  public void testMovingFiles() throws IOException, InterruptedException {
+  public void testMovingFiles() throws Exception {
+    testMovingFiles(false);
+  }
+  
+  @Test
+  public void testAclMovingFiles() throws Exception {
+    testMovingFiles(true);
+  }
+  
+  private void testMovingFiles(boolean useAcl) throws IOException, InterruptedException {
     MiniDFSCluster cluster = null;
 
     try {
@@ -212,8 +298,13 @@ public class TestStickyBit {
       hdfs.mkdirs(tmpPath);
       hdfs.mkdirs(tmpPath2);
       hdfs.setPermission(tmpPath, new FsPermission((short) 01777));
+      if (useAcl) {
+        applyAcl(tmpPath);
+      }
       hdfs.setPermission(tmpPath2, new FsPermission((short) 01777));
-
+      if (useAcl) {
+        applyAcl(tmpPath2);
+      }
       // Write a file to the new tmp directory as a regular user
       Path file = new Path(tmpPath, "foo");
 
@@ -268,13 +359,14 @@ public class TestStickyBit {
 
       // Two directories had there sticky bits set explicitly...
       hdfs.setPermission(sbSet, new FsPermission((short) 01777));
+      applyAcl(sbSet);
       hdfs.setPermission(sbSetOff, new FsPermission((short) 00777));
+      applyAcl(sbSetOff);
 
       cluster.shutdown();
 
       // Start file system up again
-      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(4).format(false)
-          .build();
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(4).format(false).build();
       hdfs = cluster.getFileSystem();
 
       assertTrue(hdfs.exists(sbSet));
@@ -301,6 +393,18 @@ public class TestStickyBit {
     FSDataOutputStream o = hdfs.create(p);
     o.write("some file contents".getBytes());
     o.close();
+  }
+  
+  /**
+   * Applies an ACL (both access and default) to the given path.
+   *
+   * @param p Path to set
+   * @throws IOException if an ACL could not be modified
+   */
+  private static void applyAcl(Path p) throws IOException {
+//    hdfs.modifyAclEntries(p, Arrays.asList(
+//        aclEntry(ACCESS, USER, user2.getShortUserName(), ALL),
+//        aclEntry(DEFAULT, USER, user2.getShortUserName(), ALL)));
   }
 
   private void initUsers(){

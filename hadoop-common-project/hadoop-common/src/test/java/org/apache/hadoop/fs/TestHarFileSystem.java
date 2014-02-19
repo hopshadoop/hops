@@ -186,6 +186,8 @@ public class TestHarFileSystem {
 
     public void setAcl(Path path, List<AclEntry> aclSpec) throws IOException;
 
+    public AclStatus getAclStatus(Path path) throws IOException;
+
     public void setXAttr(Path path, String name, byte[] value)
         throws IOException;
 
@@ -202,8 +204,6 @@ public class TestHarFileSystem {
     public List<String> listXAttrs(Path path) throws IOException;
 
     public void removeXAttr(Path path, String name) throws IOException;
-
-    public AclStatus getAclStatus(Path path) throws IOException;
 
     public void access(Path path, FsAction mode) throws IOException;
 

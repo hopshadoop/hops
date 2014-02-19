@@ -404,6 +404,10 @@ public class LockFactory {
     return new LastTwoBlocksLock(src);
   }
 
+  public Lock getAcesLock(){
+    return new AcesLock();
+  }
+  
   public void setConfiguration(Configuration conf) {
     BaseINodeLock.enableSetPartitionKey(
         conf.getBoolean(DFSConfigKeys.DFS_SET_PARTITION_KEY_ENABLED,

@@ -17,8 +17,11 @@
  */
 package org.apache.hadoop.hdfs.web;
 
+import com.google.common.collect.Lists;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.AclEntry;
+import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
@@ -29,7 +32,17 @@ import org.junit.Test;
 import org.mortbay.util.ajax.JSON;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
+
+import static org.apache.hadoop.fs.permission.AclEntryScope.ACCESS;
+import static org.apache.hadoop.fs.permission.AclEntryType.GROUP;
+import static org.apache.hadoop.fs.permission.AclEntryType.OTHER;
+import static org.apache.hadoop.fs.permission.AclEntryType.USER;
+import static org.apache.hadoop.fs.permission.FsAction.ALL;
+import static org.apache.hadoop.fs.permission.FsAction.READ_EXECUTE;
+import static org.apache.hadoop.fs.permission.FsAction.READ_WRITE;
+import static org.apache.hadoop.hdfs.server.namenode.AclTestHelpers.aclEntry;
 
 public class TestJsonUtil {
   static FileStatus toFileStatus(HdfsFileStatus f, String parent) throws IOException {
@@ -59,5 +72,46 @@ public class TestJsonUtil {
     System.out.println("s2      = " + s2);
     System.out.println("fs2     = " + fs2);
     Assert.assertEquals(fstatus, fs2);
+  }
+  
+  @Test
+  public void testToAclStatus() {
+    String jsonString =
+        "{\"AclStatus\":{\"entries\":[\"user::rwx\",\"user:user1:rw-\",\"group::rw-\",\"other::r-x\"],\"group\":\"supergroup\",\"owner\":\"testuser\",\"stickyBit\":false}}";
+    Map<?, ?> json = (Map<?, ?>) JSON.parse(jsonString);
+
+    List<AclEntry> aclSpec =
+        Lists.newArrayList(aclEntry(ACCESS, USER, ALL),
+            aclEntry(ACCESS, USER, "user1", READ_WRITE),
+            aclEntry(ACCESS, GROUP, READ_WRITE),
+            aclEntry(ACCESS, OTHER, READ_EXECUTE));
+
+    AclStatus.Builder aclStatusBuilder = new AclStatus.Builder();
+    aclStatusBuilder.owner("testuser");
+    aclStatusBuilder.group("supergroup");
+    aclStatusBuilder.addEntries(aclSpec);
+    aclStatusBuilder.stickyBit(false);
+
+    Assert.assertEquals("Should be equal", aclStatusBuilder.build(),
+        JsonUtil.toAclStatus(json));
+  }
+
+  @Test
+  public void testToJsonFromAclStatus() {
+    String jsonString =
+        "{\"AclStatus\":{\"entries\":[\"user:user1:rwx\",\"group::rw-\"],\"group\":\"supergroup\",\"owner\":\"testuser\",\"stickyBit\":false}}";
+    AclStatus.Builder aclStatusBuilder = new AclStatus.Builder();
+    aclStatusBuilder.owner("testuser");
+    aclStatusBuilder.group("supergroup");
+    aclStatusBuilder.stickyBit(false);
+
+    List<AclEntry> aclSpec =
+        Lists.newArrayList(aclEntry(ACCESS, USER,"user1", ALL),
+            aclEntry(ACCESS, GROUP, READ_WRITE));
+
+    aclStatusBuilder.addEntries(aclSpec);
+    Assert.assertEquals(jsonString,
+        JsonUtil.toJsonString(aclStatusBuilder.build()));
+
   }
 }

@@ -34,6 +34,9 @@ import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLocks;
+import com.google.common.collect.Lists;
+
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -46,6 +49,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileSystem.Statistics;
 import org.apache.hadoop.fs.Options.Rename;
+import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
@@ -725,14 +729,14 @@ public class DFSTestUtil {
         LOG.info("All blocks of file " + fileName +
             " verified to have replication factor " + replFactor);
       }
-      
+
       if (System.currentTimeMillis() - initTime > timeout) {
         throw new TimeoutException(
             "Waiting for replication timed out. File " + fileName);
       }
     } while (!good);
   }
-  
+
   /**
    * delete directory and everything underneath it.
    */
@@ -797,7 +801,7 @@ public class DFSTestUtil {
     FSDataOutputStream os = fs.append(p);
     IOUtils.copyBytes(is, os, s.length(), true);
   }
-  
+
   /**
    * @return url content as string (UTF-8 encoding assumed)
    */
@@ -941,7 +945,7 @@ public class DFSTestUtil {
 
     return BlockOpResponseProto.parseDelimitedFrom(in);
   }
-  
+
   private static DatanodeID getDatanodeID(String ipAddr) {
     return new DatanodeID(ipAddr, "localhost", "",
         DFSConfigKeys.DFS_DATANODE_DEFAULT_PORT,
@@ -1015,7 +1019,7 @@ public class DFSTestUtil {
        LOG.error(ex);
      }
   }
-  
+
   public static DatanodeDescriptor getDatanodeDescriptor(String ipAddr,
       String rackLocation) {
     return getDatanodeDescriptor(ipAddr,
@@ -1093,7 +1097,7 @@ public class DFSTestUtil {
   public static void createRootFolder() throws IOException {
     createRootFolder(new PermissionStatus("user", "grp", new FsPermission((short) 0755)));
   }
-  
+
   public static INodeDirectoryWithQuota createRootFolder(final PermissionStatus ps) throws IOException {
     LightWeightRequestHandler addRootINode =
         new LightWeightRequestHandler(HDFSOperationType.SET_ROOT) {
@@ -1124,7 +1128,7 @@ public class DFSTestUtil {
         };
     return (INodeDirectoryWithQuota) addRootINode.handle();
   }
-  
+
   public static class Builder {
     private int maxLevels = 3;
     private int maxSize = 8 * 1024;
@@ -1250,7 +1254,7 @@ public class DFSTestUtil {
           + contain, output.contains(contain));
     }
 }
-  
+
   public static void DFSAdminRun(String cmd, int retcode, String contain,
       Configuration conf) throws Exception {
     DFSAdmin admin = new DFSAdmin(new Configuration(conf));
@@ -1261,7 +1265,7 @@ public class DFSTestUtil {
    * Run a set of operations and generate all edit logs
    */
   public static void runOperations(MiniDFSCluster cluster,
-      DistributedFileSystem filesystem, Configuration conf, long blockSize, 
+      DistributedFileSystem filesystem, Configuration conf, long blockSize,
       int nnIndex) throws IOException {
     // create FileContext for rename2
     FileContext fc = FileContext.getFileContext(cluster.getURI(0), conf);
@@ -1297,7 +1301,7 @@ public class DFSTestUtil {
     long atime = mtime;
     filesystem.setTimes(pathFileCreate, mtime, atime);
     // OP_SET_QUOTA 14
-    filesystem.setQuota(pathDirectoryMkdir, 1000L, 
+    filesystem.setQuota(pathDirectoryMkdir, 1000L,
         HdfsConstants.QUOTA_DONT_SET);
     // OP_RENAME 15
     fc.rename(pathFileCreate, pathFileMoved, Rename.NONE);

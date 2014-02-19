@@ -29,12 +29,13 @@ import io.hops.exception.*;
 import io.hops.leader_election.node.ActiveNode;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.HdfsVariables;
+import io.hops.metadata.hdfs.dal.AceDataAccess;
 import io.hops.metadata.hdfs.dal.BlockChecksumDataAccess;
 import io.hops.metadata.hdfs.dal.EncodingStatusDataAccess;
-import io.hops.metadata.hdfs.dal.INodeAttributesDataAccess;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.metadata.hdfs.dal.RetryCacheEntryDataAccess;
 import io.hops.metadata.hdfs.dal.SafeBlocksDataAccess;
+import io.hops.metadata.hdfs.entity.Ace;
 import io.hops.metadata.hdfs.entity.BlockChecksum;
 import io.hops.metadata.hdfs.entity.EncodingPolicy;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
@@ -77,6 +78,9 @@ import org.apache.hadoop.fs.Options.Rename;
 import org.apache.hadoop.fs.ParentNotDirectoryException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.UnresolvedLinkException;
+import org.apache.hadoop.fs.permission.AclEntry;
+import org.apache.hadoop.fs.permission.AclEntryScope;
+import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
@@ -108,8 +112,6 @@ import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenSecretMan
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockPlacementPolicyDefault;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeManager;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStatistics;
@@ -160,7 +162,6 @@ import javax.management.ObjectName;
 import javax.management.StandardMBean;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
@@ -450,6 +451,8 @@ public class FSNamesystem
   private static int DB_IN_MEMORY_FILE_MAX_SIZE;
   private final long BIGGEST_DELETABLE_DIR;
 
+  private final AclConfigFlag aclConfigFlag;
+
   private final RetryCacheDistributed retryCache;
   
   /**
@@ -635,6 +638,7 @@ public class FSNamesystem
       this.auditLoggers = initAuditLoggers(conf);
       this.isDefaultAuditLogger = auditLoggers.size() == 1 &&
           auditLoggers.get(0) instanceof DefaultAuditLogger;
+      this.aclConfigFlag = new AclConfigFlag(conf);
       this.retryCache = ignoreRetryCache ? null : initRetryCache(conf);
     } catch (IOException | RuntimeException e) {
       LOG.error(getClass().getSimpleName() + " initialization failed.", e);
@@ -1048,7 +1052,7 @@ public class FSNamesystem
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
     final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
     boolean txFailed = true;
-    INodeIdentifier inode = null;;
+    INodeIdentifier inode = null;
     try{
     inode = lockSubtreeAndCheckPathPermission(src,
             true, null, null, null, null, SubTreeOperation.StoOperationType.SET_OWNER_STO);
@@ -1203,6 +1207,7 @@ public class FSNamesystem
                 locks.add(lf.getINodeLock(!dir.isQuotaEnabled(),nameNode, lockType,
                         INodeResolveType.PATH, src)).add(lf.getBlockLock())
                         .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UC));
+                locks.add(lf.getAcesLock());
               }
 
           @Override
@@ -1411,6 +1416,7 @@ public class FSNamesystem
         if (erasureCodingEnabled) {
           locks.add(lf.getEncodingStatusLock(LockType.WRITE, srcs));
         }
+        locks.add(lf.getAcesLock());
       }
 
       @Override
@@ -1604,6 +1610,7 @@ public class FSNamesystem
         LockFactory lf = getInstance();
         locks.add(lf.getINodeLock(nameNode, INodeLockType.WRITE,
             INodeResolveType.PATH, src)).add(lf.getBlockLock());
+        locks.add(lf.getAcesLock());
       }
 
       @Override
@@ -1657,8 +1664,9 @@ public class FSNamesystem
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = getInstance();
         locks.add(lf.getINodeLock(nameNode, INodeLockType.WRITE,
-            INodeResolveType.PATH, false, link))
-            .add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId()));
+            INodeResolveType.PATH, false, link));
+        locks.add(lf.getAcesLock());
+        locks.add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId()));
       }
 
       @Override
@@ -1758,6 +1766,7 @@ public class FSNamesystem
                 src)).add(lf.getBlockLock()).add(
                 lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UC, BLK.UR,
                     BLK.IV));
+            locks.add(lf.getAcesLock());
           }
 
           @Override
@@ -1817,6 +1826,7 @@ public class FSNamesystem
           LockFactory lf = getInstance();
           locks.add(lf.getINodeLock(nameNode, INodeLockType.WRITE,
               INodeResolveType.PATH, true, true, src));
+          locks.add(lf.getAcesLock());
         }
 
         @Override
@@ -1997,10 +2007,10 @@ public class FSNamesystem
    * For description of parameters and exceptions thrown see
    * {@link ClientProtocol#create()}, except it returns valid file status upon
    * success
-   * 
+   *
    * For retryCache handling details see -
    * {@link #getFileStatus(boolean, CacheEntryWithPayload)}
-   * 
+   *
    */
   HdfsFileStatus startFile(final String src1, final PermissionStatus permissions,
       final String holder, final String clientMachine,
@@ -2025,13 +2035,14 @@ public class FSNamesystem
                   BLK.IV))
               .add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId()));
 
-          if (flag.contains(CreateFlag.OVERWRITE) && dir.isQuotaEnabled()) {
-            locks.add(lf.getQuotaUpdateLock(src));
-          }
-          if (flag.contains(CreateFlag.OVERWRITE) && erasureCodingEnabled) {
-            locks.add(lf.getEncodingStatusLock(LockType.WRITE, src));
-          }
+        if (flag.contains(CreateFlag.OVERWRITE) && dir.isQuotaEnabled()) {
+          locks.add(lf.getQuotaUpdateLock(src));
         }
+        if (flag.contains(CreateFlag.OVERWRITE) && erasureCodingEnabled) {
+          locks.add(lf.getEncodingStatusLock(LockType.WRITE, src));
+        }
+        locks.add(lf.getAcesLock());
+      }
 
         @Override
         public Object performTask() throws IOException {
@@ -2093,7 +2104,7 @@ public class FSNamesystem
 
   /**
    * Create a new file or overwrite an existing file<br>
-   * 
+   *
    * Once the file is create the client then allocates a new block with the next
    * call using {@link NameNode#addBlock()}.
    * <p>
@@ -2171,17 +2182,17 @@ public class FSNamesystem
   /**
    * Append to an existing file for append.
    * <p>
-   * 
+   *
    * The method returns the last block of the file if this is a partial block,
    * which can still be used for writing more data. The client uses the returned
    * block locations to form the data pipeline for this block.<br>
    * The method returns null if the last block is full. The client then
    * allocates a new block with the next call using {@link NameNode#addBlock()}.
    * <p>
-   * 
+   *
    * For description of parameters and exceptions thrown see
    * {@link ClientProtocol#append(String, String)}
-   * 
+   *
    * @return the last block locations if the block is partial or null otherwise
    */
   private LocatedBlock appendFileInternal(FSPermissionChecker pc, String src,
@@ -2215,7 +2226,7 @@ public class FSNamesystem
       // Opening an existing file for write - may need to recover lease.
       recoverLeaseInternal(myFile, src, holder, clientMachine, false);
 
-      final DatanodeDescriptor clientNode = 
+      final DatanodeDescriptor clientNode =
           blockManager.getDatanodeManager().getDatanodeByHost(clientMachine);
       return prepareFileForWrite(src, myFile, holder, clientMachine, clientNode);
     } catch (IOException ie) {
@@ -2290,8 +2301,8 @@ public class FSNamesystem
                 INodeResolveType.PATH, src))
                 .add(lf.getLeaseLock(LockType.WRITE, holder))
                 .add(lf.getLeasePathLock(LockType.READ_COMMITTED)).add(lf.getBlockLock())
-                .add(
-                    lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR));
+                .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR))
+                .add(lf.getAcesLock());
           }
 
           @Override
@@ -2412,7 +2423,7 @@ public class FSNamesystem
     } catch(HDFSClientAppendToDBFileException e){
       LOG.debug(e);
       return moveToDNsAndAppend(src, holder, clientMachine);
-    } 
+    }
   }
 
   /*
@@ -2454,26 +2465,27 @@ public class FSNamesystem
       final String clientMachine) throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
     final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
-    HopsTransactionalRequestHandler appendFileHandler = new HopsTransactionalRequestHandler(
-        HDFSOperationType.APPEND_FILE,
-        src) {
-      @Override
-      public void acquireLock(TransactionLocks locks) throws IOException {
-        LockFactory lf = getInstance();
-        locks.add(lf.getINodeLock(!dir.isQuotaEnabled(), nameNode,
-            INodeLockType.WRITE_ON_TARGET_AND_PARENT, INodeResolveType.PATH,
-            src)).add(lf.getBlockLock())
-            .add(lf.getLeaseLock(LockType.WRITE, holder))
-            .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
-            .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR,
-                BLK.IV, BLK.PE))
-            .add(lf.getLastBlockHashBucketsLock())
-            .add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId()));
-        // Always needs to be read. Erasure coding might have been
-        // enabled earlier and we don't want to end up in an inconsistent
-        // state.
-        locks.add(lf.getEncodingStatusLock(LockType.READ_COMMITTED, src));
-      }
+    HopsTransactionalRequestHandler appendFileHandler =
+        new HopsTransactionalRequestHandler(HDFSOperationType.APPEND_FILE,
+            src) {
+          @Override
+          public void acquireLock(TransactionLocks locks) throws IOException {
+            LockFactory lf = getInstance();
+            locks.add(lf.getINodeLock(!dir.isQuotaEnabled(),nameNode,
+                INodeLockType.WRITE_ON_TARGET_AND_PARENT, INodeResolveType.PATH,
+                src)).add(lf.getBlockLock())
+                .add(lf.getLeaseLock(LockType.WRITE, holder))
+                .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
+                .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR,
+                    BLK.IV, BLK.PE))
+                .add(lf.getLastBlockHashBucketsLock());
+            locks.add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId()));
+            // Always needs to be read. Erasure coding might have been
+            // enabled earlier and we don't want to end up in an inconsistent
+            // state.
+            locks.add(lf.getEncodingStatusLock(LockType.READ_COMMITTED, src));
+            locks.add(lf.getAcesLock());
+          }
 
       @Override
       public Object performTask() throws IOException {
@@ -3140,7 +3152,7 @@ public class FSNamesystem
    *
    * @param src
    *     path to the file
-   * @param inodesInPath representing each of the components of src. 
+   * @param inodesInPath representing each of the components of src.
    *                     The last INode is the INode for the file.
    * @throws QuotaExceededException
    *     If addition of block exceeds space quota
@@ -3410,6 +3422,7 @@ public class FSNamesystem
             LockFactory lf = getInstance();
             locks.add(lf.getINodeLock(true/*skip quota*/,nameNode, INodeLockType.READ,
                 INodeResolveType.PATH, resolveLink, src));
+            locks.add(lf.getAcesLock());
           }
 
           @Override
@@ -3489,6 +3502,7 @@ public class FSNamesystem
             locks.add(lf.getINodeLock(!dir.isQuotaEnabled(),nameNode,
                 INodeLockType.WRITE_ON_TARGET_AND_PARENT, INodeResolveType.PATH,
                 resolvedLink, src));
+            locks.add(lf.getAcesLock());
           }
 
           @Override
@@ -4055,6 +4069,7 @@ public class FSNamesystem
               locks.add(lf.getBlockLock())
                   .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UC));
             }
+            locks.add(lf.getAcesLock());
           }
 
           @Override
@@ -6778,9 +6793,13 @@ public class FSNamesystem
           subtreeRoot.getLocalName(),subtreeRoot.getPartitionId());
       subtreeRootIdentifier.setDepth(((short) (INodeDirectory.ROOT_DIR_DEPTH + pathInfo.getPathComponents().length-1 )));
 
-      final AbstractFileTree.CountingFileTree fileTree =
-              new AbstractFileTree.CountingFileTree(this, subtreeRootIdentifier, FsAction.READ_EXECUTE);
-      fileTree.buildUp();
+      
+    //Calcualte subtree root default ACLs to be inherited in the tree.
+    List<AclEntry> nearestDefaultsForSubtree = calculateNearestDefaultAclForSubtree(pathInfo);
+  
+    final AbstractFileTree.CountingFileTree fileTree =
+            new AbstractFileTree.CountingFileTree(this, subtreeRootIdentifier, FsAction.READ_EXECUTE, nearestDefaultsForSubtree);
+    fileTree.buildUp();
 
     return new ContentSummary(fileTree.getFileSizeSummary(),
         fileTree.getFileCount(), fileTree.getDirectoryCount(),
@@ -7158,7 +7177,7 @@ public class FSNamesystem
 
 
     PathInformation srcInfo = getPathExistingINodesFromDB(src,
-        false, null, FsAction.WRITE, null, null);
+        false, null, FsAction.WRITE, FsAction.WRITE, null);
     INode[] srcInodes = srcInfo.getPathInodes();
     INode srcInode = srcInodes[srcInodes.length - 1];
     if(srcInode == null){
@@ -7169,7 +7188,7 @@ public class FSNamesystem
     }
 
     PathInformation dstInfo = getPathExistingINodesFromDB(dst,
-        false, FsAction.WRITE, null, null, null);
+        false, null, FsAction.WRITE, null, null);
     String actualDst = dst;
     if(dstInfo.isDir()){
       actualDst += Path.SEPARATOR + new Path(src).getName();
@@ -7408,7 +7427,7 @@ public class FSNamesystem
 
     INodeIdentifier subtreeRoot = null;
     if (pathInode.isFile()) {
-      return deleteWithTransaction(path, recursive);
+      return deleteWithTransaction(path, false);
     } else {
       CacheEntry cacheEntry = retryCacheWaitForCompletionTransactional();
       if (cacheEntry != null && cacheEntry.isSuccess()) {
@@ -7430,8 +7449,10 @@ public class FSNamesystem
           subtreeRoot = lockSubtreeAndCheckPathPermission(path, false, null,
               FsAction.WRITE, null, null,
               SubTreeOperation.StoOperationType.DELETE_STO);
-
-          AbstractFileTree.FileTree fileTree = new AbstractFileTree.FileTree(this, subtreeRoot, FsAction.ALL);
+  
+          List<AclEntry> nearestDefaultsForSubtree = calculateNearestDefaultAclForSubtree(pathInfo);
+          AbstractFileTree.FileTree fileTree = new AbstractFileTree.FileTree(this, subtreeRoot, FsAction.ALL,
+              nearestDefaultsForSubtree);
           fileTree.buildUp();
 
           if (dir.isQuotaEnabled()) {
@@ -7613,6 +7634,7 @@ public class FSNamesystem
             //INode lock is sufficient
                 add(lf.getSubTreeOpsLock(LockType.READ_COMMITTED,
                 getSubTreeLockPathPrefix(path))); // it is
+        locks.add(lf.getAcesLock());
 
       }
 
@@ -8201,6 +8223,160 @@ public class FSNamesystem
   }
 
 
+  void modifyAclEntries(final String src, final List<AclEntry> aclSpec) throws IOException {
+    aclConfigFlag.checkForApiCall();
+    if(isInSafeMode()){
+      throw new SafeModeException("Cannot modify acl entries " + src, safeMode);
+    }
+    new HopsTransactionalRequestHandler(HDFSOperationType.MODIFY_ACL_ENTRIES) {
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        locks.add(lf.getINodeLock(false, nameNode, INodeLockType.WRITE,
+            INodeResolveType.PATH, src));
+        locks.add(lf.getAcesLock());
+      }
+    
+      @Override
+      public Object performTask() throws IOException {
+        FSPermissionChecker pc = getPermissionChecker();
+        if (isPermissionEnabled) {
+          checkPathAccess(pc, src, FsAction.WRITE);
+        }
+        dir.modifyAclEntries(src, aclSpec);
+        return null;
+      }
+    }.handle();
+  }
+
+  void removeAclEntries(final String src, final List<AclEntry> aclSpec) throws IOException {
+    aclConfigFlag.checkForApiCall();
+    if(isInSafeMode()){
+      throw new SafeModeException("Cannot remove acl entries " + src, safeMode);
+    }
+    new HopsTransactionalRequestHandler(HDFSOperationType.REMOVE_ACL_ENTRIES) {
+    
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        locks.add(lf.getINodeLock(true, nameNode, INodeLockType.WRITE,
+            INodeResolveType.PATH, src));
+        locks.add(lf.getAcesLock());
+      }
+      @Override
+      public Object performTask() throws IOException {
+        FSPermissionChecker pc = getPermissionChecker();
+        if (isPermissionEnabled) {
+          checkPathAccess(pc, src, FsAction.WRITE);
+        }
+        dir.removeAclEntries(src, aclSpec);
+        return null;
+      }
+    }.handle();
+  }
+
+  void removeDefaultAcl(final String src) throws IOException {
+    aclConfigFlag.checkForApiCall();
+    if(isInSafeMode()){
+      throw new SafeModeException("Cannot remove default acl " + src, safeMode);
+    }
+    new HopsTransactionalRequestHandler(HDFSOperationType.REMOVE_DEFAULT_ACL) {
+    
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        locks.add(lf.getINodeLock(true, nameNode, INodeLockType.WRITE,
+            INodeResolveType.PATH, src));
+        locks.add(lf.getAcesLock());
+      }
+      @Override
+      public Object performTask() throws IOException {
+        FSPermissionChecker pc = getPermissionChecker();
+        if (isPermissionEnabled) {
+          checkPathAccess(pc, src, FsAction.WRITE);
+        }
+        dir.removeDefaultAcl(src);
+        return null;
+      }
+    }.handle();
+  }
+
+  void removeAcl(final String src) throws IOException {
+    aclConfigFlag.checkForApiCall();
+    if(isInSafeMode()){
+      throw new SafeModeException("Cannot remove acl " + src, safeMode);
+    }
+    new HopsTransactionalRequestHandler(HDFSOperationType.REMOVE_ACL) {
+    
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        locks.add(lf.getINodeLock(true, nameNode, INodeLockType.WRITE,
+            INodeResolveType.PATH, src));
+        locks.add(lf.getAcesLock());
+      }
+      @Override
+      public Object performTask() throws IOException {
+        FSPermissionChecker pc = getPermissionChecker();
+        if (isPermissionEnabled) {
+          checkPathAccess(pc, src, FsAction.WRITE);
+        }
+        dir.removeAcl(src);
+        return null;
+      }
+    }.handle();
+  }
+
+  void setAcl(final String src, final List<AclEntry> aclSpec) throws IOException {
+    aclConfigFlag.checkForApiCall();
+    if(isInSafeMode()){
+      throw new SafeModeException("Cannot set acl " + src, safeMode);
+    }
+    new HopsTransactionalRequestHandler(HDFSOperationType.SET_ACL) {
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        locks.add(lf.getINodeLock(true, nameNode, INodeLockType.WRITE,
+            INodeResolveType.PATH, src));
+        locks.add(lf.getAcesLock());
+      }
+    
+      @Override
+      public Object performTask() throws IOException {
+        FSPermissionChecker pc = getPermissionChecker();
+        if (isPermissionEnabled) {
+          checkPathAccess(pc, src, FsAction.WRITE);
+        }
+        dir.setAcl(src, aclSpec);
+        return null;
+      }
+    }.handle();
+    
+  }
+
+  AclStatus getAclStatus(final String src) throws IOException {
+    aclConfigFlag.checkForApiCall();
+    return (AclStatus) new HopsTransactionalRequestHandler(HDFSOperationType.GET_ACL_STATUS) {
+    
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        locks.add(lf.getINodeLock(true, nameNode, INodeLockType.READ,
+            INodeResolveType.PATH, src));
+        locks.add(lf.getAcesLock());
+      }
+      
+      @Override
+      public Object performTask() throws IOException {
+        FSPermissionChecker pc = getPermissionChecker();
+        if (isPermissionEnabled) {
+          checkPathAccess(pc, src, FsAction.READ);
+        }
+        return dir.getAclStatus(src);
+      }
+    }.handle();
+  }
+
   /**
    * @see org.apache.hadoop.hdfs.protocol.ClientProtocol#getRepairedBlockLocations
    */
@@ -8297,6 +8473,7 @@ public class FSNamesystem
             locks.add(lf.getINodeLock(!dir.isQuotaEnabled()/*skip INode Attr Lock*/,nameNode, INodeLockType.READ_COMMITTED,
                 INodeResolveType.PATH, false,
                 path)).add(lf.getBlockLock()); // blk lock only if file
+            locks.add(lf.getAcesLock());
           }
 
           @Override
@@ -8331,9 +8508,18 @@ public class FSNamesystem
               }
             }
 
+            //Get acls
+            List[] acls = new List[pathInodes.length];
+            for (int i = 0; i < pathInodes.length ; i++){
+              if (pathInodes[i] != null){
+                AclFeature aclFeature = INodeAclHelper.getAclFeature(pathInodes[i]);
+                acls[i] = aclFeature != null ? aclFeature.getEntries() : null;
+              }
+            }
+
             return new PathInformation(path, pathComponents,
                 pathInodes,dstInodesInPath.getCount(),isDir,
-                srcCounts.getNsCount(), srcCounts.getDsCount(), quotaDirAttributes);
+                srcCounts.getNsCount(), srcCounts.getDsCount(), quotaDirAttributes, acls);
           }
         };
     return (PathInformation)handler.handle(this);
@@ -8348,10 +8534,11 @@ public class FSNamesystem
     private long dsCount;
     private int numExistingComp;
     private final INodeAttributes subtreeRootAttributes;
+    private final List<AclEntry>[] pathInodeAcls;
 
     public PathInformation(String path,
         byte[][] pathComponents, INode[] pathInodes, int numExistingComp,
-        boolean dir, long nsCount, long dsCount, INodeAttributes subtreeRootAttributes) {
+        boolean dir, long nsCount, long dsCount, INodeAttributes subtreeRootAttributes, List<AclEntry>[] pathInodeAcls) {
       this.path = path;
       this.pathComponents = pathComponents;
       this.pathInodes = pathInodes;
@@ -8360,6 +8547,7 @@ public class FSNamesystem
       this.dsCount = dsCount;
       this.numExistingComp = numExistingComp;
       this.subtreeRootAttributes = subtreeRootAttributes;
+      this.pathInodeAcls = pathInodeAcls;
     }
 
     public String getPath() {
@@ -8394,6 +8582,7 @@ public class FSNamesystem
       return subtreeRootAttributes;
     }
 
+    public List<AclEntry>[] getPathInodeAcls() { return pathInodeAcls; }
   }
 
   public ExecutorService getExecutorService(){
@@ -8640,6 +8829,27 @@ public class FSNamesystem
     public void stopMonitor() {
       shouldCacheCleanerRun = false;
     }
+  }
+  
+  private List<AclEntry> calculateNearestDefaultAclForSubtree(final PathInformation pathInfo) throws IOException {
+    for (int i = pathInfo.pathInodeAcls.length-1; i > -1 ; i--){
+      List<AclEntry> aclEntries = pathInfo.pathInodeAcls[i];
+      if (aclEntries == null){
+        continue;
+      }
+
+      List<AclEntry> onlyDefaults = new ArrayList<>();
+      for (AclEntry aclEntry : aclEntries) {
+        if (aclEntry.getScope().equals(AclEntryScope.DEFAULT)){
+          onlyDefaults.add(aclEntry);
+        }
+      }
+      
+      if (!onlyDefaults.isEmpty()){
+        return onlyDefaults;
+      }
+    }
+   return new ArrayList<>();
   }
 }
 

@@ -36,6 +36,9 @@ import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.permission.FsAction;
+import org.apache.hadoop.fs.BatchedRemoteIterator.BatchedEntries;
+import org.apache.hadoop.fs.permission.AclEntry;
+import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
@@ -1209,6 +1212,38 @@ class NameNodeRpcServer implements NamenodeProtocols {
   @Override // ClientProtocol
   public void checkAccess(String path, FsAction mode) throws IOException {
     namesystem.checkAccess(path, mode);
+  }
+
+  @Override
+  public void modifyAclEntries(String src, List<AclEntry> aclSpec)
+      throws IOException {
+    namesystem.modifyAclEntries(src, aclSpec);
+  }
+
+  @Override
+  public void removeAclEntries(String src, List<AclEntry> aclSpec)
+      throws IOException {
+    namesystem.removeAclEntries(src, aclSpec);
+  }
+
+  @Override
+  public void removeDefaultAcl(String src) throws IOException {
+    namesystem.removeDefaultAcl(src);
+  }
+
+  @Override
+  public void removeAcl(String src) throws IOException {
+    namesystem.removeAcl(src);
+  }
+
+  @Override
+  public void setAcl(String src, List<AclEntry> aclSpec) throws IOException {
+    namesystem.setAcl(src, aclSpec);
+  }
+
+  @Override
+  public AclStatus getAclStatus(String src) throws IOException {
+    return namesystem.getAclStatus(src);
   }
 
   @Override // ClientProtocol

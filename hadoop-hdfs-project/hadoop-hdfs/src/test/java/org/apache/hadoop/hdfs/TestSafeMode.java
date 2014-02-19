@@ -26,6 +26,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsAction;
+import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.MiniDFSCluster.DataNodeProperties;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.SafeModeAction;
@@ -68,6 +69,7 @@ public class TestSafeMode {
   public void startUp() throws IOException {
     conf = new HdfsConfiguration();
     conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE);
+    conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_ACLS_ENABLED_KEY, true);
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
     cluster.waitActive();
     fs = cluster.getFileSystem();
@@ -103,9 +105,9 @@ public class TestSafeMode {
    */
   //HOP this test case is failing because of the cluster restart
   //In this test two files are created. Each file has one block.
-  //When the cluster restarts the namenode does not find any blocks 
-  //and it thinks that it does not have to enter in the safe mode. 
-  //when all the blocks will be persisted then this test should pass 
+  //When the cluster restarts the namenode does not find any blocks
+  //and it thinks that it does not have to enter in the safe mode.
+  //when all the blocks will be persisted then this test should pass
   @Test(timeout = 300000)
   public void testManualSafeMode() throws IOException {
     fs = (DistributedFileSystem) cluster.getFileSystem();
@@ -216,9 +218,9 @@ public class TestSafeMode {
     // SafeMode is fine-grain synchronized, so the processMisReplicatedBlocks
     // call is still going on at this point - wait until it's done by grabbing
     // the lock.
-    
+
     Thread.sleep(1000);
-    
+
     int safe = NameNodeAdapter.getSafeModeSafeBlocks(nn);
     assertTrue("Expected first block report to make some but not all blocks " +
         "safe. Got: " + safe, safe >= 1 && safe < 15);
@@ -356,6 +358,42 @@ public class TestSafeMode {
       fs.setTimes(file1, 0, 0);
     } catch (IOException ioe) {
       fail("Set times failed while in SM");
+    }
+
+    runFsFun("modifyAclEntries while in SM", new FSRun() {
+      @Override
+      public void run(FileSystem fs) throws IOException {
+        fs.modifyAclEntries(file1, Lists.<AclEntry>newArrayList());
+      }});
+
+    runFsFun("removeAclEntries while in SM", new FSRun() {
+      @Override
+      public void run(FileSystem fs) throws IOException {
+        fs.removeAclEntries(file1, Lists.<AclEntry>newArrayList());
+      }});
+
+    runFsFun("removeDefaultAcl while in SM", new FSRun() {
+      @Override
+      public void run(FileSystem fs) throws IOException {
+        fs.removeDefaultAcl(file1);
+      }});
+
+    runFsFun("removeAcl while in SM", new FSRun() {
+      @Override
+      public void run(FileSystem fs) throws IOException {
+        fs.removeAcl(file1);
+      }});
+
+    runFsFun("setAcl while in SM", new FSRun() {
+      @Override
+      public void run(FileSystem fs) throws IOException {
+        fs.setAcl(file1, Lists.<AclEntry>newArrayList());
+      }});
+
+    try {
+        fs.getAclStatus(file1);
+    } catch (IOException ioe) {
+        fail("getAclStatus failed while in SM");
     }
 
     try {

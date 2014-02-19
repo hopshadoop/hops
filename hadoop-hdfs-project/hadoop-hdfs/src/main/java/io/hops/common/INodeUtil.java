@@ -19,29 +19,36 @@ import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.adaptor.INodeDALAdaptor;
+import io.hops.metadata.hdfs.dal.AceDataAccess;
 import io.hops.metadata.hdfs.dal.BlockLookUpDataAccess;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.metadata.hdfs.dal.LeaseDataAccess;
 import io.hops.metadata.hdfs.dal.LeasePathDataAccess;
+import io.hops.metadata.hdfs.entity.Ace;
 import io.hops.metadata.hdfs.entity.BlockLookUp;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.metadata.hdfs.entity.LeasePath;
+import io.hops.metadata.hdfs.entity.ProjectedINode;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.hdfs.protocol.AclException;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.UnresolvedPathException;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
 import org.apache.hadoop.hdfs.server.namenode.INode;
+import org.apache.hadoop.hdfs.server.namenode.INodeAclHelper;
 import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
 import org.apache.hadoop.hdfs.server.namenode.Lease;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -300,5 +307,37 @@ public class INodeUtil {
       }
     }
     return builder.toString();
+  }
+  
+  public static List<AclEntry> getInodeOwnAclNoTransaction(INode inode) throws AclException, StorageException {
+  
+    AceDataAccess<Ace> aceDataAccess =
+        (AceDataAccess) HdfsStorageFactory.getDataAccess(AceDataAccess.class);
+    int numAces = inode.getNumAces();
+    if (numAces == 0){
+      return new ArrayList<>();
+    }
+    int[] aceIndices = new int[numAces];
+    for (int i = 0; i < aceIndices.length; i++) {
+      aceIndices[i] = i;
+    }
+    List<Ace> acesByPKBatched = aceDataAccess.getAcesByPKBatched(inode.getId(), aceIndices);
+    return INodeAclHelper.convert(acesByPKBatched);
+  }
+  
+  public static List<AclEntry> getInodeOwnAclNoTransaction(ProjectedINode child) throws StorageException, AclException {
+     AceDataAccess<Ace> aceDataAccess =
+        (AceDataAccess) HdfsStorageFactory.getDataAccess(AceDataAccess.class);
+    int numAces = child.getNumAces();
+    if (numAces == 0){
+      return new ArrayList<>();
+    }
+    int[] aceIndices = new int[numAces];
+    for (int i = 0; i < aceIndices.length; i++) {
+      aceIndices[i] = i;
+    }
+    List<Ace> acesByPKBatched = aceDataAccess.getAcesByPKBatched(child.getId(), aceIndices);
+    return INodeAclHelper.convert(acesByPKBatched);
+    
   }
 }

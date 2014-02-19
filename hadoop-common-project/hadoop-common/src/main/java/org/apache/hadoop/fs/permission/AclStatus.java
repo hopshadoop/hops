@@ -252,22 +252,25 @@ public class AclStatus {
       // accuracy.
       permArg = this.permission;
     }
+    
+    
     if ((entry.getName() != null || entry.getType() == AclEntryType.GROUP)) {
       if (entry.getScope() == AclEntryScope.ACCESS) {
         FsAction entryPerm = entry.getPermission();
         return entryPerm.and(permArg.getGroupAction());
       } else {
-        Preconditions.checkArgument(this.entries.contains(entry)
-            && this.entries.size() >= 3,
-            "Passed default ACL entry not found in the list of ACLs");
-        // default mask entry for effective permission calculation will be the
-        // penultimate entry. This can be mask entry in case of extended ACLs.
-        // In case of minimal ACL, this is the owner group entry, and we end up
-        // intersecting group FsAction with itself, which is a no-op.
-        FsAction defaultMask = this.entries.get(this.entries.size() - 2)
-            .getPermission();
-        FsAction entryPerm = entry.getPermission();
-        return entryPerm.and(defaultMask);
+        return entry.getPermission().and(permArg.getGroupAction());
+//        Preconditions.checkArgument(this.entries.contains(entry)
+//            && this.entries.size() >= 3,
+//            "Passed default ACL entry not found in the list of ACLs");
+//        // default mask entry for effective permission calculation will be the
+//        // penultimate entry. This can be mask entry in case of extended ACLs.
+//        // In case of minimal ACL, this is the owner group entry, and we end up
+//        // intersecting group FsAction with itself, which is a no-op.
+//        FsAction defaultMask = this.entries.get(this.entries.size() - 2)
+//            .getPermission();
+//        FsAction entryPerm = entry.getPermission();
+//        return entryPerm.and(defaultMask);
       }
     } else {
       return entry.getPermission();
