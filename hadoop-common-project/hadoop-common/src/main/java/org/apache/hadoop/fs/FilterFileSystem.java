@@ -398,7 +398,7 @@ public class FilterFileSystem extends FileSystem {
     return fs.getServerDefaults();
   }
 
-  // path variants delegate to underlying filesystem 
+  // path variants delegate to underlying filesystem
   @Override
   public long getDefaultBlockSize(Path f) {
     return fs.getDefaultBlockSize(f);

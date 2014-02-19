@@ -355,6 +355,8 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
       "dfs.client.file-block-storage-locations.timeout";
   public static final int
       DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT_DEFAULT = 60;
+  public static final String DFS_WEBHDFS_ACL_PERMISSION_PATTERN_DEFAULT =
+      "^(default:)?(user|group|mask|other):[[A-Za-z_][A-Za-z0-9._-]]*:([rwx-]{3})?(,(default:)?(user|group|mask|other):[[A-Za-z_][A-Za-z0-9._-]]*:([rwx-]{3})?)*$";
 
   // HA related configuration
   public static final String DFS_CLIENT_FAILOVER_PROXY_PROVIDER_KEY_PREFIX =
@@ -497,6 +499,8 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
       "ssl-server.xml";
   public static final String DFS_NAMENODE_NAME_DIR_RESTORE_KEY =
       "dfs.namenode.name.dir.restore";
+  public static final String  DFS_NAMENODE_ACLS_ENABLED_KEY = "dfs.namenode.acls.enabled";
+  public static final boolean DFS_NAMENODE_ACLS_ENABLED_DEFAULT = false;
   public static final boolean DFS_NAMENODE_NAME_DIR_RESTORE_DEFAULT = false;
   public static final String DFS_NAMENODE_SUPPORT_ALLOW_FORMAT_KEY =
       "dfs.namenode.support.allow.format";

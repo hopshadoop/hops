@@ -506,7 +506,7 @@ public class ViewFileSystem extends FileSystem {
         fsState.resolve(getUriPath(f), true);
     return res.targetFileSystem.truncate(f, newLength);
   }
-  
+
   @Override
   public void setOwner(final Path f, final String username,
       final String groupname) throws AccessControlException,
