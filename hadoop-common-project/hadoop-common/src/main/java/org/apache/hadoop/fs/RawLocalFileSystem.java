@@ -308,8 +308,8 @@ public class RawLocalFileSystem extends FileSystem {
         createOutputStreamWithMode(f, false, permission), bufferSize),
         statistics);
   }
-  
-  protected OutputStream createOutputStream(Path f, boolean append) 
+
+  protected OutputStream createOutputStream(Path f, boolean append)
       throws IOException {
     return createOutputStreamWithMode(f, append, null);
   }
@@ -445,7 +445,7 @@ public class RawLocalFileSystem extends FileSystem {
     }
     return FileUtil.fullyDelete(f);
   }
- 
+
   @Override
   public FileStatus[] listStatus(Path f) throws IOException {
     File localf = pathToFile(f);
@@ -487,7 +487,7 @@ public class RawLocalFileSystem extends FileSystem {
         new DeprecatedRawLocalFileStatus(localf,
         getDefaultBlockSize(f), this) };
   }
-  
+
   protected boolean mkOneDir(File p2f) throws IOException {
     return mkOneDirWithMode(new Path(p2f.getAbsolutePath()), p2f, null);
   }

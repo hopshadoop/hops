@@ -291,6 +291,7 @@ public class FsPermission implements Writable {
    */
   public boolean getAclBit() {
     // File system subclasses that support the ACL bit would override this.
+    //TODO set back to false, and dynamically get the attribute in FileStatus when merging HDFS-7450
     return false;
   }
 

@@ -20,15 +20,26 @@ package org.apache.hadoop.hdfs.server.namenode;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.hdfs.entity.ProjectedINode;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.Stack;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.UnresolvedLinkException;
+import org.apache.hadoop.fs.permission.AclEntry;
+import org.apache.hadoop.fs.permission.AclEntryScope;
+import org.apache.hadoop.fs.permission.AclEntryType;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.StringUtils;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -48,20 +59,60 @@ import java.util.Stack;
 class FSPermissionChecker {
   static final Log LOG = LogFactory.getLog(UserGroupInformation.class);
   
+  
   /** @return a string for throwing {@link AccessControlException} */
   private static String toAccessControlString(INode inode) throws StorageException, TransactionContextException,
       IOException {
     return "\"" + inode.getLocalName() + "\":"
-          + inode.getUserName() + ":" + inode.getGroupName()
-          + ":" + (inode.isDirectory()? "d": "-") + inode.getFsPermission();
+        + inode.getUserName() + ":" + inode.getGroupName()
+        + ":" + (inode.isDirectory()? "d": "-") + inode.getFsPermission();
   }
   
   /** @return a string for throwing {@link AccessControlException} */
   private static String toAccessControlString(ProjectedINode inode) throws StorageException, TransactionContextException,
       IOException {
     return "\"" + inode.getName() + "\":"
-          + inode.getUserName() + ":" + inode.getGroupName()
-          + ":" + (inode.isDirectory()? "d": "-") + new FsPermission(inode.getPermission());
+        + inode.getUserName() + ":" + inode.getGroupName()
+        + ":" + (inode.isDirectory()? "d": "-") + new FsPermission(inode.getPermission());
+  }
+  
+  /** @return a string for throwing {@link AccessControlException} */
+  private String toAccessControlString(INode inode,
+      FsAction access, FsPermission mode) throws IOException {
+    return toAccessControlString(inode, access, mode, null);
+  }
+
+  /** @return a string for throwing {@link AccessControlException} */
+  private String toAccessControlString(INode inode,
+      FsAction access, FsPermission mode, List<AclEntry> featureEntries) throws IOException {
+    StringBuilder sb = new StringBuilder("Permission denied: ")
+      .append("user=").append(user).append(", ")
+      .append("access=").append(access).append(", ")
+      .append("inode=\"").append(inode.getFullPathName()).append("\":")
+      .append(inode.getUserName()).append(':')
+      .append(inode.getGroupName()).append(':')
+      .append(inode.isDirectory() ? 'd' : '-')
+      .append(mode);
+    if (featureEntries != null) {
+      sb.append(':').append(StringUtils.join(",", featureEntries));
+    }
+    return sb.toString();
+  }
+  
+  private String toAccessControlString(ProjectedINode inode,
+      FsAction access, FsPermission mode, List<AclEntry> featureEntries) throws IOException {
+    StringBuilder sb = new StringBuilder("Permission denied: ")
+        .append("user=").append(user).append(", ")
+        .append("access=").append(access).append(", ")
+        .append("projectedInode=\"").append(inode.getName()).append("\":")
+        .append(inode.getUserName()).append(':')
+        .append(inode.getGroupName()).append(':')
+        .append(inode.isDirectory() ? 'd' : '-')
+        .append(mode);
+    if (featureEntries != null) {
+      sb.append(':').append(StringUtils.join(",", featureEntries));
+    }
+    return sb.toString();
   }
 
   private final UserGroupInformation ugi;
@@ -108,6 +159,13 @@ class FSPermissionChecker {
       throw new AccessControlException("Access denied for user " + user +
           ". Superuser privilege is required");
     }
+  }
+  
+  void checkPermission(String path, INodeDirectory root, boolean doCheckOwner,
+      FsAction ancestorAccess, FsAction parentAccess, FsAction access,
+      FsAction subAccess) throws AccessControlException, UnresolvedLinkException, StorageException,
+      TransactionContextException, IOException {
+    checkPermission(path, root, doCheckOwner, ancestorAccess, parentAccess, access, subAccess, false);
   }
   
   /**
@@ -245,16 +303,191 @@ class FSPermissionChecker {
       return;
     }
     FsPermission mode = inode.getFsPermission();
+  
+    AclFeature aclFeature = inode.getAclFeature();//snapshotId);
+    if (aclFeature != null) {
+      List<AclEntry> featureEntries = aclFeature.getEntries();
+      // It's possible that the inode has a default ACL but no access ACL.
+      if (featureEntries.get(0).getScope() == AclEntryScope.ACCESS) {
+        checkAccessAcl(inode, access, mode, featureEntries);
+        return;
+      }
+    }
+    //checkFsPermission(inode, access, mode); //TODO maybe remove this call
+    
+    check(inode, access, mode, inode.getUserName(),
+        inode.getGroupName());
+    
+  }
+  
+  void check(INode inode, FsAction access, List<AclEntry> aclEntries) throws IOException {
+    if (inode == null){
+      return;
+    }
+    
+    FsPermission mode = inode.getFsPermission();
+    if (aclEntries != null && !aclEntries.isEmpty()){
+      if (aclEntries.get(0).getScope() == AclEntryScope.ACCESS) {
+        checkAccessAcl(inode, access, mode, aclEntries);
+        return;
+      }
+    }
     check(inode, access, mode, inode.getUserName(),
         inode.getGroupName());
   }
 
-  void check(ProjectedINode inode, FsAction access) throws IOException {
+  /**
+   * Checks requested access against an Access Control List.  This method relies
+   * on finding the ACL data in the relevant portions of {@link FsPermission} and
+   * {@link AclFeature} as implemented in the logic of {@link AclStorage}.  This
+   * method also relies on receiving the ACL entries in sorted order.  This is
+   * assumed to be true, because the ACL modification methods in
+   * {@link AclTransformation} sort the resulting entries.
+   *
+   * More specifically, this method depends on these invariants in an ACL:
+   * - The list must be sorted.
+   * - Each entry in the list must be unique by scope + type + name.
+   * - There is exactly one each of the unnamed user/group/other entries.
+   * - The mask entry must not have a name.
+   * - The other entry must not have a name.
+   * - Default entries may be present, but they are ignored during enforcement.
+   *
+   * @param inode INode accessed inode
+   * @param access FsAction requested permission
+   * @param mode FsPermission mode from inode
+   * @param featureEntries List<AclEntry> ACL entries from AclFeature of inode
+   * @throws AccessControlException if the ACL denies permission
+   */
+  private void checkAccessAcl(INode inode, FsAction access,
+      FsPermission mode, List<AclEntry> featureEntries)
+      throws IOException {
+    boolean foundMatch = false;
+
+    // Use owner entry from permission bits if user is owner.
+    if (user.equals(inode.getUserName())) {
+      if (mode.getUserAction().implies(access)) {
+        return;
+      }
+      foundMatch = true;
+    }
+
+    // Check named user and group entries if user was not denied by owner entry.
+    if (!foundMatch) {
+      for (AclEntry entry: featureEntries) {
+        if (entry.getScope() == AclEntryScope.DEFAULT) {
+          break;
+        }
+        AclEntryType type = entry.getType();
+        String name = entry.getName();
+        if (type == AclEntryType.USER) {
+          // Use named user entry with mask from permission bits applied if user
+          // matches name.
+          if (user.equals(name)) {
+            FsAction masked = entry.getPermission().and(mode.getGroupAction());
+            if (masked.implies(access)) {
+              return;
+            }
+            foundMatch = true;
+            break;
+          }
+        } else if (type == AclEntryType.GROUP) {
+          // Use group entry (unnamed or named) with mask from permission bits
+          // applied if user is a member and entry grants access.  If user is a
+          // member of multiple groups that have entries that grant access, then
+          // it doesn't matter which is chosen, so exit early after first match.
+          String group = name == null ? inode.getGroupName() : name;
+          if (groups.contains(group)) {
+            FsAction masked = entry.getPermission().and(mode.getGroupAction());
+            if (masked.implies(access)) {
+              return;
+            }
+            foundMatch = true;
+          }
+        }
+      }
+    }
+
+    // Use other entry if user was not denied by an earlier match.
+    if (!foundMatch && mode.getOtherAction().implies(access)) {
+      return;
+    }
+
+    throw new AccessControlException(
+      toAccessControlString(inode, access, mode, featureEntries));
+  }
+  
+  private void checkAccessAcl(ProjectedINode inode, FsAction access,
+      FsPermission mode, List<AclEntry> featureEntries)
+      throws IOException {
+    boolean foundMatch = false;
+    
+    // Use owner entry from permission bits if user is owner.
+    if (user.equals(inode.getUserName())) {
+      if (mode.getUserAction().implies(access)) {
+        return;
+      }
+      foundMatch = true;
+    }
+    
+    // Check named user and group entries if user was not denied by owner entry.
+    if (!foundMatch) {
+      for (AclEntry entry: featureEntries) {
+        if (entry.getScope() == AclEntryScope.DEFAULT) {
+          break;
+        }
+        AclEntryType type = entry.getType();
+        String name = entry.getName();
+        if (type == AclEntryType.USER) {
+          // Use named user entry with mask from permission bits applied if user
+          // matches name.
+          if (user.equals(name)) {
+            FsAction masked = entry.getPermission().and(mode.getGroupAction());
+            if (masked.implies(access)) {
+              return;
+            }
+            foundMatch = true;
+            break;
+          }
+        } else if (type == AclEntryType.GROUP) {
+          // Use group entry (unnamed or named) with mask from permission bits
+          // applied if user is a member and entry grants access.  If user is a
+          // member of multiple groups that have entries that grant access, then
+          // it doesn't matter which is chosen, so exit early after first match.
+          String group = name == null ? inode.getGroupName() : name;
+          if (groups.contains(group)) {
+            FsAction masked = entry.getPermission().and(mode.getGroupAction());
+            if (masked.implies(access)) {
+              return;
+            }
+            foundMatch = true;
+          }
+        }
+      }
+    }
+    
+    // Use other entry if user was not denied by an earlier match.
+    if (!foundMatch && mode.getOtherAction().implies(access)) {
+      return;
+    }
+    
+    throw new AccessControlException(
+        toAccessControlString(inode, access, mode, featureEntries));
+  }
+
+  void check(ProjectedINode inode, FsAction access, List<AclEntry> aclEntries) throws IOException {
     if (inode == null) {
       return;
     }
     
-    if(!check(inode.getId(), access, new FsPermission(inode.getPermission()), inode
+    FsPermission mode = new FsPermission(inode.getPermission());
+    if (aclEntries != null && !aclEntries.isEmpty()){
+      if (aclEntries.get(0).getScope() == AclEntryScope.ACCESS) {
+        checkAccessAcl(inode, access, mode, aclEntries);
+        return;
+      }
+    }
+    
+    if(!check(inode.getId(), access, mode, inode
         .getUserName(), inode.getGroupName())){
       throw new AccessControlException(
           "Permission denied: user=" + user + ", access=" + access + ", inode=" + toAccessControlString(inode));

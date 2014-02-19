@@ -105,7 +105,7 @@ public abstract class FileSystem extends Configured implements Closeable {
    * Priority of the FileSystem shutdown hook.
    */
   public static final int SHUTDOWN_HOOK_PRIORITY = 10;
-  
+
   public static final String TRASH_PREFIX = ".Trash";
 
   /** FileSystem cache */
@@ -1347,7 +1347,7 @@ public abstract class FileSystem extends Configured implements Closeable {
     throw new UnsupportedOperationException("Not implemented by the " +
         getClass().getSimpleName() + " FileSystem implementation");
   }
-  
+
   /**
    * Delete a file 
    * @deprecated Use {@link #delete(Path, boolean)} instead.
@@ -1497,7 +1497,7 @@ public abstract class FileSystem extends Configured implements Closeable {
       @Override
       public boolean accept(Path file) {
         return true;
-      }     
+      }
     };
     
   /**
@@ -1666,7 +1666,7 @@ public abstract class FileSystem extends Configured implements Closeable {
    * and is accepted by the user-supplied path filter. Results are sorted by
    * their path names.
    * Return null if pathPattern has no glob and the path does not exist.
-   * Return an empty array if pathPattern has a glob and no path matches it. 
+   * Return an empty array if pathPattern has a glob and no path matches it.
    * 
    * @param pathPattern
    *          a regular expression specifying the path pattern
@@ -1743,7 +1743,7 @@ public abstract class FileSystem extends Configured implements Closeable {
    * Returns a remote iterator so that followup calls are made on demand
    * while consuming the entries. Each file system implementation should
    * override this method and provide a more efficient implementation, if
-   * possible. 
+   * possible.
    *
    * @param p target path
    * @return remote iterator
@@ -2831,7 +2831,7 @@ public abstract class FileSystem extends Configured implements Closeable {
         this.unique = unique;
         
         this.ugi = UserGroupInformation.getCurrentUser();
-        
+
         this.keystoreUsed = conf.get(HopsSSLSocketFactory.CryptoKeys
                 .KEY_STORE_FILEPATH_KEY.getValue(),
             HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY
@@ -2868,7 +2868,7 @@ public abstract class FileSystem extends Configured implements Closeable {
       public String toString() {
         return "("+ugi.toString() + ")@" + scheme + "://" + authority
             + " <kstore: " + keystoreUsed + ">";
-        
+
       }
     }
   }
@@ -2934,23 +2934,23 @@ public abstract class FileSystem extends Configured implements Closeable {
             + readOps + " read ops, " + largeReadOps + " large read ops, "
             + writeOps + " write ops";
       }
-      
+
       public long getBytesRead() {
         return bytesRead;
       }
-      
+
       public long getBytesWritten() {
         return bytesWritten;
       }
-      
+
       public int getReadOps() {
         return readOps;
       }
-      
+
       public int getLargeReadOps() {
         return largeReadOps;
       }
-      
+
       public int getWriteOps() {
         return writeOps;
       }
@@ -3397,7 +3397,7 @@ public abstract class FileSystem extends Configured implements Closeable {
   public static void enableSymlinks() {
     symlinksEnabled = true;
   }
- 
+
   /**
    * Get the root directory of Trash for current user when the path specified
    * is deleted.
