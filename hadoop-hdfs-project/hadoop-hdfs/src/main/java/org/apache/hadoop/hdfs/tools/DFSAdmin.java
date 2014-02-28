@@ -52,6 +52,7 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.RefreshUserMappingsProtocol;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.RefreshAuthorizationPolicyProtocol;
+import org.apache.hadoop.ipc.RefreshCallQueueProtocol;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.ToolRunner;
 
@@ -714,6 +715,8 @@ public class DFSAdmin extends FsShell {
     String refreshSuperUserGroupsConfiguration =
         "-refreshSuperUserGroupsConfiguration: Refresh superuser proxy groups mappings\n";
 
+    String refreshCallQueue = "-refreshCallQueue: Reload the call queue from config\n";
+    
     String reconfig = "-reconfig <datanode|...> <host:ipc_port> <start|status>:\n" +
         "\tStarts reconfiguration or gets the status of an ongoing reconfiguration.\n" +
         "\tThe second parameter specifies the node type.\n" +
@@ -784,6 +787,8 @@ public class DFSAdmin extends FsShell {
       System.out.println(refreshUserToGroupsMappings);
     } else if ("refreshSuperUserGroupsConfiguration".equals(cmd)) {
       System.out.println(refreshSuperUserGroupsConfiguration);
+    } else if ("refreshCallQueue".equals(cmd)) {
+      System.out.println(refreshCallQueue);
     } else if ("reconfig".equals(cmd)) {
       System.out.println(reconfig);
     } else if ("printTopology".equals(cmd)) {
@@ -811,6 +816,7 @@ public class DFSAdmin extends FsShell {
       System.out.println(refreshServiceAcl);
       System.out.println(refreshUserToGroupsMappings);
       System.out.println(refreshSuperUserGroupsConfiguration);
+      System.out.println(refreshCallQueue);
       System.out.println(reconfig);
       System.out.println(printTopology);
       System.out.println(deleteBlockPool);
@@ -958,6 +964,27 @@ public class DFSAdmin extends FsShell {
 
     return 0;
   }
+  
+  public int refreshCallQueue() throws IOException {
+    // Get the current configuration
+    Configuration conf = getConf();
+    
+    // for security authorization
+    // server principal for this call   
+    // should be NN's one.
+    conf.set(CommonConfigurationKeys.HADOOP_SECURITY_SERVICE_USER_NAME_KEY, 
+        conf.get(DFSConfigKeys.DFS_NAMENODE_KERBEROS_PRINCIPAL_KEY, ""));
+ 
+    // Create the client
+    RefreshCallQueueProtocol refreshProtocol =
+      NameNodeProxies.createProxy(conf, FileSystem.getDefaultUri(conf),
+          RefreshCallQueueProtocol.class).getProxy();
+
+    // Refresh the user-to-groups mappings
+    refreshProtocol.refreshCallQueue();
+    
+    return 0;
+  }
 
   public int reconfig(String[] argv, int i) throws IOException {
     String nodeType = argv[i];
@@ -1067,6 +1094,9 @@ public class DFSAdmin extends FsShell {
     } else if ("-refreshSuperUserGroupsConfiguration".equals(cmd)) {
       System.err.println("Usage: hdfs dfsadmin"
                          + " [-refreshSuperUserGroupsConfiguration]");
+    } else if ("-refreshCallQueue".equals(cmd)) {
+      System.err.println("Usage: java DFSAdmin"
+                         + " [-refreshCallQueue]");
     } else if ("-reconfig".equals(cmd)) {
       System.err.println("Usage: hdfs dfsadmin"
                          + " [-reconfig <datanode|...> <host:port> <start|status>]");
@@ -1223,6 +1253,8 @@ public class DFSAdmin extends FsShell {
         exitCode = refreshUserToGroupsMappings();
       } else if ("-refreshSuperUserGroupsConfiguration".equals(cmd)) {
         exitCode = refreshSuperUserGroupsConfiguration();
+      } else if ("-refreshCallQueue".equals(cmd)) {
+        exitCode = refreshCallQueue();
       } else if ("-printTopology".equals(cmd)) {
         exitCode = printTopology();
       } else if ("-deleteBlockPool".equals(cmd)) {

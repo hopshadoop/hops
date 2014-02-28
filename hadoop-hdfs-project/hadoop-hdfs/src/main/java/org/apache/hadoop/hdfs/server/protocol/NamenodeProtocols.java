@@ -22,6 +22,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.security.RefreshUserMappingsProtocol;
 import org.apache.hadoop.security.authorize.RefreshAuthorizationPolicyProtocol;
+import org.apache.hadoop.ipc.RefreshCallQueueProtocol;
 import org.apache.hadoop.tools.GetUserMappingsProtocol;
 import org.apache.hadoop.tracing.TraceAdminProtocol;
 
@@ -35,6 +36,7 @@ public interface NamenodeProtocols
           NamenodeProtocol,
           RefreshAuthorizationPolicyProtocol,
           RefreshUserMappingsProtocol,
+          RefreshCallQueueProtocol,
           GetUserMappingsProtocol,
           TraceAdminProtocol {
 }
