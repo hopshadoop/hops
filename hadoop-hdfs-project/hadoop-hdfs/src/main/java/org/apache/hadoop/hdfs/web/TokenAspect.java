@@ -39,6 +39,7 @@ import org.apache.hadoop.security.token.TokenRenewer;
 import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenSelector;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.net.NetUtils;
 
 /**
  * This class implements the aspects that relate to delegation tokens for all
@@ -71,17 +72,23 @@ final class TokenAspect<T extends FileSystem & Renewable> {
 
     private TokenManagementDelegator getInstance(Token<?> token,
         Configuration conf) throws IOException {
-      final InetSocketAddress address = SecurityUtil.getTokenServiceAddr(token);
       Text kind = token.getKind();
       final URI uri;
+      final String scheme = getSchemeByKind(token.getKind());
+      final InetSocketAddress address = SecurityUtil.getTokenServiceAddr
+                (token);
+      uri = URI.create(scheme + "://" + NetUtils.getHostPortString(address));
+      return (TokenManagementDelegator) FileSystem.get(uri, conf);
+    }
+
+    private static String getSchemeByKind(Text kind) {
       if (kind.equals(WebHdfsConstants.WEBHDFS_TOKEN_KIND)) {
-        uri = DFSUtil.createUri(WebHdfsConstants.WEBHDFS_SCHEME, address);
+        return WebHdfsConstants.WEBHDFS_SCHEME;
       } else if (kind.equals(WebHdfsConstants.SWEBHDFS_TOKEN_KIND)) {
-        uri = DFSUtil.createUri(WebHdfsConstants.SWEBHDFS_SCHEME, address);
+        return WebHdfsConstants.SWEBHDFS_SCHEME;
       } else {
         throw new IllegalArgumentException("Unsupported scheme");
       }
-      return (TokenManagementDelegator) FileSystem.get(uri, conf);
     }
   }
 

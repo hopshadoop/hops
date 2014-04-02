@@ -616,6 +616,7 @@ public class TestDistributedFileSystem {
       }
 
       hdfs.setPermission(dir, new FsPermission((short)0));
+
       { //test permission error on webhdfs 
         try {
           webhdfs.getFileChecksum(webhdfsqualified);

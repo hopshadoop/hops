@@ -29,9 +29,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenSecretManager;
-
-import org.apache.hadoop.hdfs.web.SWebHdfsFileSystem;
-import org.apache.hadoop.hdfs.web.WebHdfsFileSystem;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
@@ -47,6 +44,7 @@ import java.util.Collection;
 import java.util.Date;
 import org.apache.hadoop.util.ExitUtil;
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdfs.web.WebHdfsConstants;
 
 /**
  * Fetch a DelegationToken from the current Namenode and store it in the
@@ -139,8 +137,8 @@ public class DelegationTokenFetcher {
 
     // For backward compatibility
     URI fsUri = URI.create(
-            url.replaceFirst("^http://", WebHdfsFileSystem.SCHEME + "://")
-               .replaceFirst("^https://", SWebHdfsFileSystem.SCHEME + "://"));
+            url.replaceFirst("^http://", WebHdfsConstants.WEBHDFS_SCHEME + "://")
+               .replaceFirst("^https://", WebHdfsConstants.SWEBHDFS_SCHEME + "://"));
 
     return FileSystem.get(fsUri, conf);
   }
