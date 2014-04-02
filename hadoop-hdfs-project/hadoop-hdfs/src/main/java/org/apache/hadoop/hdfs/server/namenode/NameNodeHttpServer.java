@@ -227,25 +227,8 @@ public class NameNodeHttpServer {
   private static void setupServlets(HttpServer3 httpServer, Configuration conf) {
     httpServer.addInternalServlet("startupProgress",
         StartupProgressServlet.PATH_SPEC, StartupProgressServlet.class);
-    httpServer.addInternalServlet("getDelegationToken",
-        GetDelegationTokenServlet.PATH_SPEC, GetDelegationTokenServlet.class,
+    httpServer.addInternalServlet("fsck", "/fsck", FsckServlet.class,
         true);
-    httpServer.addInternalServlet("renewDelegationToken",
-        RenewDelegationTokenServlet.PATH_SPEC,
-        RenewDelegationTokenServlet.class, true);
-    httpServer.addInternalServlet("cancelDelegationToken",
-        CancelDelegationTokenServlet.PATH_SPEC,
-        CancelDelegationTokenServlet.class, true);
-    httpServer.addInternalServlet("fsck", "/fsck", FsckServlet.class, true);
-    httpServer
-        .addInternalServlet("listPaths", "/listPaths/*", ListPathsServlet.class,
-            false);
-    httpServer
-        .addInternalServlet("data", "/data/*", FileDataServlet.class, false);
-    httpServer.addInternalServlet("checksum", "/fileChecksum/*",
-        FileChecksumServlets.RedirectServlet.class, false);
-    httpServer.addInternalServlet("contentSummary", "/contentSummary/*",
-        ContentSummaryServlet.class, false);
   }
 
   public static NameNode getNameNodeFromContext(ServletContext context) {
