@@ -54,6 +54,8 @@ public class DNConf {
   final long deleteReportInterval;
   final long initialBlockReportDelay;
   final long cacheReportInterval;
+  final long dfsclientSlowIoWarningThresholdMs;
+  final long datanodeSlowIoWarningThresholdMs;
   final int writePacketSize;
 
   final String minimumNameNodeVersion;
@@ -111,6 +113,15 @@ public class DNConf {
         DFS_BLOCKREPORT_SPLIT_THRESHOLD_DEFAULT);
     long initBRDelay = conf.getLong(DFS_BLOCKREPORT_INITIAL_DELAY_KEY,
         DFS_BLOCKREPORT_INITIAL_DELAY_DEFAULT) * 1000L;
+    
+    this.dfsclientSlowIoWarningThresholdMs = conf.getLong(
+        DFSConfigKeys.DFS_CLIENT_SLOW_IO_WARNING_THRESHOLD_KEY,
+        DFSConfigKeys.DFS_CLIENT_SLOW_IO_WARNING_THRESHOLD_DEFAULT);
+    this.datanodeSlowIoWarningThresholdMs = conf.getLong(
+        DFSConfigKeys.DFS_DATANODE_SLOW_IO_WARNING_THRESHOLD_KEY,
+        DFSConfigKeys.DFS_DATANODE_SLOW_IO_WARNING_THRESHOLD_DEFAULT);
+
+
     if (initBRDelay >= blockReportInterval) {
       initBRDelay = 0;
       DataNode.LOG.info("dfs.blockreport.initialDelay is greater than " +
@@ -154,7 +165,7 @@ public class DNConf {
         DFS_DATANODE_RESTART_REPLICA_EXPIRY_KEY,
         DFS_DATANODE_RESTART_REPLICA_EXPIRY_DEFAULT) * 1000L;
   }
-  
+
   // We get minimumNameNodeVersion via a method so it can be mocked out in tests.
   String getMinimumNameNodeVersion() {
     return this.minimumNameNodeVersion;

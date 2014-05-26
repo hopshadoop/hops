@@ -1007,4 +1007,12 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_DFSCLIENT_HEDGED_READ_THREADPOOL_SIZE =
       "dfs.client.hedged.read.threadpool.size";
   public static final int DEFAULT_DFSCLIENT_HEDGED_READ_THREADPOOL_SIZE = 0;
+
+   // Slow io warning log threshold settings for dfsclient and datanode.
+   public static final String DFS_CLIENT_SLOW_IO_WARNING_THRESHOLD_KEY =
+     "dfs.client.slow.io.warning.threshold.ms";
+   public static final long DFS_CLIENT_SLOW_IO_WARNING_THRESHOLD_DEFAULT = 30000;
+   public static final String DFS_DATANODE_SLOW_IO_WARNING_THRESHOLD_KEY =
+     "dfs.datanode.slow.io.warning.threshold.ms";
+   public static final long DFS_DATANODE_SLOW_IO_WARNING_THRESHOLD_DEFAULT = 300;
 }
