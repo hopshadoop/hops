@@ -20,6 +20,21 @@ package org.apache.hadoop.hdfs.tools;
 import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import java.io.File;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.net.InetSocketAddress;
+import java.net.URI;
+import java.net.URL;
+import java.security.PrivilegedExceptionAction;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.TreeSet;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -48,11 +63,16 @@ import org.apache.hadoop.hdfs.protocol.HdfsConstants.SafeModeAction;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RemoteException;
+import org.apache.hadoop.ipc.ProtobufRpcEngine;
+import org.apache.hadoop.ipc.RefreshCallQueueProtocol;
+import org.apache.hadoop.ipc.GenericRefreshProtocol;
+import org.apache.hadoop.ipc.RefreshResponse;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.RefreshUserMappingsProtocol;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.RefreshAuthorizationPolicyProtocol;
-import org.apache.hadoop.ipc.RefreshCallQueueProtocol;
+import org.apache.hadoop.ipc.protocolPB.GenericRefreshProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ipc.protocolPB.GenericRefreshProtocolPB;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.ToolRunner;
 
@@ -722,6 +742,10 @@ public class DFSAdmin extends FsShell {
         "\tThe second parameter specifies the node type.\n" +
         "\tCurrently, only reloading DataNode's configuration is supported.\n";
     
+    String genericRefresh = "-refresh: Arguments are <hostname:port> <resource_identifier> [arg1..argn]\n" +
+      "\tTriggers a runtime-refresh of the resource specified by <resource_identifier>\n" +
+      "\ton <hostname:port>. All other args after are sent to the host.";
+    
     String printTopology =
         "-printTopology: Print a tree of the racks and their\n" +
             "\t\tnodes as reported by the Namenode\n";
@@ -789,6 +813,8 @@ public class DFSAdmin extends FsShell {
       System.out.println(refreshSuperUserGroupsConfiguration);
     } else if ("refreshCallQueue".equals(cmd)) {
       System.out.println(refreshCallQueue);
+    } else if ("refresh".equals(cmd)) {
+      System.out.println(genericRefresh);
     } else if ("reconfig".equals(cmd)) {
       System.out.println(reconfig);
     } else if ("printTopology".equals(cmd)) {
@@ -817,6 +843,7 @@ public class DFSAdmin extends FsShell {
       System.out.println(refreshUserToGroupsMappings);
       System.out.println(refreshSuperUserGroupsConfiguration);
       System.out.println(refreshCallQueue);
+      System.out.println(genericRefresh);
       System.out.println(reconfig);
       System.out.println(printTopology);
       System.out.println(deleteBlockPool);
@@ -1055,6 +1082,55 @@ public class DFSAdmin extends FsShell {
     }
     return 0;
   }
+  public int genericRefresh(String[] argv, int i) throws IOException {
+    String hostport = argv[i++];
+    String identifier = argv[i++];
+    String[] args = Arrays.copyOfRange(argv, i, argv.length);
+
+    // Get the current configuration
+    Configuration conf = getConf();
+
+    // for security authorization
+    // server principal for this call
+    // should be NN's one.
+    conf.set(CommonConfigurationKeys.HADOOP_SECURITY_SERVICE_USER_NAME_KEY,
+      conf.get(DFSConfigKeys.DFS_NAMENODE_KERBEROS_PRINCIPAL_KEY, ""));
+
+    // Create the client
+    Class<?> xface = GenericRefreshProtocolPB.class;
+    InetSocketAddress address = NetUtils.createSocketAddr(hostport);
+    UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+
+    RPC.setProtocolEngine(conf, xface, ProtobufRpcEngine.class);
+    GenericRefreshProtocolPB proxy = (GenericRefreshProtocolPB)
+      RPC.getProxy(xface, RPC.getProtocolVersion(xface), address,
+        ugi, conf, NetUtils.getDefaultSocketFactory(conf), 0);
+
+    GenericRefreshProtocol xlator =
+      new GenericRefreshProtocolClientSideTranslatorPB(proxy);
+
+    // Refresh
+    Collection<RefreshResponse> responses = xlator.refresh(identifier, args);
+
+    int returnCode = 0;
+
+    // Print refresh responses
+    System.out.println("Refresh Responses:\n");
+    for (RefreshResponse response : responses) {
+      System.out.println(response.toString());
+
+      if (returnCode == 0 && response.getReturnCode() != 0) {
+        // This is the first non-zero return code, so we should return this
+        returnCode = response.getReturnCode();
+      } else if (returnCode != 0 && response.getReturnCode() != 0) {
+        // Then now we have multiple non-zero return codes,
+        // so we merge them into -1
+        returnCode = -1;
+      }
+    }
+
+    return returnCode;
+  }
 
   /**
    * Displays format of commands.
@@ -1100,6 +1176,9 @@ public class DFSAdmin extends FsShell {
     } else if ("-reconfig".equals(cmd)) {
       System.err.println("Usage: hdfs dfsadmin"
                          + " [-reconfig <datanode|...> <host:port> <start|status>]");
+    } else if ("-refresh".equals(cmd)) {
+      System.err.println("Usage: java DFSAdmin"
+                         + " [-refresh <hostname:port> <resource_identifier> [arg1..argn]");
     } else if ("-printTopology".equals(cmd)) {
       System.err.println("Usage: hdfs dfsadmin" + " [-printTopology]");
     } else if ("-deleteBlockPool".equals(cmd)) {
@@ -1169,6 +1248,11 @@ public class DFSAdmin extends FsShell {
       }
     } else if ("-refreshServiceAcl".equals(cmd)) {
       if (argv.length != 1) {
+        printUsage(cmd);
+        return exitCode;
+      }
+    } else if ("-refresh".equals(cmd)) {
+      if (argv.length < 3) {
         printUsage(cmd);
         return exitCode;
       }
@@ -1255,6 +1339,8 @@ public class DFSAdmin extends FsShell {
         exitCode = refreshSuperUserGroupsConfiguration();
       } else if ("-refreshCallQueue".equals(cmd)) {
         exitCode = refreshCallQueue();
+      } else if ("-refresh".equals(cmd)) {
+        exitCode = genericRefresh(argv, i);
       } else if ("-printTopology".equals(cmd)) {
         exitCode = printTopology();
       } else if ("-deleteBlockPool".equals(cmd)) {

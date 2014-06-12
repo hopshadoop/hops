@@ -31,36 +31,41 @@ import org.apache.hadoop.security.authorize.Service;
 import org.apache.hadoop.tools.GetUserMappingsProtocol;
 import org.apache.hadoop.tracing.TraceAdminProtocol;
 import org.apache.hadoop.ipc.RefreshCallQueueProtocol;
+import org.apache.hadoop.ipc.GenericRefreshProtocol;
 
 /**
  * {@link PolicyProvider} for HDFS protocols.
  */
 @InterfaceAudience.Private
 public class HDFSPolicyProvider extends PolicyProvider {
-  private static final Service[] hdfsServices = new Service[]{
-      new Service(CommonConfigurationKeys.SECURITY_CLIENT_PROTOCOL_ACL,
-          ClientProtocol.class),
-      new Service(CommonConfigurationKeys.SECURITY_CLIENT_DATANODE_PROTOCOL_ACL,
-          ClientDatanodeProtocol.class),
-      new Service(CommonConfigurationKeys.SECURITY_DATANODE_PROTOCOL_ACL,
-          DatanodeProtocol.class),
-      new Service(CommonConfigurationKeys.SECURITY_INTER_DATANODE_PROTOCOL_ACL,
-          InterDatanodeProtocol.class),
-      new Service(CommonConfigurationKeys.SECURITY_NAMENODE_PROTOCOL_ACL,
-          NamenodeProtocol.class), 
-      new Service(
-          CommonConfigurationKeys.HADOOP_SECURITY_SERVICE_AUTHORIZATION_REFRESH_POLICY,
-          RefreshAuthorizationPolicyProtocol.class),
-      new Service(
-          CommonConfigurationKeys.HADOOP_SECURITY_SERVICE_AUTHORIZATION_REFRESH_USER_MAPPINGS,
-          RefreshUserMappingsProtocol.class),
-      new Service(
-          CommonConfigurationKeys.HADOOP_SECURITY_SERVICE_AUTHORIZATION_GET_USER_MAPPINGS,
-          GetUserMappingsProtocol.class),
-      new Service(
-          CommonConfigurationKeys.HADOOP_SECURITY_SERVICE_AUTHORIZATION_REFRESH_CALLQUEUE,
-          RefreshCallQueueProtocol.class),
-      new Service(
+  private static final Service[] hdfsServices =
+    new Service[] {
+    new Service(CommonConfigurationKeys.SECURITY_CLIENT_PROTOCOL_ACL,
+        ClientProtocol.class),
+    new Service(CommonConfigurationKeys.SECURITY_CLIENT_DATANODE_PROTOCOL_ACL,
+        ClientDatanodeProtocol.class),
+    new Service(CommonConfigurationKeys.SECURITY_DATANODE_PROTOCOL_ACL,
+        DatanodeProtocol.class),
+    new Service(CommonConfigurationKeys.SECURITY_INTER_DATANODE_PROTOCOL_ACL, 
+        InterDatanodeProtocol.class),
+    new Service(CommonConfigurationKeys.SECURITY_NAMENODE_PROTOCOL_ACL,
+        NamenodeProtocol.class),
+    new Service(
+        CommonConfigurationKeys.HADOOP_SECURITY_SERVICE_AUTHORIZATION_REFRESH_POLICY, 
+        RefreshAuthorizationPolicyProtocol.class),
+    new Service(
+        CommonConfigurationKeys.HADOOP_SECURITY_SERVICE_AUTHORIZATION_REFRESH_USER_MAPPINGS, 
+        RefreshUserMappingsProtocol.class),
+    new Service(
+        CommonConfigurationKeys.HADOOP_SECURITY_SERVICE_AUTHORIZATION_GET_USER_MAPPINGS,
+        GetUserMappingsProtocol.class),
+    new Service(
+        CommonConfigurationKeys.HADOOP_SECURITY_SERVICE_AUTHORIZATION_REFRESH_CALLQUEUE,
+        RefreshCallQueueProtocol.class),
+    new Service(
+        CommonConfigurationKeys.HADOOP_SECURITY_SERVICE_AUTHORIZATION_GENERIC_REFRESH,
+        GenericRefreshProtocol.class),
+    new Service(
         CommonConfigurationKeys.HADOOP_SECURITY_SERVICE_AUTHORIZATION_TRACING,
         TraceAdminProtocol.class)
   };
