@@ -26,6 +26,9 @@ Release 2.7.0 - UNRELEASED
 
   BUG FIXES
 
+    HDFS-6657. Remove link to 'Legacy UI' in the Namenode UI.
+    (Vinayakumar B via wheat9)
+
 Release 2.6.0 - UNRELEASED
 
   INCOMPATIBLE CHANGES
