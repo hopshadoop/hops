@@ -169,9 +169,9 @@ public class BlockPoolSliceStorage extends Storage {
     // During startup some of them can upgrade or roll back
     // while others could be up-to-date for the regular startup.
     for (int idx = 0; idx < getNumStorageDirs(); idx++) {
-      doTransition(getStorageDir(idx), nsInfo, startOpt);
-      assert getCTime() == nsInfo
-          .getCTime() : "Data-node and name-node CTimes must be the same.";
+      doTransition(datanode, getStorageDir(idx), nsInfo, startOpt);
+      assert getCTime() == nsInfo.getCTime() 
+          : "Data-node and name-node CTimes must be the same.";
     }
 
     // 3. Update all storages. Some of them might have just been formatted.
@@ -287,9 +287,8 @@ public class BlockPoolSliceStorage extends Storage {
    *     startup option
    * @throws IOException
    */
-  private void doTransition(StorageDirectory sd, NamespaceInfo
-      nsInfo,
-      StartupOption startOpt) throws IOException {
+  private void doTransition(DataNode datanode, StorageDirectory sd,
+      NamespaceInfo nsInfo, StartupOption startOpt) throws IOException {
     if (startOpt == StartupOption.ROLLBACK) {
       doRollback(sd, nsInfo); // rollback if applicable
     } else {
@@ -320,9 +319,9 @@ public class BlockPoolSliceStorage extends Storage {
         this.cTime == nsInfo.getCTime()) {
       return; // regular startup
     }
-    if (this.layoutVersion > HdfsConstants.DATANODE_LAYOUT_VERSION ||
-        this.cTime < nsInfo.getCTime()) {
-      doUpgrade(sd, nsInfo); // upgrade
+    if (this.layoutVersion > HdfsConstants.DATANODE_LAYOUT_VERSION
+        || this.cTime < nsInfo.getCTime()) {
+      doUpgrade(datanode, sd, nsInfo); // upgrade
       return;
     }
     // layoutVersion == LAYOUT_VERSION && this.cTime > nsInfo.cTime
@@ -356,7 +355,7 @@ public class BlockPoolSliceStorage extends Storage {
    * @throws IOException
    *     on error
    */
-  void doUpgrade(StorageDirectory bpSd, NamespaceInfo nsInfo)
+  void doUpgrade(DataNode datanode, StorageDirectory bpSd, NamespaceInfo nsInfo)
       throws IOException {
     // Upgrading is applicable only to release with federation or after
     if (!DataNodeLayoutVersion.supports(
@@ -393,7 +392,7 @@ public class BlockPoolSliceStorage extends Storage {
     rename(bpCurDir, bpTmpDir);
     
     // 3. Create new <SD>/current with block files hardlinks and VERSION
-    linkAllBlocks(bpTmpDir, bpCurDir);
+    linkAllBlocks(datanode, bpTmpDir, bpCurDir);
     this.layoutVersion = HdfsConstants.DATANODE_LAYOUT_VERSION;
     assert this.namespaceID == nsInfo
         .getNamespaceID() : "Data-node and name-node layout versions must be the same.";
@@ -576,18 +575,17 @@ public class BlockPoolSliceStorage extends Storage {
    * @throws IOException
    *     if error occurs during hardlink
    */
-  private void linkAllBlocks(File fromDir, File toDir) throws IOException {
+  private void linkAllBlocks(DataNode datanode, File fromDir, File toDir)
+      throws IOException {
     // do the link
     int diskLayoutVersion = this.getLayoutVersion();
     // hardlink finalized blocks in tmpDir
     HardLink hardLink = new HardLink();
-    DataStorage.linkBlocks(new File(fromDir, DataStorage.STORAGE_DIR_FINALIZED),
-        new File(toDir, DataStorage.STORAGE_DIR_FINALIZED), diskLayoutVersion,
-        hardLink);
-    DataStorage.linkBlocks(new File(fromDir, DataStorage.STORAGE_DIR_RBW),
-        new File(toDir, DataStorage.STORAGE_DIR_RBW), diskLayoutVersion,
-        hardLink);
-    LOG.info(hardLink.linkStats.report());
+    DataStorage.linkBlocks(datanode, new File(fromDir, DataStorage.STORAGE_DIR_FINALIZED),
+      new File(toDir,DataStorage.STORAGE_DIR_FINALIZED), diskLayoutVersion, hardLink);
+    DataStorage.linkBlocks(datanode, new File(fromDir, DataStorage.STORAGE_DIR_RBW),
+        new File(toDir, DataStorage.STORAGE_DIR_RBW), diskLayoutVersion, hardLink);
+    LOG.info( hardLink.linkStats.report() );
   }
 
   /**

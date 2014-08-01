@@ -444,17 +444,17 @@ public class TestDataNodeVolumeFailure {
           System.out.println("dir is null for dn=" + i + " and data_dir=" + j);
           continue;
         }
-
-        String[] res = metaFilesInDir(dir);
-        if (res == null) {
-          System.out.println(
-              "res is null for dir = " + dir + " i=" + i + " and j=" + j);
+      
+        List<File> res = MiniDFSCluster.getAllBlockMetadataFiles(dir);
+        if(res == null) {
+          System.out.println("res is null for dir = " + dir + " i=" + i + " and j=" + j);
           continue;
         }
         //System.out.println("for dn" + i + "." + j + ": " + dir + "=" + res.length+ " files");
 
         //int ii = 0;
-        for (String s : res) {
+        for(File f: res) {
+          String s = f.getName();
           // cut off "blk_-" at the beginning and ".meta" at the end
           assertNotNull("Block file name should not be null", s);
           String bid = s.substring(s.indexOf("_") + 1, s.lastIndexOf("_"));
@@ -470,23 +470,9 @@ public class TestDataNodeVolumeFailure {
         //System.out.println("dir1="+dir.getPath() + "blocks=" + res.length);
         //System.out.println("dir2="+dir2.getPath() + "blocks=" + res2.length);
 
-        total += res.length;
+        total += res.size();
       }
     }
     return total;
-  }
-
-  /*
-   * count how many files *.meta are in the dir
-   */
-  private String[] metaFilesInDir(File dir) {
-    String[] res = dir.list(new FilenameFilter() {
-          @Override
-          public boolean accept(File dir, String name) {
-            return name.startsWith("blk_") &&
-                name.endsWith(Block.METADATA_EXTENSION);
-          }
-        });
-    return res;
   }
 }

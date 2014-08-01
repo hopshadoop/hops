@@ -78,23 +78,25 @@ public class TestDFSUpgrade {
   void checkDataNode(String[] baseDirs, String bpid) throws IOException {
     for (int i = 0; i < baseDirs.length; i++) {
       File current = new File(baseDirs[i], "current/" + bpid + "/current");
-      assertEquals(UpgradeUtilities.checksumContents(DATA_NODE, current),
+      assertEquals(UpgradeUtilities.checksumContents(DATA_NODE, current, false),
         UpgradeUtilities.checksumMasterDataNodeContents());
       
       // block files are placed under <sd>/current/<bpid>/current/finalized
       File currentFinalized = 
         MiniDFSCluster.getFinalizedDir(new File(baseDirs[i]), bpid);
-      assertEquals(UpgradeUtilities.checksumContents(DATA_NODE, currentFinalized),
+      assertEquals(UpgradeUtilities.checksumContents(DATA_NODE,
+          currentFinalized, true),
           UpgradeUtilities.checksumMasterBlockPoolFinalizedContents());
       
       File previous = new File(baseDirs[i], "current/" + bpid + "/previous");
       assertTrue(previous.isDirectory());
-      assertEquals(UpgradeUtilities.checksumContents(DATA_NODE, previous),
+      assertEquals(UpgradeUtilities.checksumContents(DATA_NODE, previous, false),
           UpgradeUtilities.checksumMasterDataNodeContents());
       
       File previousFinalized = 
         new File(baseDirs[i], "current/" + bpid + "/previous"+"/finalized");
-      assertEquals(UpgradeUtilities.checksumContents(DATA_NODE, previousFinalized),
+      assertEquals(UpgradeUtilities.checksumContents(DATA_NODE,
+          previousFinalized, true),
           UpgradeUtilities.checksumMasterBlockPoolFinalizedContents());
       
     }

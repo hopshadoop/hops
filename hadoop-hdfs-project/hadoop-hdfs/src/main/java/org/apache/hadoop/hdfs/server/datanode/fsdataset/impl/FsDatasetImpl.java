@@ -1337,13 +1337,6 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
               ". Parent not found for file " + f);
           continue;
         }
-        ReplicaState replicaState = info.getState();
-        if (replicaState == ReplicaState.FINALIZED ||
-            (replicaState == ReplicaState.RUR &&
-                ((ReplicaUnderRecovery) info).getOriginalReplica().getState() ==
-                    ReplicaState.FINALIZED)) {
-          v.clearPath(bpid, parent);
-        }
         volumeMap.remove(bpid, invalidBlk);
       }
     
