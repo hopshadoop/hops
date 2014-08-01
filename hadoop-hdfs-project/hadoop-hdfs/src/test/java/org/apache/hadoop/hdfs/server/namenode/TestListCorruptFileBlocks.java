@@ -29,7 +29,11 @@ import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.hdfs.TestFileCorruption;
+import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
+import org.apache.hadoop.hdfs.server.datanode.DatanodeUtil;
 import org.apache.hadoop.util.StringUtils;
 import org.junit.Test;
 
@@ -39,6 +43,7 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Collection;
+import java.util.List;
 import java.util.Random;
 
 import static org.junit.Assert.assertTrue;
@@ -92,38 +97,29 @@ public class TestListCorruptFileBlocks {
       File storageDir = cluster.getInstanceStorageDir(0, 1);
       File data_dir = MiniDFSCluster.getFinalizedDir(storageDir, bpid);
       assertTrue("data directory does not exist", data_dir.exists());
-      File[] blocks = data_dir.listFiles();
-      assertTrue("Blocks do not exist in data-dir",
-          (blocks != null) && (blocks.length > 0));
-      for (File block : blocks) {
-        if (block.getName().startsWith("blk_") &&
-            block.getName().endsWith(".meta")) {
-          //
-          // shorten .meta file
-          //
-          RandomAccessFile file = new RandomAccessFile(block, "rw");
-          FileChannel channel = file.getChannel();
-          long position = channel.size() - 2;
-          int length = 2;
-          byte[] buffer = new byte[length];
-          random.nextBytes(buffer);
-          channel.write(ByteBuffer.wrap(buffer), position);
-          file.close();
-          LOG.info("Deliberately corrupting file " + block.getName() +
-              " at offset " + position + " length " + length);
-      
-          // read all files to trigger detection of corrupted replica
-          try {
-            util.checkFiles(fs, "/srcdat10");
-          } catch (BlockMissingException e) {
-            System.out.println("Received BlockMissingException as expected.");
-          } catch (IOException e) {
-            assertTrue(
-                "Corrupted replicas not handled properly. Expecting BlockMissingException " +
-                    " but received IOException " + e, false);
-          }
-          break;
-        }
+      List<File> metaFiles = MiniDFSCluster.getAllBlockMetadataFiles(data_dir);
+      assertTrue("Data directory does not contain any blocks or there was an "
+          + "IO error", metaFiles != null && !metaFiles.isEmpty());
+      File metaFile = metaFiles.get(0);
+      RandomAccessFile file = new RandomAccessFile(metaFile, "rw");
+      FileChannel channel = file.getChannel();
+      long position = channel.size() - 2;
+      int length = 2;
+      byte[] buffer = new byte[length];
+      random.nextBytes(buffer);
+      channel.write(ByteBuffer.wrap(buffer), position);
+      file.close();
+      LOG.info("Deliberately corrupting file " + metaFile.getName() +
+          " at offset " + position + " length " + length);
+
+      // read all files to trigger detection of corrupted replica
+      try {
+        util.checkFiles(fs, "/srcdat10");
+      } catch (BlockMissingException e) {
+        System.out.println("Received BlockMissingException as expected.");
+      } catch (IOException e) {
+        assertTrue("Corrupted replicas not handled properly. Expecting BlockMissingException " +
+            " but received IOException " + e, false);
       }
 
       // fetch bad file list from namenode. There should be one file.
@@ -186,38 +182,30 @@ public class TestListCorruptFileBlocks {
       File data_dir = MiniDFSCluster.getFinalizedDir(storageDir,
           cluster.getNamesystem().getBlockPoolId());
       assertTrue("data directory does not exist", data_dir.exists());
-      File[] blocks = data_dir.listFiles();
-      assertTrue("Blocks do not exist in data-dir",
-          (blocks != null) && (blocks.length > 0));
-      for (File block : blocks) {
-        if (block.getName().startsWith("blk_") &&
-            block.getName().endsWith(".meta")) {
-          //
-          // shorten .meta file
-          //
-          RandomAccessFile file = new RandomAccessFile(block, "rw");
-          FileChannel channel = file.getChannel();
-          long position = channel.size() - 2;
-          int length = 2;
-          byte[] buffer = new byte[length];
-          random.nextBytes(buffer);
-          channel.write(ByteBuffer.wrap(buffer), position);
-          file.close();
-          LOG.info("Deliberately corrupting file " + block.getName() +
-              " at offset " + position + " length " + length);
-      
-          // read all files to trigger detection of corrupted replica
-          try {
-            util.checkFiles(fs, "/srcdat10");
-          } catch (BlockMissingException e) {
-            System.out.println("Received BlockMissingException as expected.");
-          } catch (IOException e) {
-            assertTrue("Corrupted replicas not handled properly. " +
-                "Expecting BlockMissingException " +
-                " but received IOException " + e, false);
-          }
-          break;
-        }
+      List<File> metaFiles = MiniDFSCluster.getAllBlockMetadataFiles(data_dir);
+      assertTrue("Data directory does not contain any blocks or there was an "
+          + "IO error", metaFiles != null && !metaFiles.isEmpty());
+      File metaFile = metaFiles.get(0);
+      RandomAccessFile file = new RandomAccessFile(metaFile, "rw");
+      FileChannel channel = file.getChannel();
+      long position = channel.size() - 2;
+      int length = 2;
+      byte[] buffer = new byte[length];
+      random.nextBytes(buffer);
+      channel.write(ByteBuffer.wrap(buffer), position);
+      file.close();
+      LOG.info("Deliberately corrupting file " + metaFile.getName() +
+          " at offset " + position + " length " + length);
+
+      // read all files to trigger detection of corrupted replica
+      try {
+        util.checkFiles(fs, "/srcdat10");
+      } catch (BlockMissingException e) {
+        System.out.println("Received BlockMissingException as expected.");
+      } catch (IOException e) {
+        assertTrue("Corrupted replicas not handled properly. " +
+                   "Expecting BlockMissingException " +
+                   " but received IOException " + e, false);
       }
 
       // fetch bad file list from namenode. There should be one file.
@@ -308,16 +296,19 @@ public class TestListCorruptFileBlocks {
         for (int j = 0; j <= 1; j++) {
           File storageDir = cluster.getInstanceStorageDir(i, j);
           File data_dir = MiniDFSCluster.getFinalizedDir(storageDir, bpid);
-          File[] blocks = data_dir.listFiles();
-          if (blocks == null) {
+          List<File> metadataFiles = MiniDFSCluster.getAllBlockMetadataFiles(
+              data_dir);
+          if (metadataFiles == null)
             continue;
-          }
-          for (File block : blocks) {
-            if (!block.getName().startsWith("blk_")) {
-              continue;
-            }
-            LOG.info("Deliberately removing file " + block.getName());
-            assertTrue("Cannot remove file.", block.delete());
+          // assertTrue("Blocks do not exist in data-dir", (blocks != null) &&
+          // (blocks.length > 0));
+          for (File metadataFile : metadataFiles) {
+            File blockFile = Block.metaToBlockFile(metadataFile);
+            LOG.info("Deliberately removing file " + blockFile.getName());
+            assertTrue("Cannot remove file.", blockFile.delete());
+            LOG.info("Deliberately removing file " + metadataFile.getName());
+            assertTrue("Cannot remove file.", metadataFile.delete());
+            // break;
           }
         }
       }
@@ -417,16 +408,19 @@ public class TestListCorruptFileBlocks {
       for (int i = 0; i < 2; i++) {
         File storageDir = cluster.getInstanceStorageDir(0, i);
         File data_dir = MiniDFSCluster.getFinalizedDir(storageDir, bpid);
-        File[] blocks = data_dir.listFiles();
-        if (blocks == null) {
+        List<File> metadataFiles = MiniDFSCluster.getAllBlockMetadataFiles(
+            data_dir);
+        if (metadataFiles == null)
           continue;
-        }
-        for (File block : blocks) {
-          if (!block.getName().startsWith("blk_")) {
-            continue;
-          }
-          LOG.info("Deliberately removing file " + block.getName());
-          assertTrue("Cannot remove file.", block.delete());
+        // assertTrue("Blocks do not exist in data-dir", (blocks != null) &&
+        // (blocks.length > 0));
+        for (File metadataFile : metadataFiles) {
+          File blockFile = Block.metaToBlockFile(metadataFile);
+          LOG.info("Deliberately removing file " + blockFile.getName());
+          assertTrue("Cannot remove file.", blockFile.delete());
+          LOG.info("Deliberately removing file " + metadataFile.getName());
+          assertTrue("Cannot remove file.", metadataFile.delete());
+          // break;
         }
       }
 
@@ -497,16 +491,14 @@ public class TestListCorruptFileBlocks {
           File storageDir = cluster.getInstanceStorageDir(i, j);
           File data_dir = MiniDFSCluster.getFinalizedDir(storageDir, bpid);
           LOG.info("Removing files from " + data_dir);
-          File[] blocks = data_dir.listFiles();
-          if (blocks == null) {
+          List<File> metadataFiles = MiniDFSCluster.getAllBlockMetadataFiles(
+              data_dir);
+          if (metadataFiles == null)
             continue;
-          }
-  
-          for (File block : blocks) {
-            if (!block.getName().startsWith("blk_")) {
-              continue;
-            }
-            assertTrue("Cannot remove file.", block.delete());
+          for (File metadataFile : metadataFiles) {
+            File blockFile = Block.metaToBlockFile(metadataFile);
+            assertTrue("Cannot remove file.", blockFile.delete());
+            assertTrue("Cannot remove file.", metadataFile.delete());
           }
         }
       }

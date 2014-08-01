@@ -149,21 +149,21 @@ public class UpgradeUtilities {
       FileUtil.fullyDelete(new File(datanodeStorage, "in_use.lock"));
     }
     File dnCurDir = new File(datanodeStorage, "current");
-    datanodeStorageChecksum = checksumContents(DATA_NODE, dnCurDir);
+    datanodeStorageChecksum = checksumContents(DATA_NODE, dnCurDir, false);
     
-    File bpCurDir =
-        new File(BlockPoolSliceStorage.getBpRoot(bpid, dnCurDir), "current");
-    blockPoolStorageChecksum = checksumContents(DATA_NODE, bpCurDir);
+    File bpCurDir = new File(BlockPoolSliceStorage.getBpRoot(bpid, dnCurDir),
+        "current");
+    blockPoolStorageChecksum = checksumContents(DATA_NODE, bpCurDir, false);
     
-    File bpCurFinalizeDir =
-        new File(BlockPoolSliceStorage.getBpRoot(bpid, dnCurDir),
-            "current/" + DataStorage.STORAGE_DIR_FINALIZED);
-    blockPoolFinalizedStorageChecksum =
-        checksumContents(DATA_NODE, bpCurFinalizeDir);
+    File bpCurFinalizeDir = new File(BlockPoolSliceStorage.getBpRoot(bpid, dnCurDir),
+        "current/"+DataStorage.STORAGE_DIR_FINALIZED);
+    blockPoolFinalizedStorageChecksum = checksumContents(DATA_NODE,
+        bpCurFinalizeDir, true);
     
     File bpCurRbwDir = new File(BlockPoolSliceStorage.getBpRoot(bpid, dnCurDir),
-        "current/" + DataStorage.STORAGE_DIR_RBW);
-    blockPoolRbwStorageChecksum = checksumContents(DATA_NODE, bpCurRbwDir);
+        "current/"+DataStorage.STORAGE_DIR_RBW);
+    blockPoolRbwStorageChecksum = checksumContents(DATA_NODE, bpCurRbwDir,
+        false);
   }
   
   // Private helper method that writes a file to the given file system.
@@ -254,37 +254,48 @@ public class UpgradeUtilities {
   
   /**
    * Compute the checksum of all the files in the specified directory.
-   * The contents of subdirectories are not included. This method provides
-   * an easy way to ensure equality between the contents of two directories.
+   * This method provides an easy way to ensure equality between the contents
+   * of two directories.
    *
-   * @param nodeType
-   *     if DATA_NODE then any file named "VERSION" is ignored.
-   *     This is because this file file is changed every time
-   *     the Datanode is started.
-   * @param dir
-   *     must be a directory. Subdirectories are ignored.
+   * @param nodeType if DATA_NODE then any file named "VERSION" is ignored.
+   *    This is because this file file is changed every time
+   *    the Datanode is started.
+   * @param dir must be a directory
+   * @param recursive whether or not to consider subdirectories
+   *
+   * @throws IllegalArgumentException if specified directory is not a directory
+   * @throws IOException if an IOException occurs while reading the files
    * @return the computed checksum value
    * @throws IllegalArgumentException
    *     if specified directory is not a directory
    * @throws IOException
    *     if an IOException occurs while reading the files
    */
-  public static long checksumContents(NodeType nodeType, File dir)
-      throws IOException {
+  public static long checksumContents(NodeType nodeType, File dir,
+      boolean recursive) throws IOException {
+    CRC32 checksum = new CRC32();
+    checksumContentsHelper(nodeType, dir, checksum, recursive);
+    return checksum.getValue();
+  }
+
+  public static void checksumContentsHelper(NodeType nodeType, File dir,
+      CRC32 checksum, boolean recursive) throws IOException {
     if (!dir.isDirectory()) {
       throw new IllegalArgumentException(
           "Given argument is not a directory:" + dir);
     }
     File[] list = dir.listFiles();
     Arrays.sort(list);
-    CRC32 checksum = new CRC32();
     for (File aList : list) {
       if (!aList.isFile()) {
+        if (recursive) {
+          checksumContentsHelper(nodeType, aList, checksum, recursive);
+        }
         continue;
       }
       
       // skip VERSION and dfsUsed file for DataNodes
-      if (nodeType == DATA_NODE && 
+      if (nodeType == DATA_NODE &&
          (aList.getName().equals("VERSION") || 
          aList.getName().equals("dfsUsed"))) {
         continue;
@@ -304,7 +315,6 @@ public class UpgradeUtilities {
         }
       }
     }
-    return checksum.getValue();
   }
   
   /**
