@@ -253,7 +253,7 @@ class BlockReceiver implements Closeable {
       
       if (cause != null) { // possible disk error
         ioe = cause;
-         datanode.checkDiskErrorAsync();
+        datanode.checkDiskErrorAsync();
       }
       
       throw ioe;

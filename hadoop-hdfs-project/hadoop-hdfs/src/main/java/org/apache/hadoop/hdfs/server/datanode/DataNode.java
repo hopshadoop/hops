@@ -1101,11 +1101,11 @@ public class DataNode extends Configured
     // In the case that this is the first block pool to connect, initialize
     // the dataset, block scanners, etc.
     initStorage(nsInfo);
-    
+
     // Exclude failed disks before initializing the block pools to avoid startup
     // failures.
     checkDiskError();
-    
+
     initPeriodicScanners(conf);
     
     data.addBlockPool(nsInfo.getBlockPoolID(), conf);
@@ -1607,61 +1607,6 @@ public class DataNode extends Configured
   }
 
   /**
-   * Check if there is a disk failure and if so, handle the error
-   */
-  public void checkDiskError() {
-    try {
-      data.checkDataDir();
-    } catch (DiskErrorException de) {
-      handleDiskError(de.getMessage());
-    }
-  }
-
-  /**
-   * Starts a new thread which will check for disk error check request
-   * every 5 sec
-   */
-  private void startCheckDiskErrorThread() {
-    checkDiskErrorThread = new Thread(new Runnable() {
-      @Override
-      public void run() {
-        while(shouldRun) {
-          boolean tempFlag ;
-          synchronized(checkDiskErrorMutex) {
-            tempFlag = checkDiskErrorFlag;
-            checkDiskErrorFlag = false;
-          }
-          if(tempFlag) {
-            try {
-              checkDiskError();
-            } catch (Exception e) {
-              LOG.warn("Unexpected exception occurred while checking disk error  " + e);
-              checkDiskErrorThread = null;
-              return;
-            }
-            synchronized(checkDiskErrorMutex) {
-              lastDiskErrorCheck = Time.monotonicNow();
-            }
-          }
-          try {
-            Thread.sleep(checkDiskErrorInterval);
-          } catch (InterruptedException e) {
-            LOG.debug("InterruptedException in check disk error thread", e);
-            checkDiskErrorThread = null;
-            return;
-          }
-        }
-      }
-    });
-  }
-
-  public long getLastDiskErrorCheck() {
-    synchronized(checkDiskErrorMutex) {
-      return lastDiskErrorCheck;
-    }
-  }
-  
-  /**
    * Check if there is a disk failure asynchronously and if so, handle the error
    */
   public void checkDiskErrorAsync() {
@@ -1987,7 +1932,6 @@ public class DataNode extends Configured
             targets[0] + " got ", ie);
         // check if there are any disk problem
         checkDiskErrorAsync();
-        
       } finally {
         xmitsInProgress.getAndDecrement();
         IOUtils.closeStream(blockSender);
@@ -2976,5 +2920,60 @@ public class DataNode extends Configured
   
   public ShortCircuitRegistry getShortCircuitRegistry() {
     return shortCircuitRegistry;
+  }
+  
+  /**
+   * Check the disk error
+   */
+  private void checkDiskError() {
+    try {
+      data.checkDataDir();
+    } catch (DiskErrorException de) {
+      handleDiskError(de.getMessage());
+    }
+  }
+
+  /**
+   * Starts a new thread which will check for disk error check request 
+   * every 5 sec
+   */
+  private void startCheckDiskErrorThread() {
+    checkDiskErrorThread = new Thread(new Runnable() {
+          @Override
+          public void run() {
+            while(shouldRun) {
+              boolean tempFlag ;
+              synchronized(checkDiskErrorMutex) {
+                tempFlag = checkDiskErrorFlag;
+                checkDiskErrorFlag = false;
+              }
+              if(tempFlag) {
+                try {
+                  checkDiskError();
+                } catch (Exception e) {
+                  LOG.warn("Unexpected exception occurred while checking disk error  " + e);
+                  checkDiskErrorThread = null;
+                  return;
+                }
+                synchronized(checkDiskErrorMutex) {
+                  lastDiskErrorCheck = Time.monotonicNow();
+                }
+              }
+              try {
+                Thread.sleep(checkDiskErrorInterval);
+              } catch (InterruptedException e) {
+                LOG.debug("InterruptedException in check disk error thread", e);
+                checkDiskErrorThread = null;
+                return;
+              }
+            }
+          }
+    });
+  }
+  
+  public long getLastDiskErrorCheck() {
+    synchronized(checkDiskErrorMutex) {
+      return lastDiskErrorCheck;
+    }
   }
 }

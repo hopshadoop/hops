@@ -203,7 +203,7 @@ public class TestDiskError {
 
   /**
    * Checks whether {@link DataNode#checkDiskErrorAsync()} is being called or not.
-   * Before refactoring the code the above function was not getting called
+   * Before refactoring the code the above function was not getting called 
    * @throws IOException, InterruptedException
    */
   @Test
