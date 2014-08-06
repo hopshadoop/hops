@@ -19,16 +19,22 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import java.io.ByteArrayOutputStream;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.hdfs.MiniDFSCluster.DataNodeProperties;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockManagerTestUtil;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeManager;
 import org.junit.AfterClass;
@@ -40,7 +46,6 @@ import java.io.PrintStream;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
@@ -89,6 +94,8 @@ public class TestDecommissioningStatus {
         4);
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_INTERVAL_KEY, 1000);
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_DECOMMISSION_INTERVAL_KEY, 1);
+    conf.setLong(DFSConfigKeys.DFS_DATANODE_BALANCE_BANDWIDTHPERSEC_KEY, 1);
+
     writeConfigFile(localFileSys, excludeFile, null);
     writeConfigFile(localFileSys, includeFile, null);
 
@@ -100,12 +107,9 @@ public class TestDecommissioningStatus {
 
   @AfterClass
   public static void tearDown() throws Exception {
-    if (fileSys != null) {
-      fileSys.close();
-    }
-    if (cluster != null) {
-      cluster.shutdown();
-    }
+    if (localFileSys != null ) cleanupFile(localFileSys, dir);
+    if(fileSys != null) fileSys.close();
+    if(cluster != null) cluster.shutdown();
   }
 
   private static void writeConfigFile(FileSystem fs, Path name,
@@ -155,7 +159,8 @@ public class TestDecommissioningStatus {
     return stm;
   }
   
-  private void cleanupFile(FileSystem fileSys, Path name) throws IOException {
+  static private void cleanupFile(FileSystem fileSys, Path name)
+      throws IOException {
     assertTrue(fileSys.exists(name));
     fileSys.delete(name, true);
     assertTrue(!fileSys.exists(name));
@@ -169,13 +174,21 @@ public class TestDecommissioningStatus {
     DatanodeInfo[] info = client.datanodeReport(DatanodeReportType.LIVE);
 
     String nodename = info[nodeIndex].getXferAddr();
-    System.out.println("Decommissioning node: " + nodename);
+    decommissionNode(namesystem, localFileSys, nodename);
+    return nodename;
+  }
+
+  /*
+   * Decommissions the node by name
+   */
+  private void decommissionNode(FSNamesystem namesystem,
+      FileSystem localFileSys, String dnName) throws IOException {
+    System.out.println("Decommissioning node: " + dnName);
 
     // write nodename into the exclude file.
-    ArrayList<String> nodes = new ArrayList<>(decommissionedNodes);
-    nodes.add(nodename);
+    ArrayList<String> nodes = new ArrayList<String>(decommissionedNodes);
+    nodes.add(dnName);
     writeConfigFile(localFileSys, excludeFile, nodes);
-    return nodename;
   }
 
   private void checkDecommissionStatus(DatanodeDescriptor decommNode,
@@ -291,6 +304,69 @@ public class TestDecommissioningStatus {
     st1.close();
     cleanupFile(fileSys, file1);
     cleanupFile(fileSys, file2);
-    cleanupFile(localFileSys, dir);
+  }
+
+  /**
+   * Verify a DN remains in DECOMMISSION_INPROGRESS state if it is marked
+   * as dead before decommission has completed. That will allow DN to resume
+   * the replication process after it rejoins the cluster.
+   */
+  @Test(timeout=120000)
+  public void testDecommissionStatusAfterDNRestart()
+      throws IOException, InterruptedException {
+    DistributedFileSystem fileSys =
+        (DistributedFileSystem)cluster.getFileSystem();
+
+    // Create a file with one block. That block has one replica.
+    Path f = new Path("decommission.dat");
+    DFSTestUtil.createFile(fileSys, f, fileSize, fileSize, fileSize,
+        (short)1, seed);
+
+    // Find the DN that owns the only replica.
+    RemoteIterator<LocatedFileStatus> fileList = fileSys.listLocatedStatus(f);
+    BlockLocation[] blockLocations = fileList.next().getBlockLocations();
+    String dnName = blockLocations[0].getNames()[0];
+
+    // Decommission the DN.
+    FSNamesystem fsn = cluster.getNamesystem();
+    final DatanodeManager dm = fsn.getBlockManager().getDatanodeManager();
+    decommissionNode(fsn, localFileSys, dnName);
+    dm.refreshNodes(conf);
+
+    // Stop the DN when decommission is in progress.
+    // Given DFS_DATANODE_BALANCE_BANDWIDTHPERSEC_KEY is to 1 and the size of
+    // the block, it will take much longer time that test timeout value for
+    // the decommission to complete. So when stopDataNode is called,
+    // decommission should be in progress.
+    DataNodeProperties dataNodeProperties = cluster.stopDataNode(dnName);
+    final List<DatanodeDescriptor> dead = new ArrayList<DatanodeDescriptor>();
+    while (true) {
+      dm.fetchDatanodes(null, dead, false);
+      if (dead.size() == 1) {
+        break;
+      }
+      Thread.sleep(1000);
+    }
+
+    // Force removal of the dead node's blocks.
+    BlockManagerTestUtil.checkHeartbeat(fsn.getBlockManager());
+
+    // Force DatanodeManager to check decommission state.
+    BlockManagerTestUtil.checkDecommissionState(dm, dead.get(0));
+
+    // Verify that the DN remains in DECOMMISSION_INPROGRESS state.
+    assertTrue("the node is in decommissioned state ",
+        !dead.get(0).isDecommissioned());
+
+    // Add the node back
+    cluster.restartDataNode(dataNodeProperties, true);
+    cluster.waitActive();
+
+    // Call refreshNodes on FSNamesystem with empty exclude file.
+    // This will remove the datanodes from decommissioning list and
+    // make them available again.
+    writeConfigFile(localFileSys, excludeFile, null);
+    dm.refreshNodes(conf);
+    cleanupFile(fileSys, f);
   }
 }

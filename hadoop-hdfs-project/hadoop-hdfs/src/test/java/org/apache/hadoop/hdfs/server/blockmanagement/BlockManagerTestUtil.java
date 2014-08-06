@@ -326,4 +326,14 @@ public class BlockManagerTestUtil {
     }
     return reports.toArray(StorageReport.EMPTY_ARRAY);
   }
+
+  /**
+   * Have DatanodeManager check decommission state.
+   * @param dm the DatanodeManager to manipulate
+   */
+  public static void checkDecommissionState(DatanodeManager dm,
+      DatanodeDescriptor node) throws IOException {
+    dm.checkDecommissionState(node);
+  }
+
 }
