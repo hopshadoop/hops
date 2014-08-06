@@ -4649,6 +4649,12 @@ public class BlockManager {
                   }
                 }
               }
+              if (!status.get() && !srcNode.isAlive) {
+                LOG.warn("srcNode " + srcNode + " is dead " + "when decommission is in progress. Continue to mark "
+                    + "it as decommission in progress. In that way, when it rejoins the "
+                    + "cluster it can continue the decommission process.");
+                status.set(true);
+              }
               return null;
             }
           };
