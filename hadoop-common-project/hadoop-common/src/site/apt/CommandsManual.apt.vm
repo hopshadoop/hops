@@ -1,0 +1,360 @@
+~~ Licensed to the Apache Software Foundation (ASF) under one or more
+~~ contributor license agreements.  See the NOTICE file distributed with
+~~ this work for additional information regarding copyright ownership.
+~~ The ASF licenses this file to You under the Apache License, Version 2.0
+~~ (the "License"); you may not use this file except in compliance with
+~~ the License.  You may obtain a copy of the License at
+~~
+~~     http://www.apache.org/licenses/LICENSE-2.0
+~~
+~~ Unless required by applicable law or agreed to in writing, software
+~~ distributed under the License is distributed on an "AS IS" BASIS,
+~~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+~~ See the License for the specific language governing permissions and
+~~ limitations under the License.
+
+  ---
+  Hadoop Commands Guide
+  ---
+  ---
+  ${maven.build.timestamp}
+
+%{toc}
+
+Overview
+
+   All hadoop commands are invoked by the <<<bin/hadoop>>> script. Running the
+   hadoop script without any arguments prints the description for all
+   commands.
+
+   Usage: <<<hadoop [--config confdir] [COMMAND] [GENERIC_OPTIONS] [COMMAND_OPTIONS]>>>
+
+   Hadoop has an option parsing framework that employs parsing generic
+   options as well as running classes.
+
+*-----------------------+---------------+
+|| COMMAND_OPTION       || Description
+*-----------------------+---------------+
+| <<<--config confdir>>>| Overwrites the default Configuration directory.  Default is <<<${HADOOP_HOME}/conf>>>.
+*-----------------------+---------------+
+| GENERIC_OPTIONS       | The common set of options supported by multiple commands.
+| COMMAND_OPTIONS       | Various commands with their options are described in the following sections. The commands have been grouped into User Commands and Administration Commands.
+*-----------------------+---------------+
+
+Generic Options
+
+   The following options are supported by {{dfsadmin}}, {{fs}}, {{fsck}},
+   {{job}} and {{fetchdt}}. Applications should implement 
+   {{{../../api/org/apache/hadoop/util/Tool.html}Tool}} to support
+   GenericOptions.
+
+*------------------------------------------------+-----------------------------+
+||            GENERIC_OPTION                     ||            Description
+*------------------------------------------------+-----------------------------+
+|<<<-conf \<configuration file\> >>>             | Specify an application
+                                                 | configuration file.
+*------------------------------------------------+-----------------------------+
+|<<<-D \<property\>=\<value\> >>>                | Use value for given property.
+*------------------------------------------------+-----------------------------+
+|<<<-jt \<local\> or \<jobtracker:port\> >>>     | Specify a job tracker.
+                                                 | Applies only to job.
+*------------------------------------------------+-----------------------------+
+|<<<-files \<comma separated list of files\> >>> | Specify comma separated files
+                                                 | to be copied to the map
+                                                 | reduce cluster.  Applies only
+                                                 | to job.
+*------------------------------------------------+-----------------------------+
+|<<<-libjars \<comma seperated list of jars\> >>>| Specify comma separated jar
+                                                 | files to include in the
+                                                 | classpath. Applies only to
+                                                 | job.
+*------------------------------------------------+-----------------------------+
+|<<<-archives \<comma separated list of archives\> >>> | Specify comma separated
+                                                 | archives to be unarchived on
+                                                 | the compute machines. Applies
+                                                 | only to job.
+*------------------------------------------------+-----------------------------+
+
+User Commands
+
+   Commands useful for users of a hadoop cluster.
+
+* <<<archive>>>
+
+   Creates a hadoop archive. More information can be found at Hadoop
+   Archives.
+
+   Usage: <<<hadoop archive -archiveName NAME <src>* <dest> >>>
+
+*-------------------+-------------------------------------------------------+
+||COMMAND_OPTION    ||                   Description
+*-------------------+-------------------------------------------------------+
+| -archiveName NAME |  Name of the archive to be created.
+*-------------------+-------------------------------------------------------+
+| src               | Filesystem pathnames which work as usual with regular
+                    | expressions.
+*-------------------+-------------------------------------------------------+
+| dest              | Destination directory which would contain the archive.
+*-------------------+-------------------------------------------------------+
+
+* <<<distcp>>>
+
+   Copy file or directories recursively. More information can be found at
+   Hadoop DistCp Guide.
+
+   Usage: <<<hadoop distcp <srcurl> <desturl> >>>
+
+*-------------------+--------------------------------------------+
+||COMMAND_OPTION    || Description
+*-------------------+--------------------------------------------+
+| srcurl            | Source Url
+*-------------------+--------------------------------------------+
+| desturl           | Destination Url
+*-------------------+--------------------------------------------+
+
+* <<<fs>>>
+
+   Deprecated, use {{{../hadoop-hdfs/HDFSCommands.html#dfs}<<<hdfs dfs>>>}}
+   instead.
+
+* <<<fsck>>>
+
+   Deprecated, use {{{../hadoop-hdfs/HDFSCommands.html#fsck}<<<hdfs fsck>>>}}
+   instead.
+
+* <<<fetchdt>>>
+
+   Deprecated, use {{{../hadoop-hdfs/HDFSCommands.html#fetchdt}
+   <<<hdfs fetchdt>>>}} instead.
+
+* <<<jar>>>
+
+   Runs a jar file. Users can bundle their Map Reduce code in a jar file and
+   execute it using this command.
+
+   Usage: <<<hadoop jar <jar> [mainClass] args...>>>
+
+   The streaming jobs are run via this command. Examples can be referred from
+   Streaming examples
+
+   Word count example is also run using jar command. It can be referred from
+   Wordcount example
+
+* <<<job>>>
+
+   Command to interact with Map Reduce Jobs.
+
+   Usage: <<<hadoop job [GENERIC_OPTIONS] [-submit <job-file>] | [-status <job-id>] | [-counter <job-id> <group-name> <counter-name>] | [-kill <job-id>] | [-events <job-id> <from-event-#> <#-of-events>] | [-history [all] <jobOutputDir>] | [-list [all]] | [-kill-task <task-id>] | [-fail-task <task-id>] | [-set-priority <job-id> <priority>]>>>
+
+*------------------------------+---------------------------------------------+
+|| COMMAND_OPTION              || Description
+*------------------------------+---------------------------------------------+
+| -submit <job-file>           | Submits the job.
+*------------------------------+---------------------------------------------+
+| -status <job-id>             | Prints the map and reduce completion
+                               | percentage and all job counters.
+*------------------------------+---------------------------------------------+
+| -counter <job-id> <group-name> <counter-name> | Prints the counter value.
+*------------------------------+---------------------------------------------+
+| -kill <job-id>               | Kills the job.
+*------------------------------+---------------------------------------------+
+| -events <job-id> <from-event-#> <#-of-events> | Prints the events' details
+                               | received by jobtracker for the given range.
+*------------------------------+---------------------------------------------+
+| -history [all]<jobOutputDir> | Prints job details, failed and killed tip
+                               | details.  More details about the job such as
+                               | successful tasks and task attempts made for
+                               | each task can be viewed by specifying the [all]
+                               | option.
+*------------------------------+---------------------------------------------+
+| -list [all]                  | Displays jobs which are yet to complete.
+                               | <<<-list all>>> displays all jobs.
+*------------------------------+---------------------------------------------+
+| -kill-task <task-id>         | Kills the task. Killed tasks are NOT counted
+                               | against failed attempts.
+*------------------------------+---------------------------------------------+
+| -fail-task <task-id>         | Fails the task. Failed tasks are counted
+                               | against failed attempts.
+*------------------------------+---------------------------------------------+
+| -set-priority <job-id> <priority> | Changes the priority of the job. Allowed
+                               | priority values are VERY_HIGH, HIGH, NORMAL,
+                               | LOW, VERY_LOW
+*------------------------------+---------------------------------------------+
+
+* <<<pipes>>>
+
+   Runs a pipes job.
+
+   Usage: <<<hadoop pipes [-conf <path>] [-jobconf <key=value>, <key=value>,
+   ...] [-input <path>] [-output <path>] [-jar <jar file>] [-inputformat
+   <class>] [-map <class>] [-partitioner <class>] [-reduce <class>] [-writer
+   <class>] [-program <executable>] [-reduces <num>]>>>
+ 
+*----------------------------------------+------------------------------------+
+|| COMMAND_OPTION                        || Description
+*----------------------------------------+------------------------------------+
+| -conf <path>                           | Configuration for job
+*----------------------------------------+------------------------------------+
+| -jobconf <key=value>, <key=value>, ... | Add/override configuration for job
+*----------------------------------------+------------------------------------+
+| -input <path>                          | Input directory
+*----------------------------------------+------------------------------------+
+| -output <path>                         | Output directory
+*----------------------------------------+------------------------------------+
+| -jar <jar file>                        | Jar filename
+*----------------------------------------+------------------------------------+
+| -inputformat <class>                   | InputFormat class
+*----------------------------------------+------------------------------------+
+| -map <class>                           | Java Map class
+*----------------------------------------+------------------------------------+
+| -partitioner <class>                   | Java Partitioner
+*----------------------------------------+------------------------------------+
+| -reduce <class>                        | Java Reduce class
+*----------------------------------------+------------------------------------+
+| -writer <class>                        | Java RecordWriter
+*----------------------------------------+------------------------------------+
+| -program <executable>                  | Executable URI
+*----------------------------------------+------------------------------------+
+| -reduces <num>                         | Number of reduces
+*----------------------------------------+------------------------------------+
+
+* <<<queue>>>
+
+   command to interact and view Job Queue information
+
+   Usage: <<<hadoop queue [-list] | [-info <job-queue-name> [-showJobs]] | [-showacls]>>>
+
+*-----------------+-----------------------------------------------------------+
+|| COMMAND_OPTION || Description
+*-----------------+-----------------------------------------------------------+
+| -list           | Gets list of Job Queues configured in the system.
+                  | Along with scheduling information associated with the job queues.
+*-----------------+-----------------------------------------------------------+
+| -info <job-queue-name> [-showJobs] | Displays the job queue information and
+                  | associated scheduling information of particular job queue.
+                  | If <<<-showJobs>>> options is present a list of jobs
+                  | submitted to the particular job queue is displayed.
+*-----------------+-----------------------------------------------------------+
+| -showacls       | Displays the queue name and associated queue operations
+                  | allowed for the current user. The list consists of only
+                  | those queues to which the user has access.
+*-----------------+-----------------------------------------------------------+
+
+* <<<version>>>
+
+   Prints the version.
+
+   Usage: <<<hadoop version>>>
+
+* <<<CLASSNAME>>>
+
+   hadoop script can be used to invoke any class.
+
+   Usage: <<<hadoop CLASSNAME>>>
+
+   Runs the class named <<<CLASSNAME>>>.
+
+* <<<classpath>>>
+
+   Prints the class path needed to get the Hadoop jar and the required
+   libraries.  If called without arguments, then prints the classpath set up by
+   the command scripts, which is likely to contain wildcards in the classpath
+   entries.  Additional options print the classpath after wildcard expansion or
+   write the classpath into the manifest of a jar file.  The latter is useful in
+   environments where wildcards cannot be used and the expanded classpath exceeds
+   the maximum supported command line length.
+
+   Usage: <<<hadoop classpath [--glob|--jar <path>|-h|--help]>>>
+
+*-----------------+-----------------------------------------------------------+
+|| COMMAND_OPTION || Description
+*-----------------+-----------------------------------------------------------+
+| --glob          | expand wildcards
+*-----------------+-----------------------------------------------------------+
+| --jar <path>    | write classpath as manifest in jar named <path>
+*-----------------+-----------------------------------------------------------+
+| -h, --help      | print help
+*-----------------+-----------------------------------------------------------+
+
+Administration Commands
+
+   Commands useful for administrators of a hadoop cluster.
+
+* <<<balancer>>>
+
+   Deprecated, use {{{../hadoop-hdfs/HDFSCommands.html#balancer}
+   <<<hdfs balancer>>>}} instead.
+
+* <<<daemonlog>>>
+
+   Get/Set the log level for each daemon.
+
+   Usage: <<<hadoop daemonlog -getlevel <host:port> <name> >>>
+   Usage: <<<hadoop daemonlog -setlevel <host:port> <name> <level> >>>
+
+*------------------------------+-----------------------------------------------------------+
+|| COMMAND_OPTION              || Description
+*------------------------------+-----------------------------------------------------------+
+| -getlevel <host:port> <name> | Prints the log level of the daemon running at
+                               | <host:port>. This command internally connects
+                               | to http://<host:port>/logLevel?log=<name>
+*------------------------------+-----------------------------------------------------------+
+|   -setlevel <host:port> <name> <level> | Sets the log level of the daemon
+                               | running at <host:port>. This command internally
+                               | connects to http://<host:port>/logLevel?log=<name>
+*------------------------------+-----------------------------------------------------------+
+
+* <<<datanode>>>
+
+   Deprecated, use {{{../hadoop-hdfs/HDFSCommands.html#datanode}
+   <<<hdfs datanode>>>}} instead.
+
+* <<<dfsadmin>>>
+
+   Deprecated, use {{{../hadoop-hdfs/HDFSCommands.html#dfsadmin}
+   <<<hdfs dfsadmin>>>}} instead.
+
+* <<<mradmin>>>
+
+   Runs MR admin client
+
+   Usage: <<<hadoop mradmin [ GENERIC_OPTIONS ] [-refreshQueueAcls]>>>
+
+*-------------------+-----------------------------------------------------------+
+|| COMMAND_OPTION   || Description
+*-------------------+-----------------------------------------------------------+
+| -refreshQueueAcls | Refresh the queue acls used by hadoop, to check access
+                    | during submissions and administration of the job by the
+                    | user. The properties present in mapred-queue-acls.xml is
+                    | reloaded by the queue manager.
+*-------------------+-----------------------------------------------------------+
+
+* <<<jobtracker>>>
+
+   Runs the MapReduce job Tracker node.
+
+   Usage: <<<hadoop jobtracker [-dumpConfiguration]>>>
+
+*--------------------+-----------------------------------------------------------+
+|| COMMAND_OPTION    || Description
+*--------------------+-----------------------------------------------------------+
+| -dumpConfiguration | Dumps the configuration used by the JobTracker alongwith
+                     | queue configuration in JSON format into Standard output
+                     | used by the jobtracker and exits.
+*--------------------+-----------------------------------------------------------+
+
+* <<<namenode>>>
+
+   Deprecated, use {{{../hadoop-hdfs/HDFSCommands.html#namenode}
+   <<<hdfs namenode>>>}} instead.
+
+* <<<secondarynamenode>>>
+
+   Deprecated, use {{{../hadoop-hdfs/HDFSCommands.html#secondarynamenode}
+   <<<hdfs secondarynamenode>>>}} instead.
+
+* <<<tasktracker>>>
+
+   Runs a MapReduce task Tracker node.
+
+   Usage: <<<hadoop tasktracker>>>
