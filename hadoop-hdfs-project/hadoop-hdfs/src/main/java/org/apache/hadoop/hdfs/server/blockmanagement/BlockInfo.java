@@ -318,7 +318,7 @@ public class BlockInfo extends Block {
     }
     return replica;
   }
-
+  
   Replica removeReplica(int sid)
       throws StorageException, TransactionContextException {
     List<Replica> replicas = getReplicasNoCheck();
