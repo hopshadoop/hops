@@ -113,12 +113,13 @@ class FsDatasetAsyncDiskService {
     if (executors == null) {
       throw new RuntimeException("AsyncDiskService is already shutdown");
     }
-    if (executors.containsKey(volume)) {
-      throw new RuntimeException("Volume " + volume + " already exists.");
+    ThreadPoolExecutor executor = executors.get(volume);
+    if (executor != null) {
+      throw new RuntimeException("Volume " + volume + " is already existed.");
     }
     addExecutorForVolume(volume);
   }
-
+  
   /**
    * Stops AsyncDiskService for a volume.
    * @param volume the root of the volume.
