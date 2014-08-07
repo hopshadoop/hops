@@ -321,18 +321,6 @@ public class DatanodeDescriptor extends DatanodeInfo {
     updateHeartbeatState(StorageReport.EMPTY_ARRAY, 0L, 0L, 0, 0);
   }
 
-  /**
-   * Add block to the storage. Return true on success.
-   */
-  public boolean addBlock(String storageID, BlockInfo b)
-      throws TransactionContextException, StorageException {
-    DatanodeStorageInfo s = getStorageInfo(storageID);
-    if(s != null) {
-      return s.addBlock(b);
-    }
-    return false;
-  }
-
   @VisibleForTesting
   public DatanodeStorageInfo getStorageInfo(String storageID) {
     synchronized (storageMap) {
@@ -371,10 +359,21 @@ public class DatanodeDescriptor extends DatanodeInfo {
    * Remove block from the list of blocks belonging to this data-node.
    * Remove datanode from the block.
    */
-  public boolean removeReplica(BlockInfo b)
-      throws StorageException, TransactionContextException {
-    DatanodeStorageInfo s = b.getStorageOnNode(this);
-
+  boolean removeBlock(BlockInfo b) throws TransactionContextException, StorageException {
+    final DatanodeStorageInfo s = b.getStorageOnNode(this);
+    // if block exists on this datanode
+    if (s != null) {
+      return s.removeBlock(b);
+    }
+    return false;
+  }
+  
+  /**
+   * Remove block from the list of blocks belonging to the data-node. Remove
+   * data-node from the block.
+   */
+  boolean removeBlock(String storageID, BlockInfo b) throws StorageException, TransactionContextException {
+    DatanodeStorageInfo s = getStorageInfo(storageID);
     if (s != null) {
       return b.removeReplica(s) != null;
     }

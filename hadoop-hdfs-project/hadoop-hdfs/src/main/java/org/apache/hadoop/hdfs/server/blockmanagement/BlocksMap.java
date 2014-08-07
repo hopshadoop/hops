@@ -35,6 +35,8 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 
+import com.google.common.base.Preconditions;
+
 /**
  * This class maintains the map from a block to its metadata.
  * block's metadata currently includes blockCollection it belongs to and
@@ -180,7 +182,7 @@ class BlocksMap {
     }
 
     // remove block from the data-node list and the node from the block info
-    return node.removeReplica(info);
+    return node.removeBlock(info);
   }
 
   boolean removeNode(Block b, int sid)
