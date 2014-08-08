@@ -17,11 +17,13 @@
  */
 package org.apache.hadoop.fs.http.server;
 
+import org.apache.hadoop.security.token.delegation.web.DelegationTokenAuthenticator;
+import org.apache.hadoop.security.token.delegation.web.KerberosDelegationTokenAuthenticationHandler;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.http.client.HttpFSKerberosAuthenticator;
 import org.apache.hadoop.lib.server.Service;
 import org.apache.hadoop.lib.server.ServiceException;
 import org.apache.hadoop.lib.service.Groups;
@@ -585,8 +587,9 @@ public class TestHttpFSServer extends HFSTestCase {
         conn.getResponseCode());
 
 
-    AuthenticationToken token = new AuthenticationToken("u", "p",
-        HttpFSKerberosAuthenticationHandlerForTesting.TYPE);
+    AuthenticationToken token =
+      new AuthenticationToken("u", "p",
+          new KerberosDelegationTokenAuthenticationHandler().getType());
     token.setExpires(System.currentTimeMillis() + 100000000);
     SignerSecretProvider secretProvider =
         StringSignerSecretProviderCreator.newStringSignerSecretProvider();
@@ -610,12 +613,12 @@ public class TestHttpFSServer extends HFSTestCase {
         AuthenticatedURL.AUTH_COOKIE + "=" + tokenSigned);
     Assert.assertEquals(HttpURLConnection.HTTP_OK, conn.getResponseCode());
 
-    JSONObject json = (JSONObject) new JSONParser()
-        .parse(new InputStreamReader(conn.getInputStream()));
-    json = (JSONObject) json
-        .get(HttpFSKerberosAuthenticator.DELEGATION_TOKEN_JSON);
-    String tokenStr = (String) json
-        .get(HttpFSKerberosAuthenticator.DELEGATION_TOKEN_URL_STRING_JSON);
+    JSONObject json = (JSONObject)
+      new JSONParser().parse(new InputStreamReader(conn.getInputStream()));
+    json = (JSONObject)
+      json.get(DelegationTokenAuthenticator.DELEGATION_TOKEN_JSON);
+    String tokenStr = (String)
+        json.get(DelegationTokenAuthenticator.DELEGATION_TOKEN_URL_STRING_JSON);
 
     url = new URL(TestJettyHelper.getJettyURL(),
         "/webhdfs/v1/?op=GETHOMEDIRECTORY&delegation=" + tokenStr);
