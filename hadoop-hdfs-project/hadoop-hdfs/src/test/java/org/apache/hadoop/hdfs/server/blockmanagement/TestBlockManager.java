@@ -479,7 +479,7 @@ public class TestBlockManager {
 
         for (DatanodeDescriptor dn : nodes) {
           for (DatanodeStorageInfo storage : dn.getStorageInfos()) {
-            blockInfo.addReplica(storage);
+            blockInfo.addStorage(storage);
           }
         }
         return blockInfo;
