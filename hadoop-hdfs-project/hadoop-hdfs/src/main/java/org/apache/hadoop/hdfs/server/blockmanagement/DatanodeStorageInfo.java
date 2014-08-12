@@ -343,7 +343,22 @@ public class DatanodeStorageInfo {
 
   public boolean addBlock(BlockInfo b)
       throws TransactionContextException, StorageException {
-    return b.addReplica(this);
+    // First check whether the block belongs to a different storage
+    // on the same DN.
+    boolean replaced = false;
+    Integer otherStorage = b.getReplicatedOnDatanode(this.getDatanodeDescriptor());
+    if(otherStorage!=null){
+      if (otherStorage != this.sid) {
+        // The block belongs to a different storage. Remove it first.
+        b.removeReplica(otherStorage);
+        replaced = true;
+      } else {
+        // The block is already associated with this storage.
+        return false;
+      }
+    }
+    b.addStorage(this);
+    return !replaced;
   }
 
   public boolean removeBlock(BlockInfo b)

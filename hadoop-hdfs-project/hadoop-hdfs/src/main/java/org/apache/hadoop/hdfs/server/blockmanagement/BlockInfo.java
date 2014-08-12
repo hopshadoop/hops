@@ -275,12 +275,8 @@ public class BlockInfo extends Block {
    * Adds new replica for this block.
    * @return the replica stored, or null if it is already stored on this storage
    */
-  boolean addReplica(DatanodeStorageInfo storage)
+  boolean addStorage(DatanodeStorageInfo storage)
       throws StorageException, TransactionContextException {
-
-    if (isReplicatedOnDatanode(storage.getDatanodeDescriptor())) {
-      return false;
-    }
  
     Replica replica =
         new Replica(storage.getSid(), getBlockId(), getInodeId(), HashBuckets
@@ -333,11 +329,12 @@ public class BlockInfo extends Block {
     return replica;
   }
   /**
-   * Returns true if this block has a replica on the given datanode.
+   * Returns the storage id of the version of the replica stored on the datanode
+   * return null if this block does not have a replica on the given datanode.
    * @param dn
    * @return
    */
-  boolean isReplicatedOnDatanode(DatanodeDescriptor dn)
+  public Integer getReplicatedOnDatanode(DatanodeDescriptor dn)
       throws StorageException, TransactionContextException {
     DatanodeStorageInfo[] storages = dn.getStorageInfos();
     Set<Integer> sids = new HashSet<>();
@@ -350,11 +347,11 @@ public class BlockInfo extends Block {
     if (list != null) {
       for (Replica replica : list) {
         if (sids.contains(replica.getStorageId())) {
-          return true;
+          return replica.getStorageId();
         }
       }
     }
-    return false;
+    return null;
   }
   
   boolean isReplicatedOnStorage(DatanodeStorageInfo storage)
