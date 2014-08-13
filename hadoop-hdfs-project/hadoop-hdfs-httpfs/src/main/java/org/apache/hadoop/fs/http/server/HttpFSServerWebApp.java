@@ -102,8 +102,8 @@ public class HttpFSServerWebApp extends ServerWebApp {
     super.init();
     adminGroup = getConfig().get(getPrefixedName(CONF_ADMIN_GROUP), "admin");
     LOG.info("Connects to Namenode [{}]",
-        get().get(FileSystemAccess.class).getFileSystemConfiguration().
-            get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY));
+             get().get(FileSystemAccess.class).getFileSystemConfiguration().
+               get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY));
   }
 
   /**
