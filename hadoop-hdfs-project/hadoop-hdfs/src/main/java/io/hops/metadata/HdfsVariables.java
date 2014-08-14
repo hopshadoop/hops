@@ -499,26 +499,23 @@ public class HdfsVariables {
   
   public static boolean getNeedRescan()
       throws StorageException, TransactionContextException, IOException {
-    LightWeightRequestHandler handler = new LightWeightRequestHandler(HDFSOperationType.GET_NEED_RESCAN) {
+    return (boolean) new LightWeightRequestHandler(HDFSOperationType.GET_NEED_RESCAN) {
       @Override
       public Object performTask() throws IOException {
         return handleVariableWithReadLock(new Handler() {
           @Override
           public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
               throws StorageException {
-            return vd.getVariable(Variable.Finder.NeedRescan);
+            int completedScanCount = ((IntVariable) vd.getVariable(Variable.Finder.completedScanCount)).getValue();
+            int neededScanCoun = ((IntVariable) vd.getVariable(Variable.Finder.neededScanCount)).getValue();
+            return completedScanCount < neededScanCoun;
           }
         });
       }
-    };
-    IntVariable var = (IntVariable) handler.handle();
-    if (var.getValue() != null && var.getValue() != 0) {
-      return true;
-    }
-    return false;
+    }.handle();
   }
 
-  public static void setNeedRescan(final boolean needRescan)
+  public static void setNeedRescan()
       throws StorageException, TransactionContextException, IOException {
     new LightWeightRequestHandler(HDFSOperationType.SET_NEED_RESCAN) {
       @Override
@@ -527,14 +524,73 @@ public class HdfsVariables {
           @Override
           public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
               throws StorageException {
-            int val;
-            if (needRescan) {
-              val = 1;
+            int curScanCount = ((IntVariable) vd.getVariable(Variable.Finder.curScanCount)).getValue();
+            if (curScanCount >= 0) {
+              // If there is a scan in progress, we need to wait for the scan after
+              // that.
+              vd.setVariable(new IntVariable(Variable.Finder.neededScanCount, curScanCount + 1));
+              int val = curScanCount + 1;
             } else {
-              val = 0;
+              // If there is no scan in progress, we need to wait for the next scan.
+              int completedScanCount = ((IntVariable) vd.getVariable(Variable.Finder.completedScanCount)).getValue();
+              vd.setVariable(new IntVariable(Variable.Finder.neededScanCount, completedScanCount + 1));
+              int val = completedScanCount +1;
             }
-            vd.setVariable(new IntVariable(Variable.Finder.NeedRescan, val));
             return null;
+          }
+        });
+      }
+    }.handle();
+  }
+  
+  public static void setCompletedAndCurScanCount()
+      throws StorageException, TransactionContextException, IOException {
+    new LightWeightRequestHandler(HDFSOperationType.SET_NEED_RESCAN) {
+      @Override
+      public Object performTask() throws IOException {
+        return handleVariableWithWriteLock(new Handler() {
+          @Override
+          public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
+              throws StorageException {
+            int curScanCount = ((IntVariable) vd.getVariable(Variable.Finder.curScanCount)).getValue();
+            vd.setVariable(new IntVariable(Variable.Finder.completedScanCount, curScanCount));
+            vd.setVariable(new IntVariable(Variable.Finder.curScanCount, -1));
+            return null;
+          }
+        });
+      }
+    }.handle();
+  }
+  
+  public static void setCurScanCount()
+      throws StorageException, TransactionContextException, IOException {
+    new LightWeightRequestHandler(HDFSOperationType.SET_NEED_RESCAN) {
+      @Override
+      public Object performTask() throws IOException {
+        return handleVariableWithWriteLock(new Handler() {
+          @Override
+          public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
+              throws StorageException {
+            int completedScanCount = ((IntVariable) vd.getVariable(Variable.Finder.completedScanCount)).getValue();
+            vd.setVariable(new IntVariable(Variable.Finder.curScanCount, completedScanCount+1));
+            int val = completedScanCount+1;
+            return null;
+          }
+        });
+      }
+    }.handle();
+  }
+  
+  public static int getCurScanCount()
+      throws StorageException, TransactionContextException, IOException {
+    return (int) new LightWeightRequestHandler(HDFSOperationType.SET_NEED_RESCAN) {
+      @Override
+      public Object performTask() throws IOException {
+        return handleVariableWithReadLock(new Handler() {
+          @Override
+          public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
+              throws StorageException {
+            return ((IntVariable) vd.getVariable(Variable.Finder.curScanCount)).getValue();
           }
         });
       }
@@ -712,8 +768,12 @@ public class HdfsVariables {
                     DFSConfigKeys.DFS_BR_LB_MAX_CONCURRENT_BRS_DEFAULT)).getBytes());
     Variable.registerVariableDefaultValue(Variable.Finder.CacheDirectiveID,
         new LongVariable(1).getBytes());
-    Variable.registerVariableDefaultValue(Variable.Finder.NeedRescan,
+    Variable.registerVariableDefaultValue(Variable.Finder.neededScanCount,
         new IntVariable(0).getBytes());
+    Variable.registerVariableDefaultValue(Variable.Finder.completedScanCount,
+        new IntVariable(0).getBytes());
+    Variable.registerVariableDefaultValue(Variable.Finder.curScanCount,
+        new IntVariable(-1).getBytes());
     VarsRegister.registerHdfsDefaultValues();
     // This is a workaround that is needed until HA-YARN has its own format command
     VarsRegister.registerYarnDefaultValues();

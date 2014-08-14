@@ -110,17 +110,6 @@ public class CacheReplicationMonitor extends Thread implements Closeable {
   private final Condition scanFinished;
 
   /**
-   * Whether we are currently doing a rescan. Protected by the CRM lock.
-   */
-  private boolean isScanning = false;
-
-  /**
-   * The number of rescans completed. Used to wait for scans to finish.
-   * Protected by the CacheReplicationMonitor lock.
-   */
-  private long scanCount = 0;
-
-  /**
    * True if this monitor should terminate. Protected by the CRM lock.
    */
   private boolean shutdown = false;
@@ -185,8 +174,6 @@ public class CacheReplicationMonitor extends Thread implements Closeable {
             doRescan.await(delta, TimeUnit.MILLISECONDS);
             curTimeMs = Time.monotonicNow();
           }
-          isScanning = true;
-          HdfsVariables.setNeedRescan(false);
         } finally {
           lock.unlock();
         }
@@ -197,8 +184,7 @@ public class CacheReplicationMonitor extends Thread implements Closeable {
         // Update synchronization-related variables.
         lock.lock();
         try {
-          isScanning = false;
-          scanCount++;
+          HdfsVariables.setCompletedAndCurScanCount();
           scanFinished.signalAll();
         } finally {
           lock.unlock();
@@ -233,12 +219,11 @@ public class CacheReplicationMonitor extends Thread implements Closeable {
       throw new RuntimeException("Asked non leading node to rescan cache");
     }
     // If no scan is already ongoing, mark the CRM as dirty and kick
-    if (!isScanning) {
+    if (HdfsVariables.getCurScanCount() < 0) {
       doRescan.signal();
     }
     // Wait until the scan finishes and the count advances
-    final long startCount = scanCount;
-    while ((!shutdown) && (startCount >= scanCount)) {
+    while ((!shutdown) && (HdfsVariables.getNeedRescan())) {
       try {
         scanFinished.await();
       } catch (InterruptedException e) {
@@ -256,7 +241,7 @@ public class CacheReplicationMonitor extends Thread implements Closeable {
   public void setNeedsRescan() throws StorageException, TransactionContextException, IOException {
     Preconditions.checkArgument(lock.isHeldByCurrentThread(),
         "Must hold the CRM lock when setting the needsRescan bit.");
-    HdfsVariables.setNeedRescan(true);
+    HdfsVariables.setNeedRescan();
   }
 
   /**
@@ -286,8 +271,16 @@ public class CacheReplicationMonitor extends Thread implements Closeable {
   private void rescan() throws InterruptedException, StorageException, TransactionContextException, IOException {
     scannedDirectives = 0;
     scannedBlocks = 0;
-    if (shutdown) {
-      throw new InterruptedException("CacheReplicationMonitor was " + "shut down.");
+    lock.lock();
+    try{
+      if (shutdown) {
+        throw new InterruptedException("CacheReplicationMonitor was " +
+            "shut down.");
+      }
+      HdfsVariables.setCurScanCount();
+    }
+    finally {
+      lock.unlock();
     }
     new HopsTransactionalRequestHandler(HDFSOperationType.LIST_CACHE_DIRECTIVE) {
       @Override
