@@ -73,6 +73,15 @@ public class TestCommitBlockSynchronization {
 
     FSNamesystem namesystem = new FSNamesystem(conf, cluster.getNameNode());
     namesystem.setImageLoaded(true);
+
+    // set file's parent as root and put the file to inodeMap, so
+    // FSNamesystem's isFileDeleted() method will return false on this file
+    if (file.getParent() == null) {
+      INodeDirectory parent = mock(INodeDirectory.class);
+      parent.setLocalName(new byte[0]);
+      file.setParent(parent);
+    }
+
     FSNamesystem namesystemSpy = spy(namesystem);
     doReturn(1L).when(file).getId();
     BlockInfoUnderConstruction blockInfo = createBlockInfoUnderConstruction(targets, block, file);
@@ -81,6 +90,8 @@ public class TestCommitBlockSynchronization {
     doReturn(file).when(mockBlockInfo).getBlockCollection();
     doReturn(blockInfo.getGenerationStamp()).when(mockBlockInfo).getGenerationStamp();
     doReturn(blockInfo.getBlockRecoveryId()).when(mockBlockInfo).getBlockRecoveryId();
+    doReturn(blockInfo.getBlockId()).when(mockBlockInfo).getBlockId();
+    doReturn(blockInfo.getInodeId()).when(mockBlockInfo).getInodeId();
     
     doReturn(true).when(file).removeLastBlock(any(Block.class));
     doReturn(true).when(file).isUnderConstruction();
@@ -143,7 +154,7 @@ public class TestCommitBlockSynchronization {
     FSNamesystem namesystemSpy = makeNameSystemSpy(block, file);
     DatanodeID[] newTargets = new DatanodeID[0];
 
-    ExtendedBlock lastBlock = new ExtendedBlock();
+    ExtendedBlock lastBlock = new ExtendedBlock(null ,block);
     namesystemSpy.commitBlockSynchronization(
         lastBlock, genStamp, length, false,
         false, newTargets, null);
@@ -236,7 +247,7 @@ public class TestCommitBlockSynchronization {
     DatanodeDescriptor[] targets = new DatanodeDescriptor[0];
     DatanodeID[] newTargets = new DatanodeID[0];
 
-    ExtendedBlock lastBlock = new ExtendedBlock();
+    ExtendedBlock lastBlock = new ExtendedBlock(null, block);
       namesystemSpy.commitBlockSynchronization(
           lastBlock, genStamp, length, false,
           true, newTargets, null);
@@ -257,7 +268,7 @@ public class TestCommitBlockSynchronization {
     DatanodeDescriptor[] targets = new DatanodeDescriptor[0];
     DatanodeID[] newTargets = new DatanodeID[0];
 
-    ExtendedBlock lastBlock = new ExtendedBlock();
+    ExtendedBlock lastBlock = new ExtendedBlock(null, block);
       namesystemSpy.commitBlockSynchronization(
           lastBlock, genStamp, length, true,
           false, newTargets, null);
@@ -289,7 +300,7 @@ public class TestCommitBlockSynchronization {
     DatanodeID[] newTargets = new DatanodeID[]{
         new DatanodeID("0.0.0.0", "nonexistantHost", "1", 0, 0, 0, 0)};
 
-    ExtendedBlock lastBlock = new ExtendedBlock();
+    ExtendedBlock lastBlock = new ExtendedBlock(null, block);
     namesystemSpy.commitBlockSynchronization(
         lastBlock, genStamp, length, true,
         false, newTargets, null);

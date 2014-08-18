@@ -480,6 +480,10 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
           .find(INode.Finder.ByINodeIdFTIS, getParentId());
     }
 
+    if(parent==null){
+      return null;
+    }
+    
     return this.parent.asDirectory();
   }
 
