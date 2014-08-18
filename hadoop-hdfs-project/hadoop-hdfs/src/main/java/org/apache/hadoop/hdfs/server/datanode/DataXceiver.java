@@ -102,7 +102,8 @@ class DataXceiver extends Receiver implements Runnable {
   private long opStartTime; //the start time of receiving an Op
   private final InputStream socketIn;
   private OutputStream socketOut;
-
+  private BlockReceiver blockReceiver = null;
+  
   /**
    * Client Name used in previous operation. Not available on first request
    * on the socket.
@@ -162,6 +163,12 @@ class DataXceiver extends Receiver implements Runnable {
     return socketOut;
   }
 
+  public void sendOOB() throws IOException, InterruptedException {
+    LOG.info("Sending OOB to peer: " + peer);
+    if(blockReceiver!=null)
+      blockReceiver.sendOOB();
+  }
+  
   /**
    * Read/write data from/to the DataXceiverServer.
    */
@@ -171,7 +178,7 @@ class DataXceiver extends Receiver implements Runnable {
     Op op = null;
     
     try {
-      dataXceiverServer.addPeer(peer, Thread.currentThread());
+      dataXceiverServer.addPeer(peer, Thread.currentThread(), this);
       peer.setWriteTimeout(datanode.getDnConf().socketWriteTimeout);
       InputStream input = socketIn;
       IOStreamPair saslStreams = datanode.saslServer.receive(peer, socketOut,
@@ -600,7 +607,6 @@ class DataXceiver extends Receiver implements Runnable {
     DataOutputStream mirrorOut = null;  // stream to next target
     DataInputStream mirrorIn = null;    // reply from next target
     Socket mirrorSock = null;           // socket to next target
-    BlockReceiver blockReceiver = null; // responsible for data handling
     String mirrorNode = null;           // the name:port of next target
     String firstBadLink = "";           // first datanode that failed in connection setup
     Status mirrorInStatus = SUCCESS;
@@ -759,6 +765,7 @@ class DataXceiver extends Receiver implements Runnable {
       IOUtils.closeStream(replyOut);
       IOUtils.closeSocket(mirrorSock);
       IOUtils.closeStream(blockReceiver);
+      blockReceiver = null;
     }
 
     //update metrics
