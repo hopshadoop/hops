@@ -17,15 +17,25 @@
  */
 package org.apache.hadoop.hdfs;
 
+import io.hops.metadata.HdfsStorageFactory;
+import io.hops.metadata.hdfs.dal.BlockInfoDataAccess;
+import io.hops.transaction.handler.HDFSOperationType;
+import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.Options.Rename;
+import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
 import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
 import org.junit.Test;
 
 import java.io.DataOutputStream;
 import java.io.IOException;
+import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -129,5 +139,58 @@ public class TestDFSRename {
         cluster.shutdown();
       }
     }
+  }
+  
+  /**
+   * Check the blocks of dst file are cleaned after rename with overwrite
+   */
+  @Test(timeout = 120000)
+  public void testRenameWithOverwrite() throws Exception {
+    final short replFactor = 2;
+    final long blockSize = 512;
+    Configuration conf = new Configuration();
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).
+        numDataNodes(replFactor).build();
+    DistributedFileSystem dfs = cluster.getFileSystem();
+    try {
+      
+      long fileLen = blockSize*3;
+      String src = "/foo/src";
+      String dst = "/foo/dst";
+      Path srcPath = new Path(src);
+      Path dstPath = new Path(dst);
+      
+      DFSTestUtil.createFile(dfs, srcPath, fileLen, replFactor, 1);
+      DFSTestUtil.createFile(dfs, dstPath, fileLen, replFactor, 1);
+      
+      LocatedBlocks lbs = NameNodeAdapter.getBlockLocations(
+          cluster.getNameNode(), dst, 0, fileLen);
+      BlockManager bm = NameNodeAdapter.getNamesystem(cluster.getNameNode()).
+          getBlockManager();
+      assertTrue(bm.getStoredBlock(lbs.getLocatedBlocks().get(0).getBlock().
+          getLocalBlock()) != null);
+      BlockInfo block = bm.getStoredBlock(lbs.getLocatedBlocks().get(0).getBlock().
+          getLocalBlock());
+      dfs.rename(srcPath, dstPath, Rename.OVERWRITE);
+      BlockInfo b = getBlock(block.getBlockId(), block.getInodeId());
+      assertTrue(b == null);
+    } finally {
+      if (dfs != null) {
+        dfs.close();
+      }
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+  
+  private BlockInfo getBlock(final long blockId, final long inodeId) throws IOException{
+    return (BlockInfo) new LightWeightRequestHandler(HDFSOperationType.TEST) {
+      @Override
+      public Object performTask() throws IOException {
+        BlockInfoDataAccess da = (BlockInfoDataAccess) HdfsStorageFactory.getDataAccess(BlockInfoDataAccess.class);
+        return da.findById(blockId, inodeId);
+      }
+    }.handle();
   }
 }
