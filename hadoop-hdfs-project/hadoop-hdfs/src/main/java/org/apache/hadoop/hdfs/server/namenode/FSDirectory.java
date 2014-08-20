@@ -424,12 +424,12 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
         tx.updateMtimeAndLease(timestamp);
 
         // Collect the blocks and remove the lease for previous dst
-        int filesDeleted = 0;
+        boolean filesDeleted = false;
         if (removedDst != null) {
           INode rmdst = removedDst;
           restoreDst=false;
           BlocksMapUpdateInfo collectedBlocks = new BlocksMapUpdateInfo();
-          filesDeleted = 1; // rmdst.collectSubtreeBlocksAndClear(collectedBlocks);
+          filesDeleted = true; // rmdst.collectSubtreeBlocksAndClear(collectedBlocks);
                             // [S] as the dst dir was empty it will always return 1
                             // if the destination is file then we need to collect the blocks for it
           if(rmdst instanceof  INodeFile && !((INodeFile)rmdst).isFileStoredInDB()){
@@ -452,7 +452,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
             removedSrc);
         
         tx.updateQuotasInSourceTree();
-        return filesDeleted > 0;
+        return filesDeleted;
       }
     } finally {
       if (restoreSrc) {
