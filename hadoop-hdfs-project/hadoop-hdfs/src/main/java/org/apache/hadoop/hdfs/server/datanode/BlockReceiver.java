@@ -29,6 +29,7 @@ import org.apache.hadoop.hdfs.protocol.datatransfer.BlockConstructionStage;
 import org.apache.hadoop.hdfs.protocol.datatransfer.PacketHeader;
 import org.apache.hadoop.hdfs.protocol.datatransfer.PacketReceiver;
 import org.apache.hadoop.hdfs.protocol.datatransfer.PipelineAck;
+import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.BlockOpResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.ReplicaInputStreams;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.ReplicaOutputStreams;
@@ -130,6 +131,14 @@ class BlockReceiver implements Closeable {
   private boolean syncOnClose;
   private long restartBudget;
 
+  /**
+   * for replaceBlock response
+   */
+  private final long responseInterval;
+  private long lastResponseTime = 0;
+  private boolean isReplaceBlock = false;
+  private DataOutputStream replyOut = null;
+
   BlockReceiver(final ExtendedBlock block, final StorageType storageType,
       final DataInputStream in,
       final String inAddr, final String myAddr,
@@ -150,6 +159,9 @@ class BlockReceiver implements Closeable {
       this.isClient = !this.isDatanode;
       this.restartBudget = datanode.getDnConf().restartReplicaExpiry;
       this.datanodeSlowLogThresholdMs = datanode.getDnConf().datanodeSlowIoWarningThresholdMs;
+      // For replaceBlock() calls response should be sent to avoid socketTimeout
+      // at clients. So sending with the interval of 0.5 * socketTimeout
+      this.responseInterval = (long) (datanode.getDnConf().socketTimeout * 0.5);
       //for datanode, we have
       //1: clientName.length() == 0, and
       //2: stage == null or PIPELINE_SETUP_CREATE
@@ -657,6 +669,20 @@ class BlockReceiver implements Closeable {
           .enqueue(seqno, lastPacketInBlock, offsetInBlock, Status.SUCCESS);
     }
 
+    /*
+     * Send in-progress responses for the replaceBlock() calls back to caller to
+     * avoid timeouts due to balancer throttling. HDFS-6247
+     */
+    if (isReplaceBlock
+        && (Time.monotonicNow() - lastResponseTime > responseInterval)) {
+      BlockOpResponseProto.Builder response = BlockOpResponseProto.newBuilder()
+          .setStatus(Status.IN_PROGRESS);
+      response.build().writeDelimitedTo(replyOut);
+      replyOut.flush();
+
+      lastResponseTime = Time.monotonicNow();
+    }
+
     if (throttler != null) { // throttle I/O
       throttler.throttle(len);
     }
@@ -729,13 +755,17 @@ class BlockReceiver implements Closeable {
       DataInputStream mirrIn,   // input from next datanode
       DataOutputStream replyOut,  // output to previous datanode
       String mirrAddr, DataTransferThrottler throttlerArg,
-      DatanodeInfo[] downstreams) throws IOException {
+      DatanodeInfo[] downstreams,
+      boolean isReplaceBlock) throws IOException {
 
     syncOnClose = datanode.getDnConf().syncOnClose;
     boolean responderClosed = false;
     mirrorOut = mirrOut;
     mirrorAddr = mirrAddr;
     throttler = throttlerArg;
+
+      this.replyOut = replyOut;
+      this.isReplaceBlock = isReplaceBlock;
 
     try {
       if (isClient && !isTransfer) {
