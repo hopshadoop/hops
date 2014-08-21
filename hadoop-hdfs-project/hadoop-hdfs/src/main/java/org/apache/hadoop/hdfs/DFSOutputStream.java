@@ -1523,16 +1523,20 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
           //
           // Xmit header info to datanode
           //
+  
+          BlockConstructionStage bcs = recoveryFlag? stage.getRecoveryStage(): stage;
 
-          BlockConstructionStage bcs =
-              recoveryFlag ? stage.getRecoveryStage() : stage;
+          // We cannot change the block length in 'block' as it counts the number
+          // of bytes ack'ed.
+          ExtendedBlock blockCopy = new ExtendedBlock(block);
+          blockCopy.setNumBytes(blockSize);
+
           // send the request
-          new Sender(out)
-                  .writeBlock(block, nodeStorageTypes[0], accessToken,
-              dfsClient.clientName, nodes, nodeStorageTypes, null,
-              bcs, nodes.length, block.getNumBytes(), bytesSent, newGS,
-              checksum, cachingStrategy.get());
-
+          new Sender(out).writeBlock(blockCopy, nodeStorageTypes[0], accessToken,
+              dfsClient.clientName, nodes, nodeStorageTypes, null, bcs, 
+              nodes.length, block.getNumBytes(), bytesSent, newGS, checksum,
+              cachingStrategy.get());
+  
           // receive ack for connect
           BlockOpResponseProto resp = BlockOpResponseProto
                   .parseFrom(PBHelper.vintPrefixed(blockReplyStream));
