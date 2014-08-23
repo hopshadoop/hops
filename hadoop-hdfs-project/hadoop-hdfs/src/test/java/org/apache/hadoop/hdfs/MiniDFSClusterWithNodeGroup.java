@@ -60,9 +60,11 @@ public class MiniDFSClusterWithNodeGroup extends MiniDFSCluster {
       boolean setupHostsFile,
       boolean checkDataNodeAddrConfig,
       boolean checkDataNodeHostConfig) throws IOException {
+
     assert storageCapacities == null || simulatedCapacities == null;
     assert storageTypes == null || storageTypes.length == numDataNodes;
     assert storageCapacities == null || storageCapacities.length == numDataNodes;
+
     if (operation == StartupOption.RECOVER) {
       return;
     }
@@ -192,7 +194,7 @@ public class MiniDFSClusterWithNodeGroup extends MiniDFSCluster {
     curDatanodesNum += numDataNodes;
     this.numDataNodes += numDataNodes;
     waitActive();
-    
+
     if (storageCapacities != null) {
       for (int i = curDatanodesNum; i < curDatanodesNum+numDataNodes; ++i) {
         List<? extends FsVolumeSpi> volumes = dns[i].getFSDataset().getVolumes();
@@ -211,7 +213,7 @@ public class MiniDFSClusterWithNodeGroup extends MiniDFSCluster {
       String[] racks, String[] nodeGroups, String[] hosts,
       long[] simulatedCapacities,
       boolean setupHostsFile) throws IOException {
-    startDataNodes(conf, numDataNodes, null, manageDfsDirs, operation, racks, nodeGroups, 
+    startDataNodes(conf, numDataNodes, null, manageDfsDirs, operation, racks, nodeGroups,
         hosts, null, simulatedCapacities, setupHostsFile, false, false);
   }
 
@@ -232,9 +234,10 @@ public class MiniDFSClusterWithNodeGroup extends MiniDFSCluster {
       long[] simulatedCapacities,
       boolean setupHostsFile,
       boolean checkDataNodeAddrConfig,
-      boolean checkDataNodeHostConfig, Configuration[] dnConfOverlays) throws IOException {
-    startDataNodes(conf, numDataNodes, storageTypes, manageDfsDirs, operation, racks, 
-        NODE_GROUPS, hosts, storageCapacities, simulatedCapacities, setupHostsFile, 
+      boolean checkDataNodeHostConfig,
+      Configuration[] dnConfOverlays) throws IOException {
+    startDataNodes(conf, numDataNodes, storageTypes, manageDfsDirs, operation, racks,
+        NODE_GROUPS, hosts, storageCapacities, simulatedCapacities, setupHostsFile,
         checkDataNodeAddrConfig, checkDataNodeHostConfig);
   }
 
