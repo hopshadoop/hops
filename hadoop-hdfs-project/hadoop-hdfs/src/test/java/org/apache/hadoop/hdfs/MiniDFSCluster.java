@@ -54,6 +54,7 @@ import org.apache.hadoop.hdfs.server.datanode.SecureDataNodeStarter.SecureResour
 import org.apache.hadoop.hdfs.server.datanode.SimulatedFSDataset;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsDatasetSpi;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsVolumeSpi;
+import org.apache.hadoop.hdfs.server.datanode.fsdataset.impl.FsDatasetUtil;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.impl.FsVolumeImpl;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
@@ -434,7 +435,7 @@ public class MiniDFSCluster {
     if (builder.storageTypes == null && builder.storageTypes1D != null) {
       assert builder.storageTypes1D.length == storagesPerDatanode;
       builder.storageTypes = new StorageType[builder.numDataNodes][storagesPerDatanode];
-
+      
       for (int i = 0; i < builder.numDataNodes; ++i) {
         builder.storageTypes[i] = builder.storageTypes1D;
       }
@@ -506,7 +507,7 @@ public class MiniDFSCluster {
   private boolean waitSafeMode = true;
   private boolean checkExitOnShutdown = true;
   protected final int storagesPerDatanode;
-
+  
   /**
    * A unique instance identifier for the cluster. This
    * is used to disambiguate HA filesystems in the case where
@@ -536,7 +537,7 @@ public class MiniDFSCluster {
    */
   public MiniDFSCluster() {
     nameNodes = new NameNodeInfo[0]; // No namenode in the cluster
-    this.storagesPerDatanode = DEFAULT_STORAGES_PER_DATANODE;
+    storagesPerDatanode = DEFAULT_STORAGES_PER_DATANODE;
     synchronized (MiniDFSCluster.class) {
       instanceId = instanceCount++;
     }
@@ -1068,7 +1069,6 @@ public class MiniDFSCluster {
         operation != StartupOption.ROLLBACK) ?
         null : new String[] {operation.getName()};
     DataNode[] dns = new DataNode[numDataNodes];
-    
     for (int i = curDatanodesNum; i < curDatanodesNum + numDataNodes; i++) {
       Configuration dnConf = new HdfsConfiguration(conf);
       if (dnConfOverlays != null) {
@@ -1153,7 +1153,8 @@ public class MiniDFSCluster {
             racks[i-curDatanodesNum]);
       }
       dn.runDatanodeDaemon();
-      dataNodes.add(new DataNodeProperties(dn, newconf, dnArgs, secureResources, dn.getIpcPort()));
+      dataNodes.add(new DataNodeProperties(dn, newconf, dnArgs,
+          secureResources, dn.getIpcPort()));
       dns[i - curDatanodesNum] = dn;
     }
     this.numDataNodes += numDataNodes;
