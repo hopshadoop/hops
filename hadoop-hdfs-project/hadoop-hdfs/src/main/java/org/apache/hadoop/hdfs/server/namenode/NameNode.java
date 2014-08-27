@@ -81,8 +81,11 @@ import java.util.Collection;
 import java.util.List;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
+import org.apache.hadoop.tracing.TraceUtils;
+import org.apache.hadoop.tracing.TracerConfigurationManager;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 import org.apache.hadoop.util.JvmPauseMonitor;
+import org.apache.htrace.core.Tracer;
 
 /**
  * ********************************************************
@@ -208,6 +211,8 @@ public class NameNode implements NameNodeStatusMXBean {
   public static final Log blockStateChangeLog =
       LogFactory.getLog("BlockStateChange");
 
+  private static final String NAMENODE_HTRACE_PREFIX = "namenode.htrace.";
+  
   protected FSNamesystem namesystem;
   protected final Configuration conf;
 
@@ -248,6 +253,9 @@ public class NameNode implements NameNodeStatusMXBean {
   private long stoTableCleanDelay = 0;
 
   private ObjectName nameNodeStatusBeanName;
+  protected final Tracer tracer;
+  protected final TracerConfigurationManager tracerConfigurationManager;
+  
   /**
    * The service name of the delegation token issued by the namenode. It is
    * the name service id in HA mode, or the rpc address in non-HA mode.
@@ -740,6 +748,11 @@ public class NameNode implements NameNodeStatusMXBean {
   }
 
   protected NameNode(Configuration conf, NamenodeRole role) throws IOException {
+    this.tracer = new Tracer.Builder("NameNode").
+      conf(TraceUtils.wrapHadoopConf(NAMENODE_HTRACE_PREFIX, conf)).
+      build();
+    this.tracerConfigurationManager =
+      new TracerConfigurationManager(NAMENODE_HTRACE_PREFIX, conf);
     this.conf = conf;
     try {
       initializeGenericKeys(conf);
@@ -790,6 +803,7 @@ public class NameNode implements NameNodeStatusMXBean {
         nameNodeStatusBeanName = null;
       }
     }
+    tracer.close();
   }
   
 

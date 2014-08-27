@@ -223,6 +223,10 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>bcpkix-jdk15on</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>org.apache.htrace</groupId>
+      <artifactId>htrace-core4</artifactId>
+    </dependency>
   </dependencies>
 
   <build>
