@@ -164,8 +164,11 @@ import org.apache.hadoop.http.HttpConfig;
 import org.apache.hadoop.http.HttpServer3;
 import org.apache.hadoop.io.nativeio.NativeIO;
 import org.apache.hadoop.net.unix.DomainSocket;
+import org.apache.hadoop.tracing.TraceUtils;
+import org.apache.hadoop.tracing.TracerConfigurationManager;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 import org.apache.hadoop.util.JvmPauseMonitor;
+import org.apache.htrace.core.Tracer;
 
 /**
  * *******************************************************
@@ -232,6 +235,7 @@ public class DataNode extends Configured
   
   static final int CURRENT_BLOCK_FORMAT_VERSION = 1;
   
+  private static final String DATANODE_HTRACE_PREFIX = "datanode.htrace.";
   /**
    * Use {@link NetUtils#createSocketAddr(String)} instead.
    */
@@ -305,6 +309,15 @@ public class DataNode extends Configured
 
   private RevocationListFetcherService revocationListFetcherService;
   
+  final Tracer tracer;
+  private final TracerConfigurationManager tracerConfigurationManager;
+
+  private static Tracer createTracer(Configuration conf) {
+    return new Tracer.Builder("DataNode").
+        conf(TraceUtils.wrapHadoopConf(DATANODE_HTRACE_PREFIX , conf)).
+        build();
+  }
+  
   /**
    * Create the DataNode given a configuration, an array of dataDirs,
    * and a namenode proxy
@@ -313,6 +326,9 @@ public class DataNode extends Configured
       final AbstractList<StorageLocation> dataDirs,
       final SecureResources resources) throws IOException {
     super(conf);
+    this.tracer = createTracer(conf);
+    this.tracerConfigurationManager =
+        new TracerConfigurationManager(DATANODE_HTRACE_PREFIX, conf);
     this.maxNumberOfBlocksToLog = conf.getLong(DFS_MAX_NUM_BLOCKS_TO_LOG_KEY,
         DFS_MAX_NUM_BLOCKS_TO_LOG_DEFAULT);
     
@@ -1565,6 +1581,7 @@ public class DataNode extends Configured
       // Notify the main thread.
       notifyAll();
     }
+    tracer.close();
   }
 
   
@@ -2002,6 +2019,7 @@ public class DataNode extends Configured
     if (localDataXceiverServer != null) {
       localDataXceiverServer.start();
     }
+    ipcServer.setTracer(tracer);
     ipcServer.start();
     startPlugins(conf);
   }
