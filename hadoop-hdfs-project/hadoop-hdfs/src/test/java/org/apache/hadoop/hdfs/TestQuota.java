@@ -190,8 +190,12 @@ public class TestQuota {
       try {
         // HOP - Write in single blocks and wait to trigger exception
         fout.write(new byte[fileLen / 2]);
+        // ensure that the first block is written out (see FSOutputSummer#flush)
+        fout.flush();
         DFSTestUtil.waitForQuotaUpdatesToBeApplied();
         fout.write(new byte[fileLen / 2]);
+        // ensure that the first block is written out (see FSOutputSummer#flush)
+        fout.flush();
         fout.close();
       } catch (QuotaExceededException e) {
         hasException = true;
@@ -675,6 +679,8 @@ public class TestQuota {
         // HOP - Write in single blocks and wait to trigger exception
         for (int i = 0; i < 2 * fileLen; i += BLOCK_SIZE) {
           fout.write(new byte[BLOCK_SIZE]);
+          // ensure that the first block is written out (see FSOutputSummer#flush)
+          fout.flush();
           DFSTestUtil.waitForQuotaUpdatesToBeApplied();
         }
         fout.close();
@@ -1108,11 +1114,15 @@ public class TestQuota {
       // Should be fast enough to violate the quota
       for (int i = 0; i < 3; i++) {
         out.write(new byte[BLOCK_SIZE]);
+        // ensure that the first block is written out (see FSOutputSummer#flush)
+        out.flush();
       }
       DFSTestUtil.waitForQuotaUpdatesToBeApplied();
       // This time should be too late to violate the quota further
       try {
         out.write(new byte[BLOCK_SIZE]);
+        // ensure that the first block is written out (see FSOutputSummer#flush)
+        out.flush();
         out.close();
         fail();
       } catch (DSQuotaExceededException e) {
