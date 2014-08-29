@@ -251,6 +251,23 @@ class FsVolumeList {
     }
   }
 
+  /**
+   * Dynamically remove volume to the list.
+   * @param volume the volume to be removed.
+   */
+  synchronized void removeVolume(String volume) {
+    // Make a copy of volumes to remove one volume.
+    final FsVolumeImpl[] curVolumes = volumes.get();
+    final List<FsVolumeImpl> volumeList = Lists.newArrayList(curVolumes);
+    for (Iterator<FsVolumeImpl> it = volumeList.iterator(); it.hasNext(); ) {
+      FsVolumeImpl fsVolume = it.next();
+      if (fsVolume.getBasePath().equals(volume)) {
+        // Make sure the removed volume is the one in the curVolumes.
+        removeVolume(fsVolume);
+      }
+    }
+  }
+
   void addBlockPool(final String bpid, final Configuration conf) throws IOException {
     long totalStartTime = Time.monotonicNow();
 

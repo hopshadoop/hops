@@ -52,6 +52,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -297,6 +299,33 @@ public class DataStorage extends Storage {
     } catch (IOException ioe) {
       sd.unlock();
       throw ioe;
+    }
+  }
+
+  /**
+   * Remove volumes from DataStorage.
+   * @param locations a collection of volumes.
+   */
+  synchronized void removeVolumes(Collection<StorageLocation> locations) {
+    if (locations.isEmpty()) {
+      return;
+    }
+
+    Set<File> dataDirs = new HashSet<File>();
+    for (StorageLocation sl : locations) {
+      dataDirs.add(sl.getFile());
+    }
+
+    for (BlockPoolSliceStorage bpsStorage : this.bpStorageMap.values()) {
+      bpsStorage.removeVolumes(dataDirs);
+    }
+
+    for (Iterator<StorageDirectory> it = this.storageDirs.iterator();
+         it.hasNext(); ) {
+      StorageDirectory sd = it.next();
+      if (dataDirs.contains(sd.getRoot())) {
+        it.remove();
+      }
     }
   }
 
