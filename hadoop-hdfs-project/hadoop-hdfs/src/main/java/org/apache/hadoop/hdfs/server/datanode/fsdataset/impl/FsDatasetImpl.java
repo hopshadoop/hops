@@ -83,9 +83,11 @@ import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import org.apache.hadoop.hdfs.ExtendedBlockId;
@@ -280,6 +282,79 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
       volumes.addVolume(fsVolume);
     }
     LOG.info("Added volume - " + dir + ", StorageType: " + storageType);
+  }
+
+  /**
+   * Add an array of StorageLocation to FsDataset.
+   *
+   * @pre dataStorage must have these volumes.
+   * @param volumes
+   * @throws IOException
+   */
+  public synchronized void addVolumes(Collection<StorageLocation> volumes)
+      throws IOException {
+    final Collection<StorageLocation> dataLocations =
+        DataNode.getStorageLocations(this.conf);
+    Map<String, Storage.StorageDirectory> allStorageDirs =
+        new HashMap<String, Storage.StorageDirectory>();
+    for (int idx = 0; idx < dataStorage.getNumStorageDirs(); idx++) {
+      Storage.StorageDirectory sd = dataStorage.getStorageDir(idx);
+      allStorageDirs.put(sd.getRoot().getAbsolutePath(), sd);
+    }
+
+    for (StorageLocation vol : volumes) {
+      String key = vol.getFile().getAbsolutePath();
+      if (!allStorageDirs.containsKey(key)) {
+        LOG.warn("Attempt to add an invalid volume: " + vol.getFile());
+      } else {
+        addVolume(dataLocations, allStorageDirs.get(key));
+      }
+    }
+  }
+
+  /**
+   * Removes a collection of volumes from FsDataset.
+   * @param volumes the root directories of the volumes.
+   *
+   * DataNode should call this function before calling
+   * {@link DataStorage#removeVolumes(java.util.Collection)}.
+   */
+  @Override
+  public synchronized void removeVolumes(Collection<StorageLocation> volumes) {
+    Set<File> volumeSet = new HashSet<File>();
+    for (StorageLocation sl : volumes) {
+      volumeSet.add(sl.getFile());
+    }
+    for (int idx = 0; idx < dataStorage.getNumStorageDirs(); idx++) {
+      Storage.StorageDirectory sd = dataStorage.getStorageDir(idx);
+      if (volumeSet.contains(sd.getRoot())) {
+        String volume = sd.getRoot().toString();
+        LOG.info("Removing " + volume + " from FsDataset.");
+
+        this.volumes.removeVolume(volume);
+        storageMap.remove(sd.getStorageUuid());
+        asyncDiskService.removeVolume(sd.getCurrentDir());
+
+        // Removed all replica information for the blocks on the volume. Unlike
+        // updating the volumeMap in addVolume(), this operation does not scan
+        // disks.
+        for (String bpid : volumeMap.getBlockPoolList()) {
+          List<Block> blocks = new ArrayList<Block>();
+          for (Iterator<ReplicaInfo> it = volumeMap.replicas(bpid).iterator();
+              it.hasNext(); ) {
+            ReplicaInfo block = it.next();
+            if (block.getVolume().getBasePath().equals(volume)) {
+              invalidate(bpid, block.getBlockId());
+              blocks.add(block);
+              it.remove();
+            }
+          }
+          // Delete blocks from the block scanner in batch.
+          datanode.getBlockScanner().deleteBlocks(bpid,
+              blocks.toArray(new Block[blocks.size()]));
+        }
+      }
+    }
   }
 
   private StorageType getStorageTypeFromLocations(
@@ -1302,6 +1377,28 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
         b.append("\n").append(i).append(") ").append(errors.get(i));
       }
       throw new IOException(b.toString());
+    }
+  }
+
+  /**
+   * Invalidate a block but does not delete the actual on-disk block file.
+   *
+   * It should only be used for decommissioning disks.
+   *
+   * @param bpid the block pool ID.
+   * @param blockId the ID of the block.
+   */
+  public void invalidate(String bpid, long blockId) {
+    // If a DFSClient has the replica in its cache of short-circuit file
+    // descriptors (and the client is using ShortCircuitShm), invalidate it.
+    // The short-circuit registry is null in the unit tests, because the
+    // datanode is mock object.
+    if (datanode.getShortCircuitRegistry() != null) {
+      datanode.getShortCircuitRegistry().processBlockInvalidation(
+          new ExtendedBlockId(blockId, bpid));
+
+      // If the block is cached, start uncaching it.
+      cacheManager.uncacheBlock(bpid, blockId);
     }
   }
 
