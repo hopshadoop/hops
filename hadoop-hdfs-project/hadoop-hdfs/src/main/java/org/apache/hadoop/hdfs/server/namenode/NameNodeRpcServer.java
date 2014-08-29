@@ -958,7 +958,8 @@ class NameNodeRpcServer implements NamenodeProtocols {
       metrics.incrStorageBlockReportOps();
     }
 
-    if(noStaleStorages) {
+    if(noStaleStorages &&
+        !namesystem.isRollingUpgradeTX()) {
       return new FinalizeCommand(poolId);
     } else {
       return null;
