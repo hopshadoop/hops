@@ -334,6 +334,8 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final int DFS_CLIENT_SOCKET_CACHE_CAPACITY_DEFAULT = 16;
   public static final String DFS_CLIENT_USE_DN_HOSTNAME =
       "dfs.client.use.datanode.hostname";
+  public static final String  DFS_CLIENT_WRITE_REPLACE_DATANODE_ON_FAILURE_BEST_EFFORT_KEY = "dfs.client.block.write.replace-datanode-on-failure.best-effort";
+  public static final boolean DFS_CLIENT_WRITE_REPLACE_DATANODE_ON_FAILURE_BEST_EFFORT_DEFAULT = false;
   public static final boolean DFS_CLIENT_USE_DN_HOSTNAME_DEFAULT = false;
   public static final String  DFS_CLIENT_CACHE_DROP_BEHIND_WRITES = "dfs.client.cache.drop.behind.writes";
   public static final String  DFS_CLIENT_CACHE_DROP_BEHIND_READS = "dfs.client.cache.drop.behind.reads";
