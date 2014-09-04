@@ -307,6 +307,8 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_BYTES_PER_CHECKSUM_KEY =
       "dfs.bytes-per-checksum";
   public static final int DFS_BYTES_PER_CHECKSUM_DEFAULT = 512;
+  public static final String  DFS_USER_HOME_DIR_PREFIX_KEY = "dfs.user.home.dir.prefix";
+  public static final String  DFS_USER_HOME_DIR_PREFIX_DEFAULT = "/user";
   public static final String DFS_CLIENT_RETRY_POLICY_ENABLED_KEY =
       "dfs.client.retry.policy.enabled";
   public static final boolean DFS_CLIENT_RETRY_POLICY_ENABLED_DEFAULT = true;
