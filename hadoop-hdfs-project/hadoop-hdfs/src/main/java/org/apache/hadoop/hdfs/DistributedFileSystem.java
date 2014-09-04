@@ -104,6 +104,8 @@ import org.apache.hadoop.net.NetUtils;
 public class DistributedFileSystem extends FileSystem {
   private Path workingDir;
   private URI uri;
+  private String homeDirPrefix =
+      DFSConfigKeys.DFS_USER_HOME_DIR_PREFIX_DEFAULT;
 
   DFSClient dfs;
   private boolean verifyChecksum = true;
@@ -138,7 +140,10 @@ public class DistributedFileSystem extends FileSystem {
     if (host == null) {
       throw new IOException("Incomplete HDFS URI, no host: "+ uri);
     }
-
+    homeDirPrefix = conf.get(
+        DFSConfigKeys.DFS_USER_HOME_DIR_PREFIX_KEY,
+        DFSConfigKeys.DFS_USER_HOME_DIR_PREFIX_DEFAULT);
+    
     this.dfs = new DFSClient(uri, conf, statistics);
     this.uri = URI.create(uri.getScheme()+"://"+uri.getAuthority());
     this.workingDir = getHomeDirectory();
@@ -169,10 +174,10 @@ public class DistributedFileSystem extends FileSystem {
     workingDir = fixRelativePart(dir);
   }
 
-
   @Override
   public Path getHomeDirectory() {
-    return makeQualified(new Path("/user/" + dfs.ugi.getShortUserName()));
+    return makeQualified(new Path(homeDirPrefix + "/"
+        + dfs.ugi.getShortUserName()));
   }
 
   /**
