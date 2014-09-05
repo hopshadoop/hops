@@ -184,7 +184,7 @@ public class TestHDFSServerPorts {
     return true;
   }
 
-  @Test
+  @Test(timeout = 300000)
   public void testNameNodePorts() throws Exception {
     runTestNameNodePorts(false);
     runTestNameNodePorts(true);
@@ -235,7 +235,7 @@ public class TestHDFSServerPorts {
   /**
    * Verify datanode port usage.
    */
-  @Test
+  @Test(timeout = 300000)
   public void testDataNodePorts() throws Exception {
     NameNode nn = null;
     try {
