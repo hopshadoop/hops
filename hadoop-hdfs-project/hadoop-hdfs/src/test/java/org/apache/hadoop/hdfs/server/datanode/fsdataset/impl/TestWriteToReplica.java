@@ -171,9 +171,10 @@ public class TestWriteToReplica {
     replicaInfo.getBlockFile().createNewFile();
     replicaInfo.getMetaFile().createNewFile();
     
-    replicasMap.add(bpid, new ReplicaInPipeline(blocks[TEMPORARY].getBlockId(),
-        blocks[TEMPORARY].getGenerationStamp(), vol,
-        vol.createTmpFile(bpid, blocks[TEMPORARY].getLocalBlock()).getParentFile()));
+    replicasMap.add(bpid, new ReplicaInPipeline(
+        blocks[TEMPORARY].getBlockId(),
+        blocks[TEMPORARY].getGenerationStamp(), vol, 
+        vol.createTmpFile(bpid, blocks[TEMPORARY].getLocalBlock()).getParentFile(), 0));
     
     replicaInfo = new ReplicaBeingWritten(blocks[RBW].getLocalBlock(), vol,
         vol.createRbwFile(bpid, blocks[RBW].getLocalBlock()).getParentFile(),

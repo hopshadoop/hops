@@ -31,19 +31,16 @@ import java.io.File;
 public class ReplicaBeingWritten extends ReplicaInPipeline {
   /**
    * Constructor for a zero length replica
-   *
-   * @param blockId
-   *     block id
-   * @param genStamp
-   *     replica generation stamp
-   * @param vol
-   *     volume where replica is located
-   * @param dir
-   *     directory path where block and meta files are located
+   * @param blockId block id
+   * @param genStamp replica generation stamp
+   * @param vol volume where replica is located
+   * @param dir directory path where block and meta files are located
+   * @param bytesToReserve disk space to reserve for this replica, based on
+   *                       the estimated maximum block length.
    */
-  public ReplicaBeingWritten(long blockId, long genStamp, FsVolumeSpi vol,
-      File dir) {
-    super(blockId, genStamp, vol, dir);
+  public ReplicaBeingWritten(long blockId, long genStamp, 
+        FsVolumeSpi vol, File dir, long bytesToReserve) {
+    super(blockId, genStamp, vol, dir, bytesToReserve);
   }
   
   /**
@@ -65,23 +62,18 @@ public class ReplicaBeingWritten extends ReplicaInPipeline {
 
   /**
    * Constructor
-   *
-   * @param blockId
-   *     block id
-   * @param len
-   *     replica length
-   * @param genStamp
-   *     replica generation stamp
-   * @param vol
-   *     volume where replica is located
-   * @param dir
-   *     directory path where block and meta files are located
-   * @param writer
-   *     a thread that is writing to this replica
+   * @param blockId block id
+   * @param len replica length
+   * @param genStamp replica generation stamp
+   * @param vol volume where replica is located
+   * @param dir directory path where block and meta files are located
+   * @param writer a thread that is writing to this replica
+   * @param bytesToReserve disk space to reserve for this replica, based on
+   *                       the estimated maximum block length.
    */
   public ReplicaBeingWritten(long blockId, long len, long genStamp,
-      FsVolumeSpi vol, File dir, Thread writer) {
-    super(blockId, len, genStamp, vol, dir, writer);
+      FsVolumeSpi vol, File dir, Thread writer, long bytesToReserve) {
+    super(blockId, len, genStamp, vol, dir, writer, bytesToReserve);
   }
 
   /**
