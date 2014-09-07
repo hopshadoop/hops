@@ -44,22 +44,26 @@ public class ReplicaInPipeline extends ReplicaInfo
   private long bytesOnDisk;
   private byte[] lastChecksum;
   private Thread writer;
+
+  /**
+   * Bytes reserved for this replica on the containing volume.
+   * Based off difference between the estimated maximum block length and
+   * the bytes already written to this block.
+   */
+  private long bytesReserved;
   
   /**
    * Constructor for a zero length replica
-   *
-   * @param blockId
-   *     block id
-   * @param genStamp
-   *     replica generation stamp
-   * @param vol
-   *     volume where replica is located
-   * @param dir
-   *     directory path where block and meta files are located
+   * @param blockId block id
+   * @param genStamp replica generation stamp
+   * @param vol volume where replica is located
+   * @param dir directory path where block and meta files are located
+   * @param bytesToReserve disk space to reserve for this replica, based on
+   *                       the estimated maximum block length.
    */
-  public ReplicaInPipeline(long blockId, long genStamp, FsVolumeSpi vol,
-      File dir) {
-    this(blockId, 0L, genStamp, vol, dir, Thread.currentThread());
+  public ReplicaInPipeline(long blockId, long genStamp, 
+        FsVolumeSpi vol, File dir, long bytesToReserve) {
+    this(blockId, 0L, genStamp, vol, dir, Thread.currentThread(), bytesToReserve);
   }
 
   /**
@@ -74,33 +78,30 @@ public class ReplicaInPipeline extends ReplicaInfo
    * @param writer
    *     a thread that is writing to this replica
    */
-  ReplicaInPipeline(Block block, FsVolumeSpi vol, File dir, Thread writer) {
-    this(block.getBlockId(), block.getNumBytes(), block.getGenerationStamp(),
-        vol, dir, writer);
+  ReplicaInPipeline(Block block, 
+      FsVolumeSpi vol, File dir, Thread writer) {
+    this( block.getBlockId(), block.getNumBytes(), block.getGenerationStamp(),
+        vol, dir, writer, 0L);
   }
 
   /**
    * Constructor
-   *
-   * @param blockId
-   *     block id
-   * @param len
-   *     replica length
-   * @param genStamp
-   *     replica generation stamp
-   * @param vol
-   *     volume where replica is located
-   * @param dir
-   *     directory path where block and meta files are located
-   * @param writer
-   *     a thread that is writing to this replica
+   * @param blockId block id
+   * @param len replica length
+   * @param genStamp replica generation stamp
+   * @param vol volume where replica is located
+   * @param dir directory path where block and meta files are located
+   * @param writer a thread that is writing to this replica
+   * @param bytesToReserve disk space to reserve for this replica, based on
+   *                       the estimated maximum block length.
    */
-  ReplicaInPipeline(long blockId, long len, long genStamp, FsVolumeSpi vol,
-      File dir, Thread writer) {
-    super(blockId, len, genStamp, vol, dir);
+  ReplicaInPipeline(long blockId, long len, long genStamp,
+      FsVolumeSpi vol, File dir, Thread writer, long bytesToReserve) {
+    super( blockId, len, genStamp, vol, dir);
     this.bytesAcked = len;
     this.bytesOnDisk = len;
     this.writer = writer;
+    this.bytesReserved = bytesToReserve;
   }
 
   /**
@@ -113,6 +114,7 @@ public class ReplicaInPipeline extends ReplicaInfo
     this.bytesAcked = from.getBytesAcked();
     this.bytesOnDisk = from.getBytesOnDisk();
     this.writer = from.writer;
+    this.bytesReserved = from.bytesReserved;
   }
 
   @Override
@@ -132,12 +134,24 @@ public class ReplicaInPipeline extends ReplicaInfo
   
   @Override // ReplicaInPipelineInterface
   public void setBytesAcked(long bytesAcked) {
+    long newBytesAcked = bytesAcked - this.bytesAcked;
     this.bytesAcked = bytesAcked;
+
+    // Once bytes are ACK'ed we can release equivalent space from the
+    // volume's reservedForRbw count. We could have released it as soon
+    // as the write-to-disk completed but that would be inefficient.
+    getVolume().releaseReservedSpace(newBytesAcked);
+    bytesReserved -= newBytesAcked;
   }
   
   @Override // ReplicaInPipelineInterface
   public long getBytesOnDisk() {
     return bytesOnDisk;
+  }
+
+  @Override
+  public long getBytesReserved() {
+    return bytesReserved;
   }
   
   @Override // ReplicaInPipelineInterface

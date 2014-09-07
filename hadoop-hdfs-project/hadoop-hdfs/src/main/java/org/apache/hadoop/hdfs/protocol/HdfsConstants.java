@@ -46,7 +46,7 @@ public class HdfsConstants {
       "org.apache.hadoop.hdfs.protocol.ClientDatanodeProtocol";
   
   
-  public static int MIN_BLOCKS_FOR_WRITE = 1;
+  public static final int MIN_BLOCKS_FOR_WRITE = 1;
 
   // Long that indicates "leave current quota unchanged"
   public static final long QUOTA_DONT_SET = Long.MAX_VALUE;
