@@ -2911,6 +2911,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
               dfsClientConf.socketTimeout);
       peer = TcpPeerServer.peerFromSocketAndKey(saslClient, sock, this,
           blockToken, datanodeId);
+      peer.setReadTimeout(dfsClientConf.socketTimeout);
       success = true;
       return peer;
     } finally {
