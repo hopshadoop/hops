@@ -179,6 +179,20 @@ Release 2.6.0 - UNRELEASED
     HDFS-6959. Make the HDFS home directory location customizable. (yzhang via
     cmccabe)
 
+    HDFS-6609. Use DirectorySnapshottableFeature to represent a snapshottable
+    directory. (Jing Zhao via wheat9)
+
+    HDFS-6886. Use single editlog record for creating file + overwrite. (Yi Liu
+    via jing9)
+
+    HDFS-6376. Distcp data between two HA clusters requires another configuration.
+    (Dave Marion and Haohui Mai via jing9)
+
+    HDFS-6940. Refactoring to allow ConsensusNode implementation. (shv)
+
+    HDFS-6943. Improve NN allocateBlock log to include replicas' datanode IPs.
+    (Ming Ma via wheat9)
+
   OPTIMIZATIONS
 
     HDFS-6690. Deduplicate xattr names in memory. (wang)
