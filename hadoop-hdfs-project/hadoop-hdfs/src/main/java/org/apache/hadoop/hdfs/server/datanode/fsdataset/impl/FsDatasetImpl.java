@@ -2077,9 +2077,18 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
     return dataStorage.trashEnabled(bpid);
   }
   
+  public void setRollingUpgradeMarker(String bpid) throws IOException {
+    dataStorage.setRollingUpgradeMarker(bpid);
+  }
+
   @Override
-  public RollingLogs createRollingLogs(String bpid, String prefix)
-      throws IOException {
+  public void clearRollingUpgradeMarker(String bpid) throws IOException {
+    dataStorage.clearRollingUpgradeMarker(bpid);
+  }
+
+  @Override
+  public RollingLogs createRollingLogs(String bpid, String prefix
+      ) throws IOException {
     String dir = null;
     final List<FsVolumeImpl> volumes = getVolumes();
     for (FsVolumeImpl vol : volumes) {
