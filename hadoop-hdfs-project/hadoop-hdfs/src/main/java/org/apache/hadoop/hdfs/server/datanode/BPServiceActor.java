@@ -312,7 +312,7 @@ class BPServiceActor implements Runnable {
 
   }
 
-  private void handleRollingUpgradeStatus(HeartbeatResponse resp) {
+  private void handleRollingUpgradeStatus(HeartbeatResponse resp) throws IOException {
     RollingUpgradeStatus rollingUpgradeStatus = resp.getRollingUpdateStatus();
     if (rollingUpgradeStatus != null &&
         rollingUpgradeStatus.getBlockPoolId().compareTo(bpos.getBlockPoolId()) != 0) {

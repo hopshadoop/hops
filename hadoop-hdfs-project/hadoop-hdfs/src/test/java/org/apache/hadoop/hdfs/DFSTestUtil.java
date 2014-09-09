@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
 import com.google.common.collect.Lists;
 import io.hops.common.INodeUtil;
@@ -69,6 +70,7 @@ import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeManager;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
+import org.apache.hadoop.hdfs.server.datanode.DataNodeLayoutVersion;
 import org.apache.hadoop.hdfs.server.datanode.TestTransferRbw;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.INode;
@@ -85,24 +87,10 @@ import org.apache.hadoop.security.ShellBasedUnixGroupsMapping;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 
-import java.io.BufferedOutputStream;
-import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.Closeable;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.PrintStream;
-import java.net.HttpURLConnection;
-import java.net.InetSocketAddress;
-import java.net.Socket;
-import java.net.URL;
-import java.net.URLConnection;
+import java.io.*;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.net.*;
 import java.nio.ByteBuffer;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
@@ -126,6 +114,7 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROU
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_KEY;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveInfo;
 import org.apache.hadoop.hdfs.protocol.CachePoolInfo;
+import org.apache.hadoop.hdfs.protocol.LayoutVersion;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsDatasetSpi;
 import org.apache.hadoop.io.nativeio.NativeIO;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -1558,5 +1547,39 @@ public class DFSTestUtil {
       DFSInputStream.tcpReadsDisabledForTesting = formerTcpReadsDisabled;
       sockDir.close();
     }
+  }
+
+  public static void addDataNodeLayoutVersion(final int lv, final String description)
+      throws NoSuchFieldException, IllegalAccessException {
+    Preconditions.checkState(lv < DataNodeLayoutVersion.CURRENT_LAYOUT_VERSION);
+
+    // Override {@link DataNodeLayoutVersion#CURRENT_LAYOUT_VERSION} via reflection.
+    Field modifiersField = Field.class.getDeclaredField("modifiers");
+    modifiersField.setAccessible(true);
+    Field field = DataNodeLayoutVersion.class.getField("CURRENT_LAYOUT_VERSION");
+    field.setAccessible(true);
+    modifiersField.setInt(field, field.getModifiers() & ~Modifier.FINAL);
+    field.setInt(null, lv);
+
+    // Override {@link HdfsConstants#DATANODE_LAYOUT_VERSION}
+    field = HdfsConstants.class.getField("DATANODE_LAYOUT_VERSION");
+    field.setAccessible(true);
+    modifiersField.setInt(field, field.getModifiers() & ~Modifier.FINAL);
+    field.setInt(null, lv);
+
+    // Inject the feature into the FEATURES map.
+    final LayoutVersion.FeatureInfo featureInfo =
+        new LayoutVersion.FeatureInfo(lv, lv + 1, description, false);
+    final LayoutVersion.LayoutFeature feature =
+        new LayoutVersion.LayoutFeature() {
+      @Override
+      public LayoutVersion.FeatureInfo getInfo() {
+        return featureInfo;
+      }
+    };
+
+    // Update the FEATURES map with the new layout version.
+    LayoutVersion.updateMap(DataNodeLayoutVersion.FEATURES,
+                            new LayoutVersion.LayoutFeature[] { feature });
   }
 }
