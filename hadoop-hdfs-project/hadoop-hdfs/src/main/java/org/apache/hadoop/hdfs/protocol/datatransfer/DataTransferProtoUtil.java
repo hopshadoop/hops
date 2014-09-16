@@ -25,12 +25,14 @@ import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.BaseHeaderProto;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.ChecksumProto;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.ClientOperationHeaderProto;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.OpWriteBlockProto;
+import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.DataTransferTraceInfoProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.ChecksumTypeProto;
 import org.apache.hadoop.hdfs.protocolPB.PBHelper;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.DataChecksum;
-
+import org.apache.htrace.core.SpanId;
+import org.apache.htrace.core.Tracer;
 
 /**
  * Static utilities for dealing with the protocol buffers used by the
@@ -77,7 +79,23 @@ public abstract class DataTransferProtoUtil {
 
   static BaseHeaderProto buildBaseHeader(ExtendedBlock blk,
       Token<BlockTokenIdentifier> blockToken) {
-    return BaseHeaderProto.newBuilder().setBlock(PBHelper.convert(blk))
-        .setToken(PBHelper.convert(blockToken)).build();
+    BaseHeaderProto.Builder builder =  BaseHeaderProto.newBuilder()
+      .setBlock(PBHelper.convert(blk))
+      .setToken(PBHelper.convert(blockToken));
+    SpanId spanId = Tracer.getCurrentSpanId();
+    if (spanId.isValid()) {
+      builder.setTraceInfo(DataTransferTraceInfoProto.newBuilder()
+          .setTraceId(spanId.getHigh())
+          .setParentId(spanId.getLow()));
+    }
+    return builder.build();
+  }
+
+  public static SpanId fromProto(DataTransferTraceInfoProto proto) {
+    if ((proto != null) && proto.hasTraceId() &&
+          proto.hasParentId()) {
+      return new SpanId(proto.getTraceId(), proto.getParentId());
+    }
+    return null;
   }
 }

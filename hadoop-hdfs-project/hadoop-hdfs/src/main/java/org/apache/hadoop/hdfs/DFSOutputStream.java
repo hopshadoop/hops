@@ -101,6 +101,10 @@ import org.apache.hadoop.fs.CanSetDropBehind;
 
 import static org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status.SUCCESS;
 import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
+import org.apache.htrace.core.Span;
+import org.apache.htrace.core.SpanId;
+import org.apache.htrace.core.TraceScope;
+import org.apache.htrace.core.Tracer;
 
 
 /**
@@ -194,6 +198,8 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
   private boolean syncOrFlushCalled = false;
   private int currentSizeOfSmallFile = 0;
 
+  private static SpanId[] EMPTY = new SpanId[0];
+      
   private class Packet {
     private static final long HEART_BEAT_SEQNO = -1L;
     long seqno;               // sequencenumber of buffer in block
@@ -222,6 +228,9 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
     int checksumPos;
     final int dataStart;
     int dataPos;
+    private SpanId[] traceParents =  new SpanId[0];
+    private int traceParentsUsed;
+    private TraceScope scope;
 
     /**
      * Create a heartbeat packet.
@@ -340,6 +349,76 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
               " lastPacketInBlock:" + this.lastPacketInBlock +
               " lastByteOffsetInBlock: " + this.getLastByteOffsetBlock();
     }
+    
+  /**
+   * Add a trace parent span for this packet.<p/>
+   *
+   * Trace parent spans for a packet are the trace spans responsible for
+   * adding data to that packet.  We store them as an array of longs for
+   * efficiency.<p/>
+   *
+   * Protected by the DFSOutputStream dataQueue lock.
+   */
+  public void addTraceParent(Span span) {
+    if (span == null) {
+      return;
+    }
+    addTraceParent(span.getSpanId());
+  }
+
+  public void addTraceParent(SpanId id) {
+    if (!id.isValid()) {
+      return;
+    }
+    if (traceParentsUsed == traceParents.length) {
+      int newLength = (traceParents.length == 0) ? 8 :
+          traceParents.length * 2;
+      traceParents = Arrays.copyOf(traceParents, newLength);
+    }
+    traceParents[traceParentsUsed] = id;
+    traceParentsUsed++;
+  }
+
+  /**
+   * Get the trace parent spans for this packet.<p/>
+   *
+   * Will always be non-null.<p/>
+   *
+   * Protected by the DFSOutputStream dataQueue lock.
+   */
+  public SpanId[] getTraceParents() {
+    // Remove duplicates from the array.
+    int len = traceParentsUsed;
+    Arrays.sort(traceParents, 0, len);
+    int i = 0, j = 0;
+    SpanId prevVal = SpanId.INVALID;
+    while (true) {
+      if (i == len) {
+        break;
+      }
+      SpanId val = traceParents[i];
+      if (!val.equals(prevVal)) {
+        traceParents[j] = val;
+        j++;
+        prevVal = val;
+      }
+      i++;
+    }
+    if (j < traceParents.length) {
+      traceParents = Arrays.copyOf(traceParents, j);
+      traceParentsUsed = traceParents.length;
+    }
+    return traceParents;
+  }
+
+  public void setTraceScope(TraceScope scope) {
+    this.scope = scope;
+  }
+
+  public TraceScope getTraceScope() {
+    return scope;
+  }
+
   }
 
   //
@@ -436,7 +515,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
      *     if error occurs
      */
     private DataStreamer(LocatedBlock lastBlock, HdfsFileStatus stat,
-                         int bytesPerChecksum) throws IOException {
+        int bytesPerChecksum) throws IOException {
       isAppend = true;
       stage = BlockConstructionStage.PIPELINE_SETUP_APPEND;
       block = lastBlock.getBlock();
@@ -530,6 +609,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
     @Override
     public void run() {
       long lastPacket = Time.now();
+      TraceScope scope = null;
       while (!streamerClosed && dfsClient.clientRunning) {
 
         // if the Responder encountered an error, shutdown Responder
@@ -583,6 +663,12 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
               one = new Packet(checksum.getChecksumSize());  // heartbeat packet
             } else {
               one = dataQueue.getFirst(); // regular data packet
+              SpanId[] parents = one.getTraceParents();
+              if (parents.length > 0) {
+                scope = dfsClient.getTracer().
+                    newScope("dataStreamer", parents[0]);
+                scope.getSpan().setParents(parents);
+              }
             }
           }
           assert one != null;
@@ -641,9 +727,16 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
           }
 
           // send the packet
+          SpanId spanId = SpanId.INVALID;
           synchronized (dataQueue) {
             // move packet from dataQueue to ackQueue
             if (!one.isHeartbeatPacket()) {
+              if (scope != null) {
+                spanId = scope.getSpanId();
+                scope.detach();
+                one.setTraceScope(scope);
+              }
+              scope = null;
               dataQueue.removeFirst();
               ackQueue.addLast(one);
               dataQueue.notifyAll();
@@ -656,7 +749,8 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
           }
 
           // write out data to remote datanode
-          try {
+          try (TraceScope ignored = dfsClient.getTracer().
+              newScope("DataStreamer#writeTo", spanId)) {
             one.writeTo(blockStream);
             blockStream.flush();
           } catch (IOException e) {
@@ -716,6 +810,11 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
           if (errorIndex == -1 && restartingNodeIndex == -1) {
             // Not a datanode issue
             streamerClosed = true;
+          }
+        } finally {
+          if (scope != null) {
+            scope.close();
+            scope = null;
           }
         }
       }
@@ -1892,7 +1991,8 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
       LOG.debug("Stuffed Inode:  appending to a file stored on datanodes");
       // indicate that we are appending to an existing block
       bytesCurBlock = lastBlock.getBlockSize();
-      streamer = new DataStreamer(lastBlock, stat, checksum.getBytesPerChecksum());
+      streamer = new DataStreamer(lastBlock, stat,
+          checksum.getBytesPerChecksum());
     } else {
 
       computePacketChunkSize(dfsClient.getConf().writePacketSize, checksum.getBytesPerChecksum());
@@ -1980,7 +2080,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
       if (currentPacket == null) {
         return;
       }
-
+      currentPacket.addTraceParent(Tracer.getCurrentSpanId());
       // put it is the small files buffer
       if (canStoreFileInDB() && (currentPacket.getLastByteOffsetBlock() <= dbFileMaxSize)) {
         LOG.debug("Stuffed Inode:  Temporarily withholding the packet in a buffer for small files");
@@ -2016,6 +2116,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
 //                .getLastByteOffsetBlock() + " Max size of a file in DB: " + dbFileMaxSize);
 
         for (Packet packet : smallFileDataQueue) {
+          packet.addTraceParent(Tracer.getCurrentSpanId());
           dataQueue.addLast(packet);
           if (DFSClient.LOG.isDebugEnabled()) {
             DFSClient.LOG.debug("Queued packet " + packet.seqno);

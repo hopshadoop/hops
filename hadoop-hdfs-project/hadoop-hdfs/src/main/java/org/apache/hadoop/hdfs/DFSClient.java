@@ -181,6 +181,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.net.InetAddresses;
 import java.net.ConnectException;
+import org.apache.hadoop.fs.FsTracer;
 import org.apache.hadoop.hdfs.shortcircuit.DomainSocketFactory;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.hdfs.protocol.datatransfer.TrustedChannelResolver;
@@ -189,6 +190,8 @@ import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.DataTransferSaslUtil;
 import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.SaslDataTransferClient;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorageReport;
+import org.apache.htrace.core.TraceScope;
+import org.apache.htrace.core.Tracer;
 
 /********************************************************
  * DFSClient can connect to a Hadoop Filesystem and
@@ -209,6 +212,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
   static final int TCP_WINDOW_SIZE = 128 * 1024; // 128 KB
 
   private final Configuration conf;
+  private final Tracer tracer;
   private final Conf dfsClientConf;
   final ClientProtocol namenode;
   ClientProtocol leaderNN;
@@ -573,6 +577,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
       Configuration conf, FileSystem.Statistics stats)
     throws IOException {
     // Copy only the required DFSClient configuration
+    this.tracer = FsTracer.get(conf);
     this.dfsClientConf = new Conf(conf);
     this.shouldUseLegacyBlockReaderLocal =
         this.dfsClientConf.useLegacyBlockReaderLocal;
@@ -3040,6 +3045,29 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
   public void setNamenodes(Collection<ClientProtocol> namenodes){
     allNNs.clear();
     allNNs.addAll(namenodes);
+  }
+  
+  TraceScope newPathTraceScope(String description, String path) {
+    TraceScope scope = tracer.newScope(description);
+    if (path != null) {
+      scope.addKVAnnotation("path", path);
+    }
+    return scope;
+  }
+
+  TraceScope newSrcDstTraceScope(String description, String src, String dst) {
+    TraceScope scope = tracer.newScope(description);
+    if (src != null) {
+      scope.addKVAnnotation("src", src);
+    }
+    if (dst != null) {
+      scope.addKVAnnotation("dst", dst);
+    }
+    return scope;
+  }
+
+  Tracer getTracer() {
+    return tracer;
   }
   
 }
