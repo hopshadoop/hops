@@ -102,6 +102,10 @@ public interface FsDatasetSpi<V extends FsVolumeSpi> extends FSDatasetMBean {
    */
   public List<V> getVolumes();
 
+  /** Add an array of StorageLocation to FsDataset. */
+  public List<StorageLocation> addVolumes(List<StorageLocation> volumes,
+      final Collection<String> bpids);
+
   /** Removes a collection of volumes from FsDataset. */
   public void removeVolumes(Collection<StorageLocation> volumes);
 
