@@ -208,6 +208,25 @@ Release 2.6.0 - UNRELEASED
     HDFS-6880. Adding tracing to DataNode data transfer protocol. (iwasakims
     via cmccabe)
 
+    HDFS-7006. Test encryption zones with KMS. (Anthony Young-Garner and tucu)
+
+    HDFS-6851. Refactor EncryptionZoneWithId and EncryptionZone. (clamb via wang)
+
+    HDFS-6705. Create an XAttr that disallows the HDFS admin from accessing a
+    file. (clamb via wang)
+
+    HDFS-6843. Create FileStatus isEncrypted() method (clamb via cmccabe)
+
+    HDFS-7004. Update KeyProvider instantiation to create by URI. (wang)
+
+    HDFS-7047. Expose FileStatus#isEncrypted in libhdfs (cmccabe)
+
+    HDFS-7003. Add NFS Gateway support for reading and writing to
+    encryption zones. (clamb via wang)
+
+    HDFS-6727. Refresh data volumes on DataNode based on configuration changes
+    (Lei Xu via cmccabe)
+
   OPTIMIZATIONS
 
     HDFS-6690. Deduplicate xattr names in memory. (wang)
