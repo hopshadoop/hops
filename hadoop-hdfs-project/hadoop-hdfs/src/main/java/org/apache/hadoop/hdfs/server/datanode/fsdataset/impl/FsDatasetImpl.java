@@ -913,8 +913,8 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
   }
 
   @Override // FsDatasetSpi
-  public String recoverClose(ExtendedBlock b, long newGS, long expectedBlockLen)
-      throws IOException {
+  public synchronized String recoverClose(ExtendedBlock b, long newGS,
+      long expectedBlockLen) throws IOException {
     LOG.info("Recover failed close " + b);
     // check replica's state
     ReplicaInfo replicaInfo = recoverCheck(b, newGS, expectedBlockLen);
