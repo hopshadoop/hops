@@ -226,8 +226,6 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_MAX_OBJECTS_DEFA
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_MAX_OBJECTS_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_QUOTA_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_QUOTA_ENABLED_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RANDOMIZE_BLOCK_LOCATIONS_PER_BLOCK;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RANDOMIZE_BLOCK_LOCATIONS_PER_BLOCK_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_REPLICATION_MIN_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_REPLICATION_MIN_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_REPL_QUEUE_THRESHOLD_PCT_KEY;
@@ -499,8 +497,6 @@ public class FSNamesystem
   int slicerBatchSize;
   int slicerNbThreads;
   
-  private boolean randomizeBlockLocationsPerBlock;
-  
   private volatile AtomicBoolean forceReadTheSafeModeFromDB = new AtomicBoolean(true);
   
   /**
@@ -715,10 +711,6 @@ public class FSNamesystem
           conf.getBoolean(DFS_NAMENODE_DELEGATION_TOKEN_ALWAYS_USE_KEY,
               DFS_NAMENODE_DELEGATION_TOKEN_ALWAYS_USE_DEFAULT);
 
-      this.randomizeBlockLocationsPerBlock = conf.getBoolean(
-          DFS_NAMENODE_RANDOMIZE_BLOCK_LOCATIONS_PER_BLOCK,
-          DFS_NAMENODE_RANDOMIZE_BLOCK_LOCATIONS_PER_BLOCK_DEFAULT);
-      
       this.dtSecretManager = createDelegationTokenSecretManager(conf);
       this.dir = new FSDirectory(this, conf);
       this.cacheManager = new CacheManager(this, conf, blockManager);
@@ -1406,7 +1398,7 @@ public class FSNamesystem
             if (blocks != null && !blocks
                 .hasPhantomBlock()) { // no need to sort phantom datanodes
               blockManager.getDatanodeManager()
-                  .sortLocatedBlocks(clientMachine, blocks.getLocatedBlocks(), randomizeBlockLocationsPerBlock);
+                  .sortLocatedBlocks(clientMachine, blocks.getLocatedBlocks());
 
              // lastBlock is not part of getLocatedBlocks(), might need to sort it too
               LocatedBlock lastBlock = blocks.getLastLocatedBlock();
@@ -1414,7 +1406,7 @@ public class FSNamesystem
                 ArrayList<LocatedBlock> lastBlockList = Lists.newArrayListWithCapacity(1);
                 lastBlockList.add(lastBlock);
                 blockManager.getDatanodeManager()
-                    .sortLocatedBlocks(clientMachine, lastBlockList, randomizeBlockLocationsPerBlock);
+                    .sortLocatedBlocks(clientMachine, lastBlockList);
                   }
                 }
                 return blocks;
