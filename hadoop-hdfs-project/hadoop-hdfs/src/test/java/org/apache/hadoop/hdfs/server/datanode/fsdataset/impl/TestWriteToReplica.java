@@ -119,9 +119,8 @@ public class TestWriteToReplica {
   
   // test writeToTemporary
   @Test
-  public void testWriteToTempoary() throws Exception {
-    MiniDFSCluster cluster =
-        new MiniDFSCluster.Builder(new HdfsConfiguration()).build();
+  public void testWriteToTemporary() throws Exception {
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(new HdfsConfiguration()).build();
     try {
       cluster.waitActive();
       DataNode dn = cluster.getDataNodes().get(0);
@@ -509,5 +508,28 @@ public class TestWriteToReplica {
     }
     
     dataSet.createTemporary(StorageType.DEFAULT, blocks[NON_EXISTENT]);
+
+    try {
+      dataSet.createTemporary(StorageType.DEFAULT, blocks[NON_EXISTENT]);
+      Assert.fail("Should not have created a replica that had already been "
+          + "created " + blocks[NON_EXISTENT]);
+    } catch (Exception e) {
+      Assert.assertTrue(
+          e.getMessage().contains(blocks[NON_EXISTENT].getBlockName()));
+      Assert.assertTrue(e instanceof ReplicaAlreadyExistsException);
+    }
+
+    long newGenStamp = blocks[NON_EXISTENT].getGenerationStamp() * 10;
+    blocks[NON_EXISTENT].setGenerationStamp(newGenStamp);
+    try {
+      ReplicaInPipeline replicaInfo =
+                dataSet.createTemporary(StorageType.DEFAULT, blocks[NON_EXISTENT]);
+      Assert.assertTrue(replicaInfo.getGenerationStamp() == newGenStamp);
+      Assert.assertTrue(
+          replicaInfo.getBlockId() == blocks[NON_EXISTENT].getBlockId());
+    } catch (ReplicaAlreadyExistsException e) {
+      Assert.fail("createRbw() Should have removed the block with the older "
+          + "genstamp and replaced it with the newer one: " + blocks[NON_EXISTENT]);
+    }
   }
 }
