@@ -46,8 +46,8 @@ import com.google.common.base.Preconditions;
  * to connect to during fail-over. The first configured address is tried first,
  * and on a fail-over event the other address is tried.
  */
-public class ConfiguredFailoverProxyProvider<T> implements
-    FailoverProxyProvider<T> {
+public class ConfiguredFailoverProxyProvider<T> extends
+    AbstractNNFailoverProxyProvider<T> {
   
   private static final Log LOG =
       LogFactory.getLog(ConfiguredFailoverProxyProvider.class);
@@ -123,7 +123,7 @@ public class ConfiguredFailoverProxyProvider<T> implements
     if (current.namenode == null) {
       try {
         current.namenode = NameNodeProxies.createNonHAProxy(conf,
-            current.address, xface, ugi, false).getProxy();
+            current.address, xface, ugi, false, fallbackToSimpleAuth).getProxy();
       } catch (IOException e) {
         LOG.error("Failed to create RPC proxy to NameNode", e);
         throw new RuntimeException(e);

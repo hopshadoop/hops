@@ -787,10 +787,7 @@ public class Dispatcher {
 
     this.saslClient = new SaslDataTransferClient(
       DataTransferSaslUtil.getSaslPropertiesResolver(conf),
-      TrustedChannelResolver.getInstance(conf),
-      conf.getBoolean(
-        IPC_CLIENT_FALLBACK_TO_SIMPLE_AUTH_ALLOWED_KEY,
-        IPC_CLIENT_FALLBACK_TO_SIMPLE_AUTH_ALLOWED_DEFAULT));
+      TrustedChannelResolver.getInstance(conf), nnc.fallbackToSimpleAuth);
   }
 
   public DistributedFileSystem getDistributedFileSystem() {

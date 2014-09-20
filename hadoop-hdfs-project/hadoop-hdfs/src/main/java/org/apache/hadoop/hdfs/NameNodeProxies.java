@@ -36,6 +36,7 @@ import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -132,18 +133,41 @@ public class NameNodeProxies {
   @SuppressWarnings("unchecked")
   public static <T> ProxyAndInfo<T> createProxy(Configuration conf,
       URI nameNodeUri, Class<T> xface) throws IOException {
+    return createProxy(conf, nameNodeUri, xface, null);
+  }
+
+  /**
+   * Creates the namenode proxy with the passed protocol. This will handle
+   * creation of either HA- or non-HA-enabled proxy objects, depending upon
+   * if the provided URI is a configured logical URI.
+   *
+   * @param conf the configuration containing the required IPC
+   *        properties, client failover configurations, etc.
+   * @param nameNodeUri the URI pointing either to a specific NameNode
+   *        or to a logical nameservice.
+   * @param xface the IPC interface which should be created
+   * @param fallbackToSimpleAuth set to true or false during calls to indicate if
+   *   a secure client falls back to simple auth
+   * @return an object containing both the proxy and the associated
+   *         delegation token service it corresponds to
+   * @throws IOException if there is an error creating the proxy
+   **/
+  @SuppressWarnings("unchecked")
+  public static <T> ProxyAndInfo<T> createProxy(Configuration conf,
+      URI nameNodeUri, Class<T> xface, AtomicBoolean fallbackToSimpleAuth)
+      throws IOException {
     Class<FailoverProxyProvider<T>> failoverProxyProviderClass =
         getFailoverProxyProviderClass(conf, nameNodeUri, xface);
   
     if (failoverProxyProviderClass == null) {
       // Non-HA case
       return createNonHAProxy(conf, NameNode.getAddress(nameNodeUri), xface,
-          UserGroupInformation.getCurrentUser(), true);
+          UserGroupInformation.getCurrentUser(), true, fallbackToSimpleAuth);
     } else {
       // HA case
       FailoverProxyProvider<T> failoverProxyProvider = NameNodeProxies
           .createFailoverProxyProvider(conf, failoverProxyProviderClass, xface,
-              nameNodeUri);
+              nameNodeUri, fallbackToSimpleAuth);
       Conf config = new Conf(conf);
       T proxy = (T) RetryProxy.create(xface, failoverProxyProvider,
           RetryPolicies.failoverOnNetworkException(
@@ -169,6 +193,8 @@ public class NameNodeProxies {
    *        or to a logical nameservice.
    * @param xface the IPC interface which should be created
    * @param numResponseToDrop The number of responses to drop for each RPC call
+   * @param fallbackToSimpleAuth set to true or false during calls to indicate if
+   *   a secure client falls back to simple auth
    * @return an object containing both the proxy and the associated
    *         delegation token service it corresponds to. Will return null of the
    *         given configuration does not support HA.
@@ -177,14 +203,15 @@ public class NameNodeProxies {
   @SuppressWarnings("unchecked")
   public static <T> ProxyAndInfo<T> createProxyWithLossyRetryHandler(
       Configuration config, URI nameNodeUri, Class<T> xface,
-      int numResponseToDrop) throws IOException {
+      int numResponseToDrop, AtomicBoolean fallbackToSimpleAuth)
+      throws IOException {
     Preconditions.checkArgument(numResponseToDrop > 0);
     Class<FailoverProxyProvider<T>> failoverProxyProviderClass = 
         getFailoverProxyProviderClass(config, nameNodeUri, xface);
     if (failoverProxyProviderClass != null) { // HA case
       FailoverProxyProvider<T> failoverProxyProvider = 
           createFailoverProxyProvider(config, failoverProxyProviderClass, 
-              xface, nameNodeUri);
+              xface, nameNodeUri, fallbackToSimpleAuth);
       int delay = config.getInt(
           DFS_CLIENT_FAILOVER_SLEEPTIME_BASE_KEY,
           DFS_CLIENT_FAILOVER_SLEEPTIME_BASE_DEFAULT);
@@ -233,14 +260,36 @@ public class NameNodeProxies {
   public static <T> ProxyAndInfo<T> createNonHAProxy(
       Configuration conf, InetSocketAddress nnAddr, Class<T> xface,
       UserGroupInformation ugi, boolean withRetries) throws IOException {
+    return createNonHAProxy(conf, nnAddr, xface, ugi, withRetries, null);
+  }
+
+  /**
+   * Creates an explicitly non-HA-enabled proxy object. Most of the time you
+   * don't want to use this, and should instead use {@link NameNodeProxies#createProxy}.
+   *
+   * @param conf the configuration object
+   * @param nnAddr address of the remote NN to connect to
+   * @param xface the IPC interface which should be created
+   * @param ugi the user who is making the calls on the proxy object
+   * @param withRetries certain interfaces have a non-standard retry policy
+   * @param fallbackToSimpleAuth - set to true or false during this method to
+   *   indicate if a secure client falls back to simple auth
+   * @return an object containing both the proxy and the associated
+   *         delegation token service it corresponds to
+   * @throws IOException
+   */
+  @SuppressWarnings("unchecked")
+  public static <T> ProxyAndInfo<T> createNonHAProxy(
+      Configuration conf, InetSocketAddress nnAddr, Class<T> xface,
+      UserGroupInformation ugi, boolean withRetries,
+      AtomicBoolean fallbackToSimpleAuth) throws IOException {
     Text dtService = SecurityUtil.buildTokenService(nnAddr);
   
     T proxy;
     if (xface == ClientProtocol.class) {
       proxy = (T) createNNProxyWithClientProtocol(nnAddr, conf, ugi,
-          withRetries);
-    }
-    else if (xface == NamenodeProtocol.class) {
+          withRetries, fallbackToSimpleAuth);
+    } else if (xface == NamenodeProtocol.class) {
       proxy = (T) createNNProxyWithNamenodeProtocol(nnAddr, conf, ugi,
           withRetries);
     } else if (xface == GetUserMappingsProtocol.class) {
@@ -307,7 +356,8 @@ public class NameNodeProxies {
   
   private static ClientProtocol createNNProxyWithClientProtocol(
       InetSocketAddress address, Configuration conf, UserGroupInformation ugi,
-      boolean withRetries) throws IOException {
+      boolean withRetries, AtomicBoolean fallbackToSimpleAuth)
+      throws IOException {
     RPC.setProtocolEngine(conf, ClientNamenodeProtocolPB.class, ProtobufRpcEngine.class);
 
     final RetryPolicy defaultPolicy = 
@@ -323,8 +373,8 @@ public class NameNodeProxies {
     ClientNamenodeProtocolPB proxy = RPC.getProtocolProxy(
         ClientNamenodeProtocolPB.class, version, address, ugi, conf,
         NetUtils.getDefaultSocketFactory(conf),
-        org.apache.hadoop.ipc.Client.getTimeout(conf), defaultPolicy)
-            .getProxy();
+        org.apache.hadoop.ipc.Client.getTimeout(conf), defaultPolicy,
+        fallbackToSimpleAuth).getProxy();
 
     if (withRetries) { // create the proxy with retries
 
@@ -408,7 +458,7 @@ public class NameNodeProxies {
   @VisibleForTesting
   public static <T> FailoverProxyProvider<T> createFailoverProxyProvider(
       Configuration conf, Class<FailoverProxyProvider<T>> failoverProxyProviderClass,
-      Class<T> xface, URI nameNodeUri) throws IOException {
+      Class<T> xface, URI nameNodeUri, AtomicBoolean fallbackToSimpleAuth) throws IOException {
     Preconditions.checkArgument(
         xface.isAssignableFrom(NamenodeProtocols.class),
         "Interface %s is not a NameNode protocol", xface);
@@ -434,9 +484,8 @@ public class NameNodeProxies {
   }
 
   @SuppressWarnings("unchecked")
-  public static <T> ProxyAndInfo<T> createHopsRandomStickyProxy(Configuration conf,
-                                                                URI nameNodeUri,
-                                                                Class<T> xface) throws IOException {
+  public static <T> ProxyAndInfo<T> createHopsRandomStickyProxy(Configuration conf, URI nameNodeUri, Class<T> xface,
+      AtomicBoolean fallbackToSimpleAuth) throws IOException {
 
     String failoverProxyProviderClassStr =
             "org.apache.hadoop.hdfs.server.namenode.ha.HopsRandomStickyFailoverProxyProvider";
@@ -447,7 +496,7 @@ public class NameNodeProxies {
 
     FailoverProxyProvider<T> failoverProxyProvider = NameNodeProxies
             .createFailoverProxyProvider(conf, failoverProxyProviderClass, xface,
-                    nameNodeUri);
+                    nameNodeUri, fallbackToSimpleAuth);
     Conf config = new Conf(conf);
 
     final RetryPolicy defaultPolicy =
@@ -475,9 +524,8 @@ public class NameNodeProxies {
     return new ProxyAndInfo<T>(proxy, dtService);
   }
 
-  public static <T> ProxyAndInfo<T> createHopsLeaderProxy(Configuration conf,
-                                                          URI nameNodeUri,
-                                                          Class<T> xface) throws IOException {
+  public static <T> ProxyAndInfo<T> createHopsLeaderProxy(Configuration conf, URI nameNodeUri, Class<T> xface,
+      AtomicBoolean fallbackToSimpleAuth) throws IOException {
 
     String failoverProxyProviderClassStr =
             "org.apache.hadoop.hdfs.server.namenode.ha.HopsLeaderFailoverProxyProvider";
@@ -488,7 +536,7 @@ public class NameNodeProxies {
 
     FailoverProxyProvider<T> failoverProxyProvider = NameNodeProxies
             .createFailoverProxyProvider(conf, failoverProxyProviderClass, xface,
-                    nameNodeUri);
+                    nameNodeUri, fallbackToSimpleAuth);
     Conf config = new Conf(conf);
 
     final RetryPolicy defaultPolicy =

@@ -165,9 +165,8 @@ public class NamenodeFsck implements DataEncryptionKeyFactory {
   private final Configuration conf;
   private final PrintWriter out;
 
-  private BlockPlacementPolicy bpPolicy;
-  private final SaslDataTransferClient saslClient;
-  
+  private final BlockPlacementPolicy bpPolicy;
+
   /**
    * Filesystem checker.
    *
@@ -201,12 +200,6 @@ public class NamenodeFsck implements DataEncryptionKeyFactory {
     this.bpPolicy = BlockPlacementPolicy.getInstance(conf, null,
         networktopology, namenode.getNamesystem().getBlockManager().getDatanodeManager()
           .getHost2DatanodeMap());
-    this.saslClient = new SaslDataTransferClient(
-        DataTransferSaslUtil.getSaslPropertiesResolver(conf),
-        TrustedChannelResolver.getInstance(conf),
-      conf.getBoolean(
-        IPC_CLIENT_FALLBACK_TO_SIMPLE_AUTH_ALLOWED_KEY,
-        IPC_CLIENT_FALLBACK_TO_SIMPLE_AUTH_ALLOWED_DEFAULT));
         
     for (String key : pmap.keySet()) {
       if (key.equals("path")) {
@@ -641,8 +634,8 @@ public class NamenodeFsck implements DataEncryptionKeyFactory {
    * bad. Both places should be refactored to provide a method to copy blocks
    * around.
    */
-  private void copyBlock(DFSClient dfs, LocatedBlock lblock, OutputStream fos)
-      throws Exception {
+  private void copyBlock(final DFSClient dfs, LocatedBlock lblock,
+                         OutputStream fos) throws Exception {
     int failures = 0;
     InetSocketAddress targetAddr = null;
     TreeSet<DatanodeInfo> deadNodes = new TreeSet<>();
@@ -700,8 +693,9 @@ public class NamenodeFsck implements DataEncryptionKeyFactory {
                 try {
                   s.connect(addr, HdfsServerConstants.READ_TIMEOUT);
                   s.setSoTimeout(HdfsServerConstants.READ_TIMEOUT);
-                  peer = TcpPeerServer.peerFromSocketAndKey(saslClient, s,
-                        NamenodeFsck.this, blockToken, datanodeId);
+                  peer = TcpPeerServer.peerFromSocketAndKey(
+                        dfs.getSaslDataTransferClient(), s, NamenodeFsck.this,
+                        blockToken, datanodeId);
                 } finally {
                   if (peer == null) {
                     IOUtils.closeQuietly(s);
