@@ -55,6 +55,7 @@ import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -109,7 +110,8 @@ public class NameNodeConnector implements Closeable {
   final NamenodeProtocol namenode;
   final ClientProtocol client;
   private final KeyManager keyManager;
-  
+  final AtomicBoolean fallbackToSimpleAuth = new AtomicBoolean(false);
+
   final DistributedFileSystem fs;
   private final Path idPath;
   final OutputStream out;
@@ -125,8 +127,9 @@ public class NameNodeConnector implements Closeable {
     this.targetPaths = targetPaths == null || targetPaths.isEmpty() ? Arrays.asList(new Path("/")) : targetPaths;
 
     this.namenode = NameNodeProxies.createProxy(conf, nameNodeUri, NamenodeProtocol.class).getProxy();
-    this.client = NameNodeProxies.createProxy(conf, nameNodeUri, ClientProtocol.class).getProxy();
-    this.fs = (DistributedFileSystem) FileSystem.get(nameNodeUri, conf);
+    this.client = NameNodeProxies.createProxy(conf, nameNodeUri,
+        ClientProtocol.class, fallbackToSimpleAuth).getProxy();
+    this.fs = (DistributedFileSystem)FileSystem.get(nameNodeUri, conf);
 
     final NamespaceInfo namespaceinfo = namenode.versionRequest();
     this.blockpoolID = namespaceinfo.getBlockPoolID();

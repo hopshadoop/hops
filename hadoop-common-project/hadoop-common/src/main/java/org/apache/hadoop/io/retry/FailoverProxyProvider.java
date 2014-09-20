@@ -29,7 +29,7 @@ import org.apache.hadoop.classification.InterfaceStability;
  * {@link RetryPolicy}.
  */
 @InterfaceStability.Evolving
-public interface FailoverProxyProvider<T> extends Closeable {
+public interface FailoverProxyProvider<T> extends Closeable {  
   public static final class ProxyInfo<T> {
     public final T proxy;
     /*

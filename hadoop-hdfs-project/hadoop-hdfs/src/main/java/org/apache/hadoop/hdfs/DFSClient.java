@@ -87,6 +87,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -607,13 +608,15 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
         DFSConfigKeys.DFS_CLIENT_TEST_DROP_NAMENODE_RESPONSE_NUM_KEY,
         DFSConfigKeys.DFS_CLIENT_TEST_DROP_NAMENODE_RESPONSE_NUM_DEFAULT);
     NameNodeProxies.ProxyAndInfo<ClientProtocol> proxyInfo = null;
+    AtomicBoolean nnFallbackToSimpleAuth = new AtomicBoolean(false);
     if (numResponseToDrop > 0) {
       // This case is used for testing.
       LOG.warn(DFSConfigKeys.DFS_CLIENT_TEST_DROP_NAMENODE_RESPONSE_NUM_KEY
           + " is set to " + numResponseToDrop
           + ", this hacked client will proactively drop responses");
       proxyInfo = NameNodeProxies.createProxyWithLossyRetryHandler(conf,
-          nameNodeUri, ClientProtocol.class, numResponseToDrop);
+          nameNodeUri, ClientProtocol.class, numResponseToDrop,
+          nnFallbackToSimpleAuth);
     }
 
     if (proxyInfo != null) {
@@ -630,7 +633,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
       Preconditions.checkArgument(nameNodeUri != null,
           "null URI");
       proxyInfo = NameNodeProxies.createHopsRandomStickyProxy(conf, nameNodeUri,
-          ClientProtocol.class);
+          ClientProtocol.class, nnFallbackToSimpleAuth);
       this.dtService = proxyInfo.getDelegationTokenService();
       this.namenode = proxyInfo.getProxy();
 
@@ -638,11 +641,11 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
         try {
           List<ActiveNode> anns = namenode.getActiveNamenodesForClient().getSortedActiveNodes();
           leaderNN = NameNodeProxies.createHopsLeaderProxy(conf, nameNodeUri,
-                  ClientProtocol.class).getProxy();
+                  ClientProtocol.class, nnFallbackToSimpleAuth).getProxy();
 
           for (ActiveNode an : anns) {
             allNNs.add(NameNodeProxies.createNonHAProxy(conf, an.getRpcServerAddressForClients(),
-                    ClientProtocol.class, ugi, false).getProxy());
+                    ClientProtocol.class, ugi, false, nnFallbackToSimpleAuth).getProxy());
           }
         } catch (ConnectException e){
           LOG.warn("Namenode proxy is null");
@@ -687,11 +690,8 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
       this.initThreadsNumForHedgedReads(numThreads);
     }
     this.saslClient = new SaslDataTransferClient(
-        DataTransferSaslUtil.getSaslPropertiesResolver(conf),
-      TrustedChannelResolver.getInstance(conf),
-      conf.getBoolean(
-        IPC_CLIENT_FALLBACK_TO_SIMPLE_AUTH_ALLOWED_KEY,
-        IPC_CLIENT_FALLBACK_TO_SIMPLE_AUTH_ALLOWED_DEFAULT));
+      DataTransferSaslUtil.getSaslPropertiesResolver(conf),
+      TrustedChannelResolver.getInstance(conf), nnFallbackToSimpleAuth);
   }
   
   /**
@@ -3070,4 +3070,12 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     return tracer;
   }
   
+  /**
+   * Returns the SaslDataTransferClient configured for this DFSClient.
+   *
+   * @return SaslDataTransferClient configured for this DFSClient
+   */
+  public SaslDataTransferClient getSaslDataTransferClient() {
+    return saslClient;
+  }
 }

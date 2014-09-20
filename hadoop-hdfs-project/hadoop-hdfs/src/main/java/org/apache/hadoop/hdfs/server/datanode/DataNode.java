@@ -104,6 +104,7 @@ import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.DNS;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.AccessControlException;
+import org.apache.hadoop.security.SaslPropertiesResolver;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
@@ -983,9 +984,7 @@ public class DataNode extends ReconfigurableBase
    * @throws IOException
    */
   void startDataNode(Configuration conf, AbstractList<StorageLocation> dataDirs,
-      SecureResources resources) throws IOException {
-    
-    checkSecureConfig(conf, resources);
+      SecureResources resources) throws IOException {  
 
     // settings global for all BPs in the Data Node
     this.secureResources = resources;
@@ -994,6 +993,7 @@ public class DataNode extends ReconfigurableBase
     }
     this.conf = conf;
     this.dnConf = new DNConf(conf);
+    checkSecureConfig(dnConf, conf, resources);
 
     if (dnConf.maxLockedMemory > 0) {
       if (!NativeIO.POSIX.getCacheManipulator().verifyCanMlock()) {
@@ -1051,10 +1051,7 @@ public class DataNode extends ReconfigurableBase
     // exit without having to explicitly shutdown its thread pool.
     readaheadPool = ReadaheadPool.getInstance();
     saslClient = new SaslDataTransferClient(dnConf.saslPropsResolver,
-      dnConf.trustedChannelResolver,
-      conf.getBoolean(
-        IPC_CLIENT_FALLBACK_TO_SIMPLE_AUTH_ALLOWED_KEY,
-        IPC_CLIENT_FALLBACK_TO_SIMPLE_AUTH_ALLOWED_DEFAULT));
+      dnConf.trustedChannelResolver);
     saslServer = new SaslDataTransferServer(dnConf, blockPoolTokenSecretManager);
   }
   
@@ -1074,23 +1071,24 @@ public class DataNode extends ReconfigurableBase
    * must check if the target port is a privileged port, and if so, skip the
    * SASL handshake.
    *
+   * @param dnConf DNConf to check
    * @param conf Configuration to check
    * @param resources SecuredResources obtained for DataNode
    * @throws RuntimeException if security enabled, but configuration is insecure
    */
-  private static void checkSecureConfig(Configuration conf,
+  private static void checkSecureConfig(DNConf dnConf, Configuration conf,
       SecureResources resources) throws RuntimeException {
     if (!UserGroupInformation.isSecurityEnabled()) {
       return;
     }
-    String dataTransferProtection = conf.get(DFS_DATA_TRANSFER_PROTECTION_KEY);
-    if (resources != null && dataTransferProtection == null) {
+    SaslPropertiesResolver saslPropsResolver = dnConf.getSaslPropsResolver();
+    if (resources != null && saslPropsResolver == null) {
       return;
     }
-    if (conf.getBoolean("ignore.secure.ports.for.testing", false)) {
+    if (dnConf.getIgnoreSecurePortsForTesting()) {
       return;
     }
-    if (dataTransferProtection != null &&
+    if (saslPropsResolver != null &&
         DFSUtil.getHttpPolicy(conf) == HttpConfig.Policy.HTTPS_ONLY &&
         resources == null) {
       return;
