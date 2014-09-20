@@ -420,9 +420,61 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
     }
   }
   
-  private final Map<String, Map<Block, BInfo>> blockMap =
-      new HashMap<>();
+  static class SimulatedVolume implements FsVolumeSpi {
+    private final SimulatedStorage storage;
+
+    SimulatedVolume(final SimulatedStorage storage) {
+      this.storage = storage;
+    }
+
+    @Override
+    public String getStorageID() {
+      return storage.getStorageUuid();
+    }
+
+    @Override
+    public String[] getBlockPoolList() {
+      return new String[0];
+    }
+
+    @Override
+    public long getAvailable() throws IOException {
+      return storage.getCapacity() - storage.getUsed();
+    }
+
+    @Override
+    public String getBasePath() {
+      return null;
+    }
+
+    @Override
+    public String getPath(String bpid) throws IOException {
+      return null;
+    }
+
+    @Override
+    public File getFinalizedDir(String bpid) throws IOException {
+      return null;
+    }
+
+    @Override
+    public StorageType getStorageType() {
+      return null;
+    }
+
+    @Override
+    public void reserveSpaceForRbw(long bytesToReserve) {
+    }
+
+    @Override
+    public void releaseReservedSpace(long bytesToRelease) {
+    }
+  }
+
+  private final Map<String, Map<Block, BInfo>> blockMap
+      = new HashMap<>();
   private final SimulatedStorage storage;
+  private final SimulatedVolume volume;
   private final String datanodeUuid;
   
   public SimulatedFSDataset(DataStorage storage,
@@ -442,6 +494,7 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
         conf.getEnum(CONFIG_PROPERTY_STATE, DEFAULT_STATE));
         this.NUM_BUCKETS = conf.getInt(DFSConfigKeys.DFS_NUM_BUCKETS_KEY,
         DFSConfigKeys.DFS_NUM_BUCKETS_DEFAULT);
+    this.volume = new SimulatedVolume(this.storage);
   }
 
   public synchronized void injectBlocks(String bpid,
@@ -1174,7 +1227,7 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
 
   @Override
   public FsVolumeSpi getVolume(ExtendedBlock b) {
-    throw new UnsupportedOperationException();
+    return volume;
   }
   
   @Override
