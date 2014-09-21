@@ -29,12 +29,14 @@ public abstract class AbstractNNFailoverProxyProvider<T> implements
   protected AtomicBoolean fallbackToSimpleAuth;
 
   /**
-   * Set for tracking if a secure client falls back to simple auth.
+   * Set for tracking if a secure client falls back to simple auth.  This method
+   * is synchronized only to stifle a Findbugs warning.
    *
    * @param fallbackToSimpleAuth - set to true or false during this method to
    *   indicate if a secure client falls back to simple auth
    */
-  public void setFallbackToSimpleAuth(AtomicBoolean fallbackToSimpleAuth) {
+  public synchronized void setFallbackToSimpleAuth(
+      AtomicBoolean fallbackToSimpleAuth) {
     this.fallbackToSimpleAuth = fallbackToSimpleAuth;
   }
 }
