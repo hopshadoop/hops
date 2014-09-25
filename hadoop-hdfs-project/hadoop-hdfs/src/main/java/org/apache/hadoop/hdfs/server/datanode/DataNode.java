@@ -31,6 +31,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.ReconfigurableBase;
 import org.apache.hadoop.conf.ReconfigurationException;
+import org.apache.hadoop.conf.ReconfigurationTaskStatus;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
@@ -313,7 +314,10 @@ public class DataNode extends ReconfigurableBase
   private boolean checkDiskErrorFlag = false;
   private Object checkDiskErrorMutex = new Object();
   private long lastDiskErrorCheck = 0;
-
+  private String supergroup;
+  private boolean isPermissionEnabled;
+  private String dnUserName = null;
+  
   private RevocationListFetcherService revocationListFetcherService;
   
   final Tracer tracer;
@@ -325,6 +329,24 @@ public class DataNode extends ReconfigurableBase
         build();
   }
   
+  /**
+   * Creates a dummy DataNode for testing purpose.
+   */
+  @VisibleForTesting
+  @InterfaceAudience.LimitedPrivate("HDFS")
+  DataNode(final Configuration conf) {
+    super(conf);
+    this.tracer = createTracer(conf);
+    this.tracerConfigurationManager =
+        new TracerConfigurationManager(DATANODE_HTRACE_PREFIX, conf);
+    this.fileDescriptorPassingDisabledReason = null;
+    this.maxNumberOfBlocksToLog = 0;
+    this.confVersion = null;
+    this.usersWithLocalPathAccess = null;
+    this.connectToDnViaHostname = false;
+    this.getHdfsBlockLocationsEnabled = false;
+  }
+
   /**
    * Create the DataNode given a configuration, an array of dataDirs,
    * and a namenode proxy
@@ -347,6 +369,11 @@ public class DataNode extends ReconfigurableBase
     this.getHdfsBlockLocationsEnabled =
         conf.getBoolean(DFSConfigKeys.DFS_HDFS_BLOCKS_METADATA_ENABLED,
             DFSConfigKeys.DFS_HDFS_BLOCKS_METADATA_ENABLED_DEFAULT);
+    this.supergroup = conf.get(DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_KEY,
+        DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT);
+    this.isPermissionEnabled = conf.getBoolean(
+        DFSConfigKeys.DFS_PERMISSIONS_ENABLED_KEY,
+        DFSConfigKeys.DFS_PERMISSIONS_ENABLED_DEFAULT);
     
     confVersion = "core-" +
         conf.get("hadoop.common.configuration.version", "UNSPECIFIED") +
@@ -470,7 +497,6 @@ public class DataNode extends ReconfigurableBase
    */
   private synchronized void refreshVolumes(String newVolumes) throws Exception {
     Configuration conf = getConf();
-    String oldVolumes = conf.get(DFS_DATANODE_DATA_DIR_KEY);
     conf.set(DFS_DATANODE_DATA_DIR_KEY, newVolumes);
     List<StorageLocation> locations = getStorageLocations(conf);
 
@@ -478,6 +504,7 @@ public class DataNode extends ReconfigurableBase
     dataDirs = locations;
     ChangedVolumes changedVolumes = parseChangedVolumes();
 
+    StringBuilder errorMessageBuilder = new StringBuilder();
     try {
       if (numOldDataDirs + changedVolumes.newLocations.size() -
           changedVolumes.deactivateLocations.size() <= 0) {
@@ -506,8 +533,13 @@ public class DataNode extends ReconfigurableBase
           // Clean all failed volumes.
           for (StorageLocation location : changedVolumes.newLocations) {
             if (!succeedVolumes.contains(location)) {
+              errorMessageBuilder.append("FAILED TO ADD:");
               failedVolumes.add(location);
+            } else {
+              errorMessageBuilder.append("ADDED:");
             }
+            errorMessageBuilder.append(location);
+            errorMessageBuilder.append("\n");
           }
           storage.removeVolumes(failedVolumes);
           data.removeVolumes(failedVolumes);
@@ -521,10 +553,12 @@ public class DataNode extends ReconfigurableBase
         data.removeVolumes(changedVolumes.deactivateLocations);
         storage.removeVolumes(changedVolumes.deactivateLocations);
       }
+
+      if (errorMessageBuilder.length() > 0) {
+        throw new IOException(errorMessageBuilder.toString());
+      }
     } catch (IOException e) {
-      LOG.warn("There is IOException when refreshing volumes! "
-          + "Recover configurations: " + DFS_DATANODE_DATA_DIR_KEY
-          + " = " + oldVolumes, e);
+      LOG.warn("There is IOException when refresh volumes! ", e);
       throw e;
     }
   }
@@ -679,6 +713,31 @@ public class DataNode extends ReconfigurableBase
         false)) {
       ipcServer.refreshServiceAcl(conf, new HDFSPolicyProvider());
     }
+  }
+  
+  /** Check whether the current user is in the superuser group. */
+  private void checkSuperuserPrivilege() throws IOException, AccessControlException {
+    if (!isPermissionEnabled) {
+      return;
+    }
+    // Try to get the ugi in the RPC call.
+    UserGroupInformation callerUgi = ipcServer.getRemoteUser();
+    if (callerUgi == null) {
+      // This is not from RPC.
+      callerUgi = UserGroupInformation.getCurrentUser();
+    }
+    // Is this by the DN user itself?
+    assert dnUserName != null;
+    if (callerUgi.getShortUserName().equals(dnUserName)) {
+      return;
+    }
+    // Is the user a member of the super group?
+    List<String> groups = Arrays.asList(callerUgi.getGroupNames());
+    if (groups.contains(supergroup)) {
+      return;
+    }
+    // Not a superuser.
+    throw new AccessControlException();
   }
   
   /**
@@ -1038,6 +1097,11 @@ public class DataNode extends ReconfigurableBase
   
     // BlockPoolTokenSecretManager is required to create ipc server.
     this.blockPoolTokenSecretManager = new BlockPoolTokenSecretManager();
+    
+    // Login is done by now. Set the DN user name.
+    dnUserName = UserGroupInformation.getCurrentUser().getShortUserName();
+    LOG.info("dnUserName = " + dnUserName);
+    LOG.info("supergroup = " + supergroup);
     initIpcServer(conf);
 
     metrics = DataNodeMetrics.create(conf, getDisplayName());
@@ -1651,6 +1715,9 @@ public class DataNode extends ReconfigurableBase
     // before the restart prep is done.
     this.shouldRun = false;
     
+    // wait reconfiguration thread, if any, to exit
+    shutdownReconfigurationTask();
+
     // wait for all data receiver threads to exit
     if (this.threadGroup != null) {
       int sleepMs = 2;
@@ -2961,6 +3028,7 @@ public class DataNode extends ReconfigurableBase
   @Override // ClientDatanodeProtocol
   public void deleteBlockPool(String blockPoolId, boolean force)
       throws IOException {
+    checkSuperuserPrivilege();
     LOG.info("deleteBlockPool command received for block pool " + blockPoolId +
         ", force=" + force);
     if (blockPoolManager.get(blockPoolId) != null) {
@@ -2976,6 +3044,7 @@ public class DataNode extends ReconfigurableBase
 
   @Override // ClientDatanodeProtocol
   public synchronized void shutdownDatanode(boolean forUpgrade) throws IOException {
+    checkSuperuserPrivilege();
     LOG.info("shutdownDatanode command received (upgrade=" + forUpgrade +
         "). Shutting down Datanode...");
 
@@ -3010,7 +3079,19 @@ public class DataNode extends ReconfigurableBase
     return new DatanodeLocalInfo(VersionInfo.getVersion(),
         confVersion, uptime);
   }
-  
+
+  @Override // ClientDatanodeProtocol
+  public void startReconfiguration() throws IOException {
+    checkSuperuserPrivilege();
+    startReconfigurationTask();
+  }
+
+  @Override // ClientDatanodeProtocol
+  public ReconfigurationTaskStatus getReconfigurationStatus() throws IOException {
+    checkSuperuserPrivilege();
+    return getReconfigurationTaskStatus();
+  }
+
   /**
    * @param addr
    *     rpc address of the namenode

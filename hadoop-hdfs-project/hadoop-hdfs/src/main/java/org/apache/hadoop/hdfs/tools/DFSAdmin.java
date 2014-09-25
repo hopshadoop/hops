@@ -17,11 +17,14 @@
  */
 package org.apache.hadoop.hdfs.tools;
 
+import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.conf.ReconfigurationTaskStatus;
+import org.apache.hadoop.conf.ReconfigurationUtil.PropertyChange;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FsShell;
@@ -60,8 +63,10 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.TreeSet;
 import org.apache.hadoop.hdfs.protocol.DatanodeLocalInfo;
 import org.apache.hadoop.hdfs.protocol.RollingUpgradeInfo;
@@ -384,6 +389,7 @@ public class DFSAdmin extends FsShell {
     "\t[-refreshSuperUserGroupsConfiguration]\n" +
     "\t[-refreshCallQueue]\n" +
     "\t[-refresh <host:ipc_port> <key> [arg1..argn]\n" +
+    "\t[-reconfig <datanode|...> <host:ipc_port> <start|status>]\n" +
     "\t[-printTopology]\n" +
     "\t[-refreshNamenodes datanode_host:ipc_port]\n"+
     "\t[-deleteBlockPool datanode_host:ipc_port blockpoolId [force]]\n"+
@@ -685,6 +691,11 @@ public class DFSAdmin extends FsShell {
     String refreshSuperUserGroupsConfiguration =
         "-refreshSuperUserGroupsConfiguration: Refresh superuser proxy groups mappings\n";
 
+    String reconfig = "-reconfig <datanode|...> <host:ipc_port> <start|status>:\n" +
+        "\tStarts reconfiguration or gets the status of an ongoing reconfiguration.\n" +
+        "\tThe second parameter specifies the node type.\n" +
+        "\tCurrently, only reloading DataNode's configuration is supported.\n";
+    
     String printTopology =
         "-printTopology: Print a tree of the racks and their\n" +
             "\t\tnodes as reported by the Namenode\n";
@@ -750,6 +761,8 @@ public class DFSAdmin extends FsShell {
       System.out.println(refreshUserToGroupsMappings);
     } else if ("refreshSuperUserGroupsConfiguration".equals(cmd)) {
       System.out.println(refreshSuperUserGroupsConfiguration);
+    } else if ("reconfig".equals(cmd)) {
+      System.out.println(reconfig);
     } else if ("printTopology".equals(cmd)) {
       System.out.println(printTopology);
     } else if ("deleteBlockPool".equals(cmd)) {
@@ -779,6 +792,7 @@ public class DFSAdmin extends FsShell {
       System.out.println(refreshServiceAcl);
       System.out.println(refreshUserToGroupsMappings);
       System.out.println(refreshSuperUserGroupsConfiguration);
+      System.out.println(reconfig);
       System.out.println(printTopology);
       System.out.println(deleteBlockPool);
       System.out.println(setBalancerBandwidth);
@@ -927,6 +941,75 @@ public class DFSAdmin extends FsShell {
     return 0;
   }
 
+  public int reconfig(String[] argv, int i) throws IOException {
+    String nodeType = argv[i];
+    String address = argv[i + 1];
+    String op = argv[i + 2];
+    if ("start".equals(op)) {
+      return startReconfiguration(nodeType, address);
+    } else if ("status".equals(op)) {
+      return getReconfigurationStatus(nodeType, address, System.out, System.err);
+    }
+    System.err.println("Unknown operation: " + op);
+    return -1;
+  }
+
+  int startReconfiguration(String nodeType, String address) throws IOException {
+    if ("datanode".equals(nodeType)) {
+      ClientDatanodeProtocol dnProxy = getDataNodeProxy(address);
+      dnProxy.startReconfiguration();
+      System.out.println("Started reconfiguration task on DataNode " + address);
+    } else {
+      System.err.println("Node type " + nodeType +
+          " does not support reconfiguration.");
+    }
+    return -1;
+  }
+
+  int getReconfigurationStatus(String nodeType, String address,
+      PrintStream out, PrintStream err) throws IOException {
+    if ("datanode".equals(nodeType)) {
+      ClientDatanodeProtocol dnProxy = getDataNodeProxy(address);
+      try {
+        ReconfigurationTaskStatus status = dnProxy.getReconfigurationStatus();
+        out.print("Reconfiguring status for DataNode[" + address + "]: ");
+        if (!status.hasTask()) {
+          out.println("no task was found.");
+          return 0;
+        }
+        out.print("started at " + new Date(status.getStartTime()));
+        if (!status.stopped()) {
+          out.println(" and is still running.");
+          return 0;
+        }
+
+        out.println(" and finished at " +
+            new Date(status.getEndTime()).toString() + ".");
+        for (Map.Entry<PropertyChange, Optional<String>> result :
+            status.getStatus().entrySet()) {
+          if (!result.getValue().isPresent()) {
+            out.print("SUCCESS: ");
+          } else {
+            out.print("FAILED: ");
+          }
+          out.printf("Change property %s\n\tFrom: \"%s\"\n\tTo: \"%s\"\n",
+              result.getKey().prop, result.getKey().oldVal,
+              result.getKey().newVal);
+          if (result.getValue().isPresent()) {
+            out.println("\tError: " + result.getValue().get() + ".");
+          }
+        }
+      } catch (IOException e) {
+        err.println("DataNode reloading configuration: " + e + ".");
+        return -1;
+      }
+    } else {
+      err.println("Node type " + nodeType + " does not support reconfiguration.");
+      return -1;
+    }
+    return 0;
+  }
+
   /**
    * Displays format of commands.
    *
@@ -963,8 +1046,11 @@ public class DFSAdmin extends FsShell {
       System.err
           .println("Usage: hdfs dfsadmin" + " [-refreshUserToGroupsMappings]");
     } else if ("-refreshSuperUserGroupsConfiguration".equals(cmd)) {
-      System.err.println(
-          "Usage: hdfs dfsadmin" + " [-refreshSuperUserGroupsConfiguration]");
+      System.err.println("Usage: hdfs dfsadmin"
+                         + " [-refreshSuperUserGroupsConfiguration]");
+    } else if ("-reconfig".equals(cmd)) {
+      System.err.println("Usage: java DFSAdmin"
+                         + " [-reconfig <datanode|...> <host:port> <start|status>]");
     } else if ("-printTopology".equals(cmd)) {
       System.err.println("Usage: hdfs dfsadmin" + " [-printTopology]");
     } else if ("-deleteBlockPool".equals(cmd)) {
@@ -1047,6 +1133,11 @@ public class DFSAdmin extends FsShell {
       }
     } else if ("-printTopology".equals(cmd)) {
       if (argv.length != 1) {
+        printUsage(cmd);
+        return exitCode;
+      }
+    } else if ("-reconfig".equals(cmd)) {
+      if (argv.length != 4) {
         printUsage(cmd);
         return exitCode;
       }
@@ -1135,6 +1226,8 @@ public class DFSAdmin extends FsShell {
         exitCode = shutdownDatanode(argv, i);
       } else if ("-getDatanodeInfo".equals(cmd)) {
         exitCode = getDatanodeInfo(argv, i);
+      } else if ("-reconfig".equals(cmd)) {
+        exitCode = reconfig(argv, i);
       } else if ("-help".equals(cmd)) {
         if (i < argv.length) {
           printHelp(argv[i]);
