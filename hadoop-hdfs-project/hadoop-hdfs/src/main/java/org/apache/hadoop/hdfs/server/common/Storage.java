@@ -43,6 +43,8 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
+import org.apache.hadoop.io.nativeio.NativeIO;
+import org.apache.hadoop.io.nativeio.NativeIOException;
 
 
 /**
@@ -1040,10 +1042,12 @@ public abstract class Storage extends StorageInfo {
   }
 
   public static void rename(File from, File to) throws IOException {
-    if (!from.renameTo(to)) {
-      throw new IOException(
-          "Failed to rename " + from.getCanonicalPath() + " to " +
-              to.getCanonicalPath());
+    try {
+      NativeIO.renameTo(from, to);
+    } catch (NativeIOException e) {
+      throw new IOException("Failed to rename " + from.getCanonicalPath()
+        + " to " + to.getCanonicalPath() + " due to failure in native rename. "
+        + e.toString());
     }
   }
 
