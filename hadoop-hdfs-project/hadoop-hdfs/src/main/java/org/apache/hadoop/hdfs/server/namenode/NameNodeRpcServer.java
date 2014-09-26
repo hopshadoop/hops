@@ -112,6 +112,11 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.tools.proto.GetUserMappingsProtocolProtos.GetUserMappingsProtocolService;
 import org.apache.hadoop.tools.protocolPB.GetUserMappingsProtocolPB;
 import org.apache.hadoop.tools.protocolPB.GetUserMappingsProtocolServerSideTranslatorPB;
+import org.apache.hadoop.tracing.SpanReceiverInfo;
+import org.apache.hadoop.tracing.TraceAdminPB;
+import org.apache.hadoop.tracing.TraceAdminPB.TraceAdminService;
+import org.apache.hadoop.tracing.TraceAdminProtocolPB;
+import org.apache.hadoop.tracing.TraceAdminProtocolServerSideTranslatorPB;
 import org.apache.hadoop.util.VersionInfo;
 import org.apache.hadoop.util.VersionUtil;
 
@@ -224,6 +229,11 @@ class NameNodeRpcServer implements NamenodeProtocols {
     BlockingService getUserMappingService = GetUserMappingsProtocolService
         .newReflectiveBlockingService(getUserMappingXlator);
 
+    TraceAdminProtocolServerSideTranslatorPB traceAdminXlator =
+        new TraceAdminProtocolServerSideTranslatorPB(this);
+    BlockingService traceAdminService = TraceAdminService
+        .newReflectiveBlockingService(traceAdminXlator);
+    
     WritableRpcEngine.ensureInitialized();
 
     InetSocketAddress serviceRpcAddr = nn.getServiceRpcServerAddress(conf);
@@ -258,6 +268,8 @@ class NameNodeRpcServer implements NamenodeProtocols {
           refreshUserMappingService, serviceRpcServer);
       DFSUtil.addPBProtocol(conf, GetUserMappingsProtocolPB.class,
           getUserMappingService, serviceRpcServer);
+      DFSUtil.addPBProtocol(conf, TraceAdminProtocolPB.class,
+          traceAdminService, serviceRpcServer);
 
       // Update the address with the correct port
       InetSocketAddress listenAddr = serviceRpcServer.getListenerAddress();
@@ -294,6 +306,8 @@ class NameNodeRpcServer implements NamenodeProtocols {
         refreshUserMappingService, clientRpcServer);
     DFSUtil.addPBProtocol(conf, GetUserMappingsProtocolPB.class,
         getUserMappingService, clientRpcServer);
+    DFSUtil.addPBProtocol(conf, TraceAdminProtocolPB.class,
+        traceAdminService, clientRpcServer);
 
     // set service-level authorization security policy
     if (serviceAuthEnabled =
@@ -1354,5 +1368,23 @@ class NameNodeRpcServer implements NamenodeProtocols {
   public void removeUserGroup(String userName, String groupName,
       boolean cacheOnly) throws IOException {
     namesystem.removeUserGroup(userName, groupName, cacheOnly);
+  }
+
+  @Override // TraceAdminProtocol
+  public SpanReceiverInfo[] listSpanReceivers() throws IOException {
+    namesystem.checkSuperuserPrivilege();
+    return nn.tracerConfigurationManager.listSpanReceivers();
+  }
+
+  @Override // TraceAdminProtocol
+  public long addSpanReceiver(SpanReceiverInfo info) throws IOException {
+    namesystem.checkSuperuserPrivilege();
+    return nn.tracerConfigurationManager.addSpanReceiver(info);
+  }
+
+  @Override // TraceAdminProtocol
+  public void removeSpanReceiver(long id) throws IOException {
+    namesystem.checkSuperuserPrivilege();
+    nn.tracerConfigurationManager.removeSpanReceiver(id);
   }
 }
