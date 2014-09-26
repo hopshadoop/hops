@@ -113,6 +113,9 @@ import org.apache.hadoop.security.authorize.AccessControlList;
 import org.apache.hadoop.security.ssl.RevocationListFetcherService;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
+import org.apache.hadoop.tracing.TraceAdminPB.TraceAdminService;
+import org.apache.hadoop.tracing.TraceAdminProtocolPB;
+import org.apache.hadoop.tracing.TraceAdminProtocolServerSideTranslatorPB;
 import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
@@ -122,6 +125,8 @@ import org.apache.hadoop.util.ServicePlugin;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.VersionInfo;
+import org.apache.hadoop.tracing.SpanReceiverInfo;
+import org.apache.hadoop.tracing.TraceAdminProtocol;
 import org.mortbay.util.ajax.JSON;
 
 import java.io.BufferedOutputStream;
@@ -213,7 +218,7 @@ import org.apache.htrace.core.Tracer;
 @InterfaceAudience.Private
 public class DataNode extends ReconfigurableBase
     implements InterDatanodeProtocol, ClientDatanodeProtocol,
-    DataNodeMXBean {
+        TraceAdminProtocol, DataNodeMXBean {
   public static final Log LOG = LogFactory.getLog(DataNode.class);
   
   static {
@@ -704,8 +709,16 @@ public class DataNode extends ReconfigurableBase
         new InterDatanodeProtocolServerSideTranslatorPB(this);
     service = InterDatanodeProtocolService
         .newReflectiveBlockingService(interDatanodeProtocolXlator);
-    DFSUtil
-        .addPBProtocol(conf, InterDatanodeProtocolPB.class, service, ipcServer);
+    DFSUtil.addPBProtocol(conf, InterDatanodeProtocolPB.class, service,
+        ipcServer);
+
+    TraceAdminProtocolServerSideTranslatorPB traceAdminXlator =
+        new TraceAdminProtocolServerSideTranslatorPB(this);
+    BlockingService traceAdminService = TraceAdminService
+        .newReflectiveBlockingService(traceAdminXlator);
+    DFSUtil.addPBProtocol(conf, TraceAdminProtocolPB.class, traceAdminService,
+        ipcServer);
+
     LOG.info("Opened IPC server at " + ipcServer.getListenerAddress());
 
     // set service-level authorization security policy
@@ -3239,4 +3252,22 @@ public class DataNode extends ReconfigurableBase
       return lastDiskErrorCheck;
     }
   }
+
+  @Override
+  public SpanReceiverInfo[] listSpanReceivers() throws IOException {
+    checkSuperuserPrivilege();
+    return tracerConfigurationManager.listSpanReceivers();
+  }
+
+  @Override
+  public long addSpanReceiver(SpanReceiverInfo info) throws IOException {
+    checkSuperuserPrivilege();
+    return tracerConfigurationManager.addSpanReceiver(info);
+  }
+
+  @Override
+  public void removeSpanReceiver(long id) throws IOException {
+    checkSuperuserPrivilege();
+    tracerConfigurationManager.removeSpanReceiver(id);
+}
 }
