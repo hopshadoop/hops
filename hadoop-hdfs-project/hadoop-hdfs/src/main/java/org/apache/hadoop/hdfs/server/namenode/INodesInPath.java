@@ -194,15 +194,20 @@ public class INodesInPath {
   }
 
   /**
-   * @return the whole inodes array including the null elements.
+   * @return a new array of inodes excluding the null elements introduced by
+   * snapshot path elements. E.g., after resolving path "/dir/.snapshot",
+   * {@link #inodes} is {/, dir, null}, while the returned array only contains
+   * inodes of "/" and "dir". Note the length of the returned array is always
+   * equal to {@link #capacity}.
    */
   INode[] getINodes() {
-    if (capacity < inodes.length) {
-      INode[] newNodes = new INode[capacity];
-      System.arraycopy(inodes, 0, newNodes, 0, capacity);
-      inodes = newNodes;
+    if (capacity == inodes.length) {
+      return inodes;
     }
-    return inodes;
+
+    INode[] newNodes = new INode[capacity];
+    System.arraycopy(inodes, 0, newNodes, 0, capacity);
+    return newNodes;
   }
 
   /**
@@ -223,6 +228,7 @@ public class INodesInPath {
   byte[] getLastLocalName() {
     return path[path.length - 1];
   }
+  
   /**
    * Add an INode at the end of the array
    */
