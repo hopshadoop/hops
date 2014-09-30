@@ -52,6 +52,7 @@ function print_usage(){
   echo "  groups               get the groups which users belong to"
   echo "						Use -help to see options"
   echo "  cacheadmin           configure the HDFS cache"
+  echo "  version              print the version"
   echo ""
   echo "Most commands print help when invoked w/o parameters."
 }
@@ -130,6 +131,8 @@ elif [ "$COMMAND" = "storagepolicies" ] ; then
   CLASS=org.apache.hadoop.hdfs.tools.GetStoragePolicies
 elif [ "$COMMAND" = "cacheadmin" ] ; then
   CLASS=org.apache.hadoop.hdfs.tools.CacheAdmin
+elif [ "$COMMAND" = "version" ] ; then
+  CLASS=org.apache.hadoop.util.VersionInfo
 else
   CLASS="$COMMAND"
 fi
