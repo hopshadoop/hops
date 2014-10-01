@@ -494,6 +494,32 @@ Release 2.6.0 - UNRELEASED
     HDFS-7106. Reconfiguring DataNode volumes does not release the lock files
     in removed volumes. (cnauroth via cmccabe)
 
+    HDFS-7001. Tests in TestTracing depends on the order of execution
+    (iwasakims via cmccabe)
+
+    HDFS-7132. hdfs namenode -metadataVersion command does not honor
+    configured name dirs. (Charles Lamb via wang)
+
+    HDFS-7049. TestByteRangeInputStream.testPropagatedClose fails and throw
+    NPE on branch-2. (Juan Yu via wheat9)
+
+    HDFS-7148. TestEncryptionZones#testIsEncryptedMethod fails on branch-2
+    after archival storage merge. (wang)
+
+    HDFS-7157. Using Time.now() for recording start/end time of reconfiguration
+    tasks (Lei Xu via cmccabe)
+
+    HDFS-6664. HDFS permissions guide documentation states incorrect default
+    group mapping class. (Ray Chiang via aw)
+
+    HDFS-4227. Document dfs.namenode.resource.*  (Daisuke Kobayashi via aw)
+
+    HDFS-6754. TestNamenodeCapacityReport may sometimes fail due to lack of
+    retry. (Mit Desai via kihwal)
+
+    HDFS-7172. Test data files may be checked out of git with incorrect line
+    endings, causing test failures in TestHDFSCLI. (Chris Nauroth via wheat9)
+
     BREAKDOWN OF HDFS-6134 AND HADOOP-10150 SUBTASKS AND RELATED JIRAS
   
       HDFS-6387. HDFS CLI admin tool for creating & deleting an
