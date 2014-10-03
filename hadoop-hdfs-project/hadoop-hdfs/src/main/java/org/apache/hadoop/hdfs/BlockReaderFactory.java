@@ -60,6 +60,7 @@ import org.apache.hadoop.util.Time;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
+import org.apache.htrace.core.Tracer;
 
 
 /** 
@@ -151,6 +152,11 @@ public class BlockReaderFactory implements ShortCircuitReplicaCreator {
    * Configuration to use for legacy block reader local objects, if needed.
    */
   private Configuration configuration;
+
+  /**
+   * The HTrace tracer to use.
+   */
+  private Tracer tracer;
 
   /**
    * Information about the domain socket path we should use to connect to the
@@ -263,6 +269,11 @@ public class BlockReaderFactory implements ShortCircuitReplicaCreator {
     return this;
   }
 
+  public BlockReaderFactory setTracer(Tracer tracer) {
+    this.tracer = tracer;
+    return this;
+  }
+  
   /**
    * Build a BlockReader with the given options.
    *
@@ -375,7 +386,7 @@ public class BlockReaderFactory implements ShortCircuitReplicaCreator {
     try {
       return BlockReaderLocalLegacy.newBlockReader(conf,
           userGroupInformation, configuration, fileName, block, token,
-          datanode, startOffset, length);
+          datanode, startOffset, length, tracer);
     } catch (RemoteException remoteException) {
       ioe = remoteException.unwrapRemoteException(
                 InvalidToken.class, AccessControlException.class);
@@ -437,6 +448,7 @@ public class BlockReaderFactory implements ShortCircuitReplicaCreator {
         setShortCircuitReplica(info.getReplica()).
         setVerifyChecksum(verifyChecksum).
         setCachingStrategy(cachingStrategy).
+        setTracer(tracer).
         build();
   }
 
@@ -802,12 +814,12 @@ public class BlockReaderFactory implements ShortCircuitReplicaCreator {
       return RemoteBlockReader.newBlockReader(fileName,
           block, token, startOffset, length, conf.ioBufferSize,
           verifyChecksum, clientName, peer, datanode,
-          clientContext.getPeerCache(), cachingStrategy);
+          clientContext.getPeerCache(), cachingStrategy, tracer);
     } else {
       return RemoteBlockReader2.newBlockReader(
           fileName, block, token, startOffset, length,
           verifyChecksum, clientName, peer, datanode,
-          clientContext.getPeerCache(), cachingStrategy);
+          clientContext.getPeerCache(), cachingStrategy, tracer);
     }
   }
 

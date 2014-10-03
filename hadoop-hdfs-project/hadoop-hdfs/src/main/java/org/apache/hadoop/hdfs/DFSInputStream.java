@@ -73,6 +73,9 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutorCompletionService;
 import org.apache.commons.io.IOUtils;
+import org.apache.htrace.core.SpanId;
+import org.apache.htrace.core.TraceScope;
+import org.apache.htrace.core.Tracer;
 
 /****************************************************************
  * DFSInputStream provides bytes from a named file.  It handles 
@@ -586,6 +589,7 @@ implements ByteBufferReadable, CanSetDropBehind, CanSetReadahead,
             setClientCacheContext(dfsClient.getClientContext()).
             setUserGroupInformation(dfsClient.ugi).
             setConfiguration(dfsClient.getConfiguration()).
+            setTracer(dfsClient.getTracer()).
             setEmulateHdfsClient(emulateHdfsClient).
             build();
         if(connectFailedOnce) {
@@ -840,15 +844,19 @@ implements ByteBufferReadable, CanSetDropBehind, CanSetReadahead,
   @Override
   public synchronized int read(final byte buf[], int off, int len) throws IOException {
     ReaderStrategy byteArrayReader = new ByteArrayStrategy(buf);
-
-    return readWithStrategy(byteArrayReader, off, len);
+    try (TraceScope ignored =
+          dfsClient.newPathTraceScope("DFSInputStream#byteArrayRead", src)) {
+      return readWithStrategy(byteArrayReader, off, len);
+    }
   }
 
   @Override
   public synchronized int read(final ByteBuffer buf) throws IOException {
     ReaderStrategy byteBufferReader = new ByteBufferStrategy(buf);
-
-    return readWithStrategy(byteBufferReader, 0, buf.remaining());
+    try (TraceScope ignored =
+          dfsClient.newPathTraceScope("DFSInputStream#byteBufferRead", src)){
+      return readWithStrategy(byteBufferReader, 0, buf.remaining());
+    }
   }
 
 
@@ -985,15 +993,20 @@ implements ByteBufferReadable, CanSetDropBehind, CanSetReadahead,
   private Callable<ByteBuffer> getFromOneDataNode(final DNAddrPair datanode,
       final LocatedBlock block, final long start, final long end,
       final ByteBuffer bb,
-      final Map<ExtendedBlock, Set<DatanodeInfo>> corruptedBlockMap) {
+      final Map<ExtendedBlock, Set<DatanodeInfo>> corruptedBlockMap,
+      final int hedgedReadId) {
+    final SpanId parentSpanId = Tracer.getCurrentSpanId();
     return new Callable<ByteBuffer>() {
       @Override
       public ByteBuffer call() throws Exception {
         byte[] buf = bb.array();
         int offset = bb.position();
-        actualGetFromOneDataNode(datanode, block, start, end, buf, offset,
-            corruptedBlockMap);
-        return bb;
+        try (TraceScope ignored = dfsClient.getTracer().
+            newScope("hedgedRead" + hedgedReadId, parentSpanId)) {
+          actualGetFromOneDataNode(datanode, block, start, end, buf, offset,
+              corruptedBlockMap);
+          return bb;
+        }
       }
     };
   }
@@ -1041,6 +1054,7 @@ implements ByteBufferReadable, CanSetDropBehind, CanSetReadahead,
             setClientCacheContext(dfsClient.getClientContext()).
             setUserGroupInformation(dfsClient.ugi).
             setConfiguration(dfsClient.getConfiguration()).
+            setTracer(dfsClient.getTracer()).
             setEmulateHdfsClient(emulateHdfsClient).
             build();
         int nread = reader.readAll(buf, offset, len);
@@ -1118,6 +1132,7 @@ implements ByteBufferReadable, CanSetDropBehind, CanSetReadahead,
     ArrayList<DatanodeInfo> ignored = new ArrayList<DatanodeInfo>();
     ByteBuffer bb = null;
     int len = (int) (end - start + 1);
+    int hedgedReadId = 0;
     block = getBlockAt(block.getStartOffset(), false);
     while (true) {
       // see HDFS-6591, this metric is used to verify/catch unnecessary loops
@@ -1130,7 +1145,8 @@ implements ByteBufferReadable, CanSetDropBehind, CanSetReadahead,
         chosenNode = chooseDataNode(block, ignored);
         bb = ByteBuffer.wrap(buf, offset, len);
         Callable<ByteBuffer> getFromDataNodeCallable = getFromOneDataNode(
-            chosenNode, block, start, end, bb, corruptedBlockMap);
+            chosenNode, block, start, end, bb, corruptedBlockMap,
+            hedgedReadId++);
         Future<ByteBuffer> firstRequest = hedgedService
             .submit(getFromDataNodeCallable);
         futures.add(firstRequest);
@@ -1167,7 +1183,8 @@ implements ByteBufferReadable, CanSetDropBehind, CanSetReadahead,
           }
           bb = ByteBuffer.allocate(len);
           Callable<ByteBuffer> getFromDataNodeCallable = getFromOneDataNode(
-              chosenNode, block, start, end, bb, corruptedBlockMap);
+              chosenNode, block, start, end, bb, corruptedBlockMap,
+              hedgedReadId++);
           Future<ByteBuffer> oneMoreRequest = hedgedService
               .submit(getFromDataNodeCallable);
           futures.add(oneMoreRequest);
@@ -1281,7 +1298,15 @@ implements ByteBufferReadable, CanSetDropBehind, CanSetReadahead,
    */
   @Override
   public int read(long position, byte[] buffer, int offset, int length)
-    throws IOException {
+      throws IOException {
+    try (TraceScope ignored = dfsClient.
+        newPathTraceScope("DFSInputStream#byteArrayPread", src)) {
+      return pread(position, buffer, offset, length);
+    }
+  }
+
+  private int pread(long position, byte[] buffer, int offset, int length)
+      throws IOException {
     // sanity checks
     dfsClient.checkOpen();
     if (closed) {

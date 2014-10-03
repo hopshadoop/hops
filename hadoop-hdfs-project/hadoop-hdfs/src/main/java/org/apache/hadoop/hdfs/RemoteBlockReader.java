@@ -46,6 +46,8 @@ import org.apache.hadoop.hdfs.net.Peer;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.htrace.core.TraceScope;
+import org.apache.htrace.core.Tracer;
 
 
 /**
@@ -75,10 +77,11 @@ public class RemoteBlockReader extends FSInputChecker implements BlockReader {
    */
   private long startOffset;
 
-  /**
-   * offset in block of of first chunk - may be less than startOffset
-   * if startOffset is not chunk-aligned
-   */
+  private final long blockId;
+  private final Tracer tracer;
+  
+  /** offset in block of of first chunk - may be less than startOffset
+      if startOffset is not chunk-aligned */
   private final long firstChunkOffset;
 
   private final int bytesPerChecksum;
@@ -215,8 +218,18 @@ public class RemoteBlockReader extends FSInputChecker implements BlockReader {
   }
   
   @Override
-  protected synchronized int readChunk(long pos, byte[] buf, int offset,
-      int len, byte[] checksumBuf) throws IOException {
+  protected synchronized int readChunk(long pos, byte[] buf, int offset, 
+                                       int len, byte[] checksumBuf) 
+                                       throws IOException {
+    try (TraceScope ignored = tracer.
+        newScope("RemoteBlockReader#readChunk(" + blockId + ")")) {
+      return readChunkImpl(pos, buf, offset, len, checksumBuf);
+    }
+  }
+
+  private synchronized int readChunkImpl(long pos, byte[] buf, int offset,
+                                     int len, byte[] checksumBuf)
+                                     throws IOException {
     // Read one chunk.
     if (eos) {
       // Already hit EOF
@@ -335,7 +348,7 @@ public class RemoteBlockReader extends FSInputChecker implements BlockReader {
   private RemoteBlockReader(String file, String bpid, long blockId,
       DataInputStream in, DataChecksum checksum, boolean verifyChecksum,
       long startOffset, long firstChunkOffset, long bytesToRead, Peer peer,
-      DatanodeID datanodeID, PeerCache peerCache) {
+      DatanodeID datanodeID, PeerCache peerCache, Tracer tracer) {
     // Path is used only for printing block and file information in debug
     super(new Path("/blk_" + blockId + ":" + bpid + ":of:" + file)/*too non path-like?*/,
         1, verifyChecksum, checksum.getChecksumSize() > 0 ? checksum : null,
@@ -348,7 +361,8 @@ public class RemoteBlockReader extends FSInputChecker implements BlockReader {
     this.datanodeID = datanodeID;
     this.in = in;
     this.checksum = checksum;
-    this.startOffset = Math.max(startOffset, 0);
+    this.startOffset = Math.max( startOffset, 0 );
+    this.blockId = blockId;
 
     // The total number of bytes that we need to transfer from the DN is
     // the amount that the user wants (bytesToRead), plus the padding at
@@ -363,38 +377,29 @@ public class RemoteBlockReader extends FSInputChecker implements BlockReader {
     bytesPerChecksum = this.checksum.getBytesPerChecksum();
     checksumSize = this.checksum.getChecksumSize();
     this.peerCache = peerCache;
+    this.tracer = tracer;
   }
 
   /**
    * Create a new BlockReader specifically to satisfy a read.
    * This method also sends the OP_READ_BLOCK request.
    *
-   * @param sock
-   *     An established Socket to the DN. The BlockReader will not close it
-   *     normally
-   * @param file
-   *     File location
-   * @param block
-   *     The block object
-   * @param blockToken
-   *     The block token for security
-   * @param startOffset
-   *     The read offset, relative to block head
-   * @param len
-   *     The number of bytes to read
-   * @param bufferSize
-   *     The IO buffer size (not the client buffer size)
-   * @param verifyChecksum
-   *     Whether to verify checksum
-   * @param clientName
-   *     Client name
+   * @param file  File location
+   * @param block  The block object
+   * @param blockToken  The block token for security
+   * @param startOffset  The read offset, relative to block head
+   * @param len  The number of bytes to read
+   * @param bufferSize  The IO buffer size (not the client buffer size)
+   * @param verifyChecksum  Whether to verify checksum
+   * @param clientName  Client name
    * @return New BlockReader instance, or null on error.
    */
   public static RemoteBlockReader newBlockReader(String file,
       ExtendedBlock block, Token<BlockTokenIdentifier> blockToken,
       long startOffset, long len, int bufferSize, boolean verifyChecksum,
       String clientName, Peer peer,
-      DatanodeID datanodeID, PeerCache peerCache, CachingStrategy cachingStrategy) throws IOException {
+      DatanodeID datanodeID, PeerCache peerCache, CachingStrategy cachingStrategy,
+      Tracer tracer) throws IOException {
     // in and out will be closed when sock is closed (by the caller)
     final DataOutputStream out = new DataOutputStream(new BufferedOutputStream(peer.getOutputStream()));
     new Sender(out).readBlock(block, blockToken, clientName, startOffset, len,
@@ -427,7 +432,7 @@ public class RemoteBlockReader extends FSInputChecker implements BlockReader {
 
     return new RemoteBlockReader(file, block.getBlockPoolId(),
         block.getBlockId(), in, checksum, verifyChecksum, startOffset,
-        firstChunkOffset, len, peer, datanodeID, peerCache);
+        firstChunkOffset, len, peer, datanodeID, peerCache, tracer);
   }
 
   @Override

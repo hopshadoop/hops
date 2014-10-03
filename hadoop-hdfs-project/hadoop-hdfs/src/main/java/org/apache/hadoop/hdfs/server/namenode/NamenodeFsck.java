@@ -85,6 +85,8 @@ import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.SaslDataTransferClient;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.tracing.TraceUtils;
+import org.apache.htrace.core.Tracer;
 
 /**
  * This class provides rudimentary checking of DFS volumes for errors and
@@ -134,6 +136,8 @@ public class NamenodeFsck implements DataEncryptionKeyFactory {
   private boolean showRacks = false;
   private boolean showCorruptFileBlocks = false;
 
+  private Tracer tracer;
+   
   /**
    * True if we encountered an internal error during FSCK, such as not being
    * able to delete a corrupt file.
@@ -200,7 +204,10 @@ public class NamenodeFsck implements DataEncryptionKeyFactory {
     this.bpPolicy = BlockPlacementPolicy.getInstance(conf, null,
         networktopology, namenode.getNamesystem().getBlockManager().getDatanodeManager()
           .getHost2DatanodeMap());
-        
+    this.tracer = new Tracer.Builder("NamenodeFsck").
+        conf(TraceUtils.wrapHadoopConf("namenode.fsck.htrace.", conf)).
+        build();
+
     for (String key : pmap.keySet()) {
       if (key.equals("path")) {
         this.path = pmap.get("path")[0];
@@ -678,6 +685,7 @@ public class NamenodeFsck implements DataEncryptionKeyFactory {
             setCachingStrategy(CachingStrategy.newDropBehind()).
             setClientCacheContext(dfs.getClientContext()).
             setConfiguration(namenode.conf).
+            setTracer(tracer).
             setRemotePeerFactory(new RemotePeerFactory() {
               @Override
               public SocketFactory getSocketFactory(Configuration conf) throws IOException {

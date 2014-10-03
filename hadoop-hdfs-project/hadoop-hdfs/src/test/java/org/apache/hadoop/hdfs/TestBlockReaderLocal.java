@@ -30,6 +30,7 @@ import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.fs.ChecksumException;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FsTracer;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.shortcircuit.ShortCircuitShm.ShmId;
 import org.apache.hadoop.hdfs.client.HdfsDataInputStream;
@@ -193,6 +194,7 @@ public class TestBlockReaderLocal {
           setShortCircuitReplica(replica).
           setCachingStrategy(new CachingStrategy(false, readahead)).
           setVerifyChecksum(checksum).
+          setTracer(FsTracer.get(conf)).
           build();
       dataIn = null;
       metaIn = null;

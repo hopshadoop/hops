@@ -36,6 +36,8 @@ import org.apache.hadoop.util.DataChecksum;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.htrace.core.TraceScope;
+import org.apache.htrace.core.Tracer;
 
 /**
  * BlockReaderLocal enables local short circuited reads. If the DFS client is on
@@ -66,6 +68,7 @@ class BlockReaderLocal implements BlockReader {
     private ShortCircuitReplica replica;
     private long dataPos;
     private ExtendedBlock block;
+    private Tracer tracer;
 
     public Builder(Conf conf) {
       this.maxReadahead = Integer.MAX_VALUE;
@@ -86,6 +89,11 @@ class BlockReaderLocal implements BlockReader {
       return this;
     }
 
+    public Builder setTracer(Tracer tracer) {
+      this.tracer = tracer;
+      return this;
+    }
+    
     public Builder setFilename(String filename) {
       this.filename = filename;
       return this;
@@ -209,6 +217,11 @@ class BlockReaderLocal implements BlockReader {
    */
   private ByteBuffer checksumBuf;
 
+  /**
+   * The Tracer to use.
+   */
+  private final Tracer tracer;
+
   private BlockReaderLocal(Builder builder) {
     this.replica = builder.replica;
     this.dataIn = replica.getDataStream().getChannel();
@@ -237,6 +250,7 @@ class BlockReaderLocal implements BlockReader {
       this.zeroReadaheadRequested = false;
     }
     this.maxReadaheadLength = maxReadaheadChunks * bytesPerChecksum;
+    this.tracer = builder.tracer;
   }
 
   private synchronized void createDataBufIfNeeded() {
@@ -304,48 +318,51 @@ class BlockReaderLocal implements BlockReader {
    */
   private synchronized int fillBuffer(ByteBuffer buf, boolean canSkipChecksum)
       throws IOException {
-    int total = 0;
-    long startDataPos = dataPos;
-    int startBufPos = buf.position();
-    while (buf.hasRemaining()) {
-      int nRead = dataIn.read(buf, dataPos);
-      if (nRead < 0) {
-        break;
+    try (TraceScope ignored = tracer.newScope(
+        "BlockReaderLocal#fillBuffer(" + block.getBlockId() + ")")) {
+      int total = 0;
+      long startDataPos = dataPos;
+      int startBufPos = buf.position();
+      while (buf.hasRemaining()) {
+        int nRead = dataIn.read(buf, dataPos);
+        if (nRead < 0) {
+          break;
+        }
+        dataPos += nRead;
+        total += nRead;
       }
-      dataPos += nRead;
-      total += nRead;
-    }
-    if (canSkipChecksum) {
-      freeChecksumBufIfExists();
+      if (canSkipChecksum) {
+        freeChecksumBufIfExists();
+        return total;
+      }
+      if (total > 0) {
+        try {
+          buf.limit(buf.position());
+          buf.position(startBufPos);
+          createChecksumBufIfNeeded();
+          int checksumsNeeded = (total + bytesPerChecksum - 1) / bytesPerChecksum;
+          checksumBuf.clear();
+          checksumBuf.limit(checksumsNeeded * checksumSize);
+          long checksumPos =
+              7 + ((startDataPos / bytesPerChecksum) * checksumSize);
+          while (checksumBuf.hasRemaining()) {
+            int nRead = checksumIn.read(checksumBuf, checksumPos);
+            if (nRead < 0) {
+              throw new IOException("Got unexpected checksum file EOF at " +
+                  checksumPos + ", block file position " + startDataPos + " for " +
+                  "block " + block + " of file " + filename);
+            }
+            checksumPos += nRead;
+          }
+          checksumBuf.flip();
+
+          checksum.verifyChunkedSums(buf, checksumBuf, filename, startDataPos);
+        } finally {
+          buf.position(buf.limit());
+        }
+      }
       return total;
     }
-    if (total > 0) {
-      try {
-        buf.limit(buf.position());
-        buf.position(startBufPos);
-        createChecksumBufIfNeeded();
-        int checksumsNeeded = (total + bytesPerChecksum - 1) / bytesPerChecksum;
-        checksumBuf.clear();
-        checksumBuf.limit(checksumsNeeded * checksumSize);
-        long checksumPos =
-          7 + ((startDataPos / bytesPerChecksum) * checksumSize);
-        while (checksumBuf.hasRemaining()) {
-          int nRead = checksumIn.read(checksumBuf, checksumPos);
-          if (nRead < 0) {
-            throw new IOException("Got unexpected checksum file EOF at " +
-                checksumPos + ", block file position " + startDataPos + " for " +
-                "block " + block + " of file " + filename);
-          }
-          checksumPos += nRead;
-        }
-        checksumBuf.flip();
-  
-        checksum.verifyChunkedSums(buf, checksumBuf, filename, startDataPos);
-      } finally {
-        buf.position(buf.limit());
-      }
-    }
-    return total;
   }
 
   private boolean createNoChecksumContext() {

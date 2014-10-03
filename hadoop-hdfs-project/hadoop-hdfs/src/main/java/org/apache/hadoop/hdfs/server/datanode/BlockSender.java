@@ -38,6 +38,7 @@ import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
+import org.apache.htrace.core.TraceScope;
 
 /**
  * Reads a block from the disk and sends it to a recipient.
@@ -736,8 +737,19 @@ class BlockSender implements java.io.Closeable {
    *     for sending data.
    * @return total bytes read, including checksum data.
    */
-  long sendBlock(DataOutputStream out, OutputStream baseStream,
-      DataTransferThrottler throttler) throws IOException {
+  long sendBlock(DataOutputStream out, OutputStream baseStream, 
+                 DataTransferThrottler throttler) throws IOException {
+    TraceScope scope = datanode.tracer.
+        newScope("sendBlock_" + block.getBlockId());
+    try {
+      return doSendBlock(out, baseStream, throttler);
+    } finally {
+      scope.close();
+    }
+  }
+
+  private long doSendBlock(DataOutputStream out, OutputStream baseStream,
+        DataTransferThrottler throttler) throws IOException {
     if (out == null) {
       throw new IOException("out stream is null");
     }
