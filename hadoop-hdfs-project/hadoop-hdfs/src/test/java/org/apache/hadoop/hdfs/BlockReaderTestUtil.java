@@ -53,6 +53,7 @@ import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 
 import javax.net.SocketFactory;
+import org.apache.hadoop.fs.FsTracer;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
@@ -196,6 +197,7 @@ public class BlockReaderTestUtil {
       setCachingStrategy(CachingStrategy.newDefaultStrategy()).
       setConfiguration(fs.getConf()).
       setAllowShortCircuitLocalReads(true).
+      setTracer(FsTracer.get(fs.getConf())).
       setRemotePeerFactory(new RemotePeerFactory() {
         @Override
         public SocketFactory getSocketFactory(Configuration conf) throws IOException {

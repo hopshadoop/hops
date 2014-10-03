@@ -61,6 +61,7 @@ import org.apache.hadoop.io.IOUtils;
 import org.junit.Assert;
 
 import javax.net.SocketFactory;
+import org.apache.hadoop.fs.FsTracer;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 
 import static org.junit.Assert.assertEquals;
@@ -163,6 +164,7 @@ public class TestBlockTokenWithDFS {
           setCachingStrategy(CachingStrategy.newDefaultStrategy()).
           setClientCacheContext(ClientContext.getFromConf(conf)).
           setConfiguration(conf).
+          setTracer(FsTracer.get(conf)).
           setRemotePeerFactory(new RemotePeerFactory() {
             @Override
             public SocketFactory getSocketFactory(Configuration conf) throws IOException {

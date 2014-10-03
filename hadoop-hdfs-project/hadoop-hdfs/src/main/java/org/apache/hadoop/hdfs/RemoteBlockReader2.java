@@ -52,6 +52,8 @@ import org.apache.hadoop.hdfs.net.Peer;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.htrace.core.TraceScope;
+import org.apache.htrace.core.Tracer;
 
 /**
  * This is a wrapper around connection to datanode
@@ -87,6 +89,8 @@ public class RemoteBlockReader2 implements BlockReader {
   final private Peer peer;
   final private DatanodeID datanodeID;
   final private PeerCache peerCache;
+  final private long blockId;
+  private final Tracer tracer;
   private final ReadableByteChannel in;
   private DataChecksum checksum;
   
@@ -146,10 +150,12 @@ public class RemoteBlockReader2 implements BlockReader {
         randomId.toString(), this.filename,
         this.datanodeID.getHostName()));
     }
-    
-    if (curDataSlice == null ||
-        curDataSlice.remaining() == 0 && bytesNeededToFinish > 0) {
-      readNextPacket();
+
+    if (curDataSlice == null || curDataSlice.remaining() == 0 && bytesNeededToFinish > 0) {
+      try (TraceScope ignored = tracer.
+        newScope("RemoteBlockReader2#readNextPacket(" + blockId + ")")) {
+        readNextPacket();
+      }
     }
     
     if (LOG.isTraceEnabled()) {
@@ -170,9 +176,11 @@ public class RemoteBlockReader2 implements BlockReader {
 
   @Override
   public int read(ByteBuffer buf) throws IOException {
-    if (curDataSlice == null ||
-        curDataSlice.remaining() == 0 && bytesNeededToFinish > 0) {
-      readNextPacket();
+    if (curDataSlice == null || curDataSlice.remaining() == 0 && bytesNeededToFinish > 0) {
+      try (TraceScope ignored = tracer.
+        newScope("RemoteBlockReader2#readNextPacket(" + blockId + ")")) {
+        readNextPacket();
+      }
     }
     if (curDataSlice.remaining() == 0) {
       // we're at EOF now
@@ -283,7 +291,7 @@ public class RemoteBlockReader2 implements BlockReader {
   protected RemoteBlockReader2(String file, String bpid, long blockId,
       DataChecksum checksum, boolean verifyChecksum,
       long startOffset, long firstChunkOffset, long bytesToRead, Peer peer,
-      DatanodeID datanodeID, PeerCache peerCache) {
+      DatanodeID datanodeID, PeerCache peerCache, Tracer tracer) {
     this.isLocal = DFSClient.isLocalAddress(NetUtils.
         createSocketAddr(datanodeID.getXferAddr()));
     // Path is used only for printing block and file information in debug
@@ -295,7 +303,9 @@ public class RemoteBlockReader2 implements BlockReader {
     this.startOffset = Math.max(startOffset, 0);
     this.filename = file;
     this.peerCache = peerCache;
-    
+    this.blockId = blockId;
+    this.tracer = tracer;
+
     // The total number of bytes that we need to transfer from the DN is
     // the amount that the user wants (bytesToRead), plus the padding at
     // the beginning in order to chunk-align. Note that the DN may elect
@@ -380,24 +390,13 @@ public class RemoteBlockReader2 implements BlockReader {
    * Create a new BlockReader specifically to satisfy a read.
    * This method also sends the OP_READ_BLOCK request.
    *
-   * @param sock
-   *     An established Socket to the DN. The BlockReader will not close it
-   *     normally.
-   *     This socket must have an associated Channel.
-   * @param file
-   *     File location
-   * @param block
-   *     The block object
-   * @param blockToken
-   *     The block token for security
-   * @param startOffset
-   *     The read offset, relative to block head
-   * @param len
-   *     The number of bytes to read
-   * @param verifyChecksum
-   *     Whether to verify checksum
-   * @param clientName
-   *     Client name
+   * @param file  File location
+   * @param block  The block object
+   * @param blockToken  The block token for security
+   * @param startOffset  The read offset, relative to block head
+   * @param len  The number of bytes to read
+   * @param verifyChecksum  Whether to verify checksum
+   * @param clientName  Client name
    * @param peer  The Peer to use
    * @param datanodeID  The DatanodeID this peer is connected to
    * @return New BlockReader instance, or null on error.
@@ -405,7 +404,8 @@ public class RemoteBlockReader2 implements BlockReader {
   public static BlockReader newBlockReader(String file,
       ExtendedBlock block, Token<BlockTokenIdentifier> blockToken,
       long startOffset, long len, boolean verifyChecksum,
-      String clientName, Peer peer, DatanodeID datanodeID, PeerCache peerCache, CachingStrategy cachingStrategy) throws
+      String clientName, Peer peer, DatanodeID datanodeID, PeerCache peerCache, CachingStrategy cachingStrategy,
+      Tracer tracer) throws
       IOException {
     // in and out will be closed when sock is closed (by the caller)
     final DataOutputStream out =
@@ -438,7 +438,7 @@ public class RemoteBlockReader2 implements BlockReader {
 
     return new RemoteBlockReader2(file, block.getBlockPoolId(),
         block.getBlockId(), checksum, verifyChecksum, startOffset,
-        firstChunkOffset, len, peer, datanodeID, peerCache);
+        firstChunkOffset, len, peer, datanodeID, peerCache, tracer);
   }
 
   static void checkSuccess(BlockOpResponseProto status, Peer peer,
