@@ -1949,7 +1949,7 @@ public class BlockManager {
   }
   
   public DatanodeStorageInfo[] chooseTarget4ParityRepair(String src,  int numOfReplicas,
-      DatanodeDescriptor clientnode,List<DatanodeStorageInfo> chosen, Set<Node> excludes, long blocksize,
+      Node clientnode,List<DatanodeStorageInfo> chosen, Set<Node> excludes, long blocksize,
       byte storagePolicyID) {
     final BlockStoragePolicy storagePolicy = storagePolicySuite.getPolicy(storagePolicyID);
     return blockplacement.chooseTarget(src, numOfReplicas, clientnode,

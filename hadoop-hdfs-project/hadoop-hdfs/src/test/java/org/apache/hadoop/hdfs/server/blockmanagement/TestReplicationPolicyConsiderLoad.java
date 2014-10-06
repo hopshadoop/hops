@@ -148,7 +148,7 @@ public class TestReplicationPolicyConsiderLoad {
       DatanodeStorageInfo[] targets = namenode.getNamesystem().getBlockManager()
           .getBlockPlacementPolicy().chooseTarget("testFile.txt", 3,
               writerDn, new ArrayList<DatanodeStorageInfo>(), false, null,
-              1024, TestBlockStoragePolicy.DEFAULT_STORAGE_POLICY );
+              1024, TestBlockStoragePolicy.DEFAULT_STORAGE_POLICY);
 
       assertEquals(3, targets.length);
       Set<DatanodeStorageInfo> targetSet = new HashSet<DatanodeStorageInfo>(
