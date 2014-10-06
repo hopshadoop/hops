@@ -143,6 +143,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.NetworkTopology;
 import org.apache.hadoop.net.Node;
+import org.apache.hadoop.net.NodeBase;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
@@ -2870,6 +2871,7 @@ public class FSNamesystem
             long blockSize;
             int replication;
             Node clientNode;
+            String clientMachine = null;
 
             if (NameNode.stateChangeLog.isDebugEnabled()) {
               NameNode.stateChangeLog.debug("BLOCK* NameSystem.getAdditionalBlock: "
@@ -2894,15 +2896,19 @@ public class FSNamesystem
                   + maxBlocksPerFile);
             }
             blockSize = pendingFile.getPreferredBlockSize();
-            
+            clientMachine = pendingFile.getFileUnderConstructionFeature()
+                .getClientMachine();
             clientNode = blockManager.getDatanodeManager().getDatanodeByHost(
-              pendingFile.getFileUnderConstructionFeature().getClientMachine());
+              clientMachine);
 
             replication = pendingFile.getBlockReplication();
 
             // Get the storagePolicyID of this file
             byte storagePolicyID = pendingFile.getStoragePolicyID();
 
+            if (clientNode == null) {
+              clientNode = getClientNode(clientMachine);
+            }
             // choose targets for the new block to be allocated.
             final DatanodeStorageInfo targets[] = getBlockManager().chooseTarget4NewBlock(
                 src2, replication, clientNode, excludedNodes, blockSize,
@@ -2968,6 +2974,24 @@ public class FSNamesystem
           }
         };
     return (LocatedBlock) additionalBlockHandler.handle(this);
+  }
+
+  /*
+   * Resolve clientmachine address to get a network location path
+   */
+  private Node getClientNode(String clientMachine) {
+    List<String> hosts = new ArrayList<String>(1);
+    hosts.add(clientMachine);
+    List<String> rName = getBlockManager().getDatanodeManager()
+        .resolveNetworkLocation(hosts);
+    Node clientNode = null;
+    if (rName != null) {
+      // Able to resolve clientMachine mapping.
+      // Create a temp node to findout the rack local nodes
+      clientNode = new NodeBase(rName.get(0) + NodeBase.PATH_SEPARATOR_STR
+          + clientMachine);
+    }
+    return clientNode;
   }
 
   static class FileState {
@@ -3129,7 +3153,8 @@ public class FSNamesystem
             //check if the feature is enabled
             dtpReplaceDatanodeOnFailure.checkEnabled();
 
-            final DatanodeDescriptor clientNode;
+            Node clientnode = null;
+            String clientMachine;
             final long preferredBlockSize;
             final List<DatanodeStorageInfo> chosen;
             //check safe mode
@@ -3149,9 +3174,8 @@ public class FSNamesystem
               }
             }
             final INodeFile file = checkLease(src2, clientName, inode, fileId, false);
-            String clientMachine = file.getFileUnderConstructionFeature()
-              .getClientMachine();
-            clientNode = blockManager.getDatanodeManager().getDatanodeByHost(clientMachine);
+            clientMachine = file.getFileUnderConstructionFeature().getClientMachine();
+            clientnode = blockManager.getDatanodeManager().getDatanodeByHost(clientMachine);
             preferredBlockSize = file.getPreferredBlockSize();
 
             byte storagePolicyID = file.getStoragePolicyID();
@@ -3160,9 +3184,13 @@ public class FSNamesystem
             final DatanodeManager dm = blockManager.getDatanodeManager();
             chosen = Arrays.asList(dm.getDatanodeStorageInfos(existings, storageIDs));
 
+            if (clientnode == null) {
+              clientnode = getClientNode(clientMachine);
+            }
+            
             // choose new datanodes.
             final DatanodeStorageInfo[] targets = blockManager.chooseTarget4AdditionalDatanode(
-                src2, numAdditionalNodes, clientNode, chosen,
+                src2, numAdditionalNodes, clientnode, chosen,
                 excludes, preferredBlockSize, storagePolicyID);
 
             final LocatedBlock lb = new LocatedBlock(blk, targets);

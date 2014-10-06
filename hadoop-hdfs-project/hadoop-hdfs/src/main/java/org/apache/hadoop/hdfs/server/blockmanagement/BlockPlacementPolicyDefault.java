@@ -223,7 +223,8 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
 
     // sorting nodes to form a pipeline
     return getPipeline(
-        (writer != null && writer instanceof DatanodeDescriptor) ? writer : localNode,
+        (writer != null && writer instanceof DatanodeDescriptor) ? writer
+            : localNode,
         results.toArray(new DatanodeStorageInfo[results.size()]));
   }
 
