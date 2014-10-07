@@ -640,7 +640,6 @@ public class DatanodeDescriptor extends DatanodeInfo {
     PendingReplicationWithoutTargets--;
   }
 
-  
   /**
    * Store block replication work.
    */
