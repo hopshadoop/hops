@@ -326,9 +326,9 @@ class BPOfferService implements Runnable {
     checkDelHint(delHint);
     ReceivedDeletedBlockInfo bInfo =
         new ReceivedDeletedBlockInfo(block.getLocalBlock(),
-            BlockStatus.RECEIVED, delHint);
+            BlockStatus.RECEIVED_BLOCK, delHint);
 
-    notifyNamenodeBlockImmediatelyInt(bInfo, storageUuid, true);
+    notifyNamenodeBlockInt(bInfo, storageUuid, true);
   }
 
   private void checkBlock(ExtendedBlock block) {
@@ -346,17 +346,17 @@ class BPOfferService implements Runnable {
     checkBlock(block);
     ReceivedDeletedBlockInfo bInfo =
         new ReceivedDeletedBlockInfo(block.getLocalBlock(),
-            BlockStatus.DELETED, null);
+            BlockStatus.DELETED_BLOCK, null);
 
     notifyNamenodeDeletedBlockInt(bInfo, dn.getFSDataset().getStorage(storageUuid));
   }
   
-  public void notifyNamenodeCreatingBlock(ExtendedBlock block, String storageUuid) {
+  public void notifyNamenodeReceivingBlock(ExtendedBlock block, String storageUuid) {
     checkBlock(block);
     ReceivedDeletedBlockInfo bInfo =
         new ReceivedDeletedBlockInfo(block.getLocalBlock(),
-            BlockStatus.CREATING, null);
-    notifyNamenodeBlockImmediatelyInt(bInfo, storageUuid, false);
+            BlockStatus.RECEIVING_BLOCK, null);
+    notifyNamenodeBlockInt(bInfo, storageUuid, false);
   }
 
   public void notifyNamenodeAppendingBlock(ExtendedBlock block, String storageUuid) {
@@ -364,7 +364,7 @@ class BPOfferService implements Runnable {
     ReceivedDeletedBlockInfo bInfo =
         new ReceivedDeletedBlockInfo(block.getLocalBlock(),
             BlockStatus.APPENDING, null);
-    notifyNamenodeBlockImmediatelyInt(bInfo, storageUuid, false);
+    notifyNamenodeBlockInt(bInfo, storageUuid, false);
   }
 
   public void notifyNamenodeAppendingRecoveredAppend(ExtendedBlock block, String storageUuid) {
@@ -372,7 +372,7 @@ class BPOfferService implements Runnable {
     ReceivedDeletedBlockInfo bInfo =
         new ReceivedDeletedBlockInfo(block.getLocalBlock(),
             BlockStatus.RECOVERING_APPEND, null);
-    notifyNamenodeBlockImmediatelyInt(bInfo, storageUuid, true);
+    notifyNamenodeBlockInt(bInfo, storageUuid, true);
   }
 
   public void notifyNamenodeUpdateRecoveredBlock(ExtendedBlock block, String storageUuid) {
@@ -380,7 +380,7 @@ class BPOfferService implements Runnable {
     ReceivedDeletedBlockInfo bInfo =
         new ReceivedDeletedBlockInfo(block.getLocalBlock(),
             BlockStatus.UPDATE_RECOVERED, null);
-    notifyNamenodeBlockImmediatelyInt(bInfo, storageUuid, true);
+    notifyNamenodeBlockInt(bInfo, storageUuid, true);
   }
 
 
@@ -1026,11 +1026,13 @@ public class IncrementalBRTask implements Callable{
    * till namenode is informed before responding with success to the
    * client? For now we don't.
    */
-  void notifyNamenodeBlockImmediatelyInt(
-      ReceivedDeletedBlockInfo bInfo, String storageUuid, boolean now) {
+  void notifyNamenodeBlockInt(ReceivedDeletedBlockInfo bInfo,
+      String storageUuid, boolean now) {
     synchronized (pendingIncrementalBRperStorage) {
       addPendingReplicationBlockInfo(bInfo, dn.getFSDataset().getStorage(storageUuid));
       sendImmediateIBR = true;
+      // If now is true, the report is sent right away.
+      // Otherwise, it will be sent out in the next heartbeat.
       if (now) {
         pendingIncrementalBRperStorage.notifyAll();
       }

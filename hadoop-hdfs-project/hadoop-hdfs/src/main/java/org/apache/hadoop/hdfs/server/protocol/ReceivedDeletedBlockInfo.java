@@ -29,12 +29,12 @@ public class ReceivedDeletedBlockInfo {
   String delHints;
 
   public enum BlockStatus {
-    CREATING(1),
+    RECEIVING_BLOCK(1),
     APPENDING(2),
     RECOVERING_APPEND(3),
-    RECEIVED(4),
+    RECEIVED_BLOCK(4),
     UPDATE_RECOVERED(5),
-    DELETED(6);
+    DELETED_BLOCK(6);
     
     private final int code;
 
@@ -104,7 +104,7 @@ public class ReceivedDeletedBlockInfo {
   }
 
   public boolean isDeletedBlock() {
-    return status == BlockStatus.DELETED;
+    return status == BlockStatus.DELETED_BLOCK;
   }
 
   @Override

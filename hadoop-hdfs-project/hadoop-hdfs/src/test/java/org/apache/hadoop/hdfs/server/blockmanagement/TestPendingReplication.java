@@ -235,7 +235,7 @@ public class TestPendingReplication {
           StorageReceivedDeletedBlocks[] report = {
             new StorageReceivedDeletedBlocks("Fake-storage-ID-Ignored",
             new ReceivedDeletedBlockInfo[]{new ReceivedDeletedBlockInfo(
-              blocks[0], ReceivedDeletedBlockInfo.BlockStatus.RECEIVED, "")})};
+              blocks[0], ReceivedDeletedBlockInfo.BlockStatus.RECEIVED_BLOCK, "")})};
           cluster.getNameNodeRpc().blockReceivedAndDeleted(dnR, poolId, report);
           reportDnNum++;
         }
@@ -250,7 +250,7 @@ public class TestPendingReplication {
               poolId);
           StorageReceivedDeletedBlocks[] report = {new StorageReceivedDeletedBlocks("Fake-storage-ID-Ignored",
             new ReceivedDeletedBlockInfo[]{new ReceivedDeletedBlockInfo(
-              blocks[0], ReceivedDeletedBlockInfo.BlockStatus.RECEIVED, "")})};
+              blocks[0], ReceivedDeletedBlockInfo.BlockStatus.RECEIVED_BLOCK, "")})};
           cluster.getNameNodeRpc().blockReceivedAndDeleted(dnR, poolId, report);
           reportDnNum++;
         }

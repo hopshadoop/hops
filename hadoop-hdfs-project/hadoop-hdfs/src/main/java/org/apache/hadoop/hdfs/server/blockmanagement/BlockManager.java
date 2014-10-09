@@ -4305,7 +4305,7 @@ public class BlockManager {
                     " sid: " + storage.getSid() + " status=" + rdbi.getStatus());
             HashBuckets hashBuckets = HashBuckets.getInstance();
             switch (rdbi.getStatus()) {
-              case CREATING:
+              case RECEIVING_BLOCK:
                 processAndHandleReportedBlock(storage, rdbi.getBlock(),
                         ReplicaState.RBW, null);
                 received[0]++;
@@ -4320,7 +4320,7 @@ public class BlockManager {
                     ReplicaState.RBW, null);
                 received[0]++;
                 break;
-              case RECEIVED:
+              case RECEIVED_BLOCK:
                 addBlock(storage, rdbi.getBlock(), rdbi.getDelHints());
                 hashBuckets.applyHash(storage.getSid(), ReplicaState.FINALIZED, rdbi.getBlock());
                 received[0]++;
@@ -4329,7 +4329,7 @@ public class BlockManager {
                 addBlock(storage, rdbi.getBlock(), rdbi.getDelHints());
                 received[0]++;
                 break;
-              case DELETED:
+              case DELETED_BLOCK:
                 removeStoredBlock(rdbi.getBlock(), storage.getDatanodeDescriptor());
                 deleted[0]++;
                 break;
