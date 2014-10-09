@@ -1049,7 +1049,7 @@ public class PBHelper {
 
     ReceivedDeletedBlockInfoProto.BlockStatus status;
     switch (receivedDeletedBlockInfo.getStatus()) {
-      case CREATING:
+      case RECEIVING_BLOCK:
         status = ReceivedDeletedBlockInfoProto.BlockStatus.CREATING;
         break;
       case APPENDING:
@@ -1058,13 +1058,13 @@ public class PBHelper {
       case RECOVERING_APPEND:
         status = ReceivedDeletedBlockInfoProto.BlockStatus.RECOVERING_APPEND;
         break;
-      case RECEIVED:
+      case RECEIVED_BLOCK:
         status = ReceivedDeletedBlockInfoProto.BlockStatus.RECEIVED;
         break;
       case UPDATE_RECOVERED:
         status = ReceivedDeletedBlockInfoProto.BlockStatus.UPDATE_RECOVERED;
         break;
-      case DELETED:
+      case DELETED_BLOCK:
         status = ReceivedDeletedBlockInfoProto.BlockStatus.DELETED;
         break;
       default:
@@ -1086,7 +1086,7 @@ public class PBHelper {
     ReceivedDeletedBlockInfo.BlockStatus status = null;
     switch (proto.getStatus()) {
       case CREATING:
-        status = BlockStatus.CREATING;
+        status = BlockStatus.RECEIVING_BLOCK;
         break;
       case APPENDING:
         status = BlockStatus.APPENDING;
@@ -1095,13 +1095,13 @@ public class PBHelper {
         status = BlockStatus.RECOVERING_APPEND;
         break;
       case RECEIVED:
-        status = BlockStatus.RECEIVED;
+        status = BlockStatus.RECEIVED_BLOCK;
         break;
       case UPDATE_RECOVERED:
         status = BlockStatus.UPDATE_RECOVERED;
         break;
       case DELETED:
-        status = BlockStatus.DELETED;
+        status = BlockStatus.DELETED_BLOCK;
         break;
     }
     return new ReceivedDeletedBlockInfo(PBHelper.convert(proto.getBlock()),

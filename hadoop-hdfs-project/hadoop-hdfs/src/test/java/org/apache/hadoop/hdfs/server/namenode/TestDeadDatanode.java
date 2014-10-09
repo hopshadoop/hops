@@ -115,7 +115,7 @@ public class TestDeadDatanode {
     
     ReceivedDeletedBlockInfo[] blocks =
         {new ReceivedDeletedBlockInfo(new Block(0),
-            ReceivedDeletedBlockInfo.BlockStatus.RECEIVED, null)};
+            ReceivedDeletedBlockInfo.BlockStatus.RECEIVED_BLOCK, null)};
     StorageReceivedDeletedBlocks[] storageBlocks =
         {new StorageReceivedDeletedBlocks(reg.getDatanodeUuid(), blocks)};
     

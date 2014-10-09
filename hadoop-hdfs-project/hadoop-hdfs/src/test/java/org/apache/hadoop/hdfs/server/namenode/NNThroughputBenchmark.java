@@ -1081,7 +1081,7 @@ public class NNThroughputBenchmark implements Tool {
               new ExportedBlockKeys(), VersionInfo.getVersion());
           ReceivedDeletedBlockInfo[] rdBlocks = {
               new ReceivedDeletedBlockInfo(
-                  blocks[i], ReceivedDeletedBlockInfo.BlockStatus.RECEIVED,
+                  blocks[i], ReceivedDeletedBlockInfo.BlockStatus.RECEIVED_BLOCK,
                   null) };
           StorageReceivedDeletedBlocks[] report = { new StorageReceivedDeletedBlocks(
               targetStorageID, rdBlocks) };
@@ -1216,7 +1216,7 @@ public class NNThroughputBenchmark implements Tool {
           datanodes[dnIdx].addBlock(loc.getBlock().getLocalBlock());
           ReceivedDeletedBlockInfo[] rdBlocks =
               {new ReceivedDeletedBlockInfo(loc.getBlock().getLocalBlock(),
-                  ReceivedDeletedBlockInfo.BlockStatus.RECEIVED, null)};
+                  ReceivedDeletedBlockInfo.BlockStatus.RECEIVED_BLOCK, null)};
           StorageReceivedDeletedBlocks[] report =
               {new StorageReceivedDeletedBlocks(
                   datanodes[dnIdx].storage.getStorageID(), rdBlocks)};

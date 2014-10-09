@@ -911,7 +911,7 @@ public class DataNode extends ReconfigurableBase
   void notifyNamenodeCreatingBlock(ExtendedBlock block, String storageUuid){
     BPOfferService bpos = blockPoolManager.get(block.getBlockPoolId());
     if (bpos != null) {
-      bpos.notifyNamenodeCreatingBlock(block, storageUuid);
+      bpos.notifyNamenodeReceivingBlock(block, storageUuid);
     } else {
       LOG.error(
           "Cannot find BPOfferService for reporting block creating for " +

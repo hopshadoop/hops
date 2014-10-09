@@ -163,7 +163,7 @@ public class TestIncrementalBrVariations {
       for (LocatedBlock block : blocks.getLocatedBlocks()) {
         if (block.getStorageIDs()[0].equals(volume.getStorageID())) {
           rdbi[0] = new ReceivedDeletedBlockInfo(block.getBlock().getLocalBlock(),
-              ReceivedDeletedBlockInfo.BlockStatus.DELETED, null);
+              ReceivedDeletedBlockInfo.BlockStatus.DELETED_BLOCK, null);
           foundBlockOnStorage = true;
           break;
         }
@@ -227,7 +227,7 @@ public class TestIncrementalBrVariations {
   private static StorageReceivedDeletedBlocks[] makeReportForReceivedBlock(
       Block block, DatanodeStorage storage) {
     ReceivedDeletedBlockInfo[] receivedBlocks = new ReceivedDeletedBlockInfo[1];
-    receivedBlocks[0] = new ReceivedDeletedBlockInfo(block, BlockStatus.RECEIVED, null);
+    receivedBlocks[0] = new ReceivedDeletedBlockInfo(block, BlockStatus.RECEIVED_BLOCK, null);
     StorageReceivedDeletedBlocks[] reports = new StorageReceivedDeletedBlocks[1];
     reports[0] = new StorageReceivedDeletedBlocks(storage, receivedBlocks);
     return reports;

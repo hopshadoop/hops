@@ -83,8 +83,8 @@ public class TestIncrementalBlockReports {
    */
   private void injectBlockReceived() {
     ReceivedDeletedBlockInfo rdbi = new ReceivedDeletedBlockInfo(
-        getDummyBlock(), BlockStatus.RECEIVED, null);
-    bpos.notifyNamenodeBlockImmediatelyInt(rdbi, storageUuid, true);
+        getDummyBlock(), BlockStatus.RECEIVED_BLOCK , null);
+    bpos.notifyNamenodeBlockInt(rdbi, storageUuid, true);
   }
 
   /**
@@ -92,7 +92,7 @@ public class TestIncrementalBlockReports {
    */
   private void injectBlockDeleted() {
     ReceivedDeletedBlockInfo rdbi = new ReceivedDeletedBlockInfo(
-        getDummyBlock(), BlockStatus.DELETED, null);
+        getDummyBlock(), BlockStatus.DELETED_BLOCK, null);
     bpos.notifyNamenodeDeletedBlockInt(rdbi, bpos.getDataNode().getFSDataset().getStorage(storageUuid));
   }
 
