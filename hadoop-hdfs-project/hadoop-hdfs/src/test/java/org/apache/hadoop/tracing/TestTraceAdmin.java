@@ -29,7 +29,8 @@ import java.io.PrintStream;
 import org.apache.htrace.core.Tracer;
 
 public class TestTraceAdmin {
-
+  private static final String NEWLINE = System.getProperty("line.separator");
+  
   private String runTraceCommand(TraceAdmin trace, String... cmd)
       throws Exception {
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -68,22 +69,30 @@ public class TestTraceAdmin {
     try {
       TraceAdmin trace = new TraceAdmin();
       trace.setConf(conf);
-      Assert.assertEquals("ret:0, [no span receivers found]\n",
+      Assert.assertEquals("ret:0, [no span receivers found]" + NEWLINE,
           runTraceCommand(trace, "-list", "-host", getHostPortForNN(cluster)));
       Assert.assertEquals("ret:0, Added trace span receiver 1 with " +
-          "configuration local-file-span-receiver.path = " + tracePath + "\n",
+          "configuration hadoop.htrace.local.file.span.receiver.path = " + tracePath + NEWLINE,
           runTraceCommand(trace, "-add", "-host", getHostPortForNN(cluster),
-              "-class", "org.htrace.impl.LocalFileSpanReceiver",
-              "-Clocal-file-span-receiver.path=" + tracePath));
+              "-class", "org.apache.htrace.core.LocalFileSpanReceiver",
+              "-Chadoop.htrace.local.file.span.receiver.path=" + tracePath));
       String list =
           runTraceCommand(trace, "-list", "-host", getHostPortForNN(cluster));
       Assert.assertTrue(list.startsWith("ret:0"));
-      Assert.assertTrue(list.contains("1   org.htrace.impl.LocalFileSpanReceiver"));
-      Assert.assertEquals("ret:0, Removed trace span receiver 1\n",
+      Assert.assertTrue(list.contains("1   org.apache.htrace.core.LocalFileSpanReceiver"));
+      Assert.assertEquals("ret:0, Removed trace span receiver 1" + NEWLINE,
           runTraceCommand(trace, "-remove", "1", "-host",
               getHostPortForNN(cluster)));
-      Assert.assertEquals("ret:0, [no span receivers found]\n",
+      Assert.assertEquals("ret:0, [no span receivers found]" + NEWLINE,
           runTraceCommand(trace, "-list", "-host", getHostPortForNN(cluster)));
+      Assert.assertEquals("ret:0, Added trace span receiver 2 with " +
+          "configuration hadoop.htrace.local.file.span.receiver.path = " + tracePath + NEWLINE,
+          runTraceCommand(trace, "-add", "-host", getHostPortForNN(cluster),
+              "-class", "LocalFileSpanReceiver",
+              "-Chadoop.htrace.local.file.span.receiver.path=" + tracePath));
+      Assert.assertEquals("ret:0, Removed trace span receiver 2" + NEWLINE,
+          runTraceCommand(trace, "-remove", "2", "-host",
+              getHostPortForNN(cluster)));
     } finally {
       cluster.shutdown();
       tempDir.close();
