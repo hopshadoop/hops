@@ -76,7 +76,7 @@ public class TestHostsFiles {
   }
 
   @Test
-  public void testHostsExcludeDfshealthJsp() throws Exception {
+  public void testHostsExcludeInUI() throws Exception {
     Configuration conf = getConf();
     short REPLICATION_FACTOR = 2;
     final Path filePath = new Path("/testFile");
@@ -124,17 +124,12 @@ public class TestHostsFiles {
       // Check the block still has sufficient # replicas across racks
       DFSTestUtil.waitForReplication(cluster, b, 2, REPLICATION_FACTOR, 0);
       
-      InetSocketAddress nnHttpAddress = cluster.getNameNode().getHttpAddress();
-      LOG.info("nnaddr = '" + nnHttpAddress + "'");
-      URL nnjsp = new URL("http://" + nnHttpAddress.getHostName() + ":" +
-          nnHttpAddress.getPort() + "/dfshealth.jsp");
-      LOG.info("fetching " + nnjsp);
-      String dfshealthPage =
-          StringEscapeUtils.unescapeHtml(DFSTestUtil.urlGet(nnjsp));
-      LOG.info("got " + dfshealthPage);
-      assertTrue("dfshealth should contain localhost, got:" + dfshealthPage,
-          dfshealthPage.contains("localhost"));
-
+      MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
+      ObjectName mxbeanName = new ObjectName(
+              "Hadoop:service=NameNode,name=NameNodeInfo");
+      String nodes = (String) mbs.getAttribute(mxbeanName, "LiveNodes");
+      assertTrue("Live nodes should contain the decommissioned node",
+              nodes.contains("Decommissioned"));
     } finally {
       cluster.shutdown();
     }

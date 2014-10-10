@@ -22,7 +22,15 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.net.URL;
+import javax.management.AttributeNotFoundException;
+import javax.management.InstanceNotFoundException;
+import javax.management.MBeanException;
+import javax.management.MBeanServer;
+import javax.management.MalformedObjectNameException;
+import javax.management.ObjectName;
+import javax.management.ReflectionException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -32,6 +40,7 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
+import org.junit.Assert;
 import org.junit.Test;
 
 /**
@@ -45,8 +54,10 @@ public class TestMissingBlocksAlert {
       LogFactory.getLog(TestMissingBlocksAlert.class);
 
   @Test
-  public void testMissingBlocksAlert() throws IOException,
-      InterruptedException {
+  public void testMissingBlocksAlert() throws IOException, InterruptedException,
+                       MalformedObjectNameException, AttributeNotFoundException,
+                 MBeanException, ReflectionException,
+                 InstanceNotFoundException{
 
     MiniDFSCluster cluster = null;
 
@@ -95,15 +106,12 @@ public class TestMissingBlocksAlert {
       assertEquals(4, dfs.getUnderReplicatedBlocksCount());
       assertEquals(3, bm.getUnderReplicatedNotMissingBlocks());
 
-
-      // Now verify that it shows up on webui
-      URL url = new URL("http://" + conf.get(DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY) +
-          "/dfshealth.jsp");
-      String dfsFrontPage = DFSTestUtil.urlGet(url);
-      String warnStr = "WARNING : There are ";
-      assertTrue("HDFS Front page does not contain expected warning",
-          dfsFrontPage.contains(warnStr + "1 missing blocks"));
-
+      MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
+      ObjectName mxbeanName = new ObjectName(
+              "Hadoop:service=NameNode,name=NameNodeInfo");
+      Assert.assertEquals(1, (long)(Long) mbs.getAttribute(mxbeanName,
+                      "NumberOfMissingBlocks"));
+      
       // now do the reverse : remove the file expect the number of missing
       // blocks to go to zero
 
@@ -117,11 +125,8 @@ public class TestMissingBlocksAlert {
       assertEquals(2, dfs.getUnderReplicatedBlocksCount());
       assertEquals(2, bm.getUnderReplicatedNotMissingBlocks());
 
-      // and make sure WARNING disappears
-      // Now verify that it shows up on webui
-      dfsFrontPage = DFSTestUtil.urlGet(url);
-      assertFalse("HDFS Front page contains unexpected warning",
-          dfsFrontPage.contains(warnStr));
+      Assert.assertEquals(0, (long) (Long) mbs.getAttribute(mxbeanName,
+          "NumberOfMissingBlocks"));
     } finally {
       if (cluster != null) {
         cluster.shutdown();

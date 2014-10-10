@@ -17,14 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.common;
 
-import com.google.common.base.Strings;
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.fail;
-import io.hops.metadata.StorageMap;
+import org.junit.Assert;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
@@ -42,11 +35,17 @@ import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenSecretManager;
 import org.junit.Assert;
 import org.junit.Test;
-import org.mockito.ArgumentCaptor;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
-import org.xml.sax.InputSource;
-import org.xml.sax.SAXException;
+
+import javax.servlet.ServletContext;
+import javax.servlet.http.HttpServletRequest;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
@@ -78,8 +77,7 @@ import static org.mockito.Mockito.when;
 
 public class TestJspHelper {
 
-  private Configuration conf = new HdfsConfiguration();
-  private String jspWriterOutput = "";
+  private final Configuration conf = new HdfsConfiguration();
 
   // allow user with TGT to run tests
   @BeforeClass
@@ -411,35 +409,7 @@ public class TestJspHelper {
     }
   }
 
-  @Test
-  public void testPrintGotoFormWritesValidXML()
-      throws IOException, ParserConfigurationException, SAXException {
-    JspWriter mockJspWriter = mock(JspWriter.class);
-    ArgumentCaptor<String> arg = ArgumentCaptor.forClass(String.class);
-    doAnswer(new Answer<Object>() {
-      @Override
-      public Object answer(InvocationOnMock invok) {
-        Object[] args = invok.getArguments();
-        jspWriterOutput += (String) args[0];
-        return null;
-      }
-    }).when(mockJspWriter).print(arg.capture());
-
-    jspWriterOutput = "";
-
-    JspHelper
-        .printGotoForm(mockJspWriter, 424242, "a token string", "foobar/file",
-            "0.0.0.0");
-
-    DocumentBuilder parser =
-        DocumentBuilderFactory.newInstance().newDocumentBuilder();
-    InputSource is = new InputSource();
-    is.setCharacterStream(new StringReader(jspWriterOutput));
-    parser.parse(is);
-  }
-
-  private HttpServletRequest getMockRequest(String remoteUser, String user,
-      String doAs) {
+  private HttpServletRequest getMockRequest(String remoteUser, String user, String doAs) {
     HttpServletRequest request = mock(HttpServletRequest.class);
     when(request.getParameter(UserParam.NAME)).thenReturn(user);
     if (doAs != null) {
@@ -472,148 +442,7 @@ public class TestJspHelper {
           ugi.getAuthenticationMethod());
     }
   }
-  
-  @Test
-  public void testSortNodeByFields() throws Exception {
-    DatanodeID dnId1 = new DatanodeID("127.0.0.1", "localhost1", "datanode1",
-        1234, 2345, 3456, 4567);
-    DatanodeID dnId2 = new DatanodeID("127.0.0.2", "localhost2", "datanode2",
-        1235, 2346, 3457, 4568);
-    
-    // Setup DatanodeDescriptors with one storage each.
-    StorageMap storageMap = mock(StorageMap.class);
-    DatanodeDescriptor dnDesc1 = new DatanodeDescriptor(storageMap, dnId1, "rack1");
-    DatanodeDescriptor dnDesc2 = new DatanodeDescriptor(storageMap, dnId2, "rack2");
 
-    // Update the DatanodeDescriptors with their attached storages.
-    BlockManagerTestUtil.updateStorage(dnDesc1, new DatanodeStorage("dnStorage1"));
-    BlockManagerTestUtil.updateStorage(dnDesc2, new DatanodeStorage("dnStorage2"));
-
-    DatanodeStorage dns1 = new DatanodeStorage("dnStorage1");
-    DatanodeStorage dns2 = new DatanodeStorage("dnStorage2");
-    
-    StorageReport[] report1 = new StorageReport[] {
-        new StorageReport(dns1, false, 1024, 100, 924, 100)
-    };
-    StorageReport[] report2 = new StorageReport[] {
-        new StorageReport(dns2, false, 2500, 200, 1848, 200)
-    };
-    dnDesc1.updateHeartbeat(report1, 5L, 3L, 10, 2);
-    dnDesc2.updateHeartbeat(report2, 10L, 2L, 20, 1);
-
-    ArrayList<DatanodeDescriptor> live = new ArrayList<DatanodeDescriptor>();
-    live.add(dnDesc1);
-    live.add(dnDesc2);
-
-    // Test sorting by failed volumes
-    JspHelper.sortNodeList(live, "volfails", "ASC");
-    Assert.assertEquals(dnDesc2, live.get(0));
-    Assert.assertEquals(dnDesc1, live.get(1));
-    JspHelper.sortNodeList(live, "volfails", "DSC");
-    Assert.assertEquals(dnDesc1, live.get(0));
-    Assert.assertEquals(dnDesc2, live.get(1));
-
-    // Test sorting by Blockpool used
-    JspHelper.sortNodeList(live, "bpused", "ASC");
-    Assert.assertEquals(dnDesc1, live.get(0));
-    Assert.assertEquals(dnDesc2, live.get(1));
-    JspHelper.sortNodeList(live, "bpused", "DSC");
-    Assert.assertEquals(dnDesc2, live.get(0));
-    Assert.assertEquals(dnDesc1, live.get(1));
-
-    // Test sorting by Percentage Blockpool used
-    JspHelper.sortNodeList(live, "pcbpused", "ASC");
-    Assert.assertEquals(dnDesc2, live.get(0));
-    Assert.assertEquals(dnDesc1, live.get(1));
-    JspHelper.sortNodeList(live, "pcbpused", "DSC");
-    Assert.assertEquals(dnDesc1, live.get(0));
-    Assert.assertEquals(dnDesc2, live.get(1));
-    
-    //unexisted field comparition is d1.getHostName().compareTo(d2.getHostName());    
-    JspHelper.sortNodeList(live, "unexists", "ASC");
-    Assert.assertEquals(dnDesc1, live.get(0));
-    Assert.assertEquals(dnDesc2, live.get(1));
-    
-    JspHelper.sortNodeList(live, "unexists", "DSC");
-    Assert.assertEquals(dnDesc2, live.get(0));
-    Assert.assertEquals(dnDesc1, live.get(1));  
-    
-    // test sorting by capacity
-    JspHelper.sortNodeList(live, "capacity", "ASC");
-    Assert.assertEquals(dnDesc1, live.get(0));
-    Assert.assertEquals(dnDesc2, live.get(1));
-    
-    JspHelper.sortNodeList(live, "capacity", "DSC");
-    Assert.assertEquals(dnDesc2, live.get(0));
-    Assert.assertEquals(dnDesc1, live.get(1));
-
-    // test sorting by used
-    JspHelper.sortNodeList(live, "used", "ASC");
-    Assert.assertEquals(dnDesc1, live.get(0));
-    Assert.assertEquals(dnDesc2, live.get(1));
-    
-    JspHelper.sortNodeList(live, "used", "DSC");
-    Assert.assertEquals(dnDesc2, live.get(0));
-    Assert.assertEquals(dnDesc1, live.get(1)); 
-    
-    // test sorting by nondfsused
-    JspHelper.sortNodeList(live, "nondfsused", "ASC");
-    Assert.assertEquals(dnDesc1, live.get(0));
-    Assert.assertEquals(dnDesc2, live.get(1));
-    
-    JspHelper.sortNodeList(live, "nondfsused", "DSC");
-    Assert.assertEquals(dnDesc2, live.get(0));
-    Assert.assertEquals(dnDesc1, live.get(1));
-   
-    // test sorting by remaining
-    JspHelper.sortNodeList(live, "remaining", "ASC");
-    Assert.assertEquals(dnDesc1, live.get(0));
-    Assert.assertEquals(dnDesc2, live.get(1));
-    
-    JspHelper.sortNodeList(live, "remaining", "DSC");
-    Assert.assertEquals(dnDesc2, live.get(0));
-    Assert.assertEquals(dnDesc1, live.get(1));
-  }
-  
-  @Test
-  public void testPrintMethods() throws IOException {
-    JspWriter out = mock(JspWriter.class);      
-    HttpServletRequest req = mock(HttpServletRequest.class);
-    
-    final StringBuffer buffer = new StringBuffer();
-    
-    ArgumentCaptor<String> arg = ArgumentCaptor.forClass(String.class);
-    doAnswer(new Answer<Object>() {      
-      @Override
-      public Object answer(InvocationOnMock invok) {
-        Object[] args = invok.getArguments();
-        buffer.append((String)args[0]);
-        return null;
-      }
-    }).when(out).print(arg.capture());
-    
-    
-    JspHelper.createTitle(out, req, "testfile.txt");
-    Mockito.verify(out, Mockito.times(1)).print(Mockito.anyString());
-    
-    JspHelper.addTableHeader(out);
-    Mockito.verify(out, Mockito.times(1 + 2)).print(Mockito.anyString());                  
-     
-    JspHelper.addTableRow(out, new String[] {" row11", "row12 "});
-    Mockito.verify(out, Mockito.times(1 + 2 + 4)).print(Mockito.anyString());      
-    
-    JspHelper.addTableRow(out, new String[] {" row11", "row12 "}, 3);
-    Mockito.verify(out, Mockito.times(1 + 2 + 4 + 4)).print(Mockito.anyString());
-      
-    JspHelper.addTableRow(out, new String[] {" row21", "row22"});
-    Mockito.verify(out, Mockito.times(1 + 2 + 4 + 4 + 4)).print(Mockito.anyString());      
-      
-    JspHelper.addTableFooter(out);
-    Mockito.verify(out, Mockito.times(1 + 2 + 4 + 4 + 4 + 1)).print(Mockito.anyString());
-    
-    assertFalse(Strings.isNullOrEmpty(buffer.toString()));               
-  }
-  
   @Test
   public void testReadWriteReplicaState() {
     try {
@@ -633,22 +462,7 @@ public class TestJspHelper {
       fail("testReadWrite ex error ReplicaState");
     }
   }
-  
-  @Test 
-  public void testAuthority(){
-    DatanodeID dnWithIp = new DatanodeID("127.0.0.1", "hostName", null,
-        50020, 50075, 50076, 50010);
-    assertNotNull(JspHelper.Url.authority("http", dnWithIp));
-
-    DatanodeID dnWithNullIp = new DatanodeID(null, "hostName", null,
-        50020, 50075, 50076, 50010);
-    assertNotNull(JspHelper.Url.authority("http", dnWithNullIp));
-
-    DatanodeID dnWithEmptyIp = new DatanodeID("", "hostName", null,
-        50020, 50075, 50076, 50010);
-    assertNotNull(JspHelper.Url.authority("http", dnWithEmptyIp));
-  }
-  
+ 
   private static String clientAddr = "1.1.1.1";
   private static String chainedClientAddr = clientAddr+", 2.2.2.2";
   private static String proxyAddr = "3.3.3.3";
