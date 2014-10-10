@@ -34,6 +34,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.ext.Provider;
 import java.io.IOException;
 import java.lang.reflect.Type;
+import org.apache.hadoop.security.SecurityUtil;
 
 /**
  * Inject user information to http operations.
@@ -57,7 +58,7 @@ public class UserProvider
               false);
     } catch (IOException e) {
       throw new SecurityException(
-          "Failed to obtain user group information: " + e, e);
+          SecurityUtil.FAILED_TO_GET_UGI_MSG_HEADER + " " + e, e);
     }
   }
 
