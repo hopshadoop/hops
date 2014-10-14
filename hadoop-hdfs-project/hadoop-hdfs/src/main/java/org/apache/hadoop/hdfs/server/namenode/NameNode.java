@@ -172,9 +172,8 @@ public class NameNode implements NameNodeStatusMXBean {
           StartupOption.NONINTERACTIVE.getName() + "] ] | [" +
           //StartupOption.UPGRADE.getName() + "] | [" +
           //StartupOption.ROLLBACK.getName() + "] | [" +
-          StartupOption.ROLLINGUPGRADE.getName() + " <"
-          + RollingUpgradeStartupOption.DOWNGRADE.name().toLowerCase() + "|"
-          + RollingUpgradeStartupOption.ROLLBACK.name().toLowerCase() + "> ] | [" +
+          StartupOption.ROLLINGUPGRADE.getName() + " "
+          + RollingUpgradeStartupOption.getAllOptionString() + " ] | \n\t[" +
           //StartupOption.FINALIZE.getName() + "] | [" +
           //StartupOption.IMPORT.getName() + "] | [" +
           //StartupOption.INITIALIZESHAREDEDITS.getName() + "] | [" +
@@ -1033,6 +1032,11 @@ public class NameNode implements NameNodeStatusMXBean {
       } else if (StartupOption.ROLLINGUPGRADE.getName().equalsIgnoreCase(cmd)) {
         startOpt = StartupOption.ROLLINGUPGRADE;
         ++i;
+        if (i >= argsLen) {
+          LOG.fatal("Must specify a rolling upgrade startup option "
+              + RollingUpgradeStartupOption.getAllOptionString());
+          return null;
+        }
         startOpt.setRollingUpgradeStartupOption(args[i]);
       } else if (StartupOption.ROLLBACK.getName().equalsIgnoreCase(cmd)) {
         startOpt = StartupOption.ROLLBACK;
@@ -1184,7 +1188,7 @@ public class NameNode implements NameNodeStatusMXBean {
         namenode.join();
       }
     } catch (Throwable e) {
-      LOG.fatal("Exception in namenode join", e);
+      LOG.fatal("Failed to start namenode.", e);
       terminate(1, e);
     }
   }
