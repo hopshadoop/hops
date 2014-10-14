@@ -420,26 +420,6 @@ public class TestStorageMover {
     return types;
   }
 
-  private static long[][] genCapacities(int nDatanodes, int numAllDisk,
-      int numAllArchive, int numRamDisk, long diskCapacity,
-      long archiveCapacity, long ramDiskCapacity) {
-    final long[][] capacities = new long[nDatanodes][];
-    int i = 0;
-    for (; i < numRamDisk; i++) {
-      capacities[i] = new long[]{ramDiskCapacity, diskCapacity};
-    }
-    for (; i < numRamDisk + numAllDisk; i++) {
-      capacities[i] = new long[]{diskCapacity, diskCapacity};
-    }
-    for (; i < numRamDisk + numAllDisk + numAllArchive; i++) {
-      capacities[i] = new long[]{archiveCapacity, archiveCapacity};
-    }
-    for(; i < capacities.length; i++) {
-      capacities[i] = new long[]{diskCapacity, archiveCapacity};
-    }
-    return capacities;
-  }
-
   private static class PathPolicyMap {
     final Map<Path, BlockStoragePolicy> map = Maps.newHashMap();
     final Path hot = new Path("/hot");

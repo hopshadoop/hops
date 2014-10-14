@@ -1335,6 +1335,9 @@ public class DFSTestUtil {
     FSDataOutputStream s = filesystem.create(pathFileCreate);
     // OP_CLOSE 9
     s.close();
+    // OP_SET_STORAGE_POLICY 45
+    filesystem.setStoragePolicy(pathFileCreate,
+        HdfsConstants.HOT_STORAGE_POLICY_NAME);
     // OP_RENAME_OLD 1
     final Path pathFileMoved = new Path("/file_moved");
     filesystem.rename(pathFileCreate, pathFileMoved);
