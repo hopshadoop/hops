@@ -690,7 +690,7 @@
     <name>dfs.namenode.replication.interval</name>
     <value>3</value>
     <description>The periodicity in seconds with which the namenode computes
-      repliaction work for datanodes.
+      replication work for datanodes.
     </description>
   </property>
 
@@ -834,7 +834,7 @@
       (e.g HBase random-IO workloads).
 
       This may improve performance for some workloads by freeing buffer
-      cache spage usage for more cacheable data.
+      cache space usage for more cacheable data.
 
       If the Hadoop native libraries are not available, this configuration
       has no effect.
@@ -852,7 +852,7 @@
       after it is written to disk.
 
       This may improve performance for some workloads by freeing buffer
-      cache spage usage for more cacheable data.
+      cache space usage for more cacheable data.
 
       If the Hadoop native libraries are not available, this configuration
       has no effect.
