@@ -137,7 +137,6 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
 
   private final DFSClient dfsClient;
   private final long dfsclientSlowLogThresholdMs;
-  private static final int MAX_PACKETS = 80; // each packet 64K, total 5MB
   private Socket s;
   // closed is accessed by different threads under different locks.
   private volatile boolean closed = false;
@@ -2131,7 +2130,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
     synchronized (dataQueue) {
       try {
         // If queue is full, then wait till we have enough space
-        while (!closed && dataQueue.size() + ackQueue.size() > MAX_PACKETS) {
+        while (!closed && dataQueue.size() + ackQueue.size() > dfsClient.getConf().writeMaxPackets) {
           try {
             dataQueue.wait();
           } catch (InterruptedException e) {
