@@ -35,7 +35,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Scanner;
 
@@ -118,7 +117,7 @@ public class TestDFSAdmin {
     final int port = datanode.getIpcPort();
     final String address = "localhost:" + port;
 
-    assertThat(admin.startReconfiguration("datanode", address), is(-1));
+    assertThat(admin.startReconfiguration("datanode", address), is(0));
 
     List<String> outputs = null;
     int count = 100;

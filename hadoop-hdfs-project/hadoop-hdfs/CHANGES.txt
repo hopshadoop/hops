@@ -929,6 +929,9 @@ Release 2.6.0 - UNRELEASED
     HDFS-6664. HDFS permissions guide documentation states incorrect default
     group mapping class. (Ray Chiang via aw)
 
+    HDFS-7154. Fix returning value of starting reconfiguration task (Lei Xu via
+    Colin P. McCabe)
+
 Release 2.5.1 - 2014-09-05
 
   INCOMPATIBLE CHANGES
