@@ -140,12 +140,15 @@ class PeerCache {
    * @return             An open Peer connected to the DN, or null if none
    *                     was found. 
    */
-  public synchronized Peer get(DatanodeID dnId, boolean isDomain) {
+  public Peer get(DatanodeID dnId, boolean isDomain) {
 
     if (capacity <= 0) { // disabled
       return null;
     }
+    return getInternal(dnId, isDomain);
+  }
 
+  private synchronized Peer getInternal(DatanodeID dnId, boolean isDomain) {
     List<Value> sockStreamList = multimap.get(new Key(dnId, isDomain));
     if (sockStreamList == null) {
       return null;
@@ -175,7 +178,7 @@ class PeerCache {
    * Give an unused socket to the cache.
    * @param sock socket not used by anyone.
    */
-  public synchronized void put(DatanodeID dnId, Peer peer) {
+  public void put(DatanodeID dnId, Peer peer) {
     Preconditions.checkNotNull(dnId);
     Preconditions.checkNotNull(peer);
     if (peer.isClosed()) return;
@@ -184,7 +187,10 @@ class PeerCache {
       IOUtils.cleanup(LOG, peer);
       return;
     }
- 
+    putInternal(dnId, peer);
+  }
+
+  private synchronized void putInternal(DatanodeID dnId, Peer peer) {
     startExpiryDaemon();
 
     if (capacity == multimap.size()) {
