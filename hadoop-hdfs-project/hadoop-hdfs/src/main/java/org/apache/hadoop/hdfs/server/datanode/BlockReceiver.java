@@ -31,6 +31,7 @@ import org.apache.hadoop.hdfs.protocol.datatransfer.PacketReceiver;
 import org.apache.hadoop.hdfs.protocol.datatransfer.PipelineAck;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.BlockOpResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status;
+import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsVolumeSpi;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.ReplicaInputStreams;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.ReplicaOutputStreams;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
@@ -1248,7 +1249,28 @@ class BlockReceiver implements Closeable {
 
           if (lastPacketInBlock) {
             // Finalize the block and close the block file
-            finalizeBlock(startTime);
+            try {
+              finalizeBlock(startTime);
+            } catch (ReplicaNotFoundException e) {
+              // Verify that the exception is due to volume removal.
+              FsVolumeSpi volume;
+              synchronized (datanode.data) {
+                volume = datanode.data.getVolume(block);
+              }
+              if (volume == null) {
+                // ReplicaInfo has been removed due to the corresponding data
+                // volume has been removed. Don't need to check disk error.
+                LOG.info(myString
+                    + ": BlockReceiver is interrupted because the block pool "
+                    + block.getBlockPoolId() + " has been removed.", e);
+                sendAckUpstream(ack, expected, totalAckTimeNanos, 0,
+                    Status.OOB_INTERRUPTED);
+                running = false;
+                receiverThread.interrupt();
+                continue;
+              }
+              throw e;
+            }
           }
 
           sendAckUpstream(ack, expected, totalAckTimeNanos,

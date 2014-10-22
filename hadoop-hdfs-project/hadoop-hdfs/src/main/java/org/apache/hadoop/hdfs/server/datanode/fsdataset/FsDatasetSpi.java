@@ -308,6 +308,9 @@ public interface FsDatasetSpi<V extends FsVolumeSpi> extends FSDatasetMBean {
    *
    * @param b
    * @throws IOException
+   * @throws ReplicaNotFoundException if the replica can not be found when the
+   * block is been finalized. For instance, the block resides on an HDFS volume
+   * that has been removed.
    */
   public void finalizeBlock(ExtendedBlock b) throws IOException;
 
