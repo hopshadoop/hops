@@ -49,6 +49,22 @@ Release 2.7.0 - UNRELEASED
 
     HDFS-7201. Fix typos in hdfs-default.xml. (Dawson Choong via wheat9)
 
+    HDFS-7190. Bad use of Preconditions in startFileInternal().
+    (Dawson Choong via wheat9)
+
+    HDFS-7242. Code improvement for FSN#checkUnreadableBySuperuser.
+    (Yi Liu via vinayakumarb)
+
+    HDFS-7252. small refinement to the use of isInAnEZ in FSNamesystem.
+    (Yi Liu via vinayakumarb)
+
+    HDFS-7226. Fix TestDNFencing.testQueueingWithAppend. (Yongjun Zhang via jing9)
+
+    HDFS-7277. Remove explicit dependency on netty 3.2 in BKJournal. (wheat9)
+
+    HDFS-7232. Populate hostname in httpfs audit log (Zoran Dimitrijevic
+    via aw)
+
 Release 2.6.0 - UNRELEASED
 
   INCOMPATIBLE CHANGES
