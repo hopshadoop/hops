@@ -17,6 +17,11 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
+import com.google.common.collect.Lists;
+import java.io.Closeable;
+import java.io.IOException;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -28,8 +33,10 @@ import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.junit.Test;
+import org.mockito.Mockito;
 
 import java.util.List;
 
@@ -42,6 +49,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 public class TestDataNodeMetrics {
+  private static final Log LOG = LogFactory.getLog(TestDataNodeMetrics.class);
 
   @Test
   public void testDataNodeMetrics() throws Exception {
@@ -192,6 +200,40 @@ public class TestDataNodeMetrics {
       if (cluster != null) {
         cluster.shutdown();
       }
+    }
+  }
+
+  @Test(timeout=60000)
+  public void testTimeoutMetric() throws Exception {
+    final Configuration conf = new HdfsConfiguration();
+    final Path path = new Path("/test");
+
+    final MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
+
+    final List<FSDataOutputStream> streams = Lists.newArrayList();
+    try {
+      final FSDataOutputStream out =
+          cluster.getFileSystem().create(path, (short) 2);
+      final DataNodeFaultInjector injector = Mockito.mock
+          (DataNodeFaultInjector.class);
+      Mockito.doThrow(new IOException("mock IOException")).
+          when(injector).
+          writeBlockAfterFlush();
+      DataNodeFaultInjector.instance = injector;
+      streams.add(out);
+      out.writeBytes("old gs data\n");
+      out.hflush();
+
+      final MetricsRecordBuilder dnMetrics =
+          getMetrics(cluster.getDataNodes().get(0).getMetrics().name());
+      assertCounter("DatanodeNetworkErrors", 1L, dnMetrics);
+    } finally {
+      IOUtils.cleanup(LOG, streams.toArray(new Closeable[0]));
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+      DataNodeFaultInjector.instance = new DataNodeFaultInjector();
     }
   }
 }

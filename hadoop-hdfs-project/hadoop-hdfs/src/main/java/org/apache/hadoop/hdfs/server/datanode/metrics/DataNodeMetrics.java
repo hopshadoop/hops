@@ -82,6 +82,9 @@ public class DataNodeMetrics {
   @Metric
   MutableCounterLong volumeFailures;
 
+  @Metric("Count of network errors on the datanode")
+  MutableCounterLong datanodeNetworkErrors;
+   
   @Metric
   MutableRate readBlockOp;
   @Metric
@@ -293,9 +296,11 @@ public class DataNodeMetrics {
     volumeFailures.incr();
   }
 
-  /**
-   * Increment for getBlockLocalPathInfo calls
-   */
+  public void incrDatanodeNetworkErrors() {
+    datanodeNetworkErrors.incr();
+  }
+
+  /** Increment for getBlockLocalPathInfo calls */
   public void incrBlocksGetLocalPathInfo() {
     blocksGetLocalPathInfo.incr();
   }
