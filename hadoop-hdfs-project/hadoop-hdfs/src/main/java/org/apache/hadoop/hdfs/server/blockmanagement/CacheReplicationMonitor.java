@@ -153,18 +153,18 @@ public class CacheReplicationMonitor extends Thread implements Closeable {
           while (true) {
             if (namesystem.isLeader()) {
               if (shutdown) {
-                LOG.info("Shutting down CacheReplicationMonitor");
+                LOG.debug("Shutting down CacheReplicationMonitor");
                 return;
               }
               if (HdfsVariables.getNeedRescan()) {
-                LOG.info("Rescanning because of pending operations");
+                LOG.debug("Rescanning because of pending operations");
                 break;
               }
             }
             long delta = (startTimeMs + intervalMs) - curTimeMs;
             if (delta <= 0) {
               if (namesystem.isLeader()) {
-                LOG.info("Rescanning after " + (curTimeMs - startTimeMs) + " milliseconds");
+                LOG.debug("Rescanning after " + (curTimeMs - startTimeMs) + " milliseconds");
                 break;
               } else {
                 startTimeMs = curTimeMs;
@@ -189,7 +189,7 @@ public class CacheReplicationMonitor extends Thread implements Closeable {
         } finally {
           lock.unlock();
         }
-        LOG.info("Scanned " + scannedDirectives + " directive(s) and " + scannedBlocks + " block(s) in " + (curTimeMs
+        LOG.debug("Scanned " + scannedDirectives + " directive(s) and " + scannedBlocks + " block(s) in " + (curTimeMs
             - startTimeMs) + " " + "millisecond(s).");
       }
     } catch (InterruptedException e) {
