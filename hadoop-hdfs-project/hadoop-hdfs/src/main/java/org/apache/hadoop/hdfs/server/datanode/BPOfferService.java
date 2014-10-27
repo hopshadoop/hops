@@ -67,6 +67,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import org.apache.hadoop.hdfs.client.BlockReportOptions;
+import static org.apache.hadoop.hdfs.server.datanode.BPServiceActor.LOG;
 import org.apache.hadoop.hdfs.server.protocol.BlockIdCommand;
 import org.apache.hadoop.hdfs.server.protocol.BlockReport;
 
@@ -1593,4 +1595,19 @@ public class IncrementalBRTask implements Callable{
     return isAlive();
   }
   
+  void triggerBlockReport(BlockReportOptions options) throws IOException {
+    if (options.isIncremental()) {
+      LOG.info(this.toString() + ": scheduling an incremental block report.");
+      synchronized(pendingIncrementalBRperStorage) {
+        sendImmediateIBR = true;
+        pendingIncrementalBRperStorage.notifyAll();
+      }
+    } else {
+      LOG.info(this.toString() + ": scheduling a full block report.");
+      synchronized(pendingIncrementalBRperStorage) {
+        lastBlockReport = 0;
+        pendingIncrementalBRperStorage.notifyAll();
+      }
+    }
+  }
 }

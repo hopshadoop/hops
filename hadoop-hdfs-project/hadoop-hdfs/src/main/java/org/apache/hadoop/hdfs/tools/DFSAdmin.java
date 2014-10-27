@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.tools;
 
+import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.commons.logging.Log;
@@ -65,9 +66,11 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
+import org.apache.hadoop.hdfs.client.BlockReportOptions;
 import org.apache.hadoop.hdfs.protocol.DatanodeLocalInfo;
 import org.apache.hadoop.hdfs.protocol.RollingUpgradeInfo;
 
@@ -400,6 +403,9 @@ public class DFSAdmin extends FsShell {
     "\t[-shutdownDatanode <datanode_host:ipc_port> [upgrade]]\n" +
     "\t[-getDatanodeInfo <datanode_host:ipc_port>]\n" +
     "\t[-metasave filename]\n" +
+    "\t[-setStoragePolicy path policyName]\n" +
+    "\t[-getStoragePolicy path]\n" +
+    "\t[-triggerBlockReport [-incremental] <datanode_host:ipc_port>]\n" +
     "\t[-help [cmd]]\n";
 
   /**
@@ -567,7 +573,7 @@ public class DFSAdmin extends FsShell {
 
     System.out.println("Safe mode is " + (inSafeMode ? "ON" : "OFF"));
   }
-
+  
   /**
    * Command to ask the namenode to reread the hosts and excluded hosts
    * file.
@@ -647,6 +653,38 @@ public class DFSAdmin extends FsShell {
     throw new IOException("Cannot identify the storage policy for " + argv[1]);
   }
 
+  public int triggerBlockReport(String[] argv) throws IOException {
+    List<String> args = new LinkedList<String>();
+    for (int j = 1; j < argv.length; j++) {
+      args.add(argv[j]);
+    }
+    boolean incremental = StringUtils.popOption("-incremental", args);
+    String hostPort = StringUtils.popFirstNonOption(args);
+    if (hostPort == null) {
+      System.err.println("You must specify a host:port pair.");
+      return 1;
+    }
+    if (!args.isEmpty()) {
+      System.err.print("Can't understand arguments: " +
+        Joiner.on(" ").join(args) + "\n");
+      return 1;
+    }
+    ClientDatanodeProtocol dnProxy = getDataNodeProxy(hostPort);
+    try {
+      dnProxy.triggerBlockReport(
+          new BlockReportOptions.Factory().
+              setIncremental(incremental).
+              build());
+    } catch (IOException e) {
+      System.err.println("triggerBlockReport error: " + e);
+      return 1;
+    }
+    System.out.println("Triggering " +
+        (incremental ? "an incremental " : "a full ") +
+        "block report on " + hostPort + ".");
+    return 0;
+  }
+  
   private void printHelp(String cmd) {
     String summary = "hdfs dfsadmin performs DFS administrative commands.\n" +
       "Note: Administrative commands can only be run with superuser permission.\n" +
@@ -723,6 +761,12 @@ public class DFSAdmin extends FsShell {
     String getStoragePolicy = "-getStoragePolicy path\n"
         + "\tGet the storage policy for a file/directory.\n";
 
+    String triggerBlockReport =
+      "-triggerBlockReport [-incremental] <datanode_host:ipc_port>\n"
+        + "\tTrigger a block report for the datanode.\n"
+        + "\tIf 'incremental' is specified, it will be an incremental\n"
+        + "\tblock report; otherwise, it will be a full block report.\n";
+    
     String shutdownDatanode = "-shutdownDatanode <datanode_host:ipc_port> [upgrade]\n"
         + "\tSubmit a shutdown request for the given datanode. If an optional\n"
         + "\t\"upgrade\" argument is specified, clients accessing the datanode\n"
@@ -798,6 +842,7 @@ public class DFSAdmin extends FsShell {
       System.out.println(setBalancerBandwidth);
       System.out.println(setStoragePolicy);
       System.out.println(getStoragePolicy);
+      System.out.println(triggerBlockReport);
       System.out.println(shutdownDatanode);
       System.out.println(getDatanodeInfo);
       System.out.println(help);
@@ -1072,6 +1117,9 @@ public class DFSAdmin extends FsShell {
     } else if ("-getStoragePolicy".equals(cmd)) {
       System.err.println("Usage: hdfs dfsadmin"
           + " [-getStoragePolicy path]");
+    } else if ("-triggerBlockReport".equals(cmd)) {
+      System.err.println("Usage: java DFSAdmin"
+          + " [-triggerBlockReport [-incremental] <datanode_host:ipc_port>]");
     } else {
       System.err.println("Usage: hdfs dfsadmin");
       System.err.println("Note: Administrative commands can only be run as the HDFS superuser.");
@@ -1157,6 +1205,11 @@ public class DFSAdmin extends FsShell {
         printUsage(cmd);
         return exitCode;
       }
+    } else if ("-triggerBlockReport".equals(cmd)) {
+      if (argv.length < 1) {
+        printUsage(cmd);
+        return exitCode;
+      }
     } else if ("-getStoragePolicy".equals(cmd)) {
       if (argv.length != 2) {
         printUsage(cmd);
@@ -1223,6 +1276,8 @@ public class DFSAdmin extends FsShell {
         exitCode = setStoragePolicy(argv);
       } else if ("-getStoragePolicy".equals(cmd)) {
         exitCode = getStoragePolicy(argv);
+      } else if ("-triggerBlockReport".equals(cmd)) {
+        exitCode = triggerBlockReport(argv);
       } else if ("-shutdownDatanode".equals(cmd)) {
         exitCode = shutdownDatanode(argv, i);
       } else if ("-getDatanodeInfo".equals(cmd)) {
