@@ -53,6 +53,15 @@ Release 2.7.0 - UNRELEASED
 
   BUG FIXES
 
+    HDFS-6538. Comment format error in ShortCircuitRegistry javadoc.
+    (David Luo via harsh).
+
+    HDFS-7194. Fix findbugs "inefficient new String constructor" warning in
+    DFSClient#PATH (yzhang via cmccabe)
+
+    HDFS-7198. Fix or suppress findbugs "unchecked conversion" warning in
+    DFSClient#getPathTraceScope (cmccabe)
+
     HDFS-6657. Remove link to 'Legacy UI' in the Namenode UI.
     (Vinayakumar B via wheat9)
 
