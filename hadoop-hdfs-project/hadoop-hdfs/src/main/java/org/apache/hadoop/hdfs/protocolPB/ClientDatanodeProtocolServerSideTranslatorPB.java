@@ -25,6 +25,7 @@ import com.google.protobuf.ServiceException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.ReconfigurationTaskStatus;
 import org.apache.hadoop.conf.ReconfigurationUtil.PropertyChange;
+import org.apache.hadoop.hdfs.client.BlockReportOptions;
 import org.apache.hadoop.hdfs.protocol.BlockLocalPathInfo;
 import org.apache.hadoop.hdfs.protocol.ClientDatanodeProtocol;
 import org.apache.hadoop.hdfs.protocol.HdfsBlocksMetadata;
@@ -46,6 +47,8 @@ import org.apache.hadoop.hdfs.protocol.proto.ClientDatanodeProtocolProtos.Shutdo
 import org.apache.hadoop.hdfs.protocol.proto.ClientDatanodeProtocolProtos.ShutdownDatanodeResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientDatanodeProtocolProtos.StartReconfigurationRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientDatanodeProtocolProtos.StartReconfigurationResponseProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientDatanodeProtocolProtos.TriggerBlockReportRequestProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientDatanodeProtocolProtos.TriggerBlockReportResponseProto;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.security.proto.SecurityProtos.TokenProto;
 import org.apache.hadoop.security.token.Token;
@@ -69,6 +72,8 @@ public class ClientDatanodeProtocolServerSideTranslatorPB
       ShutdownDatanodeResponseProto.newBuilder().build();
   private final static StartReconfigurationResponseProto START_RECONFIG_RESP =
       StartReconfigurationResponseProto.newBuilder().build();
+  private final static TriggerBlockReportResponseProto TRIGGER_BLOCK_REPORT_RESP =
+      TriggerBlockReportResponseProto.newBuilder().build();
   
   private final ClientDatanodeProtocol impl;
 
@@ -219,5 +224,18 @@ public class ClientDatanodeProtocolServerSideTranslatorPB
       throw new ServiceException(e);
     }
     return builder.build();
+  }
+
+  @Override
+  public TriggerBlockReportResponseProto triggerBlockReport(
+      RpcController unused, TriggerBlockReportRequestProto request)
+          throws ServiceException {
+    try {
+      impl.triggerBlockReport(new BlockReportOptions.Factory().
+          setIncremental(request.getIncremental()).build());
+    } catch (IOException e) {
+      throw new ServiceException(e);
+    }
+    return TRIGGER_BLOCK_REPORT_RESP;
   }
 }

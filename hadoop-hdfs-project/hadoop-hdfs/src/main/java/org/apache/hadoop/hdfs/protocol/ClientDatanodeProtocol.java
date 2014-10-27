@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs.protocol;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.ReconfigurationTaskStatus;
+import org.apache.hadoop.hdfs.client.BlockReportOptions;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenSelector;
@@ -153,4 +154,10 @@ public interface ClientDatanodeProtocol {
    * @see {@link org.apache.hadoop.conf.ReconfigurationTaskStatus}.
    */
   ReconfigurationTaskStatus getReconfigurationStatus() throws IOException;
+
+  /**
+   * Trigger a new block report.
+   */
+  void triggerBlockReport(BlockReportOptions options)
+    throws IOException;
 }
