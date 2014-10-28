@@ -17,8 +17,37 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
-import static org.apache.hadoop.fs.CommonConfigurationKeys.IPC_CLIENT_FALLBACK_TO_SIMPLE_AUTH_ALLOWED_DEFAULT;
-import static org.apache.hadoop.fs.CommonConfigurationKeys.IPC_CLIENT_FALLBACK_TO_SIMPLE_AUTH_ALLOWED_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_ADMIN;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_ADDRESS_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_ADDRESS_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DATA_DIR_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DATA_DIR_PERMISSION_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DATA_DIR_PERMISSION_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DIRECTORYSCAN_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DIRECTORYSCAN_INTERVAL_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DNS_INTERFACE_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DNS_INTERFACE_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DNS_NAMESERVER_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DNS_NAMESERVER_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_HANDLER_COUNT_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_HOST_NAME_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_HTTPS_ADDRESS_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_HTTPS_ADDRESS_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_HTTP_ADDRESS_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_HTTP_ADDRESS_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_IPC_ADDRESS_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_KEYTAB_FILE_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_MAX_LOCKED_MEMORY_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_PLUGINS_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_SCAN_PERIOD_HOURS_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_SCAN_PERIOD_HOURS_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_STARTUP_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_MAX_NUM_BLOCKS_TO_LOG_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_MAX_NUM_BLOCKS_TO_LOG_KEY;
+import java.io.EOFException;
+import java.io.FileNotFoundException;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
@@ -165,7 +194,6 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.management.ObjectName;
 
-import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
 import org.apache.hadoop.hdfs.net.DomainPeerServer;
 import org.apache.hadoop.hdfs.net.TcpPeerServer;
 import org.apache.hadoop.hdfs.protocol.DatanodeLocalInfo;
@@ -1913,39 +1941,63 @@ public class DataNode extends ReconfigurableBase
   public int getXceiverCount() {
     return threadGroup == null ? 0 : threadGroup.activeCount();
   }
-
-  private void reportBadBlock(final BPOfferService bpos,
-      final ExtendedBlock block, final String msg) {
-    FsVolumeSpi volume = getFSDataset().getVolume(block);
-    bpos.reportBadBlocks(block, volume.getStorageID(), volume.getStorageType());
-    LOG.warn(msg);
-  }
   
   int getXmitsInProgress() {
     return xmitsInProgress.get();
   }
 
-  private void transferBlock(ExtendedBlock block, DatanodeInfo xferTargets[],
+  private void reportBadBlock(final BPOfferService bpos,
+      final ExtendedBlock block, final String msg) {
+    FsVolumeSpi volume = getFSDataset().getVolume(block);
+    bpos.reportBadBlocks(
+        block, volume.getStorageID(), volume.getStorageType());
+    LOG.warn(msg);
+  }
+
+  private void transferBlock(ExtendedBlock block, DatanodeInfo[] xferTargets,
       StorageType[] xferTargetStorageTypes) throws IOException {
     BPOfferService bpos = getBPOSForBlock(block);
     DatanodeRegistration bpReg = getDNRegistrationForBP(block.getBlockPoolId());
-    
-    if (!data.isValidBlock(block)) {
-      // block does not exist or is under-construction
+
+    boolean replicaNotExist = false;
+    boolean replicaStateNotFinalized = false;
+    boolean blockFileNotExist = false;
+    boolean lengthTooShort = false;
+
+    try {
+      data.checkBlock(block, block.getNumBytes(), ReplicaState.FINALIZED);
+    } catch (ReplicaNotFoundException e) {
+      replicaNotExist = true;
+    } catch (UnexpectedReplicaStateException e) {
+      replicaStateNotFinalized = true;
+    } catch (FileNotFoundException e) {
+      blockFileNotExist = true;
+    } catch (EOFException e) {
+      lengthTooShort = true;
+    } catch (IOException e) {
+      // The IOException indicates not being able to access block file,
+      // treat it the same here as blockFileNotExist, to trigger 
+      // reporting it as a bad block
+      blockFileNotExist = true;      
+    }
+
+    if (replicaNotExist || replicaStateNotFinalized) {
       String errStr = "Can't send invalid block " + block;
       LOG.info(errStr);
-      
       bpos.trySendErrorReport(DatanodeProtocol.INVALID_BLOCK, errStr);
       return;
     }
-
-    // Check if NN recorded length matches on-disk length 
-    long onDiskLength = data.getLength(block);
-    if (block.getNumBytes() > onDiskLength) {
-      // Check if NN recorded length matches on-disk length
+    if (blockFileNotExist) {
+      // Report back to NN bad block caused by non-existent block file.
+      reportBadBlock(bpos, block, "Can't replicate block " + block
+          + " because the block file doesn't exist, or is not accessible");
+      return;
+    }
+    if (lengthTooShort) {
+      // Check if NN recorded length matches on-disk length 
       // Shorter on-disk len indicates corruption so report NN the corrupt block
       reportBadBlock(bpos, block, "Can't replicate block " + block
-          + " because on-disk length " + data.getLength(block)
+          + " because on-disk length " + data.getLength(block) 
           + " is shorter than NameNode recorded length " + block.getNumBytes());
       return;
     }
