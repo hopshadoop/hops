@@ -45,6 +45,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import org.apache.hadoop.hdfs.protocol.Block;
 
 /**
  * Stores information about all corrupt blocks in the File System.
@@ -380,5 +381,25 @@ public class CorruptReplicasMap {
   private void removeCorruptReplicaFromDB(CorruptReplica cr)
       throws StorageException, TransactionContextException {
     EntityManager.remove(cr);
+  }
+  
+   /**
+   * return the reason about corrupted replica for a given block
+   * on a given dn
+   * @param block block that has corrupted replica
+   * @param node datanode that contains this corrupted replica
+   * @return reason
+   */
+  String getCorruptReason(BlockInfo block, DatanodeDescriptor node) throws IOException {
+    Reason reason = null;
+    Map<DatanodeDescriptor, Reason> corruptReplicasMap = getNodesMap(block);    
+    if (corruptReplicasMap != null && corruptReplicasMap.containsKey(node)) {
+      reason = corruptReplicasMap.get(node);
+    }
+    if (reason != null) {
+      return reason.toString();
+    } else {
+      return null;
+    }
   }
 }

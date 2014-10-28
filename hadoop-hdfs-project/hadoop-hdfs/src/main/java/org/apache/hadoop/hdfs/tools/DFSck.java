@@ -75,24 +75,28 @@ public class DFSck extends Configured implements Tool {
     HdfsConfiguration.init();
   }
 
-  private static final String USAGE =
-      "Usage: DFSck <path> " + "[-list-corruptfileblocks | " +
-          "[-move | -delete | -openforwrite] " +
-          "[-files [-blocks [-locations | -racks]]]]\n" +
-          "\t<path>\tstart checking from this path\n" +
-          "\t-move\tmove corrupted files to /lost+found\n" +
-          "\t-delete\tdelete corrupted files\n" +
-          "\t-files\tprint out files being checked\n" +
-          "\t-openforwrite\tprint out files opened for write\n" +
-          "\t-list-corruptfileblocks\tprint out list of missing " +
-          "blocks and files they belong to\n" +
-          "\t-blocks\tprint out block report\n" +
-          "\t-locations\tprint out locations for every block\n" +
-          "\t-racks\tprint out network topology for data-node locations\n" +
-          "\t\tBy default fsck ignores files opened for write, " +
-          "use -openforwrite to report such files. They are usually " +
-          " tagged CORRUPT or HEALTHY depending on their block " +
-          "allocation status";
+  private static final String USAGE = "Usage: DFSck <path> "
+      + "[-list-corruptfileblocks | "
+      + "[-move | -delete | -openforwrite] "
+      + "[-files [-blocks [-locations | -racks]]]]\n"
+      + "\t<path>\tstart checking from this path\n"
+      + "\t-move\tmove corrupted files to /lost+found\n"
+      + "\t-delete\tdelete corrupted files\n"
+      + "\t-files\tprint out files being checked\n"
+      + "\t-openforwrite\tprint out files opened for write\n"
+      + "\t-list-corruptfileblocks\tprint out list of missing "
+      + "blocks and files they belong to\n"
+      + "\t-blocks\tprint out block report\n"
+      + "\t-locations\tprint out locations for every block\n"
+      + "\t-racks\tprint out network topology for data-node locations\n\n"
+      + "\t-blockId\tprint out which file this blockId belongs to, locations"
+      + " (nodes, racks) of this block, and other diagnostics info"
+      + " (under replicated, corrupted or not, etc)\n\n"
+      + "Please Note:\n"
+      + "\t1. By default fsck ignores files opened for write, "
+      + "use -openforwrite to report such files. They are usually "
+      + " tagged CORRUPT or HEALTHY depending on their block "
+      + "allocation status\n";
   
   private final UserGroupInformation ugi;
   private final PrintStream out;
@@ -264,36 +268,46 @@ public class DFSck extends Configured implements Tool {
     url.append("/fsck?ugi=").append(ugi.getShortUserName());
     String dir = null;
     boolean doListCorruptFileBlocks = false;
-    for (String arg : args) {
-      if (arg.equals("-move")) {
+    for (int idx = 0; idx < args.length; idx++) {
+      if (args[idx].equals("-move")) {
         url.append("&move=1");
-      } else if (arg.equals("-delete")) {
+      } else if (args[idx].equals("-delete")) {
         url.append("&delete=1");
-      } else if (arg.equals("-files")) {
+      } else if (args[idx].equals("-files")) {
         url.append("&files=1");
-      } else if (arg.equals("-openforwrite")) {
+      } else if (args[idx].equals("-openforwrite")) {
         url.append("&openforwrite=1");
-      } else if (arg.equals("-blocks")) {
+      } else if (args[idx].equals("-blocks")) {
         url.append("&blocks=1");
-      } else if (arg.equals("-locations")) {
+      } else if (args[idx].equals("-locations")) {
         url.append("&locations=1");
-      } else if (arg.equals("-racks")) {
+      } else if (args[idx].equals("-racks")) {
         url.append("&racks=1");
-      } else if (arg.equals("-list-corruptfileblocks")) {
+      } else if (args[idx].equals("-list-corruptfileblocks")) {
         url.append("&listcorruptfileblocks=1");
         doListCorruptFileBlocks = true;
-      } else if (!arg.startsWith("-")) {
+      } else if (args[idx].equals("-blockId")) {
+        StringBuilder sb = new StringBuilder();
+        idx++;
+        while(idx < args.length && !args[idx].startsWith("-")){
+          sb.append(args[idx]);
+          sb.append(" ");
+          idx++;
+        }
+        url.append("&blockId=").append(URLEncoder.encode(sb.toString(), "UTF-8"));
+      } else if (!args[idx].startsWith("-")) {
         if (null == dir) {
-          dir = arg;
+          dir = args[idx];
         } else {
           System.err.println(
-              "fsck: can only operate on one path at a time '" + arg +
+              "fsck: can only operate on one path at a time '" + args[idx] +
                   "'");
           printUsage(System.err);
           return -1;
         }
+
       } else {
-        System.err.println("fsck: Illegal option '" + arg + "'");
+        System.err.println("fsck: Illegal option '" + args[idx] + "'");
         printUsage(System.err);
         return -1;
       }
@@ -332,6 +346,12 @@ public class DFSck extends Configured implements Tool {
       errCode = 1;
     } else if (lastLine.endsWith(NamenodeFsck.NONEXISTENT_STATUS)) {
       errCode = 0;
+    } else if (lastLine.contains("Incorrect blockId format:")) {
+      errCode = 0;
+    } else if (lastLine.endsWith(NamenodeFsck.DECOMMISSIONED_STATUS)) {
+      errCode = 2;
+    } else if (lastLine.endsWith(NamenodeFsck.DECOMMISSIONING_STATUS)) {
+      errCode = 3;
     }
     return errCode;
   }
