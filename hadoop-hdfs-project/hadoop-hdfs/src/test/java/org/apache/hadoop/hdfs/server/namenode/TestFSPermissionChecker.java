@@ -513,7 +513,8 @@ public class TestFSPermissionChecker {
       fail("expected AccessControlException for user + " + user + ", path = " +
           path + ", access = " + access);
     } catch (AccessControlException e) {
-      // expected
+      assertTrue("Permission denied messages must carry the username",
+              e.getMessage().contains(user.getUserName().toString()));
     }
   }
   

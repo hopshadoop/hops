@@ -259,7 +259,9 @@ class FSPermissionChecker {
     if (inode != null && user.equals(inode.getUserName())) {
       return;
     }
-    throw new AccessControlException("Permission denied");
+    throw new AccessControlException(
+            "Permission denied. user="
+            + user + " is not the owner of inode=" + inode);
   }
 
   /**
