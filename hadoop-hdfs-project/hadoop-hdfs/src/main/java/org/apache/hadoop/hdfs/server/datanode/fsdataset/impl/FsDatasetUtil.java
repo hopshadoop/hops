@@ -54,7 +54,7 @@ public class FsDatasetUtil {
   /**
    * Find the corresponding meta data file from a given block file
    */
-  static File findMetaFile(final File blockFile) throws IOException {
+  public static File findMetaFile(final File blockFile) throws IOException {
     final String prefix = blockFile.getName() + "_";
     final File parent = blockFile.getParentFile();
     final File[] matches = parent.listFiles(new FilenameFilter() {
