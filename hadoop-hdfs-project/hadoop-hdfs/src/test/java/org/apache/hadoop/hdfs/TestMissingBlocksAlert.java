@@ -17,13 +17,6 @@
  */
 package org.apache.hadoop.hdfs;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
-import java.io.IOException;
-import java.lang.management.ManagementFactory;
-import java.net.URL;
 import javax.management.AttributeNotFoundException;
 import javax.management.InstanceNotFoundException;
 import javax.management.MBeanException;
@@ -43,6 +36,12 @@ import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
 import org.junit.Assert;
 import org.junit.Test;
 
+import java.io.IOException;
+import java.lang.management.ManagementFactory;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
 /**
  * The test makes sure that NameNode detects presense blocks that do not have
  * any valid replicas. In addition, it verifies that HDFS front page displays
@@ -54,11 +53,12 @@ public class TestMissingBlocksAlert {
       LogFactory.getLog(TestMissingBlocksAlert.class);
 
   @Test
-  public void testMissingBlocksAlert() throws IOException, InterruptedException,
-                       MalformedObjectNameException, AttributeNotFoundException,
+  public void testMissingBlocksAlert()
+          throws IOException, InterruptedException,
+                 MalformedObjectNameException, AttributeNotFoundException,
                  MBeanException, ReflectionException,
-                 InstanceNotFoundException{
-
+                 InstanceNotFoundException {
+    
     MiniDFSCluster cluster = null;
 
     try {
@@ -111,8 +111,8 @@ public class TestMissingBlocksAlert {
               "Hadoop:service=NameNode,name=NameNodeInfo");
       Assert.assertEquals(1, (long)(Long) mbs.getAttribute(mxbeanName,
                       "NumberOfMissingBlocks"));
-      
-      // now do the reverse : remove the file expect the number of missing
+
+      // now do the reverse : remove the file expect the number of missing 
       // blocks to go to zero
 
       dfs.delete(corruptFile, true);
@@ -125,8 +125,8 @@ public class TestMissingBlocksAlert {
       assertEquals(2, dfs.getUnderReplicatedBlocksCount());
       assertEquals(2, bm.getUnderReplicatedNotMissingBlocks());
 
-      Assert.assertEquals(0, (long) (Long) mbs.getAttribute(mxbeanName,
-          "NumberOfMissingBlocks"));
+      Assert.assertEquals(0, (long)(Long) mbs.getAttribute(mxbeanName,
+              "NumberOfMissingBlocks"));
     } finally {
       if (cluster != null) {
         cluster.shutdown();
