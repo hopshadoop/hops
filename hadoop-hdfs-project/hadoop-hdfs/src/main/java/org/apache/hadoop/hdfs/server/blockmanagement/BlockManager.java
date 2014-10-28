@@ -4362,12 +4362,12 @@ public class BlockManager {
         processIncrementalBlockReportHandler.handle(namesystem);
       }
     } finally {
-      blockLog.debug(
-          "*BLOCK* NameNode.processIncrementalBlockReport: " + "from " +
-              nodeID + " receiving: " + receiving[0] + ", " + " received: " +
-              received[0] + ", " + " deleted: " + deleted[0]);
+      if (blockLog.isDebugEnabled()) {
+        blockLog.debug(
+            "*BLOCK* NameNode.processIncrementalBlockReport: " + "from " + nodeID + " receiving: " + receiving[0] + ", "
+            + " received: " + received[0] + ", " + " deleted: " + deleted[0]);
+      }
     }
-
   }
 
   /**
