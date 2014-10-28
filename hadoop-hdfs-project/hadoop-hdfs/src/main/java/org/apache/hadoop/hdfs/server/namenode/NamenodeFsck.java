@@ -17,16 +17,16 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import static org.apache.hadoop.fs.CommonConfigurationKeys.IPC_CLIENT_FALLBACK_TO_SIMPLE_AUTH_ALLOWED_DEFAULT;
-import static org.apache.hadoop.fs.CommonConfigurationKeys.IPC_CLIENT_FALLBACK_TO_SIMPLE_AUTH_ALLOWED_KEY;
 
 import com.google.common.annotations.VisibleForTesting;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
+import io.hops.metadata.hdfs.entity.Replica;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.LockFactory;
+import static io.hops.transaction.lock.LockFactory.getInstance;
 import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
 import org.apache.commons.logging.Log;
@@ -39,14 +39,19 @@ import org.apache.hadoop.hdfs.BlockReaderFactory;
 import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.DirectoryListing;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockCollection;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockPlacementPolicy;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockPlacementStatus;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.NetworkTopology;
@@ -78,12 +83,11 @@ import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
 
 import javax.net.SocketFactory;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
-import org.apache.hadoop.hdfs.protocol.datatransfer.TrustedChannelResolver;
 import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.DataEncryptionKeyFactory;
-import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.DataTransferSaslUtil;
-import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.SaslDataTransferClient;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeManager;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.tracing.TraceUtils;
 import org.apache.htrace.core.Tracer;
@@ -117,6 +121,8 @@ public class NamenodeFsck implements DataEncryptionKeyFactory {
   // return string marking fsck status
   public static final String CORRUPT_STATUS = "is CORRUPT";
   public static final String HEALTHY_STATUS = "is HEALTHY";
+  public static final String DECOMMISSIONING_STATUS = "is DECOMMISSIONING";
+  public static final String DECOMMISSIONED_STATUS = "is DECOMMISSIONED";
   public static final String NONEXISTENT_STATUS = "does not exist";
   public static final String FAILURE_STATUS = "FAILED";
   
@@ -159,7 +165,9 @@ public class NamenodeFsck implements DataEncryptionKeyFactory {
    */
   private boolean doDelete = false;
 
-  private String path = "/";
+  String path = "/";
+
+  private String blockIds = null;
 
   // We return back N files that are corrupt; the list of files returned is
   // ordered by block id; to allow continuation support, pass in the last block
@@ -229,7 +237,98 @@ public class NamenodeFsck implements DataEncryptionKeyFactory {
         this.showCorruptFileBlocks = true;
       } else if (key.equals("startblockafter")) {
         this.currentCookie[0] = pmap.get("startblockafter")[0];
+      } else if (key.equals("blockId")) {
+        this.blockIds = pmap.get("blockId")[0];
       }
+    }
+  }
+
+  /**
+   * Check block information given a blockId number
+   *
+  */
+  public void blockIdCK(final String blockId) {
+
+    if(blockId == null) {
+      out.println("Please provide valid blockId!");
+      return;
+    }
+
+    final BlockManager bm = namenode.getNamesystem().getBlockManager();
+    try {
+      //get blockInfo
+      final Block block = new Block(Block.getBlockId(blockId));
+      new HopsTransactionalRequestHandler(
+          HDFSOperationType.CHECK_BLOCK) {
+        INodeIdentifier inodeIdentifier;
+
+        @Override
+        public void setUp() throws StorageException {
+          inodeIdentifier = INodeUtil.resolveINodeFromBlock(block);
+        }
+
+        @Override
+        public void acquireLock(TransactionLocks locks) throws IOException {
+          LockFactory lf = getInstance();
+          locks.add(lf.getIndividualINodeLock(TransactionLockTypes.INodeLockType.READ, inodeIdentifier, true))
+              .add(lf.getBlockLock(block.getBlockId(), inodeIdentifier))
+              .add(lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.ER, LockFactory.BLK.UC,
+                  LockFactory.BLK.UR));
+        }
+
+        @Override
+        public Object performTask() throws IOException {
+          //find which file this block belongs to
+          BlockInfo blockInfo = bm.getStoredBlock(block);
+          if (blockInfo == null) {
+            out.println("Block " + blockId + " " + NONEXISTENT_STATUS);
+            LOG.warn("Block " + blockId + " " + NONEXISTENT_STATUS);
+            return null;
+          }
+          BlockCollection bc = bm.getBlockCollection(blockInfo);
+          INode iNode = (INode) bc;
+          NumberReplicas numberReplicas = bm.countNodes(block);
+          out.println("Block Id: " + blockId);
+          out.println("Block belongs to: " + iNode.getFullPathName());
+          out.println("No. of Expected Replica: " + bc.getBlockReplication());
+          out.println("No. of live Replica: " + numberReplicas.liveReplicas());
+          out.println("No. of excess Replica: " + numberReplicas.excessReplicas());
+          out.println("No. of stale Replica: " + numberReplicas.replicasOnStaleNodes());
+          out.println("No. of decommission Replica: "
+              + numberReplicas.decommissionedReplicas());
+          out.println("No. of corrupted Replica: " + numberReplicas.corruptReplicas());
+          //record datanodes that have corrupted block replica
+          Collection<DatanodeDescriptor> corruptionRecord = null;
+          if (bm.getCorruptReplicas(block) != null) {
+            corruptionRecord = bm.getCorruptReplicas(block);
+          }
+
+          DatanodeManager dnm = namenode.getNamesystem().getBlockManager().getDatanodeManager();
+          DatanodeStorageInfo[] storages =  blockInfo.getStorages(dnm);
+          //report block replicas status on datanodes
+          for (int idx = (storages.length - 1); idx >= 0; idx--) {
+            DatanodeDescriptor dn = storages[idx].getDatanodeDescriptor();
+            out.print("Block replica on datanode/rack: " + dn.getHostName() + dn.getNetworkLocation() + " ");
+            if (corruptionRecord != null && corruptionRecord.contains(dn)) {
+              out.print(CORRUPT_STATUS + "\t ReasonCode: " + bm.getCorruptReason(blockInfo, dn));
+            } else if (dn.isDecommissioned()) {
+              out.print(DECOMMISSIONED_STATUS);
+            } else if (dn.isDecommissionInProgress()) {
+              out.print(DECOMMISSIONING_STATUS);
+            } else {
+              out.print(HEALTHY_STATUS);
+            }
+            out.print("\n");
+          }
+          return null;
+        }
+      }.handle();
+    } catch (Exception e){
+      String errMsg = "Fsck on blockId '" + blockId;
+      LOG.warn(errMsg, e);
+      out.println(e.getMessage());
+      out.print("\n\n" + errMsg);
+      LOG.warn("Error in looking up block", e);
     }
   }
 
@@ -239,8 +338,32 @@ public class NamenodeFsck implements DataEncryptionKeyFactory {
   public void fsck() {
     final long startTime = Time.now();
     try {
-      String msg = "FSCK started by " + UserGroupInformation.getCurrentUser() +
-          " from " + remoteAddress + " for path " + path + " at " + new Date();
+      if(blockIds != null) {
+
+        String[] blocks = blockIds.split(" ");
+        StringBuilder sb = new StringBuilder();
+        sb.append("FSCK started by " +
+            UserGroupInformation.getCurrentUser() + " from " +
+            remoteAddress + " at " + new Date());
+        out.println(sb.toString());
+        sb.append(" for blockIds: \n");
+        for (String blk: blocks) {
+          if(blk == null || !blk.contains("blk_")) {
+            out.println("Incorrect blockId format: " + blk);
+            continue;
+          }
+          out.print("\n");
+          blockIdCK(blk);
+          sb.append(blk + "\n");
+        }
+        LOG.info(sb.toString());
+        namenode.getNamesystem().logFsckEvent("/", remoteAddress);
+        out.flush();
+        return;
+      }
+
+      String msg = "FSCK started by " + UserGroupInformation.getCurrentUser()
+          + " from " + remoteAddress + " for path " + path + " at " + new Date();
       LOG.info(msg);
       out.println(msg);
       namenode.getNamesystem().logFsckEvent(path, remoteAddress);

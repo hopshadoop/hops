@@ -793,6 +793,12 @@ public class DFSTestUtil {
     return ((HdfsDataInputStream) in).getAllBlocks();
   }
 
+  public static List<LocatedBlock> getAllBlocks(FileSystem fs, Path path)
+      throws IOException {
+    HdfsDataInputStream in = (HdfsDataInputStream) fs.open(path);
+    return in.getAllBlocks();
+  }
+
   public static Token<BlockTokenIdentifier> getBlockToken(
       FSDataOutputStream out) {
     return ((DFSOutputStream) out.getWrappedStream()).getBlockToken();
