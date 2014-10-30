@@ -4842,6 +4842,11 @@ public class BlockManager {
     return this.neededReplications.getCorruptBlockSize();
   }
 
+  public long getMissingReplOneBlocksCount() throws IOException {
+    // not locking
+    return this.neededReplications.getCorruptReplOneBlockSize();
+  }
+  
   public BlockInfo addBlockCollection(BlockInfo block, BlockCollection bc)
       throws StorageException, TransactionContextException {
     return blocksMap.addBlockCollection(block, bc);

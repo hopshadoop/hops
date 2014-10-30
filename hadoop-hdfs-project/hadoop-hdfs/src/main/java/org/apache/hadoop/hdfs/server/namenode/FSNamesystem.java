@@ -4897,6 +4897,13 @@ public class FSNamesystem
     return blockManager.getMissingBlocksCount();
   }
 
+  @Metric({"MissingReplOneBlocks", "Number of missing blocks " +
+      "with replication factor 1"})
+  public long getMissingReplOneBlocksCount() throws IOException {
+    // not locking
+    return blockManager.getMissingReplOneBlocksCount();
+  }
+  
   @Metric({"ExpiredHeartbeats", "Number of expired heartbeats"})
   public int getExpiredHeartbeats() {
     return datanodeStatistics.getExpiredHeartbeats();
@@ -4907,12 +4914,11 @@ public class FSNamesystem
    */
   long[] getStats() throws IOException {
     final long[] stats = datanodeStatistics.getStats();
-    stats[ClientProtocol.GET_STATS_UNDER_REPLICATED_IDX] =
-        getUnderReplicatedBlocks();
-    stats[ClientProtocol.GET_STATS_CORRUPT_BLOCKS_IDX] =
-        getCorruptReplicaBlocks();
-    stats[ClientProtocol.GET_STATS_MISSING_BLOCKS_IDX] =
-        getMissingBlocksCount();
+    stats[ClientProtocol.GET_STATS_UNDER_REPLICATED_IDX] = getUnderReplicatedBlocks();
+    stats[ClientProtocol.GET_STATS_CORRUPT_BLOCKS_IDX] = getCorruptReplicaBlocks();
+    stats[ClientProtocol.GET_STATS_MISSING_BLOCKS_IDX] = getMissingBlocksCount();
+    stats[ClientProtocol.GET_STATS_MISSING_REPL_ONE_BLOCKS_IDX] =
+        getMissingReplOneBlocksCount();
     return stats;
   }
 
@@ -6972,6 +6978,11 @@ public class FSNamesystem
   @Override // NameNodeMXBean
   public long getNumberOfMissingBlocks() throws IOException {
     return getMissingBlocksCount();
+  }
+
+  @Override // NameNodeMXBean
+  public long getNumberOfMissingBlocksWithReplicationFactorOne() throws IOException {
+    return getMissingReplOneBlocksCount();
   }
 
   @Override // NameNodeMXBean

@@ -189,8 +189,13 @@ class HeartbeatManager implements DatanodeStatistics {
 
   @Override
   public synchronized long[] getStats() {
-    return new long[]{getCapacityTotal(), getCapacityUsed(),
-        getCapacityRemaining(), -1L, -1L, -1L, getBlockPoolUsed()};
+    return new long[] {getCapacityTotal(),
+                       getCapacityUsed(),
+                       getCapacityRemaining(),
+                       -1L,
+                       -1L,
+                       -1L,
+                       -1L};
   }
 
   @Override

@@ -1401,16 +1401,15 @@ public class PBHelper {
   }
 
   public static long[] convert(GetFsStatsResponseProto res) {
-    long[] result = new long[6];
+    long[] result = new long[7];
     result[ClientProtocol.GET_STATS_CAPACITY_IDX] = res.getCapacity();
     result[ClientProtocol.GET_STATS_USED_IDX] = res.getUsed();
     result[ClientProtocol.GET_STATS_REMAINING_IDX] = res.getRemaining();
-    result[ClientProtocol.GET_STATS_UNDER_REPLICATED_IDX] =
-        res.getUnderReplicated();
-    result[ClientProtocol.GET_STATS_CORRUPT_BLOCKS_IDX] =
-        res.getCorruptBlocks();
-    result[ClientProtocol.GET_STATS_MISSING_BLOCKS_IDX] =
-        res.getMissingBlocks();
+    result[ClientProtocol.GET_STATS_UNDER_REPLICATED_IDX] = res.getUnderReplicated();
+    result[ClientProtocol.GET_STATS_CORRUPT_BLOCKS_IDX] = res.getCorruptBlocks();
+    result[ClientProtocol.GET_STATS_MISSING_BLOCKS_IDX] = res.getMissingBlocks();
+    result[ClientProtocol.GET_STATS_MISSING_REPL_ONE_BLOCKS_IDX] =
+        res.getMissingReplOneBlocks();
     return result;
   }
 
@@ -1438,6 +1437,9 @@ public class PBHelper {
       result.setMissingBlocks(
           fsStats[ClientProtocol.GET_STATS_MISSING_BLOCKS_IDX]);
     }
+    if (fsStats.length >= ClientProtocol.GET_STATS_MISSING_REPL_ONE_BLOCKS_IDX + 1)
+      result.setMissingReplOneBlocks(
+          fsStats[ClientProtocol.GET_STATS_MISSING_REPL_ONE_BLOCKS_IDX]);
     return result.build();
   }
 
