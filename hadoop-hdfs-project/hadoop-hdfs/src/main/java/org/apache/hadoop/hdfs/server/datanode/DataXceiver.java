@@ -19,6 +19,8 @@ package org.apache.hadoop.hdfs.server.datanode;
 
 import com.google.common.net.InetAddresses;
 import com.google.protobuf.ByteString;
+import java.net.SocketTimeoutException;
+
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
@@ -244,6 +246,15 @@ class DataXceiver extends Receiver implements Runnable {
           LOG.trace(s, t);
         } else {
           LOG.info(s + "; " + t);
+        }
+      } else if (op == Op.READ_BLOCK && t instanceof SocketTimeoutException) {
+        String s1 =
+            "Likely the client has stopped reading, disconnecting it";
+        s1 += " (" + s + ")";
+        if (LOG.isTraceEnabled()) {
+          LOG.trace(s1, t);
+        } else {
+          LOG.info(s1 + "; " + t);          
         }
       } else {
         LOG.error(s, t);
@@ -537,9 +548,11 @@ class DataXceiver extends Receiver implements Runnable {
       /* What exactly should we do here?
        * Earlier version shutdown() datanode if there is disk error.
        */
-      LOG.warn(dnR + ":Got exception while serving " + block + " to "
+      if (!(ioe instanceof SocketTimeoutException)) {
+        LOG.warn(dnR + ":Got exception while serving " + block + " to "
           + remoteAddress, ioe);
-      datanode.metrics.incrDatanodeNetworkErrors();
+        datanode.metrics.incrDatanodeNetworkErrors();
+      }
       throw ioe;
     } finally {
       IOUtils.closeStream(blockSender);
