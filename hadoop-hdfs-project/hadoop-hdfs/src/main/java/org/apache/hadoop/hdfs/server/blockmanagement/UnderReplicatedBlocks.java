@@ -108,10 +108,8 @@ class UnderReplicatedBlocks implements Iterable<Block> {
    * The queue for corrupt blocks: {@value}
    */
   static final int QUEUE_WITH_CORRUPT_BLOCKS = 4;
-  
-  /**
-   * Create an object.
-   */
+
+  /** Create an object. */
   UnderReplicatedBlocks() {
   }
 
@@ -172,6 +170,20 @@ class UnderReplicatedBlocks implements Iterable<Block> {
     return count(QUEUE_WITH_CORRUPT_BLOCKS);
   }
 
+  /** Return the number of corrupt blocks with replication factor 1 */
+  synchronized int getCorruptReplOneBlockSize() throws IOException {
+    return (Integer) new LightWeightRequestHandler(
+        HDFSOperationType.COUNT_CORRUPT_REPL_ONE_BLOCKS) {
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        UnderReplicatedBlockDataAccess da =
+            (UnderReplicatedBlockDataAccess) HdfsStorageFactory
+                .getDataAccess(UnderReplicatedBlockDataAccess.class);
+        return da.countReplOneBlocks(QUEUE_WITH_CORRUPT_BLOCKS);
+      }
+    }.handle();
+  }
+  
   /**
    * Check if a block is in the neededReplication queue
    */
@@ -238,7 +250,7 @@ class UnderReplicatedBlocks implements Iterable<Block> {
     assert curReplicas >= 0 : "Negative replicas!";
     int priLevel = getPriority(block, curReplicas, decomissionedReplicas,
                                expectedReplicas);
-    if(add(block, priLevel)) {
+    if(add(block, priLevel, expectedReplicas)) {
       if(NameNode.blockStateChangeLog.isDebugEnabled()) {
         NameNode.blockStateChangeLog.debug(
             "BLOCK* NameSystem.UnderReplicationBlock.add:" + block +
@@ -252,15 +264,16 @@ class UnderReplicatedBlocks implements Iterable<Block> {
     return false;
   }
 
-  /**
-   * remove a block from a under replication queue
-   */
-  boolean remove(BlockInfo block, int oldReplicas, int decommissionedReplicas,
-      int oldExpectedReplicas)
-      throws StorageException, TransactionContextException {
-    int priLevel = getPriority(block, oldReplicas, decommissionedReplicas,
-        oldExpectedReplicas);
-    return remove(block, priLevel);
+  /** remove a block from a under replication queue */
+  synchronized boolean remove(BlockInfo block, 
+                              int oldReplicas, 
+                              int decommissionedReplicas,
+                              int oldExpectedReplicas) throws IOException {
+    int priLevel = getPriority(block, oldReplicas, 
+                               decommissionedReplicas,
+                               oldExpectedReplicas);
+    boolean removedBlock = remove(block, priLevel);
+    return removedBlock;
   }
 
   /**
@@ -342,7 +355,7 @@ class UnderReplicatedBlocks implements Iterable<Block> {
     if(oldPri != curPri) {
       remove(block, oldPri);
     }
-    if(add(block, curPri)) {
+    if(add(block, curPri, curExpectedReplicas, true)) {
       if(NameNode.blockStateChangeLog.isDebugEnabled()) {
         NameNode.blockStateChangeLog.debug(
             "BLOCK* NameSystem.UnderReplicationBlock.update:" + block +
@@ -596,16 +609,26 @@ class UnderReplicatedBlocks implements Iterable<Block> {
   }
 
   // return true if it does not exist other wise return false
-  private boolean add(BlockInfo block, int priLevel)
+  private boolean add(BlockInfo block, int priLevel, int expectedReplicas, boolean update)
       throws StorageException, TransactionContextException {
     UnderReplicatedBlock urb = getUnderReplicatedBlock(block);
     if (urb == null) {
       addUnderReplicatedBlock(
           new UnderReplicatedBlock(priLevel, block.getBlockId(),
-              block.getInodeId()));
+              block.getInodeId(), expectedReplicas));
       return true;
     }
+    if(update){
+      addUnderReplicatedBlock(
+          new UnderReplicatedBlock(priLevel, block.getBlockId(),
+              block.getInodeId(), expectedReplicas));
+    }
     return false;
+  }
+  
+  private boolean add(BlockInfo block, int priLevel, int expectedReplicas)
+      throws StorageException, TransactionContextException {
+   return add(block, priLevel, expectedReplicas, false);
   }
   
   private List<List<Block>> fillPriorityQueues() throws IOException {

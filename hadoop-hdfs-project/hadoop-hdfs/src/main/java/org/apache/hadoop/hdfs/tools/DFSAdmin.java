@@ -465,9 +465,14 @@ public class DFSAdmin extends FsShell {
      * minutes. Use "-metaSave" to list of all such blocks and accurate
      * counts.
      */
-    System.out.println("Under replicated blocks: " + dfs.getUnderReplicatedBlocksCount());
-    System.out.println("Blocks with corrupt replicas: " + dfs.getCorruptBlocksCount());
-    System.out.println("Missing blocks: " + dfs.getMissingBlocksCount());
+    System.out.println("Under replicated blocks: " + 
+                       dfs.getUnderReplicatedBlocksCount());
+    System.out.println("Blocks with corrupt replicas: " + 
+                       dfs.getCorruptBlocksCount());
+    System.out.println("Missing blocks: " + 
+                       dfs.getMissingBlocksCount());
+    System.out.println("Missing blocks (with replication factor 1): " +
+                      dfs.getMissingReplOneBlocksCount());
 
     System.out.println();
     System.out.println("-------------------------------------------------");

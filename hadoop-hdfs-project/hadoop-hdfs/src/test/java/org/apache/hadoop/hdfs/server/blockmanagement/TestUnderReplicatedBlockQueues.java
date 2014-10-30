@@ -18,22 +18,30 @@
 
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
+import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.lock.INodeLock;
 import io.hops.transaction.lock.LockFactory;
+import static io.hops.transaction.lock.LockFactory.getInstance;
+import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
+import java.io.IOException;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.protocol.Block;
-import org.junit.Assert;
+import org.apache.hadoop.security.AccessControlException;
 import org.junit.Test;
 
-import java.io.IOException;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.fail;
 
-public class TestUnderReplicatedBlockQueues extends Assert {
+public class TestUnderReplicatedBlockQueues {
 
   /**
    * Test that adding blocks with different replication counts puts them
@@ -52,6 +60,7 @@ public class TestUnderReplicatedBlockQueues extends Assert {
     BlockInfo block2 = add(new BlockInfo(new Block(2), 2));
     BlockInfo block_very_under_replicated = add(new BlockInfo(new Block(3), 3));
     BlockInfo block_corrupt = add(new BlockInfo(new Block(4), 4));
+    BlockInfo block_corrupt_repl_one = add(new BlockInfo(new Block(5), 5));
     
     //add a block with a single entry
     assertAdded(queues, block1, 1, 0, 3);
@@ -80,6 +89,46 @@ public class TestUnderReplicatedBlockQueues extends Assert {
     assertInLevel(queues, block_very_under_replicated,
         UnderReplicatedBlocks.QUEUE_VERY_UNDER_REPLICATED);
 
+    //insert a corrupt block with replication factor 1
+    assertAdded(queues, block_corrupt_repl_one, 0, 0, 1);
+    assertEquals(2, queues.getCorruptBlockSize());
+    assertEquals(1, queues.getCorruptReplOneBlockSize());
+    updateQueue(queues, block_corrupt_repl_one, 0, 0, 3, 0, 2);
+    assertEquals(0, queues.getCorruptReplOneBlockSize());
+    updateQueue(queues, block_corrupt, 0, 0, 1, 0, -2);
+    assertEquals(1, queues.getCorruptReplOneBlockSize());
+    updateQueue(queues, block_very_under_replicated, 0, 0, 1, -4, -24);
+    assertEquals(2, queues.getCorruptReplOneBlockSize());
+  }
+  
+  private void updateQueue(final UnderReplicatedBlocks queues, final BlockInfo block, final int curReplicas,
+      final int decommissionedReplicas,
+      final int curExpectedReplicas, final int curReplicasDelta, final int expectedReplicasDelta) throws IOException{
+    new HopsTransactionalRequestHandler(HDFSOperationType.TEST) {
+
+      INodeIdentifier inodeIdentifier;
+
+      @Override
+      public void setUp() throws StorageException {
+        inodeIdentifier = INodeUtil.resolveINodeFromBlock(block);
+      }
+
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = getInstance();
+        locks.add(lf.getIndividualINodeLock(TransactionLockTypes.INodeLockType.READ, inodeIdentifier, true)).
+            add(lf.getIndividualBlockLock(block.getBlockId(), inodeIdentifier))
+            .add(lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.ER, LockFactory.BLK.CR, LockFactory.BLK.UC,
+                LockFactory.BLK.UR, LockFactory.BLK.IV));
+      }
+
+      @Override
+      public Object performTask() throws IOException {
+        queues.update(block, curReplicas, decommissionedReplicas, curExpectedReplicas, curReplicasDelta,
+            expectedReplicasDelta);
+        return null;
+      }
+    }.handle();
   }
 
   private void assertAdded(UnderReplicatedBlocks queues, BlockInfo block,

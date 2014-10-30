@@ -103,7 +103,7 @@ public class UnderReplicatedBlockContext
   UnderReplicatedBlock cloneEntity(UnderReplicatedBlock hopUnderReplicatedBlock,
       long inodeId) {
     return new UnderReplicatedBlock(hopUnderReplicatedBlock.getLevel(),
-        hopUnderReplicatedBlock.getBlockId(), inodeId);
+        hopUnderReplicatedBlock.getBlockId(), inodeId, hopUnderReplicatedBlock.getExpectedReplicas());
   }
 
   @Override
