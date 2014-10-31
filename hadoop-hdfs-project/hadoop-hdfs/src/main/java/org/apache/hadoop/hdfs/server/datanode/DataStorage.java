@@ -20,8 +20,10 @@ package org.apache.hadoop.hdfs.server.datanode;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.Futures;
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
@@ -128,20 +130,11 @@ public class DataStorage extends Storage {
     this.datanodeUuid = newDatanodeUuid;
   }
   
-  /** Create an ID for this storage.
-   * @return true if a new storage ID was generated.
-   * */
-  public synchronized boolean createStorageID(
-      StorageDirectory sd, boolean regenerateStorageIds) {
-    final String oldStorageID = sd.getStorageUuid();
-    if (oldStorageID == null || regenerateStorageIds) {
+  /** Create an ID for this storage. */
+  public synchronized void createStorageID(StorageDirectory sd) {
+    if (sd.getStorageUuid() == null) {
       sd.setStorageUuid(DatanodeStorage.generateUuid());
-      LOG.info("Generated new storageID " + sd.getStorageUuid() +
-          " for directory " + sd.getRoot() +
-          (oldStorageID == null ? "" : (" to replace " + oldStorageID)));
-      return true;
     }
-    return false;
   }
 
   /**
@@ -188,37 +181,149 @@ public class DataStorage extends Storage {
     }
     return null;
   }
-  
+
   /**
-   * Analyze storage directories for a specific block pool.
-   * Recover from previous transitions if required.
-   * Perform fs state transition if necessary depending on the namespace info.
-   * Read storage info.
-   * <br>
-   * This method should be synchronized between multiple DN threads.  Only the
-   * first DN thread does DN level storage dir recoverTransitionRead.
-   *
-   * @param datanode DataNode
-   * @param nsInfo Namespace info of namenode corresponding to the block pool
-   * @param dataDirs Storage directories
-   * @param startOpt startup option
-   * @throws IOException on error
+   * VolumeBuilder holds the metadata (e.g., the storage directories) of the
+   * prepared volume returned from {@link prepareVolume()}. Calling {@link build()}
+   * to add the metadata to {@link DataStorage} so that this prepared volume can
+   * be active.
    */
-  void recoverTransitionRead(DataNode datanode, NamespaceInfo nsInfo,
-      Collection<StorageLocation> dataDirs, StartupOption startOpt) throws IOException {
-    if (this.initialized) {
-      LOG.info("DataNode version: " + HdfsConstants.DATANODE_LAYOUT_VERSION
-          + " and NameNode layout version: " + nsInfo.getLayoutVersion());
-      this.storageDirs = new ArrayList<StorageDirectory>(dataDirs.size());
-      // mark DN storage is initialized
-      this.initialized = true;
+  @InterfaceAudience.Private
+  @InterfaceStability.Unstable
+  static public class VolumeBuilder {
+    private DataStorage storage;
+    /** Volume level storage directory. */
+    private StorageDirectory sd;
+    /** Mapping from block pool ID to an array of storage directories. */
+    private Map<String, List<StorageDirectory>> bpStorageDirMap =
+        Maps.newHashMap();
+
+    @VisibleForTesting
+    public VolumeBuilder(DataStorage storage, StorageDirectory sd) {
+      this.storage = storage;
+      this.sd = sd;
     }
 
-    if (addStorageLocations(datanode, nsInfo, dataDirs, startOpt).isEmpty()) {
-      throw new IOException("All specified directories are failed to load.");
+    public final StorageDirectory getStorageDirectory() {
+      return this.sd;
+    }
+
+    private void addBpStorageDirectories(String bpid,
+        List<StorageDirectory> dirs) {
+      bpStorageDirMap.put(bpid, dirs);
+    }
+
+    /**
+     * Add loaded metadata of a data volume to {@link DataStorage}.
+     */
+    public void build() {
+      assert this.sd != null;
+      synchronized (storage) {
+        for (Map.Entry<String, List<StorageDirectory>> e :
+            bpStorageDirMap.entrySet()) {
+          final String bpid = e.getKey();
+          BlockPoolSliceStorage bpStorage = this.storage.bpStorageMap.get(bpid);
+          assert bpStorage != null;
+          for (StorageDirectory bpSd : e.getValue()) {
+            bpStorage.addStorageDir(bpSd);
+          }
+        }
+        storage.addStorageDir(sd);
+      }
     }
   }
 
+  private StorageDirectory loadStorageDirectory(DataNode datanode,
+      NamespaceInfo nsInfo, File dataDir, StartupOption startOpt)
+      throws IOException {
+    StorageDirectory sd = new StorageDirectory(dataDir, null, false);
+    try {
+      StorageState curState = sd.analyzeStorage(startOpt, this);
+      // sd is locked but not opened
+      switch (curState) {
+      case NORMAL:
+        break;
+      case NON_EXISTENT:
+        LOG.info("Storage directory " + dataDir + " does not exist");
+        throw new IOException("Storage directory " + dataDir
+            + " does not exist");
+      case NOT_FORMATTED: // format
+        LOG.info("Storage directory " + dataDir + " is not formatted for "
+            + nsInfo.getBlockPoolID());
+        LOG.info("Formatting ...");
+        format(sd, nsInfo, datanode.getDatanodeUuid());
+        break;
+      default:  // recovery part is common
+        sd.doRecover(curState);
+      }
+
+      // 2. Do transitions
+      // Each storage directory is treated individually.
+      // During startup some of them can upgrade or roll back
+      // while others could be up-to-date for the regular startup.
+      doTransition(datanode, sd, nsInfo, startOpt);
+
+      // 3. Update successfully loaded storage.
+      setServiceLayoutVersion(getServiceLayoutVersion());
+      writeProperties(sd);
+
+      return sd;
+    } catch (IOException ioe) {
+      sd.unlock();
+      throw ioe;
+    }
+  }
+
+  /**
+   * Prepare a storage directory. It creates a builder which can be used to add
+   * to the volume. If the volume cannot be added, it is OK to discard the
+   * builder later.
+   *
+   * @param datanode DataNode object.
+   * @param volume the root path of a storage directory.
+   * @param nsInfos an array of namespace infos.
+   * @return a VolumeBuilder that holds the metadata of this storage directory
+   * and can be added to DataStorage later.
+   * @throws IOException if encounters I/O errors.
+   *
+   * Note that if there is IOException, the state of DataStorage is not modified.
+   */
+  public VolumeBuilder prepareVolume(DataNode datanode, File volume,
+      List<NamespaceInfo> nsInfos) throws IOException {
+    if (containsStorageDir(volume)) {
+      final String errorMessage = "Storage directory is in use";
+      LOG.warn(errorMessage + ".");
+      throw new IOException(errorMessage);
+    }
+
+    StorageDirectory sd = loadStorageDirectory(
+        datanode, nsInfos.get(0), volume, StartupOption.HOTSWAP);
+    VolumeBuilder builder =
+        new VolumeBuilder(this, sd);
+    for (NamespaceInfo nsInfo : nsInfos) {
+      List<File> bpDataDirs = Lists.newArrayList();
+      bpDataDirs.add(BlockPoolSliceStorage.getBpRoot(
+          nsInfo.getBlockPoolID(), new File(volume, STORAGE_DIR_CURRENT)));
+      makeBlockPoolDataDir(bpDataDirs, null);
+
+      BlockPoolSliceStorage bpStorage;
+      final String bpid = nsInfo.getBlockPoolID();
+      synchronized (this) {
+        bpStorage = this.bpStorageMap.get(bpid);
+        if (bpStorage == null) {
+          bpStorage = new BlockPoolSliceStorage(
+              nsInfo.getNamespaceID(), bpid, nsInfo.getCTime(),
+              nsInfo.getClusterID());
+          addBlockPoolStorage(bpid, bpStorage);
+        }
+      }
+      builder.addBpStorageDirectories(
+          bpid, bpStorage.loadBpStorageDirectories(
+              datanode, nsInfo, bpDataDirs, StartupOption.HOTSWAP));
+    }
+    return builder;
+  }
+  
   /**
    * Add a list of volumes to be managed by DataStorage. If the volume is empty,
    * format it, otherwise recover it from previous transitions if required.
@@ -276,52 +381,15 @@ public class DataStorage extends Storage {
     return successVolumes;
   }
 
-  private StorageDirectory loadStorageDirectory(DataNode datanode,
-      NamespaceInfo nsInfo, File dataDir, StartupOption startOpt)
-      throws IOException {
-    StorageDirectory sd = new StorageDirectory(dataDir, null, false);
-    try {
-      StorageState curState = sd.analyzeStorage(startOpt, this);
-      // sd is locked but not opened
-      switch (curState) {
-        case NORMAL:
-          break;
-        case NON_EXISTENT:
-          LOG.info("Storage directory " + dataDir + " does not exist");
-          throw new IOException("Storage directory " + dataDir
-              + " does not exist");
-        case NOT_FORMATTED: // format
-          LOG.info("Storage directory " + dataDir + " is not formatted for "
-              + nsInfo.getBlockPoolID());
-          LOG.info("Formatting ...");
-          format(sd, nsInfo, datanode.getDatanodeUuid());
-          break;
-        default:  // recovery part is common
-          sd.doRecover(curState);
-      }
-
-      // 2. Do transitions
-      // Each storage directory is treated individually.
-      // During startup some of them can upgrade or roll back
-      // while others could be up-to-date for the regular startup.
-      doTransition(datanode, sd, nsInfo, startOpt);
-
-      // 3. Update successfully loaded storage.
-      setServiceLayoutVersion(getServiceLayoutVersion());
-      writeProperties(sd);
-
-      return sd;
-    } catch (IOException ioe) {
-      sd.unlock();
-      throw ioe;
-    }
-  }
-
   /**
-   * Remove volumes from DataStorage.
+   * Remove volumes from DataStorage. All volumes are removed even when the
+   * IOException is thrown.
+   * 
    * @param locations a collection of volumes.
+   * @throws IOException if I/O error when unlocking storage directory.
    */
-  synchronized void removeVolumes(Collection<StorageLocation> locations) {
+  synchronized void removeVolumes(Collection<StorageLocation> locations)
+      throws IOException {
     if (locations.isEmpty()) {
       return;
     }
@@ -335,6 +403,7 @@ public class DataStorage extends Storage {
       bpsStorage.removeVolumes(dataDirs);
     }
 
+    StringBuilder errorMsgBuilder = new StringBuilder();
     for (Iterator<StorageDirectory> it = this.storageDirs.iterator();
          it.hasNext(); ) {
       StorageDirectory sd = it.next();
@@ -346,11 +415,46 @@ public class DataStorage extends Storage {
           LOG.warn(String.format(
             "I/O error attempting to unlock storage directory %s.",
             sd.getRoot()), e);
+          errorMsgBuilder.append(String.format("Failed to remove %s: %s\n",
+              sd.getRoot(), e.getMessage()));
         }
       }
     }
+    if (errorMsgBuilder.length() > 0) {
+      throw new IOException(errorMsgBuilder.toString());
+    }
   }
 
+  /**
+   * Analyze storage directories for a specific block pool.
+   * Recover from previous transitions if required.
+   * Perform fs state transition if necessary depending on the namespace info.
+   * Read storage info.
+   * <br>
+   * This method should be synchronized between multiple DN threads.  Only the
+   * first DN thread does DN level storage dir recoverTransitionRead.
+   *
+   * @param datanode DataNode
+   * @param nsInfo Namespace info of namenode corresponding to the block pool
+   * @param dataDirs Storage directories
+   * @param startOpt startup option
+   * @throws IOException on error
+   */
+  void recoverTransitionRead(DataNode datanode, NamespaceInfo nsInfo,
+      Collection<StorageLocation> dataDirs, StartupOption startOpt) throws IOException {
+    if (this.initialized) {
+      LOG.info("DataNode version: " + HdfsConstants.DATANODE_LAYOUT_VERSION
+          + " and NameNode layout version: " + nsInfo.getLayoutVersion());
+      this.storageDirs = new ArrayList<StorageDirectory>(dataDirs.size());
+      // mark DN storage is initialized
+      this.initialized = true;
+    }
+
+    if (addStorageLocations(datanode, nsInfo, dataDirs, startOpt).isEmpty()) {
+      throw new IOException("All specified directories are failed to load.");
+    }
+  }
+  
   /**
    * Create physical directory for block pools on the data node
    *
@@ -443,6 +547,7 @@ public class DataStorage extends Storage {
       setLayoutVersion(props, sd);
     }
     setcTime(props, sd);
+    checkStorageType(props, sd);
     setClusterId(props, layoutVersion, sd);
 
     // Read NamespaceID in version before federation
@@ -564,24 +669,19 @@ public class DataStorage extends Storage {
           + nsInfo.getClusterID() + "; datanode clusterID = " + getClusterID());
     }
 
-    // Clusters previously upgraded from layout versions earlier than
-    // ADD_DATANODE_AND_STORAGE_UUIDS failed to correctly generate a
-    // new storage ID. We check for that and fix it now.
-    boolean haveValidStorageId =
-        DataNodeLayoutVersion.supports(
-            LayoutVersion.Feature.ADD_DATANODE_AND_STORAGE_UUIDS, layoutVersion) &&
-            DatanodeStorage.isValidStorageId(sd.getStorageUuid());
+    // After addition of the federation feature, ctime check is only 
+    // meaningful at BlockPoolSliceStorage level. 
 
     // regular start up.
     if (this.layoutVersion == HdfsConstants.DATANODE_LAYOUT_VERSION) {
-      createStorageID(sd, !haveValidStorageId);
+      createStorageID(sd);
       return; // regular startup
     }
 
     // do upgrade
     if (this.layoutVersion > HdfsConstants.DATANODE_LAYOUT_VERSION) {
       doUpgrade(datanode, sd, nsInfo);  // upgrade
-      createStorageID(sd, !haveValidStorageId);
+      createStorageID(sd);
       return;
     }
 
