@@ -147,8 +147,8 @@ public class TestDataStorage {
 
     locations = createStorageLocations(numLocations);
     List<StorageLocation> addedLocation =
-      storage.addStorageLocations(mockDN, namespaceInfos.get(0),
-          locations, START_OPT);
+        storage.addStorageLocations(mockDN, namespaceInfos.get(0),
+            locations, START_OPT);
     assertTrue(addedLocation.isEmpty());
 
     // The number of active storage dirs has not changed, since it tries to
@@ -166,7 +166,6 @@ public class TestDataStorage {
     final int numLocations = 3;
     List<StorageLocation> locations =
         createStorageLocations(numLocations, true);
-
     try {
       storage.recoverTransitionRead(mockDN, nsInfo, locations, START_OPT);
       fail("An IOException should throw: all StorageLocations are NON_EXISTENT");
@@ -188,9 +187,9 @@ public class TestDataStorage {
       throws IOException {
     final int numLocations = 3;
     List<StorageLocation> locations = createStorageLocations(numLocations);
-    String bpid = nsInfo.getBlockPoolID();
     // Prepare volumes
     storage.recoverTransitionRead(mockDN, nsInfo, locations, START_OPT);
+    assertEquals(numLocations, storage.getNumStorageDirs());
 
     // Reset DataStorage
     storage.unlockAll();
