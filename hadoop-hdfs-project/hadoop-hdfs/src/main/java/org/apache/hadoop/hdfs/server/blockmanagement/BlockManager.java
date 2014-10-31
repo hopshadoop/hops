@@ -146,6 +146,7 @@ public class BlockManager {
   private volatile long scheduledReplicationBlocksCount = 0L;
   private AtomicLong excessBlocksCount = new AtomicLong(0L);
   private AtomicLong postponedMisreplicatedBlocksCount = new AtomicLong(0L);
+  private final long startupDelayBlockDeletionInMs;
   
   private  ExecutorService datanodeRemover = Executors.newSingleThreadExecutor();
 
@@ -183,7 +184,12 @@ public class BlockManager {
   public long getPendingDeletionBlocksCount() throws IOException {
     return invalidateBlocks.numBlocks();
   }
-
+  
+  /** Used by metrics */
+  public long getStartupDelayBlockDeletionInMs() {
+    return startupDelayBlockDeletionInMs;
+  }
+  
   /**
    * Used by metrics
    */
@@ -358,11 +364,13 @@ public class BlockManager {
     datanodeManager = new DatanodeManager(this, namesystem, conf);
     corruptReplicas = new CorruptReplicasMap(datanodeManager);
     heartbeatManager = datanodeManager.getHeartbeatManager();
-    final long pendingPeriod = conf.getLong(
+
+    startupDelayBlockDeletionInMs = conf.getLong(
         DFSConfigKeys.DFS_NAMENODE_STARTUP_DELAY_BLOCK_DELETION_SEC_KEY,
         DFSConfigKeys.DFS_NAMENODE_STARTUP_DELAY_BLOCK_DELETION_SEC_DEFAULT) * 1000L;
-    invalidateBlocks = new InvalidateBlocks(datanodeManager.blockInvalidateLimit, pendingPeriod);
-    excessReplicateMap = new ExcessReplicasMap(datanodeManager);
+    invalidateBlocks = new InvalidateBlocks(
+        datanodeManager.blockInvalidateLimit, startupDelayBlockDeletionInMs);
+     excessReplicateMap = new ExcessReplicasMap(datanodeManager);
 
     blocksMap = new BlocksMap(datanodeManager);
     blockplacement = BlockPlacementPolicy.getInstance(

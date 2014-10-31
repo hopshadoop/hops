@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
+import java.text.SimpleDateFormat;
+
 import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -89,6 +91,15 @@ public class TestPendingInvalidateBlock {
     Thread.sleep(6000);
     Assert.assertEquals(0, cluster.getNamesystem().getBlocksTotal());
     Assert.assertEquals(0, cluster.getNamesystem().getPendingDeletionBlocks());
+    String nnStartedStr = cluster.getNamesystem().getNNStarted();
+    long nnStarted = new SimpleDateFormat("EEE MMM dd HH:mm:ss zzz yyyy")
+        .parse(nnStartedStr).getTime();
+    long blockDeletionStartTime = cluster.getNamesystem()
+        .getBlockDeletionStartTime();
+    Assert.assertTrue(String.format(
+        "Expect blockDeletionStartTime = %d > nnStarted = %d/nnStartedStr = %s.",
+        blockDeletionStartTime, nnStarted, nnStartedStr),
+        blockDeletionStartTime > nnStarted);
   }
 
   /**
@@ -135,7 +146,7 @@ public class TestPendingInvalidateBlock {
       //as soon as the first datanode as started the cluster will go out of safemode
       //it will then run the replication monitor which will remove the invalidated block for DN that didn't restart yet
       //we want to be sure that it run before to start the second DN to avoid race conditions changing the number of blocks removed
-      Thread.sleep(2000);
+      Thread.sleep(3000);
     }
     cluster.waitActive();
 

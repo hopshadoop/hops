@@ -157,14 +157,20 @@ public interface FSNamesystemMBean {
   public long getMaxObjects();
 
   /**
-   * Number of content stale storages.
-   * @return number of content stale storages
-   */
-  public int getNumStaleStorages();
-  
-  /**
    * Number of blocks pending deletion
    * @return number of blocks pending deletion
    */
   long getPendingDeletionBlocks() throws IOException;
-}
+
+  /**
+   * Time when block deletions will begin
+   * @return time when block deletions will begin
+   */
+  long getBlockDeletionStartTime();
+
+  /**
+   * Number of content stale storages.
+   * @return number of content stale storages
+   */
+  public int getNumStaleStorages();
+  }

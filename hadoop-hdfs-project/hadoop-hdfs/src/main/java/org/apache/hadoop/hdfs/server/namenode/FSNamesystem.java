@@ -6204,6 +6204,11 @@ public class FSNamesystem
     return blockManager.getPendingDeletionBlocksCount();
   }
 
+  @Override
+  public long getBlockDeletionStartTime() {
+    return startTime + blockManager.getStartupDelayBlockDeletionInMs();
+  }
+
   @Metric
   public long getExcessBlocks() throws IOException {
     return blockManager.getExcessBlocksCount();
