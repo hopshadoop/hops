@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs;
 
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -25,7 +26,6 @@ import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
-import org.apache.hadoop.hdfs.protocol.datatransfer.TrustedChannelResolver;
 import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.DataTransferSaslUtil;
 import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.SaslDataTransferServer;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager;
@@ -134,12 +134,12 @@ public class TestEncryptedTransfer {
       
       fs.close();
       
-      if (resolverClazz != null && !resolverClazz.endsWith("TestTrustedChannelResolver")){
+      if (resolverClazz == null) {
         // Test client and server negotiate cipher option
-        GenericTestUtils.assertMatches(logs.getOutput(), 
+        GenericTestUtils.assertDoesNotMatch(logs.getOutput(),
             "Server using cipher suite");
         // Check the IOStreamPair
-        GenericTestUtils.assertMatches(logs1.getOutput(), 
+        GenericTestUtils.assertDoesNotMatch(logs1.getOutput(),
             "Creating IOStreamPair of CryptoInputStream and CryptoOutputStream.");
       }
     } finally {
@@ -172,9 +172,28 @@ public class TestEncryptedTransfer {
           .startupOption(StartupOption.REGULAR).build();
       
       fs = getFileSystem(conf);
-      assertEquals(PLAIN_TEXT, DFSTestUtil.readFile(fs, TEST_PATH));
-      assertEquals(checksum, fs.getFileChecksum(TEST_PATH));
+      LogCapturer logs = GenericTestUtils.LogCapturer.captureLogs(
+          LogFactory.getLog(SaslDataTransferServer.class));
+      LogCapturer logs1 = GenericTestUtils.LogCapturer.captureLogs(
+          LogFactory.getLog(DataTransferSaslUtil.class));
+      try {
+        assertEquals(PLAIN_TEXT, DFSTestUtil.readFile(fs, TEST_PATH));
+        assertEquals(checksum, fs.getFileChecksum(TEST_PATH));
+      } finally {
+        logs.stopCapturing();
+        logs1.stopCapturing();
+      }
+
       fs.close();
+
+      if (resolverClazz == null) {
+        // Test client and server negotiate cipher option
+        GenericTestUtils.assertDoesNotMatch(logs.getOutput(),
+            "Server using cipher suite");
+        // Check the IOStreamPair
+        GenericTestUtils.assertDoesNotMatch(logs1.getOutput(),
+            "Creating IOStreamPair of CryptoInputStream and CryptoOutputStream.");
+      }
     } finally {
       if (cluster != null) {
         cluster.shutdown();
@@ -182,6 +201,61 @@ public class TestEncryptedTransfer {
     }
   }
   
+  @Test
+  public void testEncryptedReadWithAES() throws IOException {
+    MiniDFSCluster cluster = null;
+    try {
+      Configuration conf = new Configuration();
+      conf.set(DFSConfigKeys.DFS_ENCRYPT_DATA_TRANSFER_CIPHER_SUITES_KEY,
+          "AES/CTR/NoPadding");
+      cluster = new MiniDFSCluster.Builder(conf).build();
+
+      FileSystem fs = getFileSystem(conf);
+      writeTestDataToFile(fs);
+      assertEquals(PLAIN_TEXT, DFSTestUtil.readFile(fs, TEST_PATH));
+      FileChecksum checksum = fs.getFileChecksum(TEST_PATH);
+      fs.close();
+      cluster.shutdown();
+
+      setEncryptionConfigKeys(conf);
+
+      cluster = new MiniDFSCluster.Builder(conf)
+          .manageDataDfsDirs(false)
+          .manageNameDfsDirs(false)
+          .format(false)
+          .startupOption(StartupOption.REGULAR)
+          .build();
+
+      fs = getFileSystem(conf);
+      LogCapturer logs = GenericTestUtils.LogCapturer.captureLogs(
+          LogFactory.getLog(SaslDataTransferServer.class));
+      LogCapturer logs1 = GenericTestUtils.LogCapturer.captureLogs(
+          LogFactory.getLog(DataTransferSaslUtil.class));
+      try {
+        assertEquals(PLAIN_TEXT, DFSTestUtil.readFile(fs, TEST_PATH));
+        assertEquals(checksum, fs.getFileChecksum(TEST_PATH));
+      } finally {
+        logs.stopCapturing();
+        logs1.stopCapturing();
+      }
+
+      fs.close();
+
+      if (resolverClazz == null) {
+        // Test client and server negotiate cipher option
+        GenericTestUtils.assertMatches(logs.getOutput(),
+            "Server using cipher suite");
+        // Check the IOStreamPair
+        GenericTestUtils.assertMatches(logs1.getOutput(),
+            "Creating IOStreamPair of CryptoInputStream and CryptoOutputStream.");
+      }
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+
   @Test
   public void testEncryptedReadAfterNameNodeRestart() throws IOException {
     MiniDFSCluster cluster = null;
@@ -261,7 +335,7 @@ public class TestEncryptedTransfer {
       }
       fs.close();
       
-      if (resolverClazz != null && !resolverClazz.endsWith("TestTrustedChannelResolver")){
+      if (resolverClazz == null) {
         GenericTestUtils.assertMatches(logs.getOutput(),
         "Failed to read expected encryption handshake from client at");
       }
@@ -430,12 +504,12 @@ public class TestEncryptedTransfer {
       assertEquals(PLAIN_TEXT, DFSTestUtil.readFile(fs, TEST_PATH));
       fs.close();
       
-      if (resolverClazz != null && !resolverClazz.endsWith("TestTrustedChannelResolver")){
+      if (resolverClazz == null) {
         // Test client and server negotiate cipher option
-        GenericTestUtils.assertMatches(logs.getOutput(), 
+        GenericTestUtils.assertDoesNotMatch(logs.getOutput(),
             "Server using cipher suite");
         // Check the IOStreamPair
-        GenericTestUtils.assertMatches(logs1.getOutput(), 
+        GenericTestUtils.assertDoesNotMatch(logs1.getOutput(),
             "Creating IOStreamPair of CryptoInputStream and CryptoOutputStream.");
       }
     } finally {
