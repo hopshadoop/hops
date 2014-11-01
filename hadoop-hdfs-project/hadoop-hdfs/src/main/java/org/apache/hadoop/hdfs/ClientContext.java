@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdfs;
 
 import org.apache.hadoop.hdfs.shortcircuit.DomainSocketFactory;
-import com.google.common.annotations.VisibleForTesting;
 
 import java.util.HashMap;
 
@@ -28,6 +27,9 @@ import org.apache.hadoop.hdfs.DFSClient.Conf;
 import org.apache.hadoop.hdfs.shortcircuit.ShortCircuitCache;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdfs.util.ByteArrayManager;
+
+import com.google.common.annotations.VisibleForTesting;
 
 /**
  * ClientContext contains context information for a client.
@@ -84,6 +86,9 @@ public class ClientContext {
    */
   private volatile boolean disableLegacyBlockReaderLocal = false;
 
+  /** Creating byte[] for {@link DFSOutputStream}. */
+  private final ByteArrayManager byteArrayManager;  
+
   /**
    * Whether or not we complained about a DFSClient fetching a CacheContext that
    * didn't match its config values yet.
@@ -105,6 +110,8 @@ public class ClientContext {
           new PeerCache(conf.socketCacheCapacity, conf.socketCacheExpiry);
     this.useLegacyBlockReaderLocal = conf.useLegacyBlockReaderLocal;
     this.domainSocketFactory = new DomainSocketFactory(conf);
+
+    this.byteArrayManager = ByteArrayManager.newInstance(conf.writeByteArrayManagerConf);
   }
 
   public static String confAsString(Conf conf) {
@@ -203,5 +210,9 @@ public class ClientContext {
 
   public DomainSocketFactory getDomainSocketFactory() {
     return domainSocketFactory;
+  }
+
+  public ByteArrayManager getByteArrayManager() {
+    return byteArrayManager;
   }
 }
