@@ -830,7 +830,9 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
             DFSClient.LOG.warn("DataStreamer Exception", e);
           }
           if (e instanceof IOException) {
-            setLastException((IOException) e);
+            setLastException((IOException)e);
+          } else {
+            setLastException(new IOException("DataStreamer Exception: ",e));
           }
           hasError = true;
           if (errorIndex == -1 && restartingNodeIndex == -1) {
