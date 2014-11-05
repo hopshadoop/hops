@@ -2874,7 +2874,7 @@ public class FSNamesystem
             String clientMachine = null;
 
             if (NameNode.stateChangeLog.isDebugEnabled()) {
-              NameNode.stateChangeLog.debug("BLOCK* NameSystem.getAdditionalBlock: "
+              NameNode.stateChangeLog.debug("BLOCK* getAdditionalBlock: "
                   + src + " inodeId " + fileId + " for " + clientName);
             }
 
@@ -3099,7 +3099,7 @@ public class FSNamesystem
     }
 
     // Check if the penultimate block is minimally replicated
-    if (!checkFileProgress(pendingFile, false)) {
+    if (!checkFileProgress(src, pendingFile, false)) {
       throw new NotReplicatedYetException("Not replicated yet: " + src +
               " block " + pendingFile.getPenultimateBlock());
     }
@@ -3438,14 +3438,14 @@ public class FSNamesystem
     }
     // Check the state of the penultimate block. It should be completed
     // before attempting to complete the last one.
-    if (!checkFileProgress(pendingFile, false)) {
+    if (!checkFileProgress(src, pendingFile, false)) {
       return false;
     }
 
     // commit the last block and complete it if it has minimum replicas
     commitOrCompleteLastBlock(pendingFile, last);
 
-    if (!checkFileProgress(pendingFile, true)) {
+    if (!checkFileProgress(src, pendingFile, true)) {
       return false;
     }
 
@@ -3521,8 +3521,7 @@ public class FSNamesystem
       Block newBlock,
       DatanodeStorageInfo targets[]) throws IOException, StorageException {
     BlockInfo b = dir.addBlock(src, inodesInPath, newBlock, targets);
-    NameNode.stateChangeLog.info(
-        "BLOCK* allocateBlock: " + src + ". " + getBlockPoolId() + " " + b);
+    NameNode.stateChangeLog.info("BLOCK* allocate " + b + " for " + src);
     DatanodeStorageInfo.incrementBlocksScheduled(targets);
     return b;
   }
@@ -3544,49 +3543,47 @@ public class FSNamesystem
    * replicated.  If not, return false. If checkAll is true, then check
    * all blocks, otherwise check only penultimate block.
    */
-  private boolean checkFileProgress(INodeFile v, boolean checkAll)
+  private boolean checkFileProgress(String src, INodeFile v, boolean checkAll)
       throws IOException {
     if (checkAll) {
-      //
       // check all blocks of the file.
-      //
       for (BlockInfo block : v.getBlocks()) {
-        if (!block.isComplete()) {
-          BlockInfo cBlock = blockManager
-              .tryToCompleteBlock(v,
-                  block.getBlockIndex());
-          if (cBlock != null) {
-            block = cBlock;
-          }
-          if (!block.isComplete()) {
-            LOG.info("BLOCK* checkFileProgress: " + block +
-                " has not reached minimal replication " +
-                blockManager.minReplication);
-            return false;
-          }
+        if (!isCompleteBlock(src, block, blockManager.minReplication, v, blockManager)) {
+          return false;
         }
       }
     } else {
-      //
       // check the penultimate block of this file
-      //
       BlockInfo b = v.getPenultimateBlock();
-      if (b != null && !b.isComplete()) {
-        blockManager
-            .tryToCompleteBlock(v, b.getBlockIndex());
-        b = v.getPenultimateBlock();
-        if (!b.isComplete()) {
-          LOG.warn("BLOCK* checkFileProgress: " + b +
-              " has not reached minimal replication " +
-              blockManager.minReplication);
-          return false;
-        }
-
+      if (b != null
+            && !isCompleteBlock(src, b, blockManager.minReplication, v, blockManager)) {
+        return false;
       }
     }
     return true;
   }
 
+  private static boolean isCompleteBlock(String src, BlockInfo b, int minRepl, INodeFile v,
+      BlockManager blockManager) throws IOException {
+    if (!b.isComplete()) {
+      BlockInfo cBlock = blockManager
+          .tryToCompleteBlock(v, b.getBlockIndex());
+      if (cBlock != null) {
+        b = cBlock;
+      }
+      if (!b.isComplete()) {
+        final BlockInfoUnderConstruction uc = (BlockInfoUnderConstruction) b;
+        final int numNodes = b.getStorages(blockManager.getDatanodeManager()).length;
+        LOG.info("BLOCK* " + b + " is not COMPLETE (ucState = "
+            + uc.getBlockUCState() + ", replication# = " + numNodes
+            + (numNodes < minRepl ? " < " : " >= ")
+            + " minimum = " + minRepl + ") in file " + src);
+        return false;
+      }
+    }
+    return true;
+  }
+    
   ////////////////////////////////////////////////////////////////
   // Here's how to handle block-copy failure during client write:
   // -- As usual, the client's write should result in a streaming
@@ -4856,9 +4853,9 @@ public class FSNamesystem
             String lowResourcesMsg = "NameNode's database low on available " +
                 "resources.";
             if (!isInSafeMode()) {
-              FSNamesystem.LOG.warn(lowResourcesMsg + "Entering safe mode.");
+              LOG.warn(lowResourcesMsg + "Entering safe mode.");
             } else {
-              FSNamesystem.LOG.warn(lowResourcesMsg + "Already in safe mode.");
+              LOG.warn(lowResourcesMsg + "Already in safe mode.");
             }
             enterSafeMode(true);
           }
@@ -6481,16 +6478,17 @@ public class FSNamesystem
           assert newBlock.getBlockId() == oldBlock.getBlockId() :
               newBlock + " and " + oldBlock + " has different block identifier";
 
-          LOG.info("updatePipeline(block=" + oldBlock
-              + ", newGenerationStamp=" + newBlock.getGenerationStamp()
+          LOG.info("updatePipeline(" + oldBlock.getLocalBlock()
+             + ", newGS=" + newBlock.getGenerationStamp()
               + ", newLength=" + newBlock.getNumBytes()
               + ", newNodes=" + Arrays.asList(newNodes)
-              + ", clientName=" + clientName
+              + ", client=" + clientName
               + ")");
 
           updatePipelineInternal(clientName, oldBlock, newBlock, newNodes,
               newStorageIDs);
-          LOG.info("updatePipeline(" + oldBlock + ") successfully to " + newBlock);
+          LOG.info("updatePipeline(" + oldBlock.getLocalBlock() + " => "
+              + newBlock.getLocalBlock() + ") success");
           success = true;
           return null;
         } finally {
