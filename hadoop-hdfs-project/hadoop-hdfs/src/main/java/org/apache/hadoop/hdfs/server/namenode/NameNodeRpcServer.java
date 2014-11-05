@@ -349,6 +349,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
         AclException.class,
         FSLimitException.PathComponentTooLongException.class,
         FSLimitException.MaxDirectoryItemsExceededException.class,
+        UnresolvedPathException.class,
         BRLoadBalancingOverloadException.class);
   }
   
