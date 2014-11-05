@@ -18,31 +18,41 @@
 
 package org.apache.hadoop.hdfs.server.namenode;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.ipc.RemoteException;
-import org.junit.Test;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_ACLS_ENABLED_KEY;
+import static org.apache.hadoop.test.GenericTestUtils.assertExceptionContains;
+import static org.mockito.Matchers.anyListOf;
+import static org.mockito.Matchers.anyString;
 
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.List;
+
+import com.google.common.collect.Lists;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.FsPermission;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_AUDIT_LOGGERS_KEY;
 import org.apache.hadoop.hdfs.web.resources.GetOpParam;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.authorize.ProxyServers;
 import org.apache.hadoop.security.authorize.ProxyUsers;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import org.junit.Before;
+import org.junit.Test;
+import org.mockito.Mockito;
 
 /**
  * Tests for the {@link AuditLogger} custom audit logging interface.
@@ -160,7 +170,88 @@ public class TestAuditLogger {
       cluster.shutdown();
     }
   }
-  
+
+  @Test
+  public void testAuditLogWithAclFailure() throws Exception {
+    final Configuration conf = new HdfsConfiguration();
+    conf.setBoolean(DFS_NAMENODE_ACLS_ENABLED_KEY, true);
+    conf.set(DFS_NAMENODE_AUDIT_LOGGERS_KEY,
+        DummyAuditLogger.class.getName());
+    final MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).build();
+    try {
+      cluster.waitClusterUp();
+      final FSDirectory dir = cluster.getNamesystem().getFSDirectory();
+      // Set up mock FSDirectory to test FSN audit logging during failure
+      final FSDirectory mockedDir = Mockito.spy(dir);
+      Mockito.doThrow(new AccessControlException("mock setAcl exception")).
+          when(mockedDir).
+          setAcl(anyString(), anyListOf(AclEntry.class));
+      Mockito.doThrow(new AccessControlException("mock getAclStatus exception")).
+          when(mockedDir).
+          getAclStatus(anyString());
+      Mockito.doThrow(new AccessControlException("mock removeAcl exception")).
+          when(mockedDir).
+          removeAcl(anyString());
+      Mockito.doThrow(new AccessControlException("mock removeDefaultAcl exception")).
+          when(mockedDir).
+          removeDefaultAcl(anyString());
+      Mockito.doThrow(new AccessControlException("mock removeAclEntries exception")).
+          when(mockedDir).
+          removeAclEntries(anyString(), anyListOf(AclEntry.class));
+      Mockito.doThrow(new AccessControlException("mock modifyAclEntries exception")).
+          when(mockedDir).
+          modifyAclEntries(anyString(), anyListOf(AclEntry.class));
+      // Replace the FSD with the mock FSD.
+      cluster.getNamesystem().setFSDirectory(mockedDir);
+      assertTrue(DummyAuditLogger.initialized);
+      DummyAuditLogger.resetLogCount();
+
+      final FileSystem fs = cluster.getFileSystem();
+      final Path p = new Path("/");
+      final List<AclEntry> acls = Lists.newArrayList();
+
+      try {
+        fs.getAclStatus(p);
+      } catch (AccessControlException e) {
+        assertExceptionContains("mock getAclStatus exception", e);
+      }
+
+      try {
+        fs.setAcl(p, acls);
+      } catch (AccessControlException e) {
+        assertExceptionContains("mock setAcl exception", e);
+      }
+
+      try {
+        fs.removeAcl(p);
+      } catch (AccessControlException e) {
+        assertExceptionContains("mock removeAcl exception", e);
+      }
+
+      try {
+        fs.removeDefaultAcl(p);
+      } catch (AccessControlException e) {
+        assertExceptionContains("mock removeDefaultAcl exception", e);
+      }
+
+      try {
+        fs.removeAclEntries(p, acls);
+      } catch (AccessControlException e) {
+        assertExceptionContains("mock removeAclEntries exception", e);
+      }
+
+      try {
+        fs.modifyAclEntries(p, acls);
+      } catch (AccessControlException e) {
+        assertExceptionContains("mock modifyAclEntries exception", e);
+      }
+      assertEquals(6, DummyAuditLogger.logCount);
+      assertEquals(6, DummyAuditLogger.unsuccessfulCount);
+    } finally {
+      cluster.shutdown();
+    }
+  }
+
   /**
    * Tests that a broken audit logger causes requests to fail.
    */
@@ -188,6 +279,7 @@ public class TestAuditLogger {
 
     static boolean initialized;
     static int logCount;
+    static int unsuccessfulCount;
     static short foundPermission;
     static String remoteAddr;
     
@@ -197,12 +289,16 @@ public class TestAuditLogger {
 
     public static void resetLogCount() {
       logCount = 0;
+      unsuccessfulCount = 0;
     }
         
     public void logAuditEvent(boolean succeeded, String userName,
         InetAddress addr, String cmd, String src, String dst, FileStatus stat) {
       remoteAddr = addr.getHostAddress();
       logCount++;
+      if (!succeeded) {
+        unsuccessfulCount++;
+      }
       if (stat != null) {
         foundPermission = stat.getPermission().toShort();
       }

@@ -730,6 +730,22 @@ Release 2.6.0 - UNRELEASED
 
     HDFS-7260. Change DFSOutputStream.MAX_PACKETS to be configurable. (szetszwo)
 
+    HDFS-7259. Unresponseive NFS mount point due to deferred COMMIT response.
+    (brandonli)
+
+    HDFS-7215.Add JvmPauseMonitor to NFS gateway (brandonli)
+
+    HDFS-7180. NFSv3 gateway frequently gets stuck due to GC (brandonli)
+
+    HDFS-7243. HDFS concat operation should not be allowed in Encryption Zone.
+    (clamb via yliu)
+
+    HADOOP-11233. hadoop.security.kms.client.encrypted.key.cache.expiry
+    property spelled wrong in core-default. (Stephen Chu via yliu)
+
+    HDFS-7218. FSNamesystem ACL operations should write to audit log on
+    failure. (clamb via yliu)
+
     BREAKDOWN OF HDFS-6581 SUBTASKS AND RELATED JIRAS
   
       HDFS-6921. Add LazyPersist flag to FileStatus. (Arpit Agarwal)

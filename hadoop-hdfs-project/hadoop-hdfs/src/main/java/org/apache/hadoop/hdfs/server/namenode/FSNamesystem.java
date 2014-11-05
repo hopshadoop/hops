@@ -7165,6 +7165,11 @@ public class FSNamesystem
   public FSDirectory getFSDirectory() {
     return dir;
   }
+  /** Set the FSDirectory. */
+  @VisibleForTesting
+  public void setFSDirectory(FSDirectory dir) {
+    this.dir = dir;
+  }
   /** @return the cache manager. */
   public CacheManager getCacheManager() {
     return cacheManager;
@@ -9757,11 +9762,13 @@ public class FSNamesystem
   }
 
 
-  void modifyAclEntries(final String src, final List<AclEntry> aclSpec) throws IOException {
+  void modifyAclEntries(final String srcArg, final List<AclEntry> aclSpec) throws IOException {
     aclConfigFlag.checkForApiCall();
     if(isInSafeMode()){
-      throw new SafeModeException("Cannot modify acl entries " + src, safeMode());
+      throw new SafeModeException("Cannot modify acl entries " + srcArg, safeMode());
     }
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
+    final String src = FSDirectory.resolvePath(srcArg, pathComponents, dir);
     new HopsTransactionalRequestHandler(HDFSOperationType.MODIFY_ACL_ENTRIES) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
@@ -9776,21 +9783,28 @@ public class FSNamesystem
 
       @Override
       public Object performTask() throws IOException {
-        FSPermissionChecker pc = getPermissionChecker();
-        if (isPermissionEnabled) {
-          checkPathAccess(pc, src, FsAction.WRITE);
+        try {
+          FSPermissionChecker pc = getPermissionChecker();
+          if (isPermissionEnabled) {
+            checkPathAccess(pc, src, FsAction.WRITE);
+          }
+          dir.modifyAclEntries(src, aclSpec);
+        } catch (AccessControlException e) {
+          logAuditEvent(false, "modifyAclEntries", srcArg);
+          throw e;
         }
-        dir.modifyAclEntries(src, aclSpec);
         return null;
       }
     }.handle();
   }
 
-  void removeAclEntries(final String src, final List<AclEntry> aclSpec) throws IOException {
+  void removeAclEntries(final String srcArg, final List<AclEntry> aclSpec) throws IOException {
     aclConfigFlag.checkForApiCall();
     if(isInSafeMode()){
-      throw new SafeModeException("Cannot remove acl entries " + src, safeMode());
+      throw new SafeModeException("Cannot remove acl entries " + srcArg, safeMode());
     }
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
+    final String src = FSDirectory.resolvePath(srcArg, pathComponents, dir);
     new HopsTransactionalRequestHandler(HDFSOperationType.REMOVE_ACL_ENTRIES) {
 
       @Override
@@ -9805,21 +9819,28 @@ public class FSNamesystem
       }
       @Override
       public Object performTask() throws IOException {
-        FSPermissionChecker pc = getPermissionChecker();
-        if (isPermissionEnabled) {
-          checkPathAccess(pc, src, FsAction.WRITE);
+        try {
+          FSPermissionChecker pc = getPermissionChecker();
+          if (isPermissionEnabled) {
+            checkPathAccess(pc, src, FsAction.WRITE);
+          }
+          dir.removeAclEntries(src, aclSpec);
+        } catch (AccessControlException e) {
+          logAuditEvent(false, "removeAclEntries", srcArg);
+          throw e;
         }
-        dir.removeAclEntries(src, aclSpec);
         return null;
       }
     }.handle();
   }
 
-  void removeDefaultAcl(final String src) throws IOException {
+  void removeDefaultAcl(final String srcArg) throws IOException {
     aclConfigFlag.checkForApiCall();
     if(isInSafeMode()){
-      throw new SafeModeException("Cannot remove default acl " + src, safeMode());
+      throw new SafeModeException("Cannot remove default acl " + srcArg, safeMode());
     }
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
+    final String src = FSDirectory.resolvePath(srcArg, pathComponents, dir);
     new HopsTransactionalRequestHandler(HDFSOperationType.REMOVE_DEFAULT_ACL) {
 
       @Override
@@ -9834,21 +9855,28 @@ public class FSNamesystem
       }
       @Override
       public Object performTask() throws IOException {
-        FSPermissionChecker pc = getPermissionChecker();
-        if (isPermissionEnabled) {
-          checkPathAccess(pc, src, FsAction.WRITE);
+        try {
+          FSPermissionChecker pc = getPermissionChecker();
+          if (isPermissionEnabled) {
+            checkPathAccess(pc, src, FsAction.WRITE);
+          }
+          dir.removeDefaultAcl(src);
+        } catch (AccessControlException e) {
+          logAuditEvent(false, "removeDefaultAcl", srcArg);
+          throw e;
         }
-        dir.removeDefaultAcl(src);
         return null;
       }
     }.handle();
   }
 
-  void removeAcl(final String src) throws IOException {
+  void removeAcl(final String srcArg) throws IOException {
     aclConfigFlag.checkForApiCall();
     if(isInSafeMode()){
-      throw new SafeModeException("Cannot remove acl " + src, safeMode());
+      throw new SafeModeException("Cannot remove acl " + srcArg, safeMode());
     }
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
+    final String src = FSDirectory.resolvePath(srcArg, pathComponents, dir);
     new HopsTransactionalRequestHandler(HDFSOperationType.REMOVE_ACL) {
 
       @Override
@@ -9863,21 +9891,28 @@ public class FSNamesystem
       }
       @Override
       public Object performTask() throws IOException {
-        FSPermissionChecker pc = getPermissionChecker();
-        if (isPermissionEnabled) {
-          checkPathAccess(pc, src, FsAction.WRITE);
+        try {
+          FSPermissionChecker pc = getPermissionChecker();
+          if (isPermissionEnabled) {
+            checkPathAccess(pc, src, FsAction.WRITE);
+          }
+          dir.removeAcl(src);
+        } catch (AccessControlException e) {
+          logAuditEvent(false, "removeAcl", srcArg);
+          throw e;
         }
-        dir.removeAcl(src);
         return null;
       }
     }.handle();
   }
 
-  void setAcl(final String src, final List<AclEntry> aclSpec) throws IOException {
+  void setAcl(final String srcArg, final List<AclEntry> aclSpec) throws IOException {
     aclConfigFlag.checkForApiCall();
     if(isInSafeMode()){
-      throw new SafeModeException("Cannot set acl " + src, safeMode());
+      throw new SafeModeException("Cannot set acl " + srcArg, safeMode());
     }
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
+    final String src = FSDirectory.resolvePath(srcArg, pathComponents, dir);
     new HopsTransactionalRequestHandler(HDFSOperationType.SET_ACL) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
@@ -9892,21 +9927,26 @@ public class FSNamesystem
 
       @Override
       public Object performTask() throws IOException {
-        FSPermissionChecker pc = getPermissionChecker();
-        if (isPermissionEnabled) {
-          checkPathAccess(pc, src, FsAction.WRITE);
+        try {
+          FSPermissionChecker pc = getPermissionChecker();
+          if (isPermissionEnabled) {
+            checkPathAccess(pc, src, FsAction.WRITE);
+          }
+          dir.setAcl(src, aclSpec);
+        } catch (AccessControlException e) {
+          logAuditEvent(false, "setAcl", srcArg);
+          throw e;
         }
-        dir.setAcl(src, aclSpec);
         return null;
       }
     }.handle();
 
   }
 
-  AclStatus getAclStatus(final String src1) throws IOException {
+  AclStatus getAclStatus(final String srcArg) throws IOException {
     aclConfigFlag.checkForApiCall();
-    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
+    final String src = FSDirectory.resolvePath(srcArg, pathComponents, dir);
     return (AclStatus) new HopsTransactionalRequestHandler(HDFSOperationType.GET_ACL_STATUS) {
 
       @Override
@@ -9922,11 +9962,18 @@ public class FSNamesystem
 
       @Override
       public Object performTask() throws IOException {
-        FSPermissionChecker pc = getPermissionChecker();
-        if (isPermissionEnabled) {
-          checkPathAccess(pc, src, FsAction.READ);
+        boolean success = false;
+        try {
+          FSPermissionChecker pc = getPermissionChecker();
+          if (isPermissionEnabled) {
+            checkPathAccess(pc, src, FsAction.READ);
+          }
+          final AclStatus ret = dir.getAclStatus(src);
+          success = true;
+          return ret;
+        } finally {
+          logAuditEvent(success, "getAclStatus", src);
         }
-        return dir.getAclStatus(src);
       }
     }.handle();
   }
