@@ -141,6 +141,12 @@ Release 2.7.0 - UNRELEASED
     HDFS-7315. DFSTestUtil.readFileBuffer opens extra FSDataInputStream.
     (Plamen Jeliazkov via wheat9)
 
+    HDFS-7324. haadmin command usage prints incorrect command name.
+    (Brahma Reddy Battula via suresh)
+
+    HDFS-7199.  DFSOutputStream should not silently drop data if DataStreamer
+    crashes with an unchecked exception (rushabhs via cmccabe)
+
 Release 2.6.0 - UNRELEASED
 
   INCOMPATIBLE CHANGES
