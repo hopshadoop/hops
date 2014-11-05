@@ -43,6 +43,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.nativeio.NativeIO;
 import org.apache.hadoop.io.nativeio.NativeIOException;
 
@@ -747,15 +748,17 @@ public abstract class Storage extends StorageInfo {
         }
         file.write(jvmName.getBytes(Charsets.UTF_8));
         LOG.info("Lock on " + lockF + " acquired by nodename " + jvmName);
-      } catch (OverlappingFileLockException oe) {
-        LOG.error("It appears that another namenode " + file.readLine() +
-            " has already locked the storage directory");
+      } catch(OverlappingFileLockException oe) {
+        // Cannot read from the locked file on Windows.
+        String lockingJvmName = Path.WINDOWS ? "" : (" " + file.readLine());
+        LOG.error("It appears that another node " + lockingJvmName
+            + " has already locked the storage directory: " + root, oe);
         file.close();
         return null;
-      } catch (IOException e) {
-        LOG.error("Failed to acquire lock on " + lockF +
-            ". If this storage directory is mounted via NFS, " +
-            "ensure that the appropriate nfs lock services are running.", e);
+      } catch(IOException e) {
+        LOG.error("Failed to acquire lock on " + lockF
+            + ". If this storage directory is mounted via NFS, " 
+            + "ensure that the appropriate nfs lock services are running.", e);
         file.close();
         throw e;
       }
