@@ -1815,7 +1815,7 @@ public class BlockManager {
         // block should belong to a file
         bc = blocksMap.getBlockCollection(block);
         // abandoned block or block reopened for append
-        if (bc == null || (bc instanceof MutableBlockCollection && getBlockInfo(blk).equals(bc.getLastBlock()))) {
+        if (bc == null || (bc.isUnderConstruction() && getBlockInfo(blk).equals(bc.getLastBlock()))) {
           neededReplications.remove(getBlockInfo(block),
               priority); // remove from neededReplications
           rw.targets = null;
