@@ -625,7 +625,8 @@ public class MiniDFSCluster {
             enableManagedDfsDirsRedundancy,
             format, startOpt, clusterId, conf);
       } catch (IOException ioe) {
-        LOG.error("IOE creating namenodes. Permissions dump:\n" + createPermissionsDiagnosisString(data_dir));
+        LOG.error("IOE creating namenodes. Permissions dump:\n" +
+            createPermissionsDiagnosisString(data_dir), ioe);
         throw ioe;
       }
 
