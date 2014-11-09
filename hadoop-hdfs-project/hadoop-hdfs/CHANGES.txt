@@ -1227,6 +1227,29 @@ Release 2.6.0 - UNRELEASED
     HDFS-7291. Persist in-memory replicas with appropriate unbuffered copy API
     on POSIX and Windows. (Xiaoyu Yao via cnauroth)
 
+    HDFS-7328. TestTraceAdmin assumes Unix line endings. (cnauroth)
+
+    HDFS-7359. NameNode in secured HA cluster fails to start if
+    dfs.namenode.secondary.http-address cannot be interpreted as a network
+    address. (cnauroth)
+
+    HDFS-7226. Fix TestDNFencing.testQueueingWithAppend. (Yongjun Zhang via jing9)
+
+    HDFS-7382. DataNode in secure mode may throw NullPointerException if client
+    connects before DataNode registers itself with NameNode. (cnauroth)
+
+Release 2.5.2 - UNRELEASED
+
+  INCOMPATIBLE CHANGES
+
+  NEW FEATURES
+
+  IMPROVEMENTS
+
+  OPTIMIZATIONS
+
+  BUG FIXES
+
     HDFS-7274. Disable SSLv3 in HttpFS. (Robert Kanter via kasha)
 
 Release 2.5.1 - 2014-09-05
