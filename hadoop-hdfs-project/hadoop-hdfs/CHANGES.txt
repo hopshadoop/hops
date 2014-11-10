@@ -158,6 +158,9 @@ Release 2.7.0 - UNRELEASED
     HDFS-7199.  DFSOutputStream should not silently drop data if DataStreamer
     crashes with an unchecked exception (rushabhs via cmccabe)
 
+    HDFS-7383. DataNode.requestShortCircuitFdsForRead may throw 
+    NullPointerException. (szetszwo via suresh)
+
 Release 2.6.0 - UNRELEASED
 
   INCOMPATIBLE CHANGES
