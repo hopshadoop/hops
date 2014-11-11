@@ -68,15 +68,18 @@ public abstract class FSAclBaseTest {
     UserGroupInformation.createUserForTesting("diana", new String[] { });
   private static final UserGroupInformation SUPERGROUP_MEMBER =
     UserGroupInformation.createUserForTesting("super", new String[] {
-        DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT });
+      DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT });
+  // group member
+  private static final UserGroupInformation BOB = UserGroupInformation
+      .createUserForTesting("bob", new String[] { "groupY", "groupZ" });
 
   protected static MiniDFSCluster cluster;
   protected static Configuration conf;
   private static int pathCount = 0;
   private static Path path;
 
-  private FileSystem fs, fsAsBruce, fsAsDiana, fsAsSupergroupMember;
-  
+  private FileSystem fs, fsAsBruce, fsAsDiana, fsAsSupergroupMember, fsAsBob;
+
   @AfterClass
   public static void shutdown() throws Exception {
     if (cluster != null) {
@@ -94,7 +97,7 @@ public abstract class FSAclBaseTest {
   @After
   public void destroyFileSystems() {
     IOUtils.cleanup(null, fs, fsAsBruce, fsAsDiana, fsAsSupergroupMember);
-    fs = fsAsBruce = fsAsDiana = fsAsSupergroupMember = null;
+    fs = fsAsBruce = fsAsDiana = fsAsSupergroupMember = fsAsBob = null;
   }
   
   /**
@@ -1150,8 +1153,37 @@ public abstract class FSAclBaseTest {
     } catch (FileNotFoundException e) {
       // expected
     }
+
+    // Add a named group entry with only READ access
+    fsAsBruce.modifyAclEntries(p1, Lists.newArrayList(
+        aclEntry(ACCESS, GROUP, "groupY", READ)));
+    // Now bob should have read access, but not write
+    fsAsBob.access(p1, READ);
+    try {
+      fsAsBob.access(p1, WRITE);
+      fail("The access call should have failed.");
+    } catch (AccessControlException e) {
+      // expected;
+    }
+
+    // Add another named group entry with WRITE access
+    fsAsBruce.modifyAclEntries(p1, Lists.newArrayList(
+        aclEntry(ACCESS, GROUP, "groupZ", WRITE)));
+    // Now bob should have write access
+    fsAsBob.access(p1, WRITE);
+
+    // Add a named user entry to deny bob
+    fsAsBruce.modifyAclEntries(p1,
+        Lists.newArrayList(aclEntry(ACCESS, USER, "bob", NONE)));
+
+    try {
+      fsAsBob.access(p1, READ);
+      fail("The access call should have failed.");
+    } catch (AccessControlException e) {
+      // expected;
+    }
   }
-  
+
   /**
    * Asserts whether or not the inode for the test path has an AclFeature.
    *
@@ -1213,6 +1245,7 @@ public abstract class FSAclBaseTest {
     fs = createFileSystem();
     fsAsBruce = createFileSystem(BRUCE);
     fsAsDiana = createFileSystem(DIANA);
+    fsAsBob = createFileSystem(BOB);
     fsAsSupergroupMember = createFileSystem(SUPERGROUP_MEMBER);
   }
   

@@ -161,7 +161,10 @@ Release 2.7.0 - UNRELEASED
     HDFS-7383. DataNode.requestShortCircuitFdsForRead may throw 
     NullPointerException. (szetszwo via suresh)
 
-Release 2.6.0 - UNRELEASED
+    HDFS-7389. Named user ACL cannot stop the user from accessing the FS entity.
+    (Vinayakumar B via cnauroth)
+
+Release 2.6.0 - 2014-11-15
 
   INCOMPATIBLE CHANGES
 
