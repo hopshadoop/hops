@@ -9790,7 +9790,7 @@ public class FSNamesystem
         try {
           FSPermissionChecker pc = getPermissionChecker();
           if (isPermissionEnabled) {
-            checkPathAccess(pc, src, FsAction.WRITE);
+            checkOwner(pc, src);
           }
           dir.modifyAclEntries(src, aclSpec);
         } catch (AccessControlException e) {
