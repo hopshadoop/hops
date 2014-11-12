@@ -298,9 +298,9 @@ import static org.apache.hadoop.util.ExitUtil.terminate;
  * *************************************************
  */
 @InterfaceAudience.Private
-@Metrics(context = "dfs")
-public class FSNamesystem
-    implements Namesystem, FSClusterStats, FSNamesystemMBean, NameNodeMXBean {
+@Metrics(context="dfs")
+public class FSNamesystem implements Namesystem, FSNamesystemMBean,
+  NameNodeMXBean {
   public static final Log LOG = LogFactory.getLog(FSNamesystem.class);
 
   private static final ThreadLocal<StringBuilder> auditBuffer =
@@ -611,7 +611,7 @@ public class FSNamesystem
           conf.getLong(DFS_NAMENODE_RESOURCE_CHECK_INTERVAL_KEY,
               DFS_NAMENODE_RESOURCE_CHECK_INTERVAL_DEFAULT);
 
-      this.blockManager = new BlockManager(this, this, conf);
+      this.blockManager = new BlockManager(this, conf);
       this.erasureCodingEnabled =
           ErasureCodingManager.isErasureCodingEnabled(conf);
       this.erasureCodingManager = new ErasureCodingManager(this, conf);
@@ -7256,28 +7256,6 @@ public class FSNamesystem
   @VisibleForTesting
   public void setNNResourceChecker(NameNodeResourceChecker nnResourceChecker) {
     this.nnResourceChecker = nnResourceChecker;
-  }
-
-  @Override
-  public boolean isAvoidingStaleDataNodesForWrite() {
-    return this.blockManager.getDatanodeManager()
-        .shouldAvoidStaleDataNodesForWrite();
-  }
-
-  @Override // FSClusterStats
-  public int getNumDatanodesInService() {
-    return datanodeStatistics.getNumDatanodesInService();
-  }
-
-  @Override
-  public double getInServiceXceiverAverage() {
-    double avgLoad = 0;
-    final int nodes = getNumDatanodesInService();
-    if (nodes != 0) {
-      final int xceivers = datanodeStatistics.getInServiceXceiverCount();
-      avgLoad = (double)xceivers/nodes;
-    }
-    return avgLoad;
   }
 
   RollingUpgradeInfo queryRollingUpgrade() throws IOException {
