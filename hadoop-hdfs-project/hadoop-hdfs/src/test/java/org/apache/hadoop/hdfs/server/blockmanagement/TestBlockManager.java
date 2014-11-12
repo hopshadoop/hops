@@ -110,9 +110,8 @@ public class TestBlockManager {
    */
   private static final int NUM_TEST_ITERS = 30;
   
-  private static final int BLOCK_SIZE = 64 * 1024;
-  
-  private Configuration conf = new HdfsConfiguration();
+  private static final int BLOCK_SIZE = 64*1024;
+
   private FSNamesystem fsn;
   static private BlockManager bm;
   private int numBuckets;
@@ -122,17 +121,16 @@ public class TestBlockManager {
 
   @Before
   public void setupMockCluster() throws IOException {
+    Configuration conf = new HdfsConfiguration();
+    conf.set(DFSConfigKeys.NET_TOPOLOGY_SCRIPT_FILE_NAME_KEY, "need to set a dummy value here so it assumes a multi-rack cluster");
     HdfsStorageFactory.setConfiguration(conf);
-    conf.set(DFSConfigKeys.NET_TOPOLOGY_SCRIPT_FILE_NAME_KEY,
-        "need to set a dummy value here so it assumes a multi-rack cluster");
     ExecutorService subTreeOpsPool = Executors.newFixedThreadPool(
         conf.getInt(DFS_SUBTREE_EXECUTOR_LIMIT_KEY,
             DFS_SUBTREE_EXECUTOR_LIMIT_DEFAULT));
     fsn = Mockito.mock(FSNamesystem.class);
     Mockito.doReturn(subTreeOpsPool).when(fsn).getFSOperationsExecutor();
     formatStorage();
-
-    bm = new BlockManager(fsn, fsn, conf);
+    bm = new BlockManager(fsn, conf);
     final String[] racks = {
         "/rackA",
         "/rackA",

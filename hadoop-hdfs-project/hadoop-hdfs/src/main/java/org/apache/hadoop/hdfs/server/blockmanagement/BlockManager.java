@@ -70,7 +70,6 @@ import org.apache.hadoop.hdfs.security.token.block.ExportedBlockKeys;
 import org.apache.hadoop.hdfs.server.blockmanagement.CorruptReplicasMap.Reason;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
-import org.apache.hadoop.hdfs.server.namenode.FSClusterStats;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.INodeFile;
@@ -349,8 +348,8 @@ public class BlockManager {
   private final int blockFetcherNBThreads;
   private final int blockFetcherBucketsPerThread;
   
-  public BlockManager(final Namesystem namesystem, final FSClusterStats stats,
-      final Configuration conf) throws IOException {
+  public BlockManager(final Namesystem namesystem, final Configuration conf)
+    throws IOException {
     this.namesystem = namesystem;
     this.numBuckets = conf.getInt(DFSConfigKeys.DFS_NUM_BUCKETS_KEY,
         DFSConfigKeys.DFS_NUM_BUCKETS_DEFAULT);
@@ -374,8 +373,9 @@ public class BlockManager {
 
     blocksMap = new BlocksMap(datanodeManager);
     blockplacement = BlockPlacementPolicy.getInstance(
-        conf, stats, datanodeManager.getNetworkTopology(),
-        datanodeManager.getHost2DatanodeMap());
+      conf, datanodeManager.getFSClusterStats(),
+      datanodeManager.getNetworkTopology(),
+      datanodeManager.getHost2DatanodeMap());
     storagePolicySuite = BlockStoragePolicySuite.createDefaultSuite();
     pendingReplications = new PendingReplicationBlocks(conf.getInt(
         DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_KEY,

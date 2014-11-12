@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdfs.server.namenode;
+package org.apache.hadoop.hdfs.server.blockmanagement;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 
@@ -33,13 +33,13 @@ public interface FSClusterStats {
    * writes that are currently occuring on the cluster.
    */
   public int getTotalLoad();
-  
+
   /**
    * Indicate whether or not the cluster is now avoiding
    * to use stale DataNodes for writing.
    *
    * @return True if the cluster is currently avoiding using stale DataNodes
-   * for writing targets, and false otherwise.
+   *         for writing targets, and false otherwise.
    */
   public boolean isAvoidingStaleDataNodesForWrite();
 
@@ -58,5 +58,3 @@ public interface FSClusterStats {
    */
   public double getInServiceXceiverAverage();
 }
-    
-    

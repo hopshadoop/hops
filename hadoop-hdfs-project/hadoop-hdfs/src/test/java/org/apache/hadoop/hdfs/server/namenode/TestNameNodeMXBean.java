@@ -21,11 +21,8 @@ import org.apache.hadoop.util.VersionInfo;
 import org.junit.Test;
 import org.mortbay.util.ajax.JSON;
 
-import javax.management.MBeanServer;
-import javax.management.ObjectName;
-import java.lang.management.ManagementFactory;
-import java.util.Map;
 
+import com.google.common.util.concurrent.Uninterruptibles;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -35,6 +32,13 @@ import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.io.nativeio.NativeIO;
 import org.apache.hadoop.io.nativeio.NativeIO.POSIX.NoMlockCacheManipulator;
+
+
+import javax.management.MBeanServer;
+import javax.management.ObjectName;
+import java.lang.management.ManagementFactory;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -58,14 +62,11 @@ public class TestNameNodeMXBean {
   public void testNameNodeMXBeanInfo() throws Exception {
     Configuration conf = new Configuration();
     conf.setLong(DFSConfigKeys.DFS_DATANODE_MAX_LOCKED_MEMORY_KEY,
-        NativeIO.POSIX.getCacheManipulator().getMemlockLimit());
-    conf.setInt(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY, 1);
-    conf.setInt(DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY, 1);
-
+      NativeIO.POSIX.getCacheManipulator().getMemlockLimit());
     MiniDFSCluster cluster = null;
 
     try {
-      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
+      cluster = new MiniDFSCluster.Builder(conf).build();
       cluster.waitActive();
 
       FSNamesystem fsn = cluster.getNameNode().namesystem;
@@ -73,29 +74,6 @@ public class TestNameNodeMXBean {
       MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
       ObjectName mxbeanName = new ObjectName(
           "Hadoop:service=NameNode,name=NameNodeInfo");
-
-      // Define include file to generate deadNodes metrics
-      FileSystem localFileSys = FileSystem.getLocal(conf);
-      Path workingDir = localFileSys.getWorkingDirectory();
-      Path dir = new Path(workingDir,
-          "build/test/data/temp/TestNameNodeMXBean");
-      Path includeFile = new Path(dir, "include");
-      assertTrue(localFileSys.mkdirs(dir));
-      StringBuilder includeHosts = new StringBuilder();
-      for(DataNode dn : cluster.getDataNodes()) {
-        includeHosts.append(dn.getDisplayName()).append("\n");
-      }
-      DFSTestUtil.writeFile(localFileSys, includeFile, includeHosts.toString());
-      conf.set(DFSConfigKeys.DFS_HOSTS, includeFile.toUri().getPath());
-      fsn.getBlockManager().getDatanodeManager().refreshNodes(conf);
-
-      cluster.stopDataNode(0);
-      while (fsn.getNumDatanodesInService() != 2) {
-        try {
-          Thread.sleep(1000);
-        } catch (InterruptedException e) {}
-      }
-
       // get attribute "ClusterId"
       String clusterId = (String) mbs.getAttribute(mxbeanName, "ClusterId");
       assertEquals(fsn.getClusterId(), clusterId);
@@ -120,10 +98,9 @@ public class TestNameNodeMXBean {
       Long nondfs = (Long) (mbs.getAttribute(mxbeanName, "NonDfsUsedSpace"));
       assertEquals(fsn.getNonDfsUsedSpace(), nondfs.longValue());
       // get attribute percentremaining
-      Float percentremaining =
-          (Float) (mbs.getAttribute(mxbeanName, "PercentRemaining"));
-      assertEquals(fsn.getPercentRemaining(), percentremaining,
-          DELTA);
+      Float percentremaining = (Float) (mbs.getAttribute(mxbeanName,
+          "PercentRemaining"));
+      assertEquals(fsn.getPercentRemaining(), percentremaining, DELTA);
       // get attribute Totalblocks
       Long totalblocks = (Long) (mbs.getAttribute(mxbeanName, "TotalBlocks"));
       assertEquals(fsn.getTotalBlocks(), totalblocks.longValue());
@@ -146,15 +123,6 @@ public class TestNameNodeMXBean {
       String deadnodeinfo =
           (String) (mbs.getAttribute(mxbeanName, "DeadNodes"));
       assertEquals(fsn.getDeadNodes(), deadnodeinfo);
-      Map<String, Map<String, Object>> deadNodes =
-          (Map<String, Map<String, Object>>) JSON.parse(deadnodeinfo);
-      assertTrue(deadNodes.size() > 0);
-      for (Map<String, Object> deadNode : deadNodes.values()) {
-        assertTrue(deadNode.containsKey("lastContact"));
-        assertTrue(deadNode.containsKey("decommissioned"));
-        assertTrue(deadNode.containsKey("xferaddr"));
-      }
-
       // get attribute NodeUsage
       String nodeUsage = (String) (mbs.getAttribute(mxbeanName,
           "NodeUsage"));
@@ -173,6 +141,65 @@ public class TestNameNodeMXBean {
       assertEquals(NativeIO.POSIX.getCacheManipulator().getMemlockLimit() *
           cluster.getDataNodes().size(),
               mbs.getAttribute(mxbeanName, "CacheCapacity"));
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+
+  @SuppressWarnings({ "unchecked" })
+  @Test
+  public void testLastContactTime() throws Exception {
+    Configuration conf = new Configuration();
+    conf.setInt(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY, 1);
+    conf.setInt(DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY, 1);
+    MiniDFSCluster cluster = null;
+
+    try {
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
+      cluster.waitActive();
+
+      FSNamesystem fsn = cluster.getNameNode().namesystem;
+
+      MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
+      ObjectName mxbeanName = new ObjectName(
+        "Hadoop:service=NameNode,name=NameNodeInfo");
+
+      // Define include file to generate deadNodes metrics
+      FileSystem localFileSys = FileSystem.getLocal(conf);
+      Path workingDir = localFileSys.getWorkingDirectory();
+      Path dir = new Path(workingDir,
+        "build/test/data/temp/TestNameNodeMXBean");
+      Path includeFile = new Path(dir, "include");
+      assertTrue(localFileSys.mkdirs(dir));
+      StringBuilder includeHosts = new StringBuilder();
+      for(DataNode dn : cluster.getDataNodes()) {
+        includeHosts.append(dn.getDisplayName()).append("\n");
+      }
+      DFSTestUtil.writeFile(localFileSys, includeFile, includeHosts.toString());
+      conf.set(DFSConfigKeys.DFS_HOSTS, includeFile.toUri().getPath());
+      fsn.getBlockManager().getDatanodeManager().refreshNodes(conf);
+
+      cluster.stopDataNode(0);
+      while (fsn.getBlockManager().getDatanodeManager().getNumLiveDataNodes()
+        != 2 ) {
+        Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
+      }
+
+      // get attribute deadnodeinfo
+      String deadnodeinfo = (String) (mbs.getAttribute(mxbeanName,
+        "DeadNodes"));
+      assertEquals(fsn.getDeadNodes(), deadnodeinfo);
+      Map<String, Map<String, Object>> deadNodes =
+        (Map<String, Map<String, Object>>) JSON.parse(deadnodeinfo);
+      assertTrue(deadNodes.size() > 0);
+      for (Map<String, Object> deadNode : deadNodes.values()) {
+        assertTrue(deadNode.containsKey("lastContact"));
+        assertTrue(deadNode.containsKey("decommissioned"));
+        assertTrue(deadNode.containsKey("xferaddr"));
+      }
+
     } finally {
       if (cluster != null) {
         cluster.shutdown();
