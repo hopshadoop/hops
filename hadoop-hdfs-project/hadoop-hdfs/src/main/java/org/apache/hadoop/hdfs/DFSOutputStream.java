@@ -368,9 +368,9 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
       bam.release(buf);
       buf = null;
     }
-    
+
     // get the packet's last byte's offset in the block
-    long getLastByteOffsetBlock() {
+    synchronized long getLastByteOffsetBlock() {
       return offsetInBlock + dataPos - dataStart;
     }
 
