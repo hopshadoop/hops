@@ -202,8 +202,8 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
     </dependency>
     <dependency>
       <groupId>io.netty</groupId>
-      <artifactId>netty</artifactId>
-      <scope>test</scope>
+      <artifactId>netty-all</artifactId>
+      <scope>compile</scope>
     </dependency>
     <dependency>
       <groupId>org.hamcrest</groupId>

@@ -318,8 +318,8 @@ public class TestWebHdfsFileSystemContract extends FileSystemContractBaseTest {
 
     // Open the file, but request length longer than actual file length by 1.
     HttpOpParam.Op op = GetOpParam.Op.OPEN;
-    URL url = webhdfs.toUrl(op, testFile, new LengthParam(Long.valueOf(
-        content.length() + 1)));
+    URL url = webhdfs.toUrl(op, testFile, new LengthParam((long) (content
+      .length() + 1)));
     HttpURLConnection conn = null;
     InputStream is = null;
     try {
@@ -495,7 +495,7 @@ public class TestWebHdfsFileSystemContract extends FileSystemContractBaseTest {
       conn.setRequestMethod(op.getType().toString());
       conn.setDoOutput(op.getDoOutput());
       conn.connect();
-      assertEquals(HttpServletResponse.SC_BAD_REQUEST, conn.getResponseCode());
+      assertEquals(HttpServletResponse.SC_FORBIDDEN, conn.getResponseCode());
     }
 
     {//test jsonParse with non-json type.

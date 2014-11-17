@@ -1367,6 +1367,37 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
 
     return volumeBlockLocations;
   }
+  
+  /**
+   * Wraps the stream in a CryptoInputStream if the underlying file is
+   * encrypted. (HOPS: will be extended when suport for ancription is added)
+   */
+  public HdfsDataInputStream createWrappedInputStream(DFSInputStream dfsis)
+      throws IOException {
+      // No FileEncryptionInfo so no encryption.
+      return new HdfsDataInputStream(dfsis);
+  }
+  
+  /**
+   * Wraps the stream in a CryptoOutputStream if the underlying file is
+   * encrypted.
+   */
+  public HdfsDataOutputStream createWrappedOutputStream(DFSOutputStream dfsos,
+      FileSystem.Statistics statistics) throws IOException {
+    return createWrappedOutputStream(dfsos, statistics, 0);
+  }
+
+  /**
+   * Wraps the stream in a CryptoOutputStream if the underlying file is
+   * encrypted. (HOPS: will be extended when suport for ancription is added)
+   */
+  public HdfsDataOutputStream createWrappedOutputStream(DFSOutputStream dfsos,
+      FileSystem.Statistics statistics, long startPos) throws IOException {
+
+    return new HdfsDataOutputStream(dfsos, statistics, startPos);
+
+  }
+
 
   public DFSInputStream open(String src)
       throws IOException, UnresolvedLinkException {
