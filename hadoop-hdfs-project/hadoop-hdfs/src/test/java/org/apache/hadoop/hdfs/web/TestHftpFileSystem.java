@@ -243,6 +243,7 @@ public class TestHftpFileSystem {
    */
   @Test
   public void testSeek() throws IOException {
+    //will fail until HDFS-7881 is merged
     final Path testFile = new Path("/testfile+1");
     FSDataOutputStream out = hdfs.create(testFile, true);
     out.writeBytes("0123456789");
