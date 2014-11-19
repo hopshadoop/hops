@@ -604,11 +604,15 @@ public class DatanodeManager {
   /**
    * Physically remove node from datanodeMap.
    */
-  private void wipeDatanode(final DatanodeID node) {
+  private void wipeDatanode(final DatanodeID node) throws IOException {
     final String key = node.getDatanodeUuid();
+    DatanodeDescriptor descriptor;
     synchronized (datanodeMap) {
+      descriptor = datanodeMap.get(key);
       host2DatanodeMap.remove(datanodeMap.remove(key));
     }
+    // Also remove all block invalidation tasks under this node
+    blockManager.removeFromInvalidates(descriptor);
     if (LOG.isDebugEnabled()) {
       LOG.debug(
           getClass().getSimpleName() + ".wipeDatanode(" + node + "): storage " +
