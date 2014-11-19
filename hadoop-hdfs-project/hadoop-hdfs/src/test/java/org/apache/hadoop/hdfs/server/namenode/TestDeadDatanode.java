@@ -17,15 +17,15 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.Block;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockManagerTestUtil;
-import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
 import org.apache.hadoop.hdfs.server.protocol.BlockReport;
@@ -38,7 +38,6 @@ import org.apache.hadoop.hdfs.server.protocol.RegisterCommand;
 import org.apache.hadoop.hdfs.server.protocol.StorageBlockReport;
 import org.apache.hadoop.hdfs.server.protocol.StorageReceivedDeletedBlocks;
 import org.apache.hadoop.hdfs.server.protocol.StorageReport;
-import org.apache.hadoop.util.Time;
 import org.junit.After;
 import org.junit.Test;
 
@@ -62,29 +61,6 @@ public class TestDeadDatanode {
   }
 
   /**
-   * wait for datanode to reach alive or dead state for waitTime given in
-   * milliseconds.
-   */
-  private void waitForDatanodeState(String nodeID, boolean alive, int waitTime)
-      throws TimeoutException, InterruptedException {
-    long stopTime = Time.now() + waitTime;
-    FSNamesystem namesystem = cluster.getNamesystem();
-    String state = alive ? "alive" : "dead";
-    while (Time.now() < stopTime) {
-      final DatanodeDescriptor dd =
-          BlockManagerTestUtil.getDatanode(namesystem, nodeID);
-      if (dd.isAlive == alive) {
-        LOG.info("datanode " + nodeID + " is " + state);
-        return;
-      }
-      LOG.info("Waiting for datanode " + nodeID + " to become " + state);
-      Thread.sleep(1000);
-    }
-    throw new TimeoutException(
-        "Timedout waiting for datanode reach state " + state);
-  }
-
-  /**
    * Test to ensure namenode rejects request from dead datanode
    * - Start a cluster
    * - Shutdown the datanode and wait for it to be marked dead at the namenode
@@ -102,14 +78,14 @@ public class TestDeadDatanode {
     String poolId = cluster.getNamesystem().getBlockPoolId();
     // wait for datanode to be marked live
     DataNode dn = cluster.getDataNodes().get(0);
-    DatanodeRegistration reg = DataNodeTestUtils
-        .getDNRegistrationForBP(cluster.getDataNodes().get(0), poolId);
-
-    waitForDatanodeState(reg.getDatanodeUuid(), true, 20000);
+    DatanodeRegistration reg = 
+      DataNodeTestUtils.getDNRegistrationForBP(cluster.getDataNodes().get(0), poolId);
+      
+    DFSTestUtil.waitForDatanodeState(cluster, reg.getDatanodeUuid(), true, 20000);
 
     // Shutdown and wait for datanode to be marked dead
     dn.shutdown();
-    waitForDatanodeState(reg.getDatanodeUuid(), false, 20000);
+    DFSTestUtil.waitForDatanodeState(cluster, reg.getDatanodeUuid(), false, 20000);
 
     DatanodeProtocol dnp = cluster.getNameNodeRpc();
     
