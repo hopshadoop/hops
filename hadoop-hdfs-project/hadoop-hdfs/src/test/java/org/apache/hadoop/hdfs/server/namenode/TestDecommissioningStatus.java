@@ -360,8 +360,15 @@ public class TestDecommissioningStatus {
     BlockManagerTestUtil.checkDecommissionState(dm, dead.get(0));
 
     // Verify that the DN remains in DECOMMISSION_INPROGRESS state.
-    assertTrue("the node is in decommissioned state ",
-        !dead.get(0).isDecommissioned());
+    assertTrue("the node should be DECOMMISSION_IN_PROGRESSS",
+        dead.get(0).isDecommissionInProgress());
+
+    // Delete the under-replicated file, which should let the 
+    // DECOMMISSION_IN_PROGRESS node become DECOMMISSIONED
+    cleanupFile(fileSys, f);
+    BlockManagerTestUtil.checkDecommissionState(dm, dead.get(0));
+    assertTrue("the node should be decommissioned",
+        dead.get(0).isDecommissioned());
 
     // Add the node back
     cluster.restartDataNode(dataNodeProperties, true);
@@ -372,7 +379,6 @@ public class TestDecommissioningStatus {
     // make them available again.
     writeConfigFile(localFileSys, excludeFile, null);
     dm.refreshNodes(conf);
-    cleanupFile(fileSys, f);
   }
 
   /**
