@@ -50,6 +50,8 @@ import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
+import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocols;
+import org.apache.hadoop.io.EnumSetWritable;
 import org.apache.hadoop.ipc.ClientId;
 import org.apache.hadoop.ipc.RPC.RpcKind;
 import org.apache.hadoop.ipc.RetryCache.CacheEntry;
@@ -80,9 +82,8 @@ import org.junit.Test;
 public class TestNamenodeRetryCache {
   private static final byte[] CLIENT_ID = ClientId.getClientId();
   private static MiniDFSCluster cluster;
-  private static FSNamesystem namesystem;
-  private static PermissionStatus perm = new PermissionStatus(
-      "TestNamenodeRetryCache", null, FsPermission.getDefault());
+  private static NamenodeProtocols nnRpc;
+  private static final FsPermission perm = FsPermission.getDefault();
   private static DistributedFileSystem filesystem;
   private static int callId = 100;
   private static Configuration conf;
@@ -99,7 +100,7 @@ public class TestNamenodeRetryCache {
     conf.setLong(DFSConfigKeys.DFS_NAMENODE_RETRY_CACHE_EXPIRYTIME_MILLIS_KEY, 30000);
     cluster = new MiniDFSCluster.Builder(conf).build();
     cluster.waitActive();
-    namesystem = cluster.getNamesystem();
+    nnRpc = cluster.getNameNode().getRpcServer();
     filesystem = cluster.getFileSystem();
   }
   
@@ -147,15 +148,15 @@ public class TestNamenodeRetryCache {
     // Two retried concat calls succeed
     concatSetup(file1, file2);
     newCall();
-    namesystem.concat(file1, new String[]{file2});
-    namesystem.concat(file1, new String[]{file2});
-    namesystem.concat(file1, new String[]{file2});
+    nnRpc.concat(file1, new String[]{file2});
+    nnRpc.concat(file1, new String[]{file2});
+    nnRpc.concat(file1, new String[]{file2});
     
     // A non-retried concat request fails
     newCall();
     try {
       // Second non-retry call should fail with an exception
-      namesystem.concat(file1, new String[]{file2});
+      nnRpc.concat(file1, new String[]{file2});
       Assert.fail("testConcat - expected exception is not thrown");
     } catch (IOException e) {
       // Expected
@@ -170,15 +171,15 @@ public class TestNamenodeRetryCache {
     String dir = "/testNamenodeRetryCache/testDelete";
     // Two retried calls to create a non existent file
     newCall();
-    namesystem.mkdirs(dir, perm, true);
+    nnRpc.mkdirs(dir, perm, true);
     newCall();
-    Assert.assertTrue(namesystem.multiTransactionalDelete(dir, false));
-    Assert.assertTrue(namesystem.multiTransactionalDelete(dir, false));
-    Assert.assertTrue(namesystem.multiTransactionalDelete(dir, false));
+    Assert.assertTrue(nnRpc.delete(dir, false));
+    Assert.assertTrue(nnRpc.delete(dir, false));
+    Assert.assertTrue(nnRpc.delete(dir, false));
     
     // non-retried call fails and gets false as return
     newCall();
-    Assert.assertFalse(namesystem.multiTransactionalDelete(dir, false));
+    Assert.assertFalse(nnRpc.delete(dir, false));
   }
   
   /**
@@ -190,15 +191,15 @@ public class TestNamenodeRetryCache {
     
     // Two retried symlink calls succeed
     newCall();
-    namesystem.createSymlink(target, "/a/b", perm, true);
-    namesystem.createSymlink(target, "/a/b", perm, true);
-    namesystem.createSymlink(target, "/a/b", perm, true);
+    nnRpc.createSymlink(target, "/a/b", perm, true);
+    nnRpc.createSymlink(target, "/a/b", perm, true);
+    nnRpc.createSymlink(target, "/a/b", perm, true);
     
     // non-retried call fails
     newCall();
     try {
       // Second non-retry call should fail with an exception
-      namesystem.createSymlink(target, "/a/b", perm, true);
+      nnRpc.createSymlink(target, "/a/b", perm, true);
       Assert.fail("testCreateSymlink - expected exception is not thrown");
     } catch (IOException e) {
       // Expected
@@ -213,20 +214,16 @@ public class TestNamenodeRetryCache {
     String src = "/testNamenodeRetryCache/testCreate/file";
     // Two retried calls succeed
     newCall();
-    HdfsFileStatus status = namesystem.startFile(src, perm, "holder",
-        "clientmachine", EnumSet.of(CreateFlag.CREATE), true, (short) 1, BlockSize);
-    Assert.assertEquals(status.getFileId(), namesystem.startFile(src, perm, 
-        "holder", "clientmachine", EnumSet.of(CreateFlag.CREATE), 
-        true, (short) 1, BlockSize).getFileId());
-    Assert.assertEquals(status.getFileId(), namesystem.startFile(src, perm, 
-        "holder", "clientmachine", EnumSet.of(CreateFlag.CREATE), 
-        true, (short) 1, BlockSize).getFileId());
+        HdfsFileStatus status = nnRpc.create(src, perm, "holder",
+      new EnumSetWritable<CreateFlag>(EnumSet.of(CreateFlag.CREATE)), true,
+      (short) 1, BlockSize, null);
+    Assert.assertEquals(status.getFileId(), nnRpc.create(src, perm, "holder", new EnumSetWritable<CreateFlag>(EnumSet.of(CreateFlag.CREATE)), true, (short) 1, BlockSize, null).getFileId());
+    Assert.assertEquals(status.getFileId(), nnRpc.create(src, perm, "holder", new EnumSetWritable<CreateFlag>(EnumSet.of(CreateFlag.CREATE)), true, (short) 1, BlockSize, null).getFileId());
     
     // A non-retried call fails
     newCall();
     try {
-      namesystem.startFile(src, perm, "holder", "clientmachine",
-          EnumSet.of(CreateFlag.CREATE), true, (short) 1, BlockSize);
+      nnRpc.create(src, perm, "holder", new EnumSetWritable<CreateFlag>(EnumSet.of(CreateFlag.CREATE)), true, (short) 1, BlockSize, null);
       Assert.fail("testCreate - expected exception is not thrown");
     } catch (IOException e) {
       // expected
@@ -245,16 +242,14 @@ public class TestNamenodeRetryCache {
     
     // Retried append requests succeed
     newCall();
-    LocatedBlock b = namesystem.appendFile(src, "holder", "clientMachine");
-    Assert.assertEquals(b.getBlock().getBlockId(), namesystem.appendFile(src, "holder", "clientMachine").getBlock().
-        getBlockId());
-    Assert.assertEquals(b.getBlock().getBlockId(), namesystem.appendFile(src, "holder", "clientMachine").getBlock().
-        getBlockId());
+        LocatedBlock b = nnRpc.append(src, "holder");
+    Assert.assertEquals(b.getBlock().getBlockId(), nnRpc.append(src, "holder").getBlock().getBlockId());
+    Assert.assertEquals(b.getBlock().getBlockId(), nnRpc.append(src, "holder").getBlock().getBlockId());
     
     // non-retried call fails
     newCall();
     try {
-      namesystem.appendFile(src, "holder", "clientMachine");
+      nnRpc.append(src, "holder");
       Assert.fail("testAppend - expected exception is not thrown");
     } catch (Exception e) {
       // Expected
@@ -270,17 +265,17 @@ public class TestNamenodeRetryCache {
     String src = "/testNamenodeRetryCache/testRename1/src";
     String target = "/testNamenodeRetryCache/testRename1/target";
     resetCall();
-    namesystem.mkdirs(src, perm, true);
+    nnRpc.mkdirs(src, perm, true);
     
     // Retried renames succeed
     newCall();
-    Assert.assertTrue(namesystem.multiTransactionalRename(src, target));
-    Assert.assertTrue(namesystem.multiTransactionalRename(src, target));
-    Assert.assertTrue(namesystem.multiTransactionalRename(src, target));
+    Assert.assertTrue(nnRpc.rename(src, target));
+    Assert.assertTrue(nnRpc.rename(src, target));
+    Assert.assertTrue(nnRpc.rename(src, target));
     
     // A non-retried request fails
     newCall();
-    Assert.assertFalse(namesystem.multiTransactionalRename(src, target));
+    Assert.assertFalse(nnRpc.rename(src, target));
   }
   
   /**
@@ -291,18 +286,18 @@ public class TestNamenodeRetryCache {
     String src = "/testNamenodeRetryCache/testRename2/src";
     String target = "/testNamenodeRetryCache/testRename2/target";
     resetCall();
-    namesystem.mkdirs(src, perm, true);
+    nnRpc.mkdirs(src, perm, true);
     
     // Retried renames succeed
     newCall();
-    namesystem.multiTransactionalRename(src, target, Rename.NONE);
-    namesystem.multiTransactionalRename(src, target, Rename.NONE);
-    namesystem.multiTransactionalRename(src, target, Rename.NONE);
+    nnRpc.rename2(src, target, Rename.NONE);
+    nnRpc.rename2(src, target, Rename.NONE);
+    nnRpc.rename2(src, target, Rename.NONE);
     
     // A non-retried request fails
     newCall();
     try {
-      namesystem.multiTransactionalRename(src, target, Rename.NONE);
+      nnRpc.rename2(src, target, Rename.NONE);
       Assert.fail("testRename 2 expected exception is not thrown");
     } catch (IOException e) {
       // expected
@@ -316,11 +311,12 @@ public class TestNamenodeRetryCache {
   @Test(timeout = 60000)
   public void testUpdatePipelineWithFailOver() throws Exception {
     cluster.shutdown();
-    namesystem = null;
+    nnRpc = null;
     filesystem = null;
     cluster = new MiniDFSCluster.Builder(conf).nnTopology(
         MiniDFSNNTopology.simpleHOPSTopology(2)).numDataNodes(1).build();
-    FSNamesystem ns0 = cluster.getNamesystem(0);
+    cluster.waitActive();
+    NamenodeProtocols ns0 = cluster.getNameNodeRpc(0);
     ExtendedBlock oldBlock = new ExtendedBlock();
     ExtendedBlock newBlock = new ExtendedBlock();
     DatanodeID[] newNodes = new DatanodeID[2];
@@ -366,6 +362,7 @@ public class TestNamenodeRetryCache {
   public void testRetryCacheRebuild() throws Exception {
     DFSTestUtil.runOperations(cluster, filesystem, conf, BlockSize, 0);
     
+    FSNamesystem namesystem = cluster.getNamesystem();
     LightWeightCache<CacheEntry, CacheEntry> cacheSet = 
         (LightWeightCache<CacheEntry, CacheEntry>) namesystem.getRetryCache().getCacheSet();
     assertEquals(17, cacheSet.size());
@@ -385,7 +382,7 @@ public class TestNamenodeRetryCache {
     
     // check retry cache
     assertTrue(namesystem.hasRetryCache());
-    fillCacheFromDB(oldEntries);
+    fillCacheFromDB(oldEntries, namesystem);
     cacheSet = (LightWeightCache<CacheEntry, CacheEntry>) namesystem
         .getRetryCache().getCacheSet();
     assertEquals(17, cacheSet.size());
@@ -396,7 +393,7 @@ public class TestNamenodeRetryCache {
     }
   }
   
-  private void fillCacheFromDB(Map<CacheEntry, CacheEntry> oldEntries) throws IOException {
+  private void fillCacheFromDB(Map<CacheEntry, CacheEntry> oldEntries, final FSNamesystem namesystem) throws IOException {
     for (final CacheEntry entry : oldEntries.keySet()) {
       HopsTransactionalRequestHandler rh = new HopsTransactionalRequestHandler(HDFSOperationType.CONCAT) {
         @Override
@@ -424,6 +421,7 @@ public class TestNamenodeRetryCache {
   public void testRetryCacheCleaning() throws Exception {
     DFSTestUtil.runOperations(cluster, filesystem, conf, BlockSize, 0);
     
+    FSNamesystem namesystem = cluster.getNamesystem();
     LightWeightCache<CacheEntry, CacheEntry> cacheSet = 
         (LightWeightCache<CacheEntry, CacheEntry>) namesystem.getRetryCache().getCacheSet();
     assertEquals(17, cacheSet.size());
@@ -445,7 +443,7 @@ public class TestNamenodeRetryCache {
     
     // check retry cache
     assertTrue(namesystem.hasRetryCache());
-    fillCacheFromDB(oldEntries);
+    fillCacheFromDB(oldEntries, namesystem);
     cacheSet = (LightWeightCache<CacheEntry, CacheEntry>) namesystem
         .getRetryCache().getCacheSet();
     assertEquals(0, cacheSet.size());
