@@ -1117,7 +1117,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       throws
       IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
+    final String src = dir.resolvePath(src1, pathComponents, dir);
     boolean txFailed = true;
     //we just want to lock the subtree the permission are checked in setPermissionSTOInt
     final INodeIdentifier inode = lockSubtreeAndCheckOwnerAndParentPermission(src, true,
@@ -1194,7 +1194,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       throws
       IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
+    final String src = dir.resolvePath(src1, pathComponents, dir);
     new HopsTransactionalRequestHandler(HDFSOperationType.SET_PERMISSION, src) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
@@ -1242,7 +1242,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     saveTimes();
 
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
+    final String src = dir.resolvePath(src1, pathComponents);
     boolean txFailed = true;
     //we just want to lock the subtree the permission are checked in setOwnerSTOInt
     final INodeIdentifier inode =  lockSubtreeAndCheckOwnerAndParentPermission(src, true,
@@ -1353,7 +1353,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     FSPermissionChecker pc = getPermissionChecker();
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src);
     checkNameNodeSafeMode("Cannot set owner for " + src);
-    src = FSDirectory.resolvePath(src, pathComponents, dir);
+    src = dir.resolvePath(src, pathComponents);
     checkOwner(pc, src);
     if (!pc.isSuperUser()) {
       if (username != null && !pc.getUser().equals(username)) {
@@ -1393,7 +1393,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   LocatedBlocks getBlockLocationsWithLock(final String clientMachine, final String src1,
                                           final long offset, final long length, final INodeLockType lockType) throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
+    final String src = dir.resolvePath(src1, pathComponents);
     HopsTransactionalRequestHandler getBlockLocationsHandler =
             new HopsTransactionalRequestHandler(
                     HDFSOperationType.GET_BLOCK_LOCATIONS, src) {
@@ -1448,7 +1448,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       final boolean needBlockToken, final boolean checkSafeMode)
       throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
+    final String src = dir.resolvePath(src1, pathComponents, dir);
     HopsTransactionalRequestHandler getBlockLocationsHandler =
         new HopsTransactionalRequestHandler(
             HDFSOperationType.GET_BLOCK_LOCATIONS, src) {
@@ -1810,7 +1810,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   void setTimes(final String src1, final long mtime, final long atime)
       throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
+    final String src = dir.resolvePath(src1, pathComponents);
     new HopsTransactionalRequestHandler(HDFSOperationType.SET_TIMES, src) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
@@ -1866,7 +1866,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       final PermissionStatus dirPerms, final boolean createParent)
       throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(link1);
-    final String link = FSDirectory.resolvePath(link1, pathComponents, dir);
+    final String link = dir.resolvePath(link1, pathComponents, dir);
     new HopsTransactionalRequestHandler(HDFSOperationType.CREATE_SYM_LINK,
         link) {
       @Override
@@ -1965,7 +1965,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   boolean setReplication(final String src1, final short replication)
       throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
+    final String src = dir.resolvePath(src1, pathComponents, dir);
     HopsTransactionalRequestHandler setReplicationHandler =
         new HopsTransactionalRequestHandler(HDFSOperationType.SET_REPLICATION,
             src) {
@@ -2187,7 +2187,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
   long getPreferredBlockSize(final String filename1) throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(filename1);
-    final String filename = FSDirectory.resolvePath(filename1, pathComponents, dir);
+    final String filename = dir.resolvePath(filename1, pathComponents, dir);
     HopsTransactionalRequestHandler getPreferredBlockSizeHandler =
         new HopsTransactionalRequestHandler(
             HDFSOperationType.GET_PREFERRED_BLOCK_SIZE, filename) {
@@ -2247,7 +2247,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       final EnumSet<CreateFlag> flag, final boolean createParent,
       final short replication, final long blockSize) throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
+    final String src = dir.resolvePath(src1, pathComponents, dir);
       return (HdfsFileStatus) new HopsTransactionalRequestHandler(
           HDFSOperationType.START_FILE, src) {
         @Override
@@ -2540,7 +2540,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   boolean recoverLease(final String src1, final String holder,
       final String clientMachine) throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
+    final String src = dir.resolvePath(src1, pathComponents, dir);
     HopsTransactionalRequestHandler recoverLeaseHandler =
         new HopsTransactionalRequestHandler(HDFSOperationType.RECOVER_LEASE,
             src) {
@@ -2714,7 +2714,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   private LocatedBlock appendFileHopFS(final String src1, final String holder,
       final String clientMachine) throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
+    final String src = dir.resolvePath(src1, pathComponents, dir);
     HopsTransactionalRequestHandler appendFileHandler =
         new HopsTransactionalRequestHandler(HDFSOperationType.APPEND_FILE,
             src) {
@@ -2856,7 +2856,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       final ExtendedBlock previous, final Set<Node> excludedNodes,
       final List<String> favoredNodes) throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
+    final String src = dir.resolvePath(src1, pathComponents, dir);
     HopsTransactionalRequestHandler additionalBlockHandler =
         new HopsTransactionalRequestHandler(
             HDFSOperationType.GET_ADDITIONAL_BLOCK, src) {
@@ -3141,7 +3141,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       final HashSet<Node> excludes, final int numAdditionalNodes,
       final String clientName) throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
+    final String src = dir.resolvePath(src1, pathComponents, dir);
     HopsTransactionalRequestHandler getAdditionalDatanodeHandler =
         new HopsTransactionalRequestHandler(
             HDFSOperationType.GET_ADDITIONAL_DATANODE, src) {
@@ -3229,7 +3229,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   boolean abandonBlock(final ExtendedBlock b, final long fileId, final String src1,
       final String holder) throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
+    final String src = dir.resolvePath(src1, pathComponents, dir);
     HopsTransactionalRequestHandler abandonBlockHandler =
         new HopsTransactionalRequestHandler(HDFSOperationType.ABANDON_BLOCK,
             src) {
@@ -3355,7 +3355,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   boolean completeFile(final String src1, final String holder,
       final ExtendedBlock last, final long fileId, final byte[] data) throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
+    final String src = dir.resolvePath(src1, pathComponents, dir);
     HopsTransactionalRequestHandler completeFileHandler =
         new HopsTransactionalRequestHandler(HDFSOperationType.COMPLETE_FILE, src) {
           @Override
@@ -3626,7 +3626,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   public boolean deleteWithTransaction(final String src1,
       final boolean recursive) throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
+    final String src = dir.resolvePath(src1, pathComponents, dir);
     HopsTransactionalRequestHandler deleteHandler =
         new HopsTransactionalRequestHandler(HDFSOperationType.DELETE, src) {
           @Override
@@ -3822,7 +3822,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   public HdfsFileStatus getFileInfo(final String src1, final boolean resolveLink)
       throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
+    final String src = dir.resolvePath(src1, pathComponents, dir);
     HopsTransactionalRequestHandler getFileInfoHandler =
         new HopsTransactionalRequestHandler(HDFSOperationType.GET_FILE_INFO,
             src) {
@@ -3869,7 +3869,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       throws AccessControlException, UnresolvedLinkException,
       StandbyException, IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
+    final String src = dir.resolvePath(src1, pathComponents, dir);
     HopsTransactionalRequestHandler isFileClosedHandler = new HopsTransactionalRequestHandler(
         HDFSOperationType.GET_FILE_INFO,
         src) {
@@ -3909,7 +3909,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   boolean mkdirs(final String src1, final PermissionStatus permissions,
       final boolean createParent) throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
+    final String src = dir.resolvePath(src1, pathComponents, dir);
     final boolean resolvedLink = false;
     HopsTransactionalRequestHandler mkdirsHandler =
         new HopsTransactionalRequestHandler(HDFSOperationType.MKDIRS, src) {
@@ -4588,14 +4588,14 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
     String startAfterString = new String(startAfter1);
-    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
+    final String src = dir.resolvePath(src1, pathComponents, dir);
 
     // Get file name when startAfter is an INodePath
     if (FSDirectory.isReservedName(startAfterString)) {
       byte[][] startAfterComponents = FSDirectory
           .getPathComponentsForReservedPath(startAfterString);
       try {
-        String tmp = FSDirectory.resolvePath(src, startAfterComponents, dir);
+        String tmp = dir.resolvePath(src, startAfterComponents, dir);
         byte[][] regularPath = INode.getPathComponents(tmp);
         startAfter1 = regularPath[regularPath.length - 1];
       } catch (IOException e) {
@@ -8118,7 +8118,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     INodeIdentifier subtreeRoot = null;
     boolean removeSTOLock = false;
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(path1);
-    final String path = FSDirectory.resolvePath(path1, pathComponents, dir);
+    final String path = dir.resolvePath(path1, pathComponents, dir);
     try {
       PathInformation pathInfo = getPathExistingINodesFromDB(path,
           false, null, null, null, null);
@@ -8214,7 +8214,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       throws
       IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(path1);
-    final String path = FSDirectory.resolvePath(path1, pathComponents, dir);
+    final String path = dir.resolvePath(path1, pathComponents, dir);
       PathInformation pathInfo = getPathExistingINodesFromDB(path,
               false, null, null, null, null);
       if(pathInfo.getPathInodes()[pathInfo.getPathComponents().length-1] == null){
@@ -8280,9 +8280,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       throw new InvalidPathException("Invalid name: " + dst1);
     }
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
+    final String src = dir.resolvePath(src1, pathComponents, dir);
     pathComponents = FSDirectory.getPathComponentsForReservedPath(dst1);
-    final String dst = FSDirectory.resolvePath(dst1, pathComponents, dir);
+    final String dst = dir.resolvePath(dst1, pathComponents, dir);
 
     boolean success = false;
 
@@ -8481,9 +8481,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
                         final Collection<MetadataLogEntry> logEntries,
                         final Options.Rename... options) throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
+    final String src = dir.resolvePath(src1, pathComponents, dir);
     pathComponents = FSDirectory.getPathComponentsForReservedPath(dst1);
-    final String dst = FSDirectory.resolvePath(dst1, pathComponents, dir);
+    final String dst = dir.resolvePath(dst1, pathComponents, dir);
     new HopsTransactionalRequestHandler(
         isUsingSubTreeLocks?HDFSOperationType.SUBTREE_RENAME:
             HDFSOperationType.RENAME, src) {
@@ -8612,9 +8612,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
    private boolean renameToInt(final String src1, final String dst1) throws IOException{
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
+    final String src = dir.resolvePath(src1, pathComponents, dir);
     pathComponents = FSDirectory.getPathComponentsForReservedPath(dst1);
-    final String dst = FSDirectory.resolvePath(dst1, pathComponents, dir);
+    final String dst = dir.resolvePath(dst1, pathComponents, dir);
     if (NameNode.stateChangeLog.isDebugEnabled()) {
       NameNode.stateChangeLog.debug(
           "DIR* NameSystem.multiTransactionalRename: with options - " + src +
@@ -8784,9 +8784,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
                    final Collection<MetadataLogEntry> logEntries)
       throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
+    final String src = dir.resolvePath(src1, pathComponents, dir);
     pathComponents = FSDirectory.getPathComponentsForReservedPath(dst1);
-    final String dst = FSDirectory.resolvePath(dst1, pathComponents, dir);
+    final String dst = dir.resolvePath(dst1, pathComponents, dir);
     HopsTransactionalRequestHandler renameToHandler =
         new HopsTransactionalRequestHandler(
             isUsingSubTreeLocks ? HDFSOperationType.SUBTREE_DEPRICATED_RENAME :
@@ -8892,7 +8892,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   private boolean multiTransactionalDeleteInternal(final String path1,
       final boolean recursive) throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(path1);
-    final String path = FSDirectory.resolvePath(path1, pathComponents, dir);
+    final String path = dir.resolvePath(path1, pathComponents, dir);
     checkNameNodeSafeMode("Cannot delete " + path);
 
     if (!recursive) {
@@ -9030,7 +9030,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   private Future multiTransactionDeleteInternal(final String path1, final long subTreeRootId)
           throws StorageException, TransactionContextException, IOException {
    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(path1);
-   final String path = FSDirectory.resolvePath(path1, pathComponents, dir);
+   final String path = dir.resolvePath(path1, pathComponents, dir);
    return  fsOperationsExecutor.submit(new Callable<Boolean>() {
         @Override
         public Boolean call() throws Exception {
@@ -9768,7 +9768,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       throw new SafeModeException("Cannot modify acl entries " + srcArg, safeMode());
     }
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = FSDirectory.resolvePath(srcArg, pathComponents, dir);
+    final String src = dir.resolvePath(srcArg, pathComponents, dir);
     new HopsTransactionalRequestHandler(HDFSOperationType.MODIFY_ACL_ENTRIES) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
@@ -9804,7 +9804,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       throw new SafeModeException("Cannot remove acl entries " + srcArg, safeMode());
     }
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = FSDirectory.resolvePath(srcArg, pathComponents, dir);
+    final String src = dir.resolvePath(srcArg, pathComponents, dir);
     new HopsTransactionalRequestHandler(HDFSOperationType.REMOVE_ACL_ENTRIES) {
 
       @Override
@@ -9840,7 +9840,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       throw new SafeModeException("Cannot remove default acl " + srcArg, safeMode());
     }
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = FSDirectory.resolvePath(srcArg, pathComponents, dir);
+    final String src = dir.resolvePath(srcArg, pathComponents, dir);
     new HopsTransactionalRequestHandler(HDFSOperationType.REMOVE_DEFAULT_ACL) {
 
       @Override
@@ -9876,7 +9876,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       throw new SafeModeException("Cannot remove acl " + srcArg, safeMode());
     }
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = FSDirectory.resolvePath(srcArg, pathComponents, dir);
+    final String src = dir.resolvePath(srcArg, pathComponents, dir);
     new HopsTransactionalRequestHandler(HDFSOperationType.REMOVE_ACL) {
 
       @Override
@@ -9912,7 +9912,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       throw new SafeModeException("Cannot set acl " + srcArg, safeMode());
     }
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = FSDirectory.resolvePath(srcArg, pathComponents, dir);
+    final String src = dir.resolvePath(srcArg, pathComponents, dir);
     new HopsTransactionalRequestHandler(HDFSOperationType.SET_ACL) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
@@ -9946,7 +9946,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   AclStatus getAclStatus(final String srcArg) throws IOException {
     aclConfigFlag.checkForApiCall();
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = FSDirectory.resolvePath(srcArg, pathComponents, dir);
+    final String src = dir.resolvePath(srcArg, pathComponents, dir);
     return (AclStatus) new HopsTransactionalRequestHandler(HDFSOperationType.GET_ACL_STATUS) {
 
       @Override
@@ -10258,7 +10258,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
   void checkAccess(final String src1, final FsAction mode) throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = FSDirectory.resolvePath(src1, pathComponents, dir);
+    final String src = dir.resolvePath(src1, pathComponents, dir);
     HopsTransactionalRequestHandler checkAccessHandler =
         new HopsTransactionalRequestHandler(HDFSOperationType.CHECK_ACCESS,
             src) {
