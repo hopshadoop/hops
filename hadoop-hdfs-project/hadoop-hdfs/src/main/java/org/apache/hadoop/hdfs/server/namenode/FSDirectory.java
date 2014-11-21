@@ -120,6 +120,9 @@ public class FSDirectory implements Closeable {
   
   private boolean quotaEnabled;
 
+  private final boolean isPermissionEnabled;
+
+
 
   /**
    * Caches frequently used file names used in {@link INode} to reuse
@@ -137,7 +140,9 @@ public class FSDirectory implements Closeable {
 
     createRoot(ns.createFsOwnerPermissions(new FsPermission((short) 0755)),
         false /*dont overwrite if root inode already existes*/);
-    
+    this.isPermissionEnabled = conf.getBoolean(
+      DFSConfigKeys.DFS_PERMISSIONS_ENABLED_KEY,
+      DFSConfigKeys.DFS_PERMISSIONS_ENABLED_DEFAULT);
     int configuredLimit = conf.getInt(DFSConfigKeys.DFS_LIST_LIMIT,
         DFSConfigKeys.DFS_LIST_LIMIT_DEFAULT);
     this.lsLimit = configuredLimit > 0 ? configuredLimit :
@@ -683,7 +688,27 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
       throw new IOException(error);
     }
   }
-  
+
+  /**
+   * This is a wrapper for resolvePath(). If the path passed
+   * is prefixed with /.reserved/raw, then it checks to ensure that the caller
+   * has super user has super user privileges.
+   *
+   * @param pc The permission checker used when resolving path.
+   * @param path The path to resolve.
+   * @param pathComponents path components corresponding to the path
+   * @return if the path indicates an inode, return path after replacing up to
+   *         <inodeid> with the corresponding path of the inode, else the path
+   *         in {@code src} as is. If the path refers to a path in the "raw"
+   *         directory, return the non-raw pathname.
+   * @throws FileNotFoundException
+   * @throws AccessControlException
+   */
+  String resolvePath(String path, byte[][] pathComponents)
+      throws FileNotFoundException, AccessControlException, IOException {
+    return resolvePath(path, pathComponents, this);
+  }
+
   private class RenameOperation {
     private final INodesInPath srcIIP;
     private final INodesInPath dstIIP;
