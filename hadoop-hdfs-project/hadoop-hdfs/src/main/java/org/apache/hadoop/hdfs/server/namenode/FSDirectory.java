@@ -93,6 +93,8 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 
 import static org.apache.hadoop.hdfs.server.namenode.FSNamesystem.LOG;
 import static org.apache.hadoop.util.Time.now;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Both FSDirectory and FSNamesystem manage the state of the namespace.
@@ -102,7 +104,8 @@ import static org.apache.hadoop.util.Time.now;
  * @see org.apache.hadoop.hdfs.server.namenode.FSNamesystem
  **/
 public class FSDirectory implements Closeable {
-
+  static final Logger LOG = LoggerFactory.getLogger(FSDirectory.class);
+  
   @VisibleForTesting
   static boolean CHECK_RESERVED_FILE_NAMES = true;
   public final static String DOT_RESERVED_STRING = ".reserved";
@@ -181,7 +184,7 @@ public class FSDirectory implements Closeable {
     
   }
 
-  private FSNamesystem getFSNamesystem() {
+  public FSNamesystem getFSNamesystem() {
     return namesystem;
   }
 
@@ -189,6 +192,10 @@ public class FSDirectory implements Closeable {
     return getFSNamesystem().getBlockManager();
   }
 
+  boolean isPermissionEnabled() {
+    return isPermissionEnabled;
+  }
+    
   /**
    * Shutdown the filestore
    */
@@ -250,7 +257,7 @@ public class FSDirectory implements Closeable {
     // over calculation of quota
     if(fileINode.isFileStoredInDB()){
       diskspaceTobeConsumed -= (fileINode.getSize() *
-          fileINode.getBlockReplication());
+          fileINode.getFileReplication());
     }
     // check quota limits and updated space consumed
     updateCount(inodesInPath, inodes.length - 1, 0, diskspaceTobeConsumed, true);
@@ -301,7 +308,7 @@ public class FSDirectory implements Closeable {
     final INodesInPath inodesInPath = getINodesInPath4Write(path, true);
     final INode[] inodes = inodesInPath.getINodes();
     updateCount(inodesInPath, inodes.length-1, 0,
-        -fileNode.getPreferredBlockSize() * fileNode.getBlockReplication(),
+        -fileNode.getPreferredBlockSize() * fileNode.getFileReplication(),
         true);
     return true;
   }
@@ -807,7 +814,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
       return null;
     }
     INodeFile fileNode = (INodeFile) inode;
-    final short oldRepl = fileNode.getBlockReplication();
+    final short oldRepl = fileNode.getFileReplication();
 
     // check disk quota
     long dsDelta =
@@ -890,87 +897,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     inode.logMetadataEvent(MetadataLogEntry.Operation.UPDATE);
   }
 
-  /**
-   * Concat all the blocks from srcs to trg and delete the srcs files
-   */
-  public void concat(String target, String[] srcs, long timestamp)
-      throws UnresolvedLinkException, StorageException,
-      TransactionContextException {
-    unprotectedConcat(target, srcs, timestamp);
-  }
   
-
-  /**
-   * Concat all the blocks from srcs to trg and delete the srcs files
-   *
-   * @param target
-   *     target file to move the blocks to
-   * @param srcs
-   *     list of file to move the blocks from
-   *     Must be public because also called from EditLogs
-   *     NOTE: - it does not update quota (not needed for concat)
-   */
-  public void unprotectedConcat(String target, String[] srcs, long timestamp)
-      throws UnresolvedLinkException, StorageException,
-      TransactionContextException {
-    if (NameNode.stateChangeLog.isDebugEnabled()) {
-      NameNode.stateChangeLog.debug("DIR* FSNamesystem.concat to " + target);
-    }
-    // do the move
-    
-    final INodesInPath trgINodesInPath = getINodesInPath4Write(target);
-    final INode[] trgINodes = trgINodesInPath.getINodes();
-    INodeFile trgInode = (INodeFile) trgINodes[trgINodes.length - 1];
-    INodeDirectory trgParent = (INodeDirectory) trgINodes[trgINodes.length - 2];
-    
-    INodeFile[] allSrcInodes = new INodeFile[srcs.length];
-    int i = 0;
-    int totalBlocks = 0;
-    long concatSize = 0;
-    for (String src : srcs) {
-      INodeFile srcInode = (INodeFile) getINode(src);
-      allSrcInodes[i++] = srcInode;
-      totalBlocks += srcInode.numBlocks();
-      concatSize += srcInode.getSize();
-    }
-    List<BlockInfo> oldBlks =
-        trgInode.appendBlocks(allSrcInodes, totalBlocks); // copy the blocks
-    trgInode.recomputeFileSize();
-    //HOP now the blocks are added to the targed file. copy of the old block infos is returned for snapshot maintenance
-    
-
-    //params for updating the snapshots
-    INodeCandidatePrimaryKey trg_param =
-        new INodeCandidatePrimaryKey(trgInode.getId());
-    List<INodeCandidatePrimaryKey> srcs_param =
-        new ArrayList<>();
-    for (INodeFile allSrcInode : allSrcInodes) {
-      srcs_param.add(new INodeCandidatePrimaryKey(allSrcInode.getId()));
-    }
-
-    // since we are in the same dir - we can use same parent to remove files
-    int count = 0;
-    for (INodeFile nodeToRemove : allSrcInodes) {
-      if (nodeToRemove == null) {
-        continue;
-      }
-      
-      trgParent.removeChild(nodeToRemove);
-      count++;
-    }
-    
-    trgInode.setModificationTimeForce(timestamp);
-    trgParent.setModificationTime(timestamp);
-    // update quota on the parent directory ('count' files removed, 0 space)
-    unprotectedUpdateCount(trgINodesInPath, trgINodes.length - 1, -count, 0);
-    
-
-    EntityManager
-        .snapshotMaintenance(HdfsTransactionContextMaintenanceCmds.Concat,
-            trg_param, srcs_param, oldBlks);
-
-  }
-
   /**
    * Delete the target directory and collect the blocks under it
    *
@@ -2122,7 +2049,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     boolean isStoredInDB = false;
     if (node instanceof INodeFile) {
       INodeFile fileNode = (INodeFile) node;
-      replication = fileNode.getBlockReplication();
+      replication = fileNode.getFileReplication();
       blocksize = fileNode.getPreferredBlockSize();
       isStoredInDB = fileNode.isFileStoredInDB();
     }
@@ -2168,7 +2095,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
         size = fileNode.computeFileSize(true);
       }
       
-      replication = fileNode.getBlockReplication();
+      replication = fileNode.getFileReplication();
       blocksize = fileNode.getPreferredBlockSize();
 
       final boolean isUc = fileNode.isUnderConstruction();
@@ -2614,7 +2541,7 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
    * @throws UnresolvedLinkException if symlink can't be resolved
    * @throws SnapshotAccessControlException if path is in RO snapshot
    */
-  private INodesInPath getINodesInPath4Write(String src, boolean resolveLink)
+  INodesInPath getINodesInPath4Write(String src, boolean resolveLink)
           throws UnresolvedLinkException, StorageException, TransactionContextException {
     final byte[][] components = INode.getPathComponents(src);
     INodesInPath inodesInPath = INodesInPath.resolve(getRootDir(), components,
@@ -2753,5 +2680,11 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
       pc.checkPermission(path, this, doCheckOwner, ancestorAccess,
           parentAccess, access, subAccess, ignoreEmptyDir, resolveLink);
     }
+  }
+  
+  HdfsFileStatus getAuditFileInfo(String path, boolean resolveSymlink)
+    throws IOException {
+    return (namesystem.isAuditEnabled() && namesystem.isExternalInvocation())
+      ? getFileInfo(path, resolveSymlink, false) : null;
   }
 }

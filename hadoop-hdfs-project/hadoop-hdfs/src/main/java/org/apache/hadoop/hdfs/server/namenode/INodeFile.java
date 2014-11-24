@@ -148,7 +148,7 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
    * @return the replication factor of the file.
    */
   @Override
-  public short getBlockReplication() {
+  public short getFileReplication() {
     return HeaderFormat.getReplication(header);
   }
 
@@ -279,7 +279,7 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
   /**
    * append array of blocks to this.blocks
    */
-  List<BlockInfo> appendBlocks(INodeFile[] inodes, int totalAddedBlocks /*HOP not used*/)
+  List<BlockInfo> concatBlocks(INodeFile[] inodes)
       throws StorageException, TransactionContextException {
     List<BlockInfo> oldBlks = new ArrayList<>();
     for (INodeFile srcInode : inodes) {
@@ -290,6 +290,7 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
         block.setBlockCollection(this);
       }
     }
+    recomputeFileSize();
     return oldBlks;
   }
   
@@ -410,7 +411,7 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
       // We do not know the replicaton of the database here. However, to be
       // consistent with normal files we will multiply the file size by the
       // replication factor.
-      return getSize() * getBlockReplication();
+      return getSize() * getFileReplication();
     }else {
       return diskspaceConsumed(getBlocks()); // Compute the size of the file. Takes replication in to account
     }
@@ -418,7 +419,7 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
   
   long diskspaceConsumed(Block[] blkArr) {
     return diskspaceConsumed(blkArr, isUnderConstruction(),
-        getPreferredBlockSize(), getBlockReplication());
+        getPreferredBlockSize(), getFileReplication());
   }
 
   static long diskspaceConsumed(Block[] blkArr, boolean underConstruction,
@@ -485,7 +486,7 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
 
   /** @return the diskspace required for a full block. */
   final long getBlockDiskspace() {
-    return getPreferredBlockSize() * getBlockReplication();
+    return getPreferredBlockSize() * getFileReplication();
   }
 
   void setReplication(short replication)
