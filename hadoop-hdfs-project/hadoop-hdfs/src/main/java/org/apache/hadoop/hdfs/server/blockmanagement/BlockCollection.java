@@ -64,7 +64,7 @@ public interface BlockCollection {
    *
    * @return block replication value
    */
-  public short getBlockReplication();
+  public short getFileReplication();
 
   /**
    * @return the storage policy ID.

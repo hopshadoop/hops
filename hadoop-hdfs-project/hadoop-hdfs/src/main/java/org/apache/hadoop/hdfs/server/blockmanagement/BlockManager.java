@@ -1543,12 +1543,12 @@ public class BlockManager {
 
     NumberReplicas numberOfReplicas = countNodes(b.stored);
     boolean hasEnoughLiveReplicas = numberOfReplicas.liveReplicas() >= bc
-        .getBlockReplication();
+        .getFileReplication();
     boolean minReplicationSatisfied =
         numberOfReplicas.liveReplicas() >= minReplication;
     boolean hasMoreCorruptReplicas = minReplicationSatisfied &&
         (numberOfReplicas.liveReplicas() + numberOfReplicas.corruptReplicas()) >
-            bc.getBlockReplication();
+            bc.getFileReplication();
     boolean corruptedDuringWrite = minReplicationSatisfied &&
         (b.stored.getGenerationStamp() > b.corrupted.getGenerationStamp());
     // case 1: have enough number of live replicas
@@ -1757,7 +1757,7 @@ public class BlockManager {
         return scheduledWork;
       }
 
-      requiredReplication = bc.getBlockReplication();
+      requiredReplication = bc.getFileReplication();
 
       // get a source data-node
       containingNodes = new ArrayList<>();
@@ -1835,7 +1835,7 @@ public class BlockManager {
           neededReplications.decrementReplicationIndex(priority);
           continue;
         }
-        requiredReplication = bc.getBlockReplication();
+        requiredReplication = bc.getFileReplication();
 
         // do not schedule more if enough replicas is already pending
         NumberReplicas numReplicas = countNodes(block);
@@ -3205,7 +3205,7 @@ public class BlockManager {
     }
 
     // handle underReplication/overReplication
-    short fileReplication = bc.getBlockReplication();
+    short fileReplication = bc.getFileReplication();
     if (!isNeededReplication(storedBlock, fileReplication, numCurrentReplica)) {
       neededReplications
           .remove(storedBlock, numCurrentReplica, num.decommissionedReplicas(),
@@ -3713,7 +3713,7 @@ public class BlockManager {
       return MisReplicationResult.UNDER_CONSTRUCTION;
     }
     // calculate current replication
-    short expectedReplication = bc.getBlockReplication();
+    short expectedReplication = bc.getFileReplication();
     NumberReplicas num = countNodes(block);
     int numCurrentReplica = num.liveReplicas();
     // add to under-replicated queue if need to be
@@ -4538,7 +4538,7 @@ public class BlockManager {
                 for (long blockId : inodeIdsToBlockMap.get(identifier.getInodeId())) {
                   BlockInfo block = EntityManager.find(BlockInfo.Finder.ByBlockIdAndINodeId, blockId);
                   BlockCollection bc = blocksMap.getBlockCollection(block);
-                  short expectedReplication = bc.getBlockReplication();
+                  short expectedReplication = bc.getFileReplication();
                   NumberReplicas num = countNodes(block);
                   int numCurrentReplica = num.liveReplicas();
                   if (numCurrentReplica > expectedReplication) {
@@ -4767,7 +4767,7 @@ public class BlockManager {
    */
   public void checkReplication(BlockCollection bc)
       throws IOException {
-    final short expected = bc.getBlockReplication();
+    final short expected = bc.getFileReplication();
     for (Block block : bc.getBlocks()) {
       final NumberReplicas n = countNodes(block);
       if (isNeededReplication(block, expected, n.liveReplicas())) {
@@ -4786,7 +4786,7 @@ public class BlockManager {
   private int getReplication(Block block)
       throws StorageException, TransactionContextException {
     final BlockCollection bc = blocksMap.getBlockCollection(block);
-    return bc == null ? 0 : bc.getBlockReplication();
+    return bc == null ? 0 : bc.getFileReplication();
   }
 
 

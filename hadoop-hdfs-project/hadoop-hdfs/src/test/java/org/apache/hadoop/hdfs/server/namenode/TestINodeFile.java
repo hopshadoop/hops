@@ -128,7 +128,7 @@ public class TestINodeFile {
     preferredBlockSize = 128 * 1024 * 1024;
     INodeFile inf = createINodeFile(replication, preferredBlockSize);
     assertEquals("True has to be returned in this case", replication,
-        inf.getBlockReplication());
+        inf.getFileReplication());
   }
 
   /**
@@ -300,30 +300,14 @@ public class TestINodeFile {
   
   @Test  
   @Ignore
-  public void testAppendBlocks()
+  public void testConcatBlocks()
       throws IOException {
     INodeFile origFile = createINodeFiles(1, "origfile")[0];
     assertEquals("Number of blocks didn't match", origFile.numBlocks(), 1L);
 
     INodeFile[] appendFiles = createINodeFiles(4, "appendfile");
-    origFile.appendBlocks(appendFiles, getTotalBlocks(appendFiles));
+    origFile.concatBlocks(appendFiles);
     assertEquals("Number of blocks didn't match", origFile.numBlocks(), 5L);
-  }
-
-  /**
-   * Gives the count of blocks for a given number of files
-   *
-   * @param files
-   *     Array of INode files
-   * @return total count of blocks
-   */
-  private int getTotalBlocks(INodeFile[] files)
-      throws StorageException, TransactionContextException {
-    int nBlocks = 0;
-    for (INodeFile file : files) {
-      nBlocks += file.numBlocks();
-    }
-    return nBlocks;
   }
   
   /**

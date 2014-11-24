@@ -315,14 +315,13 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       };
 
   @VisibleForTesting
-  private boolean isAuditEnabled() {
+  boolean isAuditEnabled() {
     return !isDefaultAuditLogger || auditLog.isInfoEnabled();
   }
 
   private HdfsFileStatus getAuditFileInfo(String path, boolean resolveSymlink)
       throws IOException {
-    return (isAuditEnabled() && isExternalInvocation()) ?
-        dir.getFileInfo(path, resolveSymlink, false) : null;
+    return dir.getAuditFileInfo(path, resolveSymlink);
   }
 
   private void logAuditEvent(boolean succeeded, String cmd, String src)
@@ -1604,200 +1603,15 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    */
   void concat(final String target, final String[] srcs) throws IOException {
 
-    final String[] paths = new String[srcs.length + 1];
-    System.arraycopy(srcs, 0, paths, 0, srcs.length);
-    paths[srcs.length] = target;
-
-    new HopsTransactionalRequestHandler(HDFSOperationType.CONCAT) {
-      @Override
-      public void acquireLock(TransactionLocks locks) throws IOException {
-        LockFactory lf = getInstance();
-        INodeLock il = lf.getINodeLock(INodeLockType.WRITE_ON_TARGET_AND_PARENT, INodeResolveType.PATH, paths)
-                .setNameNodeID(nameNode.getId())
-                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
-        locks.add(il).add(lf.getBlockLock()).add(
-            lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.PE, BLK.UC, BLK.IV));
-        if(isRetryCacheEnabled) {
-            locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
-                Server.getCallId()));
-        }
-        if (erasureCodingEnabled) {
-          locks.add(lf.getEncodingStatusLock(LockType.WRITE, srcs));
-        }
-        locks.add(lf.getAcesLock());
-      }
-
-      @Override
-      public Object performTask() throws IOException {
-        final CacheEntry cacheEntry = RetryCacheDistributed.waitForCompletion(retryCache);
-        if (cacheEntry != null && cacheEntry.isSuccess()) {
-          return null; // Return previous response
-        }
-        // Either there is no previous request in progres or it has failed
-        boolean success = false;
-        try {
-          concatInt(target, srcs);
-          success = true;
-        } catch (AccessControlException e) {
-          logAuditEvent(false, "concat", Arrays.toString(srcs), target, null);
-          throw e;
-        } finally {
-          RetryCacheDistributed.setState(cacheEntry, success);
-        }
-        return null;
-      }
-    }.handle(this);
-  }
-
-  private void concatInt(String target, String[] srcs)
-      throws IOException {
-    if (FSNamesystem.LOG.isDebugEnabled()) {
-      FSNamesystem.LOG.debug("concat " + Arrays.toString(srcs) +
-          " to " + target);
-    }
-
-    // verify args
-    if (target.isEmpty()) {
-      throw new IllegalArgumentException("Target file name is empty");
-    }
-    if (srcs == null || srcs.length == 0) {
-      throw new IllegalArgumentException("No sources given");
-    }
-
-    // We require all files be in the same directory
-    String trgParent =
-        target.substring(0, target.lastIndexOf(Path.SEPARATOR_CHAR));
-    for (String s : srcs) {
-      String srcParent = s.substring(0, s.lastIndexOf(Path.SEPARATOR_CHAR));
-      if (!srcParent.equals(trgParent)) {
-        throw new IllegalArgumentException(
-            "Sources and target are not in the same directory");
-      }
-    }
-
-    HdfsFileStatus resultingStat;
-    FSPermissionChecker pc = getPermissionChecker();
     checkNameNodeSafeMode("Cannot concat " + target);
-    concatInternal(pc, target, srcs);
-    resultingStat = getAuditFileInfo(target, false);
-    logAuditEvent(true, "concat", Arrays.toString(srcs), target, resultingStat);
-  }
-
-  /**
-   * See {@link #concat(String, String[])}
-   */
-  private void concatInternal(FSPermissionChecker pc, String target,
-      String[] srcs)
-      throws IOException {
-
-    // write permission for the target
-    if (isPermissionEnabled) {
-      checkPathAccess(pc, target, FsAction.WRITE);
-      // and srcs
-      for (String aSrc : srcs) {
-        checkPathAccess(pc, aSrc, FsAction.READ); // read the file
-        checkParentAccess(pc, aSrc, FsAction.WRITE); // for delete
-      }
+    HdfsFileStatus stat = null;
+    boolean success = false;
+    try {
+      stat = FSDirConcatOp.concat(dir, target, srcs);
+      success = true;
+    } finally {
+      logAuditEvent(success, "concat", Arrays.toString(srcs), target, stat);
     }
-
-    // to make sure no two files are the same
-    Set<INode> si = new HashSet<>();
-
-    // we put the following prerequisite for the operation
-    // replication and blocks sizes should be the same for ALL the blocks
-
-    // check the target
-    final INodeFile trgInode = INodeFile.valueOf(dir.getINode(target), target);
-    if(trgInode.isFileStoredInDB()){
-      throw new IOException("The target file is stored in the database. Can not concat to a a file stored in the database");
-    }
-
-    if (trgInode.isUnderConstruction()) {
-      throw new HadoopIllegalArgumentException(
-          "concat: target file " + target + " is under construction");
-    }
-    // per design target shouldn't be empty and all the blocks same size
-    if (trgInode.numBlocks() == 0) {
-      throw new HadoopIllegalArgumentException(
-          "concat: target file " + target + " is empty");
-    }
-
-    long blockSize = trgInode.getPreferredBlockSize();
-
-    // check the end block to be full
-    final BlockInfo last = trgInode.getLastBlock();
-    if (blockSize != last.getNumBytes()) {
-      throw new HadoopIllegalArgumentException(
-          "The last block in " + target + " is not full; last block size = " +
-              last.getNumBytes() + " but file block size = " + blockSize);
-    }
-
-    si.add(trgInode);
-    short replication = trgInode.getBlockReplication();
-
-    // now check the srcs
-    boolean endSrc =
-        false; // final src file doesn't have to have full end block
-    for (int i = 0; i < srcs.length; i++) {
-      String src = srcs[i];
-      if (i == srcs.length - 1) {
-        endSrc = true;
-      }
-
-      final INodeFile srcInode = INodeFile.valueOf(dir.getINode(src), src);
-
-      if(srcInode.isFileStoredInDB()){
-        throw new IOException(src+" is stored in the database. Can not concat to a a file stored in the database");
-      }
-
-      if (src.isEmpty() || srcInode.isUnderConstruction() ||
-          srcInode.numBlocks() == 0) {
-        throw new HadoopIllegalArgumentException("concat: source file " + src +
-            " is invalid or empty or underConstruction");
-      }
-
-      // check replication and blocks size
-      if (replication != srcInode.getBlockReplication()) {
-        throw new HadoopIllegalArgumentException(
-            "concat: the source file " + src + " and the target file " +
-                target +
-                " should have the same replication: source replication is " +
-                srcInode.getBlockReplication() + " but target replication is " +
-                replication);
-      }
-
-      // verify that all the blocks are of the same length as target
-      // should be enough to check the end blocks
-      final BlockInfo[] srcBlocks = srcInode.getBlocks();
-      int idx = srcBlocks.length - 1;
-      if (endSrc) {
-        idx = srcBlocks.length - 2; // end block of endSrc is OK not to be full
-      }
-      if (idx >= 0 && srcBlocks[idx].getNumBytes() != blockSize) {
-        throw new HadoopIllegalArgumentException(
-            "concat: the source file " + src + " and the target file " +
-                target +
-                " should have the same blocks sizes: target block size is " +
-                blockSize + " but the size of source block " + idx + " is " +
-                srcBlocks[idx].getNumBytes());
-      }
-
-      si.add(srcInode);
-    }
-
-    // make sure no two files are the same
-    if (si.size() < srcs.length + 1) { // trg + srcs
-      // it means at least two files are the same
-      throw new HadoopIllegalArgumentException(
-          "concat: at least two of the source files are the same");
-    }
-
-    if (NameNode.stateChangeLog.isDebugEnabled()) {
-      NameNode.stateChangeLog.debug("DIR* NameSystem.concat: " +
-          Arrays.toString(srcs) + " to " + target);
-    }
-    long timestamp = now();
-    dir.concat(target, srcs, timestamp);
   }
 
   /**
@@ -2511,7 +2325,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       if (ret != null && dir.isQuotaEnabled()) {
         // update the quota: use the preferred block size for UC block
         final long diff = file.getPreferredBlockSize() - ret.getBlockSize();
-        dir.updateSpaceConsumed(src, 0, diff * file.getBlockReplication());
+        dir.updateSpaceConsumed(src, 0, diff * file.getFileReplication());
       }
       lease.updateLastTwoBlocksInLeasePath(src, file.getLastBlock(), file.getPenultimateBlock());
       return ret;
@@ -2917,7 +2731,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             clientNode = blockManager.getDatanodeManager().getDatanodeByHost(
               clientMachine);
 
-            replication = pendingFile.getBlockReplication();
+            replication = pendingFile.getFileReplication();
 
             // Get the storagePolicyID of this file
             byte storagePolicyID = pendingFile.getStoragePolicyID();
@@ -3514,7 +3328,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     if (dir.isQuotaEnabled()) {
       //account for only newly added data
       long spaceConsumed = (data.length - oldSize) * pendingFile
-          .getBlockReplication();
+          .getFileReplication();
       dir.updateSpaceConsumed(src, 0, spaceConsumed);
     }
 
@@ -4318,7 +4132,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         // Adjust disk space consumption if required
         String path = fileINode.getFullPathName();
         dir.updateSpaceConsumed(path, 0,
-            -diff * fileINode.getBlockReplication());
+            -diff * fileINode.getFileReplication());
       }
     }
   }
@@ -6818,7 +6632,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    * Client invoked methods are invoked over RPC and will be in
    * RPC call context even if the client exits.
    */
-  private boolean isExternalInvocation() {
+  boolean isExternalInvocation() {
     return Server.isRpcInvocation() ||
         NamenodeWebHdfsMethods.isWebHdfsInvocation();
   }
@@ -10491,6 +10305,10 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       boolean cacheOnly) throws IOException {
     checkSuperuserPrivilege();
     UsersGroups.removeUserGroupTx(userName, groupName, cacheOnly);
+  }
+  
+  public boolean isRetryCacheEnabled(){
+    return isRetryCacheEnabled;
   }
 }
 
