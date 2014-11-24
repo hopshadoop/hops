@@ -5938,64 +5938,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   private long getCompleteBlocksTotal() throws IOException {
 
     // Calculate number of blocks under construction
-    long numUCBlocks = 0;
-    for (final Lease lease : leaseManager.getSortedLeases()) {
-
-      final HopsTransactionalRequestHandler ucBlocksHandler = new HopsTransactionalRequestHandler(
-          HDFSOperationType.GET_LISTING) {
-        private Set<String> leasePaths = null;
-
-        @Override
-        public void setUp() throws StorageException {
-          String holder = lease.getHolder();
-          leasePaths = INodeUtil.findPathsByLeaseHolder(holder);
-          if (leasePaths != null) {
-            LOG.debug("Total Paths " + leasePaths.size() + " Paths: " + Arrays.toString(leasePaths.toArray()));
-          }
-        }
-
-        @Override
-        public void acquireLock(TransactionLocks locks) throws IOException {
-          String holder = lease.getHolder();
-          LockFactory lf = LockFactory.getInstance();
-          INodeLock il = lf.getINodeLock(INodeLockType.READ, INodeResolveType.PATH_AND_IMMEDIATE_CHILDREN,
-                  leasePaths.toArray(new String[leasePaths.size()]))
-                  .setNameNodeID(nameNode.getId())
-                  .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
-          locks.add(il).add(lf.getLeaseLock(LockType.READ, holder))
-                  .add(lf.getLeasePathLock(LockType.READ)).add(lf.getBlockLock())
-                  .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR));
-        }
-
-        @Override
-        public Object performTask() throws IOException {
-          int numUCBlocks = 0;
-          for (LeasePath leasePath : lease.getPaths()) {
-            final String path = leasePath.getPath();
-            final INodeFile cons;
-            try {
-              cons = dir.getINode(path).asFile();
-              Preconditions.checkState(cons.isUnderConstruction());
-            } catch (UnresolvedLinkException e) {
-              throw new AssertionError("Lease files should reside on this FS");
-            }
-            BlockInfo[] blocks = cons.getBlocks();
-            if (blocks == null) {
-              continue;
-            }
-            for (BlockInfo b : blocks) {
-              if (!b.isComplete()) {
-                numUCBlocks++;
-              }
-            }
-          }
-          return numUCBlocks;
-        }
-      };
-
-      numUCBlocks += (int) ucBlocksHandler.handle();
-    }
-    LOG.info("Number of blocks under construction: " + numUCBlocks);
+    long numUCBlocks = leaseManager.getNumUnderConstructionBlocks();
     return getBlocksTotal() - numUCBlocks;
   }
 

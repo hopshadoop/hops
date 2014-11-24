@@ -58,6 +58,9 @@ import java.util.TreeSet;
 import static io.hops.transaction.lock.LockFactory.BLK;
 import static io.hops.transaction.lock.LockFactory.getInstance;
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicLong;
+import org.apache.hadoop.fs.UnresolvedLinkException;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import static org.apache.hadoop.util.Time.now;
 
 /**
@@ -103,7 +106,26 @@ public class LeaseManager {
     return EntityManager.find(Lease.Finder.ByHolder, holder, Lease.getHolderId(holder));
   }
   
-  SortedSet<Lease> getSortedLeases() throws IOException {
+  @VisibleForTesting
+  int getNumSortedLeases() throws IOException {
+    HopsTransactionalRequestHandler getNumSortedLeasesHandler = new HopsTransactionalRequestHandler(
+        HDFSOperationType.GET_SORTED_LEASES) {
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+
+      }
+
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        LeaseDataAccess<Lease> da = (LeaseDataAccess) HdfsStorageFactory
+            .getDataAccess(LeaseDataAccess.class);
+        return da.countAll();
+      }
+    };
+    return (int) getNumSortedLeasesHandler.handle(fsnamesystem);
+  }
+  
+  private SortedSet<Lease> getSortedLeases() throws IOException {
     HopsTransactionalRequestHandler getSortedLeasesHandler =
         new HopsTransactionalRequestHandler(
             HDFSOperationType.GET_SORTED_LEASES) {
@@ -123,6 +145,73 @@ public class LeaseManager {
         (Collection<? extends Lease>) getSortedLeasesHandler
             .handle(fsnamesystem));
   }
+  
+  /**
+   * This method iterates through all the leases and counts the number of blocks
+   * which are not COMPLETE. The FSNamesystem read lock MUST be held before
+   * calling this method.
+   * @return
+   */
+  synchronized long getNumUnderConstructionBlocks() throws IOException {
+    
+    final AtomicLong numUCBlocks = new AtomicLong(0);
+    for (final Lease lease : getSortedLeases()) {
+      new HopsTransactionalRequestHandler(
+          HDFSOperationType.GET_LISTING) {
+        private Set<String> leasePaths = null;
+
+        @Override
+        public void setUp() throws StorageException {
+          String holder = lease.getHolder();
+          leasePaths = INodeUtil.findPathsByLeaseHolder(holder);
+          if (leasePaths != null) {
+            LOG.debug("Total Paths " + leasePaths.size() + " Paths: " + Arrays.toString(leasePaths.toArray()));
+          }
+        }
+
+        @Override
+        public void acquireLock(TransactionLocks locks) throws IOException {
+          String holder = lease.getHolder();
+          LockFactory lf = LockFactory.getInstance();
+          INodeLock il = lf.getINodeLock(INodeLockType.READ, INodeResolveType.PATH_AND_IMMEDIATE_CHILDREN,
+              leasePaths.toArray(new String[leasePaths.size()]))
+              .setNameNodeID(fsnamesystem.getNameNode().getId())
+              .setActiveNameNodes(fsnamesystem.getNameNode().getActiveNameNodes().getActiveNodes());
+          locks.add(il).add(lf.getLeaseLock(LockType.READ, holder))
+              .add(lf.getLeasePathLock(LockType.READ)).add(lf.getBlockLock())
+              .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR));
+        }
+
+        @Override
+        public Object performTask() throws IOException {
+          for (LeasePath leasePath : lease.getPaths()) {
+            final String path = leasePath.getPath();
+            final INodeFile cons;
+            try {
+              cons = fsnamesystem.getFSDirectory().getINode(path).asFile();
+              Preconditions.checkState(cons.isUnderConstruction());
+            } catch (UnresolvedLinkException e) {
+              throw new AssertionError("Lease files should reside on this FS");
+            }
+            BlockInfo[] blocks = cons.getBlocks();
+            if (blocks == null) {
+              continue;
+            }
+            for (BlockInfo b : blocks) {
+              if (!b.isComplete()) {
+                numUCBlocks.incrementAndGet();
+              }
+            }
+          }
+          return null;
+        }
+      }.handle();
+    }
+    LOG.info("Number of blocks under construction: " + numUCBlocks.get());
+    return numUCBlocks.get();
+  }
+
+
 
   /**
    * @return the lease containing src
@@ -416,7 +505,6 @@ public class LeaseManager {
    * and disposes of them.
    * ****************************************************
    */
-  //HOP: FIXME: needSync logic added for bug fix HDFS-4186
   class Monitor implements Runnable {
     final String name = getClass().getSimpleName();
 
@@ -429,17 +517,7 @@ public class LeaseManager {
         try {
           if (fsnamesystem.isLeader()) {
             try {
-              if (!fsnamesystem.isInSafeMode()) {
-                SortedSet<Lease> sortedLeases =
-                    (SortedSet<Lease>) findExpiredLeaseHandler
-                        .handle(fsnamesystem);
-                if (sortedLeases != null) {
-                  for (Lease expiredLease : sortedLeases) {
-                    expiredLeaseHandler.setParams(expiredLease.getHolder())
-                        .handle(fsnamesystem);
-                  }
-                }
-              }
+              checkLeases();
             } catch (IOException ex) {
               LOG.error(ex);
             }
@@ -453,57 +531,6 @@ public class LeaseManager {
       }
     }
 
-    LightWeightRequestHandler findExpiredLeaseHandler =
-        new LightWeightRequestHandler(
-            HDFSOperationType.PREPARE_LEASE_MANAGER_MONITOR) {
-          @Override
-          public Object performTask() throws StorageException, IOException {
-            long expiredTime = now() - hardLimit;
-            LeaseDataAccess da = (LeaseDataAccess) HdfsStorageFactory
-                .getDataAccess(LeaseDataAccess.class);
-            return new TreeSet<Lease>(da.findByTimeLimit(expiredTime));
-          }
-        };
-
-    HopsTransactionalRequestHandler expiredLeaseHandler =
-        new HopsTransactionalRequestHandler(
-            HDFSOperationType.LEASE_MANAGER_MONITOR) {
-          private Set<String> leasePaths = null;
-
-          @Override
-          public void setUp() throws StorageException {
-            String holder = (String) getParams()[0];
-            leasePaths = INodeUtil.findPathsByLeaseHolder(holder);
-            if(leasePaths!=null){
-              LOG.debug("Total Paths "+leasePaths.size()+" Paths: "+Arrays.toString(leasePaths.toArray()));
-            }
-            
-          }
-
-          @Override
-          public void acquireLock(TransactionLocks locks) throws IOException {
-            String holder = (String) getParams()[0];
-            LockFactory lf = getInstance();
-            INodeLock il = lf.getINodeLock(INodeLockType.WRITE,
-                    INodeResolveType.PATH,
-                    leasePaths.toArray(new String[leasePaths.size()])).setNameNodeID(fsnamesystem.getNameNode().getId())
-                    .setActiveNameNodes(fsnamesystem.getNameNode().getActiveNameNodes().getActiveNodes());
-
-            locks.add(il).add(lf.getNameNodeLeaseLock(LockType.WRITE))
-                    .add(lf.getLeaseLock(LockType.WRITE, holder))
-                    .add(lf.getLeasePathLock(LockType.WRITE, leasePaths.size()))
-                    .add(lf.getBlockLock()).add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR));
-          }
-
-          @Override
-          public Object performTask() throws StorageException, IOException {
-            String holder = (String) getParams()[0];
-            if (holder != null) {
-              checkLeases(holder);
-            }
-            return null;
-          }
-        };
   }
 
   /**
@@ -511,64 +538,117 @@ public class LeaseManager {
    *
    * @return true is sync is needed.
    */
-  private boolean checkLeases(String holder)
-      throws StorageException, TransactionContextException {
+  @VisibleForTesting
+  boolean checkLeases()
+      throws StorageException, TransactionContextException, IOException {
+
     boolean needSync = false;
 
-    Lease oldest = EntityManager.find(Lease.Finder.ByHolder, holder, Lease.getHolderId(holder));
+    SortedSet<Lease> sortedLeases = (SortedSet<Lease>) new LightWeightRequestHandler(
+        HDFSOperationType.PREPARE_LEASE_MANAGER_MONITOR) {
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        long expiredTime = now() - hardLimit;
+        LeaseDataAccess da = (LeaseDataAccess) HdfsStorageFactory
+            .getDataAccess(LeaseDataAccess.class);
+        return new TreeSet<Lease>(da.findByTimeLimit(expiredTime));
+      }
+    }.handle(fsnamesystem);
 
-    if (oldest == null) {
-      return needSync;
-    }
+    if (sortedLeases != null) {
+      for (Lease expiredLease : sortedLeases) {
+        HopsTransactionalRequestHandler expiredLeaseHandler = new HopsTransactionalRequestHandler(
+            HDFSOperationType.LEASE_MANAGER_MONITOR) {
+          private Set<String> leasePaths = null;
 
-    if (!expiredHardLimit(oldest)) {
-      return needSync;
-    }
+          @Override
+          public void setUp() throws StorageException {
+            String holder = (String) getParams()[0];
+            leasePaths = INodeUtil.findPathsByLeaseHolder(holder);
+            if (leasePaths != null) {
+              LOG.debug("Total Paths " + leasePaths.size() + " Paths: " + Arrays.toString(leasePaths.toArray()));
+            }
 
-    LOG.info("Lease " + oldest + " has expired hard limit");
+          }
 
-    final List<LeasePath> removing = new ArrayList<>();
-    // need to create a copy of the oldest lease paths, becuase 
-    // internalReleaseLease() removes paths corresponding to empty files,
-    // i.e. it needs to modify the collection being iterated over
-    // causing ConcurrentModificationException
-    Collection<LeasePath> paths = oldest.getPaths();
-    assert paths != null : "The lease " + oldest.toString() + " has no path.";
-    LeasePath[] leasePaths = new LeasePath[paths.size()];
-    paths.toArray(leasePaths);
-    for (LeasePath lPath : leasePaths) {
-      try {
-        boolean leaseReleased = false;
-        leaseReleased = fsnamesystem
-            .internalReleaseLease(oldest, lPath.getPath(),
-                HdfsServerConstants.NAMENODE_LEASE_HOLDER);
-        if (leaseReleased) {
-          LOG.info("Lease recovery for file " + lPath +
-              " is complete. File closed.");
-          removing.add(lPath);
-        } else {
-          LOG.info(
-              "Started block recovery for file " + lPath + " lease " + oldest);
-        }
-        
-        // If a lease recovery happened, we need to sync later.
-        if (!needSync && !leaseReleased) {
-          needSync = true;
-        }
+          @Override
+          public void acquireLock(TransactionLocks locks) throws IOException {
+            String holder = (String) getParams()[0];
+            LockFactory lf = getInstance();
+            INodeLock il = lf.getINodeLock(INodeLockType.WRITE,
+                INodeResolveType.PATH,
+                leasePaths.toArray(new String[leasePaths.size()])).setNameNodeID(fsnamesystem.getNameNode().getId())
+                .setActiveNameNodes(fsnamesystem.getNameNode().getActiveNameNodes().getActiveNodes());
 
-      } catch (IOException e) {
-        LOG.error(
-            "Cannot release the path " + lPath + " in the lease " + oldest, e);
-        removing.add(lPath);
+            locks.add(il).add(lf.getNameNodeLeaseLock(LockType.WRITE))
+                .add(lf.getLeaseLock(LockType.WRITE, holder))
+                .add(lf.getLeasePathLock(LockType.WRITE, leasePaths.size()))
+                .add(lf.getBlockLock()).add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR));
+          }
+
+          @Override
+          public Object performTask() throws StorageException, IOException {
+            String holder = (String) getParams()[0];
+            boolean needSync = false;
+            if (holder != null) {
+              Lease leaseToCheck = EntityManager.find(Lease.Finder.ByHolder, holder, Lease.getHolderId(holder));
+
+              if (!expiredHardLimit(leaseToCheck)) {
+                LOG.warn("Unable to release hard-limit expired lease: "
+                    + leaseToCheck);
+                return needSync;
+              }
+
+              LOG.info("Lease " + leaseToCheck + " has expired hard limit");
+
+              final List<LeasePath> removing = new ArrayList<>();
+              // need to create a copy of the oldest lease paths, because 
+              // internalReleaseLease() removes paths corresponding to empty files,
+              // i.e. it needs to modify the collection being iterated over
+              // causing ConcurrentModificationException
+              LeasePath[] leasePaths = new LeasePath[leaseToCheck.getPaths().size()];
+              leaseToCheck.getPaths().toArray(leasePaths);
+              for (LeasePath p : leasePaths) {
+                try {
+                  boolean completed = false;
+                  completed = fsnamesystem
+                      .internalReleaseLease(leaseToCheck, p.getPath(),
+                          HdfsServerConstants.NAMENODE_LEASE_HOLDER);
+                  if (LOG.isDebugEnabled()) {
+                    if (completed) {
+                      LOG.debug("Lease recovery for " + p + " is complete. File closed.");
+                    } else {
+                      LOG.debug("Started block recovery " + p + " lease " + leaseToCheck);
+                    }
+                  }
+
+                  // If a lease recovery happened, we need to sync later.
+                  if (!needSync && !completed) {
+                    needSync = true;
+                  }
+
+                } catch (IOException e) {
+                  LOG.error(
+                      "Cannot release the path " + p + " in the lease " + leaseToCheck, e);
+                  removing.add(p);
+                }
+              }
+
+              for (LeasePath p : removing) {
+                if (leaseToCheck.getPaths().contains(p)) {
+                  removeLease(leaseToCheck, p);
+                }
+              }
+            }
+            return needSync;
+          }
+        };
+
+        needSync = needSync || (boolean) expiredLeaseHandler.setParams(expiredLease.getHolder())
+            .handle(fsnamesystem);
       }
     }
 
-    for (LeasePath lPath : removing) {
-      if (oldest.getPaths().contains(lPath)) {
-        removeLease(oldest, lPath);
-      }
-    }
-    
     return needSync;
   }
 
