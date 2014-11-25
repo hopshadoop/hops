@@ -6784,8 +6784,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           .put("blockPoolUsedPercent", node.getBlockPoolUsedPercent())
           .put("volfails", node.getVolumeFailures())
           .build();
-
-      info.put(node.getHostName(), innerInfo);
+      info.put(node.getHostName() + ":" + node.getXferPort(), innerInfo);
     }
     return JSON.toString(info);
   }
@@ -6806,7 +6805,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           .put("decommissioned", node.isDecommissioned())
           .put("xferaddr", node.getXferAddr())
           .build();
-      info.put(node.getHostName(), innerInfo);
+      info.put(node.getHostName() + ":" + node.getXferPort(), innerInfo);
     }
     return JSON.toString(info);
   }
@@ -6832,7 +6831,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           .put("underReplicateInOpenFiles",
               node.decommissioningStatus.getUnderReplicatedInOpenFiles())
           .build();
-      info.put(node.getHostName(), innerInfo);
+      info.put(node.getHostName() + ":" + node.getXferPort(), innerInfo);
     }
     return JSON.toString(info);
   }
