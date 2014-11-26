@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
+import java.net.SocketException;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -25,6 +27,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
+import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.StorageType;
@@ -32,6 +35,7 @@ import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
+import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.protocol.datatransfer.Sender;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.BlockOpResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status;
@@ -205,7 +209,51 @@ public class TestBlockReplacement {
       cluster.shutdown();
     }
   }
-  
+
+  @Test
+  public void testBlockMoveAcrossStorageInSameNode() throws Exception {
+    final Configuration conf = new HdfsConfiguration();
+    // create only one datanode in the cluster to verify movement within
+    // datanode.
+    final MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(1).storageTypes(
+            new StorageType[] { StorageType.DISK, StorageType.ARCHIVE })
+            .build();
+    try {
+      cluster.waitActive();
+      final DistributedFileSystem dfs = cluster.getFileSystem();
+      final Path file = new Path("/testBlockMoveAcrossStorageInSameNode/file");
+      DFSTestUtil.createFile(dfs, file, 1024, (short) 1, 1024);
+      LocatedBlocks locatedBlocks = dfs.getClient().getLocatedBlocks(file.toString(), 0);
+      // get the current 
+      LocatedBlock locatedBlock = locatedBlocks.get(0);
+      ExtendedBlock block = locatedBlock.getBlock();
+      DatanodeInfo[] locations = locatedBlock.getLocations();
+      assertEquals(1, locations.length);
+      StorageType[] storageTypes = locatedBlock.getStorageTypes();
+      // current block should be written to DISK
+      assertTrue(storageTypes[0] == StorageType.DISK);
+      
+      DatanodeInfo source = locations[0];
+      // move block to ARCHIVE by using same DataNodeInfo for source, proxy and
+      // destination so that movement happens within datanode 
+      assertTrue(replaceBlock(block, source, source, source,
+          StorageType.ARCHIVE));
+      
+      // wait till namenode notified
+      Thread.sleep(3000);
+      locatedBlocks = dfs.getClient().getLocatedBlocks(file.toString(), 0);
+      // get the current 
+      locatedBlock = locatedBlocks.get(0);
+      assertEquals("Storage should be only one", 1,
+          locatedBlock.getLocations().length);
+      assertTrue("Block should be moved to ARCHIVE", locatedBlock
+          .getStorageTypes()[0] == StorageType.ARCHIVE);
+    } finally {
+      cluster.shutdown();
+    }
+  }
+
   /* check if file's blocks have expected number of replicas,
    * and exist at all of includeNodes
    */
@@ -267,24 +315,42 @@ public class TestBlockReplacement {
    */
   private boolean replaceBlock(ExtendedBlock block, DatanodeInfo source,
       DatanodeInfo sourceProxy, DatanodeInfo destination) throws IOException {
-    Socket sock = new Socket();
-    sock.connect(NetUtils.createSocketAddr(destination.getXferAddr()),
-        HdfsServerConstants.READ_TIMEOUT);
-    sock.setKeepAlive(true);
-    // sendRequest
-    DataOutputStream out = new DataOutputStream(sock.getOutputStream());
-    new Sender(out).replaceBlock(block, StorageType.DEFAULT,
-        BlockTokenSecretManager.DUMMY_TOKEN,
-        source.getDatanodeUuid(), sourceProxy);
-    out.flush();
-    // receiveResponse
-    DataInputStream reply = new DataInputStream(sock.getInputStream());
+    return replaceBlock(block, source, sourceProxy, destination,
+        StorageType.DEFAULT);
+  }
 
-    BlockOpResponseProto proto = BlockOpResponseProto.parseDelimitedFrom(reply);
-    while (proto.getStatus() == Status.IN_PROGRESS) {
-      proto = BlockOpResponseProto.parseDelimitedFrom(reply);
+  /*
+   * Replace block
+   */
+  private boolean replaceBlock(
+      ExtendedBlock block,
+      DatanodeInfo source,
+      DatanodeInfo sourceProxy,
+      DatanodeInfo destination,
+      StorageType targetStorageType) throws IOException, SocketException {
+    Socket sock = new Socket();
+    try {
+      sock.connect(NetUtils.createSocketAddr(destination.getXferAddr()),
+          HdfsServerConstants.READ_TIMEOUT);
+      sock.setKeepAlive(true);
+      // sendRequest
+      DataOutputStream out = new DataOutputStream(sock.getOutputStream());
+      new Sender(out).replaceBlock(block, targetStorageType,
+          BlockTokenSecretManager.DUMMY_TOKEN, source.getDatanodeUuid(),
+          sourceProxy);
+      out.flush();
+      // receiveResponse
+      DataInputStream reply = new DataInputStream(sock.getInputStream());
+
+      BlockOpResponseProto proto =
+          BlockOpResponseProto.parseDelimitedFrom(reply);
+      while (proto.getStatus() == Status.IN_PROGRESS) {
+        proto = BlockOpResponseProto.parseDelimitedFrom(reply);
+      }
+      return proto.getStatus() == Status.SUCCESS;
+    } finally {
+      sock.close();
     }
-    return proto.getStatus() == Status.SUCCESS;
   }
 
   /**

@@ -949,7 +949,7 @@ public class DataNode extends ReconfigurableBase
   }
   
   // calls specific to BP
-  void notifyNamenodeReceivedBlock(ExtendedBlock block,
+  public void notifyNamenodeReceivedBlock(ExtendedBlock block,
       String delHint, String storageUuid) {
     BPOfferService bpos = blockPoolManager.get(block.getBlockPoolId());
     if (bpos != null) {

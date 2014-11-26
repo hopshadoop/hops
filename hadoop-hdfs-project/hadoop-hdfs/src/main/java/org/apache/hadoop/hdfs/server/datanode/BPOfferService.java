@@ -324,7 +324,6 @@ class BPOfferService implements Runnable {
   void notifyNamenodeReceivedBlock(ExtendedBlock block, String delHint,
       String storageUuid) {
     checkBlock(block);
-    checkDelHint(delHint);
     ReceivedDeletedBlockInfo bInfo =
         new ReceivedDeletedBlockInfo(block.getLocalBlock(),
             BlockStatus.RECEIVED_BLOCK, delHint);
@@ -337,10 +336,6 @@ class BPOfferService implements Runnable {
     Preconditions.checkArgument(block.getBlockPoolId().equals(getBlockPoolId()),
         "block belongs to BP %s instead of BP %s", block.getBlockPoolId(),
         getBlockPoolId());
-  }
-
-  private void checkDelHint(String delHint) {
-    Preconditions.checkArgument(delHint != null, "delHint is null");
   }
 
   void notifyNamenodeDeletedBlock(ExtendedBlock block, String storageUuid) {
