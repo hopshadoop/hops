@@ -161,7 +161,6 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
     return id;
   }
 
-
   /**
    * @return preferred block size (in bytes) of the file.
    */

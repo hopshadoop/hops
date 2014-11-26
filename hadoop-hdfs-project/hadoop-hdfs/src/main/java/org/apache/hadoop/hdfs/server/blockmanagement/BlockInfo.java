@@ -392,13 +392,16 @@ public class BlockInfo extends Block {
       BlockUCState s, DatanodeStorageInfo[] targets)
       throws StorageException, TransactionContextException {
     if (isComplete()) {
-      return new BlockInfoUnderConstruction(this, this.getInodeId(), s,
+      BlockInfoUnderConstruction ucBlock = new BlockInfoUnderConstruction(this, this.getInodeId(), s,
           targets);
+      ucBlock.setBlockCollection(getBlockCollection());
+      return ucBlock;
     }
     // the block is already under construction
     BlockInfoUnderConstruction ucBlock = (BlockInfoUnderConstruction) this;
     ucBlock.setBlockUCState(s);
     ucBlock.setExpectedLocations(targets);
+    ucBlock.setBlockCollection(getBlockCollection());
     return ucBlock;
   }
   
