@@ -35,7 +35,6 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 
-import com.google.common.base.Preconditions;
 
 /**
  * This class maintains the map from a block to its metadata.

@@ -20,7 +20,6 @@ package org.apache.hadoop.hdfs.server.blockmanagement;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
-import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
@@ -31,7 +30,6 @@ import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.HdfsVariables;
 import io.hops.metadata.blockmanagement.ExcessReplicasMap;
 import io.hops.metadata.common.entity.Variable;
-import io.hops.metadata.hdfs.dal.BlockInfoDataAccess;
 import io.hops.metadata.hdfs.dal.MisReplicatedRangeQueueDataAccess;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
 import io.hops.metadata.hdfs.entity.HashBucket;
@@ -68,6 +66,7 @@ import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager.Acces
 import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
 import org.apache.hadoop.hdfs.security.token.block.ExportedBlockKeys;
 import org.apache.hadoop.hdfs.server.blockmanagement.CorruptReplicasMap.Reason;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo.AddBlockResult;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
@@ -3125,7 +3124,7 @@ public class BlockManager {
    */
   private Block addStoredBlock(
       final BlockInfo block,
-      DatanodeStorageInfo storage,
+      DatanodeStorageInfo storageInfo,
       DatanodeDescriptor delNodeHint,
       boolean logEveryBlock) throws IOException {
     assert block != null;
@@ -3139,7 +3138,7 @@ public class BlockManager {
     if (storedBlock == null || storedBlock.getBlockCollection() == null) {
       // If this block does not belong to anyfile, then we are done.
       blockLog.info(
-          "BLOCK* addStoredBlock: " + block + " on " + storage.getStorageID() + " size " +
+          "BLOCK* addStoredBlock: " + block + " on " + storageInfo.getStorageID() + " size " +
               block.getNumBytes() + " but it does not belong to any file");
       // we could add this block to invalidate set of this datanode.
       // it will happen in next block report otherwise.
@@ -3155,24 +3154,29 @@ public class BlockManager {
     }
 
     // add block to the datanode
-    boolean added = storage.addBlock(storedBlock);
+    AddBlockResult result = storageInfo.addBlock(storedBlock);
 
     int curReplicaDelta;
-    if (added) {
+    if (result == AddBlockResult.ADDED) {
       curReplicaDelta = 1;
       if (logEveryBlock) {
-        logAddStoredBlock(storedBlock, storage);
+        logAddStoredBlock(storedBlock, storageInfo);
       }
+    } else if (result == AddBlockResult.REPLACED) {
+      curReplicaDelta = 0;
+      blockLog.warn("BLOCK* addStoredBlock: " + "block " + storedBlock
+          + " moved to storageType " + storageInfo.getStorageType()
+          + " on storage " + storageInfo.getStorageID());
     } else {
       // if the same block is added again and the replica was corrupt
       // previously because of a wrong gen stamp, remove it from the
       // corrupt block list.
-      corruptReplicas.removeFromCorruptReplicasMap(block, storage.getDatanodeDescriptor(),
+      corruptReplicas.removeFromCorruptReplicasMap(block, storageInfo.getDatanodeDescriptor(),
           Reason.GENSTAMP_MISMATCH);
       curReplicaDelta = 0;
       blockLog.warn("BLOCK* addStoredBlock: " +
           "Redundant addStoredBlock request received for " + storedBlock +
-          " on " + storage.getStorageID() + " size " + storedBlock.getNumBytes());
+          " on " + storageInfo.getStorageID() + " size " + storedBlock.getNumBytes());
     }
 
     // Now check for completion of blocks and safe block count
@@ -3183,9 +3187,8 @@ public class BlockManager {
 
     if (storedBlock.getBlockUCState() == BlockUCState.COMMITTED &&
         numLiveReplicas >= minReplication) {
-      storedBlock =
-          completeBlock(bc, storedBlock, false);
-    } else if (storedBlock.isComplete() && added) {
+      storedBlock = completeBlock(bc, storedBlock, false);
+    } else if (storedBlock.isComplete() && result == AddBlockResult.ADDED) {
       // check whether safe replication is reached for the block
       // only complete blocks are counted towards that
       // Is no-op if not in safe mode.
@@ -3215,7 +3218,7 @@ public class BlockManager {
     }
     if (numCurrentReplica > fileReplication) {
       processOverReplicatedBlock(storedBlock, fileReplication,
-          storage.getDatanodeDescriptor(), delNodeHint);
+          storageInfo.getDatanodeDescriptor(), delNodeHint);
     }
     // If the file replication has reached desired value
     // we can remove any corrupt replicas the block may have

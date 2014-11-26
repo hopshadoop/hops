@@ -23,9 +23,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdfs.protocol.HdfsConstants;
-import org.apache.hadoop.hdfs.protocol.LayoutVersion;
-import org.apache.hadoop.hdfs.protocol.LayoutVersion.Feature;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NodeType;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
 import org.apache.hadoop.util.ToolRunner;
@@ -33,6 +30,7 @@ import org.apache.hadoop.util.VersionInfo;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -1081,6 +1079,94 @@ public abstract class Storage extends StorageInfo {
       throw new IOException("Failed to rename " + from.getCanonicalPath()
         + " to " + to.getCanonicalPath() + " due to failure in native rename. "
         + e.toString());
+    }
+  }
+
+  /**
+   * Copies a file (usually large) to a new location using native unbuffered IO.
+   * <p>
+   * This method copies the contents of the specified source file
+   * to the specified destination file using OS specific unbuffered IO.
+   * The goal is to avoid churning the file system buffer cache when copying
+   * large files.
+   *
+   * We can't use FileUtils#copyFile from apache-commons-io because it
+   * is a buffered IO based on FileChannel#transferFrom, which uses MmapByteBuffer
+   * internally.
+   *
+   * The directory holding the destination file is created if it does not exist.
+   * If the destination file exists, then this method will delete it first.
+   * <p>
+   * <strong>Note:</strong> Setting <code>preserveFileDate</code> to
+   * {@code true} tries to preserve the file's last modified
+   * date/times using {@link File#setLastModified(long)}, however it is
+   * not guaranteed that the operation will succeed.
+   * If the modification operation fails, no indication is provided.
+   *
+   * @param srcFile  an existing file to copy, must not be {@code null}
+   * @param destFile  the new file, must not be {@code null}
+   * @param preserveFileDate  true if the file date of the copy
+   *  should be the same as the original
+   *
+   * @throws NullPointerException if source or destination is {@code null}
+   * @throws IOException if source or destination is invalid
+   * @throws IOException if an IO error occurs during copying
+   */
+  public static void nativeCopyFileUnbuffered(File srcFile, File destFile,
+      boolean preserveFileDate) throws IOException {
+    if (srcFile == null) {
+      throw new NullPointerException("Source must not be null");
+    }
+    if (destFile == null) {
+      throw new NullPointerException("Destination must not be null");
+    }
+    if (srcFile.exists() == false) {
+      throw new FileNotFoundException("Source '" + srcFile + "' does not exist");
+    }
+    if (srcFile.isDirectory()) {
+      throw new IOException("Source '" + srcFile + "' exists but is a directory");
+    }
+    if (srcFile.getCanonicalPath().equals(destFile.getCanonicalPath())) {
+      throw new IOException("Source '" + srcFile + "' and destination '" +
+          destFile + "' are the same");
+    }
+    File parentFile = destFile.getParentFile();
+    if (parentFile != null) {
+      if (!parentFile.mkdirs() && !parentFile.isDirectory()) {
+        throw new IOException("Destination '" + parentFile
+            + "' directory cannot be created");
+      }
+    }
+    if (destFile.exists()) {
+      if (FileUtil.canWrite(destFile) == false) {
+        throw new IOException("Destination '" + destFile
+            + "' exists but is read-only");
+      } else {
+        if (destFile.delete() == false) {
+          throw new IOException("Destination '" + destFile
+              + "' exists but cannot be deleted");
+        }
+      }
+    }
+    try {
+      NativeIO.copyFileUnbuffered(srcFile, destFile);
+    } catch (NativeIOException e) {
+      throw new IOException("Failed to copy " + srcFile.getCanonicalPath()
+          + " to " + destFile.getCanonicalPath()
+          + " due to failure in NativeIO#copyFileUnbuffered(). "
+          + e.toString());
+    }
+    if (srcFile.length() != destFile.length()) {
+      throw new IOException("Failed to copy full contents from '" + srcFile
+          + "' to '" + destFile + "'");
+    }
+    if (preserveFileDate) {
+      if (destFile.setLastModified(srcFile.lastModified()) == false) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Failed to preserve last modified date from'" + srcFile
+            + "' to '" + destFile + "'");
+        }
+      }
     }
   }
 

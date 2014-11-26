@@ -31,6 +31,7 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo.AddBlockResult;
 import org.apache.hadoop.hdfs.server.common.GenerationStamp;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.INodeFile;
@@ -83,19 +84,18 @@ public class TestDatanodeDescriptor {
     BlockInfo blk1 = new BlockInfo(new Block(2L), 3);
     DatanodeStorageInfo[] storages = datanode.getStorageInfos();
     assertTrue(storages.length > 0);
-
     // add first block
-    assertTrue(addBlock(blocksMap, storages[0], blk));
+    assertTrue(addBlock(blocksMap, storages[0], blk) == AddBlockResult.ADDED);
     assertEquals(1, datanode.numBlocks());
     // remove a non-existent block
     assertFalse(removeBlock(datanode, blk1));
     assertEquals(1, datanode.numBlocks());
     // add an existent block
-    assertFalse(addBlock(blocksMap, storages[0], blk));
+    assertFalse(addBlock(blocksMap, storages[0], blk) == AddBlockResult.ADDED);
     System.out.println("number of blks are " + datanode.numBlocks());
     assertEquals(1, datanode.numBlocks());
     // add second block
-    assertTrue(addBlock(blocksMap, storages[0], blk1));
+    assertTrue(addBlock(blocksMap, storages[0], blk1) == AddBlockResult.ADDED);
     assertEquals(2, datanode.numBlocks());
     // remove first block
     assertTrue(removeBlock(datanode, blk));
@@ -105,11 +105,11 @@ public class TestDatanodeDescriptor {
     assertEquals(0, datanode.numBlocks());
   }
   
-  private boolean addBlock(final BlocksMap blocksMap,
+  private AddBlockResult addBlock(final BlocksMap blocksMap,
       final DatanodeStorageInfo storage,
       final BlockInfo blk)
       throws IOException {
-    return (Boolean) new HopsTransactionalRequestHandler(
+    return (AddBlockResult) new HopsTransactionalRequestHandler(
         HDFSOperationType.TEST) {
       INodeIdentifier inodeIdentifier;
 

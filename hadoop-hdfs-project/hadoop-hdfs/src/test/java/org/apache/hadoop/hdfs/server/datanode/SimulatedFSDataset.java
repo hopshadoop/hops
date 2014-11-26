@@ -1187,4 +1187,11 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
       FileDescriptor fd, long offset, long nbytes, int flags) {
     throw new UnsupportedOperationException();
   }
+
+  @Override
+  public ReplicaInfo moveBlockAcrossStorage(ExtendedBlock block,
+      StorageType targetStorageType) throws IOException {
+    // TODO Auto-generated method stub
+    return null;
+  }
 }

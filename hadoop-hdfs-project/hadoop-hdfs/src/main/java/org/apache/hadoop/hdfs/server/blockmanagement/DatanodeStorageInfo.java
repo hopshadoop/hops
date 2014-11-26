@@ -341,24 +341,24 @@ public class DatanodeStorageInfo {
     storageType = storage.getStorageType();
   }
 
-  public boolean addBlock(BlockInfo b)
+  public AddBlockResult addBlock(BlockInfo b)
       throws TransactionContextException, StorageException {
     // First check whether the block belongs to a different storage
     // on the same DN.
-    boolean replaced = false;
+    AddBlockResult result = AddBlockResult.ADDED;
     Integer otherStorage = b.getReplicatedOnDatanode(this.getDatanodeDescriptor());
     if(otherStorage!=null){
       if (otherStorage != this.sid) {
         // The block belongs to a different storage. Remove it first.
         b.removeReplica(otherStorage);
-        replaced = true;
+        result = AddBlockResult.REPLACED;
       } else {
         // The block is already associated with this storage.
-        return false;
+        return AddBlockResult.ALREADY_EXIST;
       }
     }
     b.addStorage(this);
-    return !replaced;
+    return result;
   }
 
   public boolean removeBlock(BlockInfo b)
@@ -518,5 +518,9 @@ public class DatanodeStorageInfo {
       }
     }
     return null;
+  }
+
+  static enum AddBlockResult {
+    ADDED, REPLACED, ALREADY_EXIST;
   }
 }

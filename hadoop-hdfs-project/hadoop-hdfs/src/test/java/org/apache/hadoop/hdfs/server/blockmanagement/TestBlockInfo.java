@@ -39,6 +39,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo.AddBlockResult;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.junit.Assert;
 import org.junit.Before;
@@ -127,13 +128,14 @@ public class TestBlockInfo {
     }
 
     // Try to move one of the blocks to a different storage.
-    boolean added = addBlock(storage2,blockInfos[NUM_BLOCKS / 2]);
+    boolean added =
+        addBlock(storage2,blockInfos[NUM_BLOCKS / 2]) == AddBlockResult.ADDED;
     Assert.assertThat(added, is(false));
     Assert.assertThat(getStorageId(blockInfos[NUM_BLOCKS / 2]), is(storage2.getSid()));
   }
 
-  private boolean addBlock(final DatanodeStorageInfo storage, final BlockInfo blk) throws IOException {
-    return (Boolean) new HopsTransactionalRequestHandler(HDFSOperationType.TEST) {
+  private AddBlockResult addBlock(final DatanodeStorageInfo storage, final BlockInfo blk) throws IOException {
+    return (AddBlockResult) new HopsTransactionalRequestHandler(HDFSOperationType.TEST) {
 
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
