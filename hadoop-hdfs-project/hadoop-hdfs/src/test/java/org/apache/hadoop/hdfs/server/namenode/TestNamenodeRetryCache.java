@@ -37,10 +37,7 @@ import org.apache.hadoop.fs.Options.Rename;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.fs.permission.PermissionStatus;
-import org.apache.hadoop.ha.HAServiceProtocol;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RETRY_CACHE_EXPIRYTIME_MILLIS_KEY;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
@@ -49,7 +46,7 @@ import org.apache.hadoop.hdfs.MiniDFSNNTopology;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
-import org.apache.hadoop.hdfs.protocol.LocatedBlock;
+import org.apache.hadoop.hdfs.protocol.LastBlockWithStatus;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocols;
 import org.apache.hadoop.io.EnumSetWritable;
 import org.apache.hadoop.ipc.ClientId;
@@ -57,7 +54,6 @@ import org.apache.hadoop.ipc.RPC.RpcKind;
 import org.apache.hadoop.ipc.RetryCache.CacheEntry;
 import org.apache.hadoop.ipc.RpcConstants;
 import org.apache.hadoop.ipc.Server;
-import org.apache.hadoop.ipc.StandbyException;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.LightWeightCache;
@@ -242,9 +238,9 @@ public class TestNamenodeRetryCache {
     
     // Retried append requests succeed
     newCall();
-        LocatedBlock b = nnRpc.append(src, "holder");
-    Assert.assertEquals(b.getBlock().getBlockId(), nnRpc.append(src, "holder").getBlock().getBlockId());
-    Assert.assertEquals(b.getBlock().getBlockId(), nnRpc.append(src, "holder").getBlock().getBlockId());
+    LastBlockWithStatus b = nnRpc.append(src, "holder");
+    Assert.assertEquals(b.getLastBlock().getBlock().getBlockId(), nnRpc.append(src, "holder").getLastBlock().getBlock().getBlockId());
+    Assert.assertEquals(b.getLastBlock().getBlock().getBlockId(), nnRpc.append(src, "holder").getLastBlock().getBlock().getBlockId());
     
     // non-retried call fails
     newCall();
