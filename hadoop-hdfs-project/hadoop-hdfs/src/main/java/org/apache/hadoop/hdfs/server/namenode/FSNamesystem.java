@@ -96,6 +96,7 @@ import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.DirectoryListing;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
+import org.apache.hadoop.hdfs.protocol.LastBlockWithStatus;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.SafeModeAction;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
@@ -266,6 +267,7 @@ import org.apache.hadoop.hdfs.protocol.CachePoolEntry;
 import org.apache.hadoop.hdfs.protocol.CachePoolInfo;
 import org.apache.hadoop.hdfs.protocol.RollingUpgradeException;
 import org.apache.hadoop.hdfs.protocol.RollingUpgradeInfo;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos;
 import org.apache.hadoop.hdfs.protocolPB.PBHelper;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockCollection;
@@ -2475,13 +2477,10 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   /**
    * Append to an existing file in the namespace.
    */
-
-  LocatedBlock appendFile(final String src, final String holder,
+  LastBlockWithStatus appendFile(final String src, final String holder,
                           final String clientMachine) throws IOException {
-    LocatedBlock lb = null;
     try{
-      lb = appendFileHopFS(src, holder, clientMachine);
-      return lb;
+      return appendFileHopFS(src, holder, clientMachine);
     } catch(HDFSClientAppendToDBFileException e){
       LOG.debug(e);
       return moveToDNsAndAppend(src, holder, clientMachine);
@@ -2493,7 +2492,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   To support the HDFS Clients the files stored in the database are first
   moved to the datanodes.
    */
-  private LocatedBlock moveToDNsAndAppend(final String src, final String holder,
+  private LastBlockWithStatus moveToDNsAndAppend(final String src, final String holder,
       final String clientMachine) throws IOException {
     // open the small file
     FileSystem hopsFSClient1 = FileSystem.newInstance(conf);
@@ -2523,10 +2522,10 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     return newConf;
   }
 
-  private LocatedBlock appendFileHopFS(final String src1, final String holder,
+  private LastBlockWithStatus appendFileHopFS(final String srcArg, final String holder,
       final String clientMachine) throws IOException {
-    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = dir.resolvePath(src1, pathComponents, dir);
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
+    final String src = dir.resolvePath(srcArg, pathComponents, dir);
     HopsTransactionalRequestHandler appendFileHandler =
         new HopsTransactionalRequestHandler(HDFSOperationType.APPEND_FILE,
             src) {
@@ -2555,11 +2554,14 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
       @Override
       public Object performTask() throws IOException {
-        LocatedBlock locatedBlock = null;
+        LastBlockWithStatus lastBlockWithStatus = null;
         CacheEntryWithPayload cacheEntry = RetryCacheDistributed.waitForCompletion(retryCache,
             null);
         if (cacheEntry != null && cacheEntry.isSuccess()) {
-          locatedBlock = PBHelper.convert(HdfsProtos.LocatedBlockProto.parseFrom(cacheEntry.getPayload()));
+          ClientNamenodeProtocolProtos.AppendResponseProto proto = ClientNamenodeProtocolProtos.AppendResponseProto.
+              parseFrom(cacheEntry.getPayload());
+
+          LocatedBlock locatedBlock = proto.hasBlock() ? PBHelper.convert(proto.getBlock()) : null;
           if (locatedBlock.isPhantomBlock()) {
             //we did not store the data in the cache as it was too big, we should fetch it again.
             INode inode = dir.getINode(src);
@@ -2569,7 +2571,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
               locatedBlock.setData(file.getFileDataInDB());
             }
           }
-          return locatedBlock;
+          HdfsFileStatus stat = (proto.hasStat()) ? PBHelper.convert(proto.getStat()) : null;
+          return new LastBlockWithStatus(locatedBlock, stat);
         }
 
         boolean success = false;
@@ -2589,14 +2592,15 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
                 "HDFS can not directly append to a file stored in the database");
           }
 
-          locatedBlock = appendFileInt(src, holder, clientMachine);
+          lastBlockWithStatus = appendFileInt(src, holder, clientMachine);
 
-          if (locatedBlock != null && !locatedBlock.isPhantomBlock()) {
-            for (String storageID : locatedBlock.getStorageIDs()) {
+          if (lastBlockWithStatus != null && lastBlockWithStatus.getLastBlock() != null && !lastBlockWithStatus.
+              getLastBlock().isPhantomBlock()) {
+            for (String storageID : lastBlockWithStatus.getLastBlock().getStorageIDs()) {
 
               int sId = blockManager.getDatanodeManager().getSid(storageID);
               BlockInfo blockInfo = EntityManager.find(BlockInfo.Finder.ByBlockIdAndINodeId,
-                  locatedBlock.getBlock().getBlockId(), target.getId());
+                  lastBlockWithStatus.getLastBlock().getBlock().getBlockId(), target.getId());
               Block undoBlock = new Block(blockInfo);
               undoBlock.setGenerationStampNoPersistance(undoBlock
                   .getGenerationStamp() - 1);
@@ -2604,28 +2608,40 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             }
           }
           success = true;
-          return locatedBlock;
+          return lastBlockWithStatus;
         } catch (AccessControlException e) {
           logAuditEvent(false, "append", src);
           throw e;
         } finally {
           //do not put data in the cache as it may be too big.
           //recover the data value if needed when geting from cache.
-          byte[] locatedBlockBytes = null;
-          if (locatedBlock != null) {
-            LocatedBlock lb = new LocatedBlock(locatedBlock.getBlock(), locatedBlock.getLocations(), locatedBlock.
-                getStorageIDs(), locatedBlock.getStorageTypes(), locatedBlock.getStartOffset(), locatedBlock.isCorrupt(),
-                locatedBlock.getBlockToken(), locatedBlock.getCachedLocations());
-            locatedBlockBytes = PBHelper.convert(lb).toByteArray();
+          LocatedBlock lb = null;
+          if (lastBlockWithStatus!= null && lastBlockWithStatus.getLastBlock() != null) {
+            lb = new LocatedBlock(lastBlockWithStatus.getLastBlock().getBlock(), lastBlockWithStatus.getLastBlock().
+                getLocations(), lastBlockWithStatus.getLastBlock().
+                    getStorageIDs(), lastBlockWithStatus.getLastBlock().getStorageTypes(), lastBlockWithStatus.
+                getLastBlock().getStartOffset(), lastBlockWithStatus.getLastBlock().isCorrupt(),
+                lastBlockWithStatus.getLastBlock().getBlockToken(), lastBlockWithStatus.getLastBlock().
+                getCachedLocations());
           }
-          RetryCacheDistributed.setState(cacheEntry, success, locatedBlockBytes);
+
+          ClientNamenodeProtocolProtos.AppendResponseProto.Builder builder
+              = ClientNamenodeProtocolProtos.AppendResponseProto.newBuilder();
+          if (lb != null) {
+            builder.setBlock(PBHelper.convert(lb));
+          }
+          if (lastBlockWithStatus!= null && lastBlockWithStatus.getFileStatus() != null) {
+            builder.setStat(PBHelper.convert(lastBlockWithStatus.getFileStatus()));
+          }
+          byte[] toCache = builder.build().toByteArray();
+          RetryCacheDistributed.setState(cacheEntry, success, toCache);
         }
       }
     };
-    return (LocatedBlock) appendFileHandler.handle(this);
+    return (LastBlockWithStatus) appendFileHandler.handle(this);
   }
 
-  private LocatedBlock appendFileInt(String src, String holder,
+  private LastBlockWithStatus appendFileInt(String src, String holder,
       String clientMachine) throws
       IOException {
 
@@ -2635,8 +2651,10 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
               DFS_SUPPORT_APPEND_KEY + " configuration option to enable it.");
     }
     LocatedBlock lb;
+    HdfsFileStatus stat = null;
     FSPermissionChecker pc = getPermissionChecker();
     lb = appendFileInternal(pc, src, holder, clientMachine);
+    stat = dir.getFileInfo(src, false, true);
     if (lb != null) {
       if (NameNode.stateChangeLog.isDebugEnabled()) {
         NameNode.stateChangeLog.debug(
@@ -2646,7 +2664,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       }
     }
     logAuditEvent(true, "append", src);
-    return lb;
+    return new LastBlockWithStatus(lb, stat);
   }
 
   private ExtendedBlock getExtendedBlock(Block blk) {

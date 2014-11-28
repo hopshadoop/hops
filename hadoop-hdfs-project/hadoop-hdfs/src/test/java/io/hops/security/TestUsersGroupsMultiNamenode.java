@@ -76,6 +76,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
+import org.apache.hadoop.hdfs.protocol.LastBlockWithStatus;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -156,7 +157,7 @@ public class TestUsersGroupsMultiNamenode {
     }
     
     @Override
-    public LocatedBlock append(String src, String clientName)
+    public LastBlockWithStatus append(String src, String clientName)
         throws AccessControlException, DSQuotaExceededException,
         FileNotFoundException, SafeModeException, UnresolvedLinkException,
         IOException {

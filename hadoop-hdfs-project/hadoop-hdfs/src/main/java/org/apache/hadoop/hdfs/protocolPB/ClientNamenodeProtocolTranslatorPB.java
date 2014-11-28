@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.hdfs.protocolPB;
 
-import com.google.protobuf.ByteString;
-import com.google.protobuf.ServiceException;
 import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.ActiveNodePBImpl;
 import io.hops.leader_election.node.SortedActiveNodeList;
@@ -27,6 +25,7 @@ import io.hops.leader_election.proto.ActiveNodeProtos;
 import io.hops.metadata.hdfs.entity.EncodingPolicy;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
 import java.util.EnumSet;
+
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -57,6 +56,7 @@ import org.apache.hadoop.hdfs.protocol.HdfsConstants.RollingUpgradeAction;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.SafeModeAction;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.LastUpdatedContentSummary;
+import org.apache.hadoop.hdfs.protocol.LastBlockWithStatus;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.protocol.NSQuotaExceededException;
@@ -131,8 +131,6 @@ import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.Update
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.UpdatePipelineRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.CheckAccessRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetLastUpdatedContentSummaryRequestProto;
-import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.AddUserGroupRequestProto;
-import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.AddUserGroupResponseProto;
 import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.server.namenode.NotReplicatedYetException;
@@ -163,6 +161,9 @@ import org.apache.hadoop.hdfs.protocol.CacheDirectiveInfo;
 import org.apache.hadoop.hdfs.protocol.CachePoolEntry;
 import org.apache.hadoop.hdfs.protocol.CachePoolInfo;
 import org.apache.hadoop.hdfs.protocol.RollingUpgradeInfo;
+
+import com.google.protobuf.ByteString;
+import com.google.protobuf.ServiceException;
 
 
 /**
@@ -315,7 +316,7 @@ public class ClientNamenodeProtocolTranslatorPB
   }
 
   @Override
-  public LocatedBlock append(String src, String clientName)
+  public LastBlockWithStatus append(String src, String clientName)
       throws AccessControlException, DSQuotaExceededException,
       FileNotFoundException, SafeModeException, UnresolvedLinkException,
       IOException {
@@ -324,7 +325,11 @@ public class ClientNamenodeProtocolTranslatorPB
             .build();
     try {
       AppendResponseProto res = rpcProxy.append(null, req);
-      return res.hasBlock() ? PBHelper.convert(res.getBlock()) : null;
+      LocatedBlock lastBlock = res.hasBlock() ? PBHelper
+          .convert(res.getBlock()) : null;
+      HdfsFileStatus stat = (res.hasStat()) ? PBHelper.convert(res.getStat())
+          : null;
+      return new LastBlockWithStatus(lastBlock, stat);
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);
     }
