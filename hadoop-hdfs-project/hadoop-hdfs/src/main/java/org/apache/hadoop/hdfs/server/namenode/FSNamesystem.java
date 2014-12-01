@@ -2146,7 +2146,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     
     startFileInternal(pc, src, permissions, holder, clientMachine, create, overwrite,
         createParent, replication, blockSize);
-    final HdfsFileStatus stat = dir.getFileInfo(src, false, true);
+    final HdfsFileStatus stat = FSDirStatAndListingOp.getFileInfo(dir, src, false, true);
     logAuditEvent(true, "create", src, null,
         (isAuditEnabled() && isExternalInvocation()) ? stat : null);
     return stat;
@@ -2654,7 +2654,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     HdfsFileStatus stat = null;
     FSPermissionChecker pc = getPermissionChecker();
     lb = appendFileInternal(pc, src, holder, clientMachine);
-    stat = dir.getFileInfo(src, false, true);
+    stat = FSDirStatAndListingOp.getFileInfo(dir, src, false, true);
     if (lb != null) {
       if (NameNode.stateChangeLog.isDebugEnabled()) {
         NameNode.stateChangeLog.debug(
@@ -3645,90 +3645,33 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    * @throws UnresolvedLinkException
    *     if a symlink is encountered.
    */
-  public HdfsFileStatus getFileInfo(final String src1, final boolean resolveLink)
+  public HdfsFileStatus getFileInfo(final String src, final boolean resolveLink)
       throws IOException {
-    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = dir.resolvePath(src1, pathComponents, dir);
-    HopsTransactionalRequestHandler getFileInfoHandler =
-        new HopsTransactionalRequestHandler(HDFSOperationType.GET_FILE_INFO,
-            src) {
-          @Override
-          public void acquireLock(TransactionLocks locks) throws IOException {
-            LockFactory lf = getInstance();
-            INodeLock il = lf.getINodeLock(INodeLockType.READ, INodeResolveType.PATH, src)
-                    .resolveSymLink(resolveLink).setNameNodeID(nameNode.getId())
-                    .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
-                    .skipReadingQuotaAttr(true);
-            locks.add(il);
-            locks.add(lf.getAcesLock());
-          }
-
-          @Override
-          public Object performTask() throws IOException {
-            HdfsFileStatus stat;
-            FSPermissionChecker pc = getPermissionChecker();
-            try {
-              boolean isSuperUser = true;
-              if (isPermissionEnabled) {
-                checkPermission(pc, src, false, null, null, null, null, false, resolveLink);
-                isSuperUser = pc.isSuperUser();
-              }
-              stat = dir.getFileInfo(src, resolveLink, isSuperUser);
-            } catch (AccessControlException e) {
-              logAuditEvent(false, "getfileinfo", src);
-              throw e;
-            }
-            logAuditEvent(true, "getfileinfo", src);
-            return stat;
-          }
-        };
-    if (!DFSUtil.isValidName(src)) {
-      throw new InvalidPathException("Invalid file name: " + src);
-    }
-    return (HdfsFileStatus) getFileInfoHandler.handle(this);
+    HdfsFileStatus stat = null;
+    try {
+      stat = FSDirStatAndListingOp.getFileInfo(dir, src, resolveLink);
+    } catch (AccessControlException e) {
+      logAuditEvent(false, "getfileinfo", src);
+      throw e;
+    } 
+    logAuditEvent(true, "getfileinfo", src);
+    return stat;
   }
 
   /**
    * Returns true if the file is closed
    */
-  boolean isFileClosed(final String src1)
+  boolean isFileClosed(final String src)
       throws AccessControlException, UnresolvedLinkException,
       StandbyException, IOException {
-    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = dir.resolvePath(src1, pathComponents, dir);
-    HopsTransactionalRequestHandler isFileClosedHandler = new HopsTransactionalRequestHandler(
-        HDFSOperationType.GET_FILE_INFO,
-        src) {
-      @Override
-      public void acquireLock(TransactionLocks locks) throws IOException {
-        LockFactory lf = getInstance();
-        INodeLock il = lf.getINodeLock(INodeLockType.READ,INodeResolveType.PATH, src)
-                .setNameNodeID(nameNode.getId())
-                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
-        locks.add(il);
-      }
-
-      @Override
-      public Object performTask() throws IOException {
-        FSPermissionChecker pc = getPermissionChecker();
-        try {
-          if (isPermissionEnabled) {
-            checkTraverse(pc, src);
-          }
-          return !INodeFile.valueOf(dir.getINode(src), src).isUnderConstruction();
-        } catch (AccessControlException e) {
-          if (isAuditEnabled() && isExternalInvocation()) {
-            logAuditEvent(false, UserGroupInformation.getCurrentUser(),
-                getRemoteIp(),
-                "isFileClosed", src, null, null);
-          }
-          throw e;
-        }
-      }
-    };
-    return (boolean) isFileClosedHandler.handle();
+    try {
+      return FSDirStatAndListingOp.isFileClosed(dir, src);
+    } catch (AccessControlException e) {
+      logAuditEvent(false, "isFileClosed", src);
+      throw e;
+    } 
   }
-
+    
   /**
    * Create all the necessary directories
    */
@@ -3911,7 +3854,15 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   ContentSummary getContentSummary(final String src)
       throws
       IOException {
-    return multiTransactionalGetContentSummary(src);
+    boolean success = true;
+    try {
+      return FSDirStatAndListingOp.getContentSummary(dir, src);
+    } catch (AccessControlException ace) {
+      success = false;
+      throw ace;
+    } finally {
+      logAuditEvent(success, "contentSummary", src);
+    }
   }
 
   /**
@@ -4409,76 +4360,18 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    * @throws IOException
    *     if other I/O error occurred
    */
-  DirectoryListing getListing(final String src1, byte[] startAfter1,
+  DirectoryListing getListing(final String src, byte[] startAfter,
       final boolean needLocation)
       throws IOException {
-    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    String startAfterString = new String(startAfter1);
-    final String src = dir.resolvePath(src1, pathComponents, dir);
-
-    // Get file name when startAfter is an INodePath
-    if (FSDirectory.isReservedName(startAfterString)) {
-      byte[][] startAfterComponents = FSDirectory
-          .getPathComponentsForReservedPath(startAfterString);
-      try {
-        String tmp = dir.resolvePath(src, startAfterComponents, dir);
-        byte[][] regularPath = INode.getPathComponents(tmp);
-        startAfter1 = regularPath[regularPath.length - 1];
-      } catch (IOException e) {
-        // Possibly the inode is deleted
-        throw new DirectoryListingStartAfterNotFoundException(
-            "Can't find startAfter " + startAfterString);
-      }
-    }
-
-    final byte[] startAfter = startAfter1;
-
-    HopsTransactionalRequestHandler getListingHandler =
-        new HopsTransactionalRequestHandler(HDFSOperationType.GET_LISTING,
-            src) {
-          @Override
-          public void acquireLock(TransactionLocks locks) throws IOException {
-            LockFactory lf = LockFactory.getInstance();
-            INodeLock il = lf.getINodeLock( INodeLockType.READ, INodeResolveType.PATH_AND_IMMEDIATE_CHILDREN, src)
-                    .setNameNodeID(nameNode.getId())
-                    .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
-                    .skipReadingQuotaAttr(true);
-            locks.add(il);
-            if (needLocation) {
-              locks.add(lf.getBlockLock()).add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UC, BLK.CA));
-            }
-            locks.add(lf.getAcesLock());
-          }
-
-          @Override
-          public Object performTask() throws IOException {
-            try {
-              return getListingInt(src, startAfter, needLocation);
-            } catch (AccessControlException e) {
-              logAuditEvent(false, "listStatus", src);
-              throw e;
-            }
-          }
-        };
-    return (DirectoryListing) getListingHandler.handle(this);
-  }
-
-  private DirectoryListing getListingInt(String src, byte[] startAfter,
-      boolean needLocation)
-      throws IOException {
-    DirectoryListing dl;
-    FSPermissionChecker pc = getPermissionChecker();
-    boolean isSuperUser = true;
-    if (isPermissionEnabled) {
-      if (dir.isDir(src)) {
-        checkPathAccess(pc, src, FsAction.READ_EXECUTE);
-      } else {
-        checkTraverse(pc, src);
-      }
-      isSuperUser = pc.isSuperUser();
-    }
+    DirectoryListing dl = null;
+    try {
+      dl = FSDirStatAndListingOp.getListingInt(dir, src, startAfter,
+          needLocation);
+    } catch (AccessControlException e) {
+      logAuditEvent(false, "listStatus", src);
+      throw e;
+    } 
     logAuditEvent(true, "listStatus", src);
-    dl = dir.getListing(src, startAfter, needLocation, isSuperUser);
     return dl;
   }
 
@@ -7954,61 +7847,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   }
 
   /**
-   * Creates the content summary of a directory tree in multiple transactions.
-   * Creating the content summary of a large directory tree might take to much
-   * time for a single transaction. Hence, this function first builds up an
-   * in-memory representation of the directory tree before reading its attributes
-   * level by level. The directory tree is locked during the operation to prevent
-   * any concurrent modification.
-   *
-   * @param path1
-   *    the path
-   * @return
-   *    the content summary for the given path
-   * @throws IOException
-   */
-  // [S] what if you call content summary on the root
-  // I have removed sub tree locking from the content summary for now
-  // TODO : fix content summary sub tree locking
-  //
-  private ContentSummary multiTransactionalGetContentSummary(final String path1)
-      throws
-      IOException {
-    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(path1);
-    final String path = dir.resolvePath(path1, pathComponents, dir);
-      PathInformation pathInfo = getPathExistingINodesFromDB(path,
-              false, null, null, null, null);
-      if(pathInfo.getPathInodes()[pathInfo.getPathComponents().length-1] == null){
-        throw new FileNotFoundException("File does not exist: " + path);
-      }
-      final INode subtreeRoot = pathInfo.getPathInodes()[pathInfo.getPathComponents().length-1];
-      final INodeAttributes subtreeAttr = pathInfo.getSubtreeRootAttributes();
-      final INodeIdentifier subtreeRootIdentifier = new INodeIdentifier(subtreeRoot.getId(),subtreeRoot.getParentId(),
-          subtreeRoot.getLocalName(),subtreeRoot.getPartitionId());
-      subtreeRootIdentifier.setDepth(((short) (INodeDirectory.ROOT_DIR_DEPTH + pathInfo.getPathComponents().length-1 )));
-
-
-    //Calcualte subtree root default ACLs to be inherited in the tree.
-    List<AclEntry> nearestDefaultsForSubtree = calculateNearestDefaultAclForSubtree(pathInfo);
-
-    //we do not lock the subtree and we do not need to check parent access and owner, but we need to check children access
-    //permission check in Apache Hadoop: doCheckOwner:false, ancestorAccess:null, parentAccess:null, 
-    //access:null, subAccess:FsAction.READ_EXECUTE, ignoreEmptyDir:true
-    final AbstractFileTree.CountingFileTree fileTree
-        = new AbstractFileTree.CountingFileTree(this, subtreeRootIdentifier, FsAction.READ_EXECUTE, true,
-            nearestDefaultsForSubtree);
-    fileTree.buildUp();
-
-    return new ContentSummary(fileTree.getFileSizeSummary(),
-        fileTree.getFileCount(), fileTree.getDirectoryCount(),
-        subtreeAttr == null ? subtreeRoot.getQuotaCounts().get(Quota.NAMESPACE) : subtreeAttr.getQuotaCounts().get(
-            Quota.NAMESPACE),
-        fileTree.getDiskspaceCount(), subtreeAttr == null ? subtreeRoot
-            .getQuotaCounts().get(Quota.DISKSPACE) : subtreeAttr.getQuotaCounts().get(Quota.DISKSPACE));
-
-  }
-
-  /**
    * Renaming a directory tree in multiple transactions. Renaming a large
    * directory tree might take to much time for a single transaction when
    * its quota counts need to be calculated. Hence, this functions first
@@ -8507,8 +8345,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   private boolean shouldLogSubtreeInodes(PathInformation srcInfo,
       PathInformation dstInfo, INode srcDataSet, INode dstDataSet,
       INodeIdentifier srcSubTreeRoot){
-    if(pathIsMetaEnabled(srcInfo.pathInodes) || pathIsMetaEnabled(dstInfo
-        .pathInodes)){
+    if(pathIsMetaEnabled(srcInfo.getPathInodes()) || pathIsMetaEnabled(dstInfo
+        .getPathInodes())){
       if(srcDataSet == null){
         if(dstDataSet == null){
           //shouldn't happen
@@ -9825,7 +9663,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     return i / length;
   }
 
-  private PathInformation getPathExistingINodesFromDB(final String path,
+  public PathInformation getPathExistingINodesFromDB(final String path,
       final boolean doCheckOwner, final FsAction ancestorAccess,
       final FsAction parentAccess, final FsAction access,
       final FsAction subAccess) throws IOException{
@@ -9891,66 +9729,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           }
         };
     return (PathInformation)handler.handle(this);
-  }
-
-  private class PathInformation{
-    private String path;
-    private byte[][] pathComponents;
-    private INode[] pathInodes;
-    private boolean dir;
-    private long nsCount;
-    private long dsCount;
-    private int numExistingComp;
-    private final INodeAttributes subtreeRootAttributes;
-    private final List<AclEntry>[] pathInodeAcls;
-
-    public PathInformation(String path,
-        byte[][] pathComponents, INode[] pathInodes, int numExistingComp,
-        boolean dir, long nsCount, long dsCount, INodeAttributes subtreeRootAttributes, List<AclEntry>[] pathInodeAcls) {
-      this.path = path;
-      this.pathComponents = pathComponents;
-      this.pathInodes = pathInodes;
-      this.dir = dir;
-      this.nsCount = nsCount;
-      this.dsCount = dsCount;
-      this.numExistingComp = numExistingComp;
-      this.subtreeRootAttributes = subtreeRootAttributes;
-      this.pathInodeAcls = pathInodeAcls;
-    }
-
-    public String getPath() {
-      return path;
-    }
-
-    public byte[][] getPathComponents() {
-      return pathComponents;
-    }
-
-    public INode[] getPathInodes() {
-      return pathInodes;
-    }
-
-    public boolean isDir() {
-      return dir;
-    }
-
-    public long getNsCount() {
-      return nsCount;
-    }
-
-    public long getDsCount() {
-      return dsCount;
-    }
-
-    public int getNumExistingComp() {
-      return numExistingComp;
-    }
-
-    public INodeAttributes getSubtreeRootAttributes() {
-      return subtreeRootAttributes;
-    }
-
-    public List<AclEntry>[] getPathInodeAcls() { return pathInodeAcls; }
   }
 
   public boolean storeSmallFilesInDB() {
@@ -10215,9 +9993,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     }
   }
 
-  private List<AclEntry> calculateNearestDefaultAclForSubtree(final PathInformation pathInfo) throws IOException {
-    for (int i = pathInfo.pathInodeAcls.length-1; i > -1 ; i--){
-      List<AclEntry> aclEntries = pathInfo.pathInodeAcls[i];
+  public List<AclEntry> calculateNearestDefaultAclForSubtree(final PathInformation pathInfo) throws IOException {
+    for (int i = pathInfo.getPathInodeAcls().length-1; i > -1 ; i--){
+      List<AclEntry> aclEntries = pathInfo.getPathInodeAcls()[i];
       if (aclEntries == null){
         continue;
       }
