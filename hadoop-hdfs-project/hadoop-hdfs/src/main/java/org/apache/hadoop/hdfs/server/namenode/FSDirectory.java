@@ -195,7 +195,15 @@ public class FSDirectory implements Closeable {
   boolean isPermissionEnabled() {
     return isPermissionEnabled;
   }
-    
+  
+  int getLsLimit() {
+    return lsLimit;
+  }
+
+  int getContentCountLimit() {
+    return contentCountLimit;
+  }
+  
   /**
    * Shutdown the filestore
    */
@@ -1022,92 +1030,8 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     targetNode.logMetadataEvent(MetadataLogEntry.Operation.DELETE);
   }
 
-  private byte getStoragePolicyID(byte inodePolicy, byte parentPolicy) {
+  byte getStoragePolicyID(byte inodePolicy, byte parentPolicy) {
     return inodePolicy != BlockStoragePolicySuite.ID_UNSPECIFIED ? inodePolicy : parentPolicy;
-  }
-
-  /**
-   * Get a partial listing of the indicated directory
-   *
-   * @param src
-   *     the directory name
-   * @param startAfter
-   *     the name to start listing after
-   * @param needLocation
-   *     if block locations are returned
-   * @return a partial listing starting after startAfter
-   */
-  DirectoryListing getListing(String src, byte[] startAfter,
-      boolean needLocation, boolean isSuperUser)
-      throws UnresolvedLinkException, IOException, StorageException {
-    String srcs = normalizePath(src);
-    INode targetNode = getNode(srcs, true);
-    if (targetNode == null) {
-      return null;
-    }
-
-    byte parentStoragePolicy = isSuperUser ?
-      targetNode.getStoragePolicyID() : BlockStoragePolicySuite.ID_UNSPECIFIED;
-    
-    if (!targetNode.isDirectory()) {
-      return new DirectoryListing(new HdfsFileStatus[]{
-          createFileStatus(HdfsFileStatus.EMPTY_NAME, targetNode,
-              needLocation, parentStoragePolicy)}, 0);
-    }
-    INodeDirectory dirInode = (INodeDirectory) targetNode;
-    List<INode> contents = dirInode.getChildrenList();
-    int startChild = dirInode.nextChild(contents, startAfter);
-    int totalNumChildren = contents.size();
-    int numOfListing = Math.min(totalNumChildren - startChild, this.lsLimit);
-    int locationBudget = this.lsLimit;
-      int listingCnt = 0;
-    HdfsFileStatus listing[] = new HdfsFileStatus[numOfListing];
-    for (int i = 0; i < numOfListing && locationBudget>0; i++) {
-      INode cur = contents.get(startChild + i);
-      byte curPolicy = isSuperUser && !cur.isSymlink() ? cur.getLocalStoragePolicyID()
-          : BlockStoragePolicySuite.ID_UNSPECIFIED;
-      listing[i] = createFileStatus(cur.getLocalNameBytes(), cur, needLocation, getStoragePolicyID(curPolicy,
-          parentStoragePolicy));
-      listingCnt++;
-        if (needLocation) {
-            // Once we  hit lsLimit locations, stop.
-            // This helps to prevent excessively large response payloads.
-            // Approximate #locations with locatedBlockCount() * repl_factor
-            LocatedBlocks blks = 
-                ((HdfsLocatedFileStatus)listing[i]).getBlockLocations();
-            locationBudget -= (blks == null) ? 0 :
-               blks.locatedBlockCount() * listing[i].getReplication();
-        }
-      }
-      // truncate return array if necessary
-      if (listingCnt < numOfListing) {
-          listing = Arrays.copyOf(listing, listingCnt);
-    }
-    return new DirectoryListing(listing,
-        totalNumChildren - startChild - listingCnt);
-  }
-
-  /**
-   * Get the file info for a specific file.
-   *
-   * @param src
-   *     The string representation of the path to the file
-   * @param resolveLink
-   *     whether to throw UnresolvedLinkException
-   * @return object containing information regarding the file
-   * or null if file not found
-   */
-  HdfsFileStatus getFileInfo(String src, boolean resolveLink, boolean includeStoragePolicy)
-      throws IOException {
-    String srcs = normalizePath(src);
-    INode targetNode = getNode(srcs, resolveLink);
-    if (targetNode == null) {
-      return null;
-    } else {
-      byte policyId = includeStoragePolicy && targetNode != null && !targetNode.isSymlink() ? targetNode.
-          getStoragePolicyID() : BlockStoragePolicySuite.ID_UNSPECIFIED;
-      return createFileStatus(HdfsFileStatus.EMPTY_NAME, targetNode, policyId);
-    }
   }
 
   INodesInPath getExistingPathINodes(byte[][] components)
@@ -1788,6 +1712,10 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
     return yieldCount;
   }
 
+  void addYieldCount(long value) {
+    yieldCount += value;
+  }
+  
   /**
    * Update the count of each directory with quota in the namespace
    * A directory's count is defined as the total number inodes in the tree
@@ -2008,143 +1936,6 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
         namesystem.createFsOwnerPermissions(new FsPermission((short) 0755)),
         true);
     nameCache.reset();
-  }
-
-  /**
-   * create an hdfs file status from an inode
-   *
-   * @param path
-   *     the local name
-   * @param node
-   *     inode
-   * @param needLocation
-   *     if block locations need to be included or not
-   * @return a file status
-   * @throws IOException
-   *     if any error occurs
-   */
-  private HdfsFileStatus createFileStatus(byte[] path, INode node,
-      boolean needLocation, byte storagePolicy) throws IOException, StorageException {
-    if (needLocation) {
-      return createLocatedFileStatus(path, node, storagePolicy);
-    } else {
-      return createFileStatus(path, node, storagePolicy);
-    }
-  }
-
-  /**
-   * Create FileStatus by file INode
-   */
-  private HdfsFileStatus createFileStatus(byte[] path, INode node, byte storagePolicy)
-      throws IOException {
-     long size = 0;     // length is zero for directories
-
-    if (node instanceof INodeFile) {
-      INodeFile fileNode = (INodeFile) node;
-      size = fileNode.getSize();//.computeFileSize(true);
-      //size = fileNode.computeFileSize(true);
-    }
-    short replication = 0;
-    long blocksize = 0;
-    boolean isStoredInDB = false;
-    if (node instanceof INodeFile) {
-      INodeFile fileNode = (INodeFile) node;
-      replication = fileNode.getFileReplication();
-      blocksize = fileNode.getPreferredBlockSize();
-      isStoredInDB = fileNode.isFileStoredInDB();
-    }
-    
-    int childrenNum = node.isDirectory() ? node.asDirectory().getChildrenNum() : 0;
-
-    // TODO Add encoding status
-    return new HdfsFileStatus(
-        size,
-        node.isDirectory(),
-        replication,
-        blocksize,
-        node.getModificationTime(),
-        node.getAccessTime(),
-        getPermissionForFileStatus(node),
-        node.getUserName(),
-        node.getGroupName(),
-        node.isSymlink() ? ((INodeSymlink) node).getSymlink() : null,
-        path,
-        node.getId(),
-        childrenNum,
-        isStoredInDB,
-        storagePolicy);
-  }
-
-  /**
-   * Create FileStatus with location info by file INode
-   */
-  private HdfsLocatedFileStatus createLocatedFileStatus(byte[] path,
-      INode node, byte storagePolicy) throws IOException {
-    long size = 0; // length is zero for directories
-    short replication = 0;
-    long blocksize = 0;
-    LocatedBlocks loc = null;
-    boolean isFileStoredInDB = false;
-    if (node.isFile()) {
-      final INodeFile fileNode = node.asFile();
-      isFileStoredInDB = fileNode.isFileStoredInDB();
-      
-      if(isFileStoredInDB){
-        size = fileNode.getSize();
-      } else {
-        size = fileNode.computeFileSize(true);
-      }
-      
-      replication = fileNode.getFileReplication();
-      blocksize = fileNode.getPreferredBlockSize();
-
-      final boolean isUc = fileNode.isUnderConstruction();
-      final long fileSize = isUc ? 
-          fileNode.computeFileSizeNotIncludingLastUcBlock() : size;
-      
-      if (isFileStoredInDB) {
-        loc = getFSNamesystem().getBlockManager().createPhantomLocatedBlocks(fileNode,null,isUc,false);
-      } else {
-        loc = getFSNamesystem().getBlockManager().createLocatedBlocks(
-            fileNode.getBlocks(), fileSize, isUc, 0L, size, false);
-      }
-      if (loc == null) {
-        loc = new LocatedBlocks();
-      }
-    }
-
-    int childrenNum = node.isDirectory() ? node.asDirectory().getChildrenNum() : 0;
-    
-    HdfsLocatedFileStatus status = new HdfsLocatedFileStatus(size, node.isDirectory(), replication,
-        blocksize, node.getModificationTime(),
-        node.getAccessTime(), node.getFsPermission(),
-        node.getUserName(), node.getGroupName(),
-        node.isSymlink() ? node.asSymlink().getSymlink() : null, path,
-        node.getId(), loc, childrenNum, isFileStoredInDB, storagePolicy);
-    if (loc != null) {
-      CacheManager cacheManager = namesystem.getCacheManager();
-      for (LocatedBlock lb: loc.getLocatedBlocks()) {
-        cacheManager.setCachedLocations(lb, node.getId());
-      }
-    }
-    return status;
-  }
-  
-  /**
-   * Returns an inode's FsPermission for use in an outbound FileStatus.  If the
-   * inode has an ACL, then this method will convert to a FsAclPermission.
-   *
-   * @param node INode to check
-   * @param snapshot int snapshot ID
-   * @return FsPermission from inode, with ACL bit on if the inode has an ACL
-   */
-  private static FsPermission getPermissionForFileStatus(INode node) throws TransactionContextException,
-      StorageException, AclException {
-    FsPermission perm = node.getFsPermission();
-    if (node.getAclFeature() != null) {
-      perm = new FsAclPermission(perm);
-    }
-    return perm;
   }
 
   /**
@@ -2685,6 +2476,6 @@ boolean unprotectedRenameTo(String src, String dst, long timestamp,
   HdfsFileStatus getAuditFileInfo(String path, boolean resolveSymlink)
     throws IOException {
     return (namesystem.isAuditEnabled() && namesystem.isExternalInvocation())
-      ? getFileInfo(path, resolveSymlink, false) : null;
+      ? FSDirStatAndListingOp.getFileInfo(this, path, resolveSymlink, false) : null;
   }
 }
