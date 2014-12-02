@@ -153,6 +153,7 @@ import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 import org.apache.hadoop.hdfs.protocol.RecoveryInProgressException;
 import org.apache.hadoop.hdfs.protocol.RollingUpgradeInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.BRLoadBalancingOverloadException;
+import org.apache.hadoop.ipc.RetryCache;
 
 /**
  * This class is responsible for handling all of the RPC calls to the NameNode.
@@ -681,8 +682,17 @@ class NameNodeRpcServer implements NamenodeProtocols {
               " characters, " + MAX_PATH_DEPTH + " levels.");
     }
 
-    boolean ret;
-    ret = namesystem.multiTransactionalRename(src, dst);
+    RetryCache.CacheEntry cacheEntry = namesystem.retryCacheWaitForCompletionTransactional();
+    if (cacheEntry != null && cacheEntry.isSuccess()) {
+      return true; // Return previous response
+    }
+    
+    boolean ret = false;
+    try{
+      ret = namesystem.renameTo(src, dst);
+    } finally {
+      namesystem.retryCacheSetStateTransactional(cacheEntry, ret);
+    }
     if (ret) {
       metrics.incrFilesRenamed();
     }
@@ -706,7 +716,18 @@ class NameNodeRpcServer implements NamenodeProtocols {
               " characters, " + MAX_PATH_DEPTH + " levels.");
     }
 
-    namesystem.multiTransactionalRename(src, dst, options);
+    RetryCache.CacheEntry cacheEntry = namesystem.retryCacheWaitForCompletionTransactional();
+    if (cacheEntry != null && cacheEntry.isSuccess()) {
+      return; // Return previous response
+    }
+
+    boolean success = false;
+    try {
+      namesystem.renameTo(src, dst, options);
+      success = true;
+    } finally {
+      namesystem.retryCacheSetStateTransactional(cacheEntry, success);
+    }
     metrics.incrFilesRenamed();
   }
 

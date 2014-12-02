@@ -409,10 +409,6 @@ public class TestNamenodeRetryCache {
     }
   }
   
-  /**
-   * After run a set of operations, restart NN and check if the retry cache has
-   * been rebuilt based on the editlog.
-   */
   @Test
   public void testRetryCacheCleaning() throws Exception {
     DFSTestUtil.runOperations(cluster, filesystem, conf, BlockSize, 0);
