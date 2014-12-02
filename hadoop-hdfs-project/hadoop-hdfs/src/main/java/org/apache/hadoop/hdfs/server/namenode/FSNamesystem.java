@@ -42,7 +42,6 @@ import io.hops.metadata.hdfs.entity.BlockChecksum;
 import io.hops.metadata.hdfs.entity.EncodingPolicy;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
-import io.hops.metadata.hdfs.entity.LeasePath;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.metadata.hdfs.entity.ProjectedINode;
 import io.hops.metadata.hdfs.entity.RetryCacheEntry;
@@ -74,7 +73,6 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FsServerDefaults;
 import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.fs.Options;
-import org.apache.hadoop.fs.Options.Rename;
 import org.apache.hadoop.fs.ParentNotDirectoryException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.UnresolvedLinkException;
@@ -195,7 +193,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.fs.BatchedRemoteIterator.BatchedListEntries;
 import org.apache.hadoop.fs.CacheFlag;
-import org.apache.hadoop.fs.DirectoryListingStartAfterNotFoundException;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_KEY;
@@ -3447,6 +3444,48 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   // are made, edit namespace and return to client.
   ////////////////////////////////////////////////////////////////
 
+  /** 
+   * Change the indicated filename. 
+   * @deprecated Use {@link #renameTo(String, String, Options.Rename...)} instead.
+   */
+  @Deprecated
+  boolean renameTo(String src, String dst)
+      throws IOException {
+    //only for testing
+    saveTimes();
+    boolean ret = false;
+    try {
+      checkNameNodeSafeMode("Cannot rename " + src);
+      ret = FSDirRenameOp.renameToInt(dir, src, dst);
+    } catch (AccessControlException e)  {
+      logAuditEvent(false, "rename", src, dst, null);
+      throw e;
+    }
+
+    return ret;
+  }
+
+  void renameTo(final String src, final String dst,
+                Options.Rename... options)
+      throws IOException {
+    //only for testing
+    saveTimes();
+    Map.Entry<BlocksMapUpdateInfo, HdfsFileStatus> res = null;
+    try {
+      checkNameNodeSafeMode("Cannot rename " + src);
+      res = FSDirRenameOp.renameToInt(dir, src, dst, options);
+    } catch (AccessControlException e) {
+      logAuditEvent(false, "rename (options=" + Arrays.toString(options) +
+          ")", src, dst, null);
+      throw e;
+    }
+
+    HdfsFileStatus auditStat = res.getValue();
+
+    logAuditEvent(true, "rename (options=" + Arrays.toString(options) +
+        ")", src, dst, auditStat);
+  }
+
   /**
    * Remove the indicated file from namespace.
    *
@@ -5802,7 +5841,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         parentAccess, access, subAccess, false, true);
   }
 
-  private void checkPermission(FSPermissionChecker pc,
+  void checkPermission(FSPermissionChecker pc,
       String path, boolean doCheckOwner, FsAction ancestorAccess,
       FsAction parentAccess, FsAction access, FsAction subAccess, boolean ignoreEmptyDir, 
       boolean resolveLink) throws AccessControlException, UnresolvedLinkException, TransactionContextException,
@@ -7847,607 +7886,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   }
 
   /**
-   * Renaming a directory tree in multiple transactions. Renaming a large
-   * directory tree might take to much time for a single transaction when
-   * its quota counts need to be calculated. Hence, this functions first
-   * reads up the whole tree in multiple transactions while calculating its
-   * quota counts before executing the rename in a single transaction.
-   * The subtree is locked during these operations in order to prevent any
-   * concurrent modification.
-   *
-   * @param src1
-   *    the source
-   * @param dst1
-   *    the destination
-   * @throws IOException
-   */
-  void multiTransactionalRename(final String src1, final String dst1,
-      final Options.Rename... options) throws IOException {
-    //only for testing
-    saveTimes();
-
-    CacheEntry cacheEntry = retryCacheWaitForCompletionTransactional();
-    if (cacheEntry != null && cacheEntry.isSuccess()) {
-      return; // Return previous response
-    }
-    if (NameNode.stateChangeLog.isDebugEnabled()) {
-      NameNode.stateChangeLog.debug(
-          "DIR* NameSystem.multiTransactionalRename: with options - " + src1
-              + " to " + dst1);
-    }
-    if (!DFSUtil.isValidName(dst1)) {
-      throw new InvalidPathException("Invalid name: " + dst1);
-    }
-    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = dir.resolvePath(src1, pathComponents, dir);
-    pathComponents = FSDirectory.getPathComponentsForReservedPath(dst1);
-    final String dst = dir.resolvePath(dst1, pathComponents, dir);
-
-    boolean success = false;
-
-    try {
-    if (isInSafeMode()) {
-      checkNameNodeSafeMode("Cannot rename " + src);
-    }
-
-    if (dst.equals(src)) {
-      throw new FileAlreadyExistsException(
-          "The source " + src + " and destination " + dst + " are the same");
-    }
-    // dst cannot be a directory or a file under src
-    if (dst.startsWith(src)
-        && dst.charAt(src.length()) == Path.SEPARATOR_CHAR) {
-      String error = "Rename destination " + dst
-          + " is a directory or file under source " + src;
-      NameNode.stateChangeLog
-          .warn("DIR* FSDirectory.unprotectedRenameTo: " + error);
-      throw new IOException(error);
-    }
-    //--
-    boolean overwrite = false;
-    if (null != options) {
-      for (Rename option : options) {
-        if (option == Rename.OVERWRITE) {
-          overwrite = true;
-        }
-      }
-    }
-    String error;
-    PathInformation srcInfo = getPathExistingINodesFromDB(src,
-        false, null, FsAction.WRITE, null, null);
-    INode[] srcInodes = srcInfo.getPathInodes();
-    INode srcInode = srcInodes[srcInodes.length - 1];
-    // validate source
-    if (srcInode == null) {
-      error = "rename source " + src + " is not found.";
-      NameNode.stateChangeLog
-          .warn("DIR* FSDirectory.unprotectedRenameTo: " + error);
-      throw new FileNotFoundException(error);
-    }
-    if (srcInodes.length == 1) {
-      error = "rename source cannot be the root";
-      NameNode.stateChangeLog
-          .warn("DIR* FSDirectory.unprotectedRenameTo: " + error);
-      throw new IOException(error);
-    }
-    if (srcInode.isSymlink()
-        && dst.equals(((INodeSymlink) srcInode).getSymlinkString())) {
-      throw new FileAlreadyExistsException(
-          "Cannot rename symlink " + src + " to its target " + dst);
-    }
-
-    //validate dst
-    PathInformation dstInfo = getPathExistingINodesFromDB(dst,
-        false, FsAction.WRITE, null, null, null);
-    INode[] dstInodes = dstInfo.getPathInodes();
-    INode dstInode = dstInodes[dstInodes.length - 1];
-    if (dstInodes.length == 1) {
-      error = "rename destination cannot be the root";
-      NameNode.stateChangeLog
-          .warn("DIR* FSDirectory.unprotectedRenameTo: " + error);
-      throw new IOException(error);
-    }
-    if (dstInode != null) { // Destination exists
-      // It's OK to rename a file to a symlink and vice versa
-      if (dstInode.isDirectory() != srcInode.isDirectory()) {
-        error = "Source " + src + " and destination " + dst
-            + " must both be directories";
-        NameNode.stateChangeLog
-            .warn("DIR* FSDirectory.unprotectedRenameTo: " + error);
-        throw new IOException(error);
-      }
-      if (!overwrite) { // If destination exists, overwrite flag must be true
-        error = "rename destination " + dst + " already exists";
-        NameNode.stateChangeLog
-            .warn("DIR* FSDirectory.unprotectedRenameTo: " + error);
-        throw new FileAlreadyExistsException(error);
-      }
-
-      short depth = (short) (INodeDirectory.ROOT_DIR_DEPTH + dstInfo.getPathInodes().length-1);
-      boolean areChildrenRandomlyPartitioned = INode.isTreeLevelRandomPartitioned(depth);
-      if (dstInode.isDirectory() && dir.hasChildren(dstInode.getId(),areChildrenRandomlyPartitioned)) {
-        error =
-            "rename cannot overwrite non empty destination directory " + dst;
-        NameNode.stateChangeLog
-            .warn("DIR* FSDirectory.unprotectedRenameTo: " + error);
-        throw new IOException(error);
-      }
-    }
-    if (dstInodes[dstInodes.length - 2] == null) {
-      error = "rename destination parent " + dst + " not found.";
-      NameNode.stateChangeLog
-          .warn("DIR* FSDirectory.unprotectedRenameTo: " + error);
-      throw new FileNotFoundException(error);
-    }
-    if (!dstInodes[dstInodes.length - 2].isDirectory()) {
-      error = "rename destination parent " + dst + " is a file.";
-      NameNode.stateChangeLog
-          .warn("DIR* FSDirectory.unprotectedRenameTo: " + error);
-      throw new ParentNotDirectoryException(error);
-    }
-
-    INode srcDataSet = getMetaEnabledParent(srcInodes);
-    INode dstDataSet = getMetaEnabledParent(dstInodes);
-    Collection<MetadataLogEntry> logEntries = Collections.EMPTY_LIST;
-
-    //--
-    //TODO [S]  if src is a file then there is no need for sub tree locking
-    //mechanism on the src and dst
-    //However the quota is enabled then all the quota update on the dst
-    //must be applied before the move operation.
-    INode.DirCounts srcCounts = new INode.DirCounts();
-    srcCounts.nsCount = srcInfo.getNsCount(); //if not dir then it will return zero
-    srcCounts.dsCount = srcInfo.getDsCount();
-    INode.DirCounts dstCounts = new INode.DirCounts();
-    dstCounts.nsCount = dstInfo.getNsCount();
-    dstCounts.dsCount = dstInfo.getDsCount();
-    boolean isUsingSubTreeLocks = srcInfo.isDir();
-    boolean renameTransactionCommitted = false;
-    INodeIdentifier srcSubTreeRoot = null;
-    String subTreeLockDst = INode.constructPath(dstInfo.getPathComponents(),
-        0, dstInfo.getNumExistingComp());
-    if(subTreeLockDst.equals(INodeDirectory.ROOT_NAME)){
-      subTreeLockDst = "/"; // absolute path
-    }
-    try {
-      if (isUsingSubTreeLocks) {
-        LOG.debug("Rename src: " + src + " dst: " + dst + " requires sub-tree locking mechanism");
-        //checkin parentAccess is enough for this operation, no need to pass access argument to QuotaCountingFileTree
-        //permission check in Apache Hadoop: doCheckOwner:false, ancestorAccess:null, parentAccess:FsAction.WRITE, 
-        //access:null, subAccess:null, ignoreEmptyDir:false
-        srcSubTreeRoot = lockSubtreeAndCheckOwnerAndParentPermission(src, false, 
-            FsAction.WRITE, SubTreeOperation.Type.RENAME_STO);
-
-        if (srcSubTreeRoot != null) {
-          AbstractFileTree.QuotaCountingFileTree srcFileTree;
-          if (shouldLogSubtreeInodes(srcInfo, dstInfo, srcDataSet,
-              dstDataSet, srcSubTreeRoot)) {
-            srcFileTree = new AbstractFileTree.LoggingQuotaCountingFileTree(this,
-                    srcSubTreeRoot, srcDataSet, dstDataSet);
-            srcFileTree.buildUp();
-            logEntries = ((AbstractFileTree.LoggingQuotaCountingFileTree) srcFileTree).getMetadataLogEntries();
-          } else {
-            srcFileTree = new AbstractFileTree.QuotaCountingFileTree(this,
-                    srcSubTreeRoot);
-            srcFileTree.buildUp();
-          }
-          srcCounts.nsCount = srcFileTree.getNamespaceCount();
-          srcCounts.dsCount = srcFileTree.getDiskspaceCount();
-
-          delayAfterBbuildingTree("Built Tree for "+src1+" for rename. ");
-        }
-      } else {
-        LOG.debug("Rename src: " + src + " dst: " + dst + " does not require sub-tree locking mechanism");
-      }
-
-      renameTo(src, srcSubTreeRoot != null?srcSubTreeRoot.getInodeId():0,
-              dst, srcCounts, dstCounts, isUsingSubTreeLocks,
-              subTreeLockDst, logEntries, options);
-
-      renameTransactionCommitted = true;
-    } finally {
-      if (!renameTransactionCommitted) {
-        if (srcSubTreeRoot != null) { //only unlock if locked
-          unlockSubtree(src, srcSubTreeRoot.getInodeId());
-        }
-      }
-    }
-      success = true;
-    } finally {
-      retryCacheSetStateTransactional(cacheEntry, success);
-    }
-  }
-
-  private boolean pathIsMetaEnabled(INode[] pathComponents) {
-    return getMetaEnabledParent(pathComponents) == null ? false : true;
-  }
-
-  private INode getMetaEnabledParent(INode[] pathComponents) {
-    for (INode node : pathComponents) {
-      if (node != null && node.isDirectory()) {
-        INodeDirectory dir = (INodeDirectory) node;
-        if (dir.isMetaEnabled()) {
-          return dir;
-        }
-      }
-    }
-    return null;
-  }
-
-  void renameTo(final String src1, final long srcINodeID, final String dst1,
-                        final INode.DirCounts srcCounts, final INode.DirCounts dstCounts,
-                        final boolean isUsingSubTreeLocks, final String subTreeLockDst,
-                        final Collection<MetadataLogEntry> logEntries,
-                        final Options.Rename... options) throws IOException {
-    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = dir.resolvePath(src1, pathComponents, dir);
-    pathComponents = FSDirectory.getPathComponentsForReservedPath(dst1);
-    final String dst = dir.resolvePath(dst1, pathComponents, dir);
-    new HopsTransactionalRequestHandler(
-        isUsingSubTreeLocks?HDFSOperationType.SUBTREE_RENAME:
-            HDFSOperationType.RENAME, src) {
-      @Override
-      public void acquireLock(TransactionLocks locks) throws IOException {
-        LockFactory lf = LockFactory.getInstance();
-        INodeLock il = lf.getRenameINodeLock(INodeLockType.WRITE_ON_TARGET_AND_PARENT,
-                INodeResolveType.PATH, src, dst)
-                .setNameNodeID(nameNode.getId())
-                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
-        if (isUsingSubTreeLocks) {
-          il.setIgnoredSTOInodes(srcINodeID);
-        }
-        locks.add(il)
-            .add(lf.getBlockLock())
-            .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR, BLK.IV,
-                BLK.PE, BLK.ER));
-        if (dir.isQuotaEnabled()) {
-          locks.add(lf.getQuotaUpdateLock(true, src, dst));
-        }
-        if(!isUsingSubTreeLocks){
-          locks.add(lf.getLeaseLock(LockType.WRITE))
-              .add(lf.getLeasePathLock(LockType.READ_COMMITTED));
-        }else{
-          locks.add(lf.getLeaseLock(LockType.WRITE))
-              .add(lf.getLeasePathLock(LockType.WRITE, src));
-        }
-        if (erasureCodingEnabled) {
-          locks.add(lf.getEncodingStatusLock(LockType.WRITE, dst));
-        }
-        locks.add(lf.getAcesLock());
-
-        for (Options.Rename op : options) {
-          if (op == Rename.OVERWRITE) {
-            locks.add(lf.getAllUsedHashBucketsLock());
-          }
-        }
-      }
-
-      @Override
-      public Object performTask() throws IOException {
-        if (NameNode.stateChangeLog.isDebugEnabled()) {
-          NameNode.stateChangeLog.debug(
-              "DIR* NameSystem.renameTo: with options - " + src + " to " + dst);
-        }
-
-        checkNameNodeSafeMode("Cannot rename " + src);
-        if (!DFSUtil.isValidName(dst)) {
-          throw new InvalidPathException("Invalid name: " + dst);
-        }
-        for (MetadataLogEntry logEntry : logEntries) {
-          EntityManager.add(logEntry);
-        }
-
-        AbstractFileTree.LoggingQuotaCountingFileTree.updateLogicalTime
-            (logEntries);
-
-        for (Options.Rename op : options) {
-          if (op == Rename.KEEP_ENCODING_STATUS) {
-            INodesInPath srcInodesInPath =
-                dir.getINodesInPath(src, false);
-            INode[] srcNodes = srcInodesInPath.getINodes();
-            INodesInPath dstInodesInPath =
-                dir.getINodesInPath(dst, false);
-            INode[] dstNodes = dstInodesInPath.getINodes();
-            INode srcNode = srcNodes[srcNodes.length - 1];
-            INode dstNode = dstNodes[dstNodes.length - 1];
-            EncodingStatus status = EntityManager.find(
-                EncodingStatus.Finder.ByInodeId, dstNode.getId());
-            EncodingStatus newStatus = new EncodingStatus(status);
-            newStatus.setInodeId(srcNode.getId(), srcNode.isInTree());
-            EntityManager.add(newStatus);
-            EntityManager.remove(status);
-            break;
-          }
-        }
-
-        removeSubTreeLocksForRenameInternal(src, isUsingSubTreeLocks,
-            subTreeLockDst);
-        long mtime = now();
-        dir.renameTo(src, dst, mtime, srcCounts, dstCounts,
-            options);
-        return null;
-      }
-    }.handle(this);
-  }
-
-  private void removeSubTreeLocksForRenameInternal(final String src,
-      final boolean isUsingSubTreeLocks, final String subTreeLockDst)
-      throws StorageException, TransactionContextException,
-      UnresolvedLinkException {
-    if (isUsingSubTreeLocks) {
-      INode[] nodes;
-      INode inode;
-      if (!src.equals("/")) {
-        EntityManager.remove(new SubTreeOperation(getSubTreeLockPathPrefix(src)));
-        INodesInPath inodesInPath = dir.getINodesInPath(src, false);
-        nodes = inodesInPath.getINodes();
-        inode = nodes[nodes.length - 1];
-        if (inode != null && inode.isSTOLocked()) {
-          inode.setSubtreeLocked(false);
-          EntityManager.update(inode);
-        }
-      }
-    }
-  }
-
-  @Deprecated
-  boolean multiTransactionalRename(final String src, final String dst)
-      throws IOException {
-    //only for testing
-    saveTimes();
-
-    CacheEntry cacheEntry = retryCacheWaitForCompletionTransactional();
-    if (cacheEntry != null && cacheEntry.isSuccess()) {
-      return true; // Return previous response
-    }
-    boolean ret = false;
-    try{
-      ret = renameToInt(src, dst);
-    } finally {
-      retryCacheSetStateTransactional(cacheEntry, ret);
-    }
-    return ret;
-   }
-
-   private boolean renameToInt(final String src1, final String dst1) throws IOException{
-    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = dir.resolvePath(src1, pathComponents, dir);
-    pathComponents = FSDirectory.getPathComponentsForReservedPath(dst1);
-    final String dst = dir.resolvePath(dst1, pathComponents, dir);
-    if (NameNode.stateChangeLog.isDebugEnabled()) {
-      NameNode.stateChangeLog.debug(
-          "DIR* NameSystem.multiTransactionalRename: with options - " + src +
-              " to " + dst);
-    }
-
-    checkNameNodeSafeMode("Cannot rename " + src);
-    if (!DFSUtil.isValidName(dst)) {
-      throw new InvalidPathException("Invalid name: " + dst);
-    }
-
-    if (INode.getPathComponents(src).length == 1) {
-      NameNode.stateChangeLog.warn(
-          "DIR* FSDirectory.unprotectedRenameTo: " + "failed to rename " + src +
-              " to " + dst + " because source is the root");
-      return false;
-    }
-
-
-    PathInformation srcInfo = getPathExistingINodesFromDB(src,
-        false, null, FsAction.WRITE, null, null);
-    INode[] srcInodes = srcInfo.getPathInodes();
-    INode srcInode = srcInodes[srcInodes.length - 1];
-    if(srcInode == null){
-      NameNode.stateChangeLog.warn(
-          "DIR* FSDirectory.unprotectedRenameTo: " + "failed to rename " + src +
-              " to " + dst + " because source does not exist");
-      return false;
-    }
-
-    PathInformation dstInfo = getPathExistingINodesFromDB(dst,
-        false, FsAction.WRITE, null, null, null);
-    String actualDst = dst;
-    if(dstInfo.isDir()){
-      actualDst += Path.SEPARATOR + new Path(src).getName();
-    }
-
-    if (actualDst.equals(src)) {
-      return true;
-    }
-
-    INode[] dstInodes =  dstInfo.getPathInodes();
-    if(dstInodes[dstInodes.length-2] == null){
-      NameNode.stateChangeLog.warn(
-          "DIR* FSDirectory.unprotectedRenameTo: " + "failed to rename " + src +
-              " to " + dst +
-              " because destination's parent does not exist");
-      return false;
-    }
-
-    if (actualDst.startsWith(src) &&
-        actualDst.charAt(src.length()) == Path.SEPARATOR_CHAR) {
-      NameNode.stateChangeLog.warn(
-          "DIR* FSDirectory.unprotectedRenameTo: " + "failed to rename " + src +
-              " to " + actualDst + " because destination starts with src");
-      return false;
-    }
-
-    INode srcDataSet = getMetaEnabledParent(srcInfo.getPathInodes());
-    INode dstDataSet = getMetaEnabledParent(dstInfo.getPathInodes());
-    Collection<MetadataLogEntry> logEntries = Collections.EMPTY_LIST;
-
-    //TODO [S]  if src is a file then there is no need for sub tree locking
-    //mechanism on the src and dst
-    //However the quota is enabled then all the quota update on the dst
-    //must be applied before the move operation.
-    INode.DirCounts srcCounts = new INode.DirCounts();
-    srcCounts.nsCount = srcInfo.getNsCount(); //if not dir then it will return zero
-    srcCounts.dsCount = srcInfo.getDsCount();
-    INode.DirCounts dstCounts = new INode.DirCounts();
-    dstCounts.nsCount = dstInfo.getNsCount();
-    dstCounts.dsCount = dstInfo.getDsCount();
-    boolean isUsingSubTreeLocks = srcInfo.isDir();
-    boolean renameTransactionCommitted = false;
-    INodeIdentifier srcSubTreeRoot = null;
-
-    String subTreeLockDst = INode.constructPath(dstInfo.getPathComponents(),
-        0,  dstInfo.getNumExistingComp());
-    if(subTreeLockDst.equals(INodeDirectory.ROOT_NAME)){
-      subTreeLockDst = "/"; // absolute path
-    }
-    try {
-      if (isUsingSubTreeLocks) {
-        LOG.debug("Rename src: "+src+" dst: "+dst+" requires sub-tree locking mechanism");
-        //checkin parentAccess is enough for this operation, no need to pass access argument to QuotaCountingFileTree
-        //permission check in Apache Hadoop: doCheckOwner:false, ancestorAccess:null, parentAccess:FsAction.WRITE, 
-        //access:null, subAccess:null, ignoreEmptyDir:false
-        srcSubTreeRoot = lockSubtreeAndCheckOwnerAndParentPermission(src, false, 
-            FsAction.WRITE, SubTreeOperation.Type.RENAME_STO);
-
-        if (srcSubTreeRoot != null) {
-          AbstractFileTree.QuotaCountingFileTree srcFileTree;
-          if (shouldLogSubtreeInodes(srcInfo, dstInfo, srcDataSet,
-              dstDataSet, srcSubTreeRoot)) {
-            srcFileTree = new AbstractFileTree.LoggingQuotaCountingFileTree(this,
-                    srcSubTreeRoot, srcDataSet, dstDataSet);
-            srcFileTree.buildUp();
-            logEntries = ((AbstractFileTree.LoggingQuotaCountingFileTree) srcFileTree).getMetadataLogEntries();
-          } else {
-            srcFileTree = new AbstractFileTree.QuotaCountingFileTree(this,
-                    srcSubTreeRoot);
-            srcFileTree.buildUp();
-          }
-          srcCounts.nsCount = srcFileTree.getNamespaceCount();
-          srcCounts.dsCount = srcFileTree.getDiskspaceCount();
-        }
-        delayAfterBbuildingTree("Built tree of "+src1+" for rename. ");
-      } else {
-        LOG.debug("Rename src: " + src + " dst: " + dst + " does not require sub-tree locking mechanism");
-      }
-
-      boolean retValue = renameTo(src, srcSubTreeRoot != null?srcSubTreeRoot.getInodeId():0L,
-              dst, srcCounts, dstCounts, isUsingSubTreeLocks, subTreeLockDst, logEntries);
-
-      // the rename Tx has committed. it has also remove the subTreeLocks
-      renameTransactionCommitted = true;
-
-      return retValue;
-
-    } finally {
-      if (!renameTransactionCommitted) {
-        if (srcSubTreeRoot != null) { //only unlock if locked
-          unlockSubtree(src, srcSubTreeRoot.getInodeId());
-        }
-     }
-    }
-  }
-
-  private boolean shouldLogSubtreeInodes(PathInformation srcInfo,
-      PathInformation dstInfo, INode srcDataSet, INode dstDataSet,
-      INodeIdentifier srcSubTreeRoot){
-    if(pathIsMetaEnabled(srcInfo.getPathInodes()) || pathIsMetaEnabled(dstInfo
-        .getPathInodes())){
-      if(srcDataSet == null){
-        if(dstDataSet == null){
-          //shouldn't happen
-        }else{
-          //Moving a non metaEnabled directory under a metaEnabled directory
-          return true;
-        }
-      }else{
-        if(dstDataSet == null){
-          //rename a metadateEnabled directory to a non metadataEnabled
-          // directory, always log the subtree except if it is a rename of the
-          // dataset
-          return !srcDataSet.equalsIdentifier(srcSubTreeRoot);
-        }else{
-          //Move from one dataset to another, always log except if it is the
-          //same dataset
-          return !srcDataSet.equals(dstDataSet);
-        }
-      }
-    }
-    return false;
-  }
-
-  /**
-   * Change the indicated filename.
-   *
-   * @deprecated Use {@link #multiTransactionalRename(String, String, Rename...)}}
-   * instead.
-   */
-  @Deprecated
-  boolean renameTo(final String src1, final long srcINodeID, final String dst1,
-                   final INode.DirCounts srcCounts, final INode.DirCounts dstCounts,
-                   final boolean isUsingSubTreeLocks, final String subTreeLockDst,
-                   final Collection<MetadataLogEntry> logEntries)
-      throws IOException {
-    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = dir.resolvePath(src1, pathComponents, dir);
-    pathComponents = FSDirectory.getPathComponentsForReservedPath(dst1);
-    final String dst = dir.resolvePath(dst1, pathComponents, dir);
-    HopsTransactionalRequestHandler renameToHandler =
-        new HopsTransactionalRequestHandler(
-            isUsingSubTreeLocks ? HDFSOperationType.SUBTREE_DEPRICATED_RENAME :
-                HDFSOperationType.DEPRICATED_RENAME
-            , src) {
-          @Override
-          public void acquireLock(TransactionLocks locks) throws IOException {
-            LockFactory lf = LockFactory.getInstance();
-            INodeLock il = lf.getLegacyRenameINodeLock(
-                    INodeLockType.WRITE_ON_TARGET_AND_PARENT, INodeResolveType.PATH, src, dst)
-                    .setNameNodeID(nameNode.getId())
-                    .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
-                    .skipReadingQuotaAttr(!dir.isQuotaEnabled());
-            if(isUsingSubTreeLocks) {
-                    il.setIgnoredSTOInodes(srcINodeID);
-            }
-            locks.add(il)
-                    .add(lf.getBlockLock())
-                    .add(lf.getBlockRelated(BLK.RE, BLK.UC, BLK.IV, BLK.CR, BLK.ER, BLK.PE, BLK.UR));
-            if(!isUsingSubTreeLocks){
-              locks.add(lf.getLeaseLock(LockType.WRITE))
-                .add(lf.getLeasePathLock(LockType.READ_COMMITTED));
-            }else{
-              locks.add(lf.getLeaseLock(LockType.READ_COMMITTED))
-                  .add(lf.getLeasePathLock(LockType.READ_COMMITTED,src));
-            }
-            if (dir.isQuotaEnabled()) {
-              locks.add(lf.getQuotaUpdateLock(true, src, dst));
-            }
-          }
-
-          @Override
-          public Object performTask() throws IOException {
-            if (NameNode.stateChangeLog.isDebugEnabled()) {
-              NameNode.stateChangeLog.debug("DIR* NameSystem.renameTo: " + src
-                  + " to " + dst);
-            }
-
-            checkNameNodeSafeMode("Cannot rename " + src);
-            if (!DFSUtil.isValidName(dst)) {
-              throw new IOException("Invalid name: " + dst);
-            }
-
-            // remove the subtree locks
-            removeSubTreeLocksForRenameInternal(src, isUsingSubTreeLocks,
-                subTreeLockDst);
-
-            for (MetadataLogEntry logEntry : logEntries) {
-              EntityManager.add(logEntry);
-            }
-
-            AbstractFileTree.LoggingQuotaCountingFileTree.updateLogicalTime
-                (logEntries);
-            
-            long mtime = now();
-            return dir.renameTo(src, dst, mtime, srcCounts, dstCounts);
-          }
-        };
-    return (Boolean) renameToHandler.handle(this);
-    }
-
-  /**
    * Delete a directory tree in multiple transactions. Deleting a large directory
    * tree might take to much time for a single transaction. Hence, this function
    * first builds up an in-memory representation of the directory tree to be
@@ -8717,7 +8155,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    * @throws IOException
    */
   @VisibleForTesting
-  private INodeIdentifier lockSubtreeAndCheckOwnerAndParentPermission(final String path,
+  INodeIdentifier lockSubtreeAndCheckOwnerAndParentPermission(final String path,
       final boolean doCheckOwner, 
       final FsAction parentAccess,
       final SubTreeOperation.Type stoType) throws IOException {
@@ -8804,7 +8242,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    * @param path
    * @return /path + "/"
    */
-  private String getSubTreeLockPathPrefix(String path){
+  String getSubTreeLockPathPrefix(String path){
     String subTreeLockPrefix = path;
     if(!subTreeLockPrefix.endsWith("/")){
       subTreeLockPrefix+="/";
@@ -9692,8 +9130,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             byte[][] pathComponents = INode.getPathComponents(path);
             boolean isDir = false;
             INode.DirCounts srcCounts = new INode.DirCounts();
-            INodesInPath dstInodesInPath = dir.getExistingPathINodes(pathComponents);
-            final INode[] pathInodes = dstInodesInPath.getINodes();
+            INodesInPath inodesInPath = dir.getExistingPathINodes(pathComponents);
+            final INode[] pathInodes = inodesInPath.getINodes();
 
             INodeAttributes quotaDirAttributes = null;
             INode leafInode = pathInodes[pathInodes.length - 1];
@@ -9724,7 +9162,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             }
 
             return new PathInformation(path, pathComponents,
-                pathInodes,dstInodesInPath.getNumNonNull(),isDir,
+                inodesInPath,isDir,
                 srcCounts.getNsCount(), srcCounts.getDsCount(), quotaDirAttributes, acls);
           }
         };
@@ -9883,7 +9321,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
   }
 
-  private CacheEntry retryCacheWaitForCompletionTransactional() throws IOException {
+  CacheEntry retryCacheWaitForCompletionTransactional() throws IOException {
     if(!isRetryCacheEnabled){
       return null;
     }
@@ -9903,7 +9341,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     return (CacheEntry) rh.handle(this);
   }
 
-  private CacheEntry retryCacheSetStateTransactional(final CacheEntry cacheEntry, final boolean ret) throws IOException {
+  CacheEntry retryCacheSetStateTransactional(final CacheEntry cacheEntry, final boolean ret) throws IOException {
     if(!isRetryCacheEnabled){
       return null;
     }

@@ -198,8 +198,7 @@ public class TestFsLimits {
     Class<?> generated = null;
     try {
       Collection<MetadataLogEntry> logEntries = Collections.EMPTY_LIST;
-      fs.renameTo(src, 0L, dst, new INode.DirCounts(),
-          new INode.DirCounts(), false, null, logEntries, new Rename[]{});
+      fs.renameTo(src, dst, new Rename[]{});
     } catch (Throwable e) {
       generated = e.getClass();
     }
@@ -213,7 +212,7 @@ public class TestFsLimits {
     Class<?> generated = null;
     try {
       Collection<MetadataLogEntry> logEntries = Collections.EMPTY_LIST;
-      fs.renameTo(src, 0L, dst, new INode.DirCounts(), new INode.DirCounts(), false, null, logEntries);
+      fs.renameTo(src, dst, new Rename[]{});
     } catch (Throwable e) {
       generated = e.getClass();
     }
