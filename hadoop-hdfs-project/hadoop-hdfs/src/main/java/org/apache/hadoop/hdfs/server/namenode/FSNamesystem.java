@@ -1720,7 +1720,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     HdfsFileStatus resultingStat;
     FSPermissionChecker pc = getPermissionChecker();
     if (!createParent) {
-      verifyParentDir(link);
+      dir.verifyParentDir(link);
     }
     createSymlinkInternal(pc, target, link, dirPerms, createParent);
     resultingStat = getAuditFileInfo(link, false);
@@ -2023,25 +2023,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     return (Long) getPreferredBlockSizeHandler.handle(this);
   }
 
-  /*
-   * Verify that parent directory of src exists.
-   */
-  private void verifyParentDir(String src)
-      throws FileNotFoundException, ParentNotDirectoryException,
-      UnresolvedLinkException, StorageException, TransactionContextException {
-    Path parent = new Path(src).getParent();
-    if (parent != null) {
-      INode parentNode = getINode(parent.toString());
-      if (parentNode == null) {
-        throw new FileNotFoundException(
-            "Parent directory doesn't exist: " + parent.toString());
-      } else if (!parentNode.isDirectory() && !parentNode.isSymlink()) {
-        throw new ParentNotDirectoryException(
-            "Parent path is not a directory: " + parent.toString());
-      }
-    }
-  }
-
   /**
    * Create a new file entry in the namespace.
    * <p/>
@@ -2181,7 +2162,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     }
 
     if (!createParent) {
-      verifyParentDir(src);
+      dir.verifyParentDir(src);
     }
 
     try {
@@ -2212,7 +2193,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       INodeFile newNode = null;
       // Always do an implicit mkdirs for parent directory tree.
       Path parent = new Path(src).getParent();
-      if (parent != null && mkdirsRecursively(parent.toString(),
+      if (parent != null && FSDirMkdirOp.mkdirsRecursively(dir, parent.toString(),
               permissions, true, now())) {
         newNode = dir.addFile(src, permissions, replication, blockSize,
                 holder, clientMachine);
@@ -3714,179 +3695,17 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   /**
    * Create all the necessary directories
    */
-  boolean mkdirs(final String src1, final PermissionStatus permissions,
-      final boolean createParent) throws IOException {
-    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = dir.resolvePath(src1, pathComponents, dir);
-    final boolean resolvedLink = false;
-    HopsTransactionalRequestHandler mkdirsHandler =
-        new HopsTransactionalRequestHandler(HDFSOperationType.MKDIRS, src) {
-          @Override
-          public void acquireLock(TransactionLocks locks) throws IOException {
-            LockFactory lf = getInstance();
-            INodeLock il = lf.getINodeLock( INodeLockType.WRITE_ON_TARGET_AND_PARENT, INodeResolveType.PATH, src)
-                    .resolveSymLink(resolvedLink)
-                    .setNameNodeID(nameNode.getId())
-                    .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
-                    .skipReadingQuotaAttr(!dir.isQuotaEnabled());
-            locks.add(il);
-            locks.add(lf.getAcesLock());
-          }
-
-          @Override
-          public Object performTask() throws IOException {
-            try {
-              return mkdirsInt(src, permissions, createParent);
-            } catch (AccessControlException e) {
-              logAuditEvent(false, "mkdirs", src);
-              throw e;
-            }
-          }
-        };
-    return (Boolean) mkdirsHandler.handle(this);
-  }
-
-  private boolean mkdirsInt(String src, PermissionStatus permissions,
-      boolean createParent)
-      throws IOException {
-    HdfsFileStatus resultingStat = null;
-    boolean status = false;
-    if (NameNode.stateChangeLog.isDebugEnabled()) {
-      NameNode.stateChangeLog
-          .debug(this.getNamenodeId() + ") DIR* NameSystem.mkdirs: " + src);
+  boolean mkdirs(String src, PermissionStatus permissions,
+      boolean createParent) throws IOException {
+    HdfsFileStatus auditStat = null;
+    try {
+      checkNameNodeSafeMode("Cannot create directory " + src);
+      auditStat = FSDirMkdirOp.mkdirs(this, src, permissions, createParent);
+    } catch (AccessControlException e) {
+      logAuditEvent(false, "mkdirs", src);
+      throw e;
     }
-    FSPermissionChecker pc = getPermissionChecker();
-    status = mkdirsInternal(pc, src, permissions, createParent);
-    if (status) {
-      resultingStat = getAuditFileInfo(src, false);
-    }
-
-    if (status) {
-      logAuditEvent(true, "mkdirs", src, null, resultingStat);
-    }
-    return status;
-  }
-
-  /**
-   * Create all the necessary directories
-   */
-  private boolean mkdirsInternal(FSPermissionChecker pc, String src,
-      PermissionStatus permissions, boolean createParent)
-      throws IOException {
-    checkNameNodeSafeMode("Cannot create directory " + src);
-    if (isPermissionEnabled) {
-      checkTraverse(pc, src);
-    }
-    if (dir.isDir(src)) {
-      // all the users of mkdirs() are used to expect 'true' even if
-      // a new directory is not created.
-      return true;
-    }
-    if (!DFSUtil.isValidName(src)) {
-      throw new InvalidPathException(src);
-    }
-    if (isPermissionEnabled) {
-      checkAncestorAccess(pc, src, FsAction.WRITE);
-    }
-    if (!createParent) {
-      verifyParentDir(src);
-    }
-
-    // validate that we have enough inodes. This is, at best, a
-    // heuristic because the mkdirs() operation might need to
-    // create multiple inodes.
-    checkFsObjectLimit();
-
-    if (!mkdirsRecursively(src, permissions, false, now())) {
-      throw new IOException("Failed to create directory: " + src);
-    }
-    return true;
-  }
-
-    /**
-   * Create a directory
-   * If ancestor directories do not exist, automatically create them.
-   * @param src string representation of the path to the directory
-   * @param permissions the permission of the directory
-   * @param inheritPermission if the permission of the directory should inherit
-   *                          from its parent or not. u+wx is implicitly added to
-   *                          the automatically created directories, and to the
-   *                          given directory if inheritPermission is true
-   * @param now creation time
-   * @return true if the operation succeeds false otherwise
-   * @throws QuotaExceededException if directory creation violates
-   *                                any quota limit
-   * @throws UnresolvedLinkException if a symlink is encountered in src.
-   */
-  private boolean mkdirsRecursively(String src, PermissionStatus permissions,
-      boolean inheritPermission, long now)
-      throws FileAlreadyExistsException, QuotaExceededException,
-      UnresolvedLinkException, IOException,
-      AclException {
-    src = FSDirectory.normalizePath(src);
-    String[] names = INode.getPathNames(src);
-    byte[][] components = INode.getPathComponents(names);
-    final int lastInodeIndex = components.length - 1;
-    INodesInPath iip = dir.getExistingPathINodes(components);
-    INode[] inodes = iip.getINodes();
-    // find the index of the first null in inodes[]
-    StringBuilder pathbuilder = new StringBuilder();
-    int i = 1;
-    for (; i < inodes.length && inodes[i] != null; i++) {
-      pathbuilder.append(Path.SEPARATOR).append(names[i]);
-      if (!inodes[i].isDirectory()) {
-        throw new FileAlreadyExistsException(
-            "Parent path is not a directory: "
-            + pathbuilder + " " + inodes[i].getLocalName());
-      }
-    }
-    // default to creating parent dirs with the given perms
-    PermissionStatus parentPermissions = permissions;
-    // if not inheriting and it's the last inode, there's no use in
-    // computing perms that won't be used
-    if (inheritPermission || (i < lastInodeIndex)) {
-      // if inheriting (ie. creating a file or symlink), use the parent dir,
-      // else the supplied permissions
-      // NOTE: the permissions of the auto-created directories violate posix
-      FsPermission parentFsPerm = inheritPermission
-          ? inodes[i - 1].getFsPermission() : permissions.getPermission();
-      // ensure that the permissions allow user write+execute
-      if (!parentFsPerm.getUserAction().implies(FsAction.WRITE_EXECUTE)) {
-        parentFsPerm = new FsPermission(
-            parentFsPerm.getUserAction().or(FsAction.WRITE_EXECUTE),
-            parentFsPerm.getGroupAction(),
-            parentFsPerm.getOtherAction()
-        );
-      }
-      if (!parentPermissions.getPermission().equals(parentFsPerm)) {
-        parentPermissions = new PermissionStatus(
-            parentPermissions.getUserName(),
-            parentPermissions.getGroupName(),
-            parentFsPerm
-        );
-        // when inheriting, use same perms for entire path
-        if (inheritPermission) {
-          permissions = parentPermissions;
-        }
-      }
-    }
-    // create directories beginning from the first null index
-    for (; i < inodes.length; i++) {
-      pathbuilder.append(Path.SEPARATOR).append(names[i]);
-      dir.unprotectedMkdir(IDsGeneratorFactory.getInstance().getUniqueINodeID(), iip, i, components[i],
-          (i < lastInodeIndex) ? parentPermissions : permissions, now);
-      if (inodes[i] == null) {
-        return false;
-      }
-      // Directory creation also count towards FilesCreated
-      // to match count of FilesDeleted metric.
-      NameNode.getNameNodeMetrics().incrFilesCreated();
-      final String cur = pathbuilder.toString();
-      if (NameNode.stateChangeLog.isDebugEnabled()) {
-        NameNode.stateChangeLog.debug(
-            "mkdirs: created directory " + cur);
-      }
-    }
+    logAuditEvent(true, "mkdirs", src, null, auditStat);
     return true;
   }
 
@@ -4596,7 +4415,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     final long modTime = now();
     if (createParent) {
       final String parent = new Path(path).getParent().toString();
-      if (!mkdirsRecursively(parent, dirPerms, true, modTime)) {
+      if (!FSDirMkdirOp.mkdirsRecursively(dir, parent, dirPerms, true, modTime)) {
         return null;
       }
     }
@@ -5854,7 +5673,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    * Check to see if we have exceeded the limit on the number
    * of inodes.
    */
-  private void checkFsObjectLimit() throws IOException {
+  void checkFsObjectLimit() throws IOException {
     if (maxFsObjects != 0 &&
         maxFsObjects <= dir.totalInodes() + getBlocksTotal()) {
       throw new IOException("Exceeded the configured number of objects " +

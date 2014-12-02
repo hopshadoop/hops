@@ -76,6 +76,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.apache.hadoop.fs.ParentNotDirectoryException;
 import org.apache.hadoop.fs.PathIsNotDirectoryException;
 import org.apache.hadoop.hdfs.DFSUtil;
 import static org.apache.hadoop.util.Time.now;
@@ -772,31 +773,6 @@ public class FSDirectory implements Closeable {
     }
     return getFullPathName(inodes, depth - 1);
   }
-
-  INode unprotectedMkdir(int inodeId, String src, PermissionStatus permissions,
-      long timestamp)
-      throws IOException {
-    byte[][] components = INode.getPathComponents(src);
-    INodesInPath inodesInPath = getExistingPathINodes(components);
-    INode[] inodes = inodesInPath.getINodes();
-    unprotectedMkdir(inodeId, inodesInPath, inodes.length - 1, components[inodes.length - 1],
-        permissions, timestamp);
-    return inodes[inodes.length - 1];
-  }
-
-  /**
-   * create a directory at index pos.
-   * The parent path to the directory is at [0, pos-1].
-   * All ancestors exist. Newly created one stored at index pos.
-   */
-  void unprotectedMkdir(long inodeId, INodesInPath inodesInPath, int pos, byte[] name,
-      PermissionStatus permission, long timestamp)
-      throws IOException {
-    final INodeDirectory dir = new INodeDirectory(inodeId, name, permission, timestamp);
-    if (addChild(inodesInPath, pos, dir, true)) {
-      inodesInPath.setINode(pos, dir);
-    }
-  }
     
   /**
    * Add the given child to the namespace.
@@ -1051,7 +1027,7 @@ public class FSDirectory implements Closeable {
    *         otherwise return true;
    * @throw QuotaExceededException is thrown if it violates quota limit
    */
-  private boolean addChild(INodesInPath inodesInPath, int pos,
+  boolean addChild(INodesInPath inodesInPath, int pos,
       INode child, boolean checkQuota) throws QuotaExceededException, StorageException, IOException {
     final INode[] inodes = inodesInPath.getINodes();
     // The filesystem limits are not really quotas, so this check may appear
@@ -1078,7 +1054,7 @@ public class FSDirectory implements Closeable {
     return addChild(inodesInPath, pos, child, counts, checkQuota, true);
   }
   
-  private boolean addChild(INodesInPath inodesInPath, int pos, INode child,
+  boolean addChild(INodesInPath inodesInPath, int pos, INode child,
       INode.DirCounts counts, boolean checkQuota, boolean logMetadataEvent)
       throws IOException {
     final INode[] inodes = inodesInPath.getINodes();
@@ -1847,7 +1823,7 @@ public class FSDirectory implements Closeable {
    * @throws UnresolvedLinkException if symlink can't be resolved
    * @throws SnapshotAccessControlException if path is in RO snapshot
    */
-  private INode getINode4Write(String src, boolean resolveLink)
+  INode getINode4Write(String src, boolean resolveLink)
           throws UnresolvedLinkException, StorageException, TransactionContextException {
     return getINodesInPath4Write(src, resolveLink).getLastINode();
   }
@@ -2001,5 +1977,24 @@ public class FSDirectory implements Closeable {
     throws IOException {
     return (namesystem.isAuditEnabled() && namesystem.isExternalInvocation())
       ? FSDirStatAndListingOp.getFileInfo(this, path, resolveSymlink, false) : null;
+  }
+  
+  /**
+   * Verify that parent directory of src exists.
+   */
+  void verifyParentDir(String src)
+      throws FileNotFoundException, ParentNotDirectoryException,
+             UnresolvedLinkException, StorageException, TransactionContextException {
+    Path parent = new Path(src).getParent();
+    if (parent != null) {
+      final INode parentNode = getINode(parent.toString());
+      if (parentNode == null) {
+        throw new FileNotFoundException("Parent directory doesn't exist: "
+            + parent);
+      } else if (!parentNode.isDirectory() && !parentNode.isSymlink()) {
+        throw new ParentNotDirectoryException("Parent path is not a directory: "
+            + parent);
+      }
+    }
   }
 }
