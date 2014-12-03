@@ -31,17 +31,18 @@ import java.util.List;
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class LocatedBlocks {
-  private long fileLength;
-  private List<LocatedBlock> blocks;
-  // array of blocks with prioritized locations
-  private boolean underConstruction;
-  private LocatedBlock lastLocatedBlock = null;
-  private boolean isLastBlockComplete = false;
+  private final long fileLength;
+  private final List<LocatedBlock> blocks; // array of blocks with prioritized locations
+  private final boolean underConstruction;
+  private final LocatedBlock lastLocatedBlock;
+  private final boolean isLastBlockComplete;
 
   public LocatedBlocks() {
     fileLength = 0;
     blocks = null;
     underConstruction = false;
+    lastLocatedBlock = null;
+    isLastBlockComplete = false;
   }
 
   /**
