@@ -166,6 +166,9 @@ Release 2.7.0 - UNRELEASED
     HDFS-6735. A minor optimization to avoid pread() be blocked by read()
     inside the same DFSInputStream (Lars Hofhansl via stack)
 
+    HDFS-7468. Moving verify* functions to corresponding classes.
+    (Li Lu via wheat9)
+
   OPTIMIZATIONS
 
   BUG FIXES
