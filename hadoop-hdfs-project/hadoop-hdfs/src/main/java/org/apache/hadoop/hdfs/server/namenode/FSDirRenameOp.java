@@ -43,6 +43,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
+import org.apache.hadoop.hdfs.protocol.FSLimitException;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 import org.apache.hadoop.hdfs.server.namenode.INode.BlocksMapUpdateInfo;
@@ -88,6 +89,56 @@ class FSDirRenameOp {
     final boolean status = renameToInternal(fsd, src, dst);
     
     return status;   
+  }
+
+  /**
+   * Verify quota for rename operation where srcInodes[srcInodes.length-1] moves
+   * dstInodes[dstInodes.length-1]
+   */
+  static void verifyQuotaForRename(FSDirectory fsd,
+      INode[] src, INode[] dst, INode.DirCounts srcCounts,
+      INode.DirCounts dstCounts)
+      throws QuotaExceededException, StorageException, TransactionContextException {
+    if (!fsd.getFSNamesystem().isImageLoaded() || !fsd.isQuotaEnabled()) {
+      // Do not check quota if edits log is still being processed
+      return;
+    }
+    INode commonAncestor = null;
+    for (int i = 0; src[i].equals(dst[i]); i++) {
+      commonAncestor = src[i];
+    }
+    long nsDelta = srcCounts.getNsCount();
+    long dsDelta = srcCounts.getDsCount();
+
+    // Reduce the required quota by dst that is being removed
+    INode dstInode = dst[dst.length - 1];
+    if (dstInode != null) {
+      nsDelta -= dstCounts.getNsCount();
+      dsDelta -= dstCounts.getDsCount();
+    }
+    FSDirectory.verifyQuota(dst, dst.length - 1, nsDelta, dsDelta,
+        commonAncestor);
+  }
+
+  /**
+   * Checks file system limits (max component length and max directory items)
+   * during a rename operation.
+   */
+  static void verifyFsLimitsForRename(FSDirectory fsd,
+      INodesInPath srcIIP,
+      INodesInPath dstIIP)
+      throws FSLimitException.PathComponentTooLongException,
+          FSLimitException.MaxDirectoryItemsExceededException,
+          StorageException,
+          TransactionContextException {
+    byte[] dstChildName = dstIIP.getLastLocalName();
+    INode[] dstInodes = dstIIP.getINodes();
+    int pos = dstInodes.length - 1;
+    fsd.verifyMaxComponentLength(dstChildName, dstInodes, pos);
+    // Do not enforce max directory items if renaming within same directory.
+    if (!srcIIP.getINode(-2).equals(dstIIP.getINode(-2))) {
+      fsd.verifyMaxDirItems(dstInodes, pos);
+    }
   }
 
   /**
@@ -282,8 +333,8 @@ class FSDirRenameOp {
         AbstractFileTree.LoggingQuotaCountingFileTree.updateLogicalTime(logEntries);
 
         // Ensure dst has quota to accommodate rename
-        fsd.verifyFsLimitsForRename(srcIIP, dstIIP, dstIIP.getLastLocalName());
-        fsd.verifyQuotaForRename(srcIIP.getINodes(), dstIIP.getINodes(), srcCounts, dstCounts);
+        verifyFsLimitsForRename(fsd, srcIIP, dstIIP);
+        verifyQuotaForRename(fsd, srcIIP.getINodes(), dstIIP.getINodes(), srcCounts, dstCounts);
 
         RenameOperation tx = new RenameOperation(fsd, src, dst, srcIIP, dstIIP, srcCounts);
 
@@ -635,8 +686,8 @@ class FSDirRenameOp {
         removeSubTreeLocksForRenameInternal(fsd, src, isUsingSubTreeLocks);
 
         // Ensure dst has quota to accommodate rename
-        fsd.verifyFsLimitsForRename(srcIIP, dstIIP, dstIIP.getLastLocalName());
-        fsd.verifyQuotaForRename(srcIIP.getINodes(), dstIIP.getINodes(), srcCounts, dstCounts);
+        verifyFsLimitsForRename(fsd, srcIIP, dstIIP);
+        verifyQuotaForRename(fsd, srcIIP.getINodes(), dstIIP.getINodes(), srcCounts, dstCounts);
 
         RenameOperation tx = new RenameOperation(fsd, src, dst, srcIIP, dstIIP, srcCounts);
 

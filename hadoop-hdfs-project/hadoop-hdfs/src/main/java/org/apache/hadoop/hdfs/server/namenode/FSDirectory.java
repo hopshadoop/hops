@@ -808,13 +808,9 @@ public class FSDirectory implements Closeable {
    * @throws QuotaExceededException
    *     if quota limit is exceeded.
    */
-  private void verifyQuota(INode[] inodes, int pos, long nsDelta, long dsDelta,
+  static void verifyQuota(INode[] inodes, int pos, long nsDelta, long dsDelta,
       INode commonAncestor) throws QuotaExceededException, StorageException,
       TransactionContextException {
-    if (!namesystem.isImageLoaded()) {
-      // Do not check quota if edits log is still being processed
-      return;
-    }
     if (nsDelta <= 0 && dsDelta <= 0) {
       // if quota is being freed or not being consumed
       return;
@@ -826,7 +822,7 @@ public class FSDirectory implements Closeable {
     try {
       // check existing components in the path
       for (; i >= 0; i--) {
-        if (commonAncestor == inodes[i]) {
+        if (commonAncestor!=null && commonAncestor.equals(inodes[i])) {
           // Moving an existing node. Stop checking for quota when common
           // ancestor is reached
           return;
@@ -844,65 +840,6 @@ public class FSDirectory implements Closeable {
   }
   
   /**
-   * Verify quota for rename operation where srcInodes[srcInodes.length-1]
-   * moves
-   * dstInodes[dstInodes.length-1]
-   *
-   * @param srcInodes
-   * directory from where node is being moved.
-   * @param dstInodes
-   * directory to where node is moved to.
-   * @throws QuotaExceededException
-   * if quota limit is exceeded.
-   */
-  void verifyQuotaForRename(INode[] srcInodes, INode[] dstInodes, INode.DirCounts srcCounts,
-      INode.DirCounts dstCounts) throws QuotaExceededException, StorageException, TransactionContextException {
-
-    if (!isQuotaEnabled()) {
-      return;
-    }
-
-    if (!namesystem.isImageLoaded()) {
-      // Do not check quota if edits log is still being processed
-      return;
-    }
-    INode commonAncestor = null;
-    for (int i = 0; srcInodes[i] == dstInodes[i]; i++) {
-      commonAncestor = srcInodes[i];
-    }
-    long nsDelta = srcCounts.getNsCount();
-    long dsDelta = srcCounts.getDsCount();
-    // Reduce the required quota by dst that is being removed
-    INode dstInode = dstInodes[dstInodes.length - 1];
-    if (dstInode != null) {
-      nsDelta -= dstCounts.getNsCount();
-      dsDelta -= dstCounts.getDsCount();
-    }
-    verifyQuota(dstInodes, dstInodes.length - 1, nsDelta, dsDelta,
-        commonAncestor);
-  }
-
-  /**
-   * Checks file system limits (max component length and max directory items)
-   * during a rename operation.
-   *
-   * @param srcIIP INodesInPath containing every inode in the rename source
-   * @param dstIIP INodesInPath containing every inode in the rename destination
-   * @throws PathComponentTooLongException child's name is too long.
-   * @throws MaxDirectoryItemsExceededException too many children.
-   */
-  void verifyFsLimitsForRename(INodesInPath srcIIP, INodesInPath dstIIP, byte[] dstChildName)
-      throws PathComponentTooLongException, MaxDirectoryItemsExceededException, StorageException, TransactionContextException {
-    INode[] dstInodes = dstIIP.getINodes();
-    int pos = dstInodes.length - 1;
-    verifyMaxComponentLength(dstChildName, dstInodes, pos);
-    // Do not enforce max directory items if renaming within same directory.
-    if (maxDirItems > 0 && !srcIIP.getINode(-2).equals(dstIIP.getINode(-2))) {
-      verifyMaxDirItems(dstInodes, pos);
-    }
-  }
-  
-  /**
    * Verify child's name for fs limit.
    *
    * @param childName byte[] containing new child name
@@ -910,7 +847,7 @@ public class FSDirectory implements Closeable {
    * @param pos int position of new child in path
    * @throws PathComponentTooLongException child's name is too long.
    */
-  private void verifyMaxComponentLength(byte[] childName, Object parentPath,
+  void verifyMaxComponentLength(byte[] childName, Object parentPath,
       int pos) throws PathComponentTooLongException {
     if (maxComponentLength == 0) {
       return;
@@ -938,9 +875,11 @@ public class FSDirectory implements Closeable {
    * @param pos int position of new child in pathComponents
    * @throws MaxDirectoryItemsExceededException too many children.
    */
-  private void verifyMaxDirItems(INode[] pathComponents, int pos)
+  void verifyMaxDirItems(INode[] pathComponents, int pos)
       throws MaxDirectoryItemsExceededException, StorageException, TransactionContextException {
-
+    if (maxDirItems <= 0) {
+      return;
+    }
     final INodeDirectory parent = pathComponents[pos - 1].asDirectory();
     final int count = parent.getChildrenNum();
     if (count >= maxDirItems) {
