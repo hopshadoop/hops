@@ -144,7 +144,7 @@ public class INodesInPath {
       }
       final boolean isDir = curNode.isDirectory();
       final INodeDirectory dir = isDir ? curNode.asDirectory() : null;
-      if (curNode.isSymlink() && (!lastComp || (lastComp && resolveLink))) {
+      if (curNode.isSymlink() && (!lastComp || resolveLink)) {
         final String path = constructPath(components, 0, components.length);
         final String preceding = constructPath(components, 0, count);
         final String remainder = constructPath(components, count + 1, components.length);
@@ -229,6 +229,11 @@ public class INodesInPath {
     return path[path.length - 1];
   }
   
+  /** @return the full path in string form */
+  public String getPath() {
+    return DFSUtil.byteArray2PathString(path);
+  }
+  
   /**
    * Add an INode at the end of the array
    */
@@ -272,7 +277,7 @@ public class INodesInPath {
 
   private String toString(boolean vaildateObject) throws StorageException, TransactionContextException {
     if (vaildateObject) {
-      vaildate();
+      validate();
     }
 
     final StringBuilder b = new StringBuilder(getClass().getSimpleName())
@@ -294,7 +299,7 @@ public class INodesInPath {
     return b.toString();
   }
 
-  void vaildate() throws StorageException, TransactionContextException {
+  void validate() throws StorageException, TransactionContextException {
     // check parent up to snapshotRootIndex or numNonNull
     final int n = numNonNull;
     int i = 0;

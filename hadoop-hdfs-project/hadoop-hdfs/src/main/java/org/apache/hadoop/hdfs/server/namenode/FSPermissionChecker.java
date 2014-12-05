@@ -108,20 +108,16 @@ class FSPermissionChecker {
     return sb.toString();
   }
 
-  private final UserGroupInformation ugi;
   private final String user;
-  /**
-   * A set with group namess. Not synchronized since it is unmodifiable
-   */
+  /** A set with group namess. Not synchronized since it is unmodifiable */
   private final Set<String> groups;
   private final boolean isSuper;
   
   FSPermissionChecker(String fsOwner, String supergroup,
       UserGroupInformation callerUgi) {
-    ugi = callerUgi;
-    HashSet<String> s = new HashSet<>(Arrays.asList(ugi.getGroupNames()));
+    HashSet<String> s = new HashSet<String>(Arrays.asList(callerUgi.getGroupNames()));
     groups = Collections.unmodifiableSet(s);
-    user = ugi.getShortUserName();
+    user = callerUgi.getShortUserName();
     isSuper = user.equals(fsOwner) || groups.contains(supergroup);
   }
 
@@ -173,37 +169,35 @@ class FSPermissionChecker {
    * Further, if both foo and bar do not exist,
    * then the ancestor path is "/".
    *
-   * @param doCheckOwner
-   *     Require user to be the owner of the path?
-   * @param ancestorAccess
-   *     The access required by the ancestor of the path.
-   * @param parentAccess
-   *     The access required by the parent of the path.
-   * @param access
-   *     The access required by the path.
-   * @param subAccess
-   *     If path is a directory,
-   *     it is the access required of the path and all the sub-directories.
-   *     If path is not a directory, there is no effect.
+   * @param doCheckOwner Require user to be the owner of the path?
+   * @param ancestorAccess The access required by the ancestor of the path.
+   * @param parentAccess The access required by the parent of the path.
+   * @param access The access required by the path.
+   * @param subAccess If path is a directory,
+   * it is the access required of the path and all the sub-directories.
+   * If path is not a directory, there is no effect.
+   * @param ignoreEmptyDir Ignore permission checking for empty directory?
    * @throws AccessControlException
-   * @throws UnresolvedLinkException
-   *     Guarded by {@link FSNamesystem#readLock()}
-   *     Caller of this method must hold that lock.
+   * 
+   * Guarded by {@link FSNamesystem#readLock()}
+   * Caller of this method must hold that lock.
    */
-  void checkPermission(String path, FSDirectory dir, boolean doCheckOwner,
+  void checkPermission(INodesInPath inodesInPath, boolean doCheckOwner,
       FsAction ancestorAccess, FsAction parentAccess, FsAction access,
-      FsAction subAccess, boolean ignoreEmptyDir, boolean resolveLink) throws AccessControlException,
-      UnresolvedLinkException, StorageException,
-      TransactionContextException, IOException {
+      FsAction subAccess, boolean ignoreEmptyDir) throws AccessControlException,
+      StorageException, TransactionContextException, IOException {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("ACCESS CHECK: " + this + ", doCheckOwner=" + doCheckOwner +
-          ", ancestorAccess=" + ancestorAccess + ", parentAccess=" +
-          parentAccess + ", access=" + access + ", subAccess=" + subAccess + ", ignoreEmptyDir="
-          + ignoreEmptyDir + ", resolveLink=" + resolveLink);
+      LOG.debug("ACCESS CHECK: " + this
+          + ", doCheckOwner=" + doCheckOwner
+          + ", ancestorAccess=" + ancestorAccess
+          + ", parentAccess=" + parentAccess
+          + ", access=" + access
+          + ", subAccess=" + subAccess
+          + ", ignoreEmptyDir=" + ignoreEmptyDir);
     }
     // check if (parentAccess != null) && file exists, then check sb
     // If resolveLink, the check is performed on the link target.
-      final INode[] inodes = dir.getINodesInPath(path, resolveLink).getINodes();
+      final INode[] inodes = inodesInPath.getINodes();
       int ancestorIndex = inodes.length - 2;
       for(; ancestorIndex >= 0 && inodes[ancestorIndex] == null;
           ancestorIndex--);
