@@ -311,7 +311,7 @@ public class FSDirectory implements Closeable {
   /**
    * This is a wrapper for resolvePath(). If the path passed
    * is prefixed with /.reserved/raw, then it checks to ensure that the caller
-   * has super user has super user privileges.
+   * has super user privileges.
    *
    * @param pc The permission checker used when resolving path.
    * @param path The path to resolve.
@@ -372,19 +372,19 @@ public class FSDirectory implements Closeable {
     return fileNode.getBlocks();
   }
 
-  void setStoragePolicy(String src, BlockStoragePolicy policy) throws IOException {
-    unprotectedSetStoragePolicy(src, policy);
+  void setStoragePolicy(INodesInPath iip, BlockStoragePolicy policy) throws IOException {
+    unprotectedSetStoragePolicy(iip, policy);
   }
 
-  void unprotectedSetStoragePolicy(String src, BlockStoragePolicy policy) throws IOException {
-    final INodesInPath inodesInPath = getINodesInPath4Write(src, true);
-    final INode[] inodes = inodesInPath.getINodes();
+  void unprotectedSetStoragePolicy(INodesInPath iip, BlockStoragePolicy policy) throws IOException {
+    final INode[] inodes = iip.getINodes();
     INode inode = inodes[inodes.length - 1];
 
     if (inode == null) {
-      throw new FileNotFoundException("File/Directory does not exist: " + src);
+      throw new FileNotFoundException("File/Directory does not exist: "
+          + iip.getPath());
     } else if (inode.isSymlink()) {
-      throw new IOException("Cannot set storage policy for symlink: " + src);
+      throw new IOException("Cannot set storage policy for symlink: " + iip.getPath());
     } else {
       inode.setBlockStoragePolicyID(policy.getId());
     }
@@ -463,10 +463,11 @@ public class FSDirectory implements Closeable {
   /**
    * @return true if the path is a non-empty directory; otherwise, return false.
    */
-  boolean isNonEmptyDirectory(String path)
+  boolean isNonEmptyDirectory(INodesInPath inodesInPath)
       throws UnresolvedLinkException, StorageException,
       TransactionContextException {
-    final INode inode = getNode(path, false);
+    final INode[] inodes = inodesInPath.getINodes();
+    final INode inode = inodes[inodes.length - 1];
     if (inode == null || !inode.isDirectory()) {
       //not found or not a directory
       return false;
@@ -512,8 +513,8 @@ public class FSDirectory implements Closeable {
       TransactionContextException {
     src = normalizePath(src);
 
-    final INodesInPath inodesInPath = getINodesInPath4Write(src, false);
-    final INode[] inodes = inodesInPath.getINodes();
+    final INodesInPath iip = getINodesInPath4Write(src, false);
+    final INode[] inodes = iip.getINodes();
     INode targetNode = inodes[inodes.length - 1];
 
     if (targetNode == null) { // non-existent src
@@ -535,7 +536,7 @@ public class FSDirectory implements Closeable {
     addMetaDataLogForDirDeletion(targetNode);
 
     // Remove the node from the namespace
-    targetNode = removeLastINode(inodesInPath);
+    targetNode = removeLastINode(iip);
     if (targetNode == null) {
       return -1;
     }
@@ -546,7 +547,7 @@ public class FSDirectory implements Closeable {
     int filesRemoved = targetNode.collectSubtreeBlocksAndClear(collectedBlocks);
     if (NameNode.stateChangeLog.isDebugEnabled()) {
       NameNode.stateChangeLog
-          .debug("DIR* FSDirectory.unprotectedDelete: " + src + " is removed");
+          .debug("DIR* FSDirectory.unprotectedDelete: " + iip.getPath() + " is removed");
     }
     return filesRemoved;
   }
@@ -1855,45 +1856,31 @@ public class FSDirectory implements Closeable {
     }
   }
 
-  void checkOwner(FSPermissionChecker pc, String path)
-      throws AccessControlException, UnresolvedLinkException, IOException {
-    checkPermission(pc, path, true, null, null, null, null);
+  void checkOwner(FSPermissionChecker pc, INodesInPath iip)
+      throws AccessControlException, IOException {
+    checkPermission(pc, iip, true, null, null, null, null);
   }
 
-  void checkPathAccess(FSPermissionChecker pc, String path,
+  void checkPathAccess(FSPermissionChecker pc, INodesInPath iip,
                        FsAction access)
-      throws AccessControlException, UnresolvedLinkException, IOException {
-    checkPermission(pc, path, false, null, null, access, null);
+      throws AccessControlException, IOException {
+    checkPermission(pc, iip, false, null, null, access, null);
   }
   void checkParentAccess(
-      FSPermissionChecker pc, String path, FsAction access)
-      throws AccessControlException, UnresolvedLinkException, IOException {
-    checkPermission(pc, path, false, null, access, null, null);
+      FSPermissionChecker pc, INodesInPath iip, FsAction access)
+      throws AccessControlException, IOException {
+    checkPermission(pc, iip, false, null, access, null, null);
   }
 
   void checkAncestorAccess(
-      FSPermissionChecker pc, String path, FsAction access)
-      throws AccessControlException, UnresolvedLinkException, IOException {
-    checkPermission(pc, path, false, access, null, null, null);
+      FSPermissionChecker pc, INodesInPath iip, FsAction access)
+      throws AccessControlException, IOException {
+    checkPermission(pc, iip, false, access, null, null, null);
   }
 
-  void checkTraverse(FSPermissionChecker pc, String path)
-      throws AccessControlException, UnresolvedLinkException, IOException {
-    checkPermission(pc, path, false, null, null, null, null);
-  }
-
-  /**
-   * Check whether current user have permissions to access the path. For more
-   * details of the parameters, see
-   * {@link FSPermissionChecker#checkPermission}.
-   */
-  private void checkPermission(
-    FSPermissionChecker pc, String path, boolean doCheckOwner,
-    FsAction ancestorAccess, FsAction parentAccess, FsAction access,
-    FsAction subAccess)
-    throws AccessControlException, UnresolvedLinkException, IOException {
-    checkPermission(pc, path, doCheckOwner, ancestorAccess,
-        parentAccess, access, subAccess, false, true);
+  void checkTraverse(FSPermissionChecker pc, INodesInPath iip)
+      throws AccessControlException, IOException {
+    checkPermission(pc, iip, false, null, null, null, null);
   }
 
   /**
@@ -1902,13 +1889,27 @@ public class FSDirectory implements Closeable {
    * {@link FSPermissionChecker#checkPermission}.
    */
   void checkPermission(
-      FSPermissionChecker pc, String path, boolean doCheckOwner,
+    FSPermissionChecker pc, INodesInPath iip, boolean doCheckOwner,
+    FsAction ancestorAccess, FsAction parentAccess, FsAction access,
+    FsAction subAccess)
+    throws AccessControlException, UnresolvedLinkException, IOException {
+    checkPermission(pc, iip, doCheckOwner, ancestorAccess,
+        parentAccess, access, subAccess, false);
+  }
+
+  /**
+   * Check whether current user have permissions to access the path. For more
+   * details of the parameters, see
+   * {@link FSPermissionChecker#checkPermission}.
+   */
+  void checkPermission(
+      FSPermissionChecker pc, INodesInPath iip, boolean doCheckOwner,
       FsAction ancestorAccess, FsAction parentAccess, FsAction access,
-      FsAction subAccess, boolean ignoreEmptyDir, boolean resolveLink)
+      FsAction subAccess, boolean ignoreEmptyDir)
       throws AccessControlException, UnresolvedLinkException, TransactionContextException, IOException {
     if (!pc.isSuperUser()) {
-      pc.checkPermission(path, this, doCheckOwner, ancestorAccess,
-          parentAccess, access, subAccess, ignoreEmptyDir, resolveLink);
+      pc.checkPermission(iip, doCheckOwner, ancestorAccess,
+          parentAccess, access, subAccess, ignoreEmptyDir);
     }
   }
   
@@ -1921,12 +1922,12 @@ public class FSDirectory implements Closeable {
   /**
    * Verify that parent directory of src exists.
    */
-  void verifyParentDir(String src)
+  void verifyParentDir(INodesInPath iip, String src)
       throws FileNotFoundException, ParentNotDirectoryException,
-             UnresolvedLinkException, StorageException, TransactionContextException {
+             StorageException, TransactionContextException {
     Path parent = new Path(src).getParent();
     if (parent != null) {
-      final INode parentNode = getINode(parent.toString());
+      final INode parentNode = iip.getINode(-2);
       if (parentNode == null) {
         throw new FileNotFoundException("Parent directory doesn't exist: "
             + parent);

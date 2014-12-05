@@ -78,18 +78,18 @@ class FSDirMkdirOp {
       @Override
       public Object performTask() throws IOException {
         FSPermissionChecker pc = fsd.getPermissionChecker();
-
+        INodesInPath iip = fsd.getINodesInPath4Write(src);
         if (fsd.isPermissionEnabled()) {
-          fsd.checkTraverse(pc, src);
+          fsd.checkTraverse(pc, iip);
         }
 
-        if (!isDirMutable(fsd, src)) {
+        if (!isDirMutable(fsd, iip)) {
           if (fsd.isPermissionEnabled()) {
-            fsd.checkAncestorAccess(pc, src, FsAction.WRITE);
+            fsd.checkAncestorAccess(pc, iip, FsAction.WRITE);
           }
 
           if (!createParent) {
-            fsd.verifyParentDir(src);
+            fsd.verifyParentDir(iip, src);
           }
 
           // validate that we have enough inodes. This is, at best, a
@@ -222,11 +222,10 @@ class FSDirMkdirOp {
   /**
    * Check whether the path specifies a directory
    */
-  private static boolean isDirMutable(
-      FSDirectory fsd, String src) throws UnresolvedLinkException, StorageException, TransactionContextException {
-    src = FSDirectory.normalizePath(src);
+  private static boolean isDirMutable(FSDirectory fsd, INodesInPath iip) throws UnresolvedLinkException,
+      StorageException, TransactionContextException {
 
-    INode node = fsd.getINode4Write(src, false);
+    INode node = iip.getLastINode();
     return node != null && node.isDirectory();
 
   }

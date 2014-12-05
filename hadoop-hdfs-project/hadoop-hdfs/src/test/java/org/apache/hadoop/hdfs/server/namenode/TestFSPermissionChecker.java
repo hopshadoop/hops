@@ -482,8 +482,9 @@ public class TestFSPermissionChecker {
       @Override
       public Object performTask() throws IOException {
         FSDirectory dir = cluster.getNamesystem().getFSDirectory();
-        new FSPermissionChecker(SUPERUSER, SUPERGROUP, user).checkPermission(path,
-            dir, false, null, null, access, null, false, true);
+        INodesInPath iip = dir.getINodesInPath(path, true);
+        new FSPermissionChecker(SUPERUSER, SUPERGROUP, user).checkPermission(iip,
+            false, null, null, access, null, false);
         return null;
       }
     }.handle();
@@ -505,8 +506,9 @@ public class TestFSPermissionChecker {
         @Override
         public Object performTask() throws IOException {
           FSDirectory dir = cluster.getNamesystem().getFSDirectory();
-          new FSPermissionChecker(SUPERUSER, SUPERGROUP, user).checkPermission(path,
-              dir, false, null, null, access, null, false, true);
+          INodesInPath iip = dir.getINodesInPath(path, true);
+          new FSPermissionChecker(SUPERUSER, SUPERGROUP, user).checkPermission(iip,
+              false, null, null, access, null, false);
           return null;
         }
       }.handle();

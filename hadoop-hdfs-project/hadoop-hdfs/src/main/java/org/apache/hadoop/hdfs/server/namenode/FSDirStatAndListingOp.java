@@ -97,12 +97,13 @@ class FSDirStatAndListingOp {
       @Override
       public Object performTask() throws IOException {
         FSPermissionChecker pc = fsd.getPermissionChecker();
+        final INodesInPath iip = fsd.getINodesInPath(src, true);
         final boolean isSuperUser = pc.isSuperUser();
         if (fsd.isPermissionEnabled()) {
           if (fsd.isDir(src)) {
-            fsd.checkPathAccess(pc, src, FsAction.READ_EXECUTE);
+            fsd.checkPathAccess(pc, iip, FsAction.READ_EXECUTE);
           } else {
-            fsd.checkTraverse(pc, src);
+            fsd.checkTraverse(pc, iip);
           }
         }
 
@@ -147,13 +148,13 @@ class FSDirStatAndListingOp {
           public Object performTask() throws IOException {
             HdfsFileStatus stat;
             FSPermissionChecker pc = fsd.getPermissionChecker();
-            
-              boolean isSuperUser = true;
-              if (fsd.isPermissionEnabled()) {
-                fsd.checkPermission(pc, src, false, null, null, null, null, false, resolveLink);
-                isSuperUser = pc.isSuperUser();
-              }
-              return getFileInfo(fsd, src, resolveLink, isSuperUser);
+            final INodesInPath iip = fsd.getINodesInPath(src, resolveLink);
+            boolean isSuperUser = true;
+            if (fsd.isPermissionEnabled()) {
+              fsd.checkPermission(pc, iip, false, null, null, null, null, false);
+              isSuperUser = pc.isSuperUser();
+            }
+            return getFileInfo(fsd, src, resolveLink, isSuperUser);
           }
         }.handle();
   }
@@ -180,10 +181,13 @@ class FSDirStatAndListingOp {
       @Override
       public Object performTask() throws IOException {
         FSPermissionChecker pc = fsd.getPermissionChecker();
-          if (fsd.isPermissionEnabled()) {
-            fsd.checkTraverse(pc, src);
-          }
-          return !INodeFile.valueOf(fsd.getINode(src), src).isUnderConstruction();
+        final INodesInPath iip = fsd.getINodesInPath(src, true);
+        if (fsd.isPermissionEnabled()) {
+          fsd.checkTraverse(pc, iip);
+        }
+        INode[] inodes = iip.getINodes();
+        return !INodeFile.valueOf(inodes[inodes.length - 1],
+            src).isUnderConstruction();
       }
     }.handle();    
   }
@@ -431,20 +435,19 @@ class FSDirStatAndListingOp {
 
   private static ContentSummary getContentSummaryInt(
       FSDirectory fsd, String src) throws IOException {
-    
+
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src);
     src = fsd.resolvePath(src, pathComponents, fsd);
     PathInformation pathInfo = fsd.getFSNamesystem().getPathExistingINodesFromDB(src,
-              false, null, null, null, null);
-      if(pathInfo.getPathInodes()[pathInfo.getPathComponents().length-1] == null){
-        throw new FileNotFoundException("File does not exist: " + src);
-      }
-      final INode subtreeRoot = pathInfo.getPathInodes()[pathInfo.getPathComponents().length-1];
-      final INodeAttributes subtreeAttr = pathInfo.getSubtreeRootAttributes();
-      final INodeIdentifier subtreeRootIdentifier = new INodeIdentifier(subtreeRoot.getId(),subtreeRoot.getParentId(),
-          subtreeRoot.getLocalName(),subtreeRoot.getPartitionId());
-      subtreeRootIdentifier.setDepth(((short) (INodeDirectory.ROOT_DIR_DEPTH + pathInfo.getPathComponents().length-1 )));
-
+        false, null, null, null, null);
+    if (pathInfo.getPathInodes()[pathInfo.getPathComponents().length - 1] == null) {
+      throw new FileNotFoundException("File does not exist: " + src);
+    }
+    final INode subtreeRoot = pathInfo.getPathInodes()[pathInfo.getPathComponents().length - 1];
+    final INodeAttributes subtreeAttr = pathInfo.getSubtreeRootAttributes();
+    final INodeIdentifier subtreeRootIdentifier = new INodeIdentifier(subtreeRoot.getId(), subtreeRoot.getParentId(),
+        subtreeRoot.getLocalName(), subtreeRoot.getPartitionId());
+    subtreeRootIdentifier.setDepth(((short) (INodeDirectory.ROOT_DIR_DEPTH + pathInfo.getPathComponents().length - 1)));
 
     //Calcualte subtree root default ACLs to be inherited in the tree.
     List<AclEntry> nearestDefaultsForSubtree = fsd.getFSNamesystem().calculateNearestDefaultAclForSubtree(pathInfo);
@@ -461,7 +464,7 @@ class FSDirStatAndListingOp {
         subtreeAttr == null ? subtreeRoot.getQuotaCounts().get(Quota.NAMESPACE) : subtreeAttr.getQuotaCounts().get(
             Quota.NAMESPACE),
         fileTree.getDiskspaceCount(), subtreeAttr == null ? subtreeRoot
-            .getQuotaCounts().get(Quota.DISKSPACE) : subtreeAttr.getQuotaCounts().get(Quota.DISKSPACE));
+        .getQuotaCounts().get(Quota.DISKSPACE) : subtreeAttr.getQuotaCounts().get(Quota.DISKSPACE));
     fsd.addYieldCount(0);
     return cs;
   }
