@@ -113,6 +113,12 @@ public class FSDirectory implements Closeable {
   private boolean quotaEnabled;
 
   private final boolean isPermissionEnabled;
+  /**
+   * Support for ACLs is controlled by a configuration flag. If the
+   * configuration flag is false, then the NameNode will reject all
+   * ACL-related operations.
+   */
+  private final boolean aclsEnabled;
   private final String fsOwnerShortUserName;
   private final String supergroup;
 
@@ -142,6 +148,10 @@ public class FSDirectory implements Closeable {
     this.supergroup = conf.get(
       DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_KEY,
       DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT);
+    this.aclsEnabled = conf.getBoolean(
+        DFSConfigKeys.DFS_NAMENODE_ACLS_ENABLED_KEY,
+        DFSConfigKeys.DFS_NAMENODE_ACLS_ENABLED_DEFAULT);
+    LOG.info("ACLs enabled? " + aclsEnabled);
     int configuredLimit = conf.getInt(DFSConfigKeys.DFS_LIST_LIMIT,
         DFSConfigKeys.DFS_LIST_LIMIT_DEFAULT);
     this.lsLimit = configuredLimit > 0 ? configuredLimit :
@@ -182,7 +192,10 @@ public class FSDirectory implements Closeable {
   boolean isPermissionEnabled() {
     return isPermissionEnabled;
   }
-  
+  boolean isAclsEnabled() {
+    return aclsEnabled;
+  }
+    
   int getLsLimit() {
     return lsLimit;
   }
@@ -1394,136 +1407,6 @@ public class FSDirectory implements Closeable {
     return addINode(path, symlink)? symlink: null;
   }
 
-  List<AclEntry> modifyAclEntries(String src, List<AclEntry> aclSpec) throws IOException {
-    return unprotectedModifyAclEntries(src, aclSpec);
-  }
-
-  private List<AclEntry> unprotectedModifyAclEntries(String src,
-      List<AclEntry> aclSpec) throws IOException {
-    AclStorage.validateAclSpec(aclSpec);
-    INode inode = getINode(src);
-    if (inode == null){
-      throw new FileNotFoundException();
-    }
-    
-    if (aclSpec.size() == 1 && aclSpec.get(0).getType().equals(AclEntryType.MASK)){
-      //HOPS: We allow setting
-      FsPermission fsPermission = inode.getFsPermission();
-      inode.setPermission(new FsPermission(fsPermission.getUserAction(), aclSpec.get(0).getPermission(), fsPermission
-          .getOtherAction()));
-      return AclStorage.readINodeLogicalAcl(inode);
-    }
-    List<AclEntry> existingAcl;
-    if (AclStorage.hasOwnAcl(inode)){
-      existingAcl = AclStorage.readINodeLogicalAcl(inode);
-    } else {
-      existingAcl = AclStorage.getMinimalAcl(inode);
-    }
-    
-    List<AclEntry> newAcl = AclTransformation.mergeAclEntries(existingAcl,
-      aclSpec);
-    AclStorage.updateINodeAcl(inode, newAcl);
-    return newAcl;
-  }
-
-  List<AclEntry> removeAclEntries(String src, List<AclEntry> aclSpec) throws IOException {
-    return unprotectedRemoveAclEntries(src, aclSpec);
-  }
-
-  private List<AclEntry> unprotectedRemoveAclEntries(String src,
-      List<AclEntry> aclSpec) throws IOException {
-    AclStorage.validateAclSpec(aclSpec);
-  
-    INode inode = getINode(src);
-    if (inode == null){
-      throw new FileNotFoundException();
-    }
-    List<AclEntry> existingAcl;
-    if (AclStorage.hasOwnAcl(inode)){
-      existingAcl = AclStorage.readINodeLogicalAcl(inode);
-    } else {
-      existingAcl = AclStorage.getMinimalAcl(inode);
-    }
-    List<AclEntry> newAcl = AclTransformation.filterAclEntriesByAclSpec(
-      existingAcl, aclSpec);
-    AclStorage.updateINodeAcl(inode, newAcl);
-    return newAcl;
-  }
-
-  List<AclEntry> removeDefaultAcl(String src) throws IOException {
-    return unprotectedRemoveDefaultAcl(src);
-  }
-
-  private List<AclEntry> unprotectedRemoveDefaultAcl(String src)
-      throws IOException {
-    INode inode = getINode(src);
-    if (inode == null){
-      throw new FileNotFoundException();
-    }
-    List<AclEntry> existingAcl;
-    if (AclStorage.hasOwnAcl(inode)){
-      existingAcl = AclStorage.readINodeLogicalAcl(inode);
-    } else {
-      existingAcl = AclStorage.getMinimalAcl(inode);
-    }
-    List<AclEntry> newAcl = AclTransformation.filterDefaultAclEntries(
-      existingAcl);
-    AclStorage.updateINodeAcl(inode, newAcl);
-    return newAcl;
-  }
-
-  void removeAcl(String src) throws IOException {
-    unprotectedRemoveAcl(src);
-  }
-
-  private void unprotectedRemoveAcl(String src) throws IOException {
-    INode inode = getINode(src);
-    if (inode == null){
-      throw new FileNotFoundException();
-    }
-    AclStorage.removeINodeAcl(inode);
-  }
-
-  List<AclEntry> setAcl(String src, List<AclEntry> aclSpec) throws IOException {
-    return unprotectedSetAcl(src, aclSpec);
-  }
-
-  List<AclEntry> unprotectedSetAcl(String src, List<AclEntry> aclSpec)
-      throws IOException {
-    AclStorage.validateAclSpec(aclSpec);
-  
-    // ACL removal is logged to edits as OP_SET_ACL with an empty list.
-    if (aclSpec.isEmpty()) {
-      unprotectedRemoveAcl(src);
-      return AclFeature.EMPTY_ENTRY_LIST;
-    }
-    
-    INode inode = getINode(src);
-    if (inode == null){
-      throw new FileNotFoundException();
-    }
-    List<AclEntry> existingAcl;
-    if (AclStorage.hasOwnAcl(inode)){
-      existingAcl = AclStorage.readINodeLogicalAcl(inode);
-    } else {
-      existingAcl = AclStorage.getMinimalAcl(inode);
-    }
-    List<AclEntry> newAcl = AclTransformation.replaceAclEntries(existingAcl, aclSpec);
-    AclStorage.updateINodeAcl(inode, newAcl);
-    return newAcl;
-  }
-
-  AclStatus getAclStatus(String src) throws IOException {
-    String srcs = normalizePath(src);
-    INode inode = getINode(srcs);
-    
-    List<AclEntry> acl = AclStorage.readINodeAcl(inode);
-    return new AclStatus.Builder()
-        .owner(inode.getUserName()).group(inode.getGroupName())
-        .stickyBit(inode.getFsPermission().getStickyBit())
-        .addEntries(acl).build();
-  }
-
   /**
    * Caches frequently used file names to reuse file name objects and
    * reduce heap size.
@@ -1540,7 +1423,6 @@ public class FSDirectory implements Closeable {
       inode.setLocalName(name.getBytes());
     }
   }
-  
 
   /**
    * Given an INode get all the path complents leading to it from the root.
@@ -1737,10 +1619,20 @@ public class FSDirectory implements Closeable {
         };
     return (INode) getInodeHandler.handle();
   }
+  
+  static INode resolveLastINode(String src, INodesInPath iip)
+      throws FileNotFoundException {
+    INode[] inodes = iip.getINodes();
+    INode inode = inodes[inodes.length - 1];
+    if (inode == null) {
+      throw new FileNotFoundException("cannot find " + src);
+    }
+    return inode;
+  }
 
   /** @return the {@link INodesInPath} containing only the last inode. */
-  private INodesInPath getLastINodeInPath(String path, boolean resolveLink
-  ) throws UnresolvedLinkException, StorageException, TransactionContextException {
+  INodesInPath getLastINodeInPath(String path, boolean resolveLink) throws UnresolvedLinkException, StorageException,
+      TransactionContextException {
     return INodesInPath.resolve(getRootDir(), INode.getPathComponents(path), 1,
             resolveLink);
   }

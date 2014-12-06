@@ -227,38 +227,6 @@ final class AclStorage {
   }
 
   /**
-   * Completely removes the ACL from an inode.
-   *
-   * @param inode INode to update
-   * @throws QuotaExceededException if quota limit is exceeded
-   */
-  public static void removeINodeAcl(INode inode)
-      throws QuotaExceededException, TransactionContextException, StorageException, AclException {
-    if (!(inode.getNumAces() > 0)){
-      return;
-    }
-
-    AclFeature f = inode.getAclFeature();
-    FsPermission perm = inode.getFsPermission();
-    List<AclEntry> featureEntries = f.getEntries();
-    if (featureEntries.get(0).getScope() == AclEntryScope.ACCESS) {
-      // Restore group permissions from the feature's entry to permission
-      // bits, overwriting the mask, which is not part of a minimal ACL.
-      AclEntry groupEntryKey = new AclEntry.Builder()
-          .setScope(AclEntryScope.ACCESS).setType(AclEntryType.GROUP).build();
-      int groupEntryIndex = Collections.binarySearch(featureEntries,
-          groupEntryKey, AclTransformation.ACL_ENTRY_COMPARATOR);
-      assert groupEntryIndex >= 0;
-      FsAction groupPerm = featureEntries.get(groupEntryIndex).getPermission();
-      FsPermission newPerm = new FsPermission(perm.getUserAction(), groupPerm,
-          perm.getOtherAction(), perm.getStickyBit());
-      inode.setPermission(newPerm);//, snapshotId);
-    }
-
-    inode.removeAclFeature();//snapshotId);
-  }
-
-  /**
    * Updates an inode with a new ACL.  This method takes a full logical ACL and
    * stores the entries to the inode's {@link FsPermission} and
    * {@link AclFeature}.
