@@ -24,11 +24,13 @@ import io.hops.metadata.common.FinderType;
 import io.hops.metadata.hdfs.dal.AceDataAccess;
 import io.hops.metadata.hdfs.entity.Ace;
 import io.hops.transaction.lock.TransactionLocks;
+import java.util.ArrayList;
 
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.swing.text.html.parser.Entity;
 
 public class AcesContext
     extends BaseEntityContext<Ace.PrimaryKey, Ace> {
@@ -81,5 +83,16 @@ public class AcesContext
   @Override
   Ace.PrimaryKey getKey(Ace ace) {
     return new Ace.PrimaryKey(ace.getInodeId(), ace.getIndex());
+  }
+  
+  @Override
+  public void update(Ace ace) throws TransactionContextException {
+    super.update(ace);
+    List<Ace> aces = inodeAces.get(ace.getInodeId());
+    if(aces==null){
+      aces = new ArrayList<>();
+      inodeAces.put(ace.getInodeId(), aces);
+    }
+    aces.add(ace);
   }
 }

@@ -8380,219 +8380,77 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     }.handle();
   }
 
-
-  void modifyAclEntries(final String srcArg, final List<AclEntry> aclSpec) throws IOException {
-    aclConfigFlag.checkForApiCall();
-    if(isInSafeMode()){
-      throw new SafeModeException("Cannot modify acl entries " + srcArg, safeMode());
-    }
-    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = dir.resolvePath(srcArg, pathComponents, dir);
-    new HopsTransactionalRequestHandler(HDFSOperationType.MODIFY_ACL_ENTRIES) {
-      @Override
-      public void acquireLock(TransactionLocks locks) throws IOException {
-        LockFactory lf = LockFactory.getInstance();
-        INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, src)
-                .setNameNodeID(nameNode.getId())
-                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
-                .skipReadingQuotaAttr(false);
-        locks.add(il);
-        locks.add(lf.getAcesLock());
-      }
-
-      @Override
-      public Object performTask() throws IOException {
-        try {
-          FSPermissionChecker pc = getPermissionChecker();
-          if (isPermissionEnabled) {
-            final INodesInPath iip = dir.getINodesInPath4Write(src);
-            dir.checkOwner(pc, iip);
-          }
-          dir.modifyAclEntries(src, aclSpec);
-        } catch (AccessControlException e) {
-          logAuditEvent(false, "modifyAclEntries", srcArg);
-          throw e;
-        }
-        return null;
-      }
-    }.handle();
+  void modifyAclEntries(final String src, List<AclEntry> aclSpec)
+      throws IOException {
+    HdfsFileStatus auditStat = null;
+    try {
+      checkNameNodeSafeMode("Cannot modify ACL entries on " + src);
+      auditStat = FSDirAclOp.modifyAclEntries(dir, src, aclSpec);
+    } catch (AccessControlException e) {
+      logAuditEvent(false, "modifyAclEntries", src);
+      throw e;
+    } 
+    logAuditEvent(true, "modifyAclEntries", src, null, auditStat);
   }
 
-  void removeAclEntries(final String srcArg, final List<AclEntry> aclSpec) throws IOException {
-    aclConfigFlag.checkForApiCall();
-    if(isInSafeMode()){
-      throw new SafeModeException("Cannot remove acl entries " + srcArg, safeMode());
-    }
-    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = dir.resolvePath(srcArg, pathComponents, dir);
-    new HopsTransactionalRequestHandler(HDFSOperationType.REMOVE_ACL_ENTRIES) {
-
-      @Override
-      public void acquireLock(TransactionLocks locks) throws IOException {
-        LockFactory lf = LockFactory.getInstance();
-        INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, src)
-                .setNameNodeID(nameNode.getId())
-                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
-                .skipReadingQuotaAttr(true);
-        locks.add(il);
-        locks.add(lf.getAcesLock());
-      }
-      @Override
-      public Object performTask() throws IOException {
-        try {
-          FSPermissionChecker pc = getPermissionChecker();
-          final INodesInPath iip = dir.getINodesInPath4Write(src);
-          dir.checkOwner(pc, iip);
-          dir.removeAclEntries(src, aclSpec);
-        } catch (AccessControlException e) {
-          logAuditEvent(false, "removeAclEntries", srcArg);
-          throw e;
-        }
-        return null;
-      }
-    }.handle();
+  void removeAclEntries(final String src, List<AclEntry> aclSpec)
+      throws IOException {
+    HdfsFileStatus auditStat = null;
+    try {
+      checkNameNodeSafeMode("Cannot remove ACL entries on " + src);
+      auditStat = FSDirAclOp.removeAclEntries(dir, src, aclSpec);
+    } catch (AccessControlException e) {
+      logAuditEvent(false, "removeAclEntries", src);
+      throw e;
+    } 
+    logAuditEvent(true, "removeAclEntries", src, null, auditStat);
   }
 
-  void removeDefaultAcl(final String srcArg) throws IOException {
-    aclConfigFlag.checkForApiCall();
-    if(isInSafeMode()){
-      throw new SafeModeException("Cannot remove default acl " + srcArg, safeMode());
-    }
-    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = dir.resolvePath(srcArg, pathComponents, dir);
-    new HopsTransactionalRequestHandler(HDFSOperationType.REMOVE_DEFAULT_ACL) {
-
-      @Override
-      public void acquireLock(TransactionLocks locks) throws IOException {
-        LockFactory lf = LockFactory.getInstance();
-        INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, src)
-                .setNameNodeID(nameNode.getId())
-                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
-                .skipReadingQuotaAttr(true);
-        locks.add(il);
-        locks.add(lf.getAcesLock());
-      }
-      @Override
-      public Object performTask() throws IOException {
-        try {
-          FSPermissionChecker pc = getPermissionChecker();
-          final INodesInPath iip = dir.getINodesInPath4Write(src);
-          dir.checkOwner(pc, iip);
-          dir.removeDefaultAcl(src);
-        } catch (AccessControlException e) {
-          logAuditEvent(false, "removeDefaultAcl", srcArg);
-          throw e;
-        }
-        return null;
-      }
-    }.handle();
+  void removeDefaultAcl(final String src) throws IOException {
+    HdfsFileStatus auditStat = null;
+    try {
+      checkNameNodeSafeMode("Cannot remove default ACL entries on " + src);
+      auditStat = FSDirAclOp.removeDefaultAcl(dir, src);
+    } catch (AccessControlException e) {
+      logAuditEvent(false, "removeDefaultAcl", src);
+      throw e;
+    } 
+    logAuditEvent(true, "removeDefaultAcl", src, null, auditStat);
   }
 
-  void removeAcl(final String srcArg) throws IOException {
-    aclConfigFlag.checkForApiCall();
-    if(isInSafeMode()){
-      throw new SafeModeException("Cannot remove acl " + srcArg, safeMode());
+  void removeAcl(final String src) throws IOException {
+    HdfsFileStatus auditStat = null;
+    try {
+      checkNameNodeSafeMode("Cannot remove ACL on " + src);
+      auditStat = FSDirAclOp.removeAcl(dir, src);
+    } catch (AccessControlException e) {
+      logAuditEvent(false, "removeAcl", src);
+      throw e;
     }
-    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = dir.resolvePath(srcArg, pathComponents, dir);
-    new HopsTransactionalRequestHandler(HDFSOperationType.REMOVE_ACL) {
-
-      @Override
-      public void acquireLock(TransactionLocks locks) throws IOException {
-        LockFactory lf = LockFactory.getInstance();
-        INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, src)
-                .setNameNodeID(nameNode.getId())
-                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
-                .skipReadingQuotaAttr(true);
-        locks.add(il);
-        locks.add(lf.getAcesLock());
-      }
-      @Override
-      public Object performTask() throws IOException {
-        try {
-          FSPermissionChecker pc = getPermissionChecker();
-          final INodesInPath iip = dir.getINodesInPath4Write(src);
-          dir.checkOwner(pc, iip);
-          dir.removeAcl(src);
-        } catch (AccessControlException e) {
-          logAuditEvent(false, "removeAcl", srcArg);
-          throw e;
-        }
-        return null;
-      }
-    }.handle();
+    logAuditEvent(true, "removeAcl", src, null, auditStat);
   }
 
-  void setAcl(final String srcArg, final List<AclEntry> aclSpec) throws IOException {
-    aclConfigFlag.checkForApiCall();
-    if(isInSafeMode()){
-      throw new SafeModeException("Cannot set acl " + srcArg, safeMode());
+  void setAcl(final String src, List<AclEntry> aclSpec) throws IOException {
+    HdfsFileStatus auditStat = null;
+    try {
+      checkNameNodeSafeMode("Cannot set ACL on " + src);
+      auditStat = FSDirAclOp.setAcl(dir, src, aclSpec);
+    } catch (AccessControlException e) {
+      logAuditEvent(false, "setAcl", src);
+      throw e;
     }
-    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = dir.resolvePath(srcArg, pathComponents, dir);
-    new HopsTransactionalRequestHandler(HDFSOperationType.SET_ACL) {
-      @Override
-      public void acquireLock(TransactionLocks locks) throws IOException {
-        LockFactory lf = LockFactory.getInstance();
-        INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, src)
-                .setNameNodeID(nameNode.getId())
-                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
-                .skipReadingQuotaAttr(true);
-        locks.add(il);
-        locks.add(lf.getAcesLock());
-      }
-
-      @Override
-      public Object performTask() throws IOException {
-        try {
-          FSPermissionChecker pc = getPermissionChecker();
-          final INodesInPath iip = dir.getINodesInPath4Write(src);
-          dir.checkOwner(pc, iip);
-          dir.setAcl(src, aclSpec);
-        } catch (AccessControlException e) {
-          logAuditEvent(false, "setAcl", srcArg);
-          throw e;
-        }
-        return null;
-      }
-    }.handle();
-
+    logAuditEvent(true, "setAcl", src, null, auditStat);
   }
 
-  AclStatus getAclStatus(final String srcArg) throws IOException {
-    aclConfigFlag.checkForApiCall();
-    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = dir.resolvePath(srcArg, pathComponents, dir);
-    return (AclStatus) new HopsTransactionalRequestHandler(HDFSOperationType.GET_ACL_STATUS) {
-
-      @Override
-      public void acquireLock(TransactionLocks locks) throws IOException {
-        LockFactory lf = LockFactory.getInstance();
-        INodeLock il = lf.getINodeLock(INodeLockType.READ, INodeResolveType.PATH, src)
-                .setNameNodeID(nameNode.getId())
-                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
-                .skipReadingQuotaAttr(true);
-        locks.add(il);
-        locks.add(lf.getAcesLock());
-      }
-
-      @Override
-      public Object performTask() throws IOException {
-        boolean success = false;
-        try {
-          FSPermissionChecker pc = getPermissionChecker();
-          INodesInPath iip = dir.getINodesInPath(src, true);
-          if (isPermissionEnabled) {
-            dir.checkPermission(pc, iip, false, null, null, null, null);
-          }
-          final AclStatus ret = dir.getAclStatus(src);
-          success = true;
-          return ret;
-        } finally {
-          logAuditEvent(success, "getAclStatus", src);
-        }
-      }
-    }.handle();
+  AclStatus getAclStatus(String src) throws IOException {
+    boolean success = false;
+    try {
+      final AclStatus ret = FSDirAclOp.getAclStatus(dir, src);
+      success = true;
+      return ret;
+    } finally {
+      logAuditEvent(success, "getAclStatus", src);
+    }
   }
 
   /**
