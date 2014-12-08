@@ -255,9 +255,11 @@ class FSDirAclOp {
         }
         INode inode = FSDirectory.resolveLastINode(src, iip);
         List<AclEntry> acl = AclStorage.readINodeAcl(inode);
+        FsPermission fsPermission = inode.getFsPermission();
         return new AclStatus.Builder()
             .owner(inode.getUserName()).group(inode.getGroupName())
-            .stickyBit(inode.getFsPermission().getStickyBit())
+            .stickyBit(fsPermission.getStickyBit())
+            .setPermission(fsPermission)
             .addEntries(acl).build();
       }
     }.handle();
