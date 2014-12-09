@@ -37,6 +37,7 @@ import java.util.concurrent.atomic.AtomicReference;
 class FsVolumeList {
   private final AtomicReference<FsVolumeImpl[]> volumes =
       new AtomicReference<FsVolumeImpl[]>(new FsVolumeImpl[0]);
+  private Object checkDirsMutex = new Object();
 
   private final VolumeChoosingPolicy<FsVolumeImpl> blockChooser;
   private volatile int numFailedVolumes;
@@ -156,38 +157,39 @@ class FsVolumeList {
    * Calls {@link FsVolumeImpl#checkDirs()} on each volume, removing any
    * volumes from the active list that result in a DiskErrorException.
    * <p/>
-   * This method is synchronized to allow only one instance of checkDirs()
-   * call
+   * Use checkDirsMutext to allow only one instance of checkDirs() call
    *
    * @return list of all the removed volumes.
    */
-  synchronized List<FsVolumeImpl> checkDirs() {
-    ArrayList<FsVolumeImpl> removedVols = null;
+  List<FsVolumeImpl> checkDirs() {
+    synchronized (checkDirsMutex) {
+      ArrayList<FsVolumeImpl> removedVols = null;
 
-    // Make a copy of volumes for performing modification 
-    final List<FsVolumeImpl> volumeList = getVolumes();
+      // Make a copy of volumes for performing modification 
+      final List<FsVolumeImpl> volumeList = getVolumes();
 
-    for (Iterator<FsVolumeImpl> i = volumeList.iterator(); i.hasNext(); ) {
-      final FsVolumeImpl fsv = i.next();
-      try {
-        fsv.checkDirs();
-      } catch (DiskErrorException e) {
-        FsDatasetImpl.LOG.warn("Removing failed volume " + fsv + ": ", e);
-        if (removedVols == null) {
-          removedVols = new ArrayList<>(1);
+      for (Iterator<FsVolumeImpl> i = volumeList.iterator(); i.hasNext();) {
+        final FsVolumeImpl fsv = i.next();
+        try {
+          fsv.checkDirs();
+        } catch (DiskErrorException e) {
+          FsDatasetImpl.LOG.warn("Removing failed volume " + fsv + ": ", e);
+          if (removedVols == null) {
+            removedVols = new ArrayList<>(1);
+          }
+          removedVols.add(fsv);
+          removeVolume(fsv);
+          numFailedVolumes++;
         }
-        removedVols.add(fsv);
-        removeVolume(fsv);
-        numFailedVolumes++;
       }
-    }
 
-    if (removedVols != null && removedVols.size() > 0) {
-      FsDatasetImpl.LOG.warn("Completed checkDirs. Removed " + removedVols.size()
-          + " volumes. Current volumes: " + this);
-    }
+      if (removedVols != null && removedVols.size() > 0) {
+        FsDatasetImpl.LOG.warn("Completed checkDirs. Removed " + removedVols.size()
+            + " volumes. Current volumes: " + this);
+      }
 
-    return removedVols;
+      return removedVols;
+    }
   }
 
   @Override
