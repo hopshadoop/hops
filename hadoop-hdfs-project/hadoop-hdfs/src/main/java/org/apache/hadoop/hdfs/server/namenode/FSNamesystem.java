@@ -1172,8 +1172,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     //remove sto from
     if(isSTO){
       INodesInPath inodesInPath = dir.getINodesInPath(src, false);
-      INode[] nodes = inodesInPath.getINodes();
-      INode inode = nodes[nodes.length - 1];
+      INode inode = inodesInPath.getLastINode();
       if (inode != null && inode.isSTOLocked()) {
         inode.setSubtreeLocked(false);
         EntityManager.update(inode);
@@ -1302,8 +1301,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     logAuditEvent(true, "setOwner", src, null, resultingStat);
     if(isSTO){
       INodesInPath inodesInPath = dir.getINodesInPath(src, false);
-      INode[] nodes = inodesInPath.getINodes();
-      INode inode = nodes[nodes.length - 1];
+      INode inode = inodesInPath.getLastINode();
       if (inode != null && inode.isSTOLocked()) {
         inode.setSubtreeLocked(false);
         EntityManager.update(inode);
@@ -7380,7 +7378,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     try {
       PathInformation pathInfo = getPathExistingINodesFromDB(path,
           false, null, null, null, null);
-      INode lastComp = pathInfo.getPathInodes()[pathInfo.getPathComponents().length-1];
+      INode lastComp = pathInfo.getINodesInPath().getLastINode();
       if(lastComp == null){
         throw new FileNotFoundException("Directory does not exist: " + path);
       }else if(!lastComp.isDirectory()){
@@ -7504,8 +7502,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
     PathInformation pathInfo = this.getPathExistingINodesFromDB(path,
         false, null, FsAction.WRITE, null, null);
-    INode[] pathInodes = pathInfo.getPathInodes();
-    INode pathInode = pathInodes[pathInodes.length - 1];
+    INode pathInode = pathInfo.getINodesInPath().getLastINode();
 
     if (pathInode == null) {
       NameNode.stateChangeLog
@@ -7764,8 +7761,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
               true);
         }
 
-        INode[] nodes = iip.getINodes();
-        INode inode = nodes[nodes.length - 1];
+        INode inode = iip.getLastINode();
 
         if (inode != null && inode.isDirectory() &&
             !inode.isRoot()) { // never lock the fs root
@@ -7869,8 +7865,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       @Override
       public Object performTask() throws IOException {
         INodesInPath inodesInPath = dir.getINodesInPath(path, false);
-        INode[] nodes = inodesInPath.getINodes();
-        INode inode = nodes[nodes.length - 1];
+        INode inode = inodesInPath.getLastINode();
         if (inode != null && inode.isSTOLocked()) {
           inode.setSubtreeLocked(false);
           EntityManager.update(inode);
@@ -8288,8 +8283,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       throws UnresolvedLinkException, StorageException,
       TransactionContextException {
     INodesInPath inodesInPath = dir.getINodesInPath4Write(path);
-    INode[] inodes = inodesInPath.getINodes();
-    return inodes[inodes.length - 1];
+    return inodesInPath.getLastINode();
   }
 
   public boolean isErasureCodingEnabled() {
@@ -8568,10 +8562,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
             boolean isDir = false;
             INode.DirCounts srcCounts = new INode.DirCounts();
-            final INode[] pathInodes = iip.getINodes();
 
             INodeAttributes quotaDirAttributes = null;
-            INode leafInode = pathInodes[pathInodes.length - 1];
+            INode leafInode = iip.getLastINode();
             if(leafInode != null){  // complete path resolved
               if(leafInode instanceof INodeFile ){
                 isDir = false;
@@ -8590,10 +8583,10 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             }
 
             //Get acls
-            List[] acls = new List[pathInodes.length];
-            for (int i = 0; i < pathInodes.length ; i++){
-              if (pathInodes[i] != null){
-                AclFeature aclFeature = INodeAclHelper.getAclFeature(pathInodes[i]);
+            List[] acls = new List[iip.length()];
+            for (int i = 0; i < iip.length() ; i++){
+              if (iip.getINode(i) != null){
+                AclFeature aclFeature = INodeAclHelper.getAclFeature(iip.getINode(i));
                 acls[i] = aclFeature != null ? aclFeature.getEntries() : null;
               }
             }
@@ -8692,8 +8685,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             FSPermissionChecker pc = getPermissionChecker();
             INodesInPath iip = dir.getINodesInPath(src, true);
             try {
-              INode[] inodes = iip.getINodes();
-              if (inodes[inodes.length - 1] == null) {
+              INode inode = iip.getLastINode();
+              if (inode == null) {
                 throw new FileNotFoundException("Path not found");
               }
               if (isPermissionEnabled) {

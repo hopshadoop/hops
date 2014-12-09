@@ -229,9 +229,8 @@ class FSDirConcatOp {
     // do the move
 
     final INodesInPath trgIIP = fsd.getINodesInPath4Write(target, true);
-    final INode[] trgINodes = trgIIP.getINodes();
     final INodeFile trgInode = trgIIP.getLastINode().asFile();
-    INodeDirectory trgParent = trgINodes[trgINodes.length-2].asDirectory();
+    INodeDirectory trgParent = trgIIP.getINode(-2).asDirectory();
 
     final INodeFile [] allSrcInodes = new INodeFile[srcs.length];
     for(int i = 0; i < srcs.length; i++) {
@@ -261,7 +260,7 @@ class FSDirConcatOp {
     trgInode.setModificationTimeForce(timestamp);
     trgParent.setModificationTime(timestamp);
     // update quota on the parent directory ('count' files removed, 0 space)
-    fsd.unprotectedUpdateCount(trgIIP, trgINodes.length - 1, -count, 0);
+    fsd.unprotectedUpdateCount(trgIIP, trgIIP.length() - 1, -count, 0);
     
     EntityManager
         .snapshotMaintenance(HdfsTransactionContextMaintenanceCmds.Concat,

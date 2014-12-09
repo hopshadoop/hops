@@ -197,32 +197,34 @@ class FSPermissionChecker {
     }
     // check if (parentAccess != null) && file exists, then check sb
     // If resolveLink, the check is performed on the link target.
-      final INode[] inodes = inodesInPath.getINodes();
-      int ancestorIndex = inodes.length - 2;
-      for(; ancestorIndex >= 0 && inodes[ancestorIndex] == null;
-          ancestorIndex--);
-      checkTraverse(inodes, ancestorIndex);
+    final int length = inodesInPath.length();
+    final INode last = length > 0 ? inodesInPath.getLastINode() : null;
+    final INode parent = length > 1 ? inodesInPath.getINode(-2) : null;
 
-      final INode last = inodes[inodes.length - 1];
-      if (parentAccess != null && parentAccess.implies(FsAction.WRITE)
-          && inodes.length > 1 && last != null) {
-        checkStickyBit(inodes[inodes.length - 2], last);
-      }
-      if (ancestorAccess != null && inodes.length > 1) {
-        check(inodes, ancestorIndex, ancestorAccess);
-      }
-      if (parentAccess != null && inodes.length > 1) {
-        check(inodes, inodes.length - 2, parentAccess);
-      }
-      if (access != null) {
-        check(last, access);
-      }
-      if (subAccess != null) {
-        checkSubAccess(last, subAccess, ignoreEmptyDir);
-      }
-      if (doCheckOwner) {
-        checkOwner(last);
-      }
+    checkTraverse(inodesInPath);
+
+    if (parentAccess != null && parentAccess.implies(FsAction.WRITE)
+        && length > 1 && last != null) {
+      checkStickyBit(parent, last);
+    }
+    if (ancestorAccess != null && length > 1) {
+      List<INode> inodes = inodesInPath.getReadOnlyINodes();
+      INode ancestor = null;
+      for (int i = inodes.size() - 2; i >= 0 && (ancestor = inodes.get(i)) == null; i--);
+      check(ancestor, ancestorAccess);
+    }
+    if (parentAccess != null && length > 1 && parent != null) {
+      check(parent, parentAccess);
+    }
+    if (access != null) {
+      check(last, access);
+    }
+    if (subAccess != null) {
+      checkSubAccess(last, subAccess, ignoreEmptyDir);
+    }
+    if (doCheckOwner) {
+      checkOwner(last);
+    }
   }
 
   void checkPermission(INode subtreeRoot, boolean doCheckOwner, FsAction access, FsAction subAccess,
@@ -261,10 +263,15 @@ class FSPermissionChecker {
   /**
    * Guarded by {@link FSNamesystem#readLock()}
    */
-  private void checkTraverse(INode[] inodes, int last)
+  private void checkTraverse(INodesInPath iip)
       throws IOException {
-    for (int j = 0; j <= last; j++) {
-      check(inodes[j], FsAction.EXECUTE);
+    List<INode> inodes = iip.getReadOnlyINodes();
+    for (int i = 0; i < inodes.size() - 1; i++) {
+      INode inode = inodes.get(i);
+      if (inode == null) {
+        break;
+      }
+      check(inode, FsAction.EXECUTE);
     }
   }
 
@@ -291,14 +298,6 @@ class FSPermissionChecker {
         }
       }
     }
-  }
-
-  /**
-   * Guarded by {@link FSNamesystem#readLock()}
-   */
-  private void check(INode[] inodes, int i, FsAction access)
-      throws IOException {
-    check(i >= 0 ? inodes[i] : null, access);
   }
 
   /**

@@ -43,7 +43,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
-import org.apache.hadoop.hdfs.protocol.FSLimitException;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 import org.apache.hadoop.hdfs.server.namenode.INode.BlocksMapUpdateInfo;
@@ -54,12 +53,16 @@ import java.util.AbstractMap;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.FSLimitException;
 
+import static org.apache.hadoop.hdfs.protocol.FSLimitException.MaxDirectoryItemsExceededException;
+import static org.apache.hadoop.hdfs.protocol.FSLimitException.PathComponentTooLongException;
 import static org.apache.hadoop.util.Time.now;
 
 class FSDirRenameOp {
@@ -96,7 +99,7 @@ class FSDirRenameOp {
    * dstInodes[dstInodes.length-1]
    */
   static void verifyQuotaForRename(FSDirectory fsd,
-      INode[] src, INode[] dst, INode.DirCounts srcCounts,
+      INodesInPath src, INodesInPath dst, INode.DirCounts srcCounts,
       INode.DirCounts dstCounts)
       throws QuotaExceededException, StorageException, TransactionContextException {
     if (!fsd.getFSNamesystem().isImageLoaded() || !fsd.isQuotaEnabled()) {
@@ -104,19 +107,19 @@ class FSDirRenameOp {
       return;
     }
     INode commonAncestor = null;
-    for (int i = 0; src[i].equals(dst[i]); i++) {
-      commonAncestor = src[i];
+    for (int i = 0; src.getINode(i).equals(dst.getINode(i)); i++) {
+      commonAncestor = src.getINode(i);
     }
     long nsDelta = srcCounts.getNsCount();
     long dsDelta = srcCounts.getDsCount();
 
     // Reduce the required quota by dst that is being removed
-    INode dstInode = dst[dst.length - 1];
+    INode dstInode = dst.getLastINode();
     if (dstInode != null) {
       nsDelta -= dstCounts.getNsCount();
       dsDelta -= dstCounts.getDsCount();
     }
-    FSDirectory.verifyQuota(dst, dst.length - 1, nsDelta, dsDelta,
+    FSDirectory.verifyQuota(dst, dst.length() - 1, nsDelta, dsDelta,
         commonAncestor);
   }
 
@@ -124,20 +127,18 @@ class FSDirRenameOp {
    * Checks file system limits (max component length and max directory items)
    * during a rename operation.
    */
-  static void verifyFsLimitsForRename(FSDirectory fsd,
-      INodesInPath srcIIP,
+  static void verifyFsLimitsForRename(FSDirectory fsd, INodesInPath srcIIP,
       INodesInPath dstIIP)
       throws FSLimitException.PathComponentTooLongException,
           FSLimitException.MaxDirectoryItemsExceededException,
           StorageException,
           TransactionContextException {
     byte[] dstChildName = dstIIP.getLastLocalName();
-    INode[] dstInodes = dstIIP.getINodes();
-    int pos = dstInodes.length - 1;
-    fsd.verifyMaxComponentLength(dstChildName, dstInodes, pos);
+    final String parentPath = dstIIP.getParentPath();
+    fsd.verifyMaxComponentLength(dstChildName, parentPath);
     // Do not enforce max directory items if renaming within same directory.
     if (!srcIIP.getINode(-2).equals(dstIIP.getINode(-2))) {
-      fsd.verifyMaxDirItems(dstInodes, pos);
+      fsd.verifyMaxDirItems(dstIIP.getINode(-2).asDirectory(), parentPath);
     }
   }
 
@@ -202,8 +203,8 @@ class FSDirRenameOp {
       return false;
     }
 
-    INode srcDataSet = getMetaEnabledParent(srcInfo.getPathInodes());
-    INode dstDataSet = getMetaEnabledParent(dstInfo.getPathInodes());
+    INode srcDataSet = getMetaEnabledParent(srcInfo.getINodesInPath().getReadOnlyINodes());
+    INode dstDataSet = getMetaEnabledParent(dstInfo.getINodesInPath().getReadOnlyINodes());
     Collection<MetadataLogEntry> logEntries = Collections.EMPTY_LIST;
 
     //TODO [S]  if src is a file then there is no need for sub tree locking
@@ -220,11 +221,6 @@ class FSDirRenameOp {
     boolean renameTransactionCommitted = false;
     INodeIdentifier srcSubTreeRoot = null;
 
-    String subTreeLockDst = INode.constructPath(dstInfo.getPathComponents(),
-        0,  dstInfo.getNumExistingComp());
-    if(subTreeLockDst.equals(INodeDirectory.ROOT_NAME)){
-      subTreeLockDst = "/"; // absolute path
-    }
     try {
       if (isUsingSubTreeLocks) {
         LOG.debug("Rename src: "+src+" dst: "+dst+" requires sub-tree locking mechanism");
@@ -336,7 +332,7 @@ class FSDirRenameOp {
 
         // Ensure dst has quota to accommodate rename
         verifyFsLimitsForRename(fsd, srcIIP, dstIIP);
-        verifyQuotaForRename(fsd, srcIIP.getINodes(), dstIIP.getINodes(), srcCounts, dstCounts);
+        verifyQuotaForRename(fsd, srcIIP, dstIIP, srcCounts, dstCounts);
 
         RenameOperation tx = new RenameOperation(fsd, src, dst, srcIIP, dstIIP, srcCounts);
 
@@ -345,7 +341,7 @@ class FSDirRenameOp {
 
         try {
           // remove src
-          srcChild = removeLastINodeForRename(fsd, srcIIP, srcCounts);
+          srcChild = removeLastINodeForRename(fsd, tx.srcIIP, srcCounts);
           if (srcChild == null) {
             NameNode.stateChangeLog.warn(
                 "DIR* FSDirectory.unprotectedRenameTo: " + "failed to rename " + src + " to " + dst
@@ -499,7 +495,7 @@ class FSDirRenameOp {
     PathInformation dstInfo = fsd.getFSNamesystem().getPathExistingINodesFromDB(dst,
         false, FsAction.WRITE, null, null, null);
     INodesInPath dstIIP = dstInfo.getINodesInPath();
-    if (dstIIP.getINodes().length == 1) {
+    if (dstIIP.length() == 1) {
       error = "rename destination cannot be the root";
       NameNode.stateChangeLog.warn("DIR* FSDirectory.unprotectedRenameTo: " +
           error);
@@ -526,8 +522,8 @@ class FSDirRenameOp {
       throw new ParentNotDirectoryException(error);
     }
 
-    INode srcDataSet = getMetaEnabledParent(srcInfo.getPathInodes());
-    INode dstDataSet = getMetaEnabledParent(dstInfo.getPathInodes());
+    INode srcDataSet = getMetaEnabledParent(srcInfo.getINodesInPath().getReadOnlyINodes());
+    INode dstDataSet = getMetaEnabledParent(dstInfo.getINodesInPath().getReadOnlyINodes());
     Collection<MetadataLogEntry> logEntries = Collections.EMPTY_LIST;
 
     //--
@@ -544,11 +540,6 @@ class FSDirRenameOp {
     boolean isUsingSubTreeLocks = srcInfo.isDir();
     boolean renameTransactionCommitted = false;
     INodeIdentifier srcSubTreeRoot = null;
-    String subTreeLockDst = INode.constructPath(dstInfo.getPathComponents(),
-        0, dstInfo.getNumExistingComp());
-    if(subTreeLockDst.equals(INodeDirectory.ROOT_NAME)){
-      subTreeLockDst = "/"; // absolute path
-    }
     try {
       if (isUsingSubTreeLocks) {
         LOG.debug("Rename src: " + src + " dst: " + dst + " requires sub-tree locking mechanism");
@@ -582,8 +573,7 @@ class FSDirRenameOp {
       }
 
       RenameResult ret = renameToTransaction(fsd, src, srcSubTreeRoot != null?srcSubTreeRoot.getInodeId():0,
-              dst, srcCounts, dstCounts, isUsingSubTreeLocks,
-              subTreeLockDst, logEntries, srcIIP, dstIIP, timestamp, options);
+              dst, srcCounts, dstCounts, isUsingSubTreeLocks, logEntries, srcIIP, dstIIP, timestamp, options);
 
       renameTransactionCommitted = true;
       
@@ -601,7 +591,7 @@ class FSDirRenameOp {
   private 
   static RenameResult renameToTransaction(final FSDirectory fsd, final String src, final long srcINodeID, final String dst,
       final INode.DirCounts srcCounts, final INode.DirCounts dstCounts,
-      final boolean isUsingSubTreeLocks, final String subTreeLockDst,
+      final boolean isUsingSubTreeLocks,
       final Collection<MetadataLogEntry> logEntries, final INodesInPath srcIIP,
       final INodesInPath dstIIP, final long timestamp,
       final Options.Rename... options) throws IOException {
@@ -672,11 +662,9 @@ class FSDirRenameOp {
         for (Options.Rename op : options) {
           if (op == Rename.KEEP_ENCODING_STATUS) {
             INodesInPath srcInodesInPath = fsd.getINodesInPath(src, false);
-            INode[] srcNodes = srcInodesInPath.getINodes();
             INodesInPath dstInodesInPath = fsd.getINodesInPath(dst, false);
-            INode[] dstNodes = dstInodesInPath.getINodes();
-            INode srcNode = srcNodes[srcNodes.length - 1];
-            INode dstNode = dstNodes[dstNodes.length - 1];
+            INode srcNode = srcIIP.getLastINode();
+            INode dstNode = dstIIP.getLastINode();
             EncodingStatus status = EntityManager.find(
                 EncodingStatus.Finder.ByInodeId, dstNode.getId());
             EncodingStatus newStatus = new EncodingStatus(status);
@@ -691,12 +679,12 @@ class FSDirRenameOp {
 
         // Ensure dst has quota to accommodate rename
         verifyFsLimitsForRename(fsd, srcIIP, dstIIP);
-        verifyQuotaForRename(fsd, srcIIP.getINodes(), dstIIP.getINodes(), srcCounts, dstCounts);
+        verifyQuotaForRename(fsd, srcIIP, dstIIP, srcCounts, dstCounts);
 
         RenameOperation tx = new RenameOperation(fsd, src, dst, srcIIP, dstIIP, srcCounts);
 
         boolean undoRemoveSrc = true;
-        INode removedSrc = removeLastINodeForRename(fsd, srcIIP, srcCounts);
+        INode removedSrc = removeLastINodeForRename(fsd, tx.srcIIP, srcCounts);
         if (removedSrc == null) {
           String error = "Failed to rename " + src + " to " + dst + " because the source can not be removed";
           NameNode.stateChangeLog
@@ -861,7 +849,7 @@ class FSDirRenameOp {
           + error);
       throw new FileAlreadyExistsException(error);
     }
-    short depth = (short) (INodeDirectory.ROOT_DIR_DEPTH + dstInfo.getPathInodes().length-1);
+    short depth = (short) (INodeDirectory.ROOT_DIR_DEPTH + dstInfo.getINodesInPath().length()-1);
     boolean areChildrenRandomlyPartitioned = INode.isTreeLevelRandomPartitioned(depth);
     if (dstInode.isDirectory() && fsd.hasChildren(dstInode.getId(), areChildrenRandomlyPartitioned)) {
       error = "rename destination directory is not empty: " + dst;
@@ -883,7 +871,7 @@ class FSDirRenameOp {
           + error);
       throw new FileNotFoundException(error);
     }
-    if (srcIIP.getINodes().length == 1) {
+    if (srcIIP.length() == 1) {
       error = "rename source cannot be the root";
       NameNode.stateChangeLog.warn("DIR* FSDirectory.unprotectedRenameTo: "
           + error);
@@ -907,7 +895,6 @@ class FSDirRenameOp {
                     INodesInPath srcIIP, INodesInPath dstIIP, INode.DirCounts srcCounts)
         throws QuotaExceededException, IOException {
       this.fsd = fsd;
-      this.srcIIP = srcIIP;
       this.dstIIP = dstIIP;
       this.src = src;
       this.dst = dst;
@@ -917,6 +904,7 @@ class FSDirRenameOp {
 
       oldSrcCounts = Quota.Counts.newInstance();
       this.srcCounts = srcCounts;
+      this.srcIIP = srcIIP;
     }
 
     boolean addSourceToDestination() throws IOException {
@@ -962,7 +950,7 @@ class FSDirRenameOp {
     }
   }
   
-  private static INode getMetaEnabledParent(INode[] pathComponents) {
+  private static INode getMetaEnabledParent(List<INode> pathComponents) {
     for (INode node : pathComponents) {
       if (node != null && node.isDirectory()) {
         INodeDirectory dir = (INodeDirectory) node;
@@ -977,8 +965,8 @@ class FSDirRenameOp {
   private static boolean shouldLogSubtreeInodes(PathInformation srcInfo,
       PathInformation dstInfo, INode srcDataSet, INode dstDataSet,
       INodeIdentifier srcSubTreeRoot){
-    if(pathIsMetaEnabled(srcInfo.getPathInodes()) || pathIsMetaEnabled(dstInfo
-        .getPathInodes())){
+    if (pathIsMetaEnabled(srcInfo.getINodesInPath().getReadOnlyINodes()) || pathIsMetaEnabled(dstInfo.getINodesInPath().
+        getReadOnlyINodes())) {
       if(srcDataSet == null){
         if(dstDataSet == null){
           //shouldn't happen
@@ -1002,7 +990,7 @@ class FSDirRenameOp {
     return false;
   }
   
-  private static boolean pathIsMetaEnabled(INode[] pathComponents) {
+  private static boolean pathIsMetaEnabled(List<INode> pathComponents) {
     return getMetaEnabledParent(pathComponents) == null ? false : true;
   }
   
@@ -1011,13 +999,10 @@ class FSDirRenameOp {
       throws StorageException, TransactionContextException,
       UnresolvedLinkException {
     if (isUsingSubTreeLocks) {
-      INode[] nodes;
-      INode inode;
       if (!src.equals("/")) {
         EntityManager.remove(new SubTreeOperation(fsd.getFSNamesystem().getSubTreeLockPathPrefix(src)));
         INodesInPath inodesInPath = fsd.getINodesInPath(src, false);
-        nodes = inodesInPath.getINodes();
-        inode = nodes[nodes.length - 1];
+        INode inode = inodesInPath.getLastINode();
         if (inode != null && inode.isSTOLocked()) {
           inode.setSubtreeLocked(false);
           EntityManager.update(inode);
