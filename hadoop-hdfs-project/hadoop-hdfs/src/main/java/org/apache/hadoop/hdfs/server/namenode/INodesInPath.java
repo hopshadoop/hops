@@ -28,6 +28,10 @@ import org.apache.hadoop.hdfs.protocol.UnresolvedPathException;
 import com.google.common.base.Preconditions;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.NoSuchElementException;
 
 /**
  * Contains INodes information resolved from a given path.
@@ -45,7 +49,6 @@ public class INodesInPath {
     }
     final byte[][] path = new byte[depth][];
     final INode[] inodes = new INode[depth];
-    final INodesInPath iip = new INodesInPath(path, depth);
     tmp = inode;
     index = depth;
     while (tmp != null) {
@@ -54,8 +57,7 @@ public class INodesInPath {
       inodes[index] = tmp;
       tmp = tmp.getParent();
     }
-    iip.setINodes(inodes);
-    return iip;
+    return new INodesInPath(inodes, path);
   }
     
   /**
@@ -131,16 +133,17 @@ public class INodesInPath {
     Preconditions.checkArgument(startingDir.compareTo(components[0]) == 0);
 
     INode curNode = startingDir;
-    final INodesInPath existing = new INodesInPath(components, numOfINodes);
     int count = 0;
-    int index = numOfINodes - components.length;
-    if (index > 0) {
-      index = 0;
-    }
+    int index = numOfINodes <= components.length ?
+        numOfINodes - components.length : 0;
+    int inodeNum = 0;
+    int capacity = numOfINodes;
+    INode[] inodes = new INode[numOfINodes];
+    
     while (count < components.length && curNode != null) {
       final boolean lastComp = (count == components.length - 1);
       if (index >= 0) {
-        existing.addNode(curNode);
+        inodes[inodeNum++] = curNode;
       }
       final boolean isDir = curNode.isDirectory();
       final INodeDirectory dir = isDir ? curNode.asDirectory() : null;
@@ -166,63 +169,61 @@ public class INodesInPath {
       count++;
       index++;
     }
-    return existing;
+    return new INodesInPath(inodes, components);
+  }
+
+  /**
+   * Replace an inode of the given INodesInPath in the given position. We do a
+   * deep copy of the INode array.
+   * @param pos the position of the replacement
+   * @param inode the new inode
+   * @return a new INodesInPath instance
+   */
+  public static INodesInPath replace(INodesInPath iip, int pos, INode inode) {
+    Preconditions.checkArgument(iip.length() > 0 && pos > 0 // no for root
+        && pos < iip.length());
+    if (iip.getINode(pos) == null) {
+      Preconditions.checkState(iip.getINode(pos - 1) != null);
+    }
+    INode[] inodes = new INode[iip.inodes.length];
+    System.arraycopy(iip.inodes, 0, inodes, 0, inodes.length);
+    inodes[pos] = inode;
+    return new INodesInPath(inodes, iip.path);
   }
 
   private final byte[][] path;
   /**
    * Array with the specified number of INodes resolved for a given path.
    */
-  private INode[] inodes;
-  /**
-   * Indicate the number of non-null elements in {@link #inodes}
-   */
-  private int numNonNull;
-  /**
-   * The path for a snapshot file/dir contains the .snapshot thus makes the
-   * length of the path components larger the number of inodes. We use
-   * the capacity to control this special case.
-   */
-  private int capacity;
+  private final INode[] inodes;
 
-  private INodesInPath(byte[][] path, int number) {
+  private INodesInPath(INode[] inodes, byte[][] path) {
+    Preconditions.checkArgument(inodes != null && path != null);
+    this.inodes = inodes;
     this.path = path;
-    assert (number >= 0);
-    inodes = new INode[number];
-    capacity = number;
-    numNonNull = 0;
   }
-
-  /**
-   * @return a new array of inodes excluding the null elements introduced by
-   * snapshot path elements. E.g., after resolving path "/dir/.snapshot",
-   * {@link #inodes} is {/, dir, null}, while the returned array only contains
-   * inodes of "/" and "dir". Note the length of the returned array is always
-   * equal to {@link #capacity}.
-   */
-  INode[] getINodes() {
-    if (capacity == inodes.length) {
-      return inodes;
-    }
-
-    INode[] newNodes = new INode[capacity];
-    System.arraycopy(inodes, 0, newNodes, 0, capacity);
-    return newNodes;
-  }
-
+  
   /**
    * @return the i-th inode if i >= 0;
    * otherwise, i < 0, return the (length + i)-th inode.
    */
   public INode getINode(int i) {
-    return inodes[i >= 0 ? i : inodes.length + i];
+    if (inodes == null || inodes.length == 0) {
+      throw new NoSuchElementException("inodes is null or empty");
+    }
+    int index = i >= 0 ? i : inodes.length + i;
+    if (index < inodes.length && index >= 0) {
+      return inodes[index];
+    } else {
+      throw new NoSuchElementException("inodes.length == " + inodes.length);
+    }
   }
 
   /**
    * @return the last inode.
    */
   public INode getLastINode() {
-    return inodes[inodes.length - 1];
+    return getINode(-1);
   }
 
   byte[] getLastLocalName() {
@@ -234,31 +235,20 @@ public class INodesInPath {
     return DFSUtil.byteArray2PathString(path);
   }
   
-  /**
-   * Add an INode at the end of the array
-   */
-  private void addNode(INode node) {
-    inodes[numNonNull++] = node;
+  public String getParentPath() {
+    return getPath(path.length - 1);
   }
 
-  private void setINodes(INode inodes[]) {
-    this.inodes = inodes;
-    this.numNonNull = this.inodes.length;
+  public String getPath(int pos) {
+    return DFSUtil.byteArray2PathString(path, 0, pos);
   }
 
-  void setINode(int i, INode inode) {
-    inodes[i >= 0 ? i : inodes.length + i] = inode;
+  public int length() {
+    return inodes.length;
   }
 
-  void setLastINode(INode last) {
-    inodes[inodes.length - 1] = last;
-  }
-
-  /**
-   * @return The number of non-null elements
-   */
-  int getNumNonNull() {
-    return numNonNull;
+  public List<INode> getReadOnlyINodes() {
+    return Collections.unmodifiableList(Arrays.asList(inodes));
   }
 
   private static String toString(INode inode) {
@@ -294,17 +284,14 @@ public class INodesInPath {
       }
       b.append("], length=").append(inodes.length);
     }
-    b.append("\n  numNonNull = ").append(numNonNull)
-        .append("\n  capacity   = ").append(capacity);
+    
     return b.toString();
   }
 
   void validate() throws StorageException, TransactionContextException {
-    // check parent up to snapshotRootIndex or numNonNull
-    final int n = numNonNull;
     int i = 0;
     if (inodes[i] != null) {
-      for (i++; i < n && inodes[i] != null; i++) {
+      for (i++; i < inodes.length && inodes[i] != null; i++) {
         final INodeDirectory parent_i = inodes[i].getParent();
         final INodeDirectory parent_i_1 = inodes[i - 1].getParent();
         if (parent_i != inodes[i - 1] && (parent_i_1 == null || parent_i != parent_i_1)) {
@@ -316,8 +303,8 @@ public class INodesInPath {
         }
       }
     }
-    if (i != n) {
-      throw new AssertionError("i = " + i + " != " + n
+    if (i != inodes.length) {
+      throw new AssertionError("i = " + i + " != " + inodes.length
           + ", this=" + toString(false));
     }
   }

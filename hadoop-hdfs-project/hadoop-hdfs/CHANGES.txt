@@ -183,6 +183,11 @@ Release 2.7.0 - UNRELEASED
     HDFS-7384. 'getfacl' command and 'getAclStatus' output should be in sync.
     (Vinayakumar B via cnauroth)
 
+    HDFS-7486. Consolidate XAttr-related implementation into a single class.
+    (wheat9)
+
+    HDFS-7498. Simplify the logic in INodesInPath. (jing9)
+
   OPTIMIZATIONS
 
   BUG FIXES

@@ -18,10 +18,6 @@ package org.apache.hadoop.hdfs.server.namenode;
 import java.util.List;
 import org.apache.hadoop.fs.permission.AclEntry;
 
-/**
- *
- * @author gautier
- */
 public class PathInformation {
 
   private String path;
@@ -55,10 +51,6 @@ public class PathInformation {
     return pathComponents;
   }
 
-  public INode[] getPathInodes() {
-    return IIP.getINodes();
-  }
-
   public boolean isDir() {
     return dir;
   }
@@ -69,10 +61,6 @@ public class PathInformation {
 
   public long getDsCount() {
     return dsCount;
-  }
-
-  public int getNumExistingComp() {
-    return IIP.getNumNonNull();
   }
 
   public INodesInPath getINodesInPath(){

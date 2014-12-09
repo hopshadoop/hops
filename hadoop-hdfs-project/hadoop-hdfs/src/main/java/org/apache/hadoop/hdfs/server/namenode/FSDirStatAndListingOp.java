@@ -185,9 +185,7 @@ class FSDirStatAndListingOp {
         if (fsd.isPermissionEnabled()) {
           fsd.checkTraverse(pc, iip);
         }
-        INode[] inodes = iip.getINodes();
-        return !INodeFile.valueOf(inodes[inodes.length - 1],
-            src).isUnderConstruction();
+        return !INodeFile.valueOf(iip.getLastINode(), src).isUnderConstruction();
       }
     }.handle();    
   }
@@ -219,8 +217,7 @@ class FSDirStatAndListingOp {
     String srcs = FSDirectory.normalizePath(src);
 
       final INodesInPath inodesInPath = fsd.getINodesInPath(srcs, true);
-      final INode[] inodes = inodesInPath.getINodes();
-      final INode targetNode = inodes[inodes.length - 1];
+      final INode targetNode = inodesInPath.getLastINode();
       if (targetNode == null)
         return null;
       byte parentStoragePolicy = isSuperUser ?
@@ -285,8 +282,7 @@ class FSDirStatAndListingOp {
     throws IOException {
     String srcs = FSDirectory.normalizePath(src);
       final INodesInPath inodesInPath = fsd.getINodesInPath(srcs, resolveLink);
-      final INode[] inodes = inodesInPath.getINodes();
-      final INode i = inodes[inodes.length - 1];
+      final INode i = inodesInPath.getLastINode();
       byte policyId = includeStoragePolicy && i != null && !i.isSymlink() ?
           i.getStoragePolicyID() : BlockStoragePolicySuite.ID_UNSPECIFIED;
       return i == null ? null : createFileStatus(fsd,
@@ -440,10 +436,10 @@ class FSDirStatAndListingOp {
     src = fsd.resolvePath(src, pathComponents, fsd);
     PathInformation pathInfo = fsd.getFSNamesystem().getPathExistingINodesFromDB(src,
         false, null, null, null, null);
-    if (pathInfo.getPathInodes()[pathInfo.getPathComponents().length - 1] == null) {
+    if (pathInfo.getINodesInPath().getLastINode() == null) {
       throw new FileNotFoundException("File does not exist: " + src);
     }
-    final INode subtreeRoot = pathInfo.getPathInodes()[pathInfo.getPathComponents().length - 1];
+    final INode subtreeRoot = pathInfo.getINodesInPath().getLastINode();
     final INodeAttributes subtreeAttr = pathInfo.getSubtreeRootAttributes();
     final INodeIdentifier subtreeRootIdentifier = new INodeIdentifier(subtreeRoot.getId(), subtreeRoot.getParentId(),
         subtreeRoot.getLocalName(), subtreeRoot.getPartitionId());
