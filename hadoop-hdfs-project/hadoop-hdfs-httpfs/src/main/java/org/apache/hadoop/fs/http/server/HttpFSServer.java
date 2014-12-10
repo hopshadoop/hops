@@ -78,9 +78,8 @@ import java.util.Map;
 
 /**
  * Main class of HttpFSServer server.
- * <p/>
- * The <code>HttpFSServer</code> class uses Jersey JAX-RS to binds HTTP requests
- * to the
+ * <p>
+ * The <code>HttpFSServer</code> class uses Jersey JAX-RS to binds HTTP requests to the
  * different operations.
  */
 @Path(HttpFSFileSystem.SERVICE_VERSION)
@@ -113,9 +112,8 @@ public class HttpFSServer {
    * Returns a filesystem instance. The fileystem instance is wired for release
    * at the completion of
    * the current Servlet request via the {@link FileSystemReleaseFilter}.
-   * <p/>
-   * If a do-as user is specified, the current user must be a valid proxyuser,
-   * otherwise an
+   * <p>
+   * If a do-as user is specified, the current user must be a valid proxyuser, otherwise an
    * <code>AccessControlException</code> will be thrown.
    *
    * @param ugi principal for whom the filesystem instance is.

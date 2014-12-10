@@ -76,21 +76,21 @@ public abstract class ServerWebApp extends Server
   /**
    * Constructor. Subclasses must have a default constructor specifying
    * the server name.
-   * <p/>
+   * <p>
    * The server name is used to resolve the Java System properties that define
    * the server home, config, log and temp directories.
-   * <p/>
+   * <p>
    * The home directory is looked in the Java System property
    * <code>#SERVER_NAME#.home.dir</code>.
-   * <p/>
+   * <p>
    * The config directory is looked in the Java System property
    * <code>#SERVER_NAME#.config.dir</code>, if not defined it resolves to
    * the <code>#SERVER_HOME_DIR#/conf</code> directory.
-   * <p/>
+   * <p>
    * The log directory is looked in the Java System property
    * <code>#SERVER_NAME#.log.dir</code>, if not defined it resolves to
    * the <code>#SERVER_HOME_DIR#/log</code> directory.
-   * <p/>
+   * <p>
    * The temp directory is looked in the Java System property
    * <code>#SERVER_NAME#.temp.dir</code>, if not defined it resolves to
    * the <code>#SERVER_HOME_DIR#/temp</code> directory.
@@ -107,7 +107,7 @@ public abstract class ServerWebApp extends Server
 
   /**
    * Returns the server home directory.
-   * <p/>
+   * <p>
    * It is looked up in the Java System property
    * <code>#SERVER_NAME#.home.dir</code>.
    *
@@ -165,17 +165,16 @@ public abstract class ServerWebApp extends Server
   }
 
   /**
-   * Resolves the host & port InetSocketAddress the web server is listening to.
-   * <p/>
+   * Resolves the host and port InetSocketAddress the web server is listening to.
+   * <p>
    * This implementation looks for the following 2 properties:
    * <ul>
    * <li>#SERVER_NAME#.http.hostname</li>
    * <li>#SERVER_NAME#.http.port</li>
    * </ul>
    *
-   * @return the host & port InetSocketAddress the web server is listening to.
-   * @throws ServerException
-   *     thrown if any of the above 2 properties is not defined.
+   * @return the host and port InetSocketAddress the web server is listening to.
+   * @throws ServerException thrown if any of the above 2 properties is not defined.
    */
   protected InetSocketAddress resolveAuthority() throws ServerException {
     String hostnameKey = getName() + HTTP_HOSTNAME;
@@ -225,7 +224,7 @@ public abstract class ServerWebApp extends Server
 
   /**
    * Sets an alternate hostname:port InetSocketAddress to use.
-   * <p/>
+   * <p>
    * For testing purposes.
    *
    * @param authority
