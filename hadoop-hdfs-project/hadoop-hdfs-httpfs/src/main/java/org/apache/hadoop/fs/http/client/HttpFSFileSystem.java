@@ -67,7 +67,7 @@ import java.util.Map;
 
 /**
  * HttpFSServer implementation of the FileSystemAccess FileSystem.
- * <p/>
+ * <p>
  * This implementation allows a user to access HDFS over HTTP via a HttpFSServer server.
  */
 @InterfaceAudience.Private
@@ -209,7 +209,7 @@ public class HttpFSFileSystem extends FileSystem
   /**
    * Convenience method that creates a <code>HttpURLConnection</code> for the
    * HttpFSServer file system operations.
-   * <p/>
+   * <p>
    * This methods performs and injects any needed authentication credentials
    * via the {@link #getConnection(URL, String)} method
    *
@@ -250,7 +250,7 @@ public class HttpFSFileSystem extends FileSystem
 
   /**
    * Convenience method that creates a <code>HttpURLConnection</code> for the specified URL.
-   * <p/>
+   * <p>
    * This methods performs and injects any needed authentication credentials.
    *
    * @param url url to connect to.
@@ -334,7 +334,7 @@ public class HttpFSFileSystem extends FileSystem
 
   /**
    * HttpFSServer subclass of the <code>FSDataInputStream</code>.
-   * <p/>
+   * <p>
    * This implementation does not support the
    * <code>PositionReadable</code> and <code>Seekable</code> methods.
    */
@@ -377,8 +377,8 @@ public class HttpFSFileSystem extends FileSystem
 
   /**
    * Opens an FSDataInputStream at the indicated Path.
-   * </p>
-   * IMPORTANT: the returned <code><FSDataInputStream/code> does not support the
+   * <p>
+   * IMPORTANT: the returned <code>FSDataInputStream</code> does not support the
    * <code>PositionReadable</code> and <code>Seekable</code> methods.
    *
    * @param f the file name to open
@@ -397,7 +397,7 @@ public class HttpFSFileSystem extends FileSystem
 
   /**
    * HttpFSServer subclass of the <code>FSDataOutputStream</code>.
-   * <p/>
+   * <p>
    * This implementation closes the underlying HTTP connection validating the Http connection status
    * at closing time.
    */
@@ -479,7 +479,7 @@ public class HttpFSFileSystem extends FileSystem
   /**
    * Opens an FSDataOutputStream at the indicated Path with write-progress
    * reporting.
-   * <p/>
+   * <p>
    * IMPORTANT: The <code>Progressable</code> parameter is not used.
    *
    * @param f the file name to open.
@@ -512,7 +512,7 @@ public class HttpFSFileSystem extends FileSystem
 
   /**
    * Append to an existing file (optional operation).
-   * <p/>
+   * <p>
    * IMPORTANT: The <code>Progressable</code> parameter is not used.
    *
    * @param f the existing file to be appended.
@@ -801,7 +801,7 @@ public class HttpFSFileSystem extends FileSystem
    * Modify the ACL entries for a file.
    *
    * @param path Path to modify
-   * @param aclSpec List<AclEntry> describing modifications
+   * @param aclSpec describing modifications
    * @throws IOException
    */
   @Override
@@ -818,7 +818,7 @@ public class HttpFSFileSystem extends FileSystem
   /**
    * Remove the specified ACL entries from a file
    * @param path Path to modify
-   * @param aclSpec List<AclEntry> describing entries to remove
+   * @param aclSpec describing entries to remove
    * @throws IOException
    */
   @Override
@@ -863,7 +863,7 @@ public class HttpFSFileSystem extends FileSystem
   /**
    * Set the ACLs for the given file
    * @param path Path to modify
-   * @param aclSpec List<AclEntry> describing modifications, must include
+   * @param aclSpec describing modifications, must include
    *                entries for user, group, and others for compatibility
    *                with permission bits.
    * @throws IOException

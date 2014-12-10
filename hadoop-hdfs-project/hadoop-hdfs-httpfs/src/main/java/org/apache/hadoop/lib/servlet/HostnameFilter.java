@@ -44,7 +44,7 @@ public class HostnameFilter implements Filter {
 
   /**
    * Initializes the filter.
-   * <p/>
+   * <p>
    * This implementation is a NOP.
    *
    * @param config
@@ -58,7 +58,7 @@ public class HostnameFilter implements Filter {
 
   /**
    * Resolves the requester hostname and delegates the request to the chain.
-   * <p/>
+   * <p>
    * The requester hostname is available via the {@link #get} method.
    *
    * @param request
@@ -108,7 +108,7 @@ public class HostnameFilter implements Filter {
 
   /**
    * Destroys the filter.
-   * <p/>
+   * <p>
    * This implementation is a NOP.
    */
   @Override

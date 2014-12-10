@@ -64,7 +64,7 @@ public class XException extends Exception {
 
   /**
    * Creates an XException using another XException as cause.
-   * <p/>
+   * <p>
    * The error code and error message are extracted from the cause.
    *
    * @param cause
@@ -102,7 +102,7 @@ public class XException extends Exception {
 
   /**
    * Creates a message using a error message template and arguments.
-   * <p/>
+   * <p>
    * The template must be in JDK <code>MessageFormat</code> syntax
    * (using {#} positional parameters).
    *

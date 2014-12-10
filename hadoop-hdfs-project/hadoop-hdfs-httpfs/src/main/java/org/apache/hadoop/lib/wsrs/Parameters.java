@@ -19,11 +19,14 @@ package org.apache.hadoop.lib.wsrs;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 
+import com.google.common.collect.Lists;
+
+import java.util.List;
 import java.util.Map;
 
 /**
  * Class that contains all parsed JAX-RS parameters.
- * <p/>
+ * <p>
  * Instances are created by the {@link ParametersProvider} class.
  */
 @InterfaceAudience.Private
@@ -53,5 +56,26 @@ public class Parameters {
   public <V, T extends Param<V>> V get(String name, Class<T> klass) {
     return ((T) params.get(name)).value();
   }
-  
+
+  /**
+   * Returns the values of a request parsed parameter.
+   *
+   * @param name parameter name.
+   * @param klass class of the parameter, used for value casting.
+   * @return the values of the parameter.
+   */
+  @SuppressWarnings("unchecked")
+  public <V, T extends Param<V>> List<V> getValues(String name, Class<T> klass) {
+    List<Param<?>> multiParams = (List<Param<?>>)params.get(name);
+    List<V> values = Lists.newArrayList();
+    if (multiParams != null) {
+      for (Param<?> param : multiParams) {
+        V value = ((T) param).value();
+        if (value != null) {
+          values.add(value);
+        }
+      }
+    }
+    return values;
+  }
 }
