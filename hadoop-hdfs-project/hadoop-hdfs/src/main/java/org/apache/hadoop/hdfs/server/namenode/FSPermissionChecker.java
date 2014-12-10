@@ -77,7 +77,14 @@ class FSPermissionChecker {
 
   /** @return a string for throwing {@link AccessControlException} */
   private String toAccessControlString(INode inode,
-      FsAction access, FsPermission mode, List<AclEntry> featureEntries) throws IOException {
+      FsAction access, FsPermission mode, List<AclEntry> featureEntries) throws TransactionContextException, IOException {
+    return toAccessControlString(inode, access, mode, featureEntries, false);
+  }
+
+  /** @return a string for throwing {@link AccessControlException} */
+  private String toAccessControlString(INode inode, FsAction access,
+      FsPermission mode, List<AclEntry> featureEntries, boolean deniedFromAcl) throws StorageException,
+      TransactionContextException, IOException {
     StringBuilder sb = new StringBuilder("Permission denied: ")
       .append("user=").append(user).append(", ")
       .append("access=").append(access).append(", ")
@@ -89,11 +96,14 @@ class FSPermissionChecker {
     if (featureEntries != null) {
       sb.append(':').append(StringUtils.join(",", featureEntries));
     }
+    if (deniedFromAcl) {
+      sb.append("+");
+    }
     return sb.toString();
   }
   
   private String toAccessControlString(ProjectedINode inode,
-      FsAction access, FsPermission mode, List<AclEntry> featureEntries) throws IOException {
+      FsAction access, FsPermission mode, List<AclEntry> featureEntries, boolean deniedFromAcl) throws IOException {
     StringBuilder sb = new StringBuilder("Permission denied: ")
         .append("user=").append(user).append(", ")
         .append("access=").append(access).append(", ")
@@ -104,6 +114,9 @@ class FSPermissionChecker {
         .append(mode);
     if (featureEntries != null) {
       sb.append(':').append(StringUtils.join(",", featureEntries));
+    }
+    if (deniedFromAcl) {
+      sb.append("+");
     }
     return sb.toString();
   }
@@ -419,7 +432,7 @@ class FSPermissionChecker {
     }
 
     throw new AccessControlException(
-      toAccessControlString(inode, access, mode, featureEntries));
+      toAccessControlString(inode, access, mode, featureEntries, true));
   }
   
   private void checkAccessAcl(ProjectedINode inode, FsAction access,
@@ -477,7 +490,7 @@ class FSPermissionChecker {
     }
     
     throw new AccessControlException(
-        toAccessControlString(inode, access, mode, featureEntries));
+        toAccessControlString(inode, access, mode, featureEntries, true));
   }
 
   void check(ProjectedINode inode, FsAction access, List<AclEntry> aclEntries) throws IOException {
