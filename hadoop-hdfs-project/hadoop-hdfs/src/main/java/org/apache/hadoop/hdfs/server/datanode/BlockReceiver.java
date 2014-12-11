@@ -18,6 +18,9 @@
 package org.apache.hadoop.hdfs.server.datanode;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
+
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.fs.ChecksumException;
 import org.apache.hadoop.fs.FSOutputSummer;
@@ -48,7 +51,6 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileOutputStream;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
@@ -832,9 +834,8 @@ class BlockReceiver implements Closeable {
               LOG.warn("Failed to delete restart meta file: " +
                   restartMeta.getPath());
             }
-            FileWriter out = null;
-            try {
-              out = new FileWriter(restartMeta);
+            try (Writer out = new OutputStreamWriter(
+                new FileOutputStream(restartMeta), "UTF-8")) {
               // write out the current time.
               out.write(Long.toString(Time.now() + restartBudget));
               out.flush();

@@ -61,8 +61,6 @@ import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.FSLimitException;
 
-import static org.apache.hadoop.hdfs.protocol.FSLimitException.MaxDirectoryItemsExceededException;
-import static org.apache.hadoop.hdfs.protocol.FSLimitException.PathComponentTooLongException;
 import static org.apache.hadoop.util.Time.now;
 
 class FSDirRenameOp {

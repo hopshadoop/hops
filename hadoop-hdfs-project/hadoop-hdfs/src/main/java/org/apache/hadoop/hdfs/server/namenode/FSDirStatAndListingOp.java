@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hdfs.server.namenode;
 
-import com.google.common.base.Preconditions;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
@@ -28,17 +27,15 @@ import io.hops.transaction.lock.LockFactory.BLK;
 import io.hops.transaction.lock.TransactionLockTypes.INodeLockType;
 import io.hops.transaction.lock.TransactionLockTypes.INodeResolveType;
 import io.hops.transaction.lock.TransactionLocks;
+import org.apache.commons.io.Charsets;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.DirectoryListingStartAfterNotFoundException;
-import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.fs.InvalidPathException;
-import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.DirectoryListing;
-import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.HdfsLocatedFileStatus;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
@@ -58,7 +55,7 @@ class FSDirStatAndListingOp {
     throws IOException {
     
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    String startAfterString = new String(startAfterArg);
+    String startAfterString = new String(startAfterArg, Charsets.UTF_8);
     final String src = fsd.resolvePath(srcArg, pathComponents);
 
     // Get file name when startAfter is an INodePath
@@ -246,8 +243,7 @@ class FSDirStatAndListingOp {
             cur.getLocalStoragePolicyID():
             BlockStoragePolicySuite.ID_UNSPECIFIED;
         listing[i] = createFileStatus(fsd, cur.getLocalNameBytes(), cur,
-            needLocation, fsd.getStoragePolicyID(curPolicy,
-                parentStoragePolicy), inodesInPath);
+            needLocation, fsd.getStoragePolicyID(curPolicy, parentStoragePolicy), inodesInPath);
         listingCnt++;
         if (needLocation) {
             // Once we  hit lsLimit locations, stop.

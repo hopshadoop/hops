@@ -1475,11 +1475,6 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
         }
         f = info.getBlockFile();
         v = (FsVolumeImpl) info.getVolume();
-        if (f == null) {
-          errors.add("Failed to delete replica " + invalidBlk +
-              ": File not found, volume=" + v);
-          continue;
-        }
         if (v == null) {
           errors.add("Failed to delete replica " + invalidBlk +
               ". No volume for this replica, file=" + f);
