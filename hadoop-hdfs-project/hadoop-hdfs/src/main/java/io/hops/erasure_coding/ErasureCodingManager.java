@@ -631,7 +631,7 @@ public class ErasureCodingManager extends Configured {
       String path = namesystem.getPath(status.getInodeId(), status.isInTree());
       int replication = namesystem.getFileInfo(path, true).getReplication();
       LocatedBlocks blocks = namesystem.getBlockLocations(path, 0,
-          Long.MAX_VALUE, false, true, true);
+          Long.MAX_VALUE, true, true).blocks;
       if (checkReplication(blocks, replication)) {
         LOG.info("Revocation successful for " + status);
         namesystem.deleteWithTransaction(

@@ -1365,6 +1365,18 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     logAuditEvent(true, "setOwner", src, null, resultingStat);
   }
 
+  public static class GetBlockLocationsResult {
+    final INodesInPath iip;
+    public final LocatedBlocks blocks;
+    boolean updateAccessTime() {
+      return iip != null;
+    }
+    private GetBlockLocationsResult(INodesInPath iip, LocatedBlocks blocks) {
+      this.iip = iip;
+      this.blocks = blocks;
+    }
+  }
+
   /**
    * Get block locations within the specified range.
    *
@@ -1379,125 +1391,122 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     // The lock upgrade exception is thrown when the inode access time stamp is
     // updated while holding shared lock on the inode. In this case retry the operation
     // using an exclusive lock.
-    try{
-      return getBlockLocationsWithLock(clientMachine, src, offset, length, INodeLockType.READ);
-    }catch(LockUpgradeException e){
-      LOG.debug("Encountered LockUpgradeException while reading "+src+". Retrying the operation using exclusive locks");
-      return getBlockLocationsWithLock(clientMachine, src, offset, length, INodeLockType.WRITE);
-    }
-  }
-
-  LocatedBlocks getBlockLocationsWithLock(final String clientMachine, final String src1,
-                                          final long offset, final long length, final INodeLockType lockType) throws IOException {
-    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = dir.resolvePath(src1, pathComponents);
-    HopsTransactionalRequestHandler getBlockLocationsHandler =
-            new HopsTransactionalRequestHandler(
-                    HDFSOperationType.GET_BLOCK_LOCATIONS, src) {
-              @Override
-              public void acquireLock(TransactionLocks locks) throws IOException {
-                LockFactory lf = getInstance();
-                INodeLock il = lf.getINodeLock( lockType, INodeResolveType.PATH, src)
-                        .setNameNodeID(nameNode.getId())
-                        .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
-                        .skipReadingQuotaAttr(!dir.isQuotaEnabled());
-                locks.add(il).add(lf.getBlockLock())
-                        .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UC, BLK.CA));
-                locks.add(lf.getAcesLock());
-              }
-
-          @Override
-          public Object performTask() throws IOException {
-            LocatedBlocks blocks =
-                getBlockLocationsInternal(src, offset, length, true, true,
-                    true);
-            if (blocks != null && !blocks
-                .hasPhantomBlock()) { // no need to sort phantom datanodes
-              blockManager.getDatanodeManager()
-                  .sortLocatedBlocks(clientMachine, blocks.getLocatedBlocks());
-
-             // lastBlock is not part of getLocatedBlocks(), might need to sort it too
-              LocatedBlock lastBlock = blocks.getLastLocatedBlock();
-              if (lastBlock != null) {
-                ArrayList<LocatedBlock> lastBlockList = Lists.newArrayListWithCapacity(1);
-                lastBlockList.add(lastBlock);
-                blockManager.getDatanodeManager()
-                    .sortLocatedBlocks(clientMachine, lastBlockList);
-                  }
-                }
-                return blocks;
-              }
-            };
-    LocatedBlocks locatedBlocks = (LocatedBlocks) getBlockLocationsHandler.handle(this);
-    logAuditEvent(true, "open", src);
-    return locatedBlocks;
-  }
-
-  /**
-   * Get block locations within the specified range.
-   *
-   * @throws FileNotFoundException,
-   *     UnresolvedLinkException, IOException
-   * @see ClientProtocol#getBlockLocations(String, long, long)
-   */
-  public LocatedBlocks getBlockLocations(final String src1, final long offset,
-      final long length, final boolean doAccessTime,
-      final boolean needBlockToken, final boolean checkSafeMode)
-      throws IOException {
-    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = dir.resolvePath(src1, pathComponents, dir);
-    HopsTransactionalRequestHandler getBlockLocationsHandler =
-        new HopsTransactionalRequestHandler(
-            HDFSOperationType.GET_BLOCK_LOCATIONS, src) {
-          @Override
-          public void acquireLock(TransactionLocks locks) throws IOException {
-            LockFactory lf = getInstance();
-            INodeLock il = lf.getINodeLock(INodeLockType.READ, INodeResolveType.PATH, src)
-                    .setNameNodeID(nameNode.getId())
-                    .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
-            locks.add(il).add(lf.getBlockLock())
-                .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UC, BLK.CA));
-          }
-
-          @Override
-          public Object performTask() throws IOException {
-            return getBlockLocationsInternal(src, offset, length, doAccessTime,
-                needBlockToken, checkSafeMode);
-          }
-        };
-    return (LocatedBlocks) getBlockLocationsHandler.handle(this);
-  }
-
-  /**
-   * Get block locations within the specified range.
-   *
-   * @throws FileNotFoundException,
-   *     UnresolvedLinkException, IOException
-   * @see ClientProtocol#getBlockLocations(String, long, long)
-   */
-  private LocatedBlocks getBlockLocationsInternal(String src, long offset,
-      long length,
-      boolean doAccessTime, boolean needBlockToken, boolean checkSafeMode)
-      throws IOException {
-    FSPermissionChecker pc = getPermissionChecker();
+    LocatedBlocks result = null;
     try {
-      return getBlockLocationsInt(pc, src, offset, length, doAccessTime,
-          needBlockToken, checkSafeMode);
+      try {
+        result = getBlockLocationsWithLock(clientMachine, src, offset, length, INodeLockType.READ);
+      } catch (LockUpgradeException e) {
+        LOG.debug("Encountered LockUpgradeException while reading " + src
+            + ". Retrying the operation using exclusive locks");
+        result = getBlockLocationsWithLock(clientMachine, src, offset, length, INodeLockType.WRITE);
+      }
     } catch (AccessControlException e) {
       logAuditEvent(false, "open", src);
       throw e;
     }
+    logAuditEvent(true, "open", src);
+    return result;
   }
 
+  LocatedBlocks getBlockLocationsWithLock(final String clientMachine, final String srcArg,
+      final long offset, final long length, final INodeLockType lockType) throws IOException {
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
+    final String src = dir.resolvePath(srcArg, pathComponents);
+    HopsTransactionalRequestHandler getBlockLocationsHandler = new HopsTransactionalRequestHandler(
+        HDFSOperationType.GET_BLOCK_LOCATIONS, src) {
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = getInstance();
+        INodeLock il = lf.getINodeLock(lockType, INodeResolveType.PATH, src)
+            .setNameNodeID(nameNode.getId())
+            .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
+            .skipReadingQuotaAttr(!dir.isQuotaEnabled());
+        locks.add(il).add(lf.getBlockLock())
+            .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UC, BLK.CA));
+        locks.add(lf.getAcesLock());
+      }
 
-  private LocatedBlocks getBlockLocationsInt(FSPermissionChecker pc, String src,
-      long offset, long length, boolean doAccessTime, boolean needBlockToken,
-      boolean checkSafeMode)
+      @Override
+      public Object performTask() throws IOException {
+        GetBlockLocationsResult res = null;
+        
+        res = getBlockLocationsInt(src, offset, length, true, true);
+
+        if (res == null) {
+          return null;
+        }
+
+        if (res.updateAccessTime()) {
+          final long now = now();
+          try {
+            INode inode = res.iip.getLastINode();
+            boolean updateAccessTime = now > inode.getAccessTime() + getAccessTimePrecision();
+            if (!isInSafeMode() && updateAccessTime) {
+              boolean changed = dir.setTimes(
+                  inode, -1, now, false);
+            }
+          } catch (Throwable e) {
+            LOG.warn("Failed to update the access time of " + src, e);
+          }
+        }
+
+        LocatedBlocks blocks = res.blocks;
+
+        if (blocks != null && !blocks
+            .hasPhantomBlock()) { // no need to sort phantom datanodes
+          blockManager.getDatanodeManager()
+              .sortLocatedBlocks(clientMachine, blocks.getLocatedBlocks());
+
+          // lastBlock is not part of getLocatedBlocks(), might need to sort it too
+          LocatedBlock lastBlock = blocks.getLastLocatedBlock();
+          if (lastBlock != null) {
+            ArrayList<LocatedBlock> lastBlockList = Lists.newArrayList(lastBlock);
+            blockManager.getDatanodeManager().sortLocatedBlocks(
+                clientMachine, lastBlockList);
+          }
+        }
+        return blocks;
+      }
+    };
+
+    return (LocatedBlocks) getBlockLocationsHandler.handle(this);
+
+  }
+
+  /**
+   * Get block locations within the specified range.
+   *
+   * @throws IOException
+   * @see ClientProtocol#getBlockLocations(String, long, long)
+   */
+  public GetBlockLocationsResult getBlockLocations(final String srcArg, final long offset,
+      final long length, final boolean needBlockToken, final boolean checkSafeMode)
       throws IOException {
-    final INodesInPath iip = dir.getINodesInPath(src, true);
-    if (isPermissionEnabled) {
-      dir.checkPathAccess(pc, iip, FsAction.READ);
-    }
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
+    final String src = dir.resolvePath(srcArg, pathComponents, dir);
+    HopsTransactionalRequestHandler getBlockLocationsHandler = new HopsTransactionalRequestHandler(
+        HDFSOperationType.GET_BLOCK_LOCATIONS, src) {
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = getInstance();
+        INodeLock il = lf.getINodeLock(INodeLockType.READ, INodeResolveType.PATH, src)
+            .setNameNodeID(nameNode.getId())
+            .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+        locks.add(il).add(lf.getBlockLock())
+            .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UC, BLK.CA));
+      }
+
+      @Override
+      public Object performTask() throws IOException {
+        return getBlockLocationsInt(src, offset, length, needBlockToken, checkSafeMode);
+      }
+    };
+    return (GetBlockLocationsResult) getBlockLocationsHandler.handle(this);
+  }
+  
+  private GetBlockLocationsResult getBlockLocationsInt(final String src, final long offset,
+      final long length, final boolean needBlockToken, final boolean checkSafeMode)
+      throws IOException {
 
     if (offset < 0) {
       throw new HadoopIllegalArgumentException(
@@ -1508,17 +1517,17 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           "Negative length is not supported. File: " + src);
     }
 
-    LocatedBlocks ret;
+    GetBlockLocationsResult ret;
     final INodeFile inodeFile = INodeFile.valueOf(dir.getINode(src), src);
     if (inodeFile.isFileStoredInDB()) {
       LOG.debug("SMALL_FILE The file is stored in the database. Returning Phantom Blocks");
-      ret = getPhantomBlockLocationsUpdateTimes(src, offset, length, doAccessTime, needBlockToken);
+      ret = getPhantomBlockLocationsUpdateTimes(src, needBlockToken);
     } else {
-      ret = getBlockLocationsUpdateTimes(src, offset, length, doAccessTime, needBlockToken);
+      ret = getBlockLocationsInt(src, offset, length, needBlockToken);
     }
 
     if (checkSafeMode && isInSafeMode()) {
-      for (LocatedBlock b : ret.getLocatedBlocks()) {
+      for (LocatedBlock b : ret.blocks.getLocatedBlocks()) {
         // if safe mode & no block locations yet then throw SafeModeException
         if ((b.getLocations() == null) || (b.getLocations().length == 0)) {
           SafeModeException se = new SafeModeException(
@@ -1535,61 +1544,60 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    * access times if necessary.
    */
 
-  private LocatedBlocks getPhantomBlockLocationsUpdateTimes(String src,
-      long offset, long length, boolean doAccessTime, boolean needBlockToken)
-      throws IOException {
-    for (int attempt = 0; attempt < 2; attempt++) {
-      // if the namenode is in safe mode, then do not update access time
-      if (isInSafeMode()) {
-        doAccessTime = false;
-      }
+  private GetBlockLocationsResult getPhantomBlockLocationsUpdateTimes(String src, boolean needBlockToken) throws
+      IOException {
+    
+    FSPermissionChecker pc = getPermissionChecker();
 
-      long now = now();
-      final INodeFile inode = INodeFile.valueOf(dir.getINode(src), src);
-      if (doAccessTime && isAccessTimeSupported()) {
-        if (now <= inode.getAccessTime() + getAccessTimePrecision()) {
-          // if we have to set access time but we only have a read lock, then
-          // restart this entire operation with the writeLock.
-          if (attempt == 0) {
-            continue;
-          }
-        }
-        dir.setTimes(inode, -1, now, false);
-      }
+    final INodesInPath iip = dir.getINodesInPath(src, true);
+    final INodeFile inode = INodeFile.valueOf(iip.getLastINode(), src);
 
-      return blockManager
+    if (isPermissionEnabled) {
+      dir.checkPathAccess(pc, iip, FsAction.READ);
+    }
+    
+    final LocatedBlocks blocks = blockManager
           .createPhantomLocatedBlocks(inode, inode.getFileDataInDB(),
               inode.isUnderConstruction(), needBlockToken);
-    }
-    return null; // can never reach here
+    
+    final long now = now();
+    boolean updateAccessTime = isAccessTimeSupported() && !isInSafeMode()
+        && now > inode.getAccessTime() + getAccessTimePrecision();
+    return new GetBlockLocationsResult(updateAccessTime ? iip : null, blocks);
+    
   }
 
   /*
    * Get block locations within the specified range, updating the
    * access times if necessary.
    */
-  private LocatedBlocks getBlockLocationsUpdateTimes(String src, long offset,
-      long length, boolean doAccessTime, boolean needBlockToken)
+  private GetBlockLocationsResult getBlockLocationsInt(String src, long offset,
+      long length, boolean needBlockToken)
       throws IOException {
-      // if the namenode is in safe mode, then do not update access time
-      if (isInSafeMode()) {
-        doAccessTime = false;
-      }
-      long now = now();
-      final INodeFile inode = INodeFile.valueOf(dir.getINode(src), src);
-      if (doAccessTime && isAccessTimeSupported()) {
-        dir.setTimes(inode, -1, now, false);
-      }
-      final long fileSize = inode.computeFileSizeNotIncludingLastUcBlock();
-      boolean isUc = inode.isUnderConstruction();
+    FSPermissionChecker pc = getPermissionChecker();
 
-    LocatedBlocks blocks = blockManager.createLocatedBlocks(inode.getBlocks(), fileSize,
-        isUc, offset, length, needBlockToken);
+    final INodesInPath iip = dir.getINodesInPath(src, true);
+    final INodeFile inode = INodeFile.valueOf(iip.getLastINode(), src);
+
+    if (isPermissionEnabled) {
+      dir.checkPathAccess(pc, iip, FsAction.READ);
+    }
+
+    final long fileSize = inode.computeFileSizeNotIncludingLastUcBlock();
+    boolean isUc = inode.isUnderConstruction();
+
+    final LocatedBlocks blocks = blockManager.createLocatedBlocks(
+        inode.getBlocks(), fileSize, isUc, offset, length, needBlockToken);
+
     // Set caching information for the located blocks.
     for (LocatedBlock lb : blocks.getLocatedBlocks()) {
       cacheManager.setCachedLocations(lb, inode.getId());
     }
-    return blocks;      
+
+    final long now = now();
+    boolean updateAccessTime = isAccessTimeSupported() && !isInSafeMode()
+        && now > inode.getAccessTime() + getAccessTimePrecision();
+    return new GetBlockLocationsResult(updateAccessTime ? iip : null, blocks);
   }
 
   /**

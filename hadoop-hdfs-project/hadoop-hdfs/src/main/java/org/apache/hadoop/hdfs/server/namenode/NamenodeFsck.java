@@ -480,10 +480,10 @@ public class NamenodeFsck implements DataEncryptionKeyFactory {
     long fileLen = file.getLen();
     // Get block locations without updating the file access time 
     // and without block access tokens
-    LocatedBlocks blocks;
+    LocatedBlocks blocks = null;
+    FSNamesystem fsn = namenode.getNamesystem();
     try {
-      blocks = namenode.getNamesystem().getBlockLocations(path, 0,
-          fileLen, false, false, false);
+      blocks = fsn.getBlockLocations(path, 0, fileLen, false, false).blocks;
     } catch (FileNotFoundException fnfe) {
       blocks = null;
     }
