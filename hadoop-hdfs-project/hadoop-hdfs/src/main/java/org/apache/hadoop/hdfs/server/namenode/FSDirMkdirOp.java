@@ -97,7 +97,7 @@ class FSDirMkdirOp {
           // create multiple inodes.
           fsn.checkFsObjectLimit();
 
-          if (!mkdirsRecursively(fsd, src, permissions, false, now())) {
+          if (mkdirsRecursively(fsd, iip, permissions, false, now()) == null) {
             throw new IOException("Failed to create directory: " + src);
           }
         }
@@ -124,29 +124,30 @@ class FSDirMkdirOp {
    * If ancestor directories do not exist, automatically create them.
 
    * @param fsd FSDirectory
-   * @param src string representation of the path to the directory
+   * @param iip the INodesInPath instance containing all the existing INodes
+   *            and null elements for non-existing components in the path
    * @param permissions the permission of the directory
    * @param inheritPermission
    *   if the permission of the directory should inherit from its parent or not.
    *   u+wx is implicitly added to the automatically created directories,
    *   and to the given directory if inheritPermission is true
    * @param now creation time
-   * @return true if the operation succeeds false otherwise
+   * @return non-null INodesInPath instance if operation succeeds
    * @throws QuotaExceededException if directory creation violates
    *                                any quota limit
    * @throws UnresolvedLinkException if a symlink is encountered in src.
    */
-  static boolean mkdirsRecursively(
-      FSDirectory fsd, String src, PermissionStatus permissions,
+  static INodesInPath mkdirsRecursively(
+      FSDirectory fsd, INodesInPath iip, PermissionStatus permissions,
       boolean inheritPermission, long now)
       throws FileAlreadyExistsException, QuotaExceededException,
              UnresolvedLinkException, AclException, StorageException, TransactionContextException, IOException {
-    src = FSDirectory.normalizePath(src);
-    String[] names = INode.getPathNames(src);
-    byte[][] components = INode.getPathComponents(names);
-    final int lastInodeIndex = components.length - 1;
-
-    INodesInPath iip = fsd.getExistingPathINodes(components);
+    final int lastInodeIndex = iip.length() - 1;
+    final byte[][] components = iip.getPathComponents();
+    final String[] names = new String[components.length];
+    for (int i = 0; i < components.length; i++) {
+      names[i] = DFSUtil.bytes2String(components[i]);
+    }
 
     final int length = iip.length();
     // find the index of the first null in inodes[]
@@ -156,8 +157,7 @@ class FSDirMkdirOp {
     for (; i < length && (curNode = iip.getINode(i)) != null; i++) {
       pathbuilder.append(Path.SEPARATOR).append(names[i]);
       if (!curNode.isDirectory()) {
-        throw new FileAlreadyExistsException(
-            "Parent path is not a directory: "
+        throw new FileAlreadyExistsException("Parent path is not a directory: "
             + pathbuilder + " " + curNode.getLocalName());
       }
     }
@@ -202,7 +202,7 @@ class FSDirMkdirOp {
       iip = unprotectedMkdir(fsd, IDsGeneratorFactory.getInstance().getUniqueINodeID(), iip, i, components[i],
           (i < lastInodeIndex) ? parentPermissions : permissions, null, now);
       if (iip.getINode(i) == null) {
-        return false;
+        return null;
       }
       // Directory creation also count towards FilesCreated
       // to match count of FilesDeleted metric.
@@ -215,7 +215,7 @@ class FSDirMkdirOp {
       }
     }
 
-    return true;
+    return iip;
   }
 
   /**

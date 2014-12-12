@@ -132,6 +132,7 @@ public class TestLeaseManager {
   public void testCheckLeaseNotInfiniteLoop() throws StorageException, TransactionContextException, IOException {
     HdfsStorageFactory.setConfiguration(conf);
     HdfsStorageFactory.formatStorage();
+    FSDirectory dir = Mockito.mock(FSDirectory.class);
     FSNamesystem fsn = Mockito.mock(FSNamesystem.class);
     Mockito.when(fsn.isRunning()).thenReturn(true);
     NameNode namenode = Mockito.mock(NameNode.class);
@@ -140,6 +141,7 @@ public class TestLeaseManager {
     SortedActiveNodeList sanl = Mockito.mock(SortedActiveNodeList.class);
     Mockito.when(namenode.getActiveNameNodes()).thenReturn(sanl);
     Mockito.when(sanl.getActiveNodes()).thenReturn(new ArrayList<ActiveNode>());
+    Mockito.when(fsn.getFSDirectory()).thenReturn(dir);
     LeaseManager lm = new LeaseManager(fsn);
 
     //Make sure the leases we are going to add exceed the hard limit

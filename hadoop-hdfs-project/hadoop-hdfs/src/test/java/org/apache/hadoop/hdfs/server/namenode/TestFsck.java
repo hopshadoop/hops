@@ -806,7 +806,7 @@ public class TestFsck {
             public Object performTask() throws StorageException, IOException {
               // intentionally corrupt NN data structure
               INodeFile node =
-                  (INodeFile) clusterFinal.getNamesystem().dir.getNode(fileName, true);
+                  (INodeFile) clusterFinal.getNamesystem().dir.getINode(fileName, true);
               final BlockInfo[] blocks = node.getBlocks();
               assertEquals(blocks.length, 1);
               blocks[0].setNumBytes(-1L);  // set the block length to be negative
