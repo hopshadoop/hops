@@ -873,7 +873,7 @@ public abstract class FSAclBaseTest {
 
       @Override
       public Object performTask() throws StorageException, IOException {
-        return cluster.getNamesystem().getFSDirectory().getNode(path.toUri().getPath(), false);
+        return cluster.getNamesystem().getFSDirectory().getINode(path.toUri().getPath(), false);
       }
     }.handle();
   }

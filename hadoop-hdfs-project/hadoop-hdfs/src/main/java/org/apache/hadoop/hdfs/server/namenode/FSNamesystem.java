@@ -1740,7 +1740,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     if (!createParent) {
       dir.verifyParentDir(iip, link);
     }
-    if (!dir.isValidToCreate(link)) {
+    if (!dir.isValidToCreate(link, iip)) {
       throw new IOException("failed to create link " + link +
           " either because the filename is invalid or the file exists");
     }
@@ -1751,7 +1751,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     checkFsObjectLimit();
 
     // add symbolic link to namespace
-    addSymlink(link, target, dirPerms, createParent);
+    addSymlink(link, iip, target, dirPerms, createParent);
     resultingStat = getAuditFileInfo(link, false);
     logAuditEvent(true, "createSymlink", link, target, resultingStat);
   }
@@ -2014,11 +2014,12 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           @Override
           public Object performTask() throws IOException {
             FSPermissionChecker pc = getPermissionChecker();
-            final INodesInPath iip = dir.getINodesInPath(filename, true);
+            final INodesInPath iip = dir.getINodesInPath(filename, false);
             if (isPermissionEnabled) {
               dir.checkTraverse(pc, iip);
             }
-            return dir.getPreferredBlockSize(filename);
+            return INodeFile.valueOf(iip.getLastINode(), filename)
+                .getPreferredBlockSize();
           }
         };
     return (Long) getPreferredBlockSizeHandler.handle(this);
@@ -2191,7 +2192,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           }
         } else {
           // If lease soft limit time is expired, recover the lease
-          recoverLeaseInternal(myFile, src, holder, clientMachine, false);
+          recoverLeaseInternal(iip, src, holder, clientMachine, false);
           throw new FileAlreadyExistsException(src + " for client " +
               clientMachine + " already exists");
         }
@@ -2201,10 +2202,11 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       
       INodeFile newNode = null;
       // Always do an implicit mkdirs for parent directory tree.
-      Path parent = new Path(src).getParent();
-      if (parent != null && FSDirMkdirOp.mkdirsRecursively(dir, parent.toString(),
-              permissions, true, now())) {
-        newNode = dir.addFile(src, permissions, replication, blockSize,
+      INodesInPath parentIIP = iip.getParentINodesInPath();
+      if (parentIIP != null && (parentIIP = FSDirMkdirOp.mkdirsRecursively(dir,
+          parentIIP, permissions, true, now())) != null) {
+        iip = INodesInPath.append(parentIIP, newNode, iip.getLastLocalName());
+        newNode = dir.addFile(iip, src, permissions, replication, blockSize,
                 holder, clientMachine);
       }
       
@@ -2262,12 +2264,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       INodeFile myFile = INodeFile.valueOf(inode, src, true);
 
       // Opening an existing file for write - may need to recover lease.
-      recoverLeaseInternal(myFile, src, holder, clientMachine, false);
+      recoverLeaseInternal(iip, src, holder, clientMachine, false);
 
-      // recoverLeaseInternal may create a new InodeFile via 
-      // finalizeINodeFileUnderConstruction so we need to refresh 
-      // the referenced file.  
-      myFile = INodeFile.valueOf(dir.getINode(src), src, true);
       final BlockInfo lastBlock = myFile.getLastBlock();
       // Check that the block has at least minimum replication.
       if (lastBlock != null && lastBlock.isComplete() && !getBlockManager().isSufficientlyReplicated(lastBlock)) {
@@ -2275,7 +2273,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             + " is not sufficiently replicated yet.");
       }
       
-      return prepareFileForWrite(src, myFile, holder, clientMachine);
+      return prepareFileForWrite(src, iip, holder, clientMachine);
     } catch (IOException ie) {
       NameNode.stateChangeLog.warn("DIR* NameSystem.append: " +ie.getMessage());
       throw ie;
@@ -2283,13 +2281,11 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    }
 
   /**
-   * Replace current node with a INodeUnderConstruction.
+   * Convert current node to under construction.
    * Recreate lease record.
    *
    * @param src
    *     path to the file
-   * @param file
-   *     existing file object
    * @param leaseHolder
    *     identifier of the lease holder on this file
    * @param clientMachine
@@ -2298,23 +2294,23 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    * @throws UnresolvedLinkException
    * @throws IOException
    */
-  private LocatedBlock prepareFileForWrite(String src, INodeFile file,
+  private LocatedBlock prepareFileForWrite(String src, INodesInPath iip,
       String leaseHolder, String clientMachine)
       throws IOException {
-    INodeFile cons =
-        file.toUnderConstruction(leaseHolder, clientMachine);
-    Lease lease = leaseManager.addLease(cons.getFileUnderConstructionFeature()
+    final INodeFile file = iip.getLastINode().asFile();
+    file.toUnderConstruction(leaseHolder, clientMachine);
+    Lease lease = leaseManager.addLease(file.getFileUnderConstructionFeature()
         .getClientName(), src);
-    if(cons.isFileStoredInDB()){
+    if(file.isFileStoredInDB()){
       LOG.debug("Stuffed Inode:  prepareFileForWrite stored in database. " +
           "Returning phantom block");
-      return blockManager.createPhantomLocatedBlocks(cons,cons.getFileDataInDB(),true,false).getLocatedBlocks().get(0);
+      return blockManager.createPhantomLocatedBlocks(file,file.getFileDataInDB(),true,false).getLocatedBlocks().get(0);
     } else {
-      LocatedBlock ret = blockManager.convertLastBlockToUnderConstruction(cons);
+      LocatedBlock ret = blockManager.convertLastBlockToUnderConstruction(file);
       if (ret != null && dir.isQuotaEnabled()) {
         // update the quota: use the preferred block size for UC block
         final long diff = file.getPreferredBlockSize() - ret.getBlockSize();
-        dir.updateSpaceConsumed(src, 0, diff * file.getFileReplication());
+        dir.updateSpaceConsumed(iip, 0, diff * file.getFileReplication());
       }
       lease.updateLastTwoBlocksInLeasePath(src, file.getLastBlock(), file.getPenultimateBlock());
       return ret;
@@ -2377,7 +2373,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
               dir.checkPathAccess(pc, iip, FsAction.WRITE);
             }
 
-            recoverLeaseInternal(inode, src, holder, clientMachine, true);
+            recoverLeaseInternal(iip, src, holder, clientMachine, true);
             return false;
           }
         };
@@ -2385,10 +2381,11 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     return (Boolean) recoverLeaseHandler.handle(this);
   }
 
-  private void recoverLeaseInternal(INodeFile fileInode, String src, String holder,
+  private void recoverLeaseInternal(INodesInPath iip, String src, String holder,
       String clientMachine, boolean force)
       throws IOException {
-    if (fileInode != null && fileInode.isUnderConstruction()) {
+    INodeFile file = iip.getLastINode().asFile();
+    if (file != null && file.isUnderConstruction()) {
       //
       // If the file is under construction , then it must be in our
       // leases. Find the appropriate lease record.
@@ -2410,7 +2407,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       //
       // Find the original holder.
       //
-      FileUnderConstructionFeature uc = fileInode.getFileUnderConstructionFeature();
+      FileUnderConstructionFeature uc = file.getFileUnderConstructionFeature();
       String clientName = uc.getClientName();
       lease = leaseManager.getLease(clientName);
       if (lease == null) {
@@ -2424,7 +2421,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         // close only the file src
         LOG.info("recoverLease: " + lease + ", src=" + src +
             " from client " + clientName);
-        internalReleaseLease(lease, src, holder);
+        internalReleaseLease(lease, src, iip, holder);
       } else {
         assert lease.getHolder().equals(clientName) :
             "Current lease holder " + lease.getHolder() +
@@ -2436,14 +2433,14 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         if (leaseManager.expiredSoftLimit(lease)) {
           LOG.info("startFile: recover " + lease + ", src=" + src + " client " +
               clientName);
-          boolean isClosed = internalReleaseLease(lease, src, null);
+          boolean isClosed = internalReleaseLease(lease, src, iip, null);
           if (!isClosed) {
             throw new RecoveryInProgressException.NonAbortingRecoveryInProgressException(
                 "Failed to close file " + src +
                     ". Lease recovery is in progress. Try again later.");
           }
         } else {
-          final BlockInfo lastBlock = fileInode.getLastBlock();
+          final BlockInfo lastBlock = file.getLastBlock();
           if (lastBlock != null &&
               lastBlock.getBlockUCState() == BlockUCState.UNDER_RECOVERY) {
             throw new RecoveryInProgressException(
@@ -2775,7 +2772,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             }
 
             // commit the last block and complete it if it has minimum replicas
-            commitOrCompleteLastBlock(pendingFile,
+            commitOrCompleteLastBlock(pendingFile, fileState.iip,
                 ExtendedBlock.getLocalBlock(previous));
 
             // allocate new block, record block locations in INode.
@@ -2834,10 +2831,12 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   static class FileState {
     public final INodeFile inode;
     public final String path;
+    public final INodesInPath iip;
   
-    public FileState(INodeFile inode, String fullPath) {
+    public FileState(INodeFile inode, String fullPath, INodesInPath iip) {
       this.inode = inode;
       this.path = fullPath;
+      this.iip = iip;
     }
   }
 
@@ -2853,18 +2852,22 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     checkFsObjectLimit();
 
     Block previousBlock = ExtendedBlock.getLocalBlock(previous);
-    INode inode;
+        final INode inode;
+    final INodesInPath iip;
     if (fileId == INode.ROOT_PARENT_ID) {
       // Older clients may not have given us an inode ID to work with.
       // In this case, we have to try to resolve the path and hope it
       // hasn't changed or been deleted since the file was opened for write.
-      final INodesInPath iip = dir.getINodesInPath4Write(src);
+      iip = dir.getINodesInPath4Write(src);
       inode = iip.getLastINode();
     } else {
       // Newer clients pass the inode ID, so we can just get the inode
       // directly.
       inode = EntityManager.find(INode.Finder.ByINodeIdFTIS, fileId);
-      if (inode != null) src = inode.getFullPathName();
+      iip = INodesInPath.fromINode(inode);
+      if (inode != null) {
+        src = iip.getPath();
+      }
     }
     final INodeFile pendingFile = checkLease(src, clientName, inode, fileId, true);
     BlockInfo lastBlockInFile = pendingFile.getLastBlock();
@@ -2926,7 +2929,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             ((BlockInfoUnderConstruction) lastBlockInFile).getExpectedStorageLocations(
                 getBlockManager().getDatanodeManager()),
             offset);
-        return new FileState(pendingFile, src);
+        return new FileState(pendingFile, src, iip);
       } else {
         // Case 3
         throw new IOException("Cannot allocate block in " + src + ": " +
@@ -2940,7 +2943,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       throw new NotReplicatedYetException("Not replicated yet: " + src +
               " block " + pendingFile.getPenultimateBlock());
     }
-    return new FileState(pendingFile, src);
+    return new FileState(pendingFile, src, iip);
   }
 
   private LocatedBlock makeLocatedBlock(Block blk, DatanodeStorageInfo[] locs, long offset)
@@ -3045,10 +3048,10 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   /**
    * The client would like to let go of the given block
    */
-  boolean abandonBlock(final ExtendedBlock b, final long fileId, final String src1,
+  boolean abandonBlock(final ExtendedBlock b, final long fileId, final String srcArg,
       final String holder) throws IOException {
-    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = dir.resolvePath(src1, pathComponents, dir);
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
+    final String src = dir.resolvePath(srcArg, pathComponents, dir);
     HopsTransactionalRequestHandler abandonBlockHandler =
         new HopsTransactionalRequestHandler(HDFSOperationType.ABANDON_BLOCK,
             src) {
@@ -3088,26 +3091,29 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
                   "BLOCK* NameSystem.abandonBlock: " + b + "of file " + src);
             }
             checkNameNodeSafeMode("Cannot abandon block " + b + " for file" + src);
-            String src2 = src;
+            String srcInt = src;
             final INode inode;
+            final INodesInPath iip;
             if (fileId == INode.ROOT_PARENT_ID) {
               // Older clients may not have given us an inode ID to work with.
               // In this case, we have to try to resolve the path and hope it
               // hasn't changed or been deleted since the file was opened for write.
-              inode = dir.getINode(src);
+              iip = dir.getINodesInPath(srcInt, true);
+              inode = iip.getLastINode();
             } else {
               inode = EntityManager.find(INode.Finder.ByINodeIdFTIS, fileId);
+              iip = INodesInPath.fromINode(inode);
               if (inode != null) {
-                src2 = inode.getFullPathName();
+                srcInt = iip.getPath();
               }
             }
-            final INodeFile file = checkLease(src2, holder, inode, fileId, false);
+            final INodeFile file = checkLease(srcInt, holder, inode, fileId, false);
 
-            boolean removed = dir.removeBlock(src2, file, ExtendedBlock.getLocalBlock(b));
+            boolean removed = dir.removeBlock(srcInt, iip, file, ExtendedBlock.getLocalBlock(b));
             if (!removed) {
               return true;
             }
-            leaseManager.getLease(holder).updateLastTwoBlocksInLeasePath(src2,
+            leaseManager.getLease(holder).updateLastTwoBlocksInLeasePath(srcInt,
                 file.getLastBlock(), file.getPenultimateBlock());
 
             if (NameNode.stateChangeLog.isDebugEnabled()) {
@@ -3115,7 +3121,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
                   "BLOCK* NameSystem.abandonBlock: " + b +
                       " is removed from pendingCreates");
             }
-            persistBlocks(src2, file);
+            persistBlocks(srcInt, file);
             file.recomputeFileSize();
 
             return true;
@@ -3241,25 +3247,26 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       Block last, long fileId)
       throws IOException {
     INodeFile pendingFile;
+    final INodesInPath iip;
+    INode inode = null;
     try {
-      final INode inode;
       if (fileId == INode.ROOT_PARENT_ID) {
         // Older clients may not have given us an inode ID to work with.
         // In this case, we have to try to resolve the path and hope it
         // hasn't changed or been deleted since the file was opened for write.
-        final INodesInPath iip = dir.getLastINodeInPath(src);
-        inode = iip.getINode(0);
+        iip = dir.getINodesInPath(src, true);
+        inode = iip.getLastINode();
       } else {
         inode = EntityManager.find(INode.Finder.ByINodeIdFTIS, fileId);
+        iip = INodesInPath.fromINode(inode);
         if (inode != null) {
-          src = inode.getFullPathName();
+          src = iip.getPath();
         }
       }
       pendingFile = checkLease(src, holder, inode, fileId, true);
     } catch (LeaseExpiredException lee) {
-      final INode inode = dir.getINode(src);
-      if (inode != null && inode instanceof INodeFile &&
-          !inode.isUnderConstruction()) {
+      if (inode != null && inode.isFile() && 
+          !inode.asFile().isUnderConstruction()) {
         // This could be a retry RPC - i.e the client tried to close
         // the file, but missed the RPC response. Thus, it is trying
         // again to close the file. If the file still exists and
@@ -3284,7 +3291,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     }
 
     // commit the last block and complete it if it has minimum replicas
-    commitOrCompleteLastBlock(pendingFile, last);
+    commitOrCompleteLastBlock(pendingFile, iip, last);
 
     if (!checkFileProgress(src, pendingFile, true)) {
       return false;
@@ -3302,19 +3309,22 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       final byte[] data)
       throws IOException {
     INodeFile pendingFile;
-    final INode inode;
-        if (fileId == INode.ROOT_PARENT_ID) {
-          // Older clients may not have given us an inode ID to work with.
-          // In this case, we have to try to resolve the path and hope it
-          // hasn't changed or been deleted since the file was opened for write.
-          inode = dir.getINode(src);
-        } else {
-          inode = EntityManager.find(INode.Finder.ByINodeIdFTIS, fileId);
-          if (inode != null) {
-            src = inode.getFullPathName();
-          }
-        }
-        
+    final INodesInPath iip;
+    INode inode = null;
+    if (fileId == INode.ROOT_PARENT_ID) {
+      // Older clients may not have given us an inode ID to work with.
+      // In this case, we have to try to resolve the path and hope it
+      // hasn't changed or been deleted since the file was opened for write.
+      iip = dir.getINodesInPath(src, true);
+      inode = iip.getLastINode();
+    } else {
+      inode = EntityManager.find(INode.Finder.ByINodeIdFTIS, fileId);
+      iip = INodesInPath.fromINode(inode);
+      if (inode != null) {
+        src = iip.getPath();
+      }
+    }
+
     pendingFile = checkLease(src, holder, inode, fileId, true);
 
     //in case of appending to small files. we might have to migrate the file from
@@ -3336,7 +3346,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       //account for only newly added data
       long spaceConsumed = (data.length - oldSize) * pendingFile
           .getFileReplication();
-      dir.updateSpaceConsumed(src, 0, spaceConsumed);
+      dir.updateSpaceConsumed(iip, 0, spaceConsumed);
     }
 
 
@@ -3590,7 +3600,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     }
     long mtime = now();
     // Unlink the target directory from directory tree
-    long filesRemoved = dir.delete(src, collectedBlocks,mtime);
+    long filesRemoved = dir.delete(iip, collectedBlocks,mtime);
     if (filesRemoved < 0) {      
       return false;
     }
@@ -3823,13 +3833,13 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    *     RecoveryInProgressException if lease recovery is in progress.<br>
    *     IOException in case of an error.
    */
-  boolean internalReleaseLease(Lease lease, String src,
+  boolean internalReleaseLease(Lease lease, String src, INodesInPath iip,
       String recoveryLeaseHolder)
       throws IOException {
     LOG.info("Recovering " + lease + ", src=" + src);
     assert !isInSafeMode();
 
-    final INodeFile pendingFile = INodeFile.valueOf(dir.getINode(src), src);
+    final INodeFile pendingFile = iip.getLastINode().asFile();
     int nrBlocks = pendingFile.numBlocks();
     BlockInfo[] blocks = pendingFile.getBlocks();
 
@@ -3955,7 +3965,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   }
 
   private void commitOrCompleteLastBlock(
-      final INodeFile fileINode, final Block commitBlock)
+      final INodeFile fileINode, final INodesInPath iip, final Block commitBlock)
       throws IOException {
     Preconditions.checkArgument(fileINode.isUnderConstruction());
     if (!blockManager.commitOrCompleteLastBlock(fileINode, commitBlock)) {
@@ -3969,8 +3979,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           - commitBlock.getNumBytes();
       if (diff > 0) {
         // Adjust disk space consumption if required
-        String path = fileINode.getFullPathName();
-        dir.updateSpaceConsumed(path, 0,
+        dir.updateSpaceConsumed(iip, 0,
             -diff * fileINode.getFileReplication());
       }
     }
@@ -3996,11 +4005,11 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     leaseManager.removeLease(uc.getClientName(), src);
     
     // close file and persist block allocations for this file
-    INodeFile newFile = pendingFile.toCompleteFile(now());
-    closeFile(src, newFile);
+    pendingFile.toCompleteFile(now());
+    closeFile(src, pendingFile);
 
     if (!skipReplicationChecks) {
-      blockManager.checkReplication(newFile);
+      blockManager.checkReplication(pendingFile);
     }
   }
 
@@ -4177,10 +4186,11 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       BlockInfo storedBlock)
       throws IOException {
 
-    String src = pendingFile.getFullPathName();
+    final INodesInPath iip = INodesInPath.fromINode(pendingFile);
+    final String src = iip.getPath();
 
     // commit the last block and complete it if it has minimum replicas
-    commitOrCompleteLastBlock(pendingFile, storedBlock);
+    commitOrCompleteLastBlock(pendingFile, iip, storedBlock);
 
     //remove lease, close file
     finalizeINodeFileUnderConstruction(src, pendingFile);
@@ -4419,21 +4429,24 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    * @param createParent
    * @param dir
    */
-  private INodeSymlink addSymlink(String path, String target,
+  private INodeSymlink addSymlink(String path, INodesInPath iip, String target,
                                   PermissionStatus dirPerms,
                                   boolean createParent)
       throws UnresolvedLinkException, FileAlreadyExistsException,
       QuotaExceededException, AclException, IOException {
     final long modTime = now();
     if (createParent) {
-      final String parent = new Path(path).getParent().toString();
-      if (!FSDirMkdirOp.mkdirsRecursively(dir, parent, dirPerms, true, modTime)) {
+      INodesInPath parentIIP = iip.getParentINodesInPath();
+      if (parentIIP == null || (parentIIP = FSDirMkdirOp.mkdirsRecursively(dir,
+          parentIIP, dirPerms, true, modTime)) == null) {
         return null;
+      } else {
+        iip = INodesInPath.append(parentIIP, null, iip.getLastLocalName());
       }
     }
     final String userName = dirPerms.getUserName();
     long id = IDsGeneratorFactory.getInstance().getUniqueINodeID();
-    INodeSymlink newNode = dir.addSymlink(id, path, target, modTime, modTime,
+    INodeSymlink newNode = dir.addSymlink(iip, id, target, modTime, modTime,
             new PermissionStatus(userName, null, FsPermission.getDefault()));
     if (newNode == null) {
       NameNode.stateChangeLog.info("addSymlink: failed to add " + path);

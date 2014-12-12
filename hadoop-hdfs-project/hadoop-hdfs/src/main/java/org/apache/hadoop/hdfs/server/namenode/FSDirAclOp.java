@@ -66,7 +66,7 @@ class FSDirAclOp {
             FSDirectory.normalizePath(src), true);
         fsd.checkOwner(pc, iip);
         AclStorage.validateAclSpec(aclSpec);
-        INode inode = FSDirectory.resolveLastINode(src, iip);
+        INode inode = FSDirectory.resolveLastINode(iip);
         if (aclSpec.size() == 1 && aclSpec.get(0).getType().equals(AclEntryType.MASK)) {
           //HOPS: We allow setting
           FsPermission fsPermission = inode.getFsPermission();
@@ -116,7 +116,7 @@ class FSDirAclOp {
             FSDirectory.normalizePath(src), true);
         fsd.checkOwner(pc, iip);
         AclStorage.validateAclSpec(aclSpec);
-        INode inode = FSDirectory.resolveLastINode(src, iip);
+        INode inode = FSDirectory.resolveLastINode(iip);
         List<AclEntry> existingAcl;
         if (AclStorage.hasOwnAcl(inode)) {
           existingAcl = AclStorage.readINodeLogicalAcl(inode);
@@ -155,7 +155,7 @@ class FSDirAclOp {
         INodesInPath iip = fsd.getINodesInPath4Write(
             FSDirectory.normalizePath(src), true);
         fsd.checkOwner(pc, iip);
-        INode inode = FSDirectory.resolveLastINode(src, iip);
+        INode inode = FSDirectory.resolveLastINode(iip);
         List<AclEntry> existingAcl;
         if (AclStorage.hasOwnAcl(inode)) {
           existingAcl = AclStorage.readINodeLogicalAcl(inode);
@@ -193,7 +193,7 @@ class FSDirAclOp {
         FSPermissionChecker pc = fsd.getPermissionChecker();
         INodesInPath iip = fsd.getINodesInPath4Write(src);
         fsd.checkOwner(pc, iip);
-        unprotectedRemoveAcl(fsd, src);
+        unprotectedRemoveAcl(fsd, iip);
         return fsd.getAuditFileInfo(src, false);
       }
     }.handle();
@@ -253,7 +253,7 @@ class FSDirAclOp {
         if (fsd.isPermissionEnabled()) {
           fsd.checkTraverse(pc, iip);
         }
-        INode inode = FSDirectory.resolveLastINode(src, iip);
+        INode inode = FSDirectory.resolveLastINode(iip);
         List<AclEntry> acl = AclStorage.readINodeAcl(inode);
         FsPermission fsPermission = inode.getFsPermission();
         return new AclStatus.Builder()
@@ -268,16 +268,16 @@ class FSDirAclOp {
   static List<AclEntry> unprotectedSetAcl(
       FSDirectory fsd, String src, List<AclEntry> aclSpec)
       throws IOException {
+    final INodesInPath iip = fsd.getINodesInPath4Write(
+        FSDirectory.normalizePath(src), true);
     AclStorage.validateAclSpec(aclSpec);
     // ACL removal is logged to edits as OP_SET_ACL with an empty list.
     if (aclSpec.isEmpty()) {
-      unprotectedRemoveAcl(fsd, src);
+      unprotectedRemoveAcl(fsd, iip);
       return AclFeature.EMPTY_ENTRY_LIST;
     }
 
-    INodesInPath iip = fsd.getINodesInPath4Write(FSDirectory.normalizePath
-        (src), true);
-    INode inode = FSDirectory.resolveLastINode(src, iip);
+    INode inode = FSDirectory.resolveLastINode(iip);
     List<AclEntry> existingAcl;
     if (AclStorage.hasOwnAcl(inode)){
       existingAcl = AclStorage.readINodeLogicalAcl(inode);
@@ -299,11 +299,9 @@ class FSDirAclOp {
     }
   }
 
-  private static void unprotectedRemoveAcl(FSDirectory fsd, String src)
+  private static void unprotectedRemoveAcl(FSDirectory fsd, INodesInPath iip)
       throws IOException {
-    INodesInPath iip = fsd.getINodesInPath4Write(
-        FSDirectory.normalizePath(src), true);
-    INode inode = FSDirectory.resolveLastINode(src, iip);
+    INode inode = FSDirectory.resolveLastINode(iip);
     AclFeature f = inode.getAclFeature();
     if (inode.getNumAces() <= 0){
       return;

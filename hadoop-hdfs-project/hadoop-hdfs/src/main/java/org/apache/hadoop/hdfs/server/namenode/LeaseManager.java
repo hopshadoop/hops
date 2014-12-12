@@ -610,10 +610,10 @@ public class LeaseManager {
               leaseToCheck.getPaths().toArray(leasePaths);
               for (LeasePath p : leasePaths) {
                 try {
-                  boolean completed = false;
-                  completed = fsnamesystem
-                      .internalReleaseLease(leaseToCheck, p.getPath(),
-                          HdfsServerConstants.NAMENODE_LEASE_HOLDER);
+                  INodesInPath iip = fsnamesystem.getFSDirectory().getINodesInPath(p.getPath(),
+                      true);
+                  boolean completed = fsnamesystem.internalReleaseLease(leaseToCheck, p.getPath(),
+                          iip, HdfsServerConstants.NAMENODE_LEASE_HOLDER);
                   if (LOG.isDebugEnabled()) {
                     if (completed) {
                       LOG.debug("Lease recovery for " + p + " is complete. File closed.");

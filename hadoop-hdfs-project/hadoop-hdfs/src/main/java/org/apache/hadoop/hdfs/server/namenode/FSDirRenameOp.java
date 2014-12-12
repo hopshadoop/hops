@@ -60,12 +60,11 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.FSLimitException;
-
-import static org.apache.hadoop.util.Time.now;
+import org.apache.hadoop.util.Time;
 
 class FSDirRenameOp {
   public static final Log LOG = LogFactory.getLog(FSDirRenameOp.class);
-  
+  @Deprecated
   static boolean renameToInt(
       FSDirectory fsd, final String srcArg, final String dstArg)
       throws IOException {
@@ -79,6 +78,7 @@ class FSDirRenameOp {
     if (!DFSUtil.isValidName(dst)) {
       throw new IOException("Invalid name: " + dst);
     }
+    FSPermissionChecker pc = fsd.getPermissionChecker();
     
     byte[][] srcComponents = FSDirectory.getPathComponentsForReservedPath(src);
     byte[][] dstComponents = FSDirectory.getPathComponentsForReservedPath(dst);
@@ -87,7 +87,7 @@ class FSDirRenameOp {
     dst = fsd.resolvePath(dst, dstComponents, fsd);
     
      @SuppressWarnings("deprecation")
-    final boolean status = renameToInternal(fsd, src, dst);
+    final boolean status = renameTo(fsd, pc, src, dst);
     
     return status;   
   }
@@ -151,8 +151,7 @@ class FSDirRenameOp {
    * boolean, Options.Rename...)}
    */
   @Deprecated
-  static boolean unprotectedRenameTo(
-      FSDirectory fsd, String src, String dst, long timestamp)
+  static boolean unprotectedRenameTo(FSDirectory fsd, String src, String dst, long timestamp)
       throws IOException {
     
     
@@ -162,15 +161,17 @@ class FSDirRenameOp {
     INodesInPath srcIIP = srcInfo.getINodesInPath();
     final INode srcInode = srcIIP.getLastINode();
     try{
-      validateRenameSource(src, srcInfo.getINodesInPath());
+      validateRenameSource(srcIIP);
     }catch(IOException  ignored){
       return false;
     }
     
     PathInformation dstInfo = fsd.getFSNamesystem().getPathExistingINodesFromDB(dst,
         false, FsAction.WRITE, null, null, null);
+    boolean updateDst = false;
     if(dstInfo.isDir()){
       dst += Path.SEPARATOR + new Path(src).getName();
+      updateDst = true;
     }
 
     // validate the destination
@@ -184,8 +185,10 @@ class FSDirRenameOp {
       return false;
     }
     
-    dstInfo = fsd.getFSNamesystem().getPathExistingINodesFromDB(dst,
-        false, FsAction.WRITE, null, null, null);
+    if (updateDst) {
+      dstInfo = fsd.getFSNamesystem().getPathExistingINodesFromDB(dst,
+          false, FsAction.WRITE, null, null, null);
+    }
     INodesInPath dstIIP = dstInfo.getINodesInPath();
     if (dstIIP.getLastINode() != null) {
       NameNode.stateChangeLog.warn("DIR* FSDirectory.unprotectedRenameTo: " +
@@ -399,14 +402,14 @@ class FSDirRenameOp {
     if (!DFSUtil.isValidName(dst)) {
       throw new InvalidPathException("Invalid name: " + dst);
     }
-
+    final FSPermissionChecker pc = fsd.getPermissionChecker();
+    
     byte[][] srcComponents = FSDirectory.getPathComponentsForReservedPath(src);
     byte[][] dstComponents = FSDirectory.getPathComponentsForReservedPath(dst);
     BlocksMapUpdateInfo collectedBlocks = new BlocksMapUpdateInfo();
     src = fsd.resolvePath(src, srcComponents);
     dst = fsd.resolvePath(dst, dstComponents);
-    HdfsFileStatus resultingStat = renameToInternal(fsd, src, dst, collectedBlocks,
-        options);
+    HdfsFileStatus resultingStat = renameTo(fsd, pc, src, dst, collectedBlocks, options);
 
     return new AbstractMap.SimpleImmutableEntry<BlocksMapUpdateInfo,
         HdfsFileStatus>(collectedBlocks, resultingStat);
@@ -416,15 +419,16 @@ class FSDirRenameOp {
    * @see #unprotectedRenameTo(FSDirectory, String, String, long,
    * org.apache.hadoop.fs.Options.Rename...)
    */
-  static HdfsFileStatus renameTo(
-      FSDirectory fsd, String src, String dst, long mtime,
-      BlocksMapUpdateInfo collectedBlocks, Options.Rename... options)
-      throws IOException {
+  static HdfsFileStatus renameTo(FSDirectory fsd, FSPermissionChecker pc, String src,
+      String dst, BlocksMapUpdateInfo collectedBlocks,
+      Options.Rename... options) throws IOException {
     if (NameNode.stateChangeLog.isDebugEnabled()) {
       NameNode.stateChangeLog.debug("DIR* FSDirectory.renameTo: " + src + " to "
           + dst);
     }
-    RenameResult ret = unprotectedRenameTo(fsd, src, dst, mtime, collectedBlocks, options);
+    final long mtime = Time.now();
+    RenameResult ret = unprotectedRenameTo(fsd, src, dst, mtime, 
+        collectedBlocks, options);
     if (ret.filesDeleted) {
       fsd.getFSNamesystem().incrDeletedFileCount(1);
     }
@@ -435,7 +439,7 @@ class FSDirRenameOp {
    * Rename src to dst.
    * <br>
    * Note: This is to be used by {@link org.apache.hadoop.hdfs.server
-   * .namenode.FSEditLog} only.
+   * .namenode.FSEditLogLoader} only.
    * <br>
    *
    * @param fsd       FSDirectory
@@ -469,8 +473,7 @@ class FSDirRenameOp {
    * @param collectedBlocks blocks to be removed
    * @param options         Rename options
    */
-  static RenameResult unprotectedRenameTo(
-      FSDirectory fsd, String src, String dst, long timestamp,
+  static RenameResult unprotectedRenameTo(FSDirectory fsd, String src, String dst, long timestamp,
       BlocksMapUpdateInfo collectedBlocks, Options.Rename... options)
       throws IOException {
     boolean overwrite = options != null
@@ -479,9 +482,9 @@ class FSDirRenameOp {
     final String error;
     PathInformation srcInfo = fsd.getFSNamesystem().getPathExistingINodesFromDB(src,
         false, null, FsAction.WRITE, null, null);
-    final INodesInPath srcIIP = srcInfo.getINodesInPath();
+    INodesInPath srcIIP = srcInfo.getINodesInPath();
     final INode srcInode = srcIIP.getLastINode();
-    validateRenameSource(src, srcIIP);
+    validateRenameSource(srcIIP);
 
     // validate the destination
     if (dst.equals(src)) {
@@ -751,7 +754,7 @@ class FSDirRenameOp {
           if (undoRemoveDst) {
             // Rename failed - restore dst
             removedDst.setLocalNameNoPersistance(dstChildName);
-            fsd.addLastINodeNoQuotaCheck(dstIIP, removedDst, dstCounts);
+            fsd.addLastINodeNoQuotaCheck(tx.dstIIP, removedDst, dstCounts);
           }
         }
         NameNode.stateChangeLog.warn(
@@ -764,50 +767,24 @@ class FSDirRenameOp {
 
   
   /**
-   * @see #unprotectedRenameTo(FSDirectory, String, String, long)
    * @deprecated Use {@link #renameToInt(FSDirectory, String, String,
    * boolean, Options.Rename...)}
    */
   @Deprecated
   @SuppressWarnings("deprecation")
-  private static boolean renameTo(
-      FSDirectory fsd, String src, String dst, long mtime)
-      throws IOException {
+  private static boolean renameTo(FSDirectory fsd, FSPermissionChecker pc,
+      String src, String dst) throws IOException {    
     if (NameNode.stateChangeLog.isDebugEnabled()) {
       NameNode.stateChangeLog.debug("DIR* FSDirectory.renameTo: " + src + " to "
           + dst);
     }
+    final long mtime = Time.now();
     boolean stat = false;
       stat = unprotectedRenameTo(fsd, src, dst, mtime);
-    return stat;
-  }
-
-  /**
-   * @deprecated See {@link #renameTo(FSDirectory, String, String, long)}
-   */
-  @Deprecated
-  private static boolean renameToInternal(
-      FSDirectory fsd, String src, String dst)
-      throws IOException {
-
-    long mtime = now();
-    @SuppressWarnings("deprecation")
-    final boolean stat = renameTo(fsd, src, dst, mtime);
     if (stat) {
       return true;
     }
     return false;
-  }
-
-  private static HdfsFileStatus renameToInternal(
-      FSDirectory fsd, String src, String dst,
-      BlocksMapUpdateInfo collectedBlocks,
-      Options.Rename... options)
-      throws IOException {
-
-    long mtime = now();
-    return renameTo(fsd, src, dst, mtime, collectedBlocks, options);
-    
   }
 
   private static void validateDestination(
@@ -858,13 +835,13 @@ class FSDirRenameOp {
     }
   }
 
-  private static void validateRenameSource(String src, INodesInPath srcIIP)
+  private static void validateRenameSource(INodesInPath srcIIP)
       throws IOException {
     String error;
     final INode srcInode = srcIIP.getLastINode();
     // validate source
     if (srcInode == null) {
-      error = "rename source " + src + " is not found.";
+      error = "rename source " + srcIIP.getPath() + " is not found.";
       NameNode.stateChangeLog.warn("DIR* FSDirectory.unprotectedRenameTo: "
           + error);
       throw new FileNotFoundException(error);
