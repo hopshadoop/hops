@@ -1432,10 +1432,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         
         res = getBlockLocationsInt(src, offset, length, true, true);
 
-        if (res == null) {
-          return null;
-        }
-
         if (res.updateAccessTime()) {
           final long now = now();
           try {
