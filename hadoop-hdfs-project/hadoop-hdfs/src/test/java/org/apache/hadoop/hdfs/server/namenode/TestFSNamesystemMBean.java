@@ -91,6 +91,9 @@ public class TestFSNamesystemMBean {
             "NumDecommissioningDataNodes"));
         Long MaxObjects = (Long) (mbs.getAttribute(mxbeanNameFsns,
             "MaxObjects"));
+        String topUsers =
+            (String) (mbs.getAttribute(mxbeanNameFsns, "TopUserOpCounts"));
+
         // Metrics that belong to "NameNodeInfo".
         // These are metrics that FSNamesystem registers directly with MBeanServer.
         ObjectName mxbeanNameNni = new ObjectName(
