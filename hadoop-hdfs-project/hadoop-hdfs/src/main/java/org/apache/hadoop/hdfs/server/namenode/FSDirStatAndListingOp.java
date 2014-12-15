@@ -193,6 +193,11 @@ class FSDirStatAndListingOp {
     return getContentSummaryInt(fsd, src);
   }
 
+  private static byte getStoragePolicyID(byte inodePolicy, byte parentPolicy) {
+    return inodePolicy != BlockStoragePolicySuite.ID_UNSPECIFIED ? inodePolicy :
+        parentPolicy;
+  }
+
   /**
    * Get a partial listing of the indicated directory
    *
@@ -243,7 +248,7 @@ class FSDirStatAndListingOp {
             cur.getLocalStoragePolicyID():
             BlockStoragePolicySuite.ID_UNSPECIFIED;
         listing[i] = createFileStatus(fsd, cur.getLocalNameBytes(), cur,
-            needLocation, fsd.getStoragePolicyID(curPolicy, parentStoragePolicy), iip);
+            needLocation, getStoragePolicyID(curPolicy, parentStoragePolicy), iip);
         listingCnt++;
         if (needLocation) {
             // Once we  hit lsLimit locations, stop.
@@ -322,7 +327,7 @@ class FSDirStatAndListingOp {
        final INodeFile fileNode = node.asFile();
        isStoredInDB = fileNode.isFileStoredInDB();
        size = fileNode.getSize();
-       replication = fileNode.getFileReplication();
+       replication = fileNode.getBlockReplication();
        blocksize = fileNode.getPreferredBlockSize();
      } 
 
@@ -366,7 +371,7 @@ class FSDirStatAndListingOp {
       } else {
         size = fileNode.computeFileSize(true);
       }
-      replication = fileNode.getFileReplication();
+      replication = fileNode.getBlockReplication();
       blocksize = fileNode.getPreferredBlockSize();
 
       final boolean isUc = fileNode.isUnderConstruction();

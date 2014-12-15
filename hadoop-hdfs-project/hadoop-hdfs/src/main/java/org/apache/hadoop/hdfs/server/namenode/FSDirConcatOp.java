@@ -146,7 +146,7 @@ class FSDirConcatOp {
           }
 
           si.add(trgInode);
-          final short repl = trgInode.getFileReplication();
+          final short repl = trgInode.getBlockReplication();
 
           // now check the srcs
           boolean endSrc = false; // final src file doesn't have to have full end block
@@ -165,11 +165,11 @@ class FSDirConcatOp {
             }
 
             // check replication and blocks size
-            if (repl != srcInode.getFileReplication()) {
+            if (repl != srcInode.getBlockReplication()) {
               throw new HadoopIllegalArgumentException("concat: the source file "
                   + src + " and the target file " + target
                   + " should have the same replication: source replication is "
-                  + srcInode.getFileReplication()
+                  + srcInode.getBlockReplication()
                   + " but target replication is " + repl);
             }
 

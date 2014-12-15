@@ -361,9 +361,7 @@ public abstract class INodeWithAdditionalFields extends INode {
    * Set last modification time of inode.
    */
   public void setModificationTimeNoPersistance(long modtime) {
-    if (this.modificationTime <= modtime) {
-      this.modificationTime = modtime;
-    }
+    this.modificationTime = modtime;
   }
   
   /**

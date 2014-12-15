@@ -29,7 +29,6 @@ import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.metadata.hdfs.entity.QuotaUpdate;
-import io.hops.security.UsersGroups;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
@@ -39,30 +38,22 @@ import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.UnresolvedLinkException;
-import org.apache.hadoop.fs.permission.AclEntry;
-import org.apache.hadoop.fs.permission.AclEntryType;
-import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.protocol.Block;
-import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
-import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.FSLimitException;
 import org.apache.hadoop.hdfs.protocol.FSLimitException.MaxDirectoryItemsExceededException;
 import org.apache.hadoop.hdfs.protocol.FSLimitException.PathComponentTooLongException;
-import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
 import org.apache.hadoop.hdfs.server.namenode.INode.BlocksMapUpdateInfo;
@@ -70,18 +61,23 @@ import org.apache.hadoop.hdfs.util.ByteArray;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 
+import org.apache.hadoop.fs.ParentNotDirectoryException;
+import org.apache.hadoop.hdfs.DFSUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.Closeable;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import org.apache.hadoop.fs.ParentNotDirectoryException;
-import org.apache.hadoop.fs.PathIsNotDirectoryException;
-import org.apache.hadoop.hdfs.DFSUtil;
+
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_ACCESSTIME_PRECISION_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_ACCESSTIME_PRECISION_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_STORAGE_POLICY_ENABLED_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_STORAGE_POLICY_ENABLED_KEY;
 import static org.apache.hadoop.util.Time.now;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Both FSDirectory and FSNamesystem manage the state of the namespace.
@@ -119,6 +115,12 @@ public class FSDirectory implements Closeable {
    * ACL-related operations.
    */
   private final boolean aclsEnabled;
+
+  // precision of access times.
+  private final long accessTimePrecision;
+  // whether setStoragePolicy is allowed.
+  private final boolean storagePolicyEnabled;
+
   private final String fsOwnerShortUserName;
   private final String supergroup;
 
@@ -157,6 +159,14 @@ public class FSDirectory implements Closeable {
     this.lsLimit = configuredLimit > 0 ? configuredLimit :
         DFSConfigKeys.DFS_LIST_LIMIT_DEFAULT;
     
+    this.accessTimePrecision = conf.getLong(
+        DFS_NAMENODE_ACCESSTIME_PRECISION_KEY,
+        DFS_NAMENODE_ACCESSTIME_PRECISION_DEFAULT);
+
+    this.storagePolicyEnabled =
+        conf.getBoolean(DFS_STORAGE_POLICY_ENABLED_KEY,
+                        DFS_STORAGE_POLICY_ENABLED_DEFAULT);
+
     this.contentCountLimit = conf.getInt(
         DFSConfigKeys.DFS_CONTENT_SUMMARY_LIMIT_KEY,
         DFSConfigKeys.DFS_CONTENT_SUMMARY_LIMIT_DEFAULT);
@@ -195,7 +205,14 @@ public class FSDirectory implements Closeable {
   boolean isAclsEnabled() {
     return aclsEnabled;
   }
-    
+
+  boolean isStoragePolicyEnabled() {
+    return storagePolicyEnabled;
+  }
+  boolean isAccessTimeSupported() {
+    return accessTimePrecision > 0;
+  }
+
   int getLsLimit() {
     return lsLimit;
   }
@@ -264,7 +281,7 @@ public class FSDirectory implements Closeable {
     // over calculation of quota
     if(fileINode.isFileStoredInDB()){
       diskspaceTobeConsumed -= (fileINode.getSize() *
-          fileINode.getFileReplication());
+          fileINode.getBlockReplication());
     }
     // check quota limits and updated space consumed
     updateCount(inodesInPath, 0, diskspaceTobeConsumed, true);
@@ -313,7 +330,7 @@ public class FSDirectory implements Closeable {
 
     // update space consumed
     updateCount(iip, 0,
-        -fileNode.getPreferredBlockSize() * fileNode.getFileReplication(),
+        -fileNode.getPreferredBlockSize() * fileNode.getBlockReplication(),
         true);
     return true;
   }
@@ -337,109 +354,6 @@ public class FSDirectory implements Closeable {
       throws FileNotFoundException, AccessControlException, IOException {
     return resolvePath(path, pathComponents, this);
   }
-  
-  /**
-   * Set file replication
-   *
-   * @param src
-   *     file name
-   * @param replication
-   *     new replication
-   * @param oldReplication
-   *     old replication - output parameter
-   * @return array of file blocks
-   * @throws QuotaExceededException
-   */
-  Block[] setReplication(String src, short replication, short[] oldReplication)
-      throws QuotaExceededException, UnresolvedLinkException, StorageException,
-      TransactionContextException {
-    return unprotectedSetReplication(src, replication, oldReplication);
-  }
-
-  Block[] unprotectedSetReplication(String src, short replication,
-      short[] oldReplication)
-      throws QuotaExceededException, UnresolvedLinkException, StorageException,
-      TransactionContextException {
-    final INodesInPath iip = getINodesInPath4Write(src, true);
-    INode inode = iip.getLastINode();
-    if (inode == null || !inode.isFile()) {
-      return null;
-    }
-    INodeFile fileNode = (INodeFile) inode;
-    final short oldRepl = fileNode.getFileReplication();
-
-    // check disk quota
-    long dsDelta =
-        (replication - oldRepl) * (fileNode.diskspaceConsumed() / oldRepl);
-    updateCount(iip, 0, dsDelta, true);
-
-    fileNode.setReplication(replication);
-
-    if (oldReplication != null) {
-      oldReplication[0] = oldRepl;
-    }
-    return fileNode.getBlocks();
-  }
-
-  void setStoragePolicy(INodesInPath iip, BlockStoragePolicy policy) throws IOException {
-    unprotectedSetStoragePolicy(iip, policy);
-  }
-
-  void unprotectedSetStoragePolicy(INodesInPath iip, BlockStoragePolicy policy) throws IOException {
-    INode inode = iip.getLastINode();
-
-    if (inode == null) {
-      throw new FileNotFoundException("File/Directory does not exist: "
-          + iip.getPath());
-    } else if (inode.isSymlink()) {
-      throw new IOException("Cannot set storage policy for symlink: " + iip.getPath());
-    } else {
-      inode.setBlockStoragePolicyID(policy.getId());
-    }
-  }
-
-  void setPermission(String src, FsPermission permission)
-      throws FileNotFoundException, UnresolvedLinkException, StorageException,
-      TransactionContextException {
-    unprotectedSetPermission(src, permission);
-  }
-
-  void unprotectedSetPermission(String src, FsPermission permissions)
-      throws FileNotFoundException, UnresolvedLinkException, StorageException,
-      TransactionContextException {
-    final INodesInPath inodesInPath = getINodesInPath4Write(src, true);
-    final INode inode = inodesInPath.getLastINode();
-    if (inode == null) {
-      throw new FileNotFoundException("File does not exist: " + src);
-    }
-    inode.setPermission(permissions);
-  }
-
-  void setOwner(String src, String username, String groupname)
-      throws IOException {
-    unprotectedSetOwner(src, username, groupname);
-  }
-
-  void unprotectedSetOwner(String src, String username, String groupname)
-      throws IOException {
-    final INodesInPath inodesInPath = getINodesInPath4Write(src, true);
-    INode inode = inodesInPath.getLastINode();
-    if (inode == null) {
-      throw new FileNotFoundException("File does not exist: " + src);
-    }
-    
-    if (username != null) {
-      UsersGroups.addUser(username);
-      inode.setUser(username);
-    }
-    if (groupname != null) {
-      UsersGroups.addGroup(groupname);
-      inode.setGroup(groupname);
-    }
-    
-    inode.logMetadataEvent(MetadataLogEntry.Operation.UPDATE);
-  }
-
   
   /**
    * Delete the target directory and collect the blocks under it
@@ -579,11 +493,7 @@ public class FSDirectory implements Closeable {
     targetNode.logMetadataEvent(MetadataLogEntry.Operation.DELETE);
   }
 
-  byte getStoragePolicyID(byte inodePolicy, byte parentPolicy) {
-    return inodePolicy != BlockStoragePolicySuite.ID_UNSPECIFIED ? inodePolicy : parentPolicy;
-  }
-
-  /**
+  /** 
    * Check whether the filepath could be created
    */
   boolean isValidToCreate(String src, INodesInPath iip)
@@ -628,7 +538,7 @@ public class FSDirectory implements Closeable {
     updateCount(iip, nsDelta, dsDelta, true);
   }
   
-  private void updateCount(INodesInPath iip, long nsDelta, long dsDelta,
+  void updateCount(INodesInPath iip, long nsDelta, long dsDelta,
       boolean checkQuota) throws QuotaExceededException, StorageException, TransactionContextException {
     updateCount(iip, iip.length() - 1, nsDelta, dsDelta, checkQuota);
   }
@@ -1187,74 +1097,6 @@ public class FSDirectory implements Closeable {
     counts.dsCount += parentDiskspace;
   }
   
-  /**
-   * See {@link ClientProtocol#setQuota(String, long, long)} for the contract.
-   * @return INodeDirectory if any of the quotas have changed. null otherwise.
-   *
-   * @see #unprotectedSetQuota(String, long, long)
-   */
-  INodeDirectory setQuota(String src, long nsQuota, long dsQuota, long nsCount,
-      long dsCount) throws FileNotFoundException, PathIsNotDirectoryException,
-      QuotaExceededException, UnresolvedLinkException, IOException {
-    return unprotectedSetQuota(src, nsQuota, dsQuota, nsCount, dsCount);
-  }
-
-    /**
-   * See {@link ClientProtocol#setQuota(String, long, long)} for the contract.
-   * Sets quota for for a directory.
-   * @returns INodeDirectory if any of the quotas have changed. null otherwise.
-   * @throws FileNotFoundException if the path does not exist.
-   * @throws PathIsNotDirectoryException if the path is not a directory.
-   * @throws QuotaExceededException
-   *     if the directory tree size is
-   *     greater than the given quota
-   * @throws UnresolvedLinkException
-   *     if a symlink is encountered in src.
-   */
-  INodeDirectory unprotectedSetQuota(String src, long nsQuota, long dsQuota, long nsCount, long dsCount)
-      throws FileNotFoundException, PathIsNotDirectoryException, IOException,
-      QuotaExceededException, UnresolvedLinkException, StorageException, TransactionContextException {
-    if (!isQuotaEnabled()) {
-      return null;
-    }
-
-    // sanity check
-    if ((nsQuota < 0 && nsQuota != HdfsConstants.QUOTA_DONT_SET && 
-         nsQuota != HdfsConstants.QUOTA_RESET) || 
-        (dsQuota < 0 && dsQuota != HdfsConstants.QUOTA_DONT_SET && 
-          dsQuota != HdfsConstants.QUOTA_RESET)) {
-      throw new IllegalArgumentException("Illegal value for nsQuota or " +
-          "dsQuota : " + nsQuota + " and " +
-          dsQuota);
-    }
-
-    String srcs = normalizePath(src);
-
-    final INodesInPath inodesInPath = getINodesInPath4Write(src, true);
-    INodeDirectory dirNode = INodeDirectory.valueOf(inodesInPath.getLastINode(), srcs);
-    if (dirNode.isRoot() && nsQuota == HdfsConstants.QUOTA_RESET) {
-      throw new IllegalArgumentException(
-          "Cannot clear namespace quota on root.");
-    } else { // a directory inode
-      final Quota.Counts oldQuota = dirNode.getQuotaCounts();
-      final long oldNsQuota = oldQuota.get(Quota.NAMESPACE);
-      final long oldDsQuota = oldQuota.get(Quota.DISKSPACE);
-      if (nsQuota == HdfsConstants.QUOTA_DONT_SET) {
-        nsQuota = oldNsQuota;
-      }
-      if (dsQuota == HdfsConstants.QUOTA_DONT_SET) {
-        dsQuota = oldDsQuota;
-      }
-      
-      if (!dirNode.isRoot()) {
-        dirNode.setQuota(nsQuota, nsCount, dsQuota, dsCount);
-        INodeDirectory parent = (INodeDirectory) inodesInPath.getINode(-2);
-        parent.replaceChild(dirNode);
-      }
-      return (oldNsQuota != nsQuota || oldDsQuota != dsQuota) ? dirNode : null;
-    }
-  }
-  
   long totalInodes() throws IOException {
     // TODO[Hooman]: after fixing quota, we can use root.getNscount instead of this.
     LightWeightRequestHandler totalInodesHandler =
@@ -1267,48 +1109,6 @@ public class FSDirectory implements Closeable {
           }
         };
     return (Integer) totalInodesHandler.handle();
-  }
-
-  /**
-   * Sets the access time on the file/directory. Logs it in the transaction
-   * log.
-   */
-  boolean setTimes(INode inode, long mtime, long atime, boolean force)
-      throws StorageException, TransactionContextException,
-      AccessControlException {
-    return unprotectedSetTimes(inode, mtime, atime, force);
-  }
-
-  boolean unprotectedSetTimes(String src, long mtime, long atime, boolean force)
-      throws UnresolvedLinkException, StorageException,
-      TransactionContextException, AccessControlException {
-    final INodesInPath i = getINodesInPath(src, true);
-    return unprotectedSetTimes(i.getLastINode(), mtime, atime, force);
-  }
-
-  private boolean unprotectedSetTimes(INode inode, long mtime,
-      long atime, boolean force)
-      throws StorageException, TransactionContextException,
-      AccessControlException {
-    boolean status = false;
-    if (mtime != -1) {
-      inode.setModificationTimeForce(mtime);
-      status = true;
-    }
-    if (atime != -1) {
-      long inodeTime = inode.getAccessTime();
-
-      // if the last access time update was within the last precision interval, then
-      // no need to store access time
-      if (atime <= inodeTime + getFSNamesystem().getAccessTimePrecision() &&
-          !force) {
-        status = false;
-      } else {
-        inode.setAccessTime(atime);
-        status = true;
-      }
-    }
-    return status;
   }
 
   /**

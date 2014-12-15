@@ -148,7 +148,7 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
    * @return the replication factor of the file.
    */
   @Override
-  public short getFileReplication() {
+  public short getBlockReplication() {
     return HeaderFormat.getReplication(header);
   }
 
@@ -410,7 +410,7 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
       // We do not know the replicaton of the database here. However, to be
       // consistent with normal files we will multiply the file size by the
       // replication factor.
-      return getSize() * getFileReplication();
+      return getSize() * getBlockReplication();
     }else {
       return diskspaceConsumed(getBlocks()); // Compute the size of the file. Takes replication in to account
     }
@@ -418,7 +418,7 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
   
   long diskspaceConsumed(Block[] blkArr) {
     return diskspaceConsumed(blkArr, isUnderConstruction(),
-        getPreferredBlockSize(), getFileReplication());
+        getPreferredBlockSize(), getBlockReplication());
   }
 
   static long diskspaceConsumed(Block[] blkArr, boolean underConstruction,
@@ -485,10 +485,10 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
 
   /** @return the diskspace required for a full block. */
   final long getBlockDiskspace() {
-    return getPreferredBlockSize() * getFileReplication();
+    return getPreferredBlockSize() * getBlockReplication();
   }
 
-  void setReplication(short replication)
+  void setFileReplication(short replication)
       throws StorageException, TransactionContextException {
     header = HeaderFormat.REPLICATION.BITS.combine(replication, header);
     save();
