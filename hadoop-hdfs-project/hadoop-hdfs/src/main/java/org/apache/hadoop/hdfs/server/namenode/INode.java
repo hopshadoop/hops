@@ -717,7 +717,7 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
   public abstract void setAccessTime(long atime)
       throws TransactionContextException, StorageException;
 
-  public void setBlockStoragePolicyID(byte blockStoragePolicyID)
+  public void setStoragePolicyID(byte blockStoragePolicyID)
       throws TransactionContextException, StorageException {
     setBlockStoragePolicyIDNoPersistance(blockStoragePolicyID);
     save();

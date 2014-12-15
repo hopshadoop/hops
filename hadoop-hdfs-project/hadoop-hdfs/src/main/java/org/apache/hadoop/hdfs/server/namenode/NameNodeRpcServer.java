@@ -539,13 +539,13 @@ class NameNodeRpcServer implements NamenodeProtocols {
   @Override // ClientProtocol
   public void setPermission(String src, FsPermission permissions)
       throws IOException {
-    namesystem.setPermissionSTO(src, permissions);
+    namesystem.setPermission(src, permissions);
   }
 
   @Override // ClientProtocol
   public void setOwner(String src, String username, String groupname)
       throws IOException {
-    namesystem.setOwnerSTO(src, username, groupname);
+    namesystem.setOwner(src, username, groupname);
   }
 
   @Override // ClientProtocol
@@ -889,8 +889,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
   @Override // ClientProtocol
   public void setQuota(String path, long namespaceQuota, long diskspaceQuota)
       throws IOException {
-      namesystem
-          .multiTransactionalSetQuota(path, namespaceQuota, diskspaceQuota);
+      namesystem.setQuota(path, namespaceQuota, diskspaceQuota);
   }
   
   @Override // ClientProtocol
