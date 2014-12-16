@@ -37,6 +37,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.ByteBufferReadable;
@@ -88,7 +89,7 @@ implements ByteBufferReadable, CanSetDropBehind, CanSetReadahead,
   public static boolean tcpReadsDisabledForTesting = false;
   private long hedgedReadOpsLoopNumForTesting = 0;
   private final DFSClient dfsClient;
-  private boolean closed = false;
+  private AtomicBoolean closed = new AtomicBoolean(false);
   private final String src;
   private final boolean verifyChecksum;
 
@@ -658,7 +659,8 @@ implements ByteBufferReadable, CanSetDropBehind, CanSetReadahead,
    */
   @Override
   public synchronized void close() throws IOException {
-    if (closed) {
+    if (!closed.compareAndSet(false, true)) {
+      DFSClient.LOG.warn("DFSInputStream has been closed already");
       return;
     }
     dfsClient.checkOpen();
@@ -682,7 +684,6 @@ implements ByteBufferReadable, CanSetDropBehind, CanSetReadahead,
       blockReader = null;
     }
     super.close();
-    closed = true;
   }
 
   @Override
@@ -819,7 +820,7 @@ implements ByteBufferReadable, CanSetDropBehind, CanSetReadahead,
 
   private synchronized int readWithStrategy(ReaderStrategy strategy, int off, int len) throws IOException {
     dfsClient.checkOpen();
-    if (closed) {
+    if (closed.get()) {
       throw new IOException("Stream closed");
     }
     Map<ExtendedBlock,Set<DatanodeInfo>> corruptedBlockMap 
@@ -1346,7 +1347,7 @@ implements ByteBufferReadable, CanSetDropBehind, CanSetReadahead,
       throws IOException {
     // sanity checks
     dfsClient.checkOpen();
-    if (closed) {
+    if (closed.get()) {
       throw new IOException("Stream closed");
     }
     failures = 0;
@@ -1455,7 +1456,7 @@ implements ByteBufferReadable, CanSetDropBehind, CanSetReadahead,
     if (targetPos < 0) {
       throw new IOException("Cannot seek to negative offset");
     }
-    if (closed) {
+    if (closed.get()) {
       throw new IOException("Stream is closed!");
     }
     boolean done = false;
@@ -1542,7 +1543,7 @@ implements ByteBufferReadable, CanSetDropBehind, CanSetReadahead,
    */
   @Override
   public synchronized int available() throws IOException {
-    if (closed) {
+    if (closed.get()) {
       throw new IOException("Stream closed");
     }
 
