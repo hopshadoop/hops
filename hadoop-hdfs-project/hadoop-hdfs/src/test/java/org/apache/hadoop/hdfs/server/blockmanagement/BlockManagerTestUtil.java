@@ -312,6 +312,14 @@ public class BlockManagerTestUtil {
     }
     return dn;
   }
+  
+  /**
+   * Call heartbeat check function of HeartbeatManager
+   * @param bm the BlockManager to manipulate
+   */
+  public static void rescanPostponedMisreplicatedBlocks(BlockManager bm) throws IOException {
+    bm.rescanPostponedMisreplicatedBlocks();
+  }
 
   public static StorageReport[] getStorageReportsForDatanode(
       DatanodeDescriptor dnd) {

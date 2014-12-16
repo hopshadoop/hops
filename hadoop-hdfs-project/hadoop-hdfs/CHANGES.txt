@@ -330,6 +330,9 @@ Release 2.7.0 - UNRELEASED
     HDFS-7506. Consolidate implementation of setting inode attributes into a
     single class. (wheat9)
 
+    HDFS-6425. Large postponedMisreplicatedBlocks has impact on blockReport
+    latency. (Ming Ma via kihwal)
+
 Release 2.6.1 - UNRELEASED
 
   INCOMPATIBLE CHANGES
