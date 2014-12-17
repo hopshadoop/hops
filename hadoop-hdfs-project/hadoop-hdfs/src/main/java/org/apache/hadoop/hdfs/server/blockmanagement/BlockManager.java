@@ -2567,7 +2567,7 @@ public class BlockManager {
     }
     
     final Set<Long> aggregatedSafeBlocks = new HashSet<>();
-    
+        
     final Map<Long, Long> mismatchedBlocksAndInodes = storage
             .getAllStorageReplicasInBuckets(matchingResult.mismatchedBuckets);
 

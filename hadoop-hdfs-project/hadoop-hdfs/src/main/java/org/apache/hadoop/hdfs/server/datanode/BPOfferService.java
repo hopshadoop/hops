@@ -722,9 +722,6 @@ class BPOfferService implements Runnable {
         //
         Block toDelete[] = bcmd.getBlocks();
         try {
-          if (dn.blockScanner != null) {
-            dn.blockScanner.deleteBlocks(bcmd.getBlockPoolId(), toDelete);
-          }
           // using global fsdataset
           dn.getFSDataset().invalidate(bcmd.getBlockPoolId(), toDelete);
         } catch (IOException e) {
@@ -907,12 +904,6 @@ class BPOfferService implements Runnable {
         blkReportHander.processCommand(new DatanodeCommand[]{cmd});
       }
       
-      // Now safe to start scanning the block pool.
-      // If it has already been started, this is a no-op.
-      if (dn.blockScanner != null) {
-        dn.blockScanner.addBlockPool(getBlockPoolId());
-      }
-
       if (brFailed){
         Thread.sleep(2000); //sleep before retrying to send the block report
       }

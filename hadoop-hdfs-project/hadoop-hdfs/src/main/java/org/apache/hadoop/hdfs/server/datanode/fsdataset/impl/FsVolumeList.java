@@ -25,6 +25,7 @@ import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsVolumeReference;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsVolumeSpi;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.VolumeChoosingPolicy;
+import org.apache.hadoop.hdfs.server.datanode.BlockScanner;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.Time;
 
@@ -43,11 +44,13 @@ class FsVolumeList {
   private Object checkDirsMutex = new Object();
 
   private final VolumeChoosingPolicy<FsVolumeImpl> blockChooser;
+  private final BlockScanner blockScanner;
   private volatile int numFailedVolumes;
 
-  FsVolumeList(int failedVols,
+  FsVolumeList(int failedVols, BlockScanner blockScanner,
       VolumeChoosingPolicy<FsVolumeImpl> blockChooser) {
     this.blockChooser = blockChooser;
+    this.blockScanner = blockScanner;
     this.numFailedVolumes = failedVols;
   }
   
@@ -239,13 +242,14 @@ class FsVolumeList {
 
   /**
    * Dynamically add new volumes to the existing volumes that this DN manages.
-   * @param newVolume the instance of new FsVolumeImpl.
+   *
+   * @param ref       a reference to the new FsVolumeImpl instance.
    */
-  void addVolume(FsVolumeImpl newVolume) {
+  void addVolume(FsVolumeReference ref) {
     while (true) {
       final FsVolumeImpl[] curVolumes = volumes.get();
       final List<FsVolumeImpl> volumeList = Lists.newArrayList(curVolumes);
-      volumeList.add(newVolume);
+      volumeList.add((FsVolumeImpl)ref.getVolume());
       if (volumes.compareAndSet(curVolumes,
           volumeList.toArray(new FsVolumeImpl[volumeList.size()]))) {
         break;
@@ -253,12 +257,15 @@ class FsVolumeList {
         if (FsDatasetImpl.LOG.isDebugEnabled()) {
           FsDatasetImpl.LOG.debug(
               "The volume list has been changed concurrently, " +
-                  "retry to remove volume: " + newVolume);
+                  "retry to remove volume: " + ref.getVolume().getStorageID());
         }
       }
     }
-
-    FsDatasetImpl.LOG.info("Added new volume: " + newVolume.toString());
+    if (blockScanner != null) {
+      blockScanner.addVolumeScanner(ref);
+    }
+    FsDatasetImpl.LOG.info("Added new volume: " +
+        ref.getVolume().getStorageID());
   }
 
   /**
@@ -272,6 +279,9 @@ class FsVolumeList {
       if (volumeList.remove(target)) {
         if (volumes.compareAndSet(curVolumes,
             volumeList.toArray(new FsVolumeImpl[volumeList.size()]))) {
+          if (blockScanner != null) {
+            blockScanner.removeVolumeScanner(target);
+          }
           try {
             target.closeAndWait();
           } catch (IOException e) {

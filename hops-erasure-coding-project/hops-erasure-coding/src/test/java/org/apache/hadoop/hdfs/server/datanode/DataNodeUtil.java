@@ -31,9 +31,6 @@ public class DataNodeUtil {
     Block block = lb.getBlock().getLocalBlock();
     Block[] toDelete = new Block[]{block};
     for (DataNode dataNode : dataNodes) {
-      if (dataNode.blockScanner != null) {
-        dataNode.blockScanner.deleteBlocks(blockPoolId, toDelete);
-      }
       try {
         dataNode.data.invalidate(blockPoolId, toDelete);
       } catch (IOException e) {
