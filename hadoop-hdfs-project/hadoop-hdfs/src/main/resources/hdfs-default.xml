@@ -933,6 +933,45 @@
   </property>
 
   <property>
+    <name>dfs.datanode.scan.period.hours</name>
+    <value>0</value>
+    <description>
+      If this is 0 or negative, the DataNode's block scanner will be
+      disabled.  If this is positive, the DataNode will not scan any
+      individual block more than once in the specified scan period.
+    </description>
+  </property>
+
+  <property>
+    <name>dfs.block.scanner.volume.bytes.per.second</name>
+    <value>1048576</value>
+    <description>
+      If this is 0, the DataNode's block scanner will be disabled.  If this
+      is positive, this is the number of bytes per second that the DataNode's
+      block scanner will try to scan from each volume.
+    </description>
+  </property>
+
+  <property>
+    <name>dfs.datanode.readahead.bytes</name>
+    <value>4193404</value>
+    <description>
+      While reading block files, if the Hadoop native libraries are available,
+      the datanode can use the posix_fadvise system call to explicitly
+      page data into the operating system buffer cache ahead of the current
+      reader's position. This can improve performance especially when
+      disks are highly contended.
+
+      This configuration specifies the number of bytes ahead of the current
+      read position which the datanode will attempt to read ahead. This
+      feature may be disabled by configuring this property to 0.
+
+      If the native libraries are not available, this configuration has no
+      effect.
+    </description>
+  </property>
+
+  <property>
     <name>dfs.nameservice.id</name>
     <value></value>
     <description>
