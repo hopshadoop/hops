@@ -664,7 +664,7 @@ public class FSDirectory implements Closeable {
    * @param src The full path name of the child node.
    * @throw QuotaExceededException is thrown if it violates quota limit
    */
-  private boolean addINode(INodesInPath iip, INode child)
+  boolean addINode(INodesInPath iip, INode child)
       throws IOException {
     child.setLocalNameNoPersistance(iip.getLastLocalName());
     cacheName(child);
@@ -1119,23 +1119,7 @@ public class FSDirectory implements Closeable {
         namesystem.createFsOwnerPermissions(new FsPermission((short) 0755)),
         true);
     nameCache.reset();
-  }
-
-  /**
-   * Add the specified path into the namespace.
-   */
-  INodeSymlink addSymlink(INodesInPath iip, long id, String target,
-                          long mtime, long atime, PermissionStatus perm)
-          throws UnresolvedLinkException, QuotaExceededException, IOException {
-    return unprotectedAddSymlink(iip, id, target, mtime, atime, perm);
-  }
-
-  INodeSymlink unprotectedAddSymlink(INodesInPath iip, long id, String target, long mtime,
-      long atime, PermissionStatus perm)
-      throws IOException {
-    final INodeSymlink symlink = new INodeSymlink(id, target, mtime, atime, perm);
-    return addINode(iip, symlink)? symlink: null;
-  }
+  }  
 
   /**
    * Caches frequently used file names to reuse file name objects and
