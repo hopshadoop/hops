@@ -906,8 +906,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
   @Override // ClientProtocol
   public void createSymlink(String target, String link, FsPermission dirPerms,
       boolean createParent) throws IOException {
-    metrics.incrCreateSymlinkOps();
-    /* We enforce the MAX_PATH_LENGTH limit even though a symlink
+    /* We enforce the MAX_PATH_LENGTH limit even though a symlink target
      * URI may refer to a non-HDFS file system. 
      */
     if (!checkPathLength(link)) {
@@ -915,9 +914,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
           " character limit");
 
     }
-    if ("".equals(target)) {
-      throw new IOException("Invalid symlink target");
-    }
+
     final UserGroupInformation ugi = getRemoteUser();
     namesystem.createSymlink(target, link,
         new PermissionStatus(ugi.getShortUserName(), null, dirPerms),
