@@ -101,7 +101,7 @@ class FSDirMkdirOp {
             throw new IOException("Failed to create directory: " + src);
           }
         }
-        return fsd.getAuditFileInfo(src, false);
+        return fsd.getAuditFileInfo(iip);
       }
     };
     return (HdfsFileStatus) mkdirsHandler.handle();

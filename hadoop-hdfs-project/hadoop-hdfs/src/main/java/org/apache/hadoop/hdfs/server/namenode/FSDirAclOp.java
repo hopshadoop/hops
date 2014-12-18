@@ -85,7 +85,7 @@ class FSDirAclOp {
             existingAcl, aclSpec);
         AclStorage.updateINodeAcl(inode, newAcl);
 
-        return fsd.getAuditFileInfo(src, false);
+        return fsd.getAuditFileInfo(iip);
       }
     }.handle();
   }
@@ -126,7 +126,7 @@ class FSDirAclOp {
         List<AclEntry> newAcl = AclTransformation.filterAclEntriesByAclSpec(
             existingAcl, aclSpec);
         AclStorage.updateINodeAcl(inode, newAcl);
-        return fsd.getAuditFileInfo(src, false);
+        return fsd.getAuditFileInfo(iip);
       }
     }.handle();
   }
@@ -165,7 +165,7 @@ class FSDirAclOp {
         List<AclEntry> newAcl = AclTransformation.filterDefaultAclEntries(
             existingAcl);
         AclStorage.updateINodeAcl(inode, newAcl);
-        return fsd.getAuditFileInfo(src, false);
+        return fsd.getAuditFileInfo(iip);
       }
     }.handle();
   }
@@ -194,7 +194,7 @@ class FSDirAclOp {
         INodesInPath iip = fsd.getINodesInPath4Write(src);
         fsd.checkOwner(pc, iip);
         unprotectedRemoveAcl(fsd, iip);
-        return fsd.getAuditFileInfo(src, false);
+        return fsd.getAuditFileInfo(iip);
       }
     }.handle();
   }
@@ -223,7 +223,7 @@ class FSDirAclOp {
         INodesInPath iip = fsd.getINodesInPath4Write(src);
         fsd.checkOwner(pc, iip);
         List<AclEntry> newAcl = unprotectedSetAcl(fsd, src, aclSpec);
-        return fsd.getAuditFileInfo(src, false);
+        return fsd.getAuditFileInfo(iip);
       }
     }.handle();
   }

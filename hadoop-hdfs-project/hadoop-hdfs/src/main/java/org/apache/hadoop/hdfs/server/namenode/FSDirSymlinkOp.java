@@ -106,7 +106,7 @@ class FSDirSymlinkOp {
 
           NameNode.getNameNodeMetrics().incrCreateSymlinkOps();
           success = true;
-          return fsd.getAuditFileInfo(link, false);
+          return fsd.getAuditFileInfo(iip);
         } finally {
           RetryCacheDistributed.setState(cacheEntry, success);
         }
