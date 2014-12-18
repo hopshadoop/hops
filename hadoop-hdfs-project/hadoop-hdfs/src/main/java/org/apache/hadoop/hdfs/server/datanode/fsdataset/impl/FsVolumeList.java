@@ -36,7 +36,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 class FsVolumeList {
   private final AtomicReference<FsVolumeImpl[]> volumes =
-      new AtomicReference<FsVolumeImpl[]>(new FsVolumeImpl[0]);
+      new AtomicReference<>(new FsVolumeImpl[0]);
   private Object checkDirsMutex = new Object();
 
   private final VolumeChoosingPolicy<FsVolumeImpl> blockChooser;
@@ -58,20 +58,19 @@ class FsVolumeList {
   List<FsVolumeImpl> getVolumes() {
     return Collections.unmodifiableList(Arrays.asList(volumes.get()));
   }
-  
-  /**
+
+  /** 
    * Get next volume.
    *
    * @param blockSize free space needed on the volume
-   * @param storageType the desired {@link StorageType}
+   * @param storageType the desired {@link StorageType} 
    * @return next volume to store the block in.
    */
-  synchronized FsVolumeImpl getNextVolume(StorageType storageType,
-      long blockSize) throws IOException {
+  FsVolumeImpl getNextVolume(StorageType storageType, long blockSize)
+      throws IOException {
     // Get a snapshot of currently available volumes.
     final FsVolumeImpl[] curVolumes = volumes.get();
-    final List<FsVolumeImpl> list =
-        new ArrayList<FsVolumeImpl>(curVolumes.length);
+    final List<FsVolumeImpl> list = new ArrayList<>(curVolumes.length);
     for(FsVolumeImpl v : curVolumes) {
       if (v.getStorageType() == storageType) {
         list.add(v);
@@ -79,7 +78,7 @@ class FsVolumeList {
     }
     return blockChooser.chooseVolume(list, blockSize);
   }
-
+  
   long getDfsUsed() throws IOException {
     long dfsUsed = 0L;
     for (FsVolumeImpl v : volumes.get()) {
@@ -240,7 +239,7 @@ class FsVolumeList {
           if (FsDatasetImpl.LOG.isDebugEnabled()) {
             FsDatasetImpl.LOG.debug(
                 "The volume list has been changed concurrently, " +
-                    "retry to remove volume: " + target);
+                "retry to remove volume: " + target);
           }
         }
       } else {
@@ -254,10 +253,10 @@ class FsVolumeList {
   }
 
   /**
-   * Dynamically remove volume to the list.
+   * Dynamically remove volume in the list.
    * @param volume the volume to be removed.
    */
-  synchronized void removeVolume(String volume) {
+  void removeVolume(String volume) {
     // Make a copy of volumes to remove one volume.
     final FsVolumeImpl[] curVolumes = volumes.get();
     final List<FsVolumeImpl> volumeList = Lists.newArrayList(curVolumes);
@@ -321,7 +320,7 @@ class FsVolumeList {
 
   void shutdown() {
     for (FsVolumeImpl volume : volumes.get()) {
-      if (volume != null) {
+      if(volume != null) {
         volume.shutdown();
       }
     }
