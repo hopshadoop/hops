@@ -271,23 +271,30 @@ class FSDirStatAndListingOp {
   /** Get the file info for a specific file.
    * @param fsd FSDirectory
    * @param src The string representation of the path to the file
-   * @param resolveLink whether to throw UnresolvedLinkException
-   * @param isRawPath true if a /.reserved/raw pathname was passed by the user
    * @param includeStoragePolicy whether to include storage policy
    * @return object containing information regarding the file
    *         or null if file not found
    */
   static HdfsFileStatus getFileInfo(
+      FSDirectory fsd, INodesInPath src,
+      boolean includeStoragePolicy)
+      throws IOException {
+
+    final INode i = src.getLastINode();
+    byte policyId = includeStoragePolicy && i != null && !i.isSymlink() ? i.getStoragePolicyID()
+        : BlockStoragePolicySuite.ID_UNSPECIFIED;
+    return i == null ? null : createFileStatus(
+        fsd, HdfsFileStatus.EMPTY_NAME, i, policyId,
+        src);
+  }
+  
+  static HdfsFileStatus getFileInfo(
       FSDirectory fsd, String src, boolean resolveLink,
       boolean includeStoragePolicy)
     throws IOException {
     String srcs = FSDirectory.normalizePath(src);
-      final INodesInPath inodesInPath = fsd.getINodesInPath(srcs, resolveLink);
-      final INode i = inodesInPath.getLastINode();
-      byte policyId = includeStoragePolicy && i != null && !i.isSymlink() ?
-          i.getStoragePolicyID() : BlockStoragePolicySuite.ID_UNSPECIFIED;
-      return i == null ? null : createFileStatus(fsd,
-          HdfsFileStatus.EMPTY_NAME, i, policyId, inodesInPath);
+    final INodesInPath iip = fsd.getINodesInPath(srcs, resolveLink);
+    return getFileInfo(fsd, iip, includeStoragePolicy);
   }
 
   /**

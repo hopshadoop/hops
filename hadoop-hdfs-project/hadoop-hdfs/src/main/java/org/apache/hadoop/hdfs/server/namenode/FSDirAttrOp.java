@@ -97,7 +97,7 @@ public class FSDirAttrOp {
             }
             EntityManager.remove(new SubTreeOperation(fsd.getFSNamesystem().getSubTreeLockPathPrefix(src)));
           }
-          return fsd.getAuditFileInfo(src, false);
+          return fsd.getAuditFileInfo(iip);
         }
       }.handle();
       txFailed = false;
@@ -164,7 +164,7 @@ public class FSDirAttrOp {
                 }
                 EntityManager.remove(new SubTreeOperation(fsd.getFSNamesystem().getSubTreeLockPathPrefix(src)));
               }
-              return fsd.getAuditFileInfo(src, false);
+              return fsd.getAuditFileInfo(iip);
             }
           }.handle();
       txFailed = false;
@@ -215,7 +215,7 @@ public class FSDirAttrOp {
           throw new FileNotFoundException("File/Directory " + src + " does not exist.");
         }
         boolean changed = unprotectedSetTimes(fsd, inode, mtime, atime, true);
-        return fsd.getAuditFileInfo(src, false);
+        return fsd.getAuditFileInfo(iip);
       }
     }.handle();
   }
@@ -307,7 +307,7 @@ public class FSDirAttrOp {
         }
         unprotectedSetStoragePolicy(fsd, bm, iip, policy.getId());
 
-        return fsd.getAuditFileInfo(src, false);
+        return fsd.getAuditFileInfo(iip);
       }
     };
     return (HdfsFileStatus) setStoragePolicyHandler.handle();

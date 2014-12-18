@@ -321,11 +321,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     return !isDefaultAuditLogger || auditLog.isInfoEnabled();
   }
 
-  private HdfsFileStatus getAuditFileInfo(String path, boolean resolveSymlink)
-      throws IOException {
-    return dir.getAuditFileInfo(path, resolveSymlink);
-  }
-
   private void logAuditEvent(boolean succeeded, String cmd, String src)
       throws IOException {
     logAuditEvent(succeeded, cmd, src, null, null);

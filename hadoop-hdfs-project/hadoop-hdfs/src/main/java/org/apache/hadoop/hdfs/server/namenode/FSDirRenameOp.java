@@ -151,6 +151,7 @@ class FSDirRenameOp {
    * boolean, Options.Rename...)}
    */
   @Deprecated
+  @SuppressWarnings("deprecation")
   static boolean unprotectedRenameTo(FSDirectory fsd, String src, String dst, long timestamp)
       throws IOException {
     
@@ -411,8 +412,8 @@ class FSDirRenameOp {
     dst = fsd.resolvePath(dst, dstComponents);
     HdfsFileStatus resultingStat = renameTo(fsd, pc, src, dst, collectedBlocks, options);
 
-    return new AbstractMap.SimpleImmutableEntry<BlocksMapUpdateInfo,
-        HdfsFileStatus>(collectedBlocks, resultingStat);
+    return new AbstractMap.SimpleImmutableEntry<>(
+        collectedBlocks, resultingStat);
   }
 
   /**
@@ -744,7 +745,7 @@ class FSDirRenameOp {
                 removedSrc);
 
             tx.updateQuotasInSourceTree();
-            HdfsFileStatus auditStat = fsd.getAuditFileInfo(dst, false);
+            HdfsFileStatus auditStat = fsd.getAuditFileInfo(dstIIP);
             return new RenameResult(filesDeleted, auditStat);
           }
         } finally {

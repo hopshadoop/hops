@@ -206,7 +206,7 @@ class FSDirConcatOp {
           long timestamp = now();
           unprotectedConcat(fsd, target, srcs, timestamp);
           success = true;
-          return fsd.getAuditFileInfo(target, false);
+          return fsd.getAuditFileInfo(trgIip);
         } finally {
           RetryCacheDistributed.setState(cacheEntry, success);
         }
