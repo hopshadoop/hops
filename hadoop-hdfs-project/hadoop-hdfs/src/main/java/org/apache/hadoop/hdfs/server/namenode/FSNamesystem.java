@@ -1744,7 +1744,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       } else {
         if (overwrite) {
           try {
-            deleteInt(src, true); // File exists - delete if overwrite
+            deleteInt(iip, true); // File exists - delete if overwrite
+            iip = INodesInPath.replace(iip, iip.length() - 1, null);
           } catch (AccessControlException e) {
             logAuditEvent(false, "delete", src);
             throw e;
@@ -1761,12 +1762,12 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       
       INodeFile newNode = null;
       // Always do an implicit mkdirs for parent directory tree.
-      INodesInPath parentIIP = iip.getParentINodesInPath();
-      if (parentIIP != null && (parentIIP = FSDirMkdirOp.mkdirsRecursively(dir,
-          parentIIP, permissions, true, now())) != null) {
-        iip = INodesInPath.append(parentIIP, newNode, iip.getLastLocalName());
-        newNode = dir.addFile(iip, src, permissions, replication, blockSize,
-                holder, clientMachine);
+      Map.Entry<INodesInPath, String> parent = FSDirMkdirOp
+          .createAncestorDirectories(dir, iip, permissions);
+      if (parent != null) {
+        iip = dir.addFile(parent.getKey(), parent.getValue(), permissions,
+            replication, blockSize, holder, clientMachine);
+        newNode = iip != null ? iip.getLastINode().asFile() : null;
       }
       
       if (newNode == null) {
@@ -3094,7 +3095,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             }
             boolean ret = false;
             try {
-              ret = delete(src, recursive);
+              final INodesInPath iip = dir.getINodesInPath4Write(src);
+              ret = delete(iip, recursive);
               return ret;
             } finally {
               RetryCacheDistributed.setState(cacheEntry, ret);
@@ -3104,26 +3106,26 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     return (Boolean) deleteHandler.handle(this);
   }
 
-  private boolean delete(String src, boolean recursive)
+  private boolean delete(INodesInPath iip, boolean recursive)
       throws
       IOException {
     try {
-      return deleteInt(src, recursive);
+      return deleteInt(iip, recursive);
     } catch (AccessControlException e) {
-      logAuditEvent(false, "delete", src);
+      logAuditEvent(false, "delete", iip.getPath());
       throw e;
     }
   }
 
-  private boolean deleteInt(String src, boolean recursive)
+  private boolean deleteInt(INodesInPath iip, boolean recursive)
       throws
       IOException {
     if (NameNode.stateChangeLog.isDebugEnabled()) {
-      NameNode.stateChangeLog.debug("DIR* NameSystem.delete: " + src);
+      NameNode.stateChangeLog.debug("DIR* NameSystem.delete: " + iip.getPath());
     }
-    boolean status = deleteInternal(src, recursive, true);
+    boolean status = deleteInternal(iip, recursive, true);
     if (status) {
-      logAuditEvent(true, "delete", src);
+      logAuditEvent(true, "delete", iip.getPath());
     }
     return status;
   }
@@ -3143,16 +3145,15 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    *
    * @see ClientProtocol#delete(String, boolean) for description of exceptions
    */
-  private boolean deleteInternal(String src, boolean recursive,
+  private boolean deleteInternal(INodesInPath iip, boolean recursive,
       boolean enforcePermission)
       throws
       IOException {
     BlocksMapUpdateInfo collectedBlocks = new BlocksMapUpdateInfo();
     FSPermissionChecker pc = getPermissionChecker();
-    checkNameNodeSafeMode("Cannot delete " + src);
-    final INodesInPath iip = dir.getINodesInPath4Write(src);
+    checkNameNodeSafeMode("Cannot delete " + iip.getPath());
     if (!recursive && dir.isNonEmptyDirectory(iip)) {
-       throw new PathIsNotEmptyDirectoryException(src + " is non empty");
+       throw new PathIsNotEmptyDirectoryException(iip.getPath() + " is non empty");
     }
     if (enforcePermission && isPermissionEnabled) {
       dir.checkPermission(pc, iip, false, null, FsAction.WRITE, null, FsAction.ALL, true);
@@ -3165,12 +3166,12 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     }
     incrDeletedFileCount(filesRemoved);
     // Blocks/INodes will be handled later
-    removePathAndBlocks(src, null);
+    removePathAndBlocks(iip.getPath(), null);
     removeBlocks(collectedBlocks); // Incremental deletion of blocks
     collectedBlocks.clear();
     if (NameNode.stateChangeLog.isDebugEnabled()) {
       NameNode.stateChangeLog
-          .debug("DIR* Namesystem.delete: " + src + " is removed");
+          .debug("DIR* Namesystem.delete: " + iip.getPath() + " is removed");
     }
     return true;
   }
@@ -7142,7 +7143,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
                     @Override
                     public Object performTask() throws IOException {
-                      if(!deleteInternal(path,true,false)){
+                      final INodesInPath iip = dir.getINodesInPath4Write(path);
+                      if(!deleteInternal(iip,true,false)){
                         //at this point the delete op is expected to succeed. Apart from DB errors
                         // this can only fail if the quiesce phase in subtree operation failed to
                         // quiesce the subtree. See TestSubtreeConflicts.testConcurrentSTOandInodeOps

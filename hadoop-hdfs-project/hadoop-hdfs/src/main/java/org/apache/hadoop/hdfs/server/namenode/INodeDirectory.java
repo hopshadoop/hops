@@ -198,14 +198,14 @@ public class INodeDirectory extends INodeWithAdditionalFields {
     this.metaEnabled = metaEnabled;
   }
 
-  INode removeChild(INode node)
+  public boolean removeChild(INode node)
       throws StorageException, TransactionContextException {
     INode existingInode = getChildINode(node.getLocalNameBytes());
     if (existingInode != null) {
       remove(existingInode);
-      return existingInode;
+      return true;
     }
-    return null;
+    return false;
   }
 
   /**
