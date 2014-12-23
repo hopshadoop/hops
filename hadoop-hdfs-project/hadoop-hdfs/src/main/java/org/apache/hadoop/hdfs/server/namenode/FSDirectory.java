@@ -72,6 +72,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.apache.commons.io.Charsets;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_ACCESSTIME_PRECISION_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_ACCESSTIME_PRECISION_KEY;
@@ -240,29 +241,31 @@ public class FSDirectory implements Closeable {
    * @throws QuotaExceededException
    * @throws UnresolvedLinkException
    */
-  INodeFile addFile(INodesInPath iip, String path, PermissionStatus permissions,
-      short replication, long preferredBlockSize,
+  INodesInPath addFile(INodesInPath existing, String localName, PermissionStatus 
+      permissions, short replication, long preferredBlockSize,
       String clientName, String clientMachine)
-      throws IOException {
+    throws IOException {
 
     long modTime = now();
     
     INodeFile newNode = new INodeFile(IDsGeneratorFactory.getInstance().getUniqueINodeID(), permissions,
         BlockInfo.EMPTY_ARRAY, replication, modTime, modTime, preferredBlockSize, (byte) 0);
+    newNode.setLocalNameNoPersistance(localName.getBytes(Charsets.UTF_8));
     newNode.toUnderConstruction(clientName, clientMachine);
 
-    boolean added = false;
-    added = addINode(iip, newNode);
+    INodesInPath newiip;
+    newiip = addINode(existing, newNode);
 
-    if (!added) {
-      NameNode.stateChangeLog.info("DIR* addFile: failed to add " + path);
+    if (newiip == null) {
+      NameNode.stateChangeLog.info("DIR* addFile: failed to add " +
+          existing.getPath() + "/" + localName);
       return null;
     }
 
     if (NameNode.stateChangeLog.isDebugEnabled()) {
-      NameNode.stateChangeLog.debug("DIR* addFile: " + path + " is added");
+      NameNode.stateChangeLog.debug("DIR* addFile: " + localName + " is added");
     }
-    return newNode;
+    return newiip;
   }
 
   /**
@@ -463,8 +466,8 @@ public class FSDirectory implements Closeable {
     addMetaDataLogForDirDeletion(targetNode);
 
     // Remove the node from the namespace
-    targetNode = removeLastINode(iip);
-    if (targetNode == null) {
+    long removed = removeLastINode(iip);
+    if (removed == -1) {
       return -1;
     }
     // set the parent's modification time
@@ -661,14 +664,16 @@ public class FSDirectory implements Closeable {
     
   /**
    * Add the given child to the namespace.
-   * @param src The full path name of the child node.
+   * @param existing the INodesInPath containing all the ancestral INodes
+   * @param child the new INode to add
+   * @return a new INodesInPath instance containing the new child INode. Null
+   * if the adding fails.
    * @throw QuotaExceededException is thrown if it violates quota limit
    */
-  boolean addINode(INodesInPath iip, INode child)
+  INodesInPath addINode(INodesInPath existing, INode child)
       throws IOException {
-    child.setLocalNameNoPersistance(iip.getLastLocalName());
     cacheName(child);
-    return addLastINode(iip, child, true);
+    return addLastINode(existing, child, true);
   }
 
   /**
@@ -813,74 +818,42 @@ public class FSDirectory implements Closeable {
     }
   }
   
-  /**
-   * The same as {@link #addChild(INodesInPath, int, INode, boolean)}
-   * with pos = length - 1.
-   */
-  private boolean addLastINode(INodesInPath inodesInPath,
-      INode inode, INode.DirCounts counts, boolean checkQuota, boolean
-      logMetadataEvent) throws
-      QuotaExceededException, StorageException, IOException {
-    final int pos = inodesInPath.length() - 1;
-    return addChild(inodesInPath, pos, inode, counts, checkQuota, logMetadataEvent);
-  }
-
-  private boolean addLastINode(INodesInPath inodesInPath,
+  INodesInPath addLastINode(INodesInPath existing,
       INode inode, boolean checkQuota) throws QuotaExceededException, StorageException, IOException {
-    final int pos = inodesInPath.length() - 1;
-    return addChild(inodesInPath, pos, inode, checkQuota);
-  }
-  
-  /**
-   * Add a node child to the inodes at index pos.
-   * Its ancestors are stored at [0, pos-1].
-   * @return false if the child with this name already exists;
-   *         otherwise return true;
-   * @throw QuotaExceededException is thrown if it violates quota limit
-   */
-  boolean addChild(INodesInPath iip, int pos,
-      INode child, boolean checkQuota) throws QuotaExceededException, StorageException, IOException {
-    final INodeDirectory parent = iip.getINode(pos-1).asDirectory();
-    // The filesystem limits are not really quotas, so this check may appear
-    // odd.  It's because a rename operation deletes the src, tries to add
-    // to the dest, if that fails, re-adds the src from whence it came.
-    // The rename code disables the quota when it's restoring to the
-    // original location becase a quota violation would cause the the item
-    // to go "poof".  The fs limits must be bypassed for the same reason.
-    if (checkQuota) {
-      final String parentPath = iip.getPath(pos - 1);
-      verifyFsLimits(child.getLocalNameBytes(), parentPath, parent);
-    }
+    assert existing.getLastINode() != null &&
+        existing.getLastINode().isDirectory();
     
     INode.DirCounts counts = new INode.DirCounts();
     if (isQuotaEnabled()) {       //HOP
-      child.spaceConsumedInTree(counts);
+      inode.spaceConsumedInTree(counts);
     }
-
-    return addChild(iip, pos, child, counts, checkQuota);
+    return addLastINode(existing, inode, counts, checkQuota, true);
   }
   
-  private boolean addChild(INodesInPath inodesInPath, int pos, INode child,
-      INode.DirCounts counts, boolean checkQuota)
-      throws IOException {
-    return addChild(inodesInPath, pos, child, counts, checkQuota, true);
-  }
-  
-  boolean addChild(INodesInPath iip, int pos, INode child,
-      INode.DirCounts counts, boolean checkQuota, boolean logMetadataEvent)
-      throws IOException {
+  /**
+   * Add a child to the end of the path specified by INodesInPath.
+   * @return an INodesInPath instance containing the new INode
+   */
+  INodesInPath addLastINode(INodesInPath existing,
+      INode inode, INode.DirCounts counts, boolean checkQuota, boolean
+      logMetadataEvent) throws
+      QuotaExceededException, StorageException, IOException {
+    assert existing.getLastINode() != null &&
+        existing.getLastINode().isDirectory();
+    
+    final int pos = existing.length();
     // Disallow creation of /.reserved. This may be created when loading
     // editlog/fsimage during upgrade since /.reserved was a valid name in older
     // release. This may also be called when a user tries to create a file
     // or directory /.reserved.
-    if (pos == 1 && iip.getINode(0) == getRootDir() && isReservedName(child)) {
+    if (pos == 1 && existing.getINode(0) == getRootDir() && isReservedName(inode)) {
       throw new HadoopIllegalArgumentException(
-          "File name \"" + child.getLocalName() + "\" is reserved and cannot "
+          "File name \"" + inode.getLocalName() + "\" is reserved and cannot "
               + "be created. If this is during upgrade change the name of the "
               + "existing file or directory to another name before upgrading "
               + "to the new release.");
     }
-    final INodeDirectory parent = iip.getINode(pos-1).asDirectory();
+    final INodeDirectory parent = existing.getINode(pos - 1).asDirectory();
     // The filesystem limits are not really quotas, so this check may appear
     // odd.  It's because a rename operation deletes the src, tries to add
     // to the dest, if that fails, re-adds the src from whence it came.
@@ -888,48 +861,51 @@ public class FSDirectory implements Closeable {
     // original location becase a quota violation would cause the the item
     // to go "poof".  The fs limits must be bypassed for the same reason.
     if (checkQuota) {
-      final String parentPath = iip.getPath(pos - 1);
-      verifyFsLimits(child.getLocalNameBytes(), parentPath, parent);
+      final String parentPath = existing.getPath(pos - 1);
+      verifyFsLimits(inode.getLocalNameBytes(), parentPath, parent);
     }
 
-    updateCount(iip, pos, counts.getNsCount(), counts.getDsCount(), checkQuota);
-    final boolean added = parent.addChild(child,
+    updateCount(existing, pos, counts.getNsCount(), counts.getDsCount(), checkQuota);
+    final boolean added = parent.addChild(inode,
         true, logMetadataEvent);
     if (!added) {
-      updateCount(iip, pos, -counts.getNsCount(), -counts.getDsCount(), true);
+      updateCount(existing, pos, -counts.getNsCount(), -counts.getDsCount(), true);
+      return null;
     } 
 
+    INodesInPath iip = INodesInPath.append(existing, inode, inode.getLocalNameBytes());
     if (added) {
-      if (!child.isDirectory()) {
+      if (!inode.isDirectory()) {
         List<INode> pathInodes = new ArrayList<>(pos+1);
         int i=0;
-        for(INode inode: iip.getReadOnlyINodes()){
-          pathInodes.add(inode);
+        for(INode node: existing.getReadOnlyINodes()){
+          pathInodes.add(node);
           i++;
           if(i==pos){
-            pathInodes.add(child);
+            pathInodes.add(inode);
             break;
           }
         }
-        String path = iip.getPath(pos);
+        
+        String path = iip.getPath();
         Cache.getInstance().set(path, pathInodes);
       }
     }
     //
-    return added;
+    return iip;
   }
   
-  boolean addLastINodeNoQuotaCheck(INodesInPath inodesInPath, INode child, INode.DirCounts counts)
+  INodesInPath addLastINodeNoQuotaCheck(INodesInPath existing, INode inode, INode.DirCounts counts)
       throws IOException {
     try {
-      return addLastINode(inodesInPath, child, counts, false, false);
+      return addLastINode(existing, inode, counts, false, false);
     } catch (QuotaExceededException e) {
       NameNode.LOG.warn("FSDirectory.addChildNoQuotaCheck - unexpected", e);
     }
-    return false;
+    return null;
   }
   
-  INode removeLastINode(final INodesInPath iip) throws StorageException, TransactionContextException {
+  long removeLastINode(final INodesInPath iip) throws StorageException, TransactionContextException {
     INode.DirCounts counts = new INode.DirCounts();
     if (isQuotaEnabled()) {
       iip.getLastINode().spaceConsumedInTree(counts);
@@ -942,19 +918,20 @@ public class FSDirectory implements Closeable {
    * Count of each ancestor with quota is also updated.
    * @return the removed node; null if the removal fails.
    */
-  INode removeLastINode(final INodesInPath iip, boolean forRename,
+  long removeLastINode(final INodesInPath iip, boolean forRename,
           final INode.DirCounts counts)
       throws StorageException, TransactionContextException {
-    INode removedNode = null;
-    if (forRename) {
-      removedNode = iip.getLastINode();
-    } else {
-      removedNode = ((INodeDirectory) iip.getINode(-2))
-          .removeChild(iip.getLastINode());
+    final INode last = iip.getLastINode();
+    final INodeDirectory parent = iip.getINode(-2).asDirectory();
+    if(!forRename){
+      if(!parent.removeChild(last)){
+        return -1;
+      }
     }
-    if (removedNode != null && isQuotaEnabled()) {
+
+    if (isQuotaEnabled()) {
       List<QuotaUpdate> outstandingUpdates = (List<QuotaUpdate>) EntityManager
-          .findList(QuotaUpdate.Finder.ByINodeId, removedNode.getId());
+          .findList(QuotaUpdate.Finder.ByINodeId, last.getId());
       long nsDelta = 0;
       long dsDelta = 0;
       for (QuotaUpdate update : outstandingUpdates) {
@@ -964,13 +941,14 @@ public class FSDirectory implements Closeable {
       updateCountNoQuotaCheck(iip, iip.length() - 1,
           -counts.getNsCount() + nsDelta, -counts.getDsCount() + dsDelta);
     }
-    return removedNode;
+    return counts.getNsCount();
   }
 
   INode removeChildNonRecursively(final INodesInPath inodesInPath, int pos)
       throws StorageException, TransactionContextException {
-    INode removedNode = ((INodeDirectory) inodesInPath.getINode(pos -1))
-        .removeChild(inodesInPath.getINode(pos));
+    INode removedNode = inodesInPath.getINode(pos);
+    ((INodeDirectory) inodesInPath.getINode(pos - 1))
+        .removeChild(removedNode);
     if (removedNode != null && isQuotaEnabled()) {
       List<QuotaUpdate> outstandingUpdates = (List<QuotaUpdate>) EntityManager
           .findList(QuotaUpdate.Finder.ByINodeId, removedNode.getId());

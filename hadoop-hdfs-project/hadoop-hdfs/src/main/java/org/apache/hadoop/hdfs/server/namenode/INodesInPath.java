@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 
+import com.google.common.collect.ImmutableList;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.Path;
@@ -239,6 +240,21 @@ public class INodesInPath {
     return DFSUtil.byteArray2PathString(path, 0, pos);
   }
 
+  /**
+   * @param offset start endpoint (inclusive)
+   * @param length number of path components
+   * @return sub-list of the path
+   */
+  public List<String> getPath(int offset, int length) {
+    Preconditions.checkArgument(offset >= 0 && length >= 0 && offset + length
+        <= path.length);
+    ImmutableList.Builder<String> components = ImmutableList.builder();
+    for (int i = offset; i < offset + length; i++) {
+      components.add(DFSUtil.bytes2String(path[i]));
+    }
+    return components.build();
+  }
+
   public int length() {
     return inodes.length;
   }
@@ -250,15 +266,15 @@ public class INodesInPath {
    /**
    * @param length number of ancestral INodes in the returned INodesInPath
    *               instance
-   * @return the INodesInPath instance containing ancestral INodes
+   * @return the INodesInPath instance containing ancestral INodes. Note that
+   * this method only handles non-snapshot paths.
    */
   private INodesInPath getAncestorINodesInPath(int length) {
     Preconditions.checkArgument(length >= 0 && length < inodes.length);
     final INode[] anodes = new INode[length];
-    final byte[][] apath;
-    apath = new byte[length][];
+    final byte[][] apath = new byte[length][];
     System.arraycopy(this.inodes, 0, anodes, 0, length);
-    System.arraycopy(this.path, 0, apath, 0, apath.length);
+    System.arraycopy(this.path, 0, apath, 0, length);
     return new INodesInPath(anodes, apath);
   }
 
@@ -270,7 +286,25 @@ public class INodesInPath {
     return inodes.length > 1 ? getAncestorINodesInPath(inodes.length - 1) :
         null;
   }
-  
+
+  /**
+   * @return a new INodesInPath instance that only contains exisitng INodes.
+   * Note that this method only handles non-snapshot paths.
+   */
+  public INodesInPath getExistingINodes() {
+    int i = 0;
+    for (; i < inodes.length; i++) {
+      if (inodes[i] == null) {
+        break;
+      }
+    }
+    INode[] existing = new INode[i];
+    byte[][] existingPath = new byte[i][];
+    System.arraycopy(inodes, 0, existing, 0, i);
+    System.arraycopy(path, 0, existingPath, 0, i);
+    return new INodesInPath(existing, existingPath);
+  }
+
   private static String toString(INode inode) {
     return inode == null ? null : inode.getLocalName();
   }

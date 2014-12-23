@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
+import com.google.common.base.Preconditions;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
@@ -152,7 +153,7 @@ class FSDirRenameOp {
    */
   @Deprecated
   @SuppressWarnings("deprecation")
-  static boolean unprotectedRenameTo(FSDirectory fsd, String src, String dst, long timestamp)
+  static boolean renameForEditLog(FSDirectory fsd, String src, String dst, long timestamp)
       throws IOException {
     
     
@@ -336,24 +337,15 @@ class FSDirRenameOp {
         verifyFsLimitsForRename(fsd, srcIIP, dstIIP);
         verifyQuotaForRename(fsd, srcIIP, dstIIP, srcCounts, dstCounts);
 
-        RenameOperation tx = new RenameOperation(fsd, src, dst, srcIIP, dstIIP, srcCounts);
+        RenameOperation tx = new RenameOperation(fsd, src, dst, srcIIP, dstIIP, srcCounts, dstCounts);
 
         boolean added = false;
-        INode srcChild = null;
 
         try {
           // remove src
-          srcChild = removeLastINodeForRename(fsd, tx.srcIIP, srcCounts);
-          if (srcChild == null) {
-            NameNode.stateChangeLog.warn(
-                "DIR* FSDirectory.unprotectedRenameTo: " + "failed to rename " + src + " to " + dst
-                + " because the source can not be removed");
+          if (!tx.removeSrc4OldRename()) {
             return false;
           }
-
-          INode srcClone = srcChild.cloneInode();
-
-          srcChild.setLocalNameNoPersistance(dstIIP.getLastLocalName());
 
           // add src to the destination
           added = tx.addSourceToDestination();
@@ -366,16 +358,13 @@ class FSDirRenameOp {
             tx.updateMtimeAndLease(timestamp);
             tx.updateQuotasInSourceTree();
 
-            logMetadataEventForRename(srcClone, srcChild);
-
-            EntityManager.snapshotMaintenance(
-                HdfsTransactionContextMaintenanceCmds.INodePKChanged, srcClone,
-                srcChild);
+            tx.logMetadataEvent();
+            tx.snapshotMaintenance();
 
             return true;
           }
         } finally {
-          if (!added && srcChild != null) {
+          if (!added) {
             tx.restoreSource();
           }
         }
@@ -417,8 +406,8 @@ class FSDirRenameOp {
   }
 
   /**
-   * @see #unprotectedRenameTo(FSDirectory, String, String, long,
-   * org.apache.hadoop.fs.Options.Rename...)
+   * @see {@link #unprotectedRenameTo(FSDirectory, String, String, INodesInPath,
+   * INodesInPath, long, BlocksMapUpdateInfo, Options.Rename...)}
    */
   static HdfsFileStatus renameTo(FSDirectory fsd, FSPermissionChecker pc, String src,
       String dst, BlocksMapUpdateInfo collectedBlocks,
@@ -438,32 +427,6 @@ class FSDirRenameOp {
 
   /**
    * Rename src to dst.
-   * <br>
-   * Note: This is to be used by {@link org.apache.hadoop.hdfs.server
-   * .namenode.FSEditLogLoader} only.
-   * <br>
-   *
-   * @param fsd       FSDirectory
-   * @param src       source path
-   * @param dst       destination path
-   * @param timestamp modification time
-   * @param options   Rename options
-   */
-  static RenameResult unprotectedRenameTo(
-      FSDirectory fsd, String src, String dst, long timestamp,
-      Options.Rename... options)
-      throws IOException {
-    BlocksMapUpdateInfo collectedBlocks = new BlocksMapUpdateInfo();
-    RenameResult ret = unprotectedRenameTo(fsd, src, dst, timestamp,
-        collectedBlocks, options);
-    if (!collectedBlocks.getToDeleteList().isEmpty()) {
-      fsd.getFSNamesystem().removeBlocksAndUpdateSafemodeTotal(collectedBlocks);
-    }
-    return ret;
-  }
-
-  /**
-   * Rename src to dst.
    * See {@link DistributedFileSystem#rename(Path, Path, Options.Rename...)}
    * for details related to rename semantics and exceptions.
    *
@@ -473,6 +436,7 @@ class FSDirRenameOp {
    * @param timestamp       modification time
    * @param collectedBlocks blocks to be removed
    * @param options         Rename options
+   * @return whether a file/directory gets overwritten in the dst path
    */
   static RenameResult unprotectedRenameTo(FSDirectory fsd, String src, String dst, long timestamp,
       BlocksMapUpdateInfo collectedBlocks, Options.Rename... options)
@@ -683,29 +647,21 @@ class FSDirRenameOp {
         verifyFsLimitsForRename(fsd, srcIIP, dstIIP);
         verifyQuotaForRename(fsd, srcIIP, dstIIP, srcCounts, dstCounts);
 
-        RenameOperation tx = new RenameOperation(fsd, src, dst, srcIIP, dstIIP, srcCounts);
+        RenameOperation tx = new RenameOperation(fsd, src, dst, srcIIP, dstIIP, srcCounts, dstCounts);
 
         boolean undoRemoveSrc = true;
-        INode removedSrc = removeLastINodeForRename(fsd, tx.srcIIP, srcCounts);
-        if (removedSrc == null) {
-          String error = "Failed to rename " + src + " to " + dst + " because the source can not be removed";
-          NameNode.stateChangeLog
-              .warn("DIR* FSDirectory.unprotectedRenameTo: " + error);
-          throw new IOException(error);
-        }
+        tx.removeSrc();
 
-        INode srcClone = removedSrc.cloneInode();
-
-        String dstChildName = null;
         boolean undoRemoveDst = false;
-        INode removedDst = null;
+        long removedNum = 0;
         try {
           if (dstIIP.getLastINode() != null) { // dst exists remove it
-            removedDst = removeLastINode(fsd, dstIIP, dstCounts);
-            dstChildName = removedDst.getLocalName();
-            undoRemoveDst = true;
+            removedNum = tx.removeDst();
+            if (removedNum != -1) {  
+              undoRemoveDst = true;
+            }
           }
-
+          
           // add src as dst to complete rename
           if (tx.addSourceToDestination()) {
             undoRemoveSrc = false;
@@ -717,33 +673,18 @@ class FSDirRenameOp {
 
             // Collect the blocks and remove the lease for previous dst
             boolean filesDeleted = false;
-            if (removedDst != null) {
-              INode  rmdst = removedDst;
-              undoRemoveDst = false;
-              BlocksMapUpdateInfo collectedBlocks = new BlocksMapUpdateInfo();
-              filesDeleted = true;
-              // rmdst.collectSubtreeBlocksAndClear(collectedBlocks);
-              // [S] as the dst dir was empty it will always return 1
-              // if the destination is file then we need to collect the blocks for it
-              if (rmdst instanceof INodeFile && !((INodeFile) rmdst).isFileStoredInDB()) {
-                Block[] blocks = ((INodeFile) rmdst).getBlocks();
-                for (Block blk : blocks) {
-                  collectedBlocks.addDeleteBlock(blk);
-                }
-              } else if (rmdst instanceof INodeFile && ((INodeFile) rmdst).isFileStoredInDB()) {
-                ((INodeFile) rmdst).deleteFileDataStoredInDB();
+            if (undoRemoveDst) {
+              if (removedNum > 0) {
+                filesDeleted = tx.cleanDst();
               }
-              fsd.getFSNamesystem().removePathAndBlocks(src, collectedBlocks);
             }
-
+            
             if (!undoRemoveSrc && !undoRemoveDst) {
-              logMetadataEventForRename(srcClone, removedSrc);
+              tx.logMetadataEvent();
+             
             }
-
-            EntityManager.snapshotMaintenance(
-                HdfsTransactionContextMaintenanceCmds.INodePKChanged, srcClone,
-                removedSrc);
-
+            
+            tx.snapshotMaintenance();
             tx.updateQuotasInSourceTree();
             HdfsFileStatus auditStat = fsd.getAuditFileInfo(dstIIP);
             return new RenameResult(filesDeleted, auditStat);
@@ -752,10 +693,8 @@ class FSDirRenameOp {
           if (undoRemoveSrc) {
             tx.restoreSource();
           }
-          if (undoRemoveDst) {
-            // Rename failed - restore dst
-            removedDst.setLocalNameNoPersistance(dstChildName);
-            fsd.addLastINodeNoQuotaCheck(tx.dstIIP, removedDst, dstCounts);
+          if (undoRemoveDst) { // Rename failed - restore dst
+            tx.restoreDst();
           }
         }
         NameNode.stateChangeLog.warn(
@@ -781,7 +720,7 @@ class FSDirRenameOp {
     }
     final long mtime = Time.now();
     boolean stat = false;
-      stat = unprotectedRenameTo(fsd, src, dst, mtime);
+      stat = renameForEditLog(fsd, src, dst, mtime);
     if (stat) {
       return true;
     }
@@ -857,45 +796,90 @@ class FSDirRenameOp {
 
   private static class RenameOperation {
     private final FSDirectory fsd;
-    private final INodesInPath srcIIP;
-    private final INodesInPath dstIIP;
+    private INodesInPath srcIIP;
+    private final INodesInPath srcParentIIP;
+    private INodesInPath dstIIP;
+    private final INodesInPath dstParentIIP;
     private final String src;
     private final String dst;
     private final INodeDirectory srcParent;
     private final byte[] srcChildName;
-    private final Quota.Counts oldSrcCounts;
     private final INode.DirCounts srcCounts;
+    private final INode.DirCounts dstCounts;
     private INode srcChild;
+    private INode oldDstChild;
+    private INode srcClone;
 
     RenameOperation(FSDirectory fsd, String src, String dst,
-                    INodesInPath srcIIP, INodesInPath dstIIP, INode.DirCounts srcCounts)
+                    INodesInPath srcIIP, INodesInPath dstIIP, INode.DirCounts srcCounts,
+                    INode.DirCounts dstCounts)
         throws QuotaExceededException, IOException {
       this.fsd = fsd;
-      this.dstIIP = dstIIP;
       this.src = src;
       this.dst = dst;
-      srcChild = srcIIP.getLastINode();
-      srcChildName = srcChild.getLocalNameBytes();
-      srcParent = srcIIP.getINode(-2).asDirectory();
-
-      oldSrcCounts = Quota.Counts.newInstance();
-      this.srcCounts = srcCounts;
       this.srcIIP = srcIIP;
+      this.dstIIP = dstIIP;
+      this.srcParentIIP = srcIIP.getParentINodesInPath();
+      this.dstParentIIP = dstIIP.getParentINodesInPath();
+
+      srcChild = this.srcIIP.getLastINode();
+      if (srcChild != null) {
+        srcClone = srcChild.cloneInode();
+      }
+      srcChildName = srcChild.getLocalNameBytes();
+      srcParent = this.srcIIP.getINode(-2).asDirectory();
+
+      this.srcCounts = srcCounts;
+      this.dstCounts = dstCounts;
     }
 
+    long removeSrc() throws IOException {
+      long removedNum = fsd.removeLastINode(srcIIP, true, srcCounts);
+      if (removedNum == -1) {
+        String error = "Failed to rename " + src + " to " + dst +
+            " because the source can not be removed";
+        NameNode.stateChangeLog.warn("DIR* FSDirRenameOp.unprotectedRenameTo:" +
+            error);
+        throw new IOException(error);
+      }
+      srcIIP = INodesInPath.replace(srcIIP, srcIIP.length() - 1, null);
+      return removedNum;
+    }
+        
+    boolean removeSrc4OldRename() throws IOException {
+      final long removedSrc = fsd.removeLastINode(srcIIP, true, srcCounts);
+      if (removedSrc == -1) {
+        NameNode.stateChangeLog.warn("DIR* FSDirRenameOp.unprotectedRenameTo: "
+            + "failed to rename " + src + " to " + dst + " because the source" +
+            " can not be removed");
+        return false;
+      } else {
+        srcIIP = INodesInPath.replace(srcIIP, srcIIP.length() - 1, null);
+        return true;
+      }
+    }
+    
+    long removeDst() throws IOException {
+      long removedNum = fsd.removeLastINode(dstIIP, false, dstCounts);
+      if (removedNum != -1) {
+        oldDstChild = dstIIP.getLastINode();
+        dstIIP = INodesInPath.replace(dstIIP, dstIIP.length() - 1, null);
+      }
+      return removedNum;
+    }
+        
     boolean addSourceToDestination() throws IOException {
-      final INode dstParent = dstIIP.getINode(-2);
-      srcChild = srcIIP.getLastINode();
+      final INode dstParent = dstParentIIP.getLastINode();
       final byte[] dstChildName = dstIIP.getLastLocalName();
       final INode toDst;
       srcChild.setLocalNameNoPersistance(dstChildName);
       toDst = srcChild;
-      return fsd.addLastINodeNoQuotaCheck(dstIIP, toDst, srcCounts);
+      return fsd.addLastINodeNoQuotaCheck(dstParentIIP, toDst, srcCounts) != null;
     }
 
     void updateMtimeAndLease(long timestamp) throws QuotaExceededException, IOException {
       srcParent.updateModificationTime(timestamp);
-      final INode dstParent = dstIIP.getINode(-2);
+      final INode dstParent = dstParentIIP.getLastINode();
       dstParent.updateModificationTime(timestamp);
       // update moved lease with new filename
       fsd.getFSNamesystem().unprotectedChangeLease(src, dst);
@@ -907,13 +891,71 @@ class FSDirRenameOp {
       srcChild.setLocalNameNoPersistance(srcChildName);
       // srcParent is not an INodeDirectoryWithSnapshot, we only need to add
       // the srcChild back
-      fsd.addLastINodeNoQuotaCheck(srcIIP, srcChild, srcCounts);
+      fsd.addLastINodeNoQuotaCheck(srcParentIIP, srcChild, srcCounts);
+    }
+
+    void restoreDst() throws QuotaExceededException, IOException {
+      Preconditions.checkState(oldDstChild != null);
+      
+      fsd.addLastINodeNoQuotaCheck(dstParentIIP, oldDstChild, dstCounts); 
+    }
+
+    boolean cleanDst()
+        throws QuotaExceededException, IOException {
+      Preconditions.checkState(oldDstChild != null);
+      BlocksMapUpdateInfo collectedBlocks = new BlocksMapUpdateInfo();
+      final boolean filesDeleted;
+      
+      if (oldDstChild instanceof INodeFile && !((INodeFile) oldDstChild).isFileStoredInDB()) {
+        Block[] blocks = ((INodeFile) oldDstChild).getBlocks();
+        for (Block blk : blocks) {
+          collectedBlocks.addDeleteBlock(blk);
+        }
+      } else if (oldDstChild instanceof INodeFile && ((INodeFile) oldDstChild).isFileStoredInDB()) {
+        ((INodeFile) oldDstChild).deleteFileDataStoredInDB();
+      }
+      filesDeleted = true;
+      
+      fsd.getFSNamesystem().removePathAndBlocks(src, collectedBlocks);
+      return filesDeleted;
     }
 
     void updateQuotasInSourceTree() throws QuotaExceededException {
       // update the quota usage in src tree
       // for snapshot
     }
+    
+    public void logMetadataEvent()
+        throws TransactionContextException, StorageException {
+      INode srcDataset = srcClone.getMetaEnabledParent();
+      INode dstDataset = srcChild.getMetaEnabledParent();
+
+      if (srcDataset == null) {
+        if (dstDataset == null) {
+          //No logging required
+        } else {
+          //rename from non metaEnabled directory to a metaEnabled directoy
+          srcChild.logMetadataEvent(MetadataLogEntry.Operation.ADD);
+        }
+      } else {
+        if (dstDataset == null) {
+          //rename from metaEnabled directory to a non metaEnabled directory
+          EntityManager.add(new MetadataLogEntry(srcDataset.getId(),
+              srcClone.getId(), srcClone.getPartitionId(), srcClone
+              .getParentId(), srcClone.getLocalName(), srcChild
+              .incrementLogicalTime(), MetadataLogEntry.Operation.DELETE));
+        } else {
+          //rename across datasets or the same dataset
+          srcChild.logMetadataEvent(MetadataLogEntry.Operation.RENAME);
+        }
+      }
+    }
+    
+    public void snapshotMaintenance() throws TransactionContextException {
+      EntityManager.snapshotMaintenance(
+          HdfsTransactionContextMaintenanceCmds.INodePKChanged, srcClone,
+          srcChild);
+    } 
   }
   
   static class RenameResult {
@@ -986,40 +1028,5 @@ class FSDirRenameOp {
       }
     }
   }
-  
-  private static INode removeLastINodeForRename(FSDirectory fsd, final INodesInPath inodesInPath, INode.DirCounts counts) throws
-      StorageException, TransactionContextException {
-    return fsd.removeLastINode(inodesInPath, true, counts);
-  }
-  
-  private static INode removeLastINode(FSDirectory fsd, final INodesInPath inodesInPath, final INode.DirCounts counts)
-      throws StorageException, TransactionContextException {
-    return fsd.removeLastINode(inodesInPath, false, counts);
-  }
     
-  private static void logMetadataEventForRename(INode srcClone, INode srcChild)
-      throws TransactionContextException, StorageException {
-    INode srcDataset = srcClone.getMetaEnabledParent();
-    INode dstDataset = srcChild.getMetaEnabledParent();
-  
-    if(srcDataset == null){
-      if(dstDataset == null){
-        //No logging required
-      }else{
-        //rename from non metaEnabled directory to a metaEnabled directoy
-        srcChild.logMetadataEvent(MetadataLogEntry.Operation.ADD);
-      }
-    }else{
-      if(dstDataset == null){
-        //rename from metaEnabled directory to a non metaEnabled directory
-        EntityManager.add(new MetadataLogEntry(srcDataset.getId(),
-            srcClone.getId(), srcClone.getPartitionId(), srcClone
-            .getParentId(), srcClone.getLocalName(), srcChild
-            .incrementLogicalTime(), MetadataLogEntry.Operation.DELETE));
-      }else{
-        //rename across datasets or the same dataset
-        srcChild.logMetadataEvent(MetadataLogEntry.Operation.RENAME);
-      }
-    }
-  }
 }
