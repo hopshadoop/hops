@@ -61,6 +61,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.FSLimitException;
+import org.apache.hadoop.hdfs.util.ChunkedArrayList;
 import org.apache.hadoop.util.Time;
 
 class FSDirRenameOp {
@@ -420,7 +421,7 @@ class FSDirRenameOp {
     RenameResult ret = unprotectedRenameTo(fsd, src, dst, mtime, 
         collectedBlocks, options);
     if (ret.filesDeleted) {
-      fsd.getFSNamesystem().incrDeletedFileCount(1);
+      FSDirDeleteOp.incrDeletedFileCount(1);
     }
     return ret.auditStat;
   }
@@ -674,6 +675,7 @@ class FSDirRenameOp {
             // Collect the blocks and remove the lease for previous dst
             boolean filesDeleted = false;
             if (undoRemoveDst) {
+              undoRemoveDst = false;
               if (removedNum > 0) {
                 filesDeleted = tx.cleanDst();
               }
@@ -904,19 +906,14 @@ class FSDirRenameOp {
         throws QuotaExceededException, IOException {
       Preconditions.checkState(oldDstChild != null);
       BlocksMapUpdateInfo collectedBlocks = new BlocksMapUpdateInfo();
+      List<INode> removedINodes = new ChunkedArrayList<>();
       final boolean filesDeleted;
       
-      if (oldDstChild instanceof INodeFile && !((INodeFile) oldDstChild).isFileStoredInDB()) {
-        Block[] blocks = ((INodeFile) oldDstChild).getBlocks();
-        for (Block blk : blocks) {
-          collectedBlocks.addDeleteBlock(blk);
-        }
-      } else if (oldDstChild instanceof INodeFile && ((INodeFile) oldDstChild).isFileStoredInDB()) {
-        ((INodeFile) oldDstChild).deleteFileDataStoredInDB();
-      }
+      oldDstChild.destroyAndCollectBlocks(collectedBlocks, removedINodes);
       filesDeleted = true;
       
-      fsd.getFSNamesystem().removePathAndBlocks(src, collectedBlocks);
+      fsd.getFSNamesystem().removeLeasesAndINodes(src, removedINodes);
+      fsd.getFSNamesystem().removeBlocks(collectedBlocks);
       return filesDeleted;
     }
 

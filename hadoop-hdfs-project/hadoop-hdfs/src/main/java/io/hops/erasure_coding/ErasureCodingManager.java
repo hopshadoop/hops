@@ -603,7 +603,7 @@ public class ErasureCodingManager extends Configured {
     for (EncodingStatus status : markedAsDeleted) {
       LOG.info("Trying to collect " + status);
       try {
-        namesystem.deleteWithTransaction(
+        namesystem.delete(
             parityFolder + "/" + status.getParityFileName(), false);
         namesystem.removeEncodingStatus(status);
       } catch (IOException e) {
@@ -634,7 +634,7 @@ public class ErasureCodingManager extends Configured {
           Long.MAX_VALUE, true, true).blocks;
       if (checkReplication(blocks, replication)) {
         LOG.info("Revocation successful for " + status);
-        namesystem.deleteWithTransaction(
+        namesystem.delete(
             parityFolder + "/" + status.getParityFileName(), false);
         namesystem.removeEncodingStatus(path, status);
       }

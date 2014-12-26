@@ -359,46 +359,6 @@ public class FSDirectory implements Closeable {
   }
   
   /**
-   * Delete the target directory and collect the blocks under it
-   *
-   * iip the INodesInPath instance containing all the INodes for the path
-   * @param collectedBlocks
-   *     Blocks under the deleted directory
-   * @return true on successful deletion; else false
-   */
-  long delete(INodesInPath iip, BlocksMapUpdateInfo collectedBlocks, long mtime)
-      throws UnresolvedLinkException, StorageException, IOException {
-    if (NameNode.stateChangeLog.isDebugEnabled()) {
-      NameNode.stateChangeLog.debug("DIR* FSDirectory.delete: " + iip.getPath());
-    }
-    final long filesRemoved;
-    if (!deleteAllowed(iip, iip.getPath()) ) {
-        filesRemoved = -1;
-    } else {
-      filesRemoved = unprotectedDelete(iip, collectedBlocks, mtime);
-    }
-
-    return filesRemoved;
-  }
-  
-  private static boolean deleteAllowed(final INodesInPath iip,
-      final String src) {
-    if (iip.length() < 1 || iip.getLastINode() == null) {
-      if(NameNode.stateChangeLog.isDebugEnabled()) {
-        NameNode.stateChangeLog.debug("DIR* FSDirectory.unprotectedDelete: "
-            + "failed to remove " + src + " because it does not exist");
-      }
-      return false;
-    } else if (iip.length() == 1) { // src is the root
-      NameNode.stateChangeLog.warn("DIR* FSDirectory.unprotectedDelete: "
-          + "failed to remove " + src
-          + " because the root is not allowed to be deleted");
-      return false;
-    }
-    return true;
-  }
-  
-  /**
    * @return true if the path is a non-empty directory; otherwise, return false.
    */
   boolean isNonEmptyDirectory(INodesInPath inodesInPath)
@@ -410,90 +370,6 @@ public class FSDirectory implements Closeable {
       return false;
     }
     return ((INodeDirectory) inode).getChildrenList().size() != 0;
-  }
-
-  /**
-   * Delete a path from the name space
-   * Update the count at each ancestor directory with quota
-   * <br>
-   * Note: This is to be used by FSEditLog only.
-   * <br>
-   *
-   * @param src
-   *     a string representation of a path to an inode
-   * @param mtime
-   *     the time the inode is removed
-   */
-  void unprotectedDelete(String src, long mtime)
-      throws UnresolvedLinkException, StorageException, IOException {
-    BlocksMapUpdateInfo collectedBlocks = new BlocksMapUpdateInfo();
-    final INodesInPath inodesInPath = getINodesInPath4Write(
-        normalizePath(src), false);
-    long filesRemoved = -1;
-    if (deleteAllowed(inodesInPath, src)) {
-      filesRemoved = unprotectedDelete(inodesInPath, collectedBlocks, mtime);
-    }
-    if (filesRemoved > 0) {
-      getFSNamesystem().removePathAndBlocks(src, collectedBlocks);
-    }
-  }
-  
-  /**
-   * Delete a path from the name space
-   * Update the count at each ancestor directory with quota
-   *
-   * @param src
-   *     a string representation of a path to an inode
-   * @param collectedBlocks
-   *     blocks collected from the deleted path
-   * @param mtime
-   *     the time the inode is removed
-   * @return the number of inodes deleted; 0 if no inodes are deleted.
-   */
-  int unprotectedDelete(INodesInPath iip, BlocksMapUpdateInfo collectedBlocks, long mtime)
-      throws UnresolvedLinkException, StorageException,
-      TransactionContextException {
-
-    INode targetNode = iip.getLastINode();
-    if (targetNode == null) { // non-existent src
-      return -1;
-    }
-    if (iip.length() == 1) { // src is the root
-      return -1;
-    }
-
-    // Add metadata log entry for all deleted childred.
-    addMetaDataLogForDirDeletion(targetNode);
-
-    // Remove the node from the namespace
-    long removed = removeLastINode(iip);
-    if (removed == -1) {
-      return -1;
-    }
-    // set the parent's modification time
-    iip.getINode(- 2).setModificationTime(mtime);
-    iip.getINode(- 2).asDirectory().decreaseChildrenNum();
-    
-    int filesRemoved = targetNode.collectSubtreeBlocksAndClear(collectedBlocks);
-    if (NameNode.stateChangeLog.isDebugEnabled()) {
-      NameNode.stateChangeLog
-          .debug("DIR* FSDirectory.unprotectedDelete: " + iip.getPath() + " is removed");
-    }
-    return filesRemoved;
-  }
-
-  private void addMetaDataLogForDirDeletion(INode targetNode) throws TransactionContextException, StorageException {
-    if (targetNode.isDirectory()) {
-      List<INode> children = ((INodeDirectory) targetNode).getChildrenList();
-      for(INode child : children){
-       if(child.isDirectory()){
-         addMetaDataLogForDirDeletion(child);
-       }else{
-         child.logMetadataEvent(MetadataLogEntry.Operation.DELETE);
-       }
-      }
-    }
-    targetNode.logMetadataEvent(MetadataLogEntry.Operation.DELETE);
   }
 
   /** 
@@ -940,8 +816,9 @@ public class FSDirectory implements Closeable {
       }
       updateCountNoQuotaCheck(iip, iip.length() - 1,
           -counts.getNsCount() + nsDelta, -counts.getDsCount() + dsDelta);
+      return counts.getNsCount();
     }
-    return counts.getNsCount();
+    return 1;
   }
 
   INode removeChildNonRecursively(final INodesInPath inodesInPath, int pos)
