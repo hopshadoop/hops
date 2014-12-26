@@ -311,22 +311,21 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
   }
 
   @Override
-  int collectSubtreeBlocksAndClear(BlocksMapUpdateInfo info)
+  public void destroyAndCollectBlocks(BlocksMapUpdateInfo collectedBlocks, final List<INode> removedINodes)
       throws StorageException, TransactionContextException {
     parent = null;
     BlockInfo[] blocks = getBlocks();
-    if (blocks != null && info != null) {
+    if (blocks != null && collectedBlocks != null) {
       for (BlockInfo blk : blocks) {
         blk.setBlockCollection(null);
-        info.addDeleteBlock(blk);
+        collectedBlocks.addDeleteBlock(blk);
       }
     }
 
     if(isFileStoredInDB()){
       deleteFileDataStoredInDB();
     }
-
-    return 1;
+    removedINodes.add(this);
   }
   
   @Override

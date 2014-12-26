@@ -464,7 +464,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   private static int DB_ON_DISK_MEDIUM_FILE_MAX_SIZE;
   private static int DB_ON_DISK_LARGE_FILE_MAX_SIZE;
   private static int DB_IN_MEMORY_FILE_MAX_SIZE;
-  private final long BIGGEST_DELETABLE_DIR;
 
   /** flag indicating whether replication queues have been initialized */
   boolean initializedReplQueues = false;
@@ -648,7 +647,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       fsOperationsExecutor = Executors.newFixedThreadPool(
           conf.getInt(DFS_SUBTREE_EXECUTOR_LIMIT_KEY,
               DFS_SUBTREE_EXECUTOR_LIMIT_DEFAULT));
-      BIGGEST_DELETABLE_DIR = conf.getLong(DFS_DIR_DELETE_BATCH_SIZE,
+      FSDirDeleteOp.BIGGEST_DELETABLE_DIR = conf.getLong(DFS_DIR_DELETE_BATCH_SIZE,
               DFS_DIR_DELETE_BATCH_SIZE_DEFAULT);
 
       LOG.info("fsOwner             = " + fsOwner);
@@ -1730,10 +1729,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       dir.verifyParentDir(iip, src);
     }
 
-    if (!createParent) {
-      dir.verifyParentDir(iip, src);
-    }
-
     try {
       
       if (myFile == null) {
@@ -1744,7 +1739,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       } else {
         if (overwrite) {
           try {
-            deleteInt(iip, true); // File exists - delete if overwrite
+            FSDirDeleteOp.deleteInternal(this, src, iip); // File exists - delete if overwrite
             iip = INodesInPath.replace(iip, iip.length() - 1, null);
           } catch (AccessControlException e) {
             logAuditEvent(false, "delete", src);
@@ -3050,130 +3045,36 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
   /**
    * Remove the indicated file from namespace.
-   *
-   * @see ClientProtocol#delete(String, boolean) for detailed description and
+   * 
+   * @see ClientProtocol#delete(String, boolean) for detailed description and 
    * description of exceptions
    */
-  public boolean deleteWithTransaction(final String src1,
-      final boolean recursive) throws IOException {
-    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = dir.resolvePath(src1, pathComponents, dir);
-    HopsTransactionalRequestHandler deleteHandler =
-        new HopsTransactionalRequestHandler(HDFSOperationType.DELETE, src) {
-          @Override
-          public void acquireLock(TransactionLocks locks) throws IOException {
-            LockFactory lf = getInstance();
-            INodeLock il = lf.getINodeLock( INodeLockType.WRITE_ON_TARGET_AND_PARENT,
-                    INodeResolveType.PATH_AND_IMMEDIATE_CHILDREN, src)
-                    .setNameNodeID(nameNode.getId())
-                    .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
-                    .skipReadingQuotaAttr(!dir.isQuotaEnabled());
-            locks.add(il).add(lf.getLeaseLock(LockType.WRITE))
-                    .add(lf.getLeasePathLock(LockType.READ_COMMITTED)).add(lf.getBlockLock())
-                    .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR,
-                        BLK.PE, BLK.IV));
-            if(isRetryCacheEnabled) {
-              locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
-                  Server.getCallId()));
-            }
-
-            locks.add(lf.getAllUsedHashBucketsLock());
-
-            if (dir.isQuotaEnabled()) {
-              locks.add(lf.getQuotaUpdateLock(true, src));
-            }
-            if (erasureCodingEnabled) {
-              locks.add(lf.getEncodingStatusLock(LockType.WRITE, src));
-            }
-          }
-
-          @Override
-          public Object performTask() throws IOException {
-            CacheEntry cacheEntry = RetryCacheDistributed.waitForCompletion(retryCache);
-            if (cacheEntry != null && cacheEntry.isSuccess()) {
-              return true; // Return previous response
-            }
-            boolean ret = false;
-            try {
-              final INodesInPath iip = dir.getINodesInPath4Write(src);
-              ret = delete(iip, recursive);
-              return ret;
-            } finally {
-              RetryCacheDistributed.setState(cacheEntry, ret);
-            }
-          }
-        };
-    return (Boolean) deleteHandler.handle(this);
-  }
-
-  private boolean delete(INodesInPath iip, boolean recursive)
-      throws
-      IOException {
+  public boolean delete(String src, boolean recursive)
+      throws IOException {
+    //only for testing
+    saveTimes();
+    
+    if(!nameNode.isLeader() && dir.isQuotaEnabled()){
+      throw new NotALeaderException("Quota enabled. Delete operation can only be performed on a " +
+              "leader namenode");
+    }
+    
+    boolean ret = false;
     try {
-      return deleteInt(iip, recursive);
+      checkNameNodeSafeMode("Cannot delete " + src);
+      ret = FSDirDeleteOp.delete(
+          this, src, recursive);
     } catch (AccessControlException e) {
-      logAuditEvent(false, "delete", iip.getPath());
+      logAuditEvent(false, "delete", src);
       throw e;
     }
-  }
-
-  private boolean deleteInt(INodesInPath iip, boolean recursive)
-      throws
-      IOException {
-    if (NameNode.stateChangeLog.isDebugEnabled()) {
-      NameNode.stateChangeLog.debug("DIR* NameSystem.delete: " + iip.getPath());
-    }
-    boolean status = deleteInternal(iip, recursive, true);
-    if (status) {
-      logAuditEvent(true, "delete", iip.getPath());
-    }
-    return status;
+    logAuditEvent(true, "delete", src);
+    return ret;
   }
 
   FSPermissionChecker getPermissionChecker()
       throws AccessControlException {
     return dir.getPermissionChecker();
-  }
-
-  /**
-   * Remove a file/directory from the namespace.
-   * <p/>
-   * For large directories, deletion is incremental. The blocks under
-   * the directory are collected and deleted a small number at a time.
-   * <p/>
-   * For small directory or file the deletion is done in one shot.
-   *
-   * @see ClientProtocol#delete(String, boolean) for description of exceptions
-   */
-  private boolean deleteInternal(INodesInPath iip, boolean recursive,
-      boolean enforcePermission)
-      throws
-      IOException {
-    BlocksMapUpdateInfo collectedBlocks = new BlocksMapUpdateInfo();
-    FSPermissionChecker pc = getPermissionChecker();
-    checkNameNodeSafeMode("Cannot delete " + iip.getPath());
-    if (!recursive && dir.isNonEmptyDirectory(iip)) {
-       throw new PathIsNotEmptyDirectoryException(iip.getPath() + " is non empty");
-    }
-    if (enforcePermission && isPermissionEnabled) {
-      dir.checkPermission(pc, iip, false, null, FsAction.WRITE, null, FsAction.ALL, true);
-    }
-    long mtime = now();
-    // Unlink the target directory from directory tree
-    long filesRemoved = dir.delete(iip, collectedBlocks,mtime);
-    if (filesRemoved < 0) {      
-      return false;
-    }
-    incrDeletedFileCount(filesRemoved);
-    // Blocks/INodes will be handled later
-    removePathAndBlocks(iip.getPath(), null);
-    removeBlocks(collectedBlocks); // Incremental deletion of blocks
-    collectedBlocks.clear();
-    if (NameNode.stateChangeLog.isDebugEnabled()) {
-      NameNode.stateChangeLog
-          .debug("DIR* Namesystem.delete: " + iip.getPath() + " is removed");
-    }
-    return true;
   }
 
   /**
@@ -3185,7 +3086,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    *          An instance of {@link BlocksMapUpdateInfo} which contains a list
    *          of blocks that need to be removed from blocksMap
    */
-  private void removeBlocks(BlocksMapUpdateInfo blocks)
+  public void removeBlocks(BlocksMapUpdateInfo blocks)
       throws StorageException, TransactionContextException, IOException {
     List<Block> toDeleteList = blocks.getToDeleteList();
     Iterator<Block> iter = toDeleteList.iterator();
@@ -3195,21 +3096,26 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       }
     }
   }
-
-  /**
-   * Remove leases and blocks related to a given path
-   *
-   * @param src The given path
-   * @param blocks Containing the list of blocks to be deleted from blocksMap
-   */
-  void removePathAndBlocks(String src, BlocksMapUpdateInfo blocks) throws IOException {
-    leaseManager.removeLeaseWithPrefixPath(src);
-    if (blocks == null) {
-      return;
-    }
-    removeBlocksAndUpdateSafemodeTotal(blocks);
-  }
   
+  /**
+   * Remove leases and inodes related to a given path
+   * @param src The given path
+   * @param removedINodes Containing the list of inodes to be removed from
+   *                      inodesMap
+   * @param acquireINodeMapLock Whether to acquire the lock for inode removal
+   */
+  void removeLeasesAndINodes(String src, List<INode> removedINodes) 
+      throws StorageException, TransactionContextException {
+    leaseManager.removeLeaseWithPrefixPath(src);
+    // remove inodes from inodesMap
+    if (removedINodes != null) {
+      for(INode inode: removedINodes){
+        inode.remove();
+      }
+      removedINodes.clear();
+    }
+  }
+
   /**
    * Removes the blocks from blocksmap and updates the safemode blocks total
    * 
@@ -6926,238 +6832,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       throws IOException {
     checkNameNodeSafeMode("Cannot set quota on " + src);
     FSDirAttrOp.setQuota(dir, src, nsQuota, dsQuota);
-  }
-
-  /**
-   * Delete a directory tree in multiple transactions. Deleting a large directory
-   * tree might take to much time for a single transaction. Hence, this function
-   * first builds up an in-memory representation of the directory tree to be
-   * deleted and then deletes it level by level. The directory tree is locked
-   * during the delete to prevent any concurrent modification.
-   *
-   * @param path
-   *    the path to be deleted
-   * @param recursive
-   *    whether or not and non-empty directory should be deleted
-   * @return
-   *    true if the delete succeeded
-   * @throws IOException
-   */
-  boolean multiTransactionalDelete(final String path, final boolean recursive)
-      throws IOException {
-    //only for testing
-    saveTimes();
-
-    if(!nameNode.isLeader() && dir.isQuotaEnabled()){
-      throw new NotALeaderException("Quota enabled. Delete operation can only be performed on a " +
-              "leader namenode");
-    }
-
-    boolean ret = false;
-    if (NameNode.stateChangeLog.isDebugEnabled()) {
-      NameNode.stateChangeLog
-          .debug("DIR* NameSystem.multiTransactionalDelete: " + path);
-    }
-
-    try {
-      ret = multiTransactionalDeleteInternal(path, recursive);
-      logAuditEvent(ret, "delete", path);
-    } catch (IOException e) {
-      logAuditEvent(false, "delete", path);
-      throw e;
-    }
-    return ret;
-  }
-
-  private boolean multiTransactionalDeleteInternal(final String path1,
-      final boolean recursive) throws IOException {
-    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(path1);
-    final String path = dir.resolvePath(path1, pathComponents, dir);
-    checkNameNodeSafeMode("Cannot delete " + path);
-
-    if (!recursive) {
-      // It is safe to do this as it will only delete a single file or an empty directory
-      return deleteWithTransaction(path, recursive);
-    }
-
-    PathInformation pathInfo = this.getPathExistingINodesFromDB(path,
-        false, null, FsAction.WRITE, null, null);
-    INode pathInode = pathInfo.getINodesInPath().getLastINode();
-
-    if (pathInode == null) {
-      NameNode.stateChangeLog
-          .debug("Failed to remove " + path + " because it does not exist");
-      return false;
-    } else if (pathInode.isRoot()) {
-      NameNode.stateChangeLog.warn("Failed to remove " + path
-          + " because the root is not allowed to be deleted");
-      return false;
-    }
-
-    INodeIdentifier subtreeRoot = null;
-    if (pathInode.isFile()) {
-      return deleteWithTransaction(path, false);
-    } else {
-      CacheEntry cacheEntry = retryCacheWaitForCompletionTransactional();
-      if (cacheEntry != null && cacheEntry.isSuccess()) {
-        return true; // Return previous response
-      }
-      boolean ret = false;
-      try {
-        //if quota is enabled then only the leader namenode can delete the directory.
-        //this is because before the deletion is done the quota manager has to apply all the outstanding
-        //quota updates for the directory. The current design of the quota manager is not distributed.
-        //HopsFS clients send the delete operations to the leader namenode if quota is enabled
-        if (!isLeader()) {
-          throw new QuotaUpdateException("Unable to delete the file " + path
-              + " because Quota is enabled and I am not the leader");
-        }
-
-        //sub tree operation
-        try {
-          //once subtree is locked we still need to check all subAccess in AbstractFileTree.FileTree
-          //permission check in Apache Hadoop: doCheckOwner:false, ancestorAccess:null, parentAccess:FsAction.WRITE, 
-          //access:null, subAccess:FsAction.ALL, ignoreEmptyDir:true
-          subtreeRoot = lockSubtreeAndCheckOwnerAndParentPermission(path, false, 
-              FsAction.WRITE, SubTreeOperation.Type.DELETE_STO);
-
-          List<AclEntry> nearestDefaultsForSubtree = calculateNearestDefaultAclForSubtree(pathInfo);
-          AbstractFileTree.FileTree fileTree = new AbstractFileTree.FileTree(this, subtreeRoot, FsAction.ALL, true,
-              nearestDefaultsForSubtree);
-          fileTree.buildUp();
-          delayAfterBbuildingTree("Built tree for "+path1+" for delete op");
-
-          if (dir.isQuotaEnabled()) {
-            Iterator<Long> idIterator = fileTree.getAllINodesIds().iterator();
-            synchronized (idIterator) {
-              quotaUpdateManager.addPrioritizedUpdates(idIterator);
-              try {
-                idIterator.wait();
-              } catch (InterruptedException e) {
-                // Not sure if this can happen if we are not shutting down but we need to abort in case it happens.
-                throw new IOException("Operation failed due to an Interrupt");
-              }
-            }
-          }
-
-          for (int i = fileTree.getHeight(); i > 0; i--) {
-            if (!deleteTreeLevel(path, fileTree.getSubtreeRoot().getId(), fileTree, i)) {
-              ret = false;
-              return ret;
-            }
-          }
-        } finally {
-          if (subtreeRoot != null) {
-            unlockSubtree(path, subtreeRoot.getInodeId());
-          }
-        }
-        ret = true;
-        return ret;
-      } finally {
-        retryCacheSetStateTransactional(cacheEntry, ret);
-      }
-    }
-  }
-
-  private boolean deleteTreeLevel(final String subtreeRootPath, final long subTreeRootID,
-      final AbstractFileTree.FileTree fileTree, int level) throws TransactionContextException, IOException {
-    ArrayList<Future> barrier = new ArrayList<>();
-
-     for (final ProjectedINode dir : fileTree.getDirsByLevel(level)) {
-       if (fileTree.countChildren(dir.getId()) <= BIGGEST_DELETABLE_DIR) {
-         final String path = fileTree.createAbsolutePath(subtreeRootPath, dir);
-         Future f = multiTransactionDeleteInternal(path, subTreeRootID);
-         barrier.add(f);
-       } else {
-         //delete the content of the directory one by one.
-         for (final ProjectedINode inode : fileTree.getChildren(dir.getId())) {
-           if(!inode.isDirectory()) {
-             final String path = fileTree.createAbsolutePath(subtreeRootPath, inode);
-             Future f = multiTransactionDeleteInternal(path, subTreeRootID);
-             barrier.add(f);
-           }
-         }
-         // the dir is empty now. delete it.
-         final String path = fileTree.createAbsolutePath(subtreeRootPath, dir);
-         Future f = multiTransactionDeleteInternal(path, subTreeRootID);
-         barrier.add(f);
-       }
-     }
-
-    boolean result = true;
-    for (Future f : barrier) {
-      try {
-        if (!((Boolean) f.get())) {
-          result = false;
-        }
-      } catch (ExecutionException e) {
-        result = false;
-        LOG.error("Exception was thrown during partial delete", e);
-        Throwable throwable= e.getCause();
-        if ( throwable instanceof  IOException ){
-          throw (IOException)throwable; //pass the exception as is to the client
-        } else {
-          throw new IOException(e); //only io exception as passed to clients.
-        }
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-      }
-    }
-    return result;
-  }
-
-  private Future multiTransactionDeleteInternal(final String path1, final long subTreeRootId)
-          throws StorageException, TransactionContextException, IOException {
-   byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(path1);
-   final String path = dir.resolvePath(path1, pathComponents, dir);
-   return  fsOperationsExecutor.submit(new Callable<Boolean>() {
-        @Override
-        public Boolean call() throws Exception {
-          HopsTransactionalRequestHandler deleteHandler =
-                  new HopsTransactionalRequestHandler(HDFSOperationType.SUBTREE_DELETE) {
-                    @Override
-                    public void acquireLock(TransactionLocks locks)
-                            throws IOException {
-                      LockFactory lf = LockFactory.getInstance();
-                      INodeLock il = lf.getINodeLock(INodeLockType.WRITE_ON_TARGET_AND_PARENT,
-                              INodeResolveType.PATH_AND_ALL_CHILDREN_RECURSIVELY,path)
-                               .setNameNodeID(nameNode.getId())
-                              .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
-                              .skipReadingQuotaAttr(!dir.isQuotaEnabled())
-                              .setIgnoredSTOInodes(subTreeRootId);
-                      locks.add(il).add(lf.getLeaseLock(LockType.WRITE))
-                              .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
-                              .add(lf.getBlockLock()).add(
-                              lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR, BLK.PE, BLK.IV));
-
-                      locks.add(lf.getAllUsedHashBucketsLock());
-
-                      if (dir.isQuotaEnabled()) {
-                        locks.add(lf.getQuotaUpdateLock(true, path));
-                      }
-
-                      if (erasureCodingEnabled) {
-                        locks.add(lf.getEncodingStatusLock(true, LockType.WRITE, path));
-                      }
-                    }
-
-                    @Override
-                    public Object performTask() throws IOException {
-                      final INodesInPath iip = dir.getINodesInPath4Write(path);
-                      if(!deleteInternal(iip,true,false)){
-                        //at this point the delete op is expected to succeed. Apart from DB errors
-                        // this can only fail if the quiesce phase in subtree operation failed to
-                        // quiesce the subtree. See TestSubtreeConflicts.testConcurrentSTOandInodeOps
-                        throw new RetriableException("Unable to Delete path: "+path1+"."+
-                                " Possible subtree quiesce failure");
-
-                      }
-                      return true;
-                    }
-                  };
-          return (Boolean) deleteHandler.handle(this);
-        }
-      });
   }
 
   /**

@@ -313,11 +313,20 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
   }
   
   /**
-   * Collect all the blocks in all children of this INode.
-   * Count and return the number of files in the sub tree.
-   * Also clears references since this INode is deleted.
+   * Destroy self and clear everything! If the INode is a file, this method
+   * collects its blocks for further block deletion. If the INode is a
+   * directory, the method goes down the subtree and collects blocks from the
+   * descents, and clears its parent/children references as well. The method
+   * also clears the diff list if the INode contains snapshot diff list.
+   * 
+   * @param collectedBlocks
+   *          blocks collected from the descents for further block
+   *          deletion/update will be added to this map.
+   * @param removedINodes
+   *          INodes collected from the descents for further cleaning up of
+   *          inodeMap
    */
-  abstract int collectSubtreeBlocksAndClear(BlocksMapUpdateInfo v)
+public abstract void destroyAndCollectBlocks(BlocksMapUpdateInfo v, List<INode> removedINodes)
       throws StorageException, TransactionContextException;
 
   /**

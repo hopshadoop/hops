@@ -542,25 +542,18 @@ public class INodeDirectory extends INodeWithAdditionalFields {
   }
 
   @Override
-  int collectSubtreeBlocksAndClear(BlocksMapUpdateInfo info)
+  public void destroyAndCollectBlocks(BlocksMapUpdateInfo collectedBlocks, final List<INode> removedINodes)
       throws StorageException, TransactionContextException {
-    int total = 1;
     List<INode> children = getChildren();
-    if (children == null) {
-      return total;
+    if (children != null) {
+      for (INode child : children) {
+        child.destroyAndCollectBlocks(collectedBlocks, removedINodes);
+      }
     }
-    for (INode child : children) {
-      total += child.collectSubtreeBlocksAndClear(info);
-    }
-    
     parent = null;
 
-    for (INode child : children) {
-      remove(child);
-    }
-    remove(this);
+    removedINodes.add(this);
 
-    return total;
   }
 
   public static long getRootDirPartitionKey(){

@@ -739,7 +739,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
     }
 
     boolean ret;
-    ret = namesystem.multiTransactionalDelete(src, recursive);
+    ret = namesystem.delete(src, recursive);
 
     if (ret) {
       metrics.incrDeleteFileOps();
