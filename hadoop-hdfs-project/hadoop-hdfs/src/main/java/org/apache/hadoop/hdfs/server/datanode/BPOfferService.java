@@ -1100,7 +1100,9 @@ public class IncrementalBRTask implements Callable{
 
     // Get a namenode to send the report(s) to
     ActiveNode an = nextNNForBlkReport(totalBlockCount);
-    int numReportsSent;
+    int numReportsSent = 0;
+    int numRPCs = 0;
+    boolean success = false;
     long brSendStartTime;
     try {
       if (an != null) {
@@ -1115,25 +1117,49 @@ public class IncrementalBRTask implements Callable{
 
       // Send the reports to the NN.
       brSendStartTime = now();
-      if (totalBlockCount < dnConf.blockReportSplitThreshold) {
-        // Below split threshold, send all reports in a single message.
-        numReportsSent = 1;
-        DatanodeCommand cmd =
-                blkReportHander.blockReport(bpRegistration, getBlockPoolId(), reports);
-        if (cmd != null) {
-          cmds.add(cmd);
-        }
-      } else {
-        // Send one block report per message.
-        numReportsSent = i;
-        for (StorageBlockReport report : reports) {
-          StorageBlockReport singleReport[] = {report};
+      try {
+        if (totalBlockCount < dnConf.blockReportSplitThreshold) {
+          // Below split threshold, send all reports in a single message.
           DatanodeCommand cmd = blkReportHander.blockReport(
-                  bpRegistration, getBlockPoolId(), singleReport);
+              bpRegistration, getBlockPoolId(), reports);
+          numRPCs = 1;
+          numReportsSent = reports.length;
           if (cmd != null) {
             cmds.add(cmd);
           }
+        } else {
+          // Send one block report per message.
+          for (StorageBlockReport report : reports) {
+            StorageBlockReport singleReport[] = {report};
+            DatanodeCommand cmd = blkReportHander.blockReport(bpRegistration, getBlockPoolId(), singleReport);
+            numReportsSent++;
+            numRPCs++;
+            if (cmd != null) {
+              cmds.add(cmd);
+            }
+          }
         }
+        success = true;
+      } finally {
+        // Log the block report processing stats from Datanode perspective
+        long brSendCost = now() - brSendStartTime;
+        long brCreateCost = brSendStartTime - brCreateStartTime;
+        dn.getMetrics().addBlockReport(brSendCost);
+        dn.getMetrics().incrBlocReportCounter(numReportsSent);
+        final int nCmds = cmds.size();
+        LOG.info((success ? "S" : "Uns") +
+          "uccessfully sent " + numReportsSent +
+          " of " + reports.length +
+          " blockreports for " + totalBlockCount +
+          " total blocks using " + numRPCs +
+          " RPCs. This took " + brCreateCost +
+          " msec to generate and " + brSendCost +
+          " msecs for RPC and NN processing." +
+          " Got back " +
+          ((nCmds == 0) ? "no commands" :
+              ((nCmds == 1) ? "one command: " + cmds.get(0) :
+                  (nCmds + " commands: " + Joiner.on("; ").join(cmds)))) +
+          ".");
       }
     } finally {
       // In case of un/successful block reports we have to inform the leader that
@@ -1142,18 +1168,6 @@ public class IncrementalBRTask implements Callable{
         getLeaderActor().blockReportCompleted(bpRegistration);
       }
     }
-
-    // Log the block report processing stats from Datanode perspective
-    long brSendCost = now() - brSendStartTime;
-    long brCreateCost = brSendStartTime - brCreateStartTime;
-    dn.getMetrics().addBlockReport(brSendCost);
-    dn.getMetrics().incrBlocReportCounter(numReportsSent);
-    LOG.info("Sent " + numReportsSent + " blockreports " + totalBlockCount +
-        " blocks total. Took " + brCreateCost +
-        " msec to generate and " + brSendCost +
-        " msecs for RPC and NN processing. " +
-        " Got back commands " +
-            (cmds.size() == 0 ? "none" : Joiner.on("; ").join(cmds)));
 
     scheduleNextBlockReport(startTime);
     return cmds.size() == 0 ? null : cmds;
