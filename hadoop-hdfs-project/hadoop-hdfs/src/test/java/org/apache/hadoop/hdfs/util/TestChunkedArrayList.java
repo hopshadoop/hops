@@ -20,10 +20,10 @@ package org.apache.hadoop.hdfs.util;
 import static org.junit.Assert.*;
 
 import java.util.ArrayList;
+import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.util.StopWatch;
 
 import org.junit.Test;
-
-import com.google.common.base.Stopwatch;
 
 public class TestChunkedArrayList {
 
@@ -69,24 +69,24 @@ public class TestChunkedArrayList {
       System.gc();
       {
         ArrayList<String> arrayList = new ArrayList<String>();
-        Stopwatch sw = new Stopwatch();
+        StopWatch sw = new StopWatch();
         sw.start();
         for (int i = 0; i < numElems; i++) {
           arrayList.add(obj);
         }
-        System.out.println("       ArrayList " + sw.elapsedMillis());
+        System.out.println(" ArrayList " + sw.now(TimeUnit.MILLISECONDS));
       }
       
       // test ChunkedArrayList
       System.gc();
       {
         ChunkedArrayList<String> chunkedList = new ChunkedArrayList<String>();
-        Stopwatch sw = new Stopwatch();
+        StopWatch sw = new StopWatch();
         sw.start();
         for (int i = 0; i < numElems; i++) {
           chunkedList.add(obj);
         }
-        System.out.println("ChunkedArrayList " + sw.elapsedMillis());
+        System.out.println("ChunkedArrayList " + sw.now(TimeUnit.MILLISECONDS));
       }
     }
   }
