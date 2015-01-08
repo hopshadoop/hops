@@ -91,7 +91,7 @@ public class TestHABlockReports extends junit.framework.TestCase {
 
       Thread.sleep(10000); // make sure that all block reports are in
 
-      assertEquals("Wrong number of block reports", 3, getTotalBRSent(cluster));
+      assertEquals("Wrong number of block reports", 6, getTotalBRSent(cluster));
 
       LOG.info("Cluster started. Total Block reports: " + getTotalBRSent(cluster));
 
@@ -109,7 +109,7 @@ public class TestHABlockReports extends junit.framework.TestCase {
 
       LOG.info("Created some files to change the state of the datanodes");
 
-      assertEquals("Wrong number of block reports", 3, getTotalBRSent(cluster));
+      assertEquals("Wrong number of block reports", 6, getTotalBRSent(cluster));
 
       cluster.restartNameNode(NN2); // now the cluster is running with 1 NN
       cluster.waitActive();
@@ -117,7 +117,7 @@ public class TestHABlockReports extends junit.framework.TestCase {
       Thread.sleep(10000);
 
       LOG.info("Restarted the second namenode. Total Block reports: " + getTotalBRSent(cluster));
-      assertEquals("Wrong number of block reports", 3, getTotalBRSent(cluster));
+      assertEquals("Wrong number of block reports", 6, getTotalBRSent(cluster));
 
     } finally {
       if (cluster != null) {
@@ -143,7 +143,7 @@ public class TestHABlockReports extends junit.framework.TestCase {
 
       Thread.sleep(10000); // make sure that all block reports are in
 
-      assertEquals("Wrong number of block reports", 3, getTotalBRSent(cluster));
+      assertEquals("Wrong number of block reports", 6, getTotalBRSent(cluster));
       LOG.info("Cluster started. Total Block reports: " + getTotalBRSent(cluster));
 
       cluster.shutdownNameNode(NN1);
@@ -159,7 +159,7 @@ public class TestHABlockReports extends junit.framework.TestCase {
       Thread.sleep(10000); // make sure that all block reports are in
 
       // 3 more block reports are received from the 3 datanodes
-      assertEquals("Wrong number of block reports", 6, getTotalBRSent(cluster));
+      assertEquals("Wrong number of block reports", 12, getTotalBRSent(cluster));
       LOG.info("Cluster started. Total Block reports: " + getTotalBRSent(cluster));
 
 
