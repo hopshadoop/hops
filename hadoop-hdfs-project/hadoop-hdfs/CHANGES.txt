@@ -889,6 +889,8 @@ Release 2.7.0 - 2015-04-20
     HADOOP-11032. Replace use of Guava's Stopwatch with Hadoop's StopWatch
     (ozawa)
 
+  OPTIMIZATIONS
+
     HADOOP-11470. Remove some uses of obsolete guava APIs from the hadoop
     codebase. (Sangjin Lee via Colin P. McCabe)
 
