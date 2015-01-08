@@ -367,6 +367,29 @@ Release 2.7.0 - UNRELEASED
     HDFS-7557. Fix spacing for a few keys in DFSConfigKeys.java 
     (Colin P.McCabe)
 
+    HDFS-7560. ACLs removed by removeDefaultAcl() will be back after NameNode
+    restart/failover. (Vinayakumar B via cnauroth)
+
+    HDFS-7456. De-duplicate AclFeature instances with same AclEntries do reduce
+    memory footprint of NameNode (vinayakumarb)
+
+    HDFS-7563. NFS gateway parseStaticMap NumberFormatException 
+    (Yongjun Zhang via brandonli)
+
+    HDFS-7572. TestLazyPersistFiles#testDnRestartWithSavedReplicas is flaky on
+    Windows. (Arpit Agarwal via cnauroth)
+
+    HDFS-7583. Fix findbug in TransferFsImage.java (vinayakumarb)
+
+    HDFS-7564. NFS gateway dynamically reload UID/GID mapping file /etc/nfs.map
+    (Yongjun Zhang via brandonli)
+
+    HDFS-7561. TestFetchImage should write fetched-image-dir under target.
+    (Liang Xie via shv)
+
+    HDFS-7589. Break the dependency between libnative_mini_dfs and libhdfs.
+    (Zhanwei Wang via cnauroth)
+
 Release 2.6.1 - UNRELEASED
 
   INCOMPATIBLE CHANGES
