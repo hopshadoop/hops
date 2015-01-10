@@ -21,9 +21,13 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.junit.Test;
 
+import javax.management.MBeanAttributeInfo;
+import javax.management.MBeanInfo;
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
 import java.lang.management.ManagementFactory;
+import java.util.HashSet;
+import java.util.Set;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -51,63 +55,29 @@ public class TestFSNamesystemMBean {
         // come from hadoop metrics framework for the class FSNamesystem.
         ObjectName mxbeanNamefsn = new ObjectName(
             "Hadoop:service=NameNode,name=FSNamesystem");
-        Integer blockCapacity = (Integer) (mbs.getAttribute(mxbeanNamefsn,
-            "BlockCapacity"));
+
         // Metrics that belong to "FSNamesystemState".
         // These are metrics that FSNamesystem registers directly with MBeanServer.
         ObjectName mxbeanNameFsns = new ObjectName(
             "Hadoop:service=NameNode,name=FSNamesystemState");
-        String FSState = (String) (mbs.getAttribute(mxbeanNameFsns,
-            "FSState"));
-        Long blocksTotal = (Long) (mbs.getAttribute(mxbeanNameFsns,
-            "BlocksTotal"));
-        Long capacityTotal = (Long) (mbs.getAttribute(mxbeanNameFsns,
-            "CapacityTotal"));
-        Long capacityRemaining = (Long) (mbs.getAttribute(mxbeanNameFsns,
-            "CapacityRemaining"));
-        Long capacityUsed = (Long) (mbs.getAttribute(mxbeanNameFsns,
-            "CapacityUsed"));
-        Long filesTotal = (Long) (mbs.getAttribute(mxbeanNameFsns,
-            "FilesTotal"));
-        Long pendingReplicationBlocks = (Long) (mbs.getAttribute(mxbeanNameFsns,
-            "PendingReplicationBlocks"));
-        Long underReplicatedBlocks = (Long) (mbs.getAttribute(mxbeanNameFsns,
-            "UnderReplicatedBlocks"));
-        Long scheduledReplicationBlocks = (Long) (mbs.getAttribute(mxbeanNameFsns,
-            "ScheduledReplicationBlocks"));
-        Integer totalLoad = (Integer) (mbs.getAttribute(mxbeanNameFsns,
-            "TotalLoad"));
-        Integer numLiveDataNodes = (Integer) (mbs.getAttribute(mxbeanNameFsns,
-            "NumLiveDataNodes"));
-        Integer numDeadDataNodes = (Integer) (mbs.getAttribute(mxbeanNameFsns,
-           "NumDeadDataNodes"));
-        Integer numStaleDataNodes = (Integer) (mbs.getAttribute(mxbeanNameFsns,
-            "NumStaleDataNodes"));
-        Integer numDecomLiveDataNodes = (Integer) (mbs.getAttribute(mxbeanNameFsns,
-            "NumDecomLiveDataNodes"));
-        Integer numDecomDeadDataNodes = (Integer) (mbs.getAttribute(mxbeanNameFsns,
-            "NumDecomDeadDataNodes"));
-        Integer numDecommissioningDataNodes = (Integer) (mbs.getAttribute(mxbeanNameFsns,
-            "NumDecommissioningDataNodes"));
-        Long MaxObjects = (Long) (mbs.getAttribute(mxbeanNameFsns,
-            "MaxObjects"));
-        String topUsers =
-            (String) (mbs.getAttribute(mxbeanNameFsns, "TopUserOpCounts"));
 
         // Metrics that belong to "NameNodeInfo".
         // These are metrics that FSNamesystem registers directly with MBeanServer.
         ObjectName mxbeanNameNni = new ObjectName(
             "Hadoop:service=NameNode,name=NameNodeInfo");
-        String safemode = (String) (mbs.getAttribute(mxbeanNameNni,
-            "Safemode"));
-        String liveNodes = (String) (mbs.getAttribute(mxbeanNameNni,
-            "LiveNodes"));
-        String deadNodes = (String) (mbs.getAttribute(mxbeanNameNni,
-            "DeadNodes"));
-        String decomNodes = (String) (mbs.getAttribute(mxbeanNameNni,
-            "DecomNodes"));
-        String corruptFiles = (String) (mbs.getAttribute(mxbeanNameNni,
-            "CorruptFiles"));
+
+        final Set<ObjectName> mbeans = new HashSet<ObjectName>();
+        mbeans.add(mxbeanNamefsn);
+        mbeans.add(mxbeanNameFsns);
+        mbeans.add(mxbeanNameNni);
+
+        for(ObjectName mbean : mbeans) {
+          MBeanInfo attributes = mbs.getMBeanInfo(mbean);
+          for (MBeanAttributeInfo attributeInfo : attributes.getAttributes()) {
+            mbs.getAttribute(mbean, attributeInfo.getName());
+          }
+        }
+
         succeeded = true;
       } catch (Exception e) {
         LOG.error(e,e);
