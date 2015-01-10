@@ -533,7 +533,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
   private void pruneStorageMap(final StorageReport[] reports) {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Number of storages reported in heartbeat=" + reports.length +
-          "; Number of storages in storageMap=" + storageMap.size());
+                    "; Number of storages in storageMap=" + storageMap.size());
     }
 
     HashMap<String, DatanodeStorageInfo> excessStorages;
