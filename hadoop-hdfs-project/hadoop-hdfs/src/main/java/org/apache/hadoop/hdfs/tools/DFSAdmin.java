@@ -38,15 +38,12 @@ import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.NameNodeProxies;
-import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.protocol.ClientDatanodeProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.RollingUpgradeAction;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.SafeModeAction;
-import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RemoteException;
@@ -403,8 +400,6 @@ public class DFSAdmin extends FsShell {
     "\t[-shutdownDatanode <datanode_host:ipc_port> [upgrade]]\n" +
     "\t[-getDatanodeInfo <datanode_host:ipc_port>]\n" +
     "\t[-metasave filename]\n" +
-    "\t[-setStoragePolicy path policyName]\n" +
-    "\t[-getStoragePolicy path]\n" +
     "\t[-triggerBlockReport [-incremental] <datanode_host:ipc_port>]\n" +
     "\t[-help [cmd]]\n";
 
@@ -629,35 +624,6 @@ public class DFSAdmin extends FsShell {
     return exitCode;
   }
 
-  public int setStoragePolicy(String[] argv) throws IOException {
-    DistributedFileSystem dfs = getDFS();
-    dfs.setStoragePolicy(new Path(argv[1]), argv[2]);
-    System.out.println("Set storage policy " + argv[2] + " on " + argv[1]);
-    return 0;
-  }
-
-  public int getStoragePolicy(String[] argv) throws IOException {
-    DistributedFileSystem dfs = getDFS();
-    HdfsFileStatus status = dfs.getClient().getFileInfo(argv[1]);
-    if (status == null) {
-      throw new FileNotFoundException("File/Directory does not exist: "
-          + argv[1]);
-    }
-    byte storagePolicyId = status.getStoragePolicy();
-    if (storagePolicyId == BlockStoragePolicySuite.ID_UNSPECIFIED) {
-      System.out.println("The storage policy of " + argv[1] + " is unspecified");
-      return 0;
-    }
-    BlockStoragePolicy[] policies = dfs.getStoragePolicies();
-    for (BlockStoragePolicy p : policies) {
-      if (p.getId() == storagePolicyId) {
-        System.out.println("The storage policy of " + argv[1] + ":\n" + p);
-        return 0;
-      }
-    }
-    throw new IOException("Cannot identify the storage policy for " + argv[1]);
-  }
-
   public int triggerBlockReport(String[] argv) throws IOException {
     List<String> args = new LinkedList<String>();
     for (int j = 1; j < argv.length; j++) {
@@ -760,12 +726,6 @@ public class DFSAdmin extends FsShell {
         "\t\tthe dfs.balance.bandwidthPerSec parameter.\n\n" +
         "\t\t--- NOTE: The new value is not persistent on the DataNode.---\n";
     
-    String setStoragePolicy = "-setStoragePolicy path policyName\n"
-        + "\tSet the storage policy for a file/directory.\n";
-
-    String getStoragePolicy = "-getStoragePolicy path\n"
-        + "\tGet the storage policy for a file/directory.\n";
-
     String triggerBlockReport =
       "-triggerBlockReport [-incremental] <datanode_host:ipc_port>\n"
         + "\tTrigger a block report for the datanode.\n"
@@ -818,10 +778,6 @@ public class DFSAdmin extends FsShell {
       System.out.println(deleteBlockPool);
     } else if ("setBalancerBandwidth".equals(cmd)) {
       System.out.println(setBalancerBandwidth);
-    } else if ("setStoragePolicy".equalsIgnoreCase(cmd))  {
-      System.out.println(setStoragePolicy);
-    } else if ("getStoragePolicy".equalsIgnoreCase(cmd))  {
-      System.out.println(getStoragePolicy);
     } else if ("shutdownDatanode".equalsIgnoreCase(cmd)) {
       System.out.println(shutdownDatanode);
     } else if ("getDatanodeInfo".equalsIgnoreCase(cmd)) {
@@ -845,8 +801,6 @@ public class DFSAdmin extends FsShell {
       System.out.println(printTopology);
       System.out.println(deleteBlockPool);
       System.out.println(setBalancerBandwidth);
-      System.out.println(setStoragePolicy);
-      System.out.println(getStoragePolicy);
       System.out.println(triggerBlockReport);
       System.out.println(shutdownDatanode);
       System.out.println(getDatanodeInfo);
@@ -1116,12 +1070,6 @@ public class DFSAdmin extends FsShell {
     } else if ("-getDatanodeInfo".equals(cmd)) {
       System.err.println("Usage: hdfs dfsadmin"
           + " [-getDatanodeInfo <datanode_host:ipc_port>]");
-    } else if ("-setStoragePolicy".equals(cmd)) {
-      System.err.println("Usage: hdfs dfsadmin"
-          + " [-setStoragePolicy path policyName]");
-    } else if ("-getStoragePolicy".equals(cmd)) {
-      System.err.println("Usage: hdfs dfsadmin"
-          + " [-getStoragePolicy path]");
     } else if ("-triggerBlockReport".equals(cmd)) {
       System.err.println("Usage: java DFSAdmin"
           + " [-triggerBlockReport [-incremental] <datanode_host:ipc_port>]");
@@ -1205,18 +1153,8 @@ public class DFSAdmin extends FsShell {
         printUsage(cmd);
         return exitCode;
       }
-    } else if ("-setStoragePolicy".equals(cmd)) {
-      if (argv.length != 3) {
-        printUsage(cmd);
-        return exitCode;
-      }
     } else if ("-triggerBlockReport".equals(cmd)) {
       if (argv.length < 1) {
-        printUsage(cmd);
-        return exitCode;
-      }
-    } else if ("-getStoragePolicy".equals(cmd)) {
-      if (argv.length != 2) {
         printUsage(cmd);
         return exitCode;
       }
@@ -1277,10 +1215,6 @@ public class DFSAdmin extends FsShell {
         exitCode = deleteBlockPool(argv, i);
       } else if ("-setBalancerBandwidth".equals(cmd)) {
         exitCode = setBalancerBandwidth(argv, i);
-      } else if ("-setStoragePolicy".equals(cmd)) {
-        exitCode = setStoragePolicy(argv);
-      } else if ("-getStoragePolicy".equals(cmd)) {
-        exitCode = getStoragePolicy(argv);
       } else if ("-triggerBlockReport".equals(cmd)) {
         exitCode = triggerBlockReport(argv);
       } else if ("-shutdownDatanode".equals(cmd)) {
