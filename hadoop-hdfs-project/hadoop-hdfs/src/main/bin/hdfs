@@ -39,7 +39,6 @@ function print_usage(){
   echo "  dfs                  run a filesystem command on the file systems supported in Hadoop."
   echo "  mover                run a utility to move block replicas across"
   echo "                       storage types"
-  echo "  storagepolicies      get all the existing block storage policies"
   echo "  namenode -format     format the DFS filesystem"
   echo "  namenode             run the DFS namenode"
   echo "  datanode             run a DFS datanode"
@@ -52,6 +51,7 @@ function print_usage(){
   echo "  groups               get the groups which users belong to"
   echo "						Use -help to see options"
   echo "  cacheadmin           configure the HDFS cache"
+  echo "  storagepolicies      list/get/set block storage policies"
   echo "  version              print the version"
   echo ""
   echo "Most commands print help when invoked w/o parameters."
@@ -117,6 +117,11 @@ elif [ "$COMMAND" = "fsck" ] ; then
 elif [ "$COMMAND" = "balancer" ] ; then
   CLASS=org.apache.hadoop.hdfs.server.balancer.Balancer
   HADOOP_OPTS="$HADOOP_OPTS $HADOOP_BALANCER_OPTS"
+elif [ "$COMMAND" = "mover" ] ; then
+  CLASS=org.apache.hadoop.hdfs.server.mover.Mover
+  HADOOP_OPTS="${HADOOP_OPTS} ${HADOOP_MOVER_OPTS}"
+elif [ "$COMMAND" = "storagepolicies" ] ; then
+  CLASS=org.apache.hadoop.hdfs.tools.StoragePolicyAdmin
 elif [ "$COMMAND" = "jmxget" ] ; then
   CLASS=org.apache.hadoop.hdfs.tools.JMXGet
 elif [ "$COMMAND" = "fetchdt" ] ; then
@@ -125,11 +130,6 @@ elif [ "$COMMAND" = "getconf" ] ; then
   CLASS=org.apache.hadoop.hdfs.tools.GetConf
 elif [ "$COMMAND" = "groups" ] ; then
   CLASS=org.apache.hadoop.hdfs.tools.GetGroups
-elif [ "$COMMAND" = "mover" ] ; then
-  CLASS=org.apache.hadoop.hdfs.server.mover.Mover
-  HADOOP_OPTS="${HADOOP_OPTS} ${HADOOP_MOVER_OPTS}"
-elif [ "$COMMAND" = "storagepolicies" ] ; then
-  CLASS=org.apache.hadoop.hdfs.tools.GetStoragePolicies
 elif [ "$COMMAND" = "cacheadmin" ] ; then
   CLASS=org.apache.hadoop.hdfs.tools.CacheAdmin
 elif [ "$COMMAND" = "version" ] ; then
