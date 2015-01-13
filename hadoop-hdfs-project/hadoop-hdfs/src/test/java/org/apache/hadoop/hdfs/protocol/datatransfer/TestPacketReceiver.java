@@ -27,8 +27,13 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
+import org.apache.hadoop.hdfs.AppendTestUtil;
+import org.junit.Test;
+import org.mockito.Mockito;
+
+import com.google.common.primitives.Ints;
+
+import static org.junit.Assert.*;
 
 public class TestPacketReceiver {
 
@@ -40,10 +45,9 @@ public class TestPacketReceiver {
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     DataOutputStream dos = new DataOutputStream(baos);
     
-    int packetLen = data.length + sums.length + 4;
-    PacketHeader header =
-        new PacketHeader(packetLen, OFFSET_IN_BLOCK, SEQNO, false, data.length,
-            false);
+    int packetLen = data.length + sums.length + Ints.BYTES;
+    PacketHeader header = new PacketHeader(
+        packetLen, OFFSET_IN_BLOCK, SEQNO, false, data.length, false);
     header.write(dos);
     
     dos.write(sums);
@@ -90,6 +94,7 @@ public class TestPacketReceiver {
     PacketHeader header = pr.getHeader();
     assertEquals(SEQNO, header.getSeqno());
     assertEquals(OFFSET_IN_BLOCK, header.getOffsetInBlock());
+    assertEquals(dataLen + checksumsLen + Ints.BYTES, header.getPacketLen());
     
     // Mirror the packet to an output stream and make sure it matches
     // the packet we sent.
