@@ -46,6 +46,8 @@ public class DatanodeID implements Comparable<DatanodeID> {
   private int infoPort;      // info server port
   private int infoSecurePort; // info server port
   private int ipcPort;       // IPC server port
+  private String xferAddr;
+  private int hashCode = -1;
 
   /**
    * UUID identifying a given datanode. For upgraded Datanodes this is the
@@ -90,6 +92,7 @@ public class DatanodeID implements Comparable<DatanodeID> {
     this.infoPort = infoPort;
     this.infoSecurePort = infoSecurePort;
     this.ipcPort = ipcPort;
+    updateXferAddrAndInvalidateHashCode();
   }
   
   //HOP: Mahmoud: 
@@ -105,6 +108,7 @@ public class DatanodeID implements Comparable<DatanodeID> {
   
   public void setIpAddr(String ipAddr) {
     this.ipAddr = ipAddr;
+    updateXferAddrAndInvalidateHashCode();
   }
 
   public void setPeerHostName(String peerHostName) {
@@ -136,7 +140,7 @@ public class DatanodeID implements Comparable<DatanodeID> {
    * @return IP:xferPort string
    */
   public String getXferAddr() {
-    return ipAddr + ":" + xferPort;
+    return xferAddr;
   }
 
   /**
@@ -254,10 +258,16 @@ public class DatanodeID implements Comparable<DatanodeID> {
   
   @Override
   public int hashCode() {
-    if(datanodeUuid == null) {
-      return getXferAddr().hashCode();
+    if (hashCode == -1) {
+      int newHashCode;
+      if(datanodeUuid == null) {
+        newHashCode = xferAddr.hashCode();
+      } else {
+        newHashCode = xferAddr.hashCode() ^ datanodeUuid.hashCode();
+      }
+      hashCode = newHashCode & Integer.MAX_VALUE;
     }
-    return getXferAddr().hashCode() ^ datanodeUuid.hashCode();
+    return hashCode;
   }
   
   @Override
@@ -277,6 +287,7 @@ public class DatanodeID implements Comparable<DatanodeID> {
     infoPort = nodeReg.getInfoPort();
     infoSecurePort = nodeReg.getInfoSecurePort();
     ipcPort = nodeReg.getIpcPort();
+    updateXferAddrAndInvalidateHashCode();
   }
 
   /**
@@ -288,5 +299,14 @@ public class DatanodeID implements Comparable<DatanodeID> {
   @Override
   public int compareTo(DatanodeID that) {
     return getXferAddr().compareTo(that.getXferAddr());
+  }
+
+  // NOTE: mutable hash codes are dangerous, however this class chooses to
+  // use them.  this method must be called when a value mutates that is used
+  // to compute the hash, equality, or comparison of instances.
+  private void updateXferAddrAndInvalidateHashCode() {
+    xferAddr = ipAddr + ":" + xferPort;
+    // can't compute new hash yet because uuid might still null...
+    hashCode = -1;
   }
 }
