@@ -28,6 +28,8 @@ import org.apache.hadoop.fs.InvalidRequestException;
 import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.ipc.RemoteException;
 
+import org.apache.htrace.core.TraceScope;
+import org.apache.htrace.core.Tracer;
 /**
  * CacheDirectiveIterator is a remote iterator that iterates cache directives.
  * It supports retrying in case of namenode failover.
@@ -39,12 +41,14 @@ public class CacheDirectiveIterator
 
   private CacheDirectiveInfo filter;
   private final ClientProtocol namenode;
+  private final Tracer tracer;
 
   public CacheDirectiveIterator(ClientProtocol namenode,
-      CacheDirectiveInfo filter) {
+      CacheDirectiveInfo filter, Tracer tracer) {
     super(Long.valueOf(0));
     this.namenode = namenode;
     this.filter = filter;
+    this.tracer = tracer;
   }
   
   private static CacheDirectiveInfo removeIdFromFilter(CacheDirectiveInfo filter) {
@@ -84,7 +88,7 @@ public class CacheDirectiveIterator
       throws IOException {
     
     BatchedEntries<CacheDirectiveEntry> entries = null;
-    try {
+    try (TraceScope ignored = tracer.newScope("listCacheDirectives")) {
       entries = namenode.listCacheDirectives(prevKey, filter);
     } catch (IOException e) {
       if (e.getMessage().contains("Filtering by ID is unsupported")) {

@@ -83,8 +83,9 @@ import org.junit.Test;
 import com.google.common.base.Supplier;
 import java.util.Arrays;
 import java.util.Set;
+import org.apache.hadoop.fs.FsTracer;
 import org.apache.hadoop.hdfs.BlockReaderTestUtil;
-import org.apache.hadoop.hdfs.protocol.CacheDirectiveIteratorForTesting;
+import org.apache.hadoop.hdfs.protocol.CacheDirectiveIterator;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeManager;
 
@@ -865,7 +866,7 @@ public class TestCacheDirectives {
 
     // Uncache and check each path in sequence
     RemoteIterator<CacheDirectiveEntry> entries =
-      new CacheDirectiveIteratorForTesting(nnRpc, null);
+      new CacheDirectiveIterator(nnRpc, null, FsTracer.get(conf));
     for (int i=0; i<numFiles; i++) {
       CacheDirectiveEntry entry = entries.next();
       nnRpc.removeCacheDirective(entry.getInfo().getId());
