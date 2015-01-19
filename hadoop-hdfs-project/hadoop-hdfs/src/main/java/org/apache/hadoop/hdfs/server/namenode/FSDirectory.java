@@ -1022,7 +1022,7 @@ public class FSDirectory implements Closeable {
   }
   /** Check if a given path is reserved */
   public static boolean isReservedName(String src) {
-    return src.startsWith(DOT_RESERVED_PATH_PREFIX);
+    return src.startsWith(DOT_RESERVED_PATH_PREFIX + Path.SEPARATOR);
   }
   
   /**
