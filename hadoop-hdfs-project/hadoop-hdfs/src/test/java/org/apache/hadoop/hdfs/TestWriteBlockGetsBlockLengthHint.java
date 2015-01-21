@@ -97,8 +97,9 @@ public class TestWriteBlockGetsBlockLengthHint {
      * correctly propagate the hint to FsDatasetSpi.
      */
     @Override
-    public synchronized ReplicaInPipelineInterface createRbw(
-        StorageType storageType, ExtendedBlock b) throws IOException {
+    public synchronized ReplicaHandler createRbw(
+        StorageType storageType, ExtendedBlock b)
+        throws IOException {
       assertThat(b.getLocalBlock().getNumBytes(), is(EXPECTED_BLOCK_LENGTH));
       return super.createRbw(storageType, b);
     }
