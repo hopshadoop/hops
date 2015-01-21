@@ -80,6 +80,7 @@ import java.security.PrivilegedExceptionAction;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
 import org.apache.hadoop.tracing.TraceUtils;
@@ -217,6 +218,7 @@ public class NameNode implements NameNodeStatusMXBean {
   
   protected FSNamesystem namesystem;
   protected final Configuration conf;
+  private AtomicBoolean started = new AtomicBoolean(false); 
 
   /**
    * httpServer
@@ -759,6 +761,7 @@ public class NameNode implements NameNodeStatusMXBean {
     try {
       initializeGenericKeys(conf);
       initialize(conf);
+      this.started.set(true);
       enterActiveState();
     } catch (IOException | HadoopIllegalArgumentException e) {
       this.stop();
@@ -1393,6 +1396,13 @@ public class NameNode implements NameNodeStatusMXBean {
         LOG.warn("RPC TLS is enabled but CRL validation is disabled");
       }
     }
+  }
+ 
+  /**
+   * Returns whether the NameNode is completely started
+   */
+  boolean isStarted() {
+    return this.started.get();
   }
 }
 
