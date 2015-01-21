@@ -2352,7 +2352,7 @@ public class DataNode extends ReconfigurableBase
               block.getBlockPoolId());
     }
     if (blockScanner != null) {
-      blockScanner.addBlock(block);
+      blockScanner.addBlock(block, false);
     }
   }
 

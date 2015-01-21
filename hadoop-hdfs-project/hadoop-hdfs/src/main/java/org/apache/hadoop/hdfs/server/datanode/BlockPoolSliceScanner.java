@@ -103,13 +103,15 @@ class BlockPoolSliceScanner {
   private long bytesLeft = 0; // Bytes to scan in this period
   private long totalBytesToScan = 0;
   private boolean isNewPeriod = true;
-
+  private int lastScanTimeDifference = 5*60*1000;
+  
   private final LogFileHandler verificationLog;
 
   private final DataTransferThrottler throttler = new DataTransferThrottler(
       200, MAX_SCAN_RATE);
 
   private static enum ScanType {
+    IMMEDIATE_SCAN,  
     VERIFICATION_SCAN,     // scanned as part of periodic verfication
     NONE,
   }
@@ -127,12 +129,17 @@ class BlockPoolSliceScanner {
 
       @Override
       public int compare(BlockScanInfo left, BlockScanInfo right) {
+        final ScanType leftNextScanType = left.nextScanType;
+        final ScanType rightNextScanType = right.nextScanType;
         final long l = left.lastScanTime;
         final long r = right.lastScanTime;
+        // Compare by nextScanType if they are same then compare by 
+        // lastScanTimes
         // compare blocks itself if scantimes are same to avoid.
         // because TreeMap uses comparator if available to check existence of
-        // the object.
-        return l < r? -1: l > r? 1: left.compareTo(right);
+        // the object. 
+        int compareByNextScanType = leftNextScanType.compareTo(rightNextScanType);
+        return compareByNextScanType < 0? -1: compareByNextScanType > 0? 1:  l < r? -1: l > r? 1: left.compareTo(right); 
       }
     };
 
@@ -140,7 +147,8 @@ class BlockPoolSliceScanner {
     ScanType lastScanType = ScanType.NONE;
     boolean lastScanOk = true;
     private LinkedElement next;
-
+    ScanType nextScanType = ScanType.VERIFICATION_SCAN;
+    
     BlockScanInfo(Block block) {
       super(block);
     }
@@ -259,11 +267,13 @@ class BlockPoolSliceScanner {
   /** Update blockMap by the given LogEntry */
   private synchronized void updateBlockInfo(LogEntry e) {
     BlockScanInfo info = blockMap.get(new Block(e.blockId, 0, e.genStamp));
-
-    if(info != null && e.verificationTime > 0 &&
+    
+    if (info != null && e.verificationTime > 0 && 
         info.lastScanTime < e.verificationTime) {
       delBlockInfo(info);
-      info.lastScanTime = e.verificationTime;
+      if (info.nextScanType != ScanType.IMMEDIATE_SCAN) {
+        info.lastScanTime = e.verificationTime;
+      }
       info.lastScanType = ScanType.VERIFICATION_SCAN;
       addBlockInfo(info, false);
     }
@@ -281,9 +291,23 @@ class BlockPoolSliceScanner {
         DFSUtil.getRandom().nextInt(periodInt);
   }
 
-  /** Adds block to list of blocks */
-  synchronized void addBlock(ExtendedBlock block) {
+  /** Adds block to list of blocks 
+   * @param scanNow - true if we want to make that particular block a high 
+   * priority one to scan immediately
+   **/
+  synchronized void addBlock(ExtendedBlock block, boolean scanNow) {
     BlockScanInfo info = blockMap.get(block.getLocalBlock());
+    long lastScanTime = 0;
+    if (info != null) {
+      lastScanTime = info.lastScanTime;
+    }
+    // If the particular block is scanned in last 5 minutes, the  no need to 
+    // verify that block again
+    if (scanNow && Time.monotonicNow() - lastScanTime < 
+        lastScanTimeDifference) {
+      return;
+    }
+    
     if ( info != null ) {
       LOG.warn("Adding an already existing block " + block);
       delBlockInfo(info);
@@ -291,7 +315,13 @@ class BlockPoolSliceScanner {
 
     info = new BlockScanInfo(block.getLocalBlock());
     info.lastScanTime = getNewBlockScanTime();
-
+    if (scanNow) {
+      // Create a new BlockScanInfo object and set the lastScanTime to 0
+      // which will make it the high priority block
+      LOG.info("Adding block for immediate verification " + block);
+      info.nextScanType = ScanType.IMMEDIATE_SCAN;
+    }
+    
     addBlockInfo(info, true);
     adjustThrottler();
   }
@@ -336,6 +366,7 @@ class BlockPoolSliceScanner {
     info.lastScanType = type;
     info.lastScanTime = now;
     info.lastScanOk = scanOk;
+    info.nextScanType = ScanType.VERIFICATION_SCAN;
     addBlockInfo(info, false);
 
     // Don't update meta data if the verification failed.
@@ -358,7 +389,12 @@ class BlockPoolSliceScanner {
       LOG.warn("Cannot report bad " + block.getBlockId());
     }
   }
-
+  
+  @VisibleForTesting
+  synchronized void setLastScanTimeDifference(int lastScanTimeDifference) {
+    this.lastScanTimeDifference = lastScanTimeDifference;
+  }
+  
   static private class LogEntry {
 
     long blockId = -1;
@@ -497,6 +533,9 @@ class BlockPoolSliceScanner {
 
   private synchronized boolean isFirstBlockProcessed() {
     if (!blockInfoSet.isEmpty()) {
+      if (blockInfoSet.first().nextScanType == ScanType.IMMEDIATE_SCAN) {
+        return false;
+      }
       long blockId = blockInfoSet.first().getBlockId();
       if ((processedBlocks.get(blockId) != null)
           && (processedBlocks.get(blockId) == 1)) {
