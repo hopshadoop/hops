@@ -36,6 +36,7 @@ import org.apache.hadoop.hdfs.server.datanode.DataStorage;
 import org.apache.hadoop.hdfs.server.datanode.FinalizedReplica;
 import org.apache.hadoop.hdfs.server.datanode.Replica;
 import org.apache.hadoop.hdfs.server.datanode.ReplicaInPipelineInterface;
+import org.apache.hadoop.hdfs.server.datanode.ReplicaHandler;
 import org.apache.hadoop.hdfs.server.datanode.ReplicaInfo;
 import org.apache.hadoop.hdfs.server.datanode.ReplicaNotFoundException;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
@@ -222,8 +223,8 @@ public interface FsDatasetSpi<V extends FsVolumeSpi> extends FSDatasetMBean {
    * @throws IOException
    *     if an error occurs
    */
-  public ReplicaInPipelineInterface createTemporary(StorageType storageType, ExtendedBlock b)
-      throws IOException;
+  public ReplicaHandler createTemporary(StorageType storageType,
+      ExtendedBlock b) throws IOException;
 
   /**
    * Creates a RBW replica and returns the meta info of the replica
@@ -232,7 +233,7 @@ public interface FsDatasetSpi<V extends FsVolumeSpi> extends FSDatasetMBean {
    * @return the meta info of the replica which is being written to
    * @throws IOException if an error occurs
    */
-  public ReplicaInPipelineInterface createRbw(StorageType storageType,
+  public ReplicaHandler createRbw(StorageType storageType,
       ExtendedBlock b) throws IOException;
 
   /**
@@ -250,8 +251,8 @@ public interface FsDatasetSpi<V extends FsVolumeSpi> extends FSDatasetMBean {
    * @throws IOException
    *     if an error occurs
    */
-  public ReplicaInPipelineInterface recoverRbw(ExtendedBlock b, long newGS,
-      long minBytesRcvd, long maxBytesRcvd) throws IOException;
+  public ReplicaHandler recoverRbw(ExtendedBlock b,
+      long newGS, long minBytesRcvd, long maxBytesRcvd) throws IOException;
 
   /**
    * Covert a temporary replica to a RBW.
@@ -275,7 +276,7 @@ public interface FsDatasetSpi<V extends FsVolumeSpi> extends FSDatasetMBean {
    * @return the meata info of the replica which is being written to
    * @throws IOException
    */
-  public ReplicaInPipelineInterface append(ExtendedBlock b, long newGS,
+  public ReplicaHandler append(ExtendedBlock b, long newGS,
       long expectedBlockLen) throws IOException;
 
   /**
@@ -291,8 +292,8 @@ public interface FsDatasetSpi<V extends FsVolumeSpi> extends FSDatasetMBean {
    * @return the meta info of the replica which is being written to
    * @throws IOException
    */
-  public ReplicaInPipelineInterface recoverAppend(ExtendedBlock b, long newGS,
-      long expectedBlockLen) throws IOException;
+  public ReplicaHandler recoverAppend(
+      ExtendedBlock b, long newGS, long expectedBlockLen) throws IOException;
   
   /**
    * Recover a failed pipeline close

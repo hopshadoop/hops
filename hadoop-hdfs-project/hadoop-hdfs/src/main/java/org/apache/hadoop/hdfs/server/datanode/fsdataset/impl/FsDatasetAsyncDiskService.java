@@ -18,11 +18,6 @@
 
 package org.apache.hadoop.hdfs.server.datanode.fsdataset.impl;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
-import org.apache.hadoop.hdfs.server.datanode.DataNode;
-import org.apache.hadoop.hdfs.server.protocol.BlockCommand;
 
 import java.io.File;
 import java.io.FileDescriptor;
@@ -32,6 +27,14 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
+import org.apache.hadoop.hdfs.server.datanode.DataNode;
+import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsVolumeReference;
+import org.apache.hadoop.hdfs.server.protocol.BlockCommand;
+import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.nativeio.NativeIO;
 import org.apache.hadoop.io.nativeio.NativeIOException;
 
@@ -201,13 +204,13 @@ class FsDatasetAsyncDiskService {
    * Delete the block file and meta file from the disk asynchronously, adjust
    * dfsUsed statistics accordingly.
    */
-  void deleteAsync(FsVolumeImpl volume, File blockFile, File metaFile,
+  void deleteAsync(FsVolumeReference volumeRef, File blockFile, File metaFile,
       ExtendedBlock block, String trashDirectory) {
-    LOG.info("Scheduling " + block.getLocalBlock() + " file " + blockFile +
-        " for deletion");
-    ReplicaFileDeleteTask deletionTask =
-        new ReplicaFileDeleteTask(volume, blockFile, metaFile, block, trashDirectory);
-    execute(volume.getCurrentDir(), deletionTask);
+    LOG.info("Scheduling " + block.getLocalBlock()
+        + " file " + blockFile + " for deletion");
+    ReplicaFileDeleteTask deletionTask = new ReplicaFileDeleteTask(
+        volumeRef, blockFile, metaFile, block, trashDirectory);
+    execute(((FsVolumeImpl) volumeRef.getVolume()).getCurrentDir(), deletionTask);
   }
   
   /**
@@ -218,15 +221,17 @@ class FsDatasetAsyncDiskService {
    * files are deleted immediately.
    */
   class ReplicaFileDeleteTask implements Runnable {
+    final FsVolumeReference volumeRef;
     final FsVolumeImpl volume;
     final File blockFile;
     final File metaFile;
     final ExtendedBlock block;
     final String trashDirectory;
     
-    ReplicaFileDeleteTask(FsVolumeImpl volume, File blockFile, File metaFile,
-        ExtendedBlock block, String trashDirectory) {
-      this.volume = volume;
+    ReplicaFileDeleteTask(FsVolumeReference volumeRef, File blockFile,
+        File metaFile, ExtendedBlock block, String trashDirectory) {
+      this.volumeRef = volumeRef;
+      this.volume = (FsVolumeImpl) volumeRef.getVolume();
       this.blockFile = blockFile;
       this.metaFile = metaFile;
       this.block = block;
@@ -284,6 +289,7 @@ class FsDatasetAsyncDiskService {
             "Deleted " + block.getBlockPoolId() + " " + block.getLocalBlock() +
                 " file " + blockFile);
       }
+      IOUtils.cleanup(null, volumeRef);
     }
   }
 }
