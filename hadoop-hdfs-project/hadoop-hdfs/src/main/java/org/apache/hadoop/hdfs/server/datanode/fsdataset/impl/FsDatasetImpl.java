@@ -722,7 +722,7 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
     }
 
     // Replace the old block if any to reschedule the scanning.
-    datanode.getBlockScanner().addBlock(block);
+    datanode.getBlockScanner().addBlock(block, false);
     return replicaInfo;
   }
   
@@ -1871,7 +1871,7 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
         volumeMap.add(bpid, diskBlockInfo);
         final DataBlockScanner blockScanner = datanode.getBlockScanner();
         if (blockScanner != null) {
-          blockScanner.addBlock(new ExtendedBlock(bpid, diskBlockInfo));
+          blockScanner.addBlock(new ExtendedBlock(bpid, diskBlockInfo), false);
         }
         LOG.warn("Added missing block to memory " + diskBlockInfo);
         return;
