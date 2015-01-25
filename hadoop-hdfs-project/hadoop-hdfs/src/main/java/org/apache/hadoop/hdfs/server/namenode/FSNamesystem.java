@@ -1575,7 +1575,10 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       NameNode.stateChangeLog.debug("DIR* NameSystem.truncate: src="
           + srcArg + " newLength=" + newLength);
     }
-
+    if (newLength < 0) {
+      throw new HadoopIllegalArgumentException(
+          "Cannot truncate to a negative file size: " + newLength + ".");
+    }
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
     final String src = dir.resolvePath(srcArg, pathComponents);
     return (boolean) new HopsTransactionalRequestHandler(HDFSOperationType.TRUNCATE) {

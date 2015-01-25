@@ -188,6 +188,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.net.InetAddresses;
 import java.net.ConnectException;
+import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.fs.FsTracer;
 import org.apache.hadoop.hdfs.shortcircuit.DomainSocketFactory;
 import org.apache.hadoop.fs.RemoteIterator;
@@ -1841,6 +1842,10 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
    */
   public boolean truncate(String src, long newLength) throws IOException {
     checkOpen();
+    if (newLength < 0) {
+      throw new HadoopIllegalArgumentException(
+          "Cannot truncate to a negative file size: " + newLength + ".");
+    }
     try {
       return namenode.truncate(src, newLength, clientName);
     } catch (RemoteException re) {
