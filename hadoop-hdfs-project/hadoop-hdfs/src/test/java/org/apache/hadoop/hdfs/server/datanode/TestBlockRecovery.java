@@ -591,7 +591,7 @@ public class TestBlockRecovery {
   }
 
   private final static RecoveringBlock rBlock =
-      new RecoveringBlock(block, DatanodeStorageInfo.EMPTY_ARRAY, RECOVERY_ID);
+      new RecoveringBlock(block, null, RECOVERY_ID);
 
   /**
    * BlockRecoveryFI_09. some/all DNs failed to update replicas.
@@ -659,7 +659,7 @@ public class TestBlockRecovery {
           DataChecksum.newDataChecksum(DataChecksum.Type.CRC32, 512));
       streams.getChecksumOut().write('a');
       dn.data.initReplicaRecovery(
-          new RecoveringBlock(block, DatanodeStorageInfo.EMPTY_ARRAY, RECOVERY_ID + 1));
+          new RecoveringBlock(block, null, RECOVERY_ID + 1));
       try {
         dn.syncBlock(rBlock, initBlockRecords(dn));
         fail("Sync should fail");

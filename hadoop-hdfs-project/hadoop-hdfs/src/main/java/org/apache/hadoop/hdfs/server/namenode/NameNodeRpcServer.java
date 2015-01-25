@@ -23,6 +23,25 @@ import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.SortedActiveNodeList;
 import io.hops.metadata.hdfs.entity.EncodingPolicy;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HANDLER_COUNT_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SERVICE_HANDLER_COUNT_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SERVICE_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdfs.protocol.HdfsConstants.MAX_PATH_DEPTH;
+import static org.apache.hadoop.hdfs.protocol.HdfsConstants.MAX_PATH_LENGTH;
+import static org.apache.hadoop.util.Time.now;
+
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.EnumSet;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+import com.google.common.collect.Lists;
 
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.conf.Configuration;
@@ -755,6 +774,22 @@ class NameNodeRpcServer implements NamenodeProtocols {
       namesystem.retryCacheSetStateTransactional(cacheEntry, success);
     }
     metrics.incrFilesRenamed();
+  }
+
+  @Override // ClientProtocol
+  public boolean truncate(String src, long newLength, String clientName)
+      throws IOException {
+    if(stateChangeLog.isDebugEnabled()) {
+      stateChangeLog.debug("*DIR* NameNode.truncate: " + src + " to " +
+          newLength);
+    }
+    String clientMachine = getClientMachine();
+    try {
+      return namesystem.truncate(
+          src, newLength, clientName, clientMachine, now());
+    } finally {
+      metrics.incrFilesTruncated();
+    }
   }
 
   @Override // ClientProtocol

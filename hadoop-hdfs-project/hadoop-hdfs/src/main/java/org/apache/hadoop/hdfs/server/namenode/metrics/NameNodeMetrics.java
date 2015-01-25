@@ -42,20 +42,14 @@ import static org.apache.hadoop.metrics2.impl.MsInfo.SessionId;
 public class NameNodeMetrics {
   final MetricsRegistry registry = new MetricsRegistry("namenode");
 
-  @Metric
-  MutableCounterLong createFileOps;
-  @Metric
-  MutableCounterLong filesCreated;
-  @Metric
-  MutableCounterLong filesAppended;
-  @Metric
-  MutableCounterLong getBlockLocations;
-  @Metric
-  MutableCounterLong filesRenamed;
-  @Metric
-  MutableCounterLong getListingOps;
-  @Metric
-  MutableCounterLong deleteFileOps;
+  @Metric MutableCounterLong createFileOps;
+  @Metric MutableCounterLong filesCreated;
+  @Metric MutableCounterLong filesAppended;
+  @Metric MutableCounterLong getBlockLocations;
+  @Metric MutableCounterLong filesRenamed;
+  @Metric MutableCounterLong filesTruncated;
+  @Metric MutableCounterLong getListingOps;
+  @Metric MutableCounterLong deleteFileOps;
   @Metric("Number of files/dirs deleted by delete or rename operations")
   MutableCounterLong filesDeleted;
   @Metric
@@ -158,6 +152,10 @@ public class NameNodeMetrics {
 
   public void incrFilesRenamed() {
     filesRenamed.incr();
+  }
+
+  public void incrFilesTruncated() {
+    filesTruncated.incr();
   }
 
   public void incrFilesDeleted(long delta) {

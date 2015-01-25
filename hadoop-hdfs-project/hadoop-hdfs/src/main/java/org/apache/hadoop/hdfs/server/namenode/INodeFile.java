@@ -650,4 +650,43 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
   public INode cloneInode () throws IOException{
     return new INodeFile(this);
   }
+
+  /**
+   * Remove full blocks at the end file up to newLength
+   * @return sum of sizes of the remained blocks
+   */
+  public long collectBlocksBeyondMax(final long max,
+      final BlocksMapUpdateInfo collectedBlocks) throws StorageException, TransactionContextException {
+    final BlockInfo[] oldBlocks = getBlocks();
+    if (oldBlocks == null)
+      return 0;
+    //find the minimum n such that the size of the first n blocks > max
+    int n = 0;
+    long size = 0;
+    for(; n < oldBlocks.length && max > size; n++) {
+      size += oldBlocks[n].getNumBytes();
+    }
+    if (n >= oldBlocks.length)
+      return size;
+
+    // starting from block n, the data is beyond max.
+    // resize the array.  
+    final BlockInfo[] newBlocks;
+    if (n == 0) {
+      newBlocks = BlockInfo.EMPTY_ARRAY;
+    } else {
+      newBlocks = new BlockInfo[n];
+      System.arraycopy(oldBlocks, 0, newBlocks, 0, n);
+    }
+
+    // collect the blocks beyond max
+    if (collectedBlocks != null) {
+      for(; n < oldBlocks.length; n++) {
+        BlockInfo block = oldBlocks[n];
+        EntityManager.remove(block);
+        collectedBlocks.addDeleteBlock(block);
+      }
+    }
+    return size;
+  }
 }

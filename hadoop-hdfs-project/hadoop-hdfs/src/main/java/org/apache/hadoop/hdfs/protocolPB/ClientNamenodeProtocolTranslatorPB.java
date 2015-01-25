@@ -127,6 +127,7 @@ import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.SetQuo
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.SetReplicationRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.SetSafeModeRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.SetTimesRequestProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.TruncateRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.UpdateBlockForPipelineRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.UpdatePipelineRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.CheckAccessRequestProto;
@@ -310,6 +311,21 @@ public class ClientNamenodeProtocolTranslatorPB
     try {
       CreateResponseProto result = rpcProxy.create(null, req);
       return result.hasFs() ? PBHelper.convert(result.getFs()) : null;
+    } catch (ServiceException e) {
+      throw ProtobufHelper.getRemoteException(e);
+    }
+  }
+
+  @Override
+  public boolean truncate(String src, long newLength, String clientName)
+      throws IOException, UnresolvedLinkException {
+    TruncateRequestProto req = TruncateRequestProto.newBuilder()
+        .setSrc(src)
+        .setNewLength(newLength)
+        .setClientName(clientName)
+        .build();
+    try {
+      return rpcProxy.truncate(null, req).getResult();
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);
     }
