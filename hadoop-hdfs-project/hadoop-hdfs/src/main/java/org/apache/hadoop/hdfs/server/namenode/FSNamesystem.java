@@ -1598,15 +1598,20 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
       @Override
       public Object performTask() throws IOException {
+        BlocksMapUpdateInfo toRemoveBlocks = new BlocksMapUpdateInfo();
         FSPermissionChecker pc = getPermissionChecker();
         HdfsFileStatus stat = null;
         boolean res;
         checkNameNodeSafeMode("Cannot truncate for " + src);
 
         res = truncateInternal(src, newLength, clientName,
-            clientMachine, mtime, pc);
-        stat = FSDirStatAndListingOp.getFileInfo(dir, src, false, true);
+            clientMachine, mtime, pc, toRemoveBlocks);
+        stat = dir.getAuditFileInfo(dir.getINodesInPath4Write(src, false));
         logAuditEvent(true, "truncate", src, null, stat);
+        if (!toRemoveBlocks.getToDeleteList().isEmpty()) {
+//          removeBlocks(toRemoveBlocks);
+          toRemoveBlocks.clear();
+        }
         return res;
       }
     }.handle();
@@ -1618,18 +1623,16 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    */
   boolean truncateInternal(String src, long newLength,
                            String clientName, String clientMachine,
-                           long mtime, FSPermissionChecker pc)
+                           long mtime, FSPermissionChecker pc,
+                           BlocksMapUpdateInfo toRemoveBlocks)
       throws IOException, UnresolvedLinkException {
     INodesInPath iip = dir.getINodesInPath4Write(src, true);
     if (isPermissionEnabled) {
       dir.checkPathAccess(pc, iip, FsAction.WRITE);
     }
-    INodeFile file = iip.getLastINode().asFile();
+    INodeFile file = INodeFile.valueOf(iip.getLastINode(), src);
     // Opening an existing file for write. May need lease recovery.
     recoverLeaseInternal(iip, src, clientName, clientMachine, false);
-    // Refresh INode as the file could have been closed
-    iip = dir.getINodesInPath4Write(src, true);
-    file = INodeFile.valueOf(iip.getLastINode(), src);
     // Truncate length check.
     long oldLength = file.computeFileSize();
     if(oldLength == newLength)
@@ -1639,9 +1642,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           "Cannot truncate to a larger file size. Current size: " + oldLength +
               ", truncate size: " + newLength + ".");
     // Perform INodeFile truncation.
-    BlocksMapUpdateInfo collectedBlocks = new BlocksMapUpdateInfo();
     boolean onBlockBoundary = dir.truncate(iip, newLength,
-                                           collectedBlocks, mtime);
+        toRemoveBlocks, mtime);
 
     if(! onBlockBoundary) {
       // Open file for write, but don't log into edits
@@ -1649,7 +1651,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       file = INodeFile.valueOf(dir.getINode4Write(src), src);
       initializeBlockRecovery(file);
     } 
-//    removeBlocks(collectedBlocks);
     return onBlockBoundary;
   }
 
