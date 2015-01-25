@@ -273,6 +273,13 @@ public class TestUsersGroupsMultiNamenode {
     }
     
     @Override
+    public boolean truncate(String src, long newLength, String clientName)
+      throws AccessControlException, FileNotFoundException, SafeModeException,
+      UnresolvedLinkException, IOException{
+      return false;
+    }
+    
+    @Override
     public boolean delete(String src, boolean recursive)
         throws AccessControlException, FileNotFoundException, SafeModeException,
         UnresolvedLinkException, IOException {

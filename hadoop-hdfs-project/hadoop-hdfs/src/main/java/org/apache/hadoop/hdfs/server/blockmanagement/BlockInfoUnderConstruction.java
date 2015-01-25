@@ -202,7 +202,12 @@ public class BlockInfoUnderConstruction extends BlockInfo {
   public void initializeBlockRecovery(long recoveryId,
       DatanodeManager datanodeMgr)
       throws StorageException, TransactionContextException {
-    setBlockUCState(BlockUCState.UNDER_RECOVERY);
+    initializeBlockRecovery(BlockUCState.UNDER_RECOVERY, recoveryId, datanodeMgr);
+  }
+  
+  public void initializeBlockRecovery(BlockUCState s, long recoveryId, DatanodeManager datanodeMgr) throws
+      TransactionContextException, StorageException {
+    setBlockUCState(s);
     List<ReplicaUnderConstruction> replicas = getExpectedReplicas();
     setBlockRecoveryId(recoveryId);
     if (replicas.isEmpty()) {

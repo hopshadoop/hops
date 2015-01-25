@@ -2924,7 +2924,10 @@ public class DataNode extends ReconfigurableBase
             participatingList.add(r);
           }
         }
-        newBlock.setNumBytes(finalizedLength);
+        if (rBlock.getTruncateFlag())
+          newBlock.setNumBytes(rBlock.getBlock().getNumBytes());
+        else
+          newBlock.setNumBytes(finalizedLength);
         break;
       case RBW:
       case RWR:
@@ -2936,7 +2939,10 @@ public class DataNode extends ReconfigurableBase
             participatingList.add(r);
           }
         }
-        newBlock.setNumBytes(minLength);
+        if (rBlock.getTruncateFlag())
+          newBlock.setNumBytes(rBlock.getBlock().getNumBytes());
+        else
+          newBlock.setNumBytes(minLength);
         break;
       case RUR:
       case TEMPORARY:

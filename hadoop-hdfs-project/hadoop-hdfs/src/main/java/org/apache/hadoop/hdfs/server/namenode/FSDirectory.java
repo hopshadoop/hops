@@ -864,7 +864,58 @@ public class FSDirectory implements Closeable {
   void addYieldCount(long value) {
     yieldCount += value;
   }
-  
+
+  boolean truncate(INodesInPath iip, long newLength,
+                   BlocksMapUpdateInfo collectedBlocks,
+                   long mtime)
+      throws IOException {
+    return unprotectedTruncate(iip, newLength, collectedBlocks, mtime);
+  }
+
+  /**
+   * Truncate has the following properties:
+   * 1.) Any block deletions occur now.
+   * 2.) INode length is truncated now – clients can only read up to new length.
+   * 3.) INode will be set to UC and lastBlock set to UNDER_RECOVERY.
+   * 4.) NN will trigger DN truncation recovery and waits for DNs to report.
+   * 5.) File is considered UNDER_RECOVERY until truncation recovery completes.
+   * 6.) Soft and hard Lease expiration require truncation recovery to complete.
+   *
+   * @return true if on the block boundary or false if recovery is need
+   */
+  boolean unprotectedTruncate(INodesInPath iip, long newLength,
+                              BlocksMapUpdateInfo collectedBlocks,
+                              long mtime) throws IOException {
+    INodeFile file = iip.getLastINode().asFile();
+    long oldDiskspace = file.diskspaceConsumed();
+    long remainingLength =
+        file.collectBlocksBeyondMax(newLength, collectedBlocks);
+    file.setModificationTime(mtime);
+    
+    updateCount(iip, 0, file.diskspaceConsumed() - oldDiskspace, true);
+    // If on block boundary, then return
+    long lastBlockDelta = remainingLength - newLength;
+    if(lastBlockDelta == 0){
+      file.recomputeFileSize();
+      return true;
+    }
+    // Set new last block length
+    if (!file.isFileStoredInDB()) {
+      BlockInfo lastBlock = file.getLastBlock();
+      assert lastBlock.getNumBytes() - lastBlockDelta > 0 : "wrong block size";
+      lastBlock.setNumBytes(lastBlock.getNumBytes() - lastBlockDelta);
+    } else {
+      int newLengthInt = (int) newLength;  //small files should be small enough for their size to fit in an int
+      byte[] oldData = file.getFileDataInDB();
+      byte[] newData = new byte[newLengthInt];
+      System.arraycopy(oldData, 0, newData, 0, newLengthInt);
+      file.deleteFileDataStoredInDB();
+      file.storeFileDataInDB(newData);
+    }
+    file.recomputeFileSize();
+    return false;
+  }
+
   /**
    * Update the count of each directory with quota in the namespace
    * A directory's count is defined as the total number inodes in the tree

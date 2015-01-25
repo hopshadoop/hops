@@ -53,7 +53,8 @@ public class BlockRecoveryCommand extends DatanodeCommand {
   @InterfaceAudience.Private
   @InterfaceStability.Evolving
   public static class RecoveringBlock extends LocatedBlock {
-    private long newGenerationStamp;
+    private boolean truncate;
+    private final long newGenerationStamp;
 
     /**
      * Create RecoveringBlock.
@@ -62,13 +63,14 @@ public class BlockRecoveryCommand extends DatanodeCommand {
       super(b, locs, -1, false); // startOffset is unknown
       this.newGenerationStamp = newGS;
     }
-
+    
     /**
-     * Create RecoveringBlock.
+     * RecoveryingBlock with truncate option.
      */
-    public RecoveringBlock(ExtendedBlock b, DatanodeStorageInfo[] locs, long newGS) {
-      super(b, locs); // startOffset is unknown
-      this.newGenerationStamp = newGS;
+    public RecoveringBlock(ExtendedBlock b, DatanodeInfo[] locs, long newGS,
+                           boolean truncate) {
+      this(b, locs, newGS);
+      this.truncate = truncate;
     }
 
     /**
@@ -77,6 +79,13 @@ public class BlockRecoveryCommand extends DatanodeCommand {
      */
     public long getNewGenerationStamp() {
       return newGenerationStamp;
+    }
+
+    /**
+     * Return whether to truncate the block to the ExtendedBlock's length.
+     */
+    public boolean getTruncateFlag() {
+      return truncate;
     }
   }
 

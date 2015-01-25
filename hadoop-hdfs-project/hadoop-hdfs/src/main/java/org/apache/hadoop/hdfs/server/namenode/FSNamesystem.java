@@ -1545,6 +1545,122 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   }
 
   /**
+   * Truncate file to a lower length.
+   * Truncate cannot be reverted / recovered from as it causes data loss.
+   * Truncation at block boundary is atomic, otherwise it requires
+   * block recovery to truncate the last block of the file.
+   *
+   * @return true if and client does not need to wait for block recovery,
+   * false if client needs to wait for block recovery.
+   */
+  boolean truncate(String src, long newLength,
+                   String clientName, String clientMachine,
+                   long mtime)
+      throws IOException, UnresolvedLinkException {
+    boolean ret;
+    try {
+      ret = truncateInt(src, newLength, clientName, clientMachine, mtime);
+    } catch (AccessControlException e) {
+      logAuditEvent(false, "truncate", src);
+      throw e;
+    }
+    return ret;
+  }
+
+  boolean truncateInt(String srcArg, final long newLength,
+      final String clientName, final String clientMachine,
+      final long mtime)
+      throws IOException, UnresolvedLinkException {
+    if (NameNode.stateChangeLog.isDebugEnabled()) {
+      NameNode.stateChangeLog.debug("DIR* NameSystem.truncate: src="
+          + srcArg + " newLength=" + newLength);
+    }
+
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
+    final String src = dir.resolvePath(srcArg, pathComponents);
+    return (boolean) new HopsTransactionalRequestHandler(HDFSOperationType.TRUNCATE) {
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        INodeLock il = lf.getINodeLock(INodeLockType.WRITE_ON_TARGET_AND_PARENT, INodeResolveType.PATH, src)
+            .setNameNodeID(getNamenodeId())
+            .setActiveNameNodes(getNameNode().getActiveNameNodes().getActiveNodes());
+        locks.add(il).add(lf.getBlockLock()).add(
+            lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR, BLK.IV, BLK.PE))
+                    .add(lf.getLastBlockHashBucketsLock());
+        locks.add(lf.getLeaseLock(LockType.WRITE, clientName))
+              .add(lf.getLeasePathLock(LockType.WRITE));
+        if (isErasureCodingEnabled()) {
+          locks.add(lf.getEncodingStatusLock(LockType.WRITE.WRITE, src));
+        }
+        locks.add(lf.getAcesLock());
+      }
+
+      @Override
+      public Object performTask() throws IOException {
+        FSPermissionChecker pc = getPermissionChecker();
+        HdfsFileStatus stat = null;
+        boolean res;
+        checkNameNodeSafeMode("Cannot truncate for " + src);
+
+        res = truncateInternal(src, newLength, clientName,
+            clientMachine, mtime, pc);
+        stat = FSDirStatAndListingOp.getFileInfo(dir, src, false, true);
+        logAuditEvent(true, "truncate", src, null, stat);
+        return res;
+      }
+    }.handle();
+  }
+
+  /**
+   * Truncate a file to a given size
+   * Update the count at each ancestor directory with quota
+   */
+  boolean truncateInternal(String src, long newLength,
+                           String clientName, String clientMachine,
+                           long mtime, FSPermissionChecker pc)
+      throws IOException, UnresolvedLinkException {
+    INodesInPath iip = dir.getINodesInPath4Write(src, true);
+    if (isPermissionEnabled) {
+      dir.checkPathAccess(pc, iip, FsAction.WRITE);
+    }
+    INodeFile file = iip.getLastINode().asFile();
+    // Opening an existing file for write. May need lease recovery.
+    recoverLeaseInternal(iip, src, clientName, clientMachine, false);
+    // Refresh INode as the file could have been closed
+    iip = dir.getINodesInPath4Write(src, true);
+    file = INodeFile.valueOf(iip.getLastINode(), src);
+    // Truncate length check.
+    long oldLength = file.computeFileSize();
+    if(oldLength == newLength)
+      return true;
+    if(oldLength < newLength)
+      throw new HadoopIllegalArgumentException(
+          "Cannot truncate to a larger file size. Current size: " + oldLength +
+              ", truncate size: " + newLength + ".");
+    // Perform INodeFile truncation.
+    BlocksMapUpdateInfo collectedBlocks = new BlocksMapUpdateInfo();
+    boolean onBlockBoundary = dir.truncate(iip, newLength,
+                                           collectedBlocks, mtime);
+
+    if(! onBlockBoundary) {
+      // Open file for write, but don't log into edits
+      prepareFileForWrite(src, iip, clientName, clientMachine);
+      file = INodeFile.valueOf(dir.getINode4Write(src), src);
+      initializeBlockRecovery(file);
+    } 
+//    removeBlocks(collectedBlocks);
+    return onBlockBoundary;
+  }
+
+  void initializeBlockRecovery(INodeFile inodeFile) throws IOException {
+    BlockInfo lastBlock = inodeFile.getLastBlock();
+    long recoveryId = inodeFile.nextGenerationStamp();
+    ((BlockInfoUnderConstruction)lastBlock).initializeBlockRecovery(
+        BlockUCState.BEING_TRUNCATED, recoveryId, blockManager.getDatanodeManager());
+  }
+
+  /**
    * Set the storage policy for a file or a directory.
    *
    * @param src file/directory path
@@ -1834,7 +1950,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       throw ie;
     }
    }
-
+  
   /**
    * Convert current node to under construction.
    * Recreate lease record.
@@ -1996,11 +2112,11 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           }
         } else {
           final BlockInfo lastBlock = file.getLastBlock();
-          if (lastBlock != null &&
-              lastBlock.getBlockUCState() == BlockUCState.UNDER_RECOVERY) {
-            throw new RecoveryInProgressException(
-                "Recovery in progress, file [" + src + "], " + "lease owner [" +
-                    lease.getHolder() + "]");
+          if (lastBlock != null
+              && (lastBlock.getBlockUCState() == BlockUCState.UNDER_RECOVERY ||
+                 lastBlock.getBlockUCState() == BlockUCState.BEING_TRUNCATED)) {
+            throw new RecoveryInProgressException("Recovery in progress, file ["
+                + src + "], " + "lease owner [" + lease.getHolder() + "]");
           } else {
             throw new AlreadyBeingCreatedException(
                 "Failed to create file [" + src + "] for [" + holder +
@@ -3378,6 +3494,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         throw new AlreadyBeingCreatedException(message);
       case UNDER_CONSTRUCTION:
       case UNDER_RECOVERY:
+      case BEING_TRUNCATED:
         final BlockInfoUnderConstruction uc =
             (BlockInfoUnderConstruction) lastBlock;
         // setup the last block locations from the blockManager if not known
@@ -3399,8 +3516,10 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         // start recovery of the last block for this file
         long blockRecoveryId = pendingFile.nextGenerationStamp();
         lease = reassignLease(lease, src, recoveryLeaseHolder, pendingFile);
-        uc.initializeBlockRecovery(blockRecoveryId,
-            getBlockManager().getDatanodeManager());
+        if (uc.getBlockUCState() != BlockUCState.BEING_TRUNCATED) {
+          uc.initializeBlockRecovery(blockRecoveryId,
+              getBlockManager().getDatanodeManager());
+        }
         leaseManager.renewLease(lease);
         // Cannot close file right now, since the last block requires recovery.
         // This may potentially cause infinite loop in lease recovery

@@ -29,6 +29,7 @@ public enum HDFSOperationType implements OperationType {
   GET_BLOCK_LOCATIONS,
   GET_STATS,
   CONCAT,
+  TRUNCATE,
   SET_TIMES,
   CREATE_SYM_LINK,
   SET_STORAGE_POLICY,
