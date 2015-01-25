@@ -479,6 +479,10 @@ Release 2.7.0 - UNRELEASED
 
     HDFS-7644. minor typo in HttpFS doc (Charles Lamb via aw)
 
+    HDFS-7606. Fix potential NPE in INodeFile.getBlocks(). (Byron Wong via shv)
+
+    HDFS-7638: Small fix and few refinements for FSN#truncate. (yliu)
+
 Release 2.6.1 - UNRELEASED
 
   INCOMPATIBLE CHANGES
