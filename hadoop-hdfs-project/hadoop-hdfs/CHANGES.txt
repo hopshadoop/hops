@@ -259,6 +259,14 @@ Release 2.7.0 - UNRELEASED
     HDFS-7573. Consolidate the implementation of delete() into a single class.
     (wheat9)
 
+    HDFS-7640. Print NFS Client in the NFS log. (Brandon Li via wheat9)
+
+    HDFS-7623. Add htrace configuration properties to core-default.xml and
+    update user doc about how to enable htrace. (yliu)
+
+    HDFS-7224. Allow reuse of NN connections via webhdfs (Eric Payne via
+    kihwal)
+
   OPTIMIZATIONS
 
   BUG FIXES
