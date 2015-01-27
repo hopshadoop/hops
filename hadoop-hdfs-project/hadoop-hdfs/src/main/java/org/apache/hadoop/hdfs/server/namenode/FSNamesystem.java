@@ -125,6 +125,7 @@ import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorageReport;
 import org.apache.hadoop.hdfs.server.protocol.HeartbeatResponse;
 import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
+import org.apache.hadoop.io.EnumSetWritable;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.*;
@@ -1688,8 +1689,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     boolean shouldCopyOnTruncate = shouldCopyOnTruncate(file, oldBlock);
     if(newBlock == null) {
       newBlock = (shouldCopyOnTruncate) ? createNewBlock(file) :
-          new Block(oldBlock.getBlockId(), oldBlock.getNumBytes(),
-              file.nextGenerationStamp());
+          new Block(oldBlock.getBlockId(), oldBlock.getNumBytes(), file.getGenerationStamp()+1);
     }
 
     BlockInfoContiguousUnderConstruction truncatedBlockUC;
@@ -1746,7 +1746,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 //    return file.isBlockInLatestSnapshot(blk);
     return false;
   }
-
+  
   /**
    * Set the storage policy for a file or a directory.
    *
@@ -1998,13 +1998,13 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    * <p>
    *
    * For description of parameters and exceptions thrown see
-   * {@link ClientProtocol#append(String, String)}
+   * {@link ClientProtocol#append(String, String, EnumSetWritable)}
    *
    * @return the last block locations if the block is partial or null otherwise
    */
-  private LocatedBlock appendFileInternal(FSPermissionChecker pc, INodesInPath iip,
-      String holder, String clientMachine) throws AccessControlException,
-      UnresolvedLinkException, FileNotFoundException, IOException {
+  private LocatedBlock appendFileInternal(FSPermissionChecker pc,
+      INodesInPath iip, String holder, String clientMachine, boolean newBlock) throws IOException {
+    // Verify that the destination does not exist as a directory already.
     final INode inode = iip.getLastINode();
     final String src = iip.getPath();
     if (inode != null && inode.isDirectory()) {
@@ -2021,7 +2021,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           + src + " for client " + clientMachine);
       }
       INodeFile myFile = INodeFile.valueOf(inode, src, true);
-
       // Opening an existing file for append - may need to recover lease.
       recoverLeaseInternal(RecoverLeaseOp.APPEND_FILE,
           iip, src, holder, clientMachine, false);
@@ -2032,8 +2031,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         throw new IOException("append: lastBlock=" + lastBlock + " of src=" + src
             + " is not sufficiently replicated yet.");
       }
-      
-      return prepareFileForWrite(src, iip, holder, clientMachine);
+      return prepareFileForAppend(src, iip, holder, clientMachine, newBlock);
     } catch (IOException ie) {
       NameNode.stateChangeLog.warn("DIR* NameSystem.append: " +ie.getMessage());
       throw ie;
@@ -2042,42 +2040,51 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   
   /**
    * Convert current node to under construction.
-   * Recreate lease record.
-   *
-   * @param src
-   *     path to the file
-   * @param leaseHolder
-   *     identifier of the lease holder on this file
-   * @param clientMachine
-   *     identifier of the client machine
+   * Recreate in-memory lease record.
+   * 
+   * @param src path to the file
+   * @param leaseHolder identifier of the lease holder on this file
+   * @param clientMachine identifier of the client machine
+   * @param newBlock if the data is appended to a new block
+   * @param writeToEditLog whether to persist this change to the edit log
+   * @param logRetryCache whether to record RPC ids in editlog for retry cache
+   *                      rebuilding
    * @return the last block locations if the block is partial or null otherwise
    * @throws UnresolvedLinkException
    * @throws IOException
    */
-  private LocatedBlock prepareFileForWrite(String src, INodesInPath iip,
-      String leaseHolder, String clientMachine)
-      throws IOException {
+  LocatedBlock prepareFileForAppend(String src, INodesInPath iip,
+      String leaseHolder, String clientMachine, boolean newBlock) throws IOException {
     final INodeFile file = iip.getLastINode().asFile();
     file.toUnderConstruction(leaseHolder, clientMachine);
-    Lease lease = leaseManager.addLease(file.getFileUnderConstructionFeature()
-        .getClientName(), src);
+
+    Lease lease = leaseManager.addLease(
+        file.getFileUnderConstructionFeature().getClientName(), src);
+
+    
     if(file.isFileStoredInDB()){
       LOG.debug("Stuffed Inode:  prepareFileForWrite stored in database. " +
           "Returning phantom block");
       return blockManager.createPhantomLocatedBlocks(file,file.getFileDataInDB(),true,false).getLocatedBlocks().get(0);
     } else {
-      LocatedBlock ret = blockManager.convertLastBlockToUnderConstruction(file, 0);
-      if (ret != null && dir.isQuotaEnabled()) {
-        // update the quota: use the preferred block size for UC block
-        final long diff = file.getPreferredBlockSize() - ret.getBlockSize();
-        dir.updateSpaceConsumed(iip, 0, diff * file.getBlockReplication());
+      LocatedBlock ret = null;
+      if (!newBlock) {
+        ret = blockManager.convertLastBlockToUnderConstruction(file, 0);
+        if (ret != null && dir.isQuotaEnabled()) {
+          // update the quota: use the preferred block size for UC block
+          final long diff = file.getPreferredBlockSize() - ret.getBlockSize();
+          dir.updateSpaceConsumed(iip, 0, diff * file.getBlockReplication());
+        }
+      } else {
+        BlockInfoContiguous lastBlock = file.getLastBlock();
+        if (lastBlock != null) {
+          ExtendedBlock blk = new ExtendedBlock(this.getBlockPoolId(), lastBlock);
+          ret = new LocatedBlock(blk, new DatanodeInfo[0]);
+        }
       }
       lease.updateLastTwoBlocksInLeasePath(src, file.getLastBlock(), file.getPenultimateBlock());
       return ret;
     }
-  }
-
-  /**
   }
 
   /**
@@ -2233,12 +2240,14 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    * Append to an existing file in the namespace.
    */
   LastBlockWithStatus appendFile(final String src, final String holder,
-                          final String clientMachine) throws IOException {
+      final String clientMachine, EnumSet<CreateFlag> flag)
+      throws IOException {
     try{
-      return appendFileHopFS(src, holder, clientMachine);
+      return appendFileHopFS(src, holder, clientMachine,
+          flag.contains(CreateFlag.NEW_BLOCK));
     } catch(HDFSClientAppendToDBFileException e){
       LOG.debug(e);
-      return moveToDNsAndAppend(src, holder, clientMachine);
+      return moveToDNsAndAppend(src, holder, clientMachine, flag.contains(CreateFlag.NEW_BLOCK));
     }
   }
 
@@ -2248,7 +2257,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   moved to the datanodes.
    */
   private LastBlockWithStatus moveToDNsAndAppend(final String src, final String holder,
-      final String clientMachine) throws IOException {
+      final String clientMachine, boolean newBlock) throws IOException {
     // open the small file
     FileSystem hopsFSClient1 = FileSystem.newInstance(conf);
     byte[] data = new byte[conf.getInt(DFSConfigKeys.DFS_DB_FILE_MAX_SIZE_KEY, DFSConfigKeys.DFS_DB_FILE_MAX_SIZE_DEFAULT)];
@@ -2265,7 +2274,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     os.close();
 
     // now append the file
-    return appendFileHopFS(src,holder,clientMachine);
+    return appendFileHopFS(src,holder,clientMachine, newBlock);
   }
 
   private Configuration copyConfiguration(Configuration conf){
@@ -2278,7 +2287,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   }
 
   private LastBlockWithStatus appendFileHopFS(final String srcArg, final String holder,
-      final String clientMachine) throws IOException {
+      final String clientMachine, final boolean newBlock) throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
     final String src = dir.resolvePath(srcArg, pathComponents, dir);
     HopsTransactionalRequestHandler appendFileHandler =
@@ -2347,7 +2356,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
                 "HDFS can not directly append to a file stored in the database");
           }
 
-          lastBlockWithStatus = appendFileInt(src, holder, clientMachine);
+          lastBlockWithStatus = appendFileInt(src, holder, clientMachine, newBlock);
 
           if (lastBlockWithStatus != null &&
                   lastBlockWithStatus.getLastBlock() != null &&
@@ -2398,7 +2407,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   }
 
   private LastBlockWithStatus appendFileInt(String src, String holder,
-      String clientMachine) throws
+      String clientMachine, boolean newBlock) throws
       IOException {
 
     if (!supportAppends) {
@@ -2410,7 +2419,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     HdfsFileStatus stat = null;
     FSPermissionChecker pc = getPermissionChecker();
     final INodesInPath iip = dir.getINodesInPath4Write(src);
-    lb = appendFileInternal(pc, iip, holder, clientMachine);
+    lb = appendFileInternal(pc, iip, holder, clientMachine, newBlock);
     stat = FSDirStatAndListingOp.getFileInfo(dir, src, false, true);
     if (lb != null) {
       if (NameNode.stateChangeLog.isDebugEnabled()) {

@@ -32,10 +32,10 @@ import io.hops.transaction.lock.TransactionLockTypes.INodeResolveType;
 import io.hops.transaction.lock.TransactionLockTypes.LockType;
 import io.hops.transaction.lock.TransactionLocks;
 import org.apache.hadoop.HadoopIllegalArgumentException;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
+import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -50,23 +50,15 @@ import org.apache.hadoop.ipc.Server;
 import static org.apache.hadoop.util.Time.now;
 
 class FSDirConcatOp {
-  static HdfsFileStatus concat(
-    final FSDirectory fsd, final String target, final String[] srcs) throws IOException {
+
+  static HdfsFileStatus concat(final FSDirectory fsd, final String target, final String[] srcs)
+      throws IOException {
     Preconditions.checkArgument(!target.isEmpty(), "Target file name is empty");
     Preconditions.checkArgument(srcs != null && srcs.length > 0,
       "No sources given");
     assert srcs != null;
-
-    FSDirectory.LOG.debug("concat {} to {}", Arrays.toString(srcs), target);
-    // We require all files be in the same directory
-    String trgParent =
-      target.substring(0, target.lastIndexOf(Path.SEPARATOR_CHAR));
-    for (String s : srcs) {
-      String srcParent = s.substring(0, s.lastIndexOf(Path.SEPARATOR_CHAR));
-      if (!srcParent.equals(trgParent)) {
-        throw new IllegalArgumentException(
-           "Sources and target are not in the same directory");
-      }
+    if (FSDirectory.LOG.isDebugEnabled()) {
+      FSDirectory.LOG.debug("concat {} to {}", Arrays.toString(srcs), target);
     }
 
     final String[] paths = new String[srcs.length + 1];
@@ -100,113 +92,28 @@ class FSDirConcatOp {
         }
         boolean success = false;
         try {
-          final INodesInPath trgIip = fsd.getINodesInPath4Write(target);
+          final INodesInPath targetIIP = fsd.getINodesInPath4Write(target);
           // write permission for the target
+          FSPermissionChecker pc = null;
           if (fsd.isPermissionEnabled()) {
-            FSPermissionChecker pc = fsd.getPermissionChecker();
-            fsd.checkPathAccess(pc, trgIip, FsAction.WRITE);
+            pc = fsd.getPermissionChecker();
+            fsd.checkPathAccess(pc, targetIIP, FsAction.WRITE);
+          } 
 
-            // and srcs
-            for (String aSrc : srcs) {
-              final INodesInPath srcIip = fsd.getINodesInPath4Write(aSrc);
-              fsd.checkPathAccess(pc, srcIip, FsAction.READ); // read the file
-              fsd.checkParentAccess(pc, srcIip, FsAction.WRITE); // for delete
-            }
-          }
-
-          // to make sure no two files are the same
-          Set<INode> si = new HashSet<INode>();
-
-          // we put the following prerequisite for the operation
-          // replication and blocks sizes should be the same for ALL the blocks
           // check the target
-          final INodeFile trgInode = INodeFile.valueOf(trgIip.getLastINode(), target);
-          if (trgInode.isFileStoredInDB()) {
-            throw new IOException(
-                "The target file is stored in the database. Can not concat to a a file stored in the database");
-          }
-          if (trgInode.isUnderConstruction()) {
-            throw new HadoopIllegalArgumentException("concat: target file "
-                + target + " is under construction");
-          }
-          // per design target shouldn't be empty and all the blocks same size
-          if (trgInode.numBlocks() == 0) {
-            throw new HadoopIllegalArgumentException("concat: target file "
-                + target + " is empty");
-          }
-
-          long blockSize = trgInode.getPreferredBlockSize();
-
-          // check the end block to be full
-          final BlockInfoContiguous last = trgInode.getLastBlock();
-          if (blockSize != last.getNumBytes()) {
-            throw new HadoopIllegalArgumentException("The last block in " + target
-                + " is not full; last block size = " + last.getNumBytes()
-                + " but file block size = " + blockSize);
-          }
-
-          si.add(trgInode);
-          final short repl = trgInode.getBlockReplication();
-
-          // now check the srcs
-          boolean endSrc = false; // final src file doesn't have to have full end block
-          for (int i = 0; i < srcs.length; i++) {
-            String src = srcs[i];
-            if (i == srcs.length - 1) {
-              endSrc = true;
-            }
-
-            final INodeFile srcInode = INodeFile.valueOf(fsd.getINode4Write(src), src);
-            if (src.isEmpty()
-                || srcInode.isUnderConstruction()
-                || srcInode.numBlocks() == 0) {
-              throw new HadoopIllegalArgumentException("concat: source file " + src
-                  + " is invalid or empty or underConstruction");
-            }
-
-            // check replication and blocks size
-            if (repl != srcInode.getBlockReplication()) {
-              throw new HadoopIllegalArgumentException("concat: the source file "
-                  + src + " and the target file " + target
-                  + " should have the same replication: source replication is "
-                  + srcInode.getBlockReplication()
-                  + " but target replication is " + repl);
-            }
-
-            //boolean endBlock=false;
-            // verify that all the blocks are of the same length as target
-            // should be enough to check the end blocks
-            final BlockInfoContiguous[] srcBlocks = srcInode.getBlocks();
-            int idx = srcBlocks.length - 1;
-            if (endSrc) {
-              idx = srcBlocks.length - 2; // end block of endSrc is OK not to be full
-            }
-            if (idx >= 0 && srcBlocks[idx].getNumBytes() != blockSize) {
-              throw new HadoopIllegalArgumentException("concat: the source file "
-                  + src + " and the target file " + target
-                  + " should have the same blocks sizes: target block size is "
-                  + blockSize + " but the size of source block " + idx + " is "
-                  + srcBlocks[idx].getNumBytes());
-            }
-
-            si.add(srcInode);
-          }
-
-          // make sure no two files are the same
-          if (si.size() < srcs.length + 1) { // trg + srcs
-            // it means at least two files are the same
-            throw new HadoopIllegalArgumentException(
-                "concat: at least two of the source files are the same");
-          }
+          verifyTargetFile(fsd, target, targetIIP);
+          // check the srcs
+          INodeFile[] srcFiles = verifySrcFiles(fsd, srcs, targetIIP, pc);
 
           if (NameNode.stateChangeLog.isDebugEnabled()) {
             NameNode.stateChangeLog.debug("DIR* NameSystem.concat: " + Arrays.toString(srcs) + " to " + target);
           }
 
           long timestamp = now();
-          unprotectedConcat(fsd, target, srcs, timestamp);
+          unprotectedConcat(fsd, targetIIP, srcFiles, timestamp);
           success = true;
-          return fsd.getAuditFileInfo(trgIip);
+          return fsd.getAuditFileInfo(targetIIP);
+          
         } finally {
           RetryCacheDistributed.setState(cacheEntry, success);
         }
@@ -214,54 +121,127 @@ class FSDirConcatOp {
     }.handle();
   }
 
+  private static void verifyTargetFile(FSDirectory fsd, final String target,
+      final INodesInPath targetIIP) throws IOException {
+    // check the target
+    final INodeFile targetINode = INodeFile.valueOf(targetIIP.getLastINode(),
+        target);
+
+    if (targetINode.isFileStoredInDB()) {
+      throw new IOException(
+          "The target file is stored in the database. Can not concat to a a file stored in the database");
+    }
+    if (targetINode.isUnderConstruction()) {
+      throw new HadoopIllegalArgumentException("concat: target file "
+          + target + " is under construction");
+    }
+  }
+  
+  private static INodeFile[] verifySrcFiles(FSDirectory fsd, String[] srcs,
+      INodesInPath targetIIP, FSPermissionChecker pc) throws IOException {
+    // to make sure no two files are the same
+    Set<INodeFile> si = new HashSet<>();
+    final INodeFile targetINode = targetIIP.getLastINode().asFile();
+    final INodeDirectory targetParent = targetINode.getParent();
+    // now check the srcs
+    for (String src : srcs) {
+      final INodesInPath iip = fsd.getINodesInPath4Write(src);
+      // permission check for srcs
+      if (pc != null) {
+        fsd.checkPathAccess(pc, iip, FsAction.READ); // read the file
+        fsd.checkParentAccess(pc, iip, FsAction.WRITE); // for delete
+      }
+
+      final INode srcINode = iip.getLastINode();
+      final INodeFile srcINodeFile = INodeFile.valueOf(srcINode, src);
+      // make sure the src file and the target file are in the same dir
+      if (srcINodeFile.getParent() != targetParent) {
+        throw new HadoopIllegalArgumentException("Source file " + src
+            + " is not in the same directory with the target "
+            + targetIIP.getPath());
+      }
+
+      if (srcINode == targetINode) {
+        throw new HadoopIllegalArgumentException("concat: the src file " + src
+            + " is the same with the target file " + targetIIP.getPath());
+      }
+      if (srcINodeFile.isUnderConstruction() || srcINodeFile.numBlocks() == 0) {
+        throw new HadoopIllegalArgumentException("concat: source file " + src
+            + " is invalid or empty or underConstruction");
+      }
+      si.add(srcINodeFile);
+    }
+    
+    // make sure no two files are the same
+    if (si.size() < srcs.length) {
+      // it means at least two files are the same
+      throw new HadoopIllegalArgumentException(
+          "concat: at least two of the source files are the same");
+    }
+    return si.toArray(new INodeFile[si.size()]);
+  }
+  
+    private static long computeQuotaDelta(INodeFile target, INodeFile[] srcList) throws IOException{
+    long delta = 0;
+    short targetRepl = target.getBlockReplication();
+    for (INodeFile src : srcList) {
+      if (targetRepl != src.getBlockReplication()) {
+        delta += src.computeFileSize() *
+            (targetRepl - src.getBlockReplication());
+      }
+    }
+    return delta;
+  }
+
+  private static void verifyQuota(FSDirectory fsd, INodesInPath targetIIP,
+      long delta) throws QuotaExceededException, IOException{
+    if (!fsd.getFSNamesystem().isImageLoaded()) {
+      // Do not check quota if editlog is still being processed
+      return;
+    }
+    FSDirectory.verifyQuota(targetIIP, targetIIP.length() - 1, 0, delta, null);
+  }
+  
   /**
    * Concat all the blocks from srcs to trg and delete the srcs files
    * @param fsd FSDirectory
-   * @param target target file to move the blocks to
-   * @param srcs list of file to move the blocks from
    */
-  static void unprotectedConcat(
-    FSDirectory fsd, String target, String[] srcs, long timestamp)
-    throws IOException {
+  static void unprotectedConcat(FSDirectory fsd, INodesInPath targetIIP,
+      INodeFile[] srcList, long timestamp) throws IOException {
     if (NameNode.stateChangeLog.isDebugEnabled()) {
-      NameNode.stateChangeLog.debug("DIR* FSNamesystem.concat to "+target);
+      NameNode.stateChangeLog.debug("DIR* FSNamesystem.concat to "
+          + targetIIP.getPath());
     }
-    // do the move
 
-    final INodesInPath trgIIP = fsd.getINodesInPath4Write(target, true);
-    final INodeFile trgInode = trgIIP.getLastINode().asFile();
-    INodeDirectory trgParent = trgIIP.getINode(-2).asDirectory();
+    final INodeFile trgInode = targetIIP.getLastINode().asFile();
+    long delta = computeQuotaDelta(trgInode, srcList);
+    verifyQuota(fsd, targetIIP, delta);
 
-    final INodeFile [] allSrcInodes = new INodeFile[srcs.length];
-    for(int i = 0; i < srcs.length; i++) {
-      final INodesInPath iip = fsd.getINodesInPath4Write(srcs[i]);
-      final INode inode = iip.getLastINode();
-
-      allSrcInodes[i] = inode.asFile();
-    }
-    List<BlockInfoContiguous> oldBlks = trgInode.concatBlocks(allSrcInodes);
+    INodeDirectory trgParent = targetIIP.getINode(-2).asDirectory();
+    List<BlockInfoContiguous> oldBlks = trgInode.concatBlocks(srcList);
 
     //params for updating the EntityManager.snapshots
     INodeCandidatePrimaryKey trg_param = new INodeCandidatePrimaryKey(trgInode.getId());
     List<INodeCandidatePrimaryKey> srcs_param = new ArrayList<>();
     
-    for (INodeFile allSrcInode : allSrcInodes) {
+    for (INodeFile allSrcInode : srcList) {
       srcs_param.add(new INodeCandidatePrimaryKey(allSrcInode.getId()));
     }
     // since we are in the same dir - we can use same parent to remove files
     int count = 0;
-    for(INodeFile nodeToRemove: allSrcInodes) {
-      if(nodeToRemove == null) continue;
-
-      trgParent.removeChild(nodeToRemove);
-      count++;
+    for (INodeFile nodeToRemove : srcList) {
+      if(nodeToRemove != null) {
+        
+        nodeToRemove.getParent().removeChild(nodeToRemove);
+        count++;
+      }
     }
 
-    trgInode.setModificationTimeForce(timestamp);
-    trgParent.setModificationTime(timestamp);
+    trgInode.setModificationTime(timestamp);
+    trgParent.updateModificationTime(timestamp);
     // update quota on the parent directory ('count' files removed, 0 space)
-    fsd.unprotectedUpdateCount(trgIIP, trgIIP.length() - 1, -count, 0);
-    
+    fsd.unprotectedUpdateCount(targetIIP, targetIIP.length() - 1,
+        -count, delta);
     EntityManager
         .snapshotMaintenance(HdfsTransactionContextMaintenanceCmds.Concat,
             trg_param, srcs_param, oldBlks);

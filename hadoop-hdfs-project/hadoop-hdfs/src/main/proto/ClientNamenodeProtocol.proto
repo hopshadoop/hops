@@ -89,6 +89,7 @@ enum CreateFlagProto {
   CREATE = 0x01; // Create a file
   OVERWRITE = 0x02; // Truncate/overwrite a file. Same as POSIX O_TRUNC
   APPEND = 0x04; // Append to a file
+  NEW_BLOCK = 0x20; // Write data to a new block when appending
 }
 
 message EncodingPolicyProto {
@@ -114,6 +115,7 @@ message CreateResponseProto {
 message AppendRequestProto {
   required string src = 1;
   required string clientName = 2;
+  optional uint32 flag = 3; // bits set using CreateFlag
 }
 
 message AppendResponseProto {

@@ -18,6 +18,11 @@
 
 package org.apache.hadoop.hdfs.server.namenode;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
+
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.INodeLock;
@@ -26,12 +31,10 @@ import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.core.Is.is;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.fail;
 
 import java.io.IOException;
+import org.apache.hadoop.HadoopIllegalArgumentException;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.HadoopIllegalArgumentException;
@@ -337,7 +340,7 @@ public class TestFileTruncate {
     checkFullFile(p, newLength, contents);
     fs.delete(p, false);
   }
-
+  
   /**
    * Check truncate recovery.
    */
@@ -512,7 +515,7 @@ public class TestFileTruncate {
       throws IOException {
     return dfs.getClient().getLocatedBlocks(src.toString(), 0, Long.MAX_VALUE);
   }
-
+  
   static void assertFileLength(Path file, long length) throws IOException {
     byte[] data = DFSTestUtil.readFileBuffer(fs, file);
     assertEquals("Wrong data size in snapshot.", length, data.length);

@@ -18,7 +18,10 @@
 package org.apache.hadoop.hdfs;
 
 import java.io.File;
+import java.util.EnumSet;
+
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
@@ -38,6 +41,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hdfs.protocol.BlockLocalPathInfo;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
+import org.apache.hadoop.io.EnumSetWritable;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.After;
 
@@ -127,7 +131,8 @@ public class TestLeaseRecovery {
     }
 
     DataNode.LOG.info("dfs.dfs.clientName=" + dfs.dfs.clientName);
-    cluster.getNameNodeRpc().append(filestr, dfs.dfs.clientName);
+    cluster.getNameNodeRpc().append(filestr, dfs.dfs.clientName,
+        new EnumSetWritable<>(EnumSet.of(CreateFlag.APPEND)));
 
     // expire lease to trigger block recovery.
     waitLeaseRecovery(cluster);

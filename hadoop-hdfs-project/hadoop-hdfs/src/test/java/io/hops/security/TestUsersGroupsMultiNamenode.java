@@ -158,7 +158,7 @@ public class TestUsersGroupsMultiNamenode {
     }
     
     @Override
-    public LastBlockWithStatus append(String src, String clientName)
+    public LastBlockWithStatus append(String src, String clientName, EnumSetWritable<CreateFlag> flag)
         throws AccessControlException, DSQuotaExceededException,
         FileNotFoundException, SafeModeException, UnresolvedLinkException,
         IOException {
