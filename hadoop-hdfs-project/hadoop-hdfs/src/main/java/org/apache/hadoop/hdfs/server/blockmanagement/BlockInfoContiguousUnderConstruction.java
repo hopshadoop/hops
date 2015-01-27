@@ -60,7 +60,7 @@ public class BlockInfoContiguousUnderConstruction extends BlockInfoContiguous {
    * The block source to use in the event of copy-on-write truncate.
    */
   private Block truncateBlock;
-
+  
   /**
    * Create block and set its state to {@link BlockUCState#UNDER_CONSTRUCTION}.
    */
@@ -164,7 +164,7 @@ public class BlockInfoContiguousUnderConstruction extends BlockInfoContiguous {
   public void setTruncateBlock(Block recoveryBlock) {
     this.truncateBlock = recoveryBlock;
   }
-
+  
   /**
    * Process the recorded replicas. When about to commit or finish the
    * pipeline recovery sort out bad replicas.

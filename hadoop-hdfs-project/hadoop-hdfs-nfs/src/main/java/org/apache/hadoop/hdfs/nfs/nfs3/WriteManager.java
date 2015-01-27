@@ -18,10 +18,14 @@
 package org.apache.hadoop.hdfs.nfs.nfs3;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
+import java.util.EnumSet;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
 import org.apache.hadoop.hdfs.nfs.nfs3.OpenFileCtx.COMMIT_STATUS;
@@ -143,7 +147,8 @@ public class WriteManager {
             .getInt(CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_KEY,
                 CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_DEFAULT);
         
-        fos = dfsClient.append(fileIdPath, bufferSize, null, null);
+        fos = dfsClient.append(fileIdPath, bufferSize,
+            EnumSet.of(CreateFlag.APPEND), null, null);
 
         latestAttr = Nfs3Utils.getFileAttr(dfsClient, fileIdPath, iug);
       } catch (RemoteException e) {

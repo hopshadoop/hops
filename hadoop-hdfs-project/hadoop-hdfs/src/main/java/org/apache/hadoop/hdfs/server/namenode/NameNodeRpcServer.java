@@ -499,15 +499,15 @@ class NameNodeRpcServer implements NamenodeProtocols {
   }
 
   @Override // ClientProtocol
-  public LastBlockWithStatus append(String src, String clientName) throws IOException {
+  public LastBlockWithStatus append(String src, String clientName,
+      EnumSetWritable<CreateFlag> flag) throws IOException {
     checkNNStartup();
     String clientMachine = getClientMachine();
     if (stateChangeLog.isDebugEnabled()) {
-      stateChangeLog.debug(
-          "*DIR* NameNode.append: file " + src + " for " + clientName + " at " +
-              clientMachine);
+      stateChangeLog.debug("*DIR* NameNode.append: file "
+          +src+" for "+clientName+" at "+clientMachine);
     }
-    LastBlockWithStatus info = namesystem.appendFile(src, clientName, clientMachine);
+    LastBlockWithStatus info = namesystem.appendFile(src, clientName, clientMachine, flag.get());
     metrics.incrFilesAppended();
     return info;
   }

@@ -351,12 +351,10 @@ public interface ClientProtocol {
       IOException;
 
   /**
-   * Append to the end of the file.
-   *
-   * @param src
-   *     path of the file being created.
-   * @param clientName
-   *     name of the current client.
+   * Append to the end of the file. 
+   * @param src path of the file being created.
+   * @param clientName name of the current client.
+   * @param flag indicates whether the data is appended to a new block.
    * @return wrapper with information about the last partial block and file
    *    status if any
    * @throws AccessControlException
@@ -386,10 +384,10 @@ public interface ClientProtocol {
    *     if append is not supported
    */
   @AtMostOnce
-  public LastBlockWithStatus append(String src, String clientName)
-      throws AccessControlException, DSQuotaExceededException,
-      FileNotFoundException, SafeModeException, UnresolvedLinkException,
-      IOException;
+  public LastBlockWithStatus append(String src, String clientName,
+      EnumSetWritable<CreateFlag> flag) throws AccessControlException,
+      DSQuotaExceededException, FileNotFoundException, SafeModeException,
+      UnresolvedLinkException, IOException;
 
   /**
    * Set replication for an existing file.

@@ -17,8 +17,11 @@
  */
 package org.apache.hadoop.hdfs;
 
+import java.util.EnumSet;
+import java.util.List;
 
 import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.fs.CreateFlag;
 import org.mockito.invocation.InvocationOnMock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
@@ -39,6 +42,7 @@ import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
 import org.apache.hadoop.hdfs.server.protocol.InterDatanodeProtocol;
 import org.apache.log4j.Level;
 import org.junit.AfterClass;
+import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -125,6 +129,32 @@ public class TestFileAppend3 {
     AppendTestUtil.check(fs, p, len1 + len2);
   }
 
+  @Test
+  public void testTC1ForAppend2() throws Exception {
+    final Path p = new Path("/TC1/foo2");
+
+    //a. Create file and write one block of data. Close file.
+    final int len1 = (int) BLOCK_SIZE;
+    {
+      FSDataOutputStream out = fs.create(p, false, buffersize, REPLICATION,
+          BLOCK_SIZE);
+      AppendTestUtil.write(out, 0, len1);
+      out.close();
+    }
+
+    // Reopen file to append. Append half block of data. Close file.
+    final int len2 = (int) BLOCK_SIZE / 2;
+    {
+      FSDataOutputStream out = fs.append(p,
+          EnumSet.of(CreateFlag.APPEND, CreateFlag.NEW_BLOCK), 4096, null);
+      AppendTestUtil.write(out, len1, len2);
+      out.close();
+    }
+
+    // b. Reopen file and read 1.5 blocks worth of data. Close file.
+    AppendTestUtil.check(fs, p, len1 + len2);
+  }
+
   /**
    * TC2: Append on non-block boundary.
    *
@@ -159,6 +189,40 @@ public class TestFileAppend3 {
     AppendTestUtil.check(fs, p, len1 + len2);
   }
 
+  @Test
+  public void testTC2ForAppend2() throws Exception {
+    final Path p = new Path("/TC2/foo2");
+
+    //a. Create file with one and a half block of data. Close file.
+    final int len1 = (int) (BLOCK_SIZE + BLOCK_SIZE / 2);
+    {
+      FSDataOutputStream out = fs.create(p, false, buffersize, REPLICATION,
+          BLOCK_SIZE);
+      AppendTestUtil.write(out, 0, len1);
+      out.close();
+    }
+
+    AppendTestUtil.check(fs, p, len1);
+
+    //   Reopen file to append quarter block of data. Close file.
+    final int len2 = (int) BLOCK_SIZE / 4;
+    {
+      FSDataOutputStream out = fs.append(p, EnumSet.of(CreateFlag.APPEND, CreateFlag.NEW_BLOCK),
+          4096, null);
+      AppendTestUtil.write(out, len1, len2);
+      out.close();
+    }
+
+    // b. Reopen file and read 1.75 blocks of data. Close file.
+    AppendTestUtil.check(fs, p, len1 + len2);
+    List<LocatedBlock> blocks = fs.getClient().getLocatedBlocks(
+        p.toString(), 0L).getLocatedBlocks();
+    Assert.assertEquals(3, blocks.size());
+    Assert.assertEquals(BLOCK_SIZE, blocks.get(0).getBlockSize());
+    Assert.assertEquals(BLOCK_SIZE / 2, blocks.get(1).getBlockSize());
+    Assert.assertEquals(BLOCK_SIZE / 4, blocks.get(2).getBlockSize());
+  }
+
   /**
    * TC5: Only one simultaneous append.
    *
@@ -189,7 +253,53 @@ public class TestFileAppend3 {
       AppendTestUtil.LOG.info("GOOD: got an exception", ioe);
     }
 
+    try {
+      ((DistributedFileSystem) AppendTestUtil
+          .createHdfsWithDifferentUsername(conf)).append(p,
+          EnumSet.of(CreateFlag.APPEND, CreateFlag.NEW_BLOCK), 4096, null);
+      fail("This should fail.");
+    } catch(IOException ioe) {
+      AppendTestUtil.LOG.info("GOOD: got an exception", ioe);
+    }
+
     //d. On Machine M1, close file.
+    out.close();
+  }
+
+  @Test
+  public void testTC5ForAppend2() throws Exception {
+    final Path p = new Path("/TC5/foo2");
+
+    // a. Create file on Machine M1. Write half block to it. Close file.
+    {
+      FSDataOutputStream out = fs.create(p, false, buffersize, REPLICATION,
+          BLOCK_SIZE);
+      AppendTestUtil.write(out, 0, (int)(BLOCK_SIZE/2));
+      out.close();
+    }
+
+    // b. Reopen file in "append" mode on Machine M1.
+    FSDataOutputStream out = fs.append(p, EnumSet.of(CreateFlag.APPEND, CreateFlag.NEW_BLOCK),
+        4096, null);
+
+    // c. On Machine M2, reopen file in "append" mode. This should fail.
+    try {
+      ((DistributedFileSystem) AppendTestUtil
+          .createHdfsWithDifferentUsername(conf)).append(p,
+          EnumSet.of(CreateFlag.APPEND, CreateFlag.NEW_BLOCK), 4096, null);
+      fail("This should fail.");
+    } catch(IOException ioe) {
+      AppendTestUtil.LOG.info("GOOD: got an exception", ioe);
+    }
+
+    try {
+      AppendTestUtil.createHdfsWithDifferentUsername(conf).append(p);
+      fail("This should fail.");
+    } catch(IOException ioe) {
+      AppendTestUtil.LOG.info("GOOD: got an exception", ioe);
+    }
+
+    // d. On Machine M1, close file.
     out.close();
   }
 
@@ -199,10 +309,9 @@ public class TestFileAppend3 {
    * @throws IOException
    *     an exception might be thrown
    */
-  @Test
-  public void testTC7() throws Exception {
+  private void testTC7(boolean appendToNewBlock) throws Exception {
     final short repl = 2;
-    final Path p = new Path("/TC7/foo");
+    final Path p = new Path("/TC7/foo" + (appendToNewBlock ? "0" : "1"));
     System.out.println("p=" + p);
     
     //a. Create file with replication factor of 2. Write half block of data. Close file.
@@ -239,7 +348,8 @@ public class TestFileAppend3 {
     //c. Open file in "append mode".  Append a new block worth of data. Close file.
     final int len2 = (int) BLOCK_SIZE;
     {
-      FSDataOutputStream out = fs.append(p);
+      FSDataOutputStream out = appendToNewBlock ?
+          fs.append(p, EnumSet.of(CreateFlag.APPEND, CreateFlag.NEW_BLOCK), 4096, null) : fs.append(p);
       AppendTestUtil.write(out, len1, len2);
       out.close();
     }
@@ -248,15 +358,21 @@ public class TestFileAppend3 {
     AppendTestUtil.check(fs, p, len1 + len2);
   }
 
+  @Test
+  public void testTC7() throws Exception {
+    testTC7(false);
+  }
+
+  @Test
+  public void testTC7ForAppend2() throws Exception {
+    testTC7(true);
+  }
+
   /**
    * TC11: Racing rename
-   *
-   * @throws IOException
-   *     an exception might be thrown
    */
-  @Test
-  public void testTC11() throws Exception {
-    final Path p = new Path("/TC11/foo");
+  private void testTC11(boolean appendToNewBlock) throws Exception {
+    final Path p = new Path("/TC11/foo" + (appendToNewBlock ? "0" : "1"));
     System.out.println("p=" + p);
 
     //a. Create file and write one block of data. Close file.
@@ -269,8 +385,10 @@ public class TestFileAppend3 {
     }
 
     //b. Reopen file in "append" mode. Append half block of data.
-    FSDataOutputStream out = fs.append(p);
-    final int len2 = (int) BLOCK_SIZE / 2;
+    FSDataOutputStream out = appendToNewBlock ?
+        fs.append(p, EnumSet.of(CreateFlag.APPEND, CreateFlag.NEW_BLOCK), 4096, null) :
+        fs.append(p);
+    final int len2 = (int)BLOCK_SIZE/2; 
     AppendTestUtil.write(out, len1, len2);
     out.hflush();
     
@@ -302,15 +420,21 @@ public class TestFileAppend3 {
     }
   }
 
-  /**
-   * TC12: Append to partial CRC chunk
-   *
-   * @throws IOException
-   *     an exception might be thrown
-   */
   @Test
-  public void testTC12() throws Exception {
-    final Path p = new Path("/TC12/foo");
+  public void testTC11() throws Exception {
+    testTC11(false);
+  }
+
+  @Test
+  public void testTC11ForAppend2() throws Exception {
+    testTC11(true);
+  }
+
+  /** 
+   * TC12: Append to partial CRC chunk
+   */
+  private void testTC12(boolean appendToNewBlock) throws Exception {
+    final Path p = new Path("/TC12/foo" + (appendToNewBlock ? "0" : "1"));
     System.out.println("p=" + p);
     
     //a. Create file with a block size of 64KB
@@ -327,25 +451,43 @@ public class TestFileAppend3 {
     //b. Reopen file in "append" mode. Append another 5877 bytes of data. Close file.
     final int len2 = 5877;
     {
-      FSDataOutputStream out = fs.append(p);
+      FSDataOutputStream out = appendToNewBlock ?
+          fs.append(p, EnumSet.of(CreateFlag.APPEND, CreateFlag.NEW_BLOCK), 4096, null) :
+          fs.append(p);
       AppendTestUtil.write(out, len1, len2);
       out.close();
     }
 
     //c. Reopen file and read 25687+5877 bytes of data from file. Close file.
     AppendTestUtil.check(fs, p, len1 + len2);
+    if (appendToNewBlock) {
+      LocatedBlocks blks = fs.dfs.getLocatedBlocks(p.toString(), 0);
+      Assert.assertEquals(2, blks.getLocatedBlocks().size());
+      Assert.assertEquals(len1, blks.getLocatedBlocks().get(0).getBlockSize());
+      Assert.assertEquals(len2, blks.getLocatedBlocks().get(1).getBlockSize());
+      AppendTestUtil.check(fs, p, 0, len1);
+      AppendTestUtil.check(fs, p, len1, len2);
+    }
   }
-  
-  /**
-   * Append to a partial CRC chunk and
-   * the first write does not fill up the partial CRC trunk
-   * *
-   *
-   * @throws IOException
-   */
+
   @Test
-  public void testAppendToPartialChunk() throws IOException {
-    final Path p = new Path("/partialChunk/foo");
+  public void testTC12() throws Exception {
+    testTC12(false);
+  }
+
+  @Test
+  public void testTC12ForAppend2() throws Exception {
+    testTC12(true);
+  }
+
+  /**
+   * Append to a partial CRC chunk and the first write does not fill up the
+   * partial CRC trunk
+   */
+  private void testAppendToPartialChunk(boolean appendToNewBlock)
+      throws IOException {
+    final Path p = new Path("/partialChunk/foo"
+        + (appendToNewBlock ? "0" : "1"));
     final int fileLen = 513;
     System.out.println("p=" + p);
     
@@ -360,7 +502,9 @@ public class TestFileAppend3 {
     System.out.println("Wrote 1 byte and closed the file " + p);
 
     // append to file
-    stm = fs.append(p);
+    stm = appendToNewBlock ?
+        fs.append(p, EnumSet.of(CreateFlag.APPEND, CreateFlag.NEW_BLOCK), 4096, null) :
+        fs.append(p);
     // Append to a partial CRC trunk
     stm.write(fileContents, 1, 1);
     stm.hflush();
@@ -369,7 +513,9 @@ public class TestFileAppend3 {
     System.out.println("Append 1 byte and closed the file " + p);
 
     // write the remainder of the file
-    stm = fs.append(p);
+    stm = appendToNewBlock ?
+        fs.append(p, EnumSet.of(CreateFlag.APPEND, CreateFlag.NEW_BLOCK), 4096, null) :
+        fs.append(p);
 
     // ensure getPos is set to reflect existing size of the file
     assertEquals(2, stm.getPos());
@@ -467,5 +613,15 @@ public class TestFileAppend3 {
     // append will fail when the file size crosses the checksum chunk boundary,
     // if append was called with a stale file stat.
     doSmallAppends(file, fs, 20);
+  }
+
+  @Test
+  public void testAppendToPartialChunk() throws IOException {
+    testAppendToPartialChunk(false);
+  }
+
+  @Test
+  public void testAppendToPartialChunkforAppend2() throws IOException {
+    testAppendToPartialChunk(true);
   }
 }

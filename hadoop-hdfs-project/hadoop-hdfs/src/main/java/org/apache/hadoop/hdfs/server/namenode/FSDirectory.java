@@ -277,7 +277,7 @@ public class FSDirectory implements Closeable {
     final INodeFile fileINode = inodesInPath.getLastINode().asFile();
     Preconditions.checkState(fileINode.isUnderConstruction());
 
-    long diskspaceTobeConsumed = fileINode.getBlockDiskspace();
+    long diskspaceTobeConsumed = fileINode.getPreferredBlockDiskspace();
     //When appending to a small file stored in DB we should consider the file
     // size which was accounted for before in the inode attributes to avoid
     // over calculation of quota
@@ -332,7 +332,7 @@ public class FSDirectory implements Closeable {
 
     // update space consumed
     updateCount(iip, 0,
-        -fileNode.getPreferredBlockSize() * fileNode.getBlockReplication(),
+        -fileNode.getPreferredBlockDiskspace() * fileNode.getBlockReplication(),
         true);
     return true;
   }
@@ -890,10 +890,9 @@ public class FSDirectory implements Closeable {
     long oldDiskspace = file.diskspaceConsumed();
     long remainingLength =
         file.collectBlocksBeyondMax(newLength, collectedBlocks);
-    file.setModificationTime(mtime);
-    
+    file.setModificationTime(mtime);    
     updateCount(iip, 0, file.diskspaceConsumed() - oldDiskspace, true);
-    // return whether on a block boundary
+    // If on block boundary, then return
     return (remainingLength - newLength) == 0;
   }
 

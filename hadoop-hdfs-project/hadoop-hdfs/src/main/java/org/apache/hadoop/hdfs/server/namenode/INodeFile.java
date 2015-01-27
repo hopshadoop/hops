@@ -485,7 +485,7 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
   
 
   /** @return the diskspace required for a full block. */
-  final long getBlockDiskspace() {
+  final long getPreferredBlockDiskspace() {
     return getPreferredBlockSize() * getBlockReplication();
   }
 

@@ -527,31 +527,27 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
     /**
      * Default construction for file create
      */
-    private DataStreamer() {
+    private DataStreamer(ExtendedBlock block) {
       isAppend = false;
+      this.block = block;
       stage = BlockConstructionStage.PIPELINE_SETUP_CREATE;
     }
 
     /**
      * Construct a data streamer for single block transfer
      */
-    private DataStreamer(LocatedBlock lb) {
+    private DataStreamer(LocatedBlock lb, boolean singleBlock) {
       isAppend = false;
       stage = BlockConstructionStage.PIPELINE_SETUP_SINGLE_BLOCK;
       this.lb = lb;
     }
-
+    
     /**
-     * Construct a data streamer for append
-     *
-     * @param lastBlock
-     *     last block of the file to be appended
-     * @param stat
-     *     status of the file to be appended
-     * @param bytesPerChecksum
-     *     number of bytes per checksum
-     * @throws IOException
-     *     if error occurs
+     * Construct a data streamer for appending to the last partial block
+     * @param lastBlock last block of the file to be appended
+     * @param stat status of the file to be appended
+     * @param bytesPerChecksum number of bytes per checksum
+     * @throws IOException if error occurs
      */
     private DataStreamer(LocatedBlock lastBlock, HdfsFileStatus stat,
         int bytesPerChecksum) throws IOException {
@@ -1984,7 +1980,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
     computePacketChunkSize(dfsClient.getConf().writePacketSize,
             checksum.getBytesPerChecksum());
 
-    streamer = new DataStreamer();
+    streamer = new DataStreamer(null);
     if (favoredNodes != null && favoredNodes.length != 0) {
       streamer.setFavoredNodes(favoredNodes);
     }
@@ -2014,29 +2010,6 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
     return out;
   }
 
-//  static DFSOutputStream newStreamForCreate(DFSClient dfsClient, String src,
-//                                            FsPermission masked, EnumSet<CreateFlag> flag, boolean createParent,
-//                                            short replication, long blockSize, Progressable progress, int buffersize,
-//                                            DataChecksum checksum, String[] favoredNodes,
-//                                            boolean saveSmallFilesInDB, final int dbFileMaxSize) throws IOException {
-//    return newStreamForCreate(dfsClient, src, masked, flag, createParent,
-//            replication, blockSize, progress, buffersize, checksum, favoredNodes, null, saveSmallFilesInDB, dbFileMaxSize);
-//  }
-//
-//  static DFSOutputStream newStreamForCreate(DFSClient dfsClient, String src,
-//                                            FsPermission masked, EnumSet<CreateFlag> flag, boolean createParent,
-//                                            short replication, long blockSize, Progressable progress, int buffersize,
-//                                            DataChecksum checksum, String[] favoredNodes,
-//                                            EncodingPolicy policy, boolean saveSmallFilesInDB,
-//                                            final int dbFileMaxSize) throws IOException {
-//    final DFSOutputStream out =
-//            new DFSOutputStream(dfsClient, src, masked, flag, createParent,
-//                    replication, blockSize, progress, buffersize, checksum, favoredNodes,
-//                    policy, saveSmallFilesInDB, dbFileMaxSize);
-//    out.streamer.start();
-//    return out;
-//  }
-//
   static DFSOutputStream newStreamForCreate(DFSClient dfsClient, String src,
                                             FsPermission masked, EnumSet<CreateFlag> flag, boolean createParent,
                                             short replication, long blockSize, Progressable progress, int buffersize,
@@ -2045,43 +2018,42 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
     return newStreamForCreate(dfsClient, src, masked, flag, createParent,
             replication, blockSize, progress, buffersize, checksum, null, null, saveSmallFilesInDB, dbFileMaxSize);
   }
-  /**
-   * Construct a new output stream for append.
-   */
-  private DFSOutputStream(DFSClient dfsClient, String src,
-                          Progressable progress, LocatedBlock lastBlock, HdfsFileStatus stat,
-                          DataChecksum checksum, boolean saveSmallFilesInDB, final int dbFileMaxSize)
-      throws IOException {
-    this(dfsClient, src, progress, stat, checksum, saveSmallFilesInDB,  dbFileMaxSize);
 
+  /** Construct a new output stream for append. */
+  private DFSOutputStream(DFSClient dfsClient, String src, boolean toNewBlock,
+      Progressable progress, LocatedBlock lastBlock, HdfsFileStatus stat,
+      DataChecksum checksum, boolean saveSmallFilesInDB, final int dbFileMaxSize) throws IOException {
+    this(dfsClient, src, progress, stat, checksum, saveSmallFilesInDB,  dbFileMaxSize);
     initialFileSize = stat.getLen(); // length of file when opened
     isThisFileStoredInDB = stat.isFileStoredInDB();
 
     // The last partial block of the file has to be filled.
-    if (lastBlock != null && !isThisFileStoredInDB) {
-      LOG.debug("Stuffed Inode:  appending to a file stored on datanodes");
+    if (!toNewBlock && lastBlock != null && !isThisFileStoredInDB) {
       // indicate that we are appending to an existing block
       bytesCurBlock = lastBlock.getBlockSize();
       streamer = new DataStreamer(lastBlock, stat,
           checksum.getBytesPerChecksum());
     } else {
-
-      computePacketChunkSize(dfsClient.getConf().writePacketSize, checksum.getBytesPerChecksum());
-      streamer = new DataStreamer();
+      computePacketChunkSize(dfsClient.getConf().writePacketSize,
+          checksum.getBytesPerChecksum());
       if (isThisFileStoredInDB && lastBlock != null) {
+        streamer = new DataStreamer(null);
         bytesCurBlock = 0;
         write(lastBlock.getData(), 0, lastBlock.getData().length);
         LOG.debug("Stuffed Inode:  Putting Existing data in packets");
+      } else {
+        streamer = new DataStreamer(
+          lastBlock != null ? lastBlock.getBlock() : null);
       }
     }
   }
 
   static DFSOutputStream newStreamForAppend(DFSClient dfsClient, String src,
-                                            int buffersize, Progressable progress, LocatedBlock lastBlock,
-                                            HdfsFileStatus stat, DataChecksum checksum, boolean saveSmallFilesInDB,
-                                            final int dbFileMaxSize, boolean emulateHDFSClient)
-          throws IOException {
-
+      boolean toNewBlock, int bufferSize, Progressable progress,
+      LocatedBlock lastBlock, HdfsFileStatus stat, DataChecksum checksum,
+      boolean saveSmallFilesInDB, final int dbFileMaxSize, boolean emulateHDFSClient)
+      throws IOException {
+            
     if (stat.isFileStoredInDB()) {
       String errorMessage = null;
       if (!saveSmallFilesInDB && !emulateHDFSClient) {
@@ -2102,10 +2074,10 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
                 dbFileMaxSize + " BlockSize: " + stat.getBlockSize());
       }
     }
-
-    final DFSOutputStream out =
-            new DFSOutputStream(dfsClient, src, progress, lastBlock,
-                    stat, checksum, saveSmallFilesInDB, dbFileMaxSize);
+            
+      
+    final DFSOutputStream out = new DFSOutputStream(dfsClient, src, toNewBlock,
+        progress, lastBlock, stat, checksum, saveSmallFilesInDB, dbFileMaxSize);
     out.start();
     return out;
   }
@@ -2121,11 +2093,11 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
 
     computePacketChunkSize(dfsClient.getConf().writePacketSize,
             checksum.getBytesPerChecksum());
-    streamer = new DataStreamer(lb);
+    streamer = new DataStreamer(lb, true);
   }
 
   static DFSOutputStream newStreamForSingleBlock(DFSClient dfsClient,
-                                                 String src, int buffersize, Progressable progress, LocatedBlock block,
+                                                 String src, Progressable progress, LocatedBlock block,
                                                  DataChecksum checksum, HdfsFileStatus stat) throws IOException {
     final DFSOutputStream out =
             new DFSOutputStream(dfsClient, src, progress, stat, block, 
@@ -2133,7 +2105,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
     out.start();
     return out;
   }
-
+  
   private void computePacketChunkSize(int psize, int csize) {
     int chunkSize = csize + checksum.getChecksumSize();
     chunksPerPacket = Math.max(psize / chunkSize, 1);
@@ -2304,7 +2276,6 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
     }
   }
 
-  @Override
   @Deprecated
   public void sync() throws IOException {
     hflush();
@@ -2369,35 +2340,37 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
       long toWaitFor;
       long lastBlockLength = -1L;
       boolean updateLength = syncFlags.contains(SyncFlag.UPDATE_LENGTH);
+      boolean endBlock = syncFlags.contains(SyncFlag.END_BLOCK);
       synchronized (this) {
-        // flush checksum buffer, but keep checksum buffer intact
-        int numKept = flushBuffer(true, true);
+        // flush checksum buffer, but keep checksum buffer intact if we do not
+        // need to end the current block
+        int numKept = flushBuffer(!endBlock, true);
         // bytesCurBlock potentially incremented if there was buffered data
 
         if (DFSClient.LOG.isDebugEnabled()) {
-          DFSClient.LOG.debug(
-            "DFSClient flush() :" +
-            " bytesCurBlock " + bytesCurBlock +
-            " lastFlushOffset " + lastFlushOffset);
+          DFSClient.LOG.debug("DFSClient flush():"
+              + " bytesCurBlock=" + bytesCurBlock
+              + " lastFlushOffset=" + lastFlushOffset
+              + " createNewBlock=" + endBlock);
         }
         // Flush only if we haven't already flushed till this offset.
         if (lastFlushOffset != bytesCurBlock) {
           assert bytesCurBlock > lastFlushOffset;
           // record the valid offset of this flush
           lastFlushOffset = bytesCurBlock;
-          if (isSync && currentPacket == null) {
+          if (isSync && currentPacket == null && !endBlock) {
             // Nothing to send right now,
             // but sync was requested.
-            // Send an empty packet
+            // Send an empty packet if we do not end the block right now
             currentPacket = createPacket(packetSize, chunksPerPacket,
                 bytesCurBlock, currentSeqno++);
           }
         } else {
-          if (isSync && bytesCurBlock > 0) {
+          if (isSync && bytesCurBlock > 0 && !endBlock) {
             // Nothing to send right now,
             // and the block was partially written,
             // and sync was requested.
-            // So send an empty sync packet.
+            // So send an empty sync packet if we do not end the block right now
             currentPacket = createPacket(packetSize, chunksPerPacket,
                 bytesCurBlock, currentSeqno++);
           } else if (currentPacket != null) {
@@ -2410,10 +2383,21 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
           currentPacket.syncBlock = isSync;
           waitAndQueueCurrentPacket();
         }
-        // Restore state of stream. Record the last flush offset 
-        // of the last full chunk that was flushed.
-        //
-        bytesCurBlock -= numKept;
+        if (endBlock && bytesCurBlock > 0) {
+          // Need to end the current block, thus send an empty packet to
+          // indicate this is the end of the block and reset bytesCurBlock
+          currentPacket = createPacket(0, 0, bytesCurBlock, currentSeqno++);
+          currentPacket.lastPacketInBlock = true;
+          currentPacket.syncBlock = shouldSyncBlock || isSync;
+          waitAndQueueCurrentPacket();
+          bytesCurBlock = 0;
+          lastFlushOffset = 0;
+        } else {
+          // Restore state of stream. Record the last flush offset
+          // of the last full chunk that was flushed.
+          bytesCurBlock -= numKept;
+        }
+
         toWaitFor = lastQueuedSeqno;
       } // end synchronized
 
@@ -2431,7 +2415,8 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
       // namenode.
       if (persistBlocks.getAndSet(false) || updateLength) {
         try {
-          dfsClient.namenode.fsync(src, fileId, dfsClient.clientName, lastBlockLength);
+          dfsClient.namenode.fsync(src, fileId, dfsClient.clientName,
+              lastBlockLength);
         } catch (IOException ioe) {
           DFSClient.LOG
                   .warn("Unable to persist blocks in hflush for " + src, ioe);
