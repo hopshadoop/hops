@@ -500,6 +500,11 @@ Release 2.7.0 - UNRELEASED
     HDFS-7659. truncate should check negative value of the new length.
     (Yi Liu via shv)
 
+    HDFS-7676. Fix TestFileTruncate to avoid bug of HDFS-7611. (shv)
+
+    HDFS-49. MiniDFSCluster.stopDataNode will always shut down a node in
+    the cluster if a matching name is not found. (stevel)
+
 Release 2.6.1 - UNRELEASED
 
   INCOMPATIBLE CHANGES
