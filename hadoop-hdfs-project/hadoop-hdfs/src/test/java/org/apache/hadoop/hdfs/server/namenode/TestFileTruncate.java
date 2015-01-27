@@ -59,6 +59,7 @@ import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.log4j.Level;
 import org.junit.AfterClass;
+import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -349,6 +350,36 @@ public class TestFileTruncate {
     }.handle();
   }
  
+  @Test
+  public void testTruncate4Symlink() throws IOException {
+    final int fileLength = 3 * BLOCK_SIZE;
+
+    final Path parent = new Path("/test");
+    fs.mkdirs(parent);
+    final byte[] contents = AppendTestUtil.initBuffer(fileLength);
+    final Path file = new Path(parent, "testTruncate4Symlink");
+    writeContents(contents, fileLength, file);
+
+    final Path link = new Path(parent, "link");
+    fs.createSymlink(file, link, false);
+
+    final int newLength = fileLength/3;
+    boolean isReady = fs.truncate(link, newLength);
+
+    Assert.assertTrue("Recovery is not expected.", isReady);
+
+    FileStatus fileStatus = fs.getFileStatus(file);
+    assertThat(fileStatus.getLen(), is((long) newLength));
+
+    ContentSummary cs = fs.getContentSummary(parent);
+    assertEquals("Bad disk space usage",
+        cs.getSpaceConsumed(), newLength * REPLICATION);
+    // validate the file content
+    checkFullFile(file, newLength, contents);
+
+    fs.delete(parent, true);
+  }
+
   static void writeContents(byte[] contents, int fileLength, Path p)
       throws IOException {
     FSDataOutputStream out = fs.create(p, true, BLOCK_SIZE, REPLICATION,
@@ -375,5 +406,10 @@ public class TestFileTruncate {
 
   static LocatedBlocks getLocatedBlocks(Path src) throws IOException {
     return fs.getClient().getLocatedBlocks(src.toString(), 0, Long.MAX_VALUE);
+  }
+  
+  static void checkFullFile(Path p, int newLength, byte[] contents)
+      throws IOException {
+    AppendTestUtil.checkFullFile(fs, p, newLength, contents, p.toString());
   }
 }
