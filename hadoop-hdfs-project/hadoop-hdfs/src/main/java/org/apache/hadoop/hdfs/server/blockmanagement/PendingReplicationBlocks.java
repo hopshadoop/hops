@@ -29,13 +29,14 @@ import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.commons.logging.Log;
 
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.sql.Time;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
 import static org.apache.hadoop.util.Time.now;
+import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.util.Daemon;
+import org.slf4j.Logger;
 
 /**
  * ************************************************
@@ -51,7 +52,8 @@ import static org.apache.hadoop.util.Time.now;
  * *************************************************
  */
 class PendingReplicationBlocks {
-  private static final Log LOG = BlockManager.LOG;
+  private static final Logger LOG = BlockManager.LOG;
+
   //
   // It might take anywhere between 5 to 10 minutes before
   // a request is timed out.

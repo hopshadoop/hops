@@ -46,7 +46,6 @@ import io.hops.transaction.lock.TransactionLockTypes.LockType;
 import io.hops.transaction.lock.TransactionLocks;
 import io.hops.util.Slicer;
 import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
@@ -122,6 +121,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import static org.apache.hadoop.util.ExitUtil.terminate;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Sets;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Keeps information related to the blocks stored in the Hadoop cluster.
@@ -129,7 +133,7 @@ import static org.apache.hadoop.util.ExitUtil.terminate;
 @InterfaceAudience.Private
 public class BlockManager {
 
-  static final Log LOG = LogFactory.getLog(BlockManager.class);
+  static final Logger LOG = LoggerFactory.getLogger(BlockManager.class);
   public static final Log blockLog = NameNode.blockStateChangeLog;
 
   private final Namesystem namesystem;
@@ -1279,7 +1283,7 @@ public class BlockManager {
 
           return null;
         } catch (Throwable t) {
-          LOG.error(t);
+          LOG.error(t.getMessage(), t);
           throw t;
         }
       }
@@ -1327,7 +1331,7 @@ public class BlockManager {
           return null;
 
         } catch (Throwable t) {
-          LOG.error(t);
+          LOG.error(t.getMessage(), t);
           throw t;
         }
       }
@@ -1360,7 +1364,7 @@ public class BlockManager {
           return null;
 
         } catch (Throwable t) {
-          LOG.error(t);
+          LOG.error(t.getMessage(), t);
           throw t;
         }
       }
@@ -2410,7 +2414,7 @@ public class BlockManager {
         maybeException.get();
       }
     } catch (InterruptedException e) {
-      LOG.error(e);
+      LOG.error(e.getMessage(), e);
       throw new IOException(e);
     } catch (ExecutionException e) {
       if(e.getCause() instanceof IOException){
@@ -5020,7 +5024,7 @@ public class BlockManager {
             LOG.info("Stopping ReplicationMonitor for testing.");
             break;
           }
-          LOG.fatal("ReplicationMonitor thread received Runtime exception. ",
+          LOG.error("ReplicationMonitor thread received Runtime exception. ",
               t);
           terminate(1, t);
         }
