@@ -87,6 +87,7 @@ import org.apache.hadoop.net.unix.TemporarySocketDirectory;
 import org.apache.hadoop.security.ShellBasedUnixGroupsMapping;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
+import org.apache.log4j.Level;
 
 import java.io.*;
 import java.lang.reflect.Field;
@@ -116,6 +117,7 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROU
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveInfo;
 import org.apache.hadoop.hdfs.protocol.CachePoolInfo;
 import org.apache.hadoop.hdfs.protocol.LayoutVersion;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsDatasetSpi;
 import org.apache.hadoop.io.nativeio.NativeIO;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -1616,5 +1618,11 @@ public class DFSTestUtil {
         return (dd.isAlive == alive);
       }
     }, 100, waitTime);
+  }
+
+  public static void setNameNodeLogLevel(Level level) {
+    GenericTestUtils.setLogLevel(LogFactory.getLog(FSNamesystem.class), level);
+    GenericTestUtils.setLogLevel(LogFactory.getLog(BlockManager.class), level);
+    GenericTestUtils.setLogLevel(NameNode.stateChangeLog, level);
   }
 }
