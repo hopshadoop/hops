@@ -20,8 +20,6 @@ package org.apache.hadoop.hdfs.server.datanode.fsdataset;
 import org.apache.hadoop.io.IOUtils;
 
 import java.io.Closeable;
-import java.io.FileDescriptor;
-import java.io.FileInputStream;
 import java.io.InputStream;
 
 /**
