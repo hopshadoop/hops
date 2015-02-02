@@ -42,8 +42,8 @@ import org.apache.hadoop.hdfs.server.datanode.FinalizedReplica;
 import org.apache.hadoop.hdfs.server.datanode.Replica;
 import org.apache.hadoop.hdfs.server.datanode.ReplicaAlreadyExistsException;
 import org.apache.hadoop.hdfs.server.datanode.ReplicaBeingWritten;
-import org.apache.hadoop.hdfs.server.datanode.ReplicaInPipeline;
 import org.apache.hadoop.hdfs.server.datanode.ReplicaHandler;
+import org.apache.hadoop.hdfs.server.datanode.ReplicaInPipeline;
 import org.apache.hadoop.hdfs.server.datanode.ReplicaInfo;
 import org.apache.hadoop.hdfs.server.datanode.ReplicaNotFoundException;
 import org.apache.hadoop.hdfs.server.datanode.ReplicaUnderRecovery;
@@ -537,16 +537,11 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
     File blockFile = getBlockFileNoExistsCheck(b);
     RandomAccessFile blockInFile;
     try {
-      blockInFile = new RandomAccessFile(blockFile, "r");
+      return openAndSeek(blockFile, seekOffset);
     } catch (FileNotFoundException fnfe) {
       throw new IOException("Block " + b + " is not valid. " +
           "Expected block file at " + blockFile + " does not exist.");
     }
-
-    if (seekOffset > 0) {
-      blockInFile.seek(seekOffset);
-    }
-    return new FileInputStream(blockInFile.getFD());
   }
 
   /**
@@ -597,23 +592,13 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
    */
   @Override // FsDatasetSpi
   public synchronized ReplicaInputStreams getTmpInputStreams(ExtendedBlock b,
-      long blkOffset, long ckoff) throws IOException {
+      long blkOffset, long metaOffset) throws IOException {
     ReplicaInfo info = getReplicaInfo(b);
     FsVolumeReference ref = info.getVolume().obtainReference();
     try {
-      File blockFile = info.getBlockFile();
-      RandomAccessFile blockInFile = new RandomAccessFile(blockFile, "r");
-      if (blkOffset > 0) {
-        blockInFile.seek(blkOffset);
-      }
-      File metaFile = info.getMetaFile();
-      RandomAccessFile metaInFile = new RandomAccessFile(metaFile, "r");
-      if (ckoff > 0) {
-        metaInFile.seek(ckoff);
-      }
-      InputStream blockInStream = new FileInputStream(blockInFile.getFD());
+      InputStream blockInStream = openAndSeek(info.getBlockFile(), blkOffset);
       try {
-        InputStream metaInStream = new FileInputStream(metaInFile.getFD());
+        InputStream metaInStream = openAndSeek(info.getMetaFile(), metaOffset);
         return new ReplicaInputStreams(blockInStream, metaInStream, ref);
       } catch (IOException e) {
         IOUtils.cleanup(null, blockInStream);
@@ -622,6 +607,21 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
     } catch (IOException e) {
       IOUtils.cleanup(null, ref);
       throw e;
+    }
+  }
+
+  private static FileInputStream openAndSeek(File file, long offset)
+      throws IOException {
+    RandomAccessFile raf = null;
+    try {
+      raf = new RandomAccessFile(file, "r");
+      if (offset > 0) {
+        raf.seek(offset);
+      }
+      return new FileInputStream(raf.getFD());
+    } catch(IOException ioe) {
+      IOUtils.cleanup(null, raf);
+      throw ioe;
     }
   }
 
