@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import org.apache.commons.logging.Log;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -29,13 +29,11 @@ import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.apache.hadoop.hdfs.TestFileCorruption;
 import org.apache.hadoop.hdfs.protocol.Block;
-import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
-import org.apache.hadoop.hdfs.server.datanode.DatanodeUtil;
 import org.apache.hadoop.util.StringUtils;
 import org.junit.Test;
+import org.slf4j.Logger;
 
 import java.io.File;
 import java.io.IOException;
@@ -57,7 +55,7 @@ import static org.junit.Assert.assertTrue;
  * blocks/files are also returned.
  */
 public class TestListCorruptFileBlocks {
-  static Log LOG = NameNode.stateChangeLog;
+  static final Logger LOG = NameNode.stateChangeLog;
 
   /**
    * check if nn.getCorruptFiles() returns a file that has corrupted blocks

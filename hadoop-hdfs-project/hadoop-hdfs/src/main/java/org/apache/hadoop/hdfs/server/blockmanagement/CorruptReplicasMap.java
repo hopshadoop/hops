@@ -102,16 +102,15 @@ public class CorruptReplicasMap {
     }
     
     if (!nodes.keySet().contains(storage.getDatanodeDescriptor())) {
-      NameNode.blockStateChangeLog
-          .info("BLOCK NameSystem.addToCorruptReplicasMap: " +
-              blk.getBlockName() + " added as corrupt on " + storage +
-              " by " + Server.getRemoteIp() + reasonText);
+      NameNode.blockStateChangeLog.info(
+          "BLOCK NameSystem.addToCorruptReplicasMap: {} added as corrupt on "
+              + "{} by {} {}", blk.getBlockName(), storage, Server.getRemoteIp(),
+          reasonText);
     } else {
-      NameNode.blockStateChangeLog
-          .info("BLOCK NameSystem.addToCorruptReplicasMap: " +
-              "duplicate requested for " + blk.getBlockName() +
-              " to add as corrupt on " + storage +
-              " by " + Server.getRemoteIp() + reasonText);
+      NameNode.blockStateChangeLog.info(
+          "BLOCK NameSystem.addToCorruptReplicasMap: duplicate requested for" +
+              " {} to add as corrupt on {} by {} {}", blk.getBlockName(), storage,
+              Server.getRemoteIp(), reasonText);
     }
     // Add the node or update the reason.
     addCorruptReplicaToDB(new CorruptReplica(storage.getSid(),

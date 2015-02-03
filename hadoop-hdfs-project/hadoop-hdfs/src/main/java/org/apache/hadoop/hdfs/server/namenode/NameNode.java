@@ -26,8 +26,6 @@ import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.HdfsVariables;
 import io.hops.security.UsersGroups;
 import io.hops.transaction.handler.RequestHandler;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
@@ -70,6 +68,9 @@ import org.apache.hadoop.util.ExitUtil.ExitException;
 import org.apache.hadoop.util.ServicePlugin;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
+import org.apache.log4j.LogManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.management.ObjectName;
 import java.io.IOException;
@@ -85,6 +86,26 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
 import org.apache.hadoop.tracing.TraceUtils;
 import org.apache.hadoop.tracing.TracerConfigurationManager;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_DEFAULT;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_METRICS_PERCENTILES_INTERVALS_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HTTPS_ADDRESS_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HTTP_BIND_HOST_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_KERBEROS_INTERNAL_SPNEGO_PRINCIPAL_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_KEYTAB_FILE_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_PLUGINS_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RPC_ADDRESS_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RPC_BIND_HOST_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SERVICE_RPC_BIND_HOST_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_STARTUP_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SUPPORT_ALLOW_FORMAT_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SUPPORT_ALLOW_FORMAT_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.HADOOP_USER_GROUP_METRICS_PERCENTILES_INTERVALS;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 import org.apache.hadoop.util.JvmPauseMonitor;
 import org.apache.htrace.core.Tracer;
@@ -208,12 +229,13 @@ public class NameNode implements NameNodeStatusMXBean {
   }
 
   public static final int DEFAULT_PORT = 8020;
-  public static final Log LOG = LogFactory.getLog(NameNode.class.getName());
-  public static final Log stateChangeLog =
-      LogFactory.getLog("org.apache.hadoop.hdfs.StateChange");
-  public static final Log blockStateChangeLog =
-      LogFactory.getLog("BlockStateChange");
-
+  public static final Logger LOG =
+      LoggerFactory.getLogger(NameNode.class.getName());
+  public static final Logger stateChangeLog =
+      LoggerFactory.getLogger("org.apache.hadoop.hdfs.StateChange");
+  public static final Logger blockStateChangeLog =
+      LoggerFactory.getLogger("BlockStateChange");
+ 
   private static final String NAMENODE_HTRACE_PREFIX = "namenode.htrace.";
   
   protected FSNamesystem namesystem;
@@ -321,8 +343,9 @@ public class NameNode implements NameNodeStatusMXBean {
   /**
    * Set the configuration property for the service rpc address to address
    */
-  public static void setServiceAddress(Configuration conf, String address) {
-    LOG.info("Setting ADDRESS " + address);
+  public static void setServiceAddress(Configuration conf,
+                                           String address) {
+    LOG.info("Setting ADDRESS {}", address);
     conf.set(DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY, address);
   }
 
@@ -960,7 +983,7 @@ public class NameNode implements NameNodeStatusMXBean {
         String msg = "Specify a maximum number of concurrent blocks that the NameNodes can process.";
             if ((i + 1) >= argsLen) {
               // if no of blks not specified then return null
-              LOG.fatal(msg);
+              LOG.error(msg);
               return null;
             }
             // Make sure an id is specified and not another flag
@@ -968,7 +991,7 @@ public class NameNode implements NameNodeStatusMXBean {
             try{
               maxBRs = Long.parseLong(args[i+1]);
               if(maxBRs < 1){
-                LOG.fatal("The number should be >= 1.");
+                LOG.error("The number should be >= 1.");
               return null;
               }
             }catch(NumberFormatException e){
@@ -985,8 +1008,8 @@ public class NameNode implements NameNodeStatusMXBean {
             i++;
             if (i >= argsLen) {
               // if no cluster id specified, return null
-              LOG.fatal("Must specify a valid cluster ID after the " +
-                  StartupOption.CLUSTERID.getName() + " flag");
+              LOG.error("Must specify a valid cluster ID after the "
+                  + StartupOption.CLUSTERID.getName() + " flag");
               return null;
             }
             String clusterId = args[i];
@@ -995,7 +1018,7 @@ public class NameNode implements NameNodeStatusMXBean {
                 clusterId.equalsIgnoreCase(StartupOption.FORCE.getName()) ||
                 clusterId
                     .equalsIgnoreCase(StartupOption.NONINTERACTIVE.getName())) {
-              LOG.fatal("Must specify a valid cluster ID after the " +
+              LOG.error("Must specify a valid cluster ID after the " +
                   StartupOption.CLUSTERID.getName() + " flag");
               return null;
             }
@@ -1035,7 +1058,7 @@ public class NameNode implements NameNodeStatusMXBean {
         startOpt = StartupOption.ROLLINGUPGRADE;
         ++i;
         if (i >= argsLen) {
-          LOG.fatal("Must specify a rolling upgrade startup option "
+          LOG.error("Must specify a rolling upgrade startup option "
               + RollingUpgradeStartupOption.getAllOptionString());
           return null;
         }
@@ -1059,7 +1082,7 @@ public class NameNode implements NameNodeStatusMXBean {
           } else if (StartupOption.FORCE.getName().equals(args[i])) {
             startOpt.setForceFormat(true);
           } else {
-            LOG.fatal("Invalid argument: " + args[i]);
+            LOG.error("Invalid argument: " + args[i]);
             return null;
           }
         }
@@ -1184,13 +1207,14 @@ public class NameNode implements NameNodeStatusMXBean {
     }
 
     try {
-      StringUtils.startupShutdownMessage(NameNode.class, argv, LOG);
+      StringUtils.startupShutdownMessage(NameNode.class, argv,
+          (org.apache.commons.logging.Log) LogManager.getLogger(LOG.getName()));
       NameNode namenode = createNameNode(argv, null);
       if (namenode != null) {
         namenode.join();
       }
     } catch (Throwable e) {
-      LOG.fatal("Failed to start namenode.", e);
+      LOG.error("Failed to start namenode.", e);
       terminate(1, e);
     }
   }
@@ -1248,7 +1272,7 @@ public class NameNode implements NameNodeStatusMXBean {
     String message = "Error encountered requiring NN shutdown. " +
         "Shutting down immediately.";
     try {
-      LOG.fatal(message, t);
+      LOG.error(message, t);
     } catch (Throwable ignored) {
       // This is unlikely to happen, but there's nothing we can do if it does.
     }

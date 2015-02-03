@@ -490,7 +490,7 @@ public class DatanodeManager {
       final UnregisteredNodeException e =
           new UnregisteredNodeException(nodeID, node);
       NameNode.stateChangeLog
-          .fatal("BLOCK* NameSystem.getDatanode: " + e.getLocalizedMessage());
+          .error("BLOCK* NameSystem.getDatanode: " + e.getLocalizedMessage());
       throw e;
     }
     return node;

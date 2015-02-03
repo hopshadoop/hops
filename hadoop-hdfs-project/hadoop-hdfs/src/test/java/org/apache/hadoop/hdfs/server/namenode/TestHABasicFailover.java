@@ -15,9 +15,6 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
@@ -32,17 +29,17 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
+import org.apache.hadoop.hdfs.DFSTestUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class TestHABasicFailover extends junit.framework.TestCase {
 
-  public static final Log LOG = LogFactory.getLog(TestHABasicFailover.class);
+  public static final Logger LOG = LoggerFactory.getLogger(TestHABasicFailover.class);
 
 
   {
-    ((Log4JLogger) NameNode.stateChangeLog).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger) LeaseManager.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger) LogFactory.getLog(FSNamesystem.class)).getLogger()
-        .setLevel(Level.ALL);
+    DFSTestUtil.setNameNodeLogLevel(Level.ALL);
   }
 
   Configuration conf = new HdfsConfiguration();
