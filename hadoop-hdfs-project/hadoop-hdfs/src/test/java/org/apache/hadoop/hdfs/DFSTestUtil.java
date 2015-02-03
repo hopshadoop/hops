@@ -77,6 +77,7 @@ import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.INodeAttributes;
 import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
+import org.apache.hadoop.hdfs.server.namenode.LeaseManager;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.hdfs.tools.DFSAdmin;
@@ -1621,8 +1622,11 @@ public class DFSTestUtil {
   }
 
   public static void setNameNodeLogLevel(Level level) {
-    GenericTestUtils.setLogLevel(LogFactory.getLog(FSNamesystem.class), level);
-    GenericTestUtils.setLogLevel(LogFactory.getLog(BlockManager.class), level);
+    GenericTestUtils.setLogLevel(FSNamesystem.LOG, level);
+    GenericTestUtils.setLogLevel(BlockManager.LOG, level);
+    GenericTestUtils.setLogLevel(LeaseManager.LOG, level);
+    GenericTestUtils.setLogLevel(NameNode.LOG, level);
     GenericTestUtils.setLogLevel(NameNode.stateChangeLog, level);
+    GenericTestUtils.setLogLevel(NameNode.blockStateChangeLog, level);
   }
 }

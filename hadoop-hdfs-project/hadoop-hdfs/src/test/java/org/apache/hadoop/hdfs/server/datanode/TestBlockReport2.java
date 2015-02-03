@@ -18,9 +18,6 @@
 package org.apache.hadoop.hdfs.server.datanode;
 
 import io.hops.metadata.hdfs.entity.HashBucket;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Options;
@@ -49,6 +46,8 @@ import java.util.*;
 import java.util.concurrent.TimeoutException;
 
 import static org.junit.Assert.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This test simulates a variety of situations when blocks are being
@@ -56,7 +55,7 @@ import static org.junit.Assert.*;
  * report is happening
  */
 public class TestBlockReport2 {
-  public static final Log LOG = LogFactory.getLog(TestBlockReport2.class);
+  public static final Logger LOG = LoggerFactory.getLogger(TestBlockReport2.class);
   static final int BLOCK_SIZE = 1024;
   static final int NUM_BLOCKS = 20;
   static final int FILE_SIZE = NUM_BLOCKS * BLOCK_SIZE;
@@ -71,11 +70,9 @@ public class TestBlockReport2 {
   Random rand = new Random(RAND_LIMIT);
 
   private static void initLoggers() {
-    ((Log4JLogger) NameNode.stateChangeLog).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger) LogFactory.getLog(FSNamesystem.class)).getLogger()
-            .setLevel(Level.ALL);
-    ((Log4JLogger) DataNode.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger) TestBlockReport2.LOG).getLogger().setLevel(Level.ALL);
+    DFSTestUtil.setNameNodeLogLevel(Level.ALL);
+    GenericTestUtils.setLogLevel(DataNode.LOG, Level.ALL);
+    GenericTestUtils.setLogLevel(DFSClient.LOG, Level.ALL);
   }
 
   private static void setConfiguration(Configuration conf, int numBuckets) {

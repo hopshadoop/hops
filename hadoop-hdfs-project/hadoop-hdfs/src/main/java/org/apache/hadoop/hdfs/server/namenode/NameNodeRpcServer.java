@@ -23,27 +23,8 @@ import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.SortedActiveNodeList;
 import io.hops.metadata.hdfs.entity.EncodingPolicy;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HANDLER_COUNT_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HANDLER_COUNT_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SERVICE_HANDLER_COUNT_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SERVICE_HANDLER_COUNT_KEY;
-import static org.apache.hadoop.hdfs.protocol.HdfsConstants.MAX_PATH_DEPTH;
-import static org.apache.hadoop.hdfs.protocol.HdfsConstants.MAX_PATH_LENGTH;
 import static org.apache.hadoop.util.Time.now;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.EnumSet;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-
-import com.google.common.collect.Lists;
-
-import org.apache.commons.logging.Log;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.ContentSummary;
@@ -139,6 +120,7 @@ import org.apache.hadoop.tracing.TraceAdminProtocolPB;
 import org.apache.hadoop.tracing.TraceAdminProtocolServerSideTranslatorPB;
 import org.apache.hadoop.util.VersionInfo;
 import org.apache.hadoop.util.VersionUtil;
+import org.slf4j.Logger;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -180,9 +162,10 @@ import org.apache.hadoop.ipc.RetryCache;
  */
 class NameNodeRpcServer implements NamenodeProtocols {
   
-  private static final Log LOG = NameNode.LOG;
-  private static final Log stateChangeLog = NameNode.stateChangeLog;
-  private static final Log blockStateChangeLog = NameNode.blockStateChangeLog;
+  private static final Logger LOG = NameNode.LOG;
+  private static final Logger stateChangeLog = NameNode.stateChangeLog;
+  private static final Logger blockStateChangeLog = NameNode
+      .blockStateChangeLog;
   
   // Dependencies from other parts of NN.
   protected final FSNamesystem namesystem;
@@ -1233,8 +1216,8 @@ class NameNodeRpcServer implements NamenodeProtocols {
       if (nnCTime != dnCTime) {
         IncorrectVersionException ive = new IncorrectVersionException(
             messagePrefix + " and CTime of DN ('" + dnCTime +
-                "') does not match CTime of NN ('" + nnCTime + "')");
-        LOG.warn(ive);
+            "') does not match CTime of NN ('" + nnCTime + "')");
+        LOG.warn(ive.toString(), ive);
         throw ive;
       } else {
         LOG.info(

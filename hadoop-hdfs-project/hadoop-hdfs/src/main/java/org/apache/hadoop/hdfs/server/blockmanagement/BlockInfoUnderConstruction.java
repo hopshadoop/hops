@@ -168,7 +168,7 @@ public class BlockInfoUnderConstruction extends BlockInfo {
       if (genStamp != r.getGenerationStamp()) {
         r.getExpectedStorageLocation(datanodeMgr).removeBlock(this);
         NameNode.blockStateChangeLog.info("BLOCK* Removing stale replica "
-            + "from location: " + r.getStorageId() + " for block " + r.getBlockId());
+            + "from location: {} for block {}", r.getStorageId(), r.getBlockId());
       }
     }
 
@@ -254,8 +254,8 @@ public class BlockInfoUnderConstruction extends BlockInfo {
       primaryDn.addBlockToBeRecovered(this);
       primary.setChosenAsPrimary(true);
       update(primary);
-      NameNode.blockStateChangeLog.info("BLOCK* " + this
-          + " recovery started, primary=" + primary);
+      NameNode.blockStateChangeLog.info(
+          "BLOCK* {} recovery started, primary={}", this, primary);
     }
   }
   

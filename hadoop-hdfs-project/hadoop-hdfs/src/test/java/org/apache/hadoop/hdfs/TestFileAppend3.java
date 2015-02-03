@@ -17,13 +17,13 @@
  */
 package org.apache.hadoop.hdfs;
 
+
+import org.apache.hadoop.test.GenericTestUtils;
 import org.mockito.invocation.InvocationOnMock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 import org.mockito.stubbing.Answer;
 
-import org.apache.commons.logging.LogFactory;
-import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -36,9 +36,6 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
-import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
-import org.apache.hadoop.hdfs.server.namenode.LeaseManager;
-import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.protocol.InterDatanodeProtocol;
 import org.apache.log4j.Level;
 import org.junit.AfterClass;
@@ -58,13 +55,10 @@ import static org.junit.Assert.fail;
  */
 public class TestFileAppend3 {
   {
-    ((Log4JLogger) NameNode.stateChangeLog).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger) LeaseManager.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger) LogFactory.getLog(FSNamesystem.class)).getLogger()
-        .setLevel(Level.ALL);
-    ((Log4JLogger) DataNode.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger) DFSClient.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger) InterDatanodeProtocol.LOG).getLogger().setLevel(Level.ALL);
+    DFSTestUtil.setNameNodeLogLevel(Level.ALL);
+    GenericTestUtils.setLogLevel(DataNode.LOG, Level.ALL);
+    GenericTestUtils.setLogLevel(DFSClient.LOG, Level.ALL);
+    GenericTestUtils.setLogLevel(InterDatanodeProtocol.LOG, Level.ALL);
   }
 
   static final long BLOCK_SIZE = 64 * 1024;
