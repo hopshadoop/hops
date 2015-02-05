@@ -1072,6 +1072,8 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String NNTOP_WINDOWS_MINUTES_KEY =
       "dfs.namenode.top.windows.minutes";
   public static final String[] NNTOP_WINDOWS_MINUTES_DEFAULT = {"1","5","25"};
+  public static final String DFS_PIPELINE_ECN_ENABLED = "dfs.pipeline.ecn";
+  public static final boolean DFS_PIPELINE_ECN_ENABLED_DEFAULT = false;
   
   public static final String DFS_LOCATION_DOMAIN_ID = "dfs.locationDomainId";
   public static final byte DFS_LOCATION_DOMAIN_ID_DEFAULT = 0;
