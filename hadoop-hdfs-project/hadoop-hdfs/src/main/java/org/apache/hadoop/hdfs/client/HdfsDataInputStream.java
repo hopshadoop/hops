@@ -59,8 +59,8 @@ public class HdfsDataInputStream extends FSDataInputStream {
   /**
    * Get the collection of blocks that has already been located.
    */
-  public synchronized List<LocatedBlock> getAllBlocks() throws IOException {
-    return ((DFSInputStream) in).getAllBlocks();
+  public List<LocatedBlock> getAllBlocks() throws IOException {
+    return getDFSInputStream().getAllBlocks();
   }
 
   /**
