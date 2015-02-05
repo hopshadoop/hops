@@ -17,15 +17,19 @@
  */
 package org.apache.hadoop.hdfs.protocol.datatransfer;
 
-import com.google.protobuf.TextFormat;
+import java.util.ArrayList;
+
+import com.google.common.collect.Lists;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_OOB_TIMEOUT_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_OOB_TIMEOUT_DEFAULT;
-import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos;
+
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.PipelineAckProto;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status;
+import com.google.protobuf.TextFormat;
+import org.apache.hadoop.hdfs.util.LongBitFormat;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -47,6 +51,56 @@ public class PipelineAck {
   final static int NUM_OOB_TYPES = OOB_END - OOB_START + 1;
   // place holder for timeout value of each OOB type
   final static long[] OOB_TIMEOUT;
+
+  public enum ECN {
+    DISABLED(0),
+    SUPPORTED(1),
+    SUPPORTED2(2),
+    CONGESTED(3);
+
+    private final int value;
+    private static final ECN[] VALUES = values();
+    static ECN valueOf(int value) {
+      return VALUES[value];
+    }
+
+    ECN(int value) {
+      this.value = value;
+    }
+
+    public int getValue() {
+      return value;
+    }
+  }
+
+  private enum StatusFormat {
+    STATUS(null, 4),
+    RESERVED(STATUS.BITS, 1),
+    ECN_BITS(RESERVED.BITS, 2);
+
+    private final LongBitFormat BITS;
+
+    StatusFormat(LongBitFormat prev, int bits) {
+      BITS = new LongBitFormat(name(), prev, bits, 0);
+    }
+
+    static Status getStatus(int header) {
+      return Status.valueOf((int) STATUS.BITS.retrieve(header));
+    }
+
+    static ECN getECN(int header) {
+      return ECN.valueOf((int) ECN_BITS.BITS.retrieve(header));
+    }
+
+    public static int setStatus(int old, Status status) {
+      return (int) STATUS.BITS.combine(status.getNumber(), old);
+    }
+
+    public static int setECN(int old, ECN ecn) {
+      return (int) ECN_BITS.BITS.combine(ecn.getValue(), old);
+    }
+  }
+
   static {
     OOB_TIMEOUT = new long[NUM_OOB_TYPES];
     HdfsConfiguration conf = new HdfsConfiguration();
@@ -71,7 +125,7 @@ public class PipelineAck {
    * @param replies
    *     an array of replies
    */
-  public PipelineAck(long seqno, Status[] replies) {
+  public PipelineAck(long seqno, int[] replies) {
     this(seqno, replies, 0L);
   }
 
@@ -85,11 +139,17 @@ public class PipelineAck {
    * @param downstreamAckTimeNanos
    *     ack RTT in nanoseconds, 0 if no next DN in pipeline
    */
-  public PipelineAck(long seqno, Status[] replies,
-      long downstreamAckTimeNanos) {
-    proto = PipelineAckProto.newBuilder().setSeqno(seqno)
-        .addAllStatus(Arrays.asList(replies))
-        .setDownstreamAckTimeNanos(downstreamAckTimeNanos).build();
+  public PipelineAck(long seqno, int[] replies,
+                     long downstreamAckTimeNanos) {
+    ArrayList<Integer> replyList = Lists.newArrayList();
+    for (int r : replies) {
+      replyList.add(r);
+    }
+    proto = PipelineAckProto.newBuilder()
+      .setSeqno(seqno)
+      .addAllReply(replyList)
+      .setDownstreamAckTimeNanos(downstreamAckTimeNanos)
+      .build();
   }
   
   /**
@@ -107,7 +167,7 @@ public class PipelineAck {
    * @return the number of replies
    */
   public short getNumOfReplies() {
-    return (short) proto.getStatusCount();
+    return (short)proto.getReplyCount();
   }
   
   /**
@@ -115,8 +175,8 @@ public class PipelineAck {
    *
    * @return the the ith reply
    */
-  public Status getReply(int i) {
-    return proto.getStatus(i);
+  public int getReply(int i) {
+    return proto.getReply(i);
   }
 
   /**
@@ -135,8 +195,8 @@ public class PipelineAck {
    * @return true if all statuses are SUCCESS
    */
   public boolean isSuccess() {
-    for (Status reply : proto.getStatusList()) {
-      if (reply != Status.SUCCESS) {
+    for (int reply : proto.getReplyList()) {
+      if (StatusFormat.getStatus(reply) != Status.SUCCESS) {
         return false;
       }
     }
@@ -153,11 +213,12 @@ public class PipelineAck {
     if (getSeqno() != UNKOWN_SEQNO) {
       return null;
     }
-    for (Status reply : proto.getStatusList()) {
+    for (int reply : proto.getReplyList()) {
       // The following check is valid because protobuf guarantees to
       // preserve the ordering of enum elements.
-      if (reply.getNumber() >= OOB_START && reply.getNumber() <= OOB_END) {
-        return reply;
+      Status s = StatusFormat.getStatus(reply);
+      if (s.getNumber() >= OOB_START && s.getNumber() <= OOB_END) {
+        return s;
       }
     }
     return null;
@@ -197,5 +258,20 @@ public class PipelineAck {
   @Override //Object
   public String toString() {
     return TextFormat.shortDebugString(proto);
+  }
+
+  public static Status getStatusFromHeader(int header) {
+    return StatusFormat.getStatus(header);
+  }
+
+  public static int setStatusForHeader(int old, Status status) {
+    return StatusFormat.setStatus(old, status);
+  }
+
+  public static int combineHeader(ECN ecn, Status status) {
+    int header = 0;
+    header = StatusFormat.setStatus(header, status);
+    header = StatusFormat.setECN(header, ecn);
+    return header;
   }
 }
