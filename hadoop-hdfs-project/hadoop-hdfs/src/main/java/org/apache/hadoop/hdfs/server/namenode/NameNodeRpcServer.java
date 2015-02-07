@@ -42,6 +42,7 @@ import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.HDFSPolicyProvider;
+import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.hdfs.protocol.AclException;
 import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.protocol.CorruptFileBlocks;
@@ -947,10 +948,15 @@ class NameNodeRpcServer implements NamenodeProtocols {
   }
 
   @Override // ClientProtocol
-  public void setQuota(String path, long namespaceQuota, long diskspaceQuota)
+  public void setQuota(String path, long namespaceQuota, long diskspaceQuota,
+                       StorageType type)
       throws IOException {
-      checkNNStartup();
-      namesystem.setQuota(path, namespaceQuota, diskspaceQuota);
+    checkNNStartup();
+    if (type != null) {
+      throw new UnsupportedActionException(
+          "Quota by storage type support is not fully supported by namenode yet.");
+    }
+    namesystem.setQuota(path, namespaceQuota, diskspaceQuota);
   }
   
   @Override // ClientProtocol
