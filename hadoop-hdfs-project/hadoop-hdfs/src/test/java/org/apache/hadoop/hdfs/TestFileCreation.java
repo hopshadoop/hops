@@ -34,7 +34,12 @@ import org.apache.hadoop.fs.ParentNotDirectoryException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
-import org.apache.hadoop.hdfs.protocol.*;
+import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
+import org.apache.hadoop.hdfs.protocol.HdfsConstants;
+import org.apache.hadoop.hdfs.protocol.LocatedBlock;
+import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
 import org.apache.hadoop.hdfs.server.datanode.SimulatedFSDataset;
@@ -413,8 +418,7 @@ public class TestFileCreation {
         fs2.create(p, false);
         fail("Did not throw!");
       } catch (IOException abce) {
-        GenericTestUtils
-            .assertExceptionContains("already being created by", abce);
+        GenericTestUtils.assertExceptionContains("Failed to CREATE_FILE", abce);
       }
       FSDataOutputStream stm2 = fs2.create(p, true);
       stm2.write(2);

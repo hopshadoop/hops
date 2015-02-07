@@ -183,7 +183,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.fs.BatchedRemoteIterator.BatchedListEntries;
 import org.apache.hadoop.fs.CacheFlag;
-import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_DEFAULT;
@@ -246,7 +245,6 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_TRASH_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.IO_FILE_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.IO_FILE_BUFFER_SIZE_KEY;
-import org.apache.hadoop.hdfs.protocol.AclException;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveEntry;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveInfo;
 import org.apache.hadoop.hdfs.protocol.CachePoolEntry;
@@ -1627,8 +1625,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       dir.checkPathAccess(pc, iip, FsAction.WRITE);
     }
     INodeFile file = INodeFile.valueOf(iip.getLastINode(), src);
-    // Opening an existing file for write. May need lease recovery.
-    recoverLeaseInternal(iip, src, clientName, clientMachine, false);
+    // Opening an existing file for truncate. May need lease recovery.
+    recoverLeaseInternal(RecoverLeaseOp.TRUNCATE_FILE,
+        iip, src, clientName, clientMachine, false);
     // Truncate length check.
     long oldLength = file.computeFileSize();
     if(oldLength == newLength)
@@ -1860,7 +1859,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           }
         } else {
           // If lease soft limit time is expired, recover the lease
-          recoverLeaseInternal(iip, src, holder, clientMachine, false);
+          recoverLeaseInternal(RecoverLeaseOp.CREATE_FILE,
+              iip, src, holder, clientMachine, false);
           throw new FileAlreadyExistsException(src + " for client " +
               clientMachine + " already exists");
         }
@@ -1931,9 +1931,10 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       }
       INodeFile myFile = INodeFile.valueOf(inode, src, true);
 
-      // Opening an existing file for write - may need to recover lease.
-      recoverLeaseInternal(iip, src, holder, clientMachine, false);
-
+      // Opening an existing file for append - may need to recover lease.
+      recoverLeaseInternal(RecoverLeaseOp.APPEND_FILE,
+          iip, src, holder, clientMachine, false);
+      
       final BlockInfo lastBlock = myFile.getLastBlock();
       // Check that the block has at least minimum replication.
       if (lastBlock != null && lastBlock.isComplete() && !getBlockManager().isSufficientlyReplicated(lastBlock)) {
@@ -2041,7 +2042,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
               dir.checkPathAccess(pc, iip, FsAction.WRITE);
             }
 
-            recoverLeaseInternal(iip, src, holder, clientMachine, true);
+            recoverLeaseInternal(RecoverLeaseOp.RECOVER_LEASE,
+              iip, src, holder, clientMachine, true);
             return false;
           }
         };
@@ -2049,8 +2051,21 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     return (Boolean) recoverLeaseHandler.handle(this);
   }
 
-  private void recoverLeaseInternal(INodesInPath iip, String src, String holder,
-      String clientMachine, boolean force)
+  private enum RecoverLeaseOp {
+    CREATE_FILE,
+    APPEND_FILE,
+    TRUNCATE_FILE,
+    RECOVER_LEASE;
+
+    private String getExceptionMessage(String src, String holder,
+        String clientMachine, String reason) {
+      return "Failed to " + this + " " + src + " for " + holder +
+          " on " + clientMachine + " because " + reason;
+    }
+  }
+    
+  private void recoverLeaseInternal(RecoverLeaseOp op, INodesInPath iip, 
+      String src, String holder, String clientMachine, boolean force)
       throws IOException {
     INodeFile file = iip.getLastINode().asFile();
     if (file != null && file.isUnderConstruction()) {
@@ -2059,17 +2074,15 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       // leases. Find the appropriate lease record.
       //
       Lease lease = leaseManager.getLease(holder);
-      //
-      // We found the lease for this file. And surprisingly the original
-      // holder is trying to recreate this file. This should never occur.
-      //
+
       if (!force && lease != null) {
         Lease leaseFile = leaseManager.getLeaseByPath(src);
         if (leaseFile != null && leaseFile.equals(lease)) {
+          // We found the lease for this file but the original
+          // holder is trying to obtain it again.
           throw new AlreadyBeingCreatedException(
-              "failed to create file " + src + " for " + holder +
-                  " for client " + clientMachine +
-                  " because current leaseholder is trying to recreate file.");
+              op.getExceptionMessage(src, holder, clientMachine,
+                  holder + " is already the current lease holder."));
         }
       }
       //
@@ -2080,9 +2093,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       lease = leaseManager.getLease(clientName);
       if (lease == null) {
         throw new AlreadyBeingCreatedException(
-            "failed to create file " + src + " for " + holder +
-                " for client " + clientMachine +
-                " because pendingCreates is non-null but no leases found.");
+            op.getExceptionMessage(src, holder, clientMachine,
+                "the file is under construction but no leases found."));
       }
       if (force) {
         // close now: no need to wait for soft lease expiration and
@@ -2104,23 +2116,23 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           boolean isClosed = internalReleaseLease(lease, src, iip, null);
           if (!isClosed) {
             throw new RecoveryInProgressException.NonAbortingRecoveryInProgressException(
-                "Failed to close file " + src +
-                    ". Lease recovery is in progress. Try again later.");
+                op.getExceptionMessage(src, holder, clientMachine,
+                    "lease recovery is in progress. Try again later."));
           }
         } else {
           final BlockInfo lastBlock = file.getLastBlock();
           if (lastBlock != null
               && (lastBlock.getBlockUCState() == BlockUCState.UNDER_RECOVERY ||
                  lastBlock.getBlockUCState() == BlockUCState.BEING_TRUNCATED)) {
-            throw new RecoveryInProgressException("Recovery in progress, file ["
-                + src + "], " + "lease owner [" + lease.getHolder() + "]");
+            throw new RecoveryInProgressException(
+                op.getExceptionMessage(src, holder, clientMachine,
+                    "another recovery is in progress by "
+                        + clientName + " on " + uc.getClientMachine()));
           } else {
             throw new AlreadyBeingCreatedException(
-                "Failed to create file [" + src + "] for [" + holder +
-                    "] on client [" + clientMachine +
-                    "], because this file is already being created by [" +
-                    clientName + "] on [" +
-                    uc.getClientMachine() + "]");
+                op.getExceptionMessage(src, holder, clientMachine,
+                    "this file lease is currently owned by "
+                        + clientName + " on " + uc.getClientMachine()));
           }
         }
       }
