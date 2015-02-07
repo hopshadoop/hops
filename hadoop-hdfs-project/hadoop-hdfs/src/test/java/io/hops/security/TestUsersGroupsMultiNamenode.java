@@ -76,6 +76,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
+import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.hdfs.protocol.LastBlockWithStatus;
 
 import static org.junit.Assert.assertEquals;
@@ -394,7 +395,7 @@ public class TestUsersGroupsMultiNamenode {
     }
     
     @Override
-    public void setQuota(String path, long namespaceQuota, long diskspaceQuota)
+    public void setQuota(String path, long namespaceQuota, long diskspaceQuota, StorageType type)
         throws AccessControlException, FileNotFoundException,
         UnresolvedLinkException, IOException {
       

@@ -45,6 +45,7 @@ import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenSelector;
 import org.apache.hadoop.hdfs.server.namenode.NotReplicatedYetException;
 import org.apache.hadoop.hdfs.server.namenode.SafeModeException;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorageReport;
+import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.io.EnumSetWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.retry.Idempotent;
@@ -1159,41 +1160,31 @@ public interface ClientProtocol {
 
   /**
    * Set the quota for a directory.
-   * NOTE: In contrast to Apache Hadoop, HOPS does not strictly enforce this
-   * quota as its calculation is eventually consistent. Hence, small quota
-   * violations are possible within a short period of time before after an
-   * operation affecting the quota that causes the reach of a limit.
-   *
-   * @param path
-   *     The string representation of the path to the directory
-   * @param namespaceQuota
-   *     Limit on the number of names in the tree rooted
-   *     at the directory
-   * @param diskspaceQuota
-   *     Limit on disk space occupied all the files under
-   *     this directory.
-   *     <br><br>
-   *     <p/>
-   *     The quota can have three types of values : (1) 0 or more will set
-   *     the quota to that value, (2) {@link HdfsConstants#QUOTA_DONT_SET}
-   *     implies
-   *     the quota will not be changed, and (3) {@link HdfsConstants#QUOTA_RESET}
-   *     implies the quota will be reset. Any other value is a runtime error.
-   * @throws AccessControlException
-   *     permission denied
-   * @throws FileNotFoundException
-   *     file <code>path</code> is not found
-   * @throws QuotaExceededException
-   *     if the directory size
-   *     is greater than the given quota
-   * @throws UnresolvedLinkException
-   *     if the <code>path</code> contains a symlink.
-   * @throws IOException
-   *     If an I/O error occurred
+   * @param path  The string representation of the path to the directory
+   * @param namespaceQuota Limit on the number of names in the tree rooted 
+   *                       at the directory
+   * @param diskspaceQuota Limit on disk space occupied all the files under
+   *                       this directory.
+   * @param type StorageType that the space quota is intended to be set on.
+   *             It may be null when called by traditional space/namespace quota.
+   * <br><br>
+   *                       
+   * The quota can have three types of values : (1) 0 or more will set 
+   * the quota to that value, (2) {@link HdfsConstants#QUOTA_DONT_SET}  implies 
+   * the quota will not be changed, and (3) {@link HdfsConstants#QUOTA_RESET} 
+   * implies the quota will be reset. Any other value is a runtime error.
+   * 
+   * @throws AccessControlException permission denied
+   * @throws FileNotFoundException file <code>path</code> is not found
+   * @throws QuotaExceededException if the directory size 
+   *           is greater than the given quota
+   * @throws UnresolvedLinkException if the <code>path</code> contains a symlink. 
+   * @throws SnapshotAccessControlException if path is in RO snapshot
+   * @throws IOException If an I/O error occurred
    */
   @Idempotent
-  public void setQuota(String path, long namespaceQuota, long diskspaceQuota)
-      throws AccessControlException, FileNotFoundException,
+  public void setQuota(String path, long namespaceQuota, long diskspaceQuota,
+      StorageType type) throws AccessControlException, FileNotFoundException,
       UnresolvedLinkException, IOException;
 
   /**

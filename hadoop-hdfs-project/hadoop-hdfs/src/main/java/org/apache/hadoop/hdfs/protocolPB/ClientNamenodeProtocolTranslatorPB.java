@@ -137,6 +137,7 @@ import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifie
 import org.apache.hadoop.hdfs.server.namenode.NotReplicatedYetException;
 import org.apache.hadoop.hdfs.server.namenode.SafeModeException;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorageReport;
+import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.io.EnumSetWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.ProtobufHelper;
@@ -826,12 +827,19 @@ public class ClientNamenodeProtocolTranslatorPB
   }
 
   @Override
-  public void setQuota(String path, long namespaceQuota, long diskspaceQuota)
+  public void setQuota(String path, long namespaceQuota, long diskspaceQuota,
+                       StorageType type)
       throws AccessControlException, FileNotFoundException,
       UnresolvedLinkException, IOException {
-    SetQuotaRequestProto req = SetQuotaRequestProto.newBuilder().setPath(path)
-        .setNamespaceQuota(namespaceQuota).setDiskspaceQuota(diskspaceQuota)
-        .build();
+    final SetQuotaRequestProto.Builder builder
+        = SetQuotaRequestProto.newBuilder()
+        .setPath(path)
+        .setNamespaceQuota(namespaceQuota)
+        .setDiskspaceQuota(diskspaceQuota);
+    if (type != null) {
+      builder.setStorageType(PBHelper.convertStorageType(type));
+    }
+    final SetQuotaRequestProto req = builder.build();
     try {
       rpcProxy.setQuota(null, req);
     } catch (ServiceException e) {

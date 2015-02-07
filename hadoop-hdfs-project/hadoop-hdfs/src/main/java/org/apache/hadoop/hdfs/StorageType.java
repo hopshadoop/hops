@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdfs;
 
+import java.util.ArrayList;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
@@ -32,20 +33,62 @@ import java.util.List;
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public enum StorageType {
-  DISK,
-  SSD,
-  RAID5,
-  ARCHIVE;
+  DISK(false),
+  SSD(false),
+  RAID5(false),
+  ARCHIVE(false);
+  
+  private final boolean isTransient;
 
   public static StorageType DEFAULT = DISK;
 
   public static final StorageType[] EMPTY_ARRAY = {};
+  
   private static final StorageType[] VALUES = values();
+  
+  StorageType(boolean isTransient) {
+    this.isTransient = isTransient;
+  }
+  
+  public boolean isTransient() {
+    return isTransient;
+  }
+    
+  public boolean supportTypeQuota() {
+    return !isTransient;
+  }
+
+  public boolean isMovable() {
+    return !isTransient;
+  }
+    
   public static List<StorageType> asList() {
     return Arrays.asList(VALUES);
   }
-  
-  public boolean isMovable() {
-    return true;
+
+  public static List<StorageType> getMovableTypes() {
+    return getNonTransientTypes();
+  }
+
+  public static List<StorageType> getTypesSupportingQuota() {
+    return getNonTransientTypes();
+  }
+
+  public static StorageType parseStorageType(int i) {
+    return VALUES[i];
+  }
+
+  public static StorageType parseStorageType(String s) {
+    return StorageType.valueOf(s.toUpperCase());
+  }
+
+  private static List<StorageType> getNonTransientTypes() {
+    List<StorageType> nonTransientTypes = new ArrayList<>();
+    for (StorageType t : VALUES) {
+      if ( t.isTransient == false ) {
+        nonTransientTypes.add(t);
+      }
+    }
+    return nonTransientTypes;
   }
 }

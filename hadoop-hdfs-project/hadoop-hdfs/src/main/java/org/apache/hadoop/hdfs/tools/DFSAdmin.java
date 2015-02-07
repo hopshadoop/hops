@@ -45,6 +45,7 @@ import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.RollingUpgradeAction;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.SafeModeAction;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
+import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.net.NetUtils;
@@ -54,7 +55,6 @@ import org.apache.hadoop.security.authorize.RefreshAuthorizationPolicyProtocol;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.ToolRunner;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.net.InetSocketAddress;
@@ -167,10 +167,8 @@ public class DFSAdmin extends FsShell {
             "\t\tNote: A quota of 1 would force the directory to remain empty.\n";
 
     private final long quota; // the quota to be set
-    
-    /**
-     * Constructor
-     */
+
+    /** Constructor */
     SetQuotaCommand(String[] args, int pos, FileSystem fs) {
       super(fs);
       CommandFormat c = new CommandFormat(2, Integer.MAX_VALUE);
@@ -206,21 +204,27 @@ public class DFSAdmin extends FsShell {
    */
   private static class ClearSpaceQuotaCommand extends DFSAdminCommand {
     private static final String NAME = "clrSpaceQuota";
-    private static final String USAGE = "-" + NAME + " <dirname>...<dirname>";
+    private static final String USAGE = "-"+NAME+" <dirname>...<dirname> -storageType <storagetype>";
     private static final String DESCRIPTION = USAGE + ": " +
-        "Clear the disk space quota for each directory <dirName>.\n" +
-        "\t\tFor each directory, attempt to clear the quota. An error will be reported if\n" +
-        "\t\t1. the directory does not exist or is a file, or\n" +
-        "\t\t2. user is not an administrator.\n" +
-        "\t\tIt does not fault if the directory has no quota.";
-    
-    /**
-     * Constructor
-     */
+    "Clear the disk space quota for each directory <dirName>.\n" +
+    "\t\tFor each directory, attempt to clear the quota. An error will be reported if\n" +
+    "\t\t1. the directory does not exist or is a file, or\n" +
+    "\t\t2. user is not an administrator.\n" +
+    "\t\tIt does not fault if the directory has no quota.\n" +
+    "\t\tThe storage type specific quota is cleared when -storageType option is specified.";
+
+    private StorageType type;
+
+    /** Constructor */
     ClearSpaceQuotaCommand(String[] args, int pos, FileSystem fs) {
       super(fs);
       CommandFormat c = new CommandFormat(1, Integer.MAX_VALUE);
       List<String> parameters = c.parse(args, pos);
+      String storageTypeString =
+          StringUtils.popOptionWithArgument("-storageType", parameters);
+      if (storageTypeString != null) {
+        this.type = StorageType.parseStorageType(storageTypeString);
+      }
       this.args = parameters.toArray(new String[parameters.size()]);
     }
     
@@ -242,8 +246,11 @@ public class DFSAdmin extends FsShell {
 
     @Override
     public void run(Path path) throws IOException {
-      dfs.setQuota(path, HdfsConstants.QUOTA_DONT_SET,
-          HdfsConstants.QUOTA_RESET);
+      if (type != null) {
+        dfs.setQuotaByStorageType(path, type, HdfsConstants.QUOTA_RESET);
+      } else {
+        dfs.setQuota(path, HdfsConstants.QUOTA_DONT_SET, HdfsConstants.QUOTA_RESET);
+      }
     }
   }
   
@@ -253,21 +260,23 @@ public class DFSAdmin extends FsShell {
   private static class SetSpaceQuotaCommand extends DFSAdminCommand {
     private static final String NAME = "setSpaceQuota";
     private static final String USAGE =
-        "-" + NAME + " <quota> <dirname>...<dirname>";
+      "-"+NAME+" <quota> <dirname>...<dirname> -storageType <storagetype>";
     private static final String DESCRIPTION = USAGE + ": " +
-        "Set the disk space quota <quota> for each directory <dirName>.\n" +
-        "\t\tThe space quota is a long integer that puts a hard limit\n" +
-        "\t\ton the total size of all the files under the directory tree.\n" +
-        "\t\tThe extra space required for replication is also counted. E.g.\n" +
-        "\t\ta 1GB file with replication of 3 consumes 3GB of the quota.\n\n" +
-        "\t\tQuota can also be specified with a binary prefix for terabytes,\n" +
-        "\t\tpetabytes etc (e.g. 50t is 50TB, 5m is 5MB, 3p is 3PB).\n" +
-        "\t\tFor each directory, attempt to set the quota. An error will be reported if\n" +
-        "\t\t1. N is not a positive integer, or\n" +
-        "\t\t2. user is not an administrator, or\n" +
-        "\t\t3. the directory does not exist or is a file, or\n";
+      "Set the disk space quota <quota> for each directory <dirName>.\n" + 
+      "\t\tThe space quota is a long integer that puts a hard limit\n" +
+      "\t\ton the total size of all the files under the directory tree.\n" +
+      "\t\tThe extra space required for replication is also counted. E.g.\n" +
+      "\t\ta 1GB file with replication of 3 consumes 3GB of the quota.\n\n" +
+      "\t\tQuota can also be specified with a binary prefix for terabytes,\n" +
+      "\t\tpetabytes etc (e.g. 50t is 50TB, 5m is 5MB, 3p is 3PB).\n" + 
+      "\t\tFor each directory, attempt to set the quota. An error will be reported if\n" +
+      "\t\t1. N is not a positive integer, or\n" +
+      "\t\t2. user is not an administrator, or\n" +
+      "\t\t3. the directory does not exist or is a file.\n" +
+      "\t\tThe storage type specific quota is set when -storageType option is specified.\n";
 
     private long quota; // the quota to be set
+    private StorageType type;
     
     /**
      * Constructor
@@ -282,6 +291,11 @@ public class DFSAdmin extends FsShell {
       } catch (NumberFormatException nfe) {
         throw new IllegalArgumentException(
             "\"" + str + "\" is not a valid value for a quota.");
+      }
+      String storageTypeString =
+          StringUtils.popOptionWithArgument("-storageType", parameters);
+      if (storageTypeString != null) {
+        this.type = StorageType.parseStorageType(storageTypeString);
       }
       
       this.args = parameters.toArray(new String[parameters.size()]);
@@ -305,7 +319,11 @@ public class DFSAdmin extends FsShell {
 
     @Override
     public void run(Path path) throws IOException {
-      dfs.setQuota(path, HdfsConstants.QUOTA_DONT_SET, quota);
+      if (type != null) {
+        dfs.setQuotaByStorageType(path, type, quota);
+      } else {
+        dfs.setQuota(path, HdfsConstants.QUOTA_DONT_SET, quota);
+      }
     }
   }
   
