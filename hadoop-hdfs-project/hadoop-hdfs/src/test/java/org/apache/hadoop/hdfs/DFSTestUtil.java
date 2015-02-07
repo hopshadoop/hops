@@ -946,14 +946,18 @@ public class DFSTestUtil {
   /**
    * Get a FileSystem instance as specified user in a doAs block.
    */
-  static public FileSystem getFileSystemAs(UserGroupInformation ugi,
-      final Configuration conf) throws IOException, InterruptedException {
-    return ugi.doAs(new PrivilegedExceptionAction<FileSystem>() {
-      @Override
-      public FileSystem run() throws Exception {
-        return FileSystem.get(conf);
-      }
-    });
+  static public FileSystem getFileSystemAs(UserGroupInformation ugi, 
+      final Configuration conf) throws IOException {
+    try {
+      return ugi.doAs(new PrivilegedExceptionAction<FileSystem>() {
+        @Override
+        public FileSystem run() throws Exception {
+          return FileSystem.get(conf);
+        }
+      });
+    } catch (InterruptedException e) {
+      throw (InterruptedIOException)new InterruptedIOException().initCause(e);
+    }
   }
 
   public static byte[] generateSequentialBytes(int start, int length) {
