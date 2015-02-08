@@ -80,8 +80,8 @@ public class TestDatanodeDescriptor {
 
     DatanodeDescriptor datanode = DFSTestUtil.getLocalDatanodeDescriptor(true);
     assertEquals(0, datanode.numBlocks());
-    BlockInfo blk = new BlockInfo(new Block(1L), 2);
-    BlockInfo blk1 = new BlockInfo(new Block(2L), 3);
+    BlockInfoContiguous blk = new BlockInfoContiguous(new Block(1L), 2);
+    BlockInfoContiguous blk1 = new BlockInfoContiguous(new Block(2L), 3);
     DatanodeStorageInfo[] storages = datanode.getStorageInfos();
     assertTrue(storages.length > 0);
     // add first block
@@ -107,7 +107,7 @@ public class TestDatanodeDescriptor {
   
   private AddBlockResult addBlock(final BlocksMap blocksMap,
       final DatanodeStorageInfo storage,
-      final BlockInfo blk)
+      final BlockInfoContiguous blk)
       throws IOException {
     return (AddBlockResult) new HopsTransactionalRequestHandler(
         HDFSOperationType.TEST) {
@@ -136,7 +136,7 @@ public class TestDatanodeDescriptor {
   }
 
   private boolean removeBlock(final DatanodeDescriptor dn,
-      final BlockInfo blk) throws IOException {
+      final BlockInfoContiguous blk) throws IOException {
     return (Boolean) new HopsTransactionalRequestHandler(
         HDFSOperationType.TEST) {
       INodeIdentifier inodeIdentifier;

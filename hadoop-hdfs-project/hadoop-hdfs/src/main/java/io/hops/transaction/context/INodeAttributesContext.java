@@ -24,13 +24,13 @@ import io.hops.metadata.common.FinderType;
 import io.hops.metadata.hdfs.dal.INodeAttributesDataAccess;
 import io.hops.metadata.hdfs.entity.INodeCandidatePrimaryKey;
 import io.hops.transaction.lock.TransactionLocks;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.INodeAttributes;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
 import org.apache.hadoop.hdfs.server.namenode.Quota;
 
 public class INodeAttributesContext
@@ -125,7 +125,7 @@ public class INodeAttributesContext
             (INodeCandidatePrimaryKey) params[0];
         List<INodeCandidatePrimaryKey> srcs_param =
             (List<INodeCandidatePrimaryKey>) params[1];
-        List<BlockInfo> oldBlks = (List<BlockInfo>) params[2];
+        List<BlockInfoContiguous> oldBlks = (List<BlockInfoContiguous>) params[2];
         updateAttributes(trg_param, srcs_param);
         break;
     }

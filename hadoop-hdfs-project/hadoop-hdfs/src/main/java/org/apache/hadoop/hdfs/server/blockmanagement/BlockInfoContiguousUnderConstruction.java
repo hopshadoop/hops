@@ -34,7 +34,8 @@ import java.util.List;
  * Represents a block that is currently being constructed.<br>
  * This is usually the last block of a file opened for write or append.
  */
-public class BlockInfoUnderConstruction extends BlockInfo {
+public class BlockInfoContiguousUnderConstruction extends BlockInfoContiguous {
+  /** Block state. See {@link BlockUCState} */
 
   private static final List<ReplicaUnderConstruction> EMPTY_REPLICAS_ARRAY =
       Collections.unmodifiableList(new ArrayList<ReplicaUnderConstruction>());
@@ -58,14 +59,14 @@ public class BlockInfoUnderConstruction extends BlockInfo {
   /**
    * Create block and set its state to {@link BlockUCState#UNDER_CONSTRUCTION}.
    */
-  public BlockInfoUnderConstruction(Block blk, long inodeId) {
+  public BlockInfoContiguousUnderConstruction(Block blk, long inodeId) {
     this(blk, inodeId, BlockUCState.UNDER_CONSTRUCTION);
   }
 
   /**
    * Create a block that is currently being constructed.
    */
-  private BlockInfoUnderConstruction(Block blk, long inodeId,
+  private BlockInfoContiguousUnderConstruction(Block blk, long inodeId,
       BlockUCState state) {
     super(blk, inodeId);
     assert getBlockUCState() !=
@@ -76,7 +77,7 @@ public class BlockInfoUnderConstruction extends BlockInfo {
   /**
    * Create a block that is currently being constructed.
    */
-  public BlockInfoUnderConstruction(Block blk, long inodeId, BlockUCState state,
+  public BlockInfoContiguousUnderConstruction(Block blk, long inodeId, BlockUCState state,
       DatanodeStorageInfo[] targets)
       throws StorageException, TransactionContextException {
     this(blk, inodeId, state);
@@ -88,12 +89,12 @@ public class BlockInfoUnderConstruction extends BlockInfo {
    *
    * @return BlockInfo - a complete block.
    */
-  BlockInfo convertToCompleteBlock()
+  BlockInfoContiguous convertToCompleteBlock()
       throws StorageException, TransactionContextException {
     assert getBlockUCState() !=
         BlockUCState.COMPLETE : "Trying to convert a COMPLETE block";
     complete();
-    return new BlockInfo(this);
+    return new BlockInfoContiguous(this);
   }
 
   /**

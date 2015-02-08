@@ -26,7 +26,6 @@ import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
 import org.apache.hadoop.hdfs.server.namenode.INodeFile;
@@ -35,6 +34,7 @@ import org.junit.Before;
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
 
 public class TestNDBSizer {
 
@@ -102,9 +102,9 @@ public class TestNDBSizer {
     System.out.println();
 
 
-    final List<BlockInfo> newBlocks = new LinkedList<>();
+    final List<BlockInfoContiguous> newBlocks = new LinkedList<>();
     for (int i = 0; i < NUM_BLOCKS; i++) {
-      BlockInfo block = new BlockInfo();
+      BlockInfoContiguous block = new BlockInfoContiguous();
       block.setINodeIdNoPersistance(i);
       block.setBlockIdNoPersistance(i);
       newBlocks.add(block);
@@ -115,8 +115,8 @@ public class TestNDBSizer {
           public Object performTask() throws StorageException, IOException {
             BlockInfoDataAccess bda = (BlockInfoDataAccess) HdfsStorageFactory
                 .getDataAccess(BlockInfoDataAccess.class);
-            bda.prepare(new LinkedList<BlockInfo>(), newBlocks,
-                new LinkedList<BlockInfo>());
+            bda.prepare(new LinkedList<BlockInfoContiguous>(), newBlocks,
+                new LinkedList<BlockInfoContiguous>());
             newBlocks.clear();
             showProgressBar("Blocks", j, NUM_BLOCKS);
             return null;

@@ -19,7 +19,6 @@ import com.google.common.collect.Iterables;
 import com.google.common.primitives.Longs;
 import io.hops.common.INodeUtil;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.INodeFile;
 
@@ -30,6 +29,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
 import org.apache.hadoop.hdfs.server.namenode.CachedBlock;
 
 public final class BlockLock extends IndividualBlockLock {
@@ -60,9 +60,9 @@ public final class BlockLock extends IndividualBlockLock {
           continue;
         }
         if (inode instanceof INodeFile) {
-          Collection<BlockInfo> inodeBlocks = Collections.EMPTY_LIST;
+          Collection<BlockInfoContiguous> inodeBlocks = Collections.EMPTY_LIST;
           if (((INodeFile) inode).hasBlocks()) {
-            inodeBlocks = acquireLockList(DEFAULT_LOCK_TYPE, BlockInfo.Finder.ByINodeId,
+            inodeBlocks = acquireLockList(DEFAULT_LOCK_TYPE, BlockInfoContiguous.Finder.ByINodeId,
                 inode.getId());
           }
 
@@ -87,7 +87,7 @@ public final class BlockLock extends IndividualBlockLock {
       }
       long[] blockIds = Longs.toArray(blockIdSet);
       long[] inodeIds = INodeUtil.resolveINodesFromBlockIds(blockIds);
-      blocks.addAll(acquireLockList(DEFAULT_LOCK_TYPE, BlockInfo.Finder.ByBlockIdsAndINodeIds, blockIds, inodeIds));
+      blocks.addAll(acquireLockList(DEFAULT_LOCK_TYPE, BlockInfoContiguous.Finder.ByBlockIdsAndINodeIds, blockIds, inodeIds));
     } else {
       throw new TransactionLocks.LockNotAddedException(
           "BlockLock must come either after an InodeLock of a AllCachedBlockLock");

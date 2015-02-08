@@ -35,7 +35,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -169,10 +169,10 @@ public class TestDFSRename {
           getBlockManager();
       assertTrue(bm.getStoredBlock(lbs.getLocatedBlocks().get(0).getBlock().
           getLocalBlock()) != null);
-      BlockInfo block = bm.getStoredBlock(lbs.getLocatedBlocks().get(0).getBlock().
+      BlockInfoContiguous block = bm.getStoredBlock(lbs.getLocatedBlocks().get(0).getBlock().
           getLocalBlock());
       dfs.rename(srcPath, dstPath, Rename.OVERWRITE);
-      BlockInfo b = getBlock(block.getBlockId(), block.getInodeId());
+      BlockInfoContiguous b = getBlock(block.getBlockId(), block.getInodeId());
       assertTrue(b == null);
     } finally {
       if (dfs != null) {
@@ -184,8 +184,8 @@ public class TestDFSRename {
     }
   }
   
-  private BlockInfo getBlock(final long blockId, final long inodeId) throws IOException{
-    return (BlockInfo) new LightWeightRequestHandler(HDFSOperationType.TEST) {
+  private BlockInfoContiguous getBlock(final long blockId, final long inodeId) throws IOException{
+    return (BlockInfoContiguous) new LightWeightRequestHandler(HDFSOperationType.TEST) {
       @Override
       public Object performTask() throws IOException {
         BlockInfoDataAccess da = (BlockInfoDataAccess) HdfsStorageFactory.getDataAccess(BlockInfoDataAccess.class);

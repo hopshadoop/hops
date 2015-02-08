@@ -59,14 +59,14 @@ class BlocksMap {
 
   BlockCollection getBlockCollection(Block b)
       throws StorageException, TransactionContextException {
-    BlockInfo info = getStoredBlock(b);
+    BlockInfoContiguous info = getStoredBlock(b);
     return (info != null) ? info.getBlockCollection() : null;
   }
 
   /**
    * Add block b belonging to the specified block collection to the map.
    */
-  BlockInfo addBlockCollection(BlockInfo b, BlockCollection bc)
+  BlockInfoContiguous addBlockCollection(BlockInfoContiguous b, BlockCollection bc)
       throws StorageException, TransactionContextException {
     b.setBlockCollection(bc);
     return b;
@@ -79,7 +79,7 @@ class BlocksMap {
    */
   void removeBlock(Block block)
       throws StorageException, TransactionContextException {
-    BlockInfo blockInfo = getStoredBlock(block);
+    BlockInfoContiguous blockInfo = getStoredBlock(block);
     if (blockInfo == null) {
       return;
     }
@@ -90,17 +90,17 @@ class BlocksMap {
   /**
    * Returns the block object it it exists in the map.
    */
-  BlockInfo getStoredBlock(Block b)
+  BlockInfoContiguous getStoredBlock(Block b)
       throws StorageException, TransactionContextException {
     // TODO STEFFEN - This is a workaround to prevent NullPointerExceptions for me. Not sure how to actually fix the bug.
     if (b == null) {
       return null;
     }
-    if (!(b instanceof BlockInfo)) {
+    if (!(b instanceof BlockInfoContiguous)) {
       return EntityManager
-          .find(BlockInfo.Finder.ByBlockIdAndINodeId, b.getBlockId());
+          .find(BlockInfoContiguous.Finder.ByBlockIdAndINodeId, b.getBlockId());
     }
-    return (BlockInfo) b;
+    return (BlockInfoContiguous) b;
   }
 
   /**
@@ -109,7 +109,7 @@ class BlocksMap {
    */
   List<DatanodeStorageInfo> storageList(Block b)
       throws TransactionContextException, StorageException {
-    BlockInfo blockInfo = getStoredBlock(b);
+    BlockInfoContiguous blockInfo = getStoredBlock(b);
     return storageList(blockInfo);
   }
 
@@ -117,7 +117,7 @@ class BlocksMap {
    * For a block that has already been retrieved from the BlocksMap
    * returns Iterator that iterates through the storages the block belongs to.
    */
-  List<DatanodeStorageInfo> storageList(BlockInfo storedBlock)
+  List<DatanodeStorageInfo> storageList(BlockInfoContiguous storedBlock)
       throws StorageException, TransactionContextException {
     if (storedBlock == null) {
       return null;
@@ -139,7 +139,7 @@ class BlocksMap {
    */
   List<DatanodeStorageInfo> storageList(Block b, final DatanodeStorage.State state) throws StorageException,
       TransactionContextException {
-    BlockInfo blockInfo = getStoredBlock(b);
+    BlockInfoContiguous blockInfo = getStoredBlock(b);
     return storageList(blockInfo, state);
   }
 
@@ -147,7 +147,7 @@ class BlocksMap {
    * For a block that has already been retrieved from the BlocksMap
    * returns Iterator that iterates through the storages the block belongs to.
    */
-  List<DatanodeStorageInfo> storageList(BlockInfo storedBlock, final DatanodeStorage.State state)
+  List<DatanodeStorageInfo> storageList(BlockInfoContiguous storedBlock, final DatanodeStorage.State state)
       throws StorageException, TransactionContextException {
     if (storedBlock == null) {
       return null;
@@ -164,7 +164,7 @@ class BlocksMap {
    * counts number of containing nodes. Better than using iterator.
    */
   int numNodes(Block b) throws StorageException, TransactionContextException {
-    BlockInfo info = getStoredBlock(b);
+    BlockInfoContiguous info = getStoredBlock(b);
     return info == null ? 0 : info.numNodes(datanodeManager);
   }
 
@@ -175,7 +175,7 @@ class BlocksMap {
    */
   boolean removeNode(Block b, DatanodeDescriptor node)
       throws StorageException, TransactionContextException {
-    BlockInfo info = getStoredBlock(b);
+    BlockInfoContiguous info = getStoredBlock(b);
     if (info == null) {
       return false;
     }
@@ -186,7 +186,7 @@ class BlocksMap {
 
   boolean removeNode(Block b, int sid)
       throws StorageException, TransactionContextException {
-    BlockInfo info = getStoredBlock(b);
+    BlockInfoContiguous info = getStoredBlock(b);
     if (info == null) {
       return false;
     }
@@ -222,7 +222,7 @@ class BlocksMap {
     return (Integer) getAllBlocksSizeHander.handle();
   }
 
-  Iterable<BlockInfo> getBlocks() throws IOException {
+  Iterable<BlockInfoContiguous> getBlocks() throws IOException {
     LightWeightRequestHandler getAllBlocksHander =
         new LightWeightRequestHandler(HDFSOperationType.GET_ALL_BLOCKS) {
           @Override
@@ -232,7 +232,7 @@ class BlocksMap {
             return bida.findAllBlocks();
           }
         };
-    return (List<BlockInfo>) getAllBlocksHander.handle();
+    return (List<BlockInfoContiguous>) getAllBlocksHander.handle();
   }
   
   /**

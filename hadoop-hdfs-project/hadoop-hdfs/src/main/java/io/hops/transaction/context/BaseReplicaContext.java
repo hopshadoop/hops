@@ -19,13 +19,13 @@ package io.hops.transaction.context;
 
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.hdfs.entity.INodeCandidatePrimaryKey;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
 
 
 abstract class BaseReplicaContext<Key extends BlockPK, Entity>
@@ -172,7 +172,7 @@ abstract class BaseReplicaContext<Key extends BlockPK, Entity>
             (INodeCandidatePrimaryKey) params[0];
         List<INodeCandidatePrimaryKey> srcs_param =
             (List<INodeCandidatePrimaryKey>) params[1];
-        List<BlockInfo> oldBlks = (List<BlockInfo>) params[2];
+        List<BlockInfoContiguous> oldBlks = (List<BlockInfoContiguous>) params[2];
         updateReplicas(trg_param, srcs_param);
         break;
 

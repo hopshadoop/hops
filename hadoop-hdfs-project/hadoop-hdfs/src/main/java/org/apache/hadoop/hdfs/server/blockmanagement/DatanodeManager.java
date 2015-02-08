@@ -1313,14 +1313,13 @@ public class DatanodeManager {
         }
 
         //check lease recovery
-        BlockInfoUnderConstruction[] blocks =
-            nodeinfo.getLeaseRecoveryCommand(Integer.MAX_VALUE);
+        BlockInfoContiguousUnderConstruction[] blocks = nodeinfo
+            .getLeaseRecoveryCommand(Integer.MAX_VALUE);
         if (blocks != null) {
-          BlockRecoveryCommand brCommand =
-              new BlockRecoveryCommand(blocks.length);
-          for (BlockInfoUnderConstruction b : blocks) {
+          BlockRecoveryCommand brCommand = new BlockRecoveryCommand(
+              blocks.length);
+          for (BlockInfoContiguousUnderConstruction b : blocks) {
             final DatanodeStorageInfo[] storages = getStorageInfosTx(b);
-
             // Skip stale nodes during recovery - not heart beated for some time (30s by default).
             final List<DatanodeStorageInfo> recoveryLocations =
                 new ArrayList<DatanodeStorageInfo>(storages.length);
@@ -1712,7 +1711,7 @@ public class DatanodeManager {
   }
 
   private DatanodeStorageInfo[] getStorageInfosTx(
-      final BlockInfoUnderConstruction b) throws IOException {
+      final BlockInfoContiguousUnderConstruction b) throws IOException {
     final DatanodeManager datanodeManager = this;
 
     return (DatanodeStorageInfo[]) new HopsTransactionalRequestHandler(

@@ -36,10 +36,12 @@ import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.apache.hadoop.hdfs.protocol.*;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
+import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.DatanodeID;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguousUnderConstruction;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.junit.After;
@@ -84,9 +86,9 @@ public class TestCommitBlockSynchronization {
 
     FSNamesystem namesystemSpy = spy(namesystem);
     doReturn(1L).when(file).getId();
-    BlockInfoUnderConstruction blockInfo = createBlockInfoUnderConstruction(targets, block, file);
+    BlockInfoContiguousUnderConstruction blockInfo = createBlockInfoUnderConstruction(targets, block, file);
     
-    BlockInfoUnderConstruction mockBlockInfo = mock(BlockInfoUnderConstruction.class);
+    BlockInfoContiguousUnderConstruction mockBlockInfo = mock(BlockInfoContiguousUnderConstruction.class);
     doReturn(file).when(mockBlockInfo).getBlockCollection();
     doReturn(blockInfo.getGenerationStamp()).when(mockBlockInfo).getGenerationStamp();
     doReturn(blockInfo.getBlockRecoveryId()).when(mockBlockInfo).getBlockRecoveryId();
@@ -100,14 +102,14 @@ public class TestCommitBlockSynchronization {
     
     doReturn("").when(namesystemSpy).closeFileCommitBlocks(
         any(INodeFile.class),
-        any(BlockInfo.class));
+        any(BlockInfoContiguous.class));
 
     return namesystemSpy;
   }
   
-  private BlockInfoUnderConstruction createBlockInfoUnderConstruction(final DatanodeStorageInfo[] targets,
+  private BlockInfoContiguousUnderConstruction createBlockInfoUnderConstruction(final DatanodeStorageInfo[] targets,
       final Block block, final INodeFile file) throws IOException {
-    return (BlockInfoUnderConstruction) new HopsTransactionalRequestHandler(
+    return (BlockInfoContiguousUnderConstruction) new HopsTransactionalRequestHandler(
         HDFSOperationType.COMMIT_BLOCK_SYNCHRONIZATION) {
       INodeIdentifier inodeIdentifier = new INodeIdentifier(1L);
 
@@ -131,7 +133,7 @@ public class TestCommitBlockSynchronization {
       @Override
       public Object performTask() throws IOException {
         
-        BlockInfoUnderConstruction blockInfo = new BlockInfoUnderConstruction(
+        BlockInfoContiguousUnderConstruction blockInfo = new BlockInfoContiguousUnderConstruction(
         block, 1, HdfsServerConstants.BlockUCState.UNDER_CONSTRUCTION, targets);
         blockInfo.setBlockCollection(file);
         blockInfo.setGenerationStamp(genStamp);
@@ -164,9 +166,9 @@ public class TestCommitBlockSynchronization {
         lastBlock, genStamp, length, false, false, newTargets, null);
 
     // Simulate 'completing' the block.
-    BlockInfo completedBlockInfo = new BlockInfo(block, 1);
+    BlockInfoContiguous completedBlockInfo = new BlockInfoContiguous(block, 1);
     setBlockCollectionAndGenerationStamp(completedBlockInfo, file);
-    BlockInfo mockCompletedBlockInfo = mock(BlockInfo.class);
+    BlockInfoContiguous mockCompletedBlockInfo = mock(BlockInfoContiguous.class);
     doReturn(file).when(mockCompletedBlockInfo).getBlockCollection();
     doReturn(completedBlockInfo.getGenerationStamp()).when(mockCompletedBlockInfo).getGenerationStamp();
     doReturn(completedBlockInfo.isComplete()).when(mockCompletedBlockInfo).isComplete();
@@ -179,9 +181,9 @@ public class TestCommitBlockSynchronization {
         lastBlock, genStamp, length, false, false, newTargets, null);
   }
 
-    private BlockInfoUnderConstruction setBlockCollectionAndGenerationStamp(final BlockInfo completedBlockInfo,
+    private BlockInfoContiguousUnderConstruction setBlockCollectionAndGenerationStamp(final BlockInfoContiguous completedBlockInfo,
         final INodeFile file) throws IOException {
-    return (BlockInfoUnderConstruction) new HopsTransactionalRequestHandler(
+    return (BlockInfoContiguousUnderConstruction) new HopsTransactionalRequestHandler(
         HDFSOperationType.COMMIT_BLOCK_SYNCHRONIZATION) {
       INodeIdentifier inodeIdentifier = new INodeIdentifier(1L);
 
@@ -277,9 +279,9 @@ public class TestCommitBlockSynchronization {
     namesystemSpy.commitBlockSynchronization(
         lastBlock, genStamp, length, true, false, newTargets, null);
 
-    BlockInfo completedBlockInfo = new BlockInfo(block, 1);
+    BlockInfoContiguous completedBlockInfo = new BlockInfoContiguous(block, 1);
     setBlockCollectionAndGenerationStamp(completedBlockInfo, file);
-    BlockInfo mockCompletedBlockInfo = mock(BlockInfo.class);
+    BlockInfoContiguous mockCompletedBlockInfo = mock(BlockInfoContiguous.class);
     doReturn(file).when(mockCompletedBlockInfo).getBlockCollection();
     doReturn(completedBlockInfo.getGenerationStamp()).when(mockCompletedBlockInfo).getGenerationStamp();
     doReturn(completedBlockInfo.isComplete()).when(mockCompletedBlockInfo).isComplete();

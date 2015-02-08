@@ -41,8 +41,6 @@ import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.AclException;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.UnresolvedPathException;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.INodeAclHelper;
 import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
@@ -59,6 +57,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguousUnderConstruction;
 import static org.apache.hadoop.hdfs.server.namenode.INode.EMPTY_LIST;
 
 public class INodeUtil {
@@ -253,12 +253,12 @@ public class INodeUtil {
   
   public static INodeIdentifier resolveINodeFromBlock(final Block b)
       throws StorageException {
-    if (b instanceof BlockInfo || b instanceof BlockInfoUnderConstruction) {
+    if (b instanceof BlockInfoContiguous || b instanceof BlockInfoContiguousUnderConstruction) {
       INodeIdentifier inodeIden =
-          new INodeIdentifier(((BlockInfo) b).getInodeId());
+          new INodeIdentifier(((BlockInfoContiguous) b).getInodeId());
       INodeDALAdaptor ida = (INodeDALAdaptor) HdfsStorageFactory
           .getDataAccess(INodeDataAccess.class);
-      INode inode = ida.findInodeByIdFTIS(((BlockInfo) b).getInodeId());
+      INode inode = ida.findInodeByIdFTIS(((BlockInfoContiguous) b).getInodeId());
       if (inode != null) {
         inodeIden.setName(inode.getLocalName());
         inodeIden.setPid(inode.getParentId());

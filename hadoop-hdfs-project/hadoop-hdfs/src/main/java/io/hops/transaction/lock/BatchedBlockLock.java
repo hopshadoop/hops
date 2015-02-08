@@ -17,10 +17,10 @@ package io.hops.transaction.lock;
 
 import io.hops.common.INodeUtil;
 import io.hops.common.Pair;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 
 import java.io.IOException;
 import org.apache.commons.lang.ArrayUtils;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
 
 final class BatchedBlockLock extends BaseIndividualBlockLock {
 
@@ -45,7 +45,7 @@ final class BatchedBlockLock extends BaseIndividualBlockLock {
     }
     
     blocks.addAll(acquireLockList(DEFAULT_LOCK_TYPE,
-        BlockInfo.Finder.ByBlockIdsAndINodeIds, blockIds, inodeIds));
+        BlockInfoContiguous.Finder.ByBlockIdsAndINodeIds, blockIds, inodeIds));
   }
   
   Pair<long[], long[]> getINodeBlockIds() {

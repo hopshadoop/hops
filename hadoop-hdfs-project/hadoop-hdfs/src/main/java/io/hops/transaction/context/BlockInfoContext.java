@@ -30,7 +30,6 @@ import io.hops.transaction.lock.Lock;
 import io.hops.transaction.lock.SqlBatchedBlocksLock;
 import io.hops.transaction.lock.TransactionLocks;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 
 import java.util.ArrayList;
@@ -40,20 +39,21 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
 
-public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
+public class BlockInfoContext extends BaseEntityContext<Long, BlockInfoContiguous> {
 
   private final static int DEFAULT_NUM_BLOCKS_PER_INODE = 10;
 
-  private final Map<Long, List<BlockInfo>> inodeBlocks =
+  private final Map<Long, List<BlockInfoContiguous>> inodeBlocks =
       new HashMap<>();
-  private final List<BlockInfo> concatRemovedBlks = new ArrayList<>();
+  private final List<BlockInfoContiguous> concatRemovedBlks = new ArrayList<>();
 
-  private final BlockInfoDataAccess<BlockInfo> dataAccess;
+  private final BlockInfoDataAccess<BlockInfoContiguous> dataAccess;
 
   private boolean foundByInode = false;
 
-  public BlockInfoContext(BlockInfoDataAccess<BlockInfo> dataAccess) {
+  public BlockInfoContext(BlockInfoDataAccess<BlockInfoContiguous> dataAccess) {
     this.dataAccess = dataAccess;
   }
 
@@ -65,7 +65,7 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
   }
 
   @Override
-  public void update(BlockInfo blockInfo) throws TransactionContextException {
+  public void update(BlockInfoContiguous blockInfo) throws TransactionContextException {
     super.update(blockInfo);
     //only called in update not add
     updateInodeBlocks(blockInfo);
@@ -77,7 +77,7 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
   }
 
   @Override
-  public void remove(BlockInfo blockInfo) throws TransactionContextException {
+  public void remove(BlockInfoContiguous blockInfo) throws TransactionContextException {
     super.remove(blockInfo);
     removeBlockFromInodeBlocks(blockInfo);
     if(isLogTraceEnabled()) {
@@ -94,15 +94,15 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
         && !(tlm.getLock(Lock.Type.Block) instanceof SqlBatchedBlocksLock)) {
       throw new TransactionContextException("You can't call find ByINodeId(s) when taking the lock only on one block");
     }
-    Collection<BlockInfo> removed = new ArrayList<>(getRemoved());
+    Collection<BlockInfoContiguous> removed = new ArrayList<>(getRemoved());
     removed.addAll(concatRemovedBlks);
     dataAccess.prepare(removed, getAdded(), getModified());
   }
 
   @Override
-  public BlockInfo find(FinderType<BlockInfo> finder, Object... params)
+  public BlockInfoContiguous find(FinderType<BlockInfoContiguous> finder, Object... params)
       throws TransactionContextException, StorageException {
-    BlockInfo.Finder bFinder = (BlockInfo.Finder) finder;
+    BlockInfoContiguous.Finder bFinder = (BlockInfoContiguous.Finder) finder;
     switch (bFinder) {
       case ByBlockIdAndINodeId:
         return findById(bFinder, params);
@@ -115,9 +115,9 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
   }
 
   @Override
-  public Collection<BlockInfo> findList(FinderType<BlockInfo> finder,
+  public Collection<BlockInfoContiguous> findList(FinderType<BlockInfoContiguous> finder,
       Object... params) throws TransactionContextException, StorageException {
-    BlockInfo.Finder bFinder = (BlockInfo.Finder) finder;
+    BlockInfoContiguous.Finder bFinder = (BlockInfoContiguous.Finder) finder;
     switch (bFinder) {
       case ByINodeId:
         foundByInode = true;
@@ -147,29 +147,29 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
             (INodeCandidatePrimaryKey) params[0];
         List<INodeCandidatePrimaryKey> srcs_param =
             (List<INodeCandidatePrimaryKey>) params[1]; // these are the merged inodes
-        List<BlockInfo> oldBlks = (List<BlockInfo>) params[2];
+        List<BlockInfoContiguous> oldBlks = (List<BlockInfoContiguous>) params[2];
         deleteBlocksForConcat(trg_param, srcs_param, oldBlks);
         //new blocks have been added by the concat function
         //we just have to delete the blocks rows that dont make sence
         break;
       case EmptyFile:
         Long inodeId = (Long) params[0];
-        List<BlockInfo> result = Collections.emptyList();
+        List<BlockInfoContiguous> result = Collections.emptyList();
         inodeBlocks.put(inodeId, syncBlockInfoInstances(result));
         break;
     }
   }
 
   @Override
-  Long getKey(BlockInfo blockInfo) {
+  Long getKey(BlockInfoContiguous blockInfo) {
     return blockInfo.getBlockId();
   }
 
 
-  private List<BlockInfo> findByInodeId(BlockInfo.Finder bFinder,
+  private List<BlockInfoContiguous> findByInodeId(BlockInfoContiguous.Finder bFinder,
       final Object[] params)
       throws TransactionContextException, StorageException {
-    List<BlockInfo> result = null;
+    List<BlockInfoContiguous> result = null;
     final Long inodeId = (Long) params[0];
     if (inodeBlocks.containsKey(inodeId)) {
       result = inodeBlocks.get(inodeId);
@@ -183,9 +183,9 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
     return result;
   }
 
-  private List<BlockInfo> findBatch(BlockInfo.Finder bFinder, Object[] params)
+  private List<BlockInfoContiguous> findBatch(BlockInfoContiguous.Finder bFinder, Object[] params)
       throws TransactionContextException, StorageException {
-    List<BlockInfo> result = null;
+    List<BlockInfoContiguous> result = null;
     final long[] blockIds = (long[]) params[0];
     final long[] inodeIds = (long[]) params[1];
     aboutToAccessStorage(bFinder, params);
@@ -195,9 +195,9 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
     return syncBlockInfoInstances(result, blockIds);
   }
 
-  private List<BlockInfo> findByInodeIds(BlockInfo.Finder bFinder,
+  private List<BlockInfoContiguous> findByInodeIds(BlockInfoContiguous.Finder bFinder,
       Object[] params) throws TransactionContextException, StorageException {
-    List<BlockInfo> result = null;
+    List<BlockInfoContiguous> result = null;
     final long[] ids = (long[]) params[0];
     aboutToAccessStorage(bFinder, params);
     result = dataAccess.findByInodeIds(ids);
@@ -208,16 +208,16 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
     return syncBlockInfoInstances(result, true);
   }
 
-  private BlockInfo findByInodeIdAndIndex(BlockInfo.Finder bFinder,
+  private BlockInfoContiguous findByInodeIdAndIndex(BlockInfoContiguous.Finder bFinder,
       final Object[] params)
       throws TransactionContextException, StorageException {
-    List<BlockInfo> blocks = null;
-    BlockInfo result = null;
+    List<BlockInfoContiguous> blocks = null;
+    BlockInfoContiguous result = null;
     final Long inodeId = (Long) params[0];
     final Integer index = (Integer) params[1];
     if (inodeBlocks.containsKey(inodeId)) {
       blocks = inodeBlocks.get(inodeId);
-      for(BlockInfo bi: blocks){
+      for(BlockInfoContiguous bi: blocks){
         if(bi.getBlockIndex()==index){
           result = bi;
           break;
@@ -230,9 +230,9 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
     return result;
   }
   
-  private BlockInfo findById(BlockInfo.Finder bFinder, final Object[] params)
+  private BlockInfoContiguous findById(BlockInfoContiguous.Finder bFinder, final Object[] params)
       throws TransactionContextException, StorageException {
-    BlockInfo result = null;
+    BlockInfoContiguous result = null;
     long blockId = (Long) params[0];
     Long inodeId = null;
     if (params.length > 1 && params[1] != null) {
@@ -259,26 +259,26 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
     return result;
   }
 
-  private BlockInfo findMaxBlk(BlockInfo.Finder bFinder,
+  private BlockInfoContiguous findMaxBlk(BlockInfoContiguous.Finder bFinder,
       final Object[] params) {
     final long inodeId = (Long) params[0];
-    Collection<BlockInfo> notRemovedBlks = Collections2
+    Collection<BlockInfoContiguous> notRemovedBlks = Collections2
         .filter(filterValuesNotOnState(State.REMOVED),
-            new Predicate<BlockInfo>() {
+            new Predicate<BlockInfoContiguous>() {
               @Override
-              public boolean apply(BlockInfo input) {
+              public boolean apply(BlockInfoContiguous input) {
                 return input.getInodeId() == inodeId;
               }
             });
-    BlockInfo result = Collections.max(notRemovedBlks, BlockInfo.Order.ByBlockIndex);
+    BlockInfoContiguous result = Collections.max(notRemovedBlks, BlockInfoContiguous.Order.ByBlockIndex);
     hit(bFinder, result, "inodeId", inodeId);
     return result;
   }
 
 
-  private List<BlockInfo> syncBlockInfoInstances(List<BlockInfo> newBlocks,
+  private List<BlockInfoContiguous> syncBlockInfoInstances(List<BlockInfoContiguous> newBlocks,
       long[] blockIds) {
-    List<BlockInfo> result = syncBlockInfoInstances(newBlocks);
+    List<BlockInfoContiguous> result = syncBlockInfoInstances(newBlocks);
     for (long blockId : blockIds) {
       if (!contains(blockId)) {
         gotFromDB(blockId, null);
@@ -287,15 +287,15 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
     return result;
   }
 
-  private List<BlockInfo> syncBlockInfoInstances(List<BlockInfo> newBlocks) {
+  private List<BlockInfoContiguous> syncBlockInfoInstances(List<BlockInfoContiguous> newBlocks) {
     return syncBlockInfoInstances(newBlocks, false);
   }
 
-  private List<BlockInfo> syncBlockInfoInstances(List<BlockInfo> newBlocks,
+  private List<BlockInfoContiguous> syncBlockInfoInstances(List<BlockInfoContiguous> newBlocks,
       boolean syncInodeBlocks) {
-    List<BlockInfo> finalList = new ArrayList<>();
+    List<BlockInfoContiguous> finalList = new ArrayList<>();
 
-    for (BlockInfo blockInfo : newBlocks) {
+    for (BlockInfoContiguous blockInfo : newBlocks) {
       if (isRemoved(blockInfo.getBlockId())) {
         continue;
       }
@@ -304,7 +304,7 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
       finalList.add(blockInfo);
 
       if (syncInodeBlocks) {
-        List<BlockInfo> blockList = inodeBlocks.get(blockInfo.getInodeId());
+        List<BlockInfoContiguous> blockList = inodeBlocks.get(blockInfo.getInodeId());
         if (blockList == null) {
           blockList = new ArrayList<>();
           inodeBlocks.put(blockInfo.getInodeId(), blockList);
@@ -316,11 +316,11 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
     return finalList;
   }
 
-  private void updateInodeBlocks(BlockInfo newBlock) {
+  private void updateInodeBlocks(BlockInfoContiguous newBlock) {
     if(newBlock == null)
       return;
 
-    List<BlockInfo> blockList = inodeBlocks.get(newBlock.getInodeId());
+    List<BlockInfoContiguous> blockList = inodeBlocks.get(newBlock.getInodeId());
 
     if (blockList != null) {
       int idx = blockList.indexOf(newBlock);
@@ -330,16 +330,16 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
         blockList.add(newBlock);
       }
     } else {
-      List<BlockInfo> list =
+      List<BlockInfoContiguous> list =
           new ArrayList<>(DEFAULT_NUM_BLOCKS_PER_INODE);
       list.add(newBlock);
       inodeBlocks.put(newBlock.getInodeId(), list);
     }
   }
 
-  private void removeBlockFromInodeBlocks(BlockInfo block)
+  private void removeBlockFromInodeBlocks(BlockInfoContiguous block)
       throws TransactionContextException {
-    List<BlockInfo> blockList = inodeBlocks.get(block.getInodeId());
+    List<BlockInfoContiguous> blockList = inodeBlocks.get(block.getInodeId());
     if (blockList != null) {
       if (!blockList.remove(block)) {
         throw new TransactionContextException(
@@ -360,7 +360,7 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
   }
 
   private void deleteBlocksForConcat(INodeCandidatePrimaryKey trg_param,
-      List<INodeCandidatePrimaryKey> deleteINodes, List<BlockInfo> oldBlks /* blks with old pk*/)
+      List<INodeCandidatePrimaryKey> deleteINodes, List<BlockInfoContiguous> oldBlks /* blks with old pk*/)
       throws TransactionContextException {
 
     if (!getRemoved()
@@ -370,7 +370,7 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
           "Concat file(s) whose blocks are changed. During rename and move no block blocks should have been changed.");
     }
 
-    for (BlockInfo bInfo : oldBlks) {
+    for (BlockInfoContiguous bInfo : oldBlks) {
       INodeCandidatePrimaryKey pk =
           new INodeCandidatePrimaryKey(bInfo.getInodeId());
       if (deleteINodes.contains(pk)) {

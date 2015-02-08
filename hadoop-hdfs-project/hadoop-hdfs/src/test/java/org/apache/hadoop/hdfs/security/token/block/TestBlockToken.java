@@ -48,7 +48,6 @@ import org.apache.hadoop.hdfs.protocol.proto.ClientDatanodeProtocolProtos.GetRep
 import org.apache.hadoop.hdfs.protocol.proto.ClientDatanodeProtocolProtos.GetReplicaVisibleLengthResponseProto;
 import org.apache.hadoop.hdfs.protocolPB.ClientDatanodeProtocolPB;
 import org.apache.hadoop.hdfs.protocolPB.PBHelper;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.namenode.Namesystem;
 import org.apache.hadoop.io.TestWritable;
@@ -83,6 +82,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -513,12 +513,12 @@ public class TestBlockToken {
     }
 
     @Override
-    public void incrementSafeBlockCount(int replication, BlockInfo blk) throws IOException {
+    public void incrementSafeBlockCount(int replication, BlockInfoContiguous blk) throws IOException {
       throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
-    public void decrementSafeBlockCount(BlockInfo blk)
+    public void decrementSafeBlockCount(BlockInfoContiguous blk)
         throws StorageException, IOException {
       throw new UnsupportedOperationException("Not supported yet.");
     }

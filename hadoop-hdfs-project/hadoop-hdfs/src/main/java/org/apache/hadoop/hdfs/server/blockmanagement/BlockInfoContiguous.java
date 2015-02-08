@@ -41,13 +41,12 @@ import java.util.*;
  * replicas of the block are stored.
  */
 @InterfaceAudience.Private
-public class BlockInfo extends Block {
-  
-  public static final BlockInfo[] EMPTY_ARRAY = {};
+public class BlockInfoContiguous extends Block {
+  public static final BlockInfoContiguous[] EMPTY_ARRAY = {};
   private static final List<Replica> EMPTY_REPLICAS_ARRAY =
       new ArrayList<>();
 
-  public static enum Finder implements FinderType<BlockInfo> {
+  public static enum Finder implements FinderType<BlockInfoContiguous> {
 
     ByBlockIdAndINodeId,
     ByINodeId,
@@ -58,7 +57,7 @@ public class BlockInfo extends Block {
     
     @Override
     public Class getType() {
-      return BlockInfo.class;
+      return BlockInfoContiguous.class;
     }
 
     @Override
@@ -81,11 +80,11 @@ public class BlockInfo extends Block {
     }
   }
   
-  public static enum Order implements Comparator<BlockInfo> {
+  public static enum Order implements Comparator<BlockInfoContiguous> {
     
     ByBlockIndex() {
       @Override
-      public int compare(BlockInfo o1, BlockInfo o2) {
+      public int compare(BlockInfoContiguous o1, BlockInfoContiguous o2) {
         if (o1.getBlockIndex() == o2.getBlockIndex()) {
           throw new IllegalStateException(
               "A file cannot have 2 blocks with the same index. index = " +
@@ -101,7 +100,7 @@ public class BlockInfo extends Block {
     },
     ByBlockId() {
       @Override
-      public int compare(BlockInfo o1, BlockInfo o2) {
+      public int compare(BlockInfoContiguous o1, BlockInfoContiguous o2) {
         if (o1.getBlockId() == o2.getBlockId()) {
           return 0;
         }
@@ -114,7 +113,7 @@ public class BlockInfo extends Block {
     },
     ByGenerationStamp() {
       @Override
-      public int compare(BlockInfo o1, BlockInfo o2) {
+      public int compare(BlockInfoContiguous o1, BlockInfoContiguous o2) {
         if (o1.getGenerationStamp() == o2.getGenerationStamp()) {
           throw new IllegalStateException(
               "A file cannot have 2 blocks with the same generation stamp");
@@ -128,7 +127,7 @@ public class BlockInfo extends Block {
     };
     
     @Override
-    public abstract int compare(BlockInfo o1, BlockInfo o2);
+    public abstract int compare(BlockInfoContiguous o1, BlockInfoContiguous o2);
     
     public Comparator acsending() {
       return this;
@@ -146,20 +145,20 @@ public class BlockInfo extends Block {
   
   protected long inodeId = NON_EXISTING_ID;
   
-  public BlockInfo(Block blk, long inodeId) {
+  public BlockInfoContiguous(Block blk, long inodeId) {
     super(blk);
     this.inodeId = inodeId;
-    if (blk instanceof BlockInfo) {
-      this.bc = ((BlockInfo) blk).bc;
-      this.blockIndex = ((BlockInfo) blk).blockIndex;
-      this.timestamp = ((BlockInfo) blk).timestamp;
-      if (inodeId != ((BlockInfo) blk).inodeId) {
+    if (blk instanceof BlockInfoContiguous) {
+      this.bc = ((BlockInfoContiguous) blk).bc;
+      this.blockIndex = ((BlockInfoContiguous) blk).blockIndex;
+      this.timestamp = ((BlockInfoContiguous) blk).timestamp;
+      if (inodeId != ((BlockInfoContiguous) blk).inodeId) {
         throw new IllegalArgumentException("inodeId does not match");
       }
     }
   }
   
-  public BlockInfo() {
+  public BlockInfoContiguous() {
     this.bc = null;
   }
 
@@ -169,7 +168,7 @@ public class BlockInfo extends Block {
    * @param from
    *     BlockInfo to copy from.
    */
-  protected BlockInfo(BlockInfo from) {
+  protected BlockInfoContiguous(BlockInfoContiguous from) {
     super(from);
     this.bc = from.bc;
     this.blockIndex = from.blockIndex;
@@ -366,7 +365,7 @@ public class BlockInfo extends Block {
   /**
    * BlockInfo represents a block that is not being constructed. In order to
    * start modifying the block, the BlockInfo should be converted to
-   * {@link BlockInfoUnderConstruction}.
+   * {@link BlockInfoContiguousUnderConstruction}.
    *
    * @return {@link BlockUCState#COMPLETE}
    */
@@ -388,17 +387,19 @@ public class BlockInfo extends Block {
    *
    * @return BlockInfoUnderConstruction - an under construction block.
    */
-  public BlockInfoUnderConstruction convertToBlockUnderConstruction(
+  public BlockInfoContiguousUnderConstruction convertToBlockUnderConstruction(
       BlockUCState s, DatanodeStorageInfo[] targets)
       throws StorageException, TransactionContextException {
     if (isComplete()) {
-      BlockInfoUnderConstruction ucBlock = new BlockInfoUnderConstruction(this, this.getInodeId(), s,
-          targets);
+      BlockInfoContiguousUnderConstruction ucBlock = 
+          new BlockInfoContiguousUnderConstruction(this, 
+              this.getInodeId(), s, targets);
       ucBlock.setBlockCollection(getBlockCollection());
       return ucBlock;
     }
     // the block is already under construction
-    BlockInfoUnderConstruction ucBlock = (BlockInfoUnderConstruction) this;
+    BlockInfoContiguousUnderConstruction ucBlock = 
+        (BlockInfoContiguousUnderConstruction) this;
     ucBlock.setBlockUCState(s);
     ucBlock.setExpectedLocations(targets);
     ucBlock.setBlockCollection(getBlockCollection());
@@ -507,7 +508,7 @@ public class BlockInfo extends Block {
     EntityManager.update(replica);
   }
 
-  public static final Log LOG = LogFactory.getLog(BlockInfo.class);
+  public static final Log LOG = LogFactory.getLog(BlockInfoContiguous.class);
   
   protected void remove(Replica replica)
       throws StorageException, TransactionContextException {
@@ -519,7 +520,7 @@ public class BlockInfo extends Block {
     // Super implementation is sufficient
     return super.hashCode();
   }
-  
+
   @Override
   public boolean equals(Object obj) {
     // Sufficient to rely on super's implementation
@@ -566,14 +567,14 @@ public class BlockInfo extends Block {
     EntityManager.remove(this);
   }
   
-  public static BlockInfo cloneBlock(BlockInfo block) throws StorageException {
+  public static BlockInfoContiguous cloneBlock(BlockInfoContiguous block) throws StorageException {
     if (block == null){
       throw new StorageException("Unable to create a clone of the Block");
     }
-    if (block instanceof BlockInfoUnderConstruction){
-      return new BlockInfoUnderConstruction(block, block.getInodeId());
+    if (block instanceof BlockInfoContiguousUnderConstruction){
+      return new BlockInfoContiguousUnderConstruction(block, block.getInodeId());
     } else {
-      return new BlockInfo(block, block.getInodeId());
+      return new BlockInfoContiguous(block, block.getInodeId());
     }
   }
 }

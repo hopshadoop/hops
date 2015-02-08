@@ -57,11 +57,11 @@ import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.hdfs.server.common.GenerationStamp;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguousUnderConstruction;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -367,13 +367,13 @@ static final Log LOG = LogFactory.getLog(TestFileTruncate.class);
         "id", InetAddress.getLocalHost().getHostAddress());
     dn.isAlive = true;
 
-    BlockInfoUnderConstruction blockInfo = createBlockInfoUnderConstruction(new DatanodeStorageInfo[] {storage}, oldGenstamp);
+    BlockInfoContiguousUnderConstruction blockInfo = createBlockInfoUnderConstruction(new DatanodeStorageInfo[] {storage}, oldGenstamp);
 
     initializeBlockRecovery(inode, fsn);
-    BlockInfo lastBlock = getLastBlock(inode, fsn);
+    BlockInfoContiguous lastBlock = getLastBlock(inode, fsn);
     assertThat(lastBlock.getBlockUCState(),
         is(HdfsServerConstants.BlockUCState.BEING_TRUNCATED));
-    long blockRecoveryId = ((BlockInfoUnderConstruction) lastBlock)
+    long blockRecoveryId = ((BlockInfoContiguousUnderConstruction) lastBlock)
         .getBlockRecoveryId();
      assertThat(blockRecoveryId, is(oldGenstamp + 2));
   }
@@ -424,8 +424,8 @@ static final Log LOG = LogFactory.getLog(TestFileTruncate.class);
     }.handle();
   }
  
-  private BlockInfo getLastBlock(final INodeFile inode, final FSNamesystem fsn) throws IOException{
-    return (BlockInfo) new HopsTransactionalRequestHandler(HDFSOperationType.TRUNCATE) {
+  private BlockInfoContiguous getLastBlock(final INodeFile inode, final FSNamesystem fsn) throws IOException{
+    return (BlockInfoContiguous) new HopsTransactionalRequestHandler(HDFSOperationType.TRUNCATE) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
@@ -449,9 +449,9 @@ static final Log LOG = LogFactory.getLog(TestFileTruncate.class);
     }.handle();
   }
  
- private BlockInfoUnderConstruction createBlockInfoUnderConstruction(final DatanodeStorageInfo[] storages, final long oldGenstamp) throws
+ private BlockInfoContiguousUnderConstruction createBlockInfoUnderConstruction(final DatanodeStorageInfo[] storages, final long oldGenstamp) throws
       IOException {
-    return (BlockInfoUnderConstruction) new HopsTransactionalRequestHandler(
+    return (BlockInfoContiguousUnderConstruction) new HopsTransactionalRequestHandler(
         HDFSOperationType.COMMIT_BLOCK_SYNCHRONIZATION) {
       INodeIdentifier inodeIdentifier = new INodeIdentifier(2L);
 
@@ -475,7 +475,7 @@ static final Log LOG = LogFactory.getLog(TestFileTruncate.class);
       @Override
       public Object performTask() throws IOException {
         Block block = new Block(0, 1, oldGenstamp);
-        BlockInfoUnderConstruction blockInfo = new BlockInfoUnderConstruction(
+        BlockInfoContiguousUnderConstruction blockInfo = new BlockInfoContiguousUnderConstruction(
         block, 2,
         HdfsServerConstants.BlockUCState.BEING_TRUNCATED,
         storages);

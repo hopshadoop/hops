@@ -81,7 +81,7 @@ public class TestPendingReplication {
     //
     DatanodeStorageInfo[] storages = DFSTestUtil.createDatanodeStorageInfos(10);
     for (int i = 0; i < 10; i++) {
-      BlockInfo block = newBlockInfo(new Block(i, i, 0), i);
+      BlockInfoContiguous block = newBlockInfo(new Block(i, i, 0), i);
       DatanodeStorageInfo[] targets = new DatanodeStorageInfo[i];
       System.arraycopy(storages, 0, targets, 0, i);
       increment(pendingReplications, block, DatanodeStorageInfo.toDatanodeDescriptors(targets));
@@ -94,7 +94,7 @@ public class TestPendingReplication {
     //
     // remove one item and reinsert it
     //
-    BlockInfo blk = newBlockInfo(new Block(8, 8, 0), 8);
+    BlockInfoContiguous blk = newBlockInfo(new Block(8, 8, 0), 8);
     decrement(pendingReplications, blk, storages[7].getDatanodeDescriptor());             // removes one replica
     assertEquals("pendingReplications.getNumReplicas ", 7,
         getNumReplicas(pendingReplications, blk));
@@ -112,7 +112,7 @@ public class TestPendingReplication {
     // are sane.
     //
     for (int i = 0; i < 10; i++) {
-      BlockInfo block = newBlockInfo(new Block(i, i, 0), i);
+      BlockInfoContiguous block = newBlockInfo(new Block(i, i, 0), i);
       int numReplicas = getNumReplicas(pendingReplications, block);
       assertTrue(numReplicas == i);
     }
@@ -131,7 +131,7 @@ public class TestPendingReplication {
     }
 
     for (int i = 10; i < 15; i++) {
-      BlockInfo block = newBlockInfo(new Block(i, i, 0), i);
+      BlockInfoContiguous block = newBlockInfo(new Block(i, i, 0), i);
       increment(pendingReplications, block, DatanodeStorageInfo.toDatanodeDescriptors(
               DFSTestUtil.createDatanodeStorageInfos(i)));
     }
@@ -341,7 +341,7 @@ public class TestPendingReplication {
       BlockManagerTestUtil.updateState(bm);
       assertEquals(bm.getPendingReplicationBlocksCount(), 1L);
       assertEquals(getNumReplicas(bm.pendingReplications,
-          (BlockInfo) block.getBlock().getLocalBlock()), 2);
+          (BlockInfoContiguous) block.getBlock().getLocalBlock()), 2);
       
       // 4. delete the file
       fs.delete(filePath, true);
@@ -395,8 +395,8 @@ public class TestPendingReplication {
 
       @Override
       public Object performTask() throws StorageException, IOException {
-        BlockInfo blockInfo = EntityManager
-            .find(BlockInfo.Finder.ByBlockIdAndINodeId, block.getBlockId());
+        BlockInfoContiguous blockInfo = EntityManager
+            .find(BlockInfoContiguous.Finder.ByBlockIdAndINodeId, block.getBlockId());
         if (inc) {
           pendingReplications.increment(blockInfo, dns);
         } else {
@@ -428,8 +428,8 @@ public class TestPendingReplication {
 
       @Override
       public Object performTask() throws StorageException, IOException {
-        BlockInfo blockInfo = EntityManager
-            .find(BlockInfo.Finder.ByBlockIdAndINodeId, block.getBlockId());
+        BlockInfoContiguous blockInfo = EntityManager
+            .find(BlockInfoContiguous.Finder.ByBlockIdAndINodeId, block.getBlockId());
         return pendingReplications.getNumReplicas(blockInfo);
       }
     }.handle();
@@ -528,9 +528,9 @@ public class TestPendingReplication {
     }
   }
 
-  private BlockInfo newBlockInfo(final Block block, final int inodeId)
+  private BlockInfoContiguous newBlockInfo(final Block block, final int inodeId)
       throws IOException {
-    final BlockInfo blockInfo = new BlockInfo(block, inodeId);
+    final BlockInfoContiguous blockInfo = new BlockInfoContiguous(block, inodeId);
     new HopsTransactionalRequestHandler(HDFSOperationType.TEST) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {

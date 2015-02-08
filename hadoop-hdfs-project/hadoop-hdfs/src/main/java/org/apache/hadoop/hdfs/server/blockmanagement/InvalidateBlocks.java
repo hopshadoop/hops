@@ -111,7 +111,7 @@ class InvalidateBlocks {
    * if a block is pending invalidation but with a different generation stamp,
    * returns false.
    */
-  boolean contains(final DatanodeStorageInfo dn, final BlockInfo block)
+  boolean contains(final DatanodeStorageInfo dn, final BlockInfoContiguous block)
       throws StorageException, TransactionContextException {
     InvalidatedBlock blkFound = findBlock(block.getBlockId(),
         dn.getSid(), block.getInodeId());
@@ -125,7 +125,7 @@ class InvalidateBlocks {
    * Add a block to the block collection
    * which will be invalidated on the specified storage.
    */
-  void add(final BlockInfo block, final DatanodeStorageInfo storage,
+  void add(final BlockInfoContiguous block, final DatanodeStorageInfo storage,
       final boolean log) throws StorageException, TransactionContextException {
 
     InvalidatedBlock invBlk = new InvalidatedBlock(
@@ -161,7 +161,7 @@ class InvalidateBlocks {
   /**
    * Remove the block from the specified storage.
    */
-  void remove(final DatanodeStorageInfo storageInfo, final BlockInfo block) throws IOException {
+  void remove(final DatanodeStorageInfo storageInfo, final BlockInfoContiguous block) throws IOException {
     InvalidatedBlock invBlok = findBlock(block.getBlockId(), storageInfo.getSid(), block.getInodeId());
     if (invBlok != null) {
       removeInvalidatedBlockFromDB(block.getBlockId(), storageInfo.getSid());
@@ -263,7 +263,7 @@ class InvalidateBlocks {
         List<InvalidatedBlock> invblks = new ArrayList<>();
         for (Block blk : blocks) {
           invblks.add(new InvalidatedBlock(storage.getSid(), blk.getBlockId(),
-              blk.getGenerationStamp(), blk.getNumBytes(), BlockInfo.NON_EXISTING_ID));
+              blk.getGenerationStamp(), blk.getNumBytes(), BlockInfoContiguous.NON_EXISTING_ID));
         }
         da.prepare(Collections.EMPTY_LIST, invblks, Collections.EMPTY_LIST);
         return null;

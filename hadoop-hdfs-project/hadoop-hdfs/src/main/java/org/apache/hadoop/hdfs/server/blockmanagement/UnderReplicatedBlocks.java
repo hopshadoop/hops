@@ -187,7 +187,7 @@ class UnderReplicatedBlocks implements Iterable<Block> {
   /**
    * Check if a block is in the neededReplication queue
    */
-  boolean contains(BlockInfo block)
+  boolean contains(BlockInfoContiguous block)
       throws StorageException, TransactionContextException {
     return getUnderReplicatedBlock(block) != null;
   }
@@ -244,7 +244,7 @@ class UnderReplicatedBlocks implements Iterable<Block> {
    *     expected number of replicas of the block
    * @return true if the block was added to a queue.
    */
-  boolean add(BlockInfo block, int curReplicas, int decomissionedReplicas,
+  boolean add(BlockInfoContiguous block, int curReplicas, int decomissionedReplicas,
       int expectedReplicas)
       throws StorageException, TransactionContextException {
     assert curReplicas >= 0 : "Negative replicas!";
@@ -262,7 +262,7 @@ class UnderReplicatedBlocks implements Iterable<Block> {
   }
 
   /** remove a block from a under replication queue */
-  synchronized boolean remove(BlockInfo block, 
+  synchronized boolean remove(BlockInfoContiguous block, 
                               int oldReplicas, 
                               int decommissionedReplicas,
                               int oldExpectedReplicas) throws IOException {
@@ -292,7 +292,7 @@ class UnderReplicatedBlocks implements Iterable<Block> {
    * @return true if the block was found and removed from one of the priority
    * queues
    */
-  boolean remove(BlockInfo block, int priLevel)
+  boolean remove(BlockInfoContiguous block, int priLevel)
       throws StorageException, TransactionContextException {
     UnderReplicatedBlock urb = getUnderReplicatedBlock(block);
     if (priLevel >= 0 && priLevel < LEVEL && remove(urb)) {
@@ -327,7 +327,7 @@ class UnderReplicatedBlocks implements Iterable<Block> {
    * @param expectedReplicasDelta
    *     the change in the expected replica count from before
    */
-  void update(BlockInfo block, int curReplicas, int decommissionedReplicas,
+  void update(BlockInfoContiguous block, int curReplicas, int decommissionedReplicas,
       int curExpectedReplicas, int curReplicasDelta, int expectedReplicasDelta)
       throws StorageException, TransactionContextException {
     int oldReplicas = curReplicas - curReplicasDelta;
@@ -600,7 +600,7 @@ class UnderReplicatedBlocks implements Iterable<Block> {
   }
 
   // return true if it does not exist other wise return false
-  private boolean add(BlockInfo block, int priLevel, int expectedReplicas, boolean update)
+  private boolean add(BlockInfoContiguous block, int priLevel, int expectedReplicas, boolean update)
       throws StorageException, TransactionContextException {
     UnderReplicatedBlock urb = getUnderReplicatedBlock(block);
     if (urb == null) {
@@ -617,7 +617,7 @@ class UnderReplicatedBlocks implements Iterable<Block> {
     return false;
   }
   
-  private boolean add(BlockInfo block, int priLevel, int expectedReplicas)
+  private boolean add(BlockInfoContiguous block, int priLevel, int expectedReplicas)
       throws StorageException, TransactionContextException {
    return add(block, priLevel, expectedReplicas, false);
   }
@@ -700,8 +700,8 @@ class UnderReplicatedBlocks implements Iterable<Block> {
       public Object performTask() throws StorageException, IOException {
         BlockInfoDataAccess bda = (BlockInfoDataAccess) HdfsStorageFactory
             .getDataAccess(BlockInfoDataAccess.class);
-        List<BlockInfo> blks = bda.findByIds(blockIds, inodeIds);
-        for (BlockInfo blk : blks) {
+        List<BlockInfoContiguous> blks = bda.findByIds(blockIds, inodeIds);
+        for (BlockInfoContiguous blk : blks) {
           UnderReplicatedBlock urb = allUrbHashMap.remove(blk.getBlockId());
           assert urb.getInodeId() == blk.getInodeId();
           priorityQueuestmp.get(urb.getLevel()).add(blk);
@@ -734,7 +734,7 @@ class UnderReplicatedBlocks implements Iterable<Block> {
     }.handle();
   }
   
-  private UnderReplicatedBlock getUnderReplicatedBlock(BlockInfo blk)
+  private UnderReplicatedBlock getUnderReplicatedBlock(BlockInfoContiguous blk)
       throws StorageException, TransactionContextException {
     return EntityManager
         .find(UnderReplicatedBlock.Finder.ByBlockIdAndINodeId, blk.getBlockId(),

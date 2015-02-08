@@ -25,7 +25,6 @@ import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeManager;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
@@ -35,6 +34,7 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.TreeSet;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
 
 public class ExcessReplicasMap {
 
@@ -71,7 +71,7 @@ public class ExcessReplicasMap {
     return excessBlocks;
   }
 
-  public boolean put(int storageId, BlockInfo excessBlk)
+  public boolean put(int storageId, BlockInfoContiguous excessBlk)
       throws StorageException, TransactionContextException {
     ExcessReplica er = getExcessReplica(storageId, excessBlk);
     if (er == null) {
@@ -84,7 +84,7 @@ public class ExcessReplicasMap {
   /**
    * Mark a block on a datanode for removal
    */
-  public boolean remove(DatanodeDescriptor dn, BlockInfo block)
+  public boolean remove(DatanodeDescriptor dn, BlockInfoContiguous block)
       throws StorageException, TransactionContextException {
     boolean found = false;
 
@@ -103,7 +103,7 @@ public class ExcessReplicasMap {
    * Get the datanodeUuids of all datanodes storing excess replicas of this
    * block.
    */
-  public Collection<String> get(BlockInfo blk) throws StorageException, TransactionContextException {
+  public Collection<String> get(BlockInfoContiguous blk) throws StorageException, TransactionContextException {
     Collection<ExcessReplica> excessReplicas = getExcessReplicas(blk);
     if (excessReplicas == null) {
       return null;
@@ -115,12 +115,12 @@ public class ExcessReplicasMap {
     return stIds;
   }
 
-  public boolean contains(DatanodeStorageInfo storageInfo, BlockInfo blk)
+  public boolean contains(DatanodeStorageInfo storageInfo, BlockInfoContiguous blk)
       throws IOException {
     return contains(storageInfo.getSid(), blk);
   }
 
-  public boolean contains(final int sid, final BlockInfo blk)
+  public boolean contains(final int sid, final BlockInfoContiguous blk)
       throws IOException {
     return new LightWeightRequestHandler(
         HDFSOperationType.GET_EXCESS_RELPLICAS_BY_STORAGEID) {
@@ -169,14 +169,14 @@ public class ExcessReplicasMap {
     EntityManager.remove(er);
   }
 
-  private Collection<ExcessReplica> getExcessReplicas(BlockInfo blk)
+  private Collection<ExcessReplica> getExcessReplicas(BlockInfoContiguous blk)
       throws StorageException, TransactionContextException {
     return EntityManager
         .findList(ExcessReplica.Finder.ByBlockIdAndINodeId, blk.getBlockId(),
             blk.getInodeId());
   }
 
-  private ExcessReplica getExcessReplica(int sid, BlockInfo block)
+  private ExcessReplica getExcessReplica(int sid, BlockInfoContiguous block)
       throws StorageException, TransactionContextException {
     return EntityManager.find(ExcessReplica.Finder.ByBlockIdSidAndINodeId,
         block.getBlockId(), sid, block.getInodeId());

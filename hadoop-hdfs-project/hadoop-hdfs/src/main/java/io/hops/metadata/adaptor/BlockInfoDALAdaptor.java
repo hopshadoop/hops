@@ -20,7 +20,6 @@ import io.hops.metadata.DalAdaptor;
 import io.hops.metadata.hdfs.dal.BlockInfoDataAccess;
 import io.hops.metadata.hdfs.entity.BlockInfo;
 import org.apache.hadoop.hdfs.protocol.Block;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.namenode.UnsupportedActionException;
 import org.apache.zookeeper.KeeperException;
@@ -28,11 +27,12 @@ import org.apache.zookeeper.KeeperException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguousUnderConstruction;
 
 public class BlockInfoDALAdaptor extends
-    DalAdaptor<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo, BlockInfo>
+    DalAdaptor<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous, BlockInfo>
     implements
-    BlockInfoDataAccess<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo> {
+    BlockInfoDataAccess<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous> {
 
   private final BlockInfoDataAccess<BlockInfo> dataAccess;
 
@@ -51,51 +51,51 @@ public class BlockInfoDALAdaptor extends
   }
   
   @Override
-  public org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo findById(
+  public org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous findById(
       long blockId, long inodeId) throws StorageException {
     return convertDALtoHDFS(dataAccess.findById(blockId, inodeId));
   }
 
   @Override
-  public List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo> findByInodeId(
+  public List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous> findByInodeId(
       long id) throws StorageException {
-    return (List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo>) convertDALtoHDFS(
+    return (List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous>) convertDALtoHDFS(
         dataAccess.findByInodeId(id));
   }
 
   
   @Override
-  public List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo> findByInodeIds(
+  public List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous> findByInodeIds(
       long[] inodeIds) throws StorageException {
-    return (List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo>) convertDALtoHDFS(
+    return (List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous>) convertDALtoHDFS(
         dataAccess.findByInodeIds(inodeIds));
   }
   
   @Override
-  public List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo> findAllBlocks()
+  public List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous> findAllBlocks()
       throws StorageException {
-    return (List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo>) convertDALtoHDFS(
+    return (List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous>) convertDALtoHDFS(
         dataAccess.findAllBlocks());
   }
 
   @Override
-  public List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo> findBlockInfosByStorageId(
+  public List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous> findBlockInfosByStorageId(
       int storageId) throws StorageException {
-    return (List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo>) convertDALtoHDFS(
+    return (List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous>) convertDALtoHDFS(
         dataAccess.findBlockInfosByStorageId(storageId));
   }
 
   @Override
-  public List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo> findBlockInfosByStorageId(int storageId,
+  public List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous> findBlockInfosByStorageId(int storageId,
       long from, int size) throws StorageException {
-    return (List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo>) convertDALtoHDFS(dataAccess.
+    return (List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous>) convertDALtoHDFS(dataAccess.
         findBlockInfosByStorageId(storageId, from, size));
   }
 
   @Override
-  public List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo> findBlockInfosBySids(
+  public List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous> findBlockInfosBySids(
       List<Integer> sids) throws StorageException {
-    return (List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo>) convertDALtoHDFS(
+    return (List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous>) convertDALtoHDFS(
         dataAccess.findBlockInfosBySids(sids));
   }
 
@@ -106,9 +106,9 @@ public class BlockInfoDALAdaptor extends
   }
 
   @Override
-  public List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo> findByIds(
+  public List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous> findByIds(
       long[] blockIds, long[] inodeIds) throws StorageException {
-    return (List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo>) convertDALtoHDFS(
+    return (List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous>) convertDALtoHDFS(
         dataAccess.findByIds(blockIds, inodeIds));
   }
 
@@ -120,9 +120,9 @@ public class BlockInfoDALAdaptor extends
 
   @Override
   public void prepare(
-      Collection<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo> removed,
-      Collection<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo> newed,
-      Collection<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo> modified)
+      Collection<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous> removed,
+      Collection<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous> newed,
+      Collection<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous> modified)
       throws StorageException {
     dataAccess.prepare(convertHDFStoDAL(removed), convertHDFStoDAL(newed),
         convertHDFStoDAL(modified));
@@ -130,7 +130,7 @@ public class BlockInfoDALAdaptor extends
 
   @Override
   public BlockInfo convertHDFStoDAL(
-      org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo hdfsClass)
+      org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous hdfsClass)
       throws StorageException {
     if (hdfsClass != null) {
       BlockInfo hopBlkInfo =
@@ -138,9 +138,9 @@ public class BlockInfoDALAdaptor extends
               hdfsClass.getInodeId(), hdfsClass.getNumBytes(),
               hdfsClass.getGenerationStamp(),
               hdfsClass.getBlockUCState().ordinal(), hdfsClass.getTimestamp());
-      if (hdfsClass instanceof BlockInfoUnderConstruction) {
-        BlockInfoUnderConstruction ucBlock =
-            (BlockInfoUnderConstruction) hdfsClass;
+      if (hdfsClass instanceof BlockInfoContiguousUnderConstruction) {
+        BlockInfoContiguousUnderConstruction ucBlock =
+            (BlockInfoContiguousUnderConstruction) hdfsClass;
         hopBlkInfo.setPrimaryNodeIndex(ucBlock.getPrimaryNodeIndex());
         hopBlkInfo.setBlockRecoveryId(ucBlock.getBlockRecoveryId());
       }
@@ -151,27 +151,27 @@ public class BlockInfoDALAdaptor extends
   }
 
   @Override
-  public org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo convertDALtoHDFS(
+  public org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous convertDALtoHDFS(
       BlockInfo dalClass) throws StorageException {
     if (dalClass != null) {
       Block b = new Block(dalClass.getBlockId(), dalClass.getNumBytes(),
           dalClass.getGenerationStamp());
-      org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo blockInfo = null;
+      org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous blockInfo = null;
 
       if (dalClass.getBlockUCState() >
           0) { //UNDER_CONSTRUCTION, UNDER_RECOVERY, COMMITED
-        blockInfo = new BlockInfoUnderConstruction(b, dalClass.getInodeId());
-        ((BlockInfoUnderConstruction) blockInfo).setBlockUCStateNoPersistance(
+        blockInfo = new BlockInfoContiguousUnderConstruction(b, dalClass.getInodeId());
+        ((BlockInfoContiguousUnderConstruction) blockInfo).setBlockUCStateNoPersistance(
             HdfsServerConstants.BlockUCState.values()[dalClass
                 .getBlockUCState()]);
-        ((BlockInfoUnderConstruction) blockInfo)
+        ((BlockInfoContiguousUnderConstruction) blockInfo)
             .setPrimaryNodeIndexNoPersistance(dalClass.getPrimaryNodeIndex());
-        ((BlockInfoUnderConstruction) blockInfo)
+        ((BlockInfoContiguousUnderConstruction) blockInfo)
             .setBlockRecoveryIdNoPersistance(dalClass.getBlockRecoveryId());
       } else if (dalClass.getBlockUCState() ==
           HdfsServerConstants.BlockUCState.COMPLETE.ordinal()) {
         blockInfo =
-            new org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo(b,
+            new org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous(b,
                 dalClass.getInodeId());
       } else {
         // Unexpected UC Block state

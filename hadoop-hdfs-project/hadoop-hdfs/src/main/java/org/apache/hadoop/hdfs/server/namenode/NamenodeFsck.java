@@ -47,7 +47,7 @@ import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockCollection;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockPlacementPolicy;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockPlacementStatus;
@@ -279,7 +279,7 @@ public class NamenodeFsck implements DataEncryptionKeyFactory {
         @Override
         public Object performTask() throws IOException {
           //find which file this block belongs to
-          BlockInfo blockInfo = bm.getStoredBlock(block);
+          BlockInfoContiguous blockInfo = bm.getStoredBlock(block);
           if (blockInfo == null) {
             out.println("Block " + blockId + " " + NONEXISTENT_STATUS);
             LOG.warn("Block " + blockId + " " + NONEXISTENT_STATUS);

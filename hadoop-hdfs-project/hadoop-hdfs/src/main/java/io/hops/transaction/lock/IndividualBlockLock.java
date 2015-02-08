@@ -19,10 +19,10 @@ import io.hops.exception.TransactionContextException;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.context.HdfsTransactionContextMaintenanceCmds;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 
 import java.io.IOException;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
 
 class IndividualBlockLock extends BaseIndividualBlockLock {
 
@@ -32,12 +32,12 @@ class IndividualBlockLock extends BaseIndividualBlockLock {
 
   public IndividualBlockLock() {
     this.blockId = NON_EXISTING_BLOCK;
-    this.inodeId = BlockInfo.NON_EXISTING_ID;
+    this.inodeId = BlockInfoContiguous.NON_EXISTING_ID;
   }
 
   IndividualBlockLock(long blockId, INodeIdentifier inode) {
     this.blockId = blockId;
-    this.inodeId = inode == null ? BlockInfo.NON_EXISTING_ID : inode.getInodeId();
+    this.inodeId = inode == null ? BlockInfoContiguous.NON_EXISTING_ID : inode.getInodeId();
   }
 
   @Override
@@ -58,8 +58,8 @@ class IndividualBlockLock extends BaseIndividualBlockLock {
   protected void readBlock(long blkId, long inodeId)
       throws IOException {
     if (blkId != NON_EXISTING_BLOCK || blkId > 0) {
-      BlockInfo result =
-          acquireLock(DEFAULT_LOCK_TYPE, BlockInfo.Finder.ByBlockIdAndINodeId,
+      BlockInfoContiguous result =
+          acquireLock(DEFAULT_LOCK_TYPE, BlockInfoContiguous.Finder.ByBlockIdAndINodeId,
               blkId, inodeId);
       if (result != null) {
         blocks.add(result);

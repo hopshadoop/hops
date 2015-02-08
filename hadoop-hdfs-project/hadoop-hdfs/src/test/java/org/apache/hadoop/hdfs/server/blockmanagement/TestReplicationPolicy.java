@@ -881,7 +881,7 @@ public class TestReplicationPolicy {
       for (int i = 0; i < 100; i++) {
         // Adding the blocks directly to normal priority
         int blkId = random.nextInt();
-        add(neededReplications, new BlockInfo(new Block(blkId), blkId), 2, 0,
+        add(neededReplications, new BlockInfoContiguous(new Block(blkId), blkId), 2, 0,
             3);
       }
       // Lets wait for the replication interval, to start process normal
@@ -890,7 +890,7 @@ public class TestReplicationPolicy {
 
       // Adding the block directly to high priority list
       int blkId = random.nextInt();
-      add(neededReplications, new BlockInfo(new Block(blkId), blkId), 1, 0, 3);
+      add(neededReplications, new BlockInfoContiguous(new Block(blkId), blkId), 1, 0, 3);
 
       // Lets wait for the replication interval
       Thread.sleep(3 * DFS_NAMENODE_REPLICATION_INTERVAL);
@@ -917,27 +917,27 @@ public class TestReplicationPolicy {
       // Adding QUEUE_HIGHEST_PRIORITY block
       int blockIdTmp = blockID++;
       add(underReplicatedBlocks,
-          new BlockInfo(new Block(blockIdTmp), blockIdTmp), 1, 0, 3);
+          new BlockInfoContiguous(new Block(blockIdTmp), blockIdTmp), 1, 0, 3);
 
       // Adding QUEUE_VERY_UNDER_REPLICATED block
       blockIdTmp = blockID++;
       add(underReplicatedBlocks,
-          new BlockInfo(new Block(blockIdTmp), blockIdTmp), 2, 0, 7);
+          new BlockInfoContiguous(new Block(blockIdTmp), blockIdTmp), 2, 0, 7);
 
       // Adding QUEUE_REPLICAS_BADLY_DISTRIBUTED block
       blockIdTmp = blockID++;
       add(underReplicatedBlocks,
-          new BlockInfo(new Block(blockIdTmp), blockIdTmp), 6, 0, 6);
+          new BlockInfoContiguous(new Block(blockIdTmp), blockIdTmp), 6, 0, 6);
 
       // Adding QUEUE_UNDER_REPLICATED block
       blockIdTmp = blockID++;
       add(underReplicatedBlocks,
-          new BlockInfo(new Block(blockIdTmp), blockIdTmp), 5, 0, 6);
+          new BlockInfoContiguous(new Block(blockIdTmp), blockIdTmp), 5, 0, 6);
 
       // Adding QUEUE_WITH_CORRUPT_BLOCKS block
       blockIdTmp = blockID++;
       add(underReplicatedBlocks,
-          new BlockInfo(new Block(blockIdTmp), blockIdTmp), 0, 0, 3);
+          new BlockInfoContiguous(new Block(blockIdTmp), blockIdTmp), 0, 0, 3);
     }
 
 
@@ -957,7 +957,7 @@ public class TestReplicationPolicy {
 
     // Adding QUEUE_HIGHEST_PRIORITY
     int blockIdTmp = blockID++;
-    add(underReplicatedBlocks, new BlockInfo(new Block(blockIdTmp), blockIdTmp),
+    add(underReplicatedBlocks, new BlockInfoContiguous(new Block(blockIdTmp), blockIdTmp),
         1, 0, 3);
 
     // Choose 10 blocks from UnderReplicatedBlocks. Then it should pick 1 block from
@@ -1163,7 +1163,7 @@ public class TestReplicationPolicy {
     blocksReplWorkMultiplier = DFSUtil.getReplWorkMultiplier(conf);
   }
 
-  private boolean add(final UnderReplicatedBlocks queue, final BlockInfo block,
+  private boolean add(final UnderReplicatedBlocks queue, final BlockInfoContiguous block,
       final int curReplicas, final int decomissionedReplicas,
       final int expectedReplicas) throws IOException {
     return (Boolean) new HopsTransactionalRequestHandler(
@@ -1185,9 +1185,9 @@ public class TestReplicationPolicy {
 
       @Override
       public Object performTask() throws StorageException, IOException {
-        EntityManager.add(new BlockInfo(block,
+        EntityManager.add(new BlockInfoContiguous(block,
             inodeIdentifier != null ? inodeIdentifier.getInodeId() :
-                BlockInfo.NON_EXISTING_ID));
+                BlockInfoContiguous.NON_EXISTING_ID));
         return queue
             .add(block, curReplicas, decomissionedReplicas, expectedReplicas);
       }

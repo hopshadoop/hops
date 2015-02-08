@@ -19,9 +19,9 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import io.hops.exception.StorageException;
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 
 import java.io.IOException;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
 
 /**
  * SafeMode related operations.
@@ -57,13 +57,13 @@ public interface SafeMode {
    * @param blk
    *     current block
    */
-  public void incrementSafeBlockCount(int replication, BlockInfo blk) throws IOException;
+  public void incrementSafeBlockCount(int replication, BlockInfoContiguous blk) throws IOException;
 
   /**
    * Decrement number of blocks that reached minimal replication.
    * @param blk
    *     current block
    */
-  public void decrementSafeBlockCount(BlockInfo blk)
+  public void decrementSafeBlockCount(BlockInfoContiguous blk)
       throws StorageException, IOException;
 }

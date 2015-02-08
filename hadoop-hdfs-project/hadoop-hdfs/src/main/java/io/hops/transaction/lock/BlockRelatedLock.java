@@ -22,7 +22,6 @@ import io.hops.metadata.hdfs.entity.ExcessReplica;
 import io.hops.metadata.hdfs.entity.Replica;
 import io.hops.metadata.hdfs.entity.InvalidatedBlock;
 import io.hops.metadata.hdfs.entity.UnderReplicatedBlock;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.PendingBlockInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.ReplicaUnderConstruction;
 import org.apache.hadoop.hdfs.server.namenode.INodeFile;
@@ -30,6 +29,7 @@ import org.apache.hadoop.hdfs.server.namenode.INodeFile;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
 
 final class BlockRelatedLock extends LockWithType {
 
@@ -46,7 +46,7 @@ final class BlockRelatedLock extends LockWithType {
       BaseIndividualBlockLock individualBlockLock =
               (BaseIndividualBlockLock) lock;
       //get by blocksId
-      for (BlockInfo blk : individualBlockLock.getBlocks()) {
+      for (BlockInfoContiguous blk : individualBlockLock.getBlocks()) {
         if (isList()) {
           Collection<Object> list = acquireLockList(DEFAULT_LOCK_TYPE,
                   getFinderType(true), blk.getBlockId(), blk.getInodeId());

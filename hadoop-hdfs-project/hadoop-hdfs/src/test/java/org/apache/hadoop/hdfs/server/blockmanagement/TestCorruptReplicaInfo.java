@@ -63,15 +63,15 @@ public class TestCorruptReplicaInfo {
   private static final Log LOG =
       LogFactory.getLog(TestCorruptReplicaInfo.class);
   
-  private Map<Integer, BlockInfo> block_map = new HashMap<>();
+  private Map<Integer, BlockInfoContiguous> block_map = new HashMap<>();
   private BlocksMap blocksMap = new BlocksMap(null);
 
   // Allow easy block creation by block id
   // Return existing block if one with same block id already exists
-  private BlockInfo getBlock(Integer block_id) {
+  private BlockInfoContiguous getBlock(Integer block_id) {
     if (!block_map.containsKey(block_id)) {
       block_map
-          .put(block_id, new BlockInfo(new Block(block_id, 0, 0), block_id));
+          .put(block_id, new BlockInfoContiguous(new Block(block_id, 0, 0), block_id));
     }
     
     return block_map.get(block_id);
@@ -154,7 +154,7 @@ public class TestCorruptReplicaInfo {
   }
   
   private void addToCorruptReplicasMap(final CorruptReplicasMap crm,
-      final BlockInfo blk, final DatanodeStorageInfo storage)
+      final BlockInfoContiguous blk, final DatanodeStorageInfo storage)
       throws IOException {
     new HopsTransactionalRequestHandler(
         HDFSOperationType.TEST_CORRUPT_REPLICA_INFO) {
@@ -183,7 +183,7 @@ public class TestCorruptReplicaInfo {
   }
   
   private void removeFromCorruptReplicasMap(final CorruptReplicasMap crm,
-      final BlockInfo blk) throws IOException {
+      final BlockInfoContiguous blk) throws IOException {
     new HopsTransactionalRequestHandler(
         HDFSOperationType.TEST_CORRUPT_REPLICA_INFO) {
       INodeIdentifier inodeIdentifier;

@@ -197,7 +197,7 @@ public class TestBlockManager {
   private void doBasicTest(int testIndex) throws IOException {
     List<DatanodeStorageInfo> origStorages = getStorages(0, 1);
     List<DatanodeDescriptor> origNodes = getNodes(origStorages);
-    BlockInfo blockInfo = addBlockOnNodes((long) testIndex, origNodes);
+    BlockInfoContiguous blockInfo = addBlockOnNodes((long) testIndex, origNodes);
 
     DatanodeStorageInfo[] pipeline = scheduleSingleReplication(blockInfo);
 
@@ -231,7 +231,7 @@ public class TestBlockManager {
     // Block originally on A1, A2, B1
     List<DatanodeStorageInfo> origStorages = getStorages(0, 1, 3);
     List<DatanodeDescriptor> origNodes = getNodes(origStorages);
-    BlockInfo blockInfo = addBlockOnNodes(testIndex, origNodes);
+    BlockInfoContiguous blockInfo = addBlockOnNodes(testIndex, origNodes);
     
     // Decommission two of the nodes (A1, A2)
     List<DatanodeDescriptor> decomNodes = startDecommission(0, 1);
@@ -275,7 +275,7 @@ public class TestBlockManager {
     // Block originally on A1, A2, B1
     List<DatanodeStorageInfo> origStorages = getStorages(0, 1, 3);
     List<DatanodeDescriptor> origNodes = getNodes(origStorages);
-    BlockInfo blockInfo = addBlockOnNodes(testIndex, origNodes);
+    BlockInfoContiguous blockInfo = addBlockOnNodes(testIndex, origNodes);
     
     // Decommission all of the nodes
     List<DatanodeDescriptor> decomNodes = startDecommission(0, 1, 3);
@@ -326,9 +326,8 @@ public class TestBlockManager {
     // Block originally on A1, A2, B1
     List<DatanodeStorageInfo> origStorages = getStorages(0, 1, 3);
     List<DatanodeDescriptor> origNodes = getNodes(origStorages);
-
-    BlockInfo blockInfo = addBlockOnNodes(testIndex, origNodes);
-
+    BlockInfoContiguous blockInfo = addBlockOnNodes(testIndex, origNodes);
+    
     // Decommission all of the nodes in rack A
     List<DatanodeDescriptor> decomNodes = startDecommission(0, 1, 2);
 
@@ -383,7 +382,7 @@ public class TestBlockManager {
       throws IOException {
     // Originally on only nodes in rack A.
     List<DatanodeDescriptor> origNodes = rackA;
-    BlockInfo blockInfo = addBlockOnNodes((long) testIndex, origNodes);
+    BlockInfoContiguous blockInfo = addBlockOnNodes(testIndex, origNodes);
     DatanodeStorageInfo pipeline[] = scheduleSingleReplication(blockInfo);
     
     assertEquals(2, pipeline.length); // single new copy
@@ -428,7 +427,7 @@ public class TestBlockManager {
    * Tell the block manager that replication is completed for the given
    * pipeline.
    */
-  private void fulfillPipeline(final BlockInfo blockInfo,
+  private void fulfillPipeline(final BlockInfoContiguous blockInfo,
       DatanodeStorageInfo[] pipeline) throws IOException {
     HopsTransactionalRequestHandler handler =
         new HopsTransactionalRequestHandler(
@@ -464,10 +463,10 @@ public class TestBlockManager {
     }
   }
 
-  static private BlockInfo blockOnNodes(final long blkId,
+  static private BlockInfoContiguous blockOnNodes(final long blkId,
       final List<DatanodeDescriptor> nodes, final long inode_id)
       throws IOException {
-    return (BlockInfo) new HopsTransactionalRequestHandler(
+    return (BlockInfoContiguous) new HopsTransactionalRequestHandler(
         HDFSOperationType.BLOCK_ON_NODES) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
@@ -480,7 +479,7 @@ public class TestBlockManager {
       @Override
       public Object performTask() throws IOException {
         Block block = new Block(blkId);
-        BlockInfo blockInfo = new BlockInfo(block, inode_id);
+        BlockInfoContiguous blockInfo = new BlockInfoContiguous(block, inode_id);
 
         for (DatanodeDescriptor dn : nodes) {
           for (DatanodeStorageInfo storage : dn.getStorageInfos()) {
@@ -524,12 +523,12 @@ public class TestBlockManager {
     return nodes;
   }
 
-  private BlockInfo addBlockOnNodes(final long blockId,
+  private BlockInfoContiguous addBlockOnNodes(final long blockId,
       List<DatanodeDescriptor> nodes) throws IOException {
     return addBlockOnNodes(blockId, nodes, 100);
   }
     
-  static private BlockInfo addBlockOnNodes(final long blockId,
+  static private BlockInfoContiguous addBlockOnNodes(final long blockId,
       List<DatanodeDescriptor> nodes, final int inodeId) throws IOException {
 
     LightWeightRequestHandler handle =
@@ -554,7 +553,7 @@ public class TestBlockManager {
 
     final BlockCollection bc = (INodeFile) handle.handle();
 
-    final BlockInfo blockInfo = blockOnNodes(blockId, nodes, inodeId);
+    final BlockInfoContiguous blockInfo = blockOnNodes(blockId, nodes, inodeId);
 
     new HopsTransactionalRequestHandler(HDFSOperationType.BLOCK_ON_NODES) {
       INodeIdentifier inodeIdentifier;
@@ -580,7 +579,7 @@ public class TestBlockManager {
     return blockInfo;
   }
 
-  private DatanodeStorageInfo[] scheduleSingleReplication(final BlockInfo block)
+  private DatanodeStorageInfo[] scheduleSingleReplication(final BlockInfoContiguous block)
       throws IOException {
     final List<Block> list_p1 = new ArrayList<>();
     final List<List<Block>> list_all = new ArrayList<>();
