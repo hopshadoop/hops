@@ -37,8 +37,8 @@ import org.apache.hadoop.hdfs.TestFileCreation;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguousUnderConstruction;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocols;
 import org.junit.AfterClass;
@@ -117,12 +117,12 @@ public class TestBlockUnderConstruction {
             assertTrue("File " + inode.toString() + " isUnderConstruction = " +
                     inode.isUnderConstruction() + " expected to be " +
                     isFileOpen, inode.isUnderConstruction() == isFileOpen);
-            BlockInfo[] blocks = inode.getBlocks();
+            BlockInfoContiguous[] blocks = inode.getBlocks();
             assertTrue("File does not have blocks: " + inode.toString(),
                 blocks != null && blocks.length > 0);
 
             int idx = 0;
-            BlockInfo curBlock;
+            BlockInfoContiguous curBlock;
             // all blocks but the last two should be regular blocks
             for (; idx < blocks.length - 2; idx++) {
               curBlock = blocks[idx];
@@ -199,7 +199,7 @@ public class TestBlockUnderConstruction {
       final List<LocatedBlock> blocks = lb.getLocatedBlocks();
       assertEquals(i, blocks.size());
       final Block b = blocks.get(blocks.size() - 1).getBlock().getLocalBlock();
-      assertTrue(b instanceof BlockInfoUnderConstruction);
+      assertTrue(b instanceof BlockInfoContiguousUnderConstruction);
 
       if (++i < NUM_BLOCKS) {
         // write one more block

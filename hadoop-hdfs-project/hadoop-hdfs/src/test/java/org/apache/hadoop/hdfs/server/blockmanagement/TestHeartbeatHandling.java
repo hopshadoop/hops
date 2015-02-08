@@ -189,7 +189,7 @@ public class TestHeartbeatHandling {
             dd1.getStorageInfos()[0],
             dd2.getStorageInfos()[0],
             dd3.getStorageInfos()[0]};
-          BlockInfoUnderConstruction blockInfo = createBlockInfoUnderConstruction(storages);
+          BlockInfoContiguousUnderConstruction blockInfo = createBlockInfoUnderConstruction(storages);
           dd1.addBlockToBeRecovered(blockInfo);
           DatanodeCommand[] cmds = NameNodeAdapter.sendHeartBeat(nodeReg1, dd1, namesystem).getCommands();
           assertEquals(1, cmds.length);
@@ -265,9 +265,9 @@ public class TestHeartbeatHandling {
     }
   }
   
-  private BlockInfoUnderConstruction createBlockInfoUnderConstruction(final DatanodeStorageInfo[] storages) throws
+  private BlockInfoContiguousUnderConstruction createBlockInfoUnderConstruction(final DatanodeStorageInfo[] storages) throws
       IOException {
-    return (BlockInfoUnderConstruction) new HopsTransactionalRequestHandler(
+    return (BlockInfoContiguousUnderConstruction) new HopsTransactionalRequestHandler(
         HDFSOperationType.COMMIT_BLOCK_SYNCHRONIZATION) {
       INodeIdentifier inodeIdentifier = new INodeIdentifier(3L);
 
@@ -291,9 +291,9 @@ public class TestHeartbeatHandling {
       @Override
       public Object performTask() throws IOException {
         Block block = new Block(10, 0, GenerationStamp.LAST_RESERVED_STAMP);
-        EntityManager.add(new BlockInfo(block,
-            inodeIdentifier != null ? inodeIdentifier.getInodeId() : BlockInfo.NON_EXISTING_ID));
-        BlockInfoUnderConstruction blockInfo = new BlockInfoUnderConstruction(
+        EntityManager.add(new BlockInfoContiguous(block,
+            inodeIdentifier != null ? inodeIdentifier.getInodeId() : BlockInfoContiguous.NON_EXISTING_ID));
+        BlockInfoContiguousUnderConstruction blockInfo = new BlockInfoContiguousUnderConstruction(
             block, 3,
             HdfsServerConstants.BlockUCState.UNDER_RECOVERY, storages);
         return blockInfo;

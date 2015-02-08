@@ -75,7 +75,7 @@ class PendingReplicationBlocks {
    * @param block The corresponding block
    * @param targets The DataNodes where replicas of the block should be placed
    */
-  void increment(BlockInfo block, DatanodeDescriptor[] targets)
+  void increment(BlockInfoContiguous block, DatanodeDescriptor[] targets)
       throws StorageException, TransactionContextException {
     PendingBlockInfo found = getPendingBlock(block);
     if (found == null) {
@@ -94,7 +94,7 @@ class PendingReplicationBlocks {
    * Decrement the number of pending replication requests
    * for this block.
    */
-  void decrement(BlockInfo block, DatanodeDescriptor dn)
+  void decrement(BlockInfoContiguous block, DatanodeDescriptor dn)
       throws StorageException, TransactionContextException {
     PendingBlockInfo found = getPendingBlock(block);
     if (found != null && !isTimedout(found)) {
@@ -114,7 +114,7 @@ class PendingReplicationBlocks {
    *     The given block whose pending replication requests need to be
    *     removed
    */
-  void remove(BlockInfo block)
+  void remove(BlockInfoContiguous block)
       throws StorageException, TransactionContextException {
     PendingBlockInfo found = getPendingBlock(block);
     if (found != null) {
@@ -152,7 +152,7 @@ class PendingReplicationBlocks {
   /**
    * How many copies of this block is pending replication?
    */
-  int getNumReplicas(BlockInfo block)
+  int getNumReplicas(BlockInfoContiguous block)
       throws StorageException, TransactionContextException {
     PendingBlockInfo found = getPendingBlock(block);
     if (found != null && !isTimedout(found)) {
@@ -224,7 +224,7 @@ class PendingReplicationBlocks {
     return now() - timeout;
   }
 
-  private PendingBlockInfo getPendingBlock(BlockInfo block)
+  private PendingBlockInfo getPendingBlock(BlockInfoContiguous block)
       throws StorageException, TransactionContextException {
     return EntityManager
         .find(PendingBlockInfo.Finder.ByBlockIdAndINodeId, block.getBlockId(),
@@ -237,10 +237,10 @@ class PendingReplicationBlocks {
         .findList(PendingBlockInfo.Finder.All);
   }
 
-  private BlockInfo getBlockInfo(PendingBlockInfo pendingBlock)
+  private BlockInfoContiguous getBlockInfo(PendingBlockInfo pendingBlock)
       throws StorageException, TransactionContextException {
     return EntityManager
-        .find(BlockInfo.Finder.ByBlockIdAndINodeId, pendingBlock.getBlockId());
+        .find(BlockInfoContiguous.Finder.ByBlockIdAndINodeId, pendingBlock.getBlockId());
   }
 
   private void addPendingBlockInfo(PendingBlockInfo pbi)

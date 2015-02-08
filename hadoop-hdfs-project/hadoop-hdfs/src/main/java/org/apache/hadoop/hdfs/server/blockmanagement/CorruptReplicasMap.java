@@ -85,7 +85,7 @@ public class CorruptReplicasMap {
    * @param reason a textual reason (for logging purposes)
    * @param reasonCode the enum representation of the reason
    */
-  public void addToCorruptReplicasMap(BlockInfo blk, DatanodeStorageInfo storage,
+  public void addToCorruptReplicasMap(BlockInfoContiguous blk, DatanodeStorageInfo storage,
       String reason, Reason reasonCode) throws StorageException, TransactionContextException {
     Map <DatanodeDescriptor, Reason> nodes = getNodesMap(blk);
     String reasonText;
@@ -123,7 +123,7 @@ public class CorruptReplicasMap {
    * @param blk
    *     Block to be removed
    */
-  void removeFromCorruptReplicasMap(BlockInfo blk)
+  void removeFromCorruptReplicasMap(BlockInfoContiguous blk)
       throws StorageException, TransactionContextException {
     Collection<CorruptReplica> corruptReplicas = getCorruptReplicas(blk);
     if (corruptReplicas != null) {
@@ -140,12 +140,12 @@ public class CorruptReplicasMap {
    * @return true if the removal is successful;
    * false if the replica is not in the map
    */
-  boolean removeFromCorruptReplicasMap(BlockInfo blk, DatanodeDescriptor
+  boolean removeFromCorruptReplicasMap(BlockInfoContiguous blk, DatanodeDescriptor
       datanode) throws IOException {
     return removeFromCorruptReplicasMap(blk, datanode, Reason.ANY);
   }
   
-  boolean removeFromCorruptReplicasMap(BlockInfo blk, DatanodeDescriptor datanode,
+  boolean removeFromCorruptReplicasMap(BlockInfoContiguous blk, DatanodeDescriptor datanode,
       Reason reason) throws StorageException, TransactionContextException {
     Collection<CorruptReplica> corruptReplicas = getCorruptReplicas(blk);
     Map <DatanodeDescriptor, Reason> datanodes = getNodesMap(corruptReplicas);
@@ -176,7 +176,7 @@ public class CorruptReplicasMap {
   
   }
 
-  void forceRemoveFromCorruptReplicasMap(BlockInfo blk, int sid) throws StorageException, TransactionContextException {
+  void forceRemoveFromCorruptReplicasMap(BlockInfoContiguous blk, int sid) throws StorageException, TransactionContextException {
     Collection<CorruptReplica> corruptReplicas = getCorruptReplicas(blk);
     if (corruptReplicas == null) {
       return;
@@ -196,7 +196,7 @@ public class CorruptReplicasMap {
    *     Block for which nodes are requested
    * @return collection of nodes. Null if does not exists
    */
-  Collection<DatanodeDescriptor> getNodes(BlockInfo blk) throws StorageException, TransactionContextException {
+  Collection<DatanodeDescriptor> getNodes(BlockInfoContiguous blk) throws StorageException, TransactionContextException {
     // HOPS datanodeMgr is null in some tests
     if (datanodeMgr == null) {
       return new ArrayList<>();
@@ -223,7 +223,7 @@ public class CorruptReplicasMap {
    *     Block for which nodes are requested
    * @return collection of nodes. Null if does not exists
    */
-  Map<DatanodeDescriptor, Reason> getNodesMap(BlockInfo blk) throws StorageException, TransactionContextException {
+  Map<DatanodeDescriptor, Reason> getNodesMap(BlockInfoContiguous blk) throws StorageException, TransactionContextException {
     // HOPS datanodeMgr is null in some tests
     if (datanodeMgr == null) {
       return new TreeMap<>();
@@ -260,13 +260,13 @@ public class CorruptReplicasMap {
    *     DatanodeDescriptor which holds the replica
    * @return true if replica is corrupt, false if does not exists in this map
    */
-  boolean isReplicaCorrupt(BlockInfo blk, DatanodeDescriptor node)
+  boolean isReplicaCorrupt(BlockInfoContiguous blk, DatanodeDescriptor node)
       throws StorageException, TransactionContextException {
     Collection<DatanodeDescriptor> nodes = getNodes(blk);
     return ((nodes != null) && (nodes.contains(node)));
   }
 
-  int numCorruptReplicas(BlockInfo blk)
+  int numCorruptReplicas(BlockInfoContiguous blk)
       throws StorageException, TransactionContextException {
     Collection<DatanodeDescriptor> nodes = getNodes(blk);
     return (nodes == null) ? 0 : nodes.size();
@@ -350,7 +350,7 @@ public class CorruptReplicasMap {
     return ret;
   }
   
-  private Collection<CorruptReplica> getCorruptReplicas(BlockInfo blk)
+  private Collection<CorruptReplica> getCorruptReplicas(BlockInfoContiguous blk)
       throws StorageException, TransactionContextException {
     return EntityManager
         .findList(CorruptReplica.Finder.ByBlockIdAndINodeId, blk.getBlockId(),
@@ -389,7 +389,7 @@ public class CorruptReplicasMap {
    * @param node datanode that contains this corrupted replica
    * @return reason
    */
-  String getCorruptReason(BlockInfo block, DatanodeDescriptor node) throws IOException {
+  String getCorruptReason(BlockInfoContiguous block, DatanodeDescriptor node) throws IOException {
     Reason reason = null;
     Map<DatanodeDescriptor, Reason> corruptReplicasMap = getNodesMap(block);    
     if (corruptReplicasMap != null && corruptReplicasMap.containsKey(node)) {

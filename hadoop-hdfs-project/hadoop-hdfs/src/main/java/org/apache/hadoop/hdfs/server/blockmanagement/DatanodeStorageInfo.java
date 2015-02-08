@@ -194,12 +194,12 @@ public class DatanodeStorageInfo {
   /**
    * Iterates over the list of blocks belonging to the Storage.
    */
-  public Iterator<BlockInfo> getBlockIterator() throws IOException {
+  public Iterator<BlockInfoContiguous> getBlockIterator() throws IOException {
     return new BlockIterator();
   }
       
-  private class BlockIterator implements Iterator<BlockInfo> {    
-    private Iterator<BlockInfo> blocks = Collections.EMPTY_LIST.iterator();
+  private class BlockIterator implements Iterator<BlockInfoContiguous> {    
+    private Iterator<BlockInfoContiguous> blocks = Collections.EMPTY_LIST.iterator();
     long index = 0;
     
     public BlockIterator(){
@@ -215,7 +215,7 @@ public class DatanodeStorageInfo {
     }
 
     @Override
-    public BlockInfo next() {
+    public BlockInfoContiguous next() {
       if(!blocks.hasNext()){
         update();
       }
@@ -240,7 +240,7 @@ public class DatanodeStorageInfo {
     
   }
 
-  private List<BlockInfo> getStorageBlockInfos(final long from, final int size) throws IOException {
+  private List<BlockInfoContiguous> getStorageBlockInfos(final long from, final int size) throws IOException {
     final int sid = this.sid;
 
     LightWeightRequestHandler findBlocksHandler = new LightWeightRequestHandler(
@@ -263,7 +263,7 @@ public class DatanodeStorageInfo {
         }
       }
     };
-    return (List<BlockInfo>) findBlocksHandler.handle();
+    return (List<BlockInfoContiguous>) findBlocksHandler.handle();
   }
   
   private boolean hasBlocksWithIdGreaterThan(final long from) throws IOException {
@@ -341,7 +341,7 @@ public class DatanodeStorageInfo {
     storageType = storage.getStorageType();
   }
 
-  public AddBlockResult addBlock(BlockInfo b)
+  public AddBlockResult addBlock(BlockInfoContiguous b)
       throws TransactionContextException, StorageException {
     // First check whether the block belongs to a different storage
     // on the same DN.
@@ -361,7 +361,7 @@ public class DatanodeStorageInfo {
     return result;
   }
 
-  public boolean removeBlock(BlockInfo b)
+  public boolean removeBlock(BlockInfoContiguous b)
       throws TransactionContextException, StorageException {
     return b.removeReplica(this) != null;
   }

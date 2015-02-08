@@ -74,14 +74,14 @@ public class TestBlockInfoUnderConstruction {
           DatanodeStorageInfo s3 = dd3.getStorageInfos()[0];
 
           dd1.isAlive = dd2.isAlive = dd3.isAlive = true;
-          BlockInfoUnderConstruction blockInfo = createBlockInfoUnderConstruction(new DatanodeStorageInfo[]{s1, s2, s3});
+          BlockInfoContiguousUnderConstruction blockInfo = createBlockInfoUnderConstruction(new DatanodeStorageInfo[]{s1, s2, s3});
           // Recovery attempt #1.
           long currentTime = System.currentTimeMillis();
           dd1.setLastUpdate(currentTime - 3 * 1000);
           dd2.setLastUpdate(currentTime - 1 * 1000);
           dd3.setLastUpdate(currentTime - 2 * 1000);
           initializeBlockRecovery(blockInfo, 1, dn);
-          BlockInfoUnderConstruction[] blockInfoRecovery = dd2.getLeaseRecoveryCommand(1);
+          BlockInfoContiguousUnderConstruction[] blockInfoRecovery = dd2.getLeaseRecoveryCommand(1);
           assertEquals(blockInfoRecovery[0], blockInfo);
 
           // Recovery attempt #2.
@@ -121,9 +121,9 @@ public class TestBlockInfoUnderConstruction {
     }
   }
 
-  private BlockInfoUnderConstruction createBlockInfoUnderConstruction(final DatanodeStorageInfo[] storages) throws
+  private BlockInfoContiguousUnderConstruction createBlockInfoUnderConstruction(final DatanodeStorageInfo[] storages) throws
       IOException {
-    return (BlockInfoUnderConstruction) new HopsTransactionalRequestHandler(
+    return (BlockInfoContiguousUnderConstruction) new HopsTransactionalRequestHandler(
         HDFSOperationType.COMMIT_BLOCK_SYNCHRONIZATION) {
       INodeIdentifier inodeIdentifier = new INodeIdentifier(3L);
 
@@ -147,9 +147,9 @@ public class TestBlockInfoUnderConstruction {
       @Override
       public Object performTask() throws IOException {
         Block block = new Block(10, 0, GenerationStamp.LAST_RESERVED_STAMP);
-        EntityManager.add(new BlockInfo(block,
-            inodeIdentifier != null ? inodeIdentifier.getInodeId() : BlockInfo.NON_EXISTING_ID));
-        BlockInfoUnderConstruction blockInfo = new BlockInfoUnderConstruction(
+        EntityManager.add(new BlockInfoContiguous(block,
+            inodeIdentifier != null ? inodeIdentifier.getInodeId() : BlockInfoContiguous.NON_EXISTING_ID));
+        BlockInfoContiguousUnderConstruction blockInfo = new BlockInfoContiguousUnderConstruction(
             block, 3,
             HdfsServerConstants.BlockUCState.UNDER_RECOVERY, storages);
         return blockInfo;
@@ -158,7 +158,7 @@ public class TestBlockInfoUnderConstruction {
     }.handle();
   }
 
-  private void initializeBlockRecovery(final BlockInfoUnderConstruction blockInfo, final long recoveryId,
+  private void initializeBlockRecovery(final BlockInfoContiguousUnderConstruction blockInfo, final long recoveryId,
       final DatanodeManager dn) throws
       IOException {
     new HopsTransactionalRequestHandler(

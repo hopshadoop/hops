@@ -27,7 +27,6 @@ import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.INodeAttributesDataAccess;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
-import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.metadata.hdfs.entity.QuotaUpdate;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.handler.HDFSOperationType;
@@ -51,8 +50,8 @@ import org.apache.hadoop.hdfs.protocol.FSLimitException.MaxDirectoryItemsExceede
 import org.apache.hadoop.hdfs.protocol.FSLimitException.PathComponentTooLongException;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguousUnderConstruction;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
@@ -249,7 +248,7 @@ public class FSDirectory implements Closeable {
     long modTime = now();
     
     INodeFile newNode = new INodeFile(IDsGeneratorFactory.getInstance().getUniqueINodeID(), permissions,
-        BlockInfo.EMPTY_ARRAY, replication, modTime, modTime, preferredBlockSize, (byte) 0);
+        BlockInfoContiguous.EMPTY_ARRAY, replication, modTime, modTime, preferredBlockSize, (byte) 0);
     newNode.setLocalNameNoPersistance(localName.getBytes(Charsets.UTF_8));
     newNode.toUnderConstruction(clientName, clientMachine);
 
@@ -271,7 +270,7 @@ public class FSDirectory implements Closeable {
   /**
    * Add a block to the file. Returns a reference to the added block.
    */
-  BlockInfo addBlock(String path, INodesInPath inodesInPath, Block block,
+  BlockInfoContiguous addBlock(String path, INodesInPath inodesInPath, Block block,
       DatanodeStorageInfo targets[])
       throws QuotaExceededException, StorageException,
       TransactionContextException, IOException {
@@ -290,8 +289,8 @@ public class FSDirectory implements Closeable {
     updateCount(inodesInPath, 0, diskspaceTobeConsumed, true);
 
     // associate new last block for the file
-    BlockInfoUnderConstruction blockInfo =
-        new BlockInfoUnderConstruction(block, fileINode.getId(),
+    BlockInfoContiguousUnderConstruction blockInfo =
+        new BlockInfoContiguousUnderConstruction(block, fileINode.getId(),
             BlockUCState.UNDER_CONSTRUCTION, targets);
     getBlockManager().addBlockCollection(blockInfo, fileINode);
     fileINode.addBlock(blockInfo);
@@ -901,7 +900,7 @@ public class FSDirectory implements Closeable {
     }
     // Set new last block length
     if (!file.isFileStoredInDB()) {
-      BlockInfo lastBlock = file.getLastBlock();
+      BlockInfoContiguous lastBlock = file.getLastBlock();
       assert lastBlock.getNumBytes() - lastBlockDelta > 0 : "wrong block size";
       lastBlock.setNumBytes(lastBlock.getNumBytes() - lastBlockDelta);
     } else {

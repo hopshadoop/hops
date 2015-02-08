@@ -56,11 +56,11 @@ public class TestUnderReplicatedBlockQueues {
     HdfsStorageFactory.formatStorage();
     
     UnderReplicatedBlocks queues = new UnderReplicatedBlocks();
-    BlockInfo block1 = add(new BlockInfo(new Block(1), 1));
-    BlockInfo block2 = add(new BlockInfo(new Block(2), 2));
-    BlockInfo block_very_under_replicated = add(new BlockInfo(new Block(3), 3));
-    BlockInfo block_corrupt = add(new BlockInfo(new Block(4), 4));
-    BlockInfo block_corrupt_repl_one = add(new BlockInfo(new Block(5), 5));
+    BlockInfoContiguous block1 = add(new BlockInfoContiguous(new Block(1), 1));
+    BlockInfoContiguous block2 = add(new BlockInfoContiguous(new Block(2), 2));
+    BlockInfoContiguous block_very_under_replicated = add(new BlockInfoContiguous(new Block(3), 3));
+    BlockInfoContiguous block_corrupt = add(new BlockInfoContiguous(new Block(4), 4));
+    BlockInfoContiguous block_corrupt_repl_one = add(new BlockInfoContiguous(new Block(5), 5));
     
     //add a block with a single entry
     assertAdded(queues, block1, 1, 0, 3);
@@ -101,7 +101,7 @@ public class TestUnderReplicatedBlockQueues {
     assertEquals(2, queues.getCorruptReplOneBlockSize());
   }
   
-  private void updateQueue(final UnderReplicatedBlocks queues, final BlockInfo block, final int curReplicas,
+  private void updateQueue(final UnderReplicatedBlocks queues, final BlockInfoContiguous block, final int curReplicas,
       final int decommissionedReplicas,
       final int curExpectedReplicas, final int curReplicasDelta, final int expectedReplicasDelta) throws IOException{
     new HopsTransactionalRequestHandler(HDFSOperationType.TEST) {
@@ -131,7 +131,7 @@ public class TestUnderReplicatedBlockQueues {
     }.handle();
   }
 
-  private void assertAdded(UnderReplicatedBlocks queues, BlockInfo block,
+  private void assertAdded(UnderReplicatedBlocks queues, BlockInfoContiguous block,
       int curReplicas, int decomissionedReplicas, int expectedReplicas)
       throws IOException {
     assertTrue("Failed to add " + block,
@@ -153,7 +153,7 @@ public class TestUnderReplicatedBlockQueues {
    * @param level
    *     level to select
    */
-  private void assertInLevel(UnderReplicatedBlocks queues, BlockInfo block,
+  private void assertInLevel(UnderReplicatedBlocks queues, BlockInfoContiguous block,
       int level) {
     UnderReplicatedBlocks.BlockIterator bi = queues.iterator(level);
     while (bi.hasNext()) {
@@ -166,7 +166,7 @@ public class TestUnderReplicatedBlockQueues {
   }
   
   
-  private BlockInfo add(final BlockInfo block) throws IOException {
+  private BlockInfoContiguous add(final BlockInfoContiguous block) throws IOException {
     new HopsTransactionalRequestHandler(HDFSOperationType.TEST) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
@@ -174,14 +174,14 @@ public class TestUnderReplicatedBlockQueues {
 
       @Override
       public Object performTask() throws StorageException, IOException {
-        EntityManager.add(new BlockInfo(block));
+        EntityManager.add(new BlockInfoContiguous(block));
         return null;
       }
     }.handle();
     return block;
   }
 
-  private boolean add(final UnderReplicatedBlocks queues, final BlockInfo block,
+  private boolean add(final UnderReplicatedBlocks queues, final BlockInfoContiguous block,
       final int curReplicas, final int decomissionedReplicas,
       final int expectedReplicas) throws IOException {
     return (Boolean) new HopsTransactionalRequestHandler(

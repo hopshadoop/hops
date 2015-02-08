@@ -28,8 +28,8 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockCollection;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguousUnderConstruction;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.hdfs.server.common.GenerationStamp;
@@ -89,13 +89,13 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
     return this;
   }
 
-  public INodeFile(long id, PermissionStatus permissions, BlockInfo[] blklist,
+  public INodeFile(long id, PermissionStatus permissions, BlockInfoContiguous[] blklist,
       short replication, long modificationTime, long atime,
       long preferredBlockSize, byte storagePolicyID) throws IOException {
     this(id, permissions, blklist, replication, modificationTime, atime, preferredBlockSize, storagePolicyID, false);
   }
 
-  public INodeFile(long id, PermissionStatus permissions, BlockInfo[] blklist,
+  public INodeFile(long id, PermissionStatus permissions, BlockInfoContiguous[] blklist,
       short replication, long modificationTime, long atime,
       long preferredBlockSize, byte storagePolicyID, boolean inTree) throws IOException {
     super(id, permissions, modificationTime, atime, inTree);
@@ -170,28 +170,28 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
   }
   
   @Override
-  public BlockInfo getBlock(int index) throws TransactionContextException, StorageException {
-    return (BlockInfo) EntityManager.find(BlockInfo.Finder.ByINodeIdAndIndex, id, index);
+  public BlockInfoContiguous getBlock(int index) throws TransactionContextException, StorageException {
+    return (BlockInfoContiguous) EntityManager.find(BlockInfoContiguous.Finder.ByINodeIdAndIndex, id, index);
   }
   
   /**
    * @return the blocks of the file.
    */
   @Override
-  public BlockInfo[] getBlocks()
+  public BlockInfoContiguous[] getBlocks()
       throws StorageException, TransactionContextException {
 
     if(isFileStoredInDB()){
       FSNamesystem.LOG.debug("Stuffed Inode:  getBlocks(). the file is stored in the database. Returning empty list of blocks");
-      return BlockInfo.EMPTY_ARRAY;
+      return BlockInfoContiguous.EMPTY_ARRAY;
     }
 
-    List<BlockInfo> blocks = getBlocksOrderedByIndex();
+    List<BlockInfoContiguous> blocks = getBlocksOrderedByIndex();
     if(blocks == null){
-      return BlockInfo.EMPTY_ARRAY;
+      return BlockInfoContiguous.EMPTY_ARRAY;
     }
 
-    BlockInfo[] blks = new BlockInfo[blocks.size()];
+    BlockInfoContiguous[] blks = new BlockInfoContiguous[blocks.size()];
     return blocks.toArray(blks);
   }
 
@@ -278,12 +278,12 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
   /**
    * append array of blocks to this.blocks
    */
-  List<BlockInfo> concatBlocks(INodeFile[] inodes)
+  List<BlockInfoContiguous> concatBlocks(INodeFile[] inodes)
       throws StorageException, TransactionContextException {
-    List<BlockInfo> oldBlks = new ArrayList<>();
+    List<BlockInfoContiguous> oldBlks = new ArrayList<>();
     for (INodeFile srcInode : inodes) {
-      for (BlockInfo block : srcInode.getBlocks()) {
-        BlockInfo copy = BlockInfo.cloneBlock(block);
+      for (BlockInfoContiguous block : srcInode.getBlocks()) {
+        BlockInfoContiguous copy = BlockInfoContiguous.cloneBlock(block);
         oldBlks.add(copy);
         addBlock(block);
         block.setBlockCollection(this);
@@ -296,16 +296,16 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
   /**
    * add a block to the block list
    */
-  void addBlock(BlockInfo newblock)
+  void addBlock(BlockInfoContiguous newblock)
       throws StorageException, TransactionContextException {
-    BlockInfo maxBlk = findMaxBlk();
+    BlockInfoContiguous maxBlk = findMaxBlk();
     newblock.setBlockIndex(maxBlk.getBlockIndex() + 1);
   }
 
   /**
    * Set the block of the file at the given index.
    */
-  public void setBlock(int idx, BlockInfo blk)
+  public void setBlock(int idx, BlockInfoContiguous blk)
       throws StorageException, TransactionContextException {
     blk.setBlockIndex(idx);
   }
@@ -314,9 +314,9 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
   public void destroyAndCollectBlocks(BlocksMapUpdateInfo collectedBlocks, final List<INode> removedINodes)
       throws StorageException, TransactionContextException {
     parent = null;
-    BlockInfo[] blocks = getBlocks();
+    BlockInfoContiguous[] blocks = getBlocks();
     if (blocks != null && collectedBlocks != null) {
-      for (BlockInfo blk : blocks) {
+      for (BlockInfoContiguous blk : blocks) {
         blk.setBlockCollection(null);
         collectedBlocks.addDeleteBlock(blk);
       }
@@ -374,7 +374,7 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
   }
 
   static long computeFileSize(boolean includesBlockInfoUnderConstruction,
-      BlockInfo[] blocks) throws StorageException {
+      BlockInfoContiguous[] blocks) throws StorageException {
     if (blocks == null || blocks.length == 0) {
       return 0;
     }
@@ -382,7 +382,7 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
     //check if the last block is BlockInfoUnderConstruction
     long bytes = 0;
     
-    if(blocks[last] instanceof BlockInfoUnderConstruction){
+    if(blocks[last] instanceof BlockInfoContiguousUnderConstruction){
         if(includesBlockInfoUnderConstruction){
             bytes = blocks[last].getNumBytes();
         }
@@ -445,16 +445,16 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
   /**
    * Return the penultimate allocated block for this file.
    */
-  BlockInfo getPenultimateBlock()
+  BlockInfoContiguous getPenultimateBlock()
       throws StorageException, TransactionContextException {
     if (isUnderConstruction()) {
       FileUnderConstructionFeature uc = getFileUnderConstructionFeature();
       if (uc != null && uc.getPenultimateBlockId() > -1) {
-        return EntityManager.find(BlockInfo.Finder.ByBlockIdAndINodeId,
+        return EntityManager.find(BlockInfoContiguous.Finder.ByBlockIdAndINodeId,
             uc.getPenultimateBlockId(), getId());
       }
     }
-    BlockInfo[] blocks = getBlocks();
+    BlockInfoContiguous[] blocks = getBlocks();
     if (blocks == null || blocks.length <= 1) {
       return null;
     }
@@ -462,22 +462,22 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
   }
 
   @Override
-  public BlockInfo getLastBlock() throws IOException, StorageException {
+  public BlockInfoContiguous getLastBlock() throws IOException, StorageException {
     if (isUnderConstruction()) {
       FileUnderConstructionFeature uc = getFileUnderConstructionFeature();
       if (uc != null && uc.getLastBlockId() > -1) {
-        return EntityManager.find(BlockInfo.Finder.ByBlockIdAndINodeId,
+        return EntityManager.find(BlockInfoContiguous.Finder.ByBlockIdAndINodeId,
             uc.getLastBlockId(), getId());
       }
     }
-    BlockInfo[] blocks = getBlocks();
+    BlockInfoContiguous[] blocks = getBlocks();
     return blocks == null || blocks.length == 0 ? null :
         blocks[blocks.length - 1];
   }
 
   @Override
   public int numBlocks() throws StorageException, TransactionContextException {
-    BlockInfo[] blocks = getBlocks();
+    BlockInfoContiguous[] blocks = getBlocks();
     return blocks == null ? 0 : blocks.length;
   }
   
@@ -523,7 +523,7 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
    */
   private boolean assertAllBlocksComplete()
       throws StorageException, TransactionContextException {
-    for (BlockInfo b : getBlocks()) {
+    for (BlockInfoContiguous b : getBlocks()) {
       if (!b.isComplete()) {
         return false;
       }
@@ -532,13 +532,14 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
   }
   
   @Override
-  public BlockInfoUnderConstruction setLastBlock(BlockInfo lastBlock, DatanodeStorageInfo[] locations)
+  public BlockInfoContiguousUnderConstruction setLastBlock(
+      BlockInfoContiguous lastBlock, DatanodeStorageInfo[] locations)
       throws IOException {
     Preconditions.checkState(isUnderConstruction());
     if (numBlocks() == 0) {
       throw new IOException("Failed to set last block: File is empty.");
     }
-    BlockInfoUnderConstruction ucBlock = lastBlock
+    BlockInfoContiguousUnderConstruction ucBlock = lastBlock
         .convertToBlockUnderConstruction(HdfsServerConstants.BlockUCState.UNDER_CONSTRUCTION,
             locations);
     ucBlock.setBlockCollection(this);
@@ -551,7 +552,7 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
    * the last one on the list
    */
   boolean removeLastBlock(Block oldBlock) throws IOException, StorageException {
-    final BlockInfo[] blocks = getBlocks();
+    final BlockInfoContiguous[] blocks = getBlocks();
     if (blocks == null || blocks.length == 0) {
       return false;
     }
@@ -563,9 +564,9 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
     return true;
   }
   
-  public void removeBlock(BlockInfo block)
+  public void removeBlock(BlockInfoContiguous block)
       throws StorageException, TransactionContextException {
-    BlockInfo[] blks = getBlocks();
+    BlockInfoContiguous[] blks = getBlocks();
     int index = block.getBlockIndex();
     
     block.setBlockCollection(null);
@@ -579,10 +580,10 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
   
   /* End of Under-Construction Feature */
   
-  public BlockInfo findMaxBlk()
+  public BlockInfoContiguous findMaxBlk()
       throws StorageException, TransactionContextException {
-    BlockInfo maxBlk = (BlockInfo) EntityManager
-        .find(BlockInfo.Finder.ByMaxBlockIndexForINode, this.getId());
+    BlockInfoContiguous maxBlk = (BlockInfoContiguous) EntityManager
+        .find(BlockInfoContiguous.Finder.ByMaxBlockIndexForINode, this.getId());
     return maxBlk;
   }
   
@@ -631,15 +632,15 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
     save();
   }
 
-  protected List<BlockInfo> getBlocksOrderedByIndex()
+  protected List<BlockInfoContiguous> getBlocksOrderedByIndex()
       throws TransactionContextException, StorageException {
     if (!isInTree()) {
       return null;
     }
-    List<BlockInfo> blocks = (List<BlockInfo>) EntityManager
-        .findList(BlockInfo.Finder.ByINodeId, id);
+    List<BlockInfoContiguous> blocks = (List<BlockInfoContiguous>) EntityManager
+        .findList(BlockInfoContiguous.Finder.ByINodeId, id);
     if (blocks != null) {
-      Collections.sort(blocks, BlockInfo.Order.ByBlockIndex);
+      Collections.sort(blocks, BlockInfoContiguous.Order.ByBlockIndex);
       return blocks;
     } else {
       return null;
@@ -657,7 +658,7 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
    */
   public long collectBlocksBeyondMax(final long max,
       final BlocksMapUpdateInfo collectedBlocks) throws StorageException, TransactionContextException {
-    final BlockInfo[] oldBlocks = getBlocks();
+    final BlockInfoContiguous[] oldBlocks = getBlocks();
     if (oldBlocks == null)
       return 0;
     //find the minimum n such that the size of the first n blocks > max
@@ -671,18 +672,18 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
 
     // starting from block n, the data is beyond max.
     // resize the array.  
-    final BlockInfo[] newBlocks;
+    final BlockInfoContiguous[] newBlocks;
     if (n == 0) {
-      newBlocks = BlockInfo.EMPTY_ARRAY;
+      newBlocks = BlockInfoContiguous.EMPTY_ARRAY;
     } else {
-      newBlocks = new BlockInfo[n];
+      newBlocks = new BlockInfoContiguous[n];
       System.arraycopy(oldBlocks, 0, newBlocks, 0, n);
     }
 
     // collect the blocks beyond max
     if (collectedBlocks != null) {
       for(; n < oldBlocks.length; n++) {
-        BlockInfo block = oldBlocks[n];
+        BlockInfoContiguous block = oldBlocks[n];
         EntityManager.remove(block);
         collectedBlocks.addDeleteBlock(block);
       }

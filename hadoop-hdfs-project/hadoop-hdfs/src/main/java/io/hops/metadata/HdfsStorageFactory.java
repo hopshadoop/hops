@@ -118,8 +118,6 @@ import io.hops.transaction.lock.LockFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
 import org.apache.hadoop.hdfs.server.blockmanagement.PendingBlockInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.ReplicaUnderConstruction;
 import org.apache.hadoop.hdfs.server.namenode.INode;
@@ -142,6 +140,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.hadoop.hdfs.protocol.CacheDirective;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguousUnderConstruction;
 import org.apache.hadoop.hdfs.server.namenode.CachePool;
 
 public class HdfsStorageFactory {
@@ -264,8 +264,8 @@ public class HdfsStorageFactory {
 
         BlockInfoContext bic = new BlockInfoContext(
             (BlockInfoDataAccess) getDataAccess(BlockInfoDataAccess.class));
-        entityContexts.put(BlockInfo.class, bic);
-        entityContexts.put(BlockInfoUnderConstruction.class, bic);
+        entityContexts.put(BlockInfoContiguous.class, bic);
+        entityContexts.put(BlockInfoContiguousUnderConstruction.class, bic);
         entityContexts.put(ReplicaUnderConstruction.class,
             new ReplicaUnderConstructionContext(
                 (ReplicaUnderConstructionDataAccess) getDataAccess(

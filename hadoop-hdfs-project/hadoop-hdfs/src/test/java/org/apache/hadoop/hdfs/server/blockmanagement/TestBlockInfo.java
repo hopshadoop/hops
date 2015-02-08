@@ -66,7 +66,7 @@ public class TestBlockInfo {
   @Test
   public void testAddStorage() throws Exception {
     Block block = new Block(0);
-    BlockInfo blockInfo = new BlockInfo(block, 1);
+    BlockInfoContiguous blockInfo = new BlockInfoContiguous(block, 1);
 
     final DatanodeStorageInfo storage = DFSTestUtil.createDatanodeStorageInfo("storageID", "127.0.0.1");
     storage.setSid(0);
@@ -77,7 +77,7 @@ public class TestBlockInfo {
     Assert.assertEquals(storage.getSid(), getStorageId(blockInfo));
   }
 
-  private boolean addStorage(final BlockInfo blockInfo, final DatanodeStorageInfo storage) throws IOException {
+  private boolean addStorage(final BlockInfoContiguous blockInfo, final DatanodeStorageInfo storage) throws IOException {
     return (boolean) new HopsTransactionalRequestHandler(HDFSOperationType.TEST) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
@@ -95,7 +95,7 @@ public class TestBlockInfo {
     }.handle();
   }
 
-  private int getStorageId(final BlockInfo blockInfo) throws IOException {
+  private int getStorageId(final BlockInfoContiguous blockInfo) throws IOException {
     return (int) new LightWeightRequestHandler(HDFSOperationType.TEST) {
       @Override
       public Object performTask() throws IOException {
@@ -117,12 +117,12 @@ public class TestBlockInfo {
         "storageID2"));
     storage2.setSid(2);
     final int NUM_BLOCKS = 10;
-    BlockInfo[] blockInfos = new BlockInfo[NUM_BLOCKS];
+    BlockInfoContiguous[] blockInfos = new BlockInfoContiguous[NUM_BLOCKS];
 
     // Create a few dummy blocks and add them to the first storage.
     for (int i = 0; i < NUM_BLOCKS; ++i) {
       Block block = new Block(i);
-      blockInfos[i] = new BlockInfo(block, i);
+      blockInfos[i] = new BlockInfoContiguous(block, i);
       addBlockInfo(blockInfos[i]);
       addBlock(storage1,blockInfos[i]);
     }
@@ -134,7 +134,7 @@ public class TestBlockInfo {
     Assert.assertThat(getStorageId(blockInfos[NUM_BLOCKS / 2]), is(storage2.getSid()));
   }
 
-  private AddBlockResult addBlock(final DatanodeStorageInfo storage, final BlockInfo blk) throws IOException {
+  private AddBlockResult addBlock(final DatanodeStorageInfo storage, final BlockInfoContiguous blk) throws IOException {
     return (AddBlockResult) new HopsTransactionalRequestHandler(HDFSOperationType.TEST) {
 
       @Override
@@ -152,12 +152,12 @@ public class TestBlockInfo {
     }.handle();
   }
   
-  private void addBlockInfo(final BlockInfo blk) throws IOException{
+  private void addBlockInfo(final BlockInfoContiguous blk) throws IOException{
     new LightWeightRequestHandler(HDFSOperationType.TEST) {
       @Override
       public Object performTask() throws IOException {
         BlockInfoDataAccess da = (BlockInfoDataAccess) HdfsStorageFactory.getDataAccess(BlockInfoDataAccess.class);
-        List<BlockInfo> added = new ArrayList<>();
+        List<BlockInfoContiguous> added = new ArrayList<>();
         added.add(blk);
         da.prepare(null, null, added);
         return null;

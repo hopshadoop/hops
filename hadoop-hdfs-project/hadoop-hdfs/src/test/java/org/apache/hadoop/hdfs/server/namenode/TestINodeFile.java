@@ -33,7 +33,6 @@ import io.hops.transaction.lock.TransactionLocks;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.io.IOUtils;
 import org.junit.Test;
 
@@ -69,6 +68,7 @@ import org.apache.hadoop.hdfs.protocol.DirectoryListing;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocols;
 
 import static org.apache.hadoop.util.Time.now;
@@ -331,7 +331,7 @@ public class TestINodeFile {
       iNodes[i] =
           new INodeFile(IDsGeneratorFactory.getInstance().getUniqueINodeID(), perms, null, replication, 0L, 0L, preferredBlockSize, (byte) 0);
       iNodes[i].setLocalNameNoPersistance(fileNamePrefix + Integer.toString(i));
-      BlockInfo newblock = new BlockInfo();
+      BlockInfoContiguous newblock = new BlockInfoContiguous();
       newblock.setBlockId(blkid++);
       newblock.setINodeId(iNodes[i].getId());
       iNodes[i].addBlock(newblock);
@@ -390,7 +390,7 @@ public class TestINodeFile {
     }
 
     {
-      final INode from = new INodeFile(0, perm, BlockInfo.EMPTY_ARRAY,
+      final INode from = new INodeFile(0, perm, BlockInfoContiguous.EMPTY_ARRAY,
           replication, 0L, 0L, preferredBlockSize, (byte) 0);
       
       //cast to INodeFile, should success

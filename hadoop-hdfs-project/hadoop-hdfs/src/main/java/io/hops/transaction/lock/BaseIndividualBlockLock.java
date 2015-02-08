@@ -15,21 +15,21 @@
  */
 package io.hops.transaction.lock;
 
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
 
 abstract class BaseIndividualBlockLock extends Lock {
 
-  protected final List<BlockInfo> blocks;
+  protected final List<BlockInfoContiguous> blocks;
 
   BaseIndividualBlockLock() {
     this.blocks = new ArrayList<>();
   }
 
-  Collection<BlockInfo> getBlocks() {
+  Collection<BlockInfoContiguous> getBlocks() {
     return blocks;
   }
 

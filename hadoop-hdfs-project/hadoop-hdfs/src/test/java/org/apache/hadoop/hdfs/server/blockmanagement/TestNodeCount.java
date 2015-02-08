@@ -127,7 +127,7 @@ public class TestNodeCount {
 
             @Override
             public Object performTask() throws StorageException, IOException {
-              BlockInfo blkInfo = new BlockInfo(block.getLocalBlock(),
+              BlockInfoContiguous blkInfo = new BlockInfoContiguous(block.getLocalBlock(),
                   inodeIdentifier.getInodeId());
               Collection<String> excessDns = bm.excessReplicateMap.get(blkInfo);
               DatanodeDescriptor nonExcessDN = null;

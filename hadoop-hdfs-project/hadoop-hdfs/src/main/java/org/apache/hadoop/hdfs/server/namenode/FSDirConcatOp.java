@@ -35,7 +35,7 @@ import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -138,7 +138,7 @@ class FSDirConcatOp {
           long blockSize = trgInode.getPreferredBlockSize();
 
           // check the end block to be full
-          final BlockInfo last = trgInode.getLastBlock();
+          final BlockInfoContiguous last = trgInode.getLastBlock();
           if (blockSize != last.getNumBytes()) {
             throw new HadoopIllegalArgumentException("The last block in " + target
                 + " is not full; last block size = " + last.getNumBytes()
@@ -176,7 +176,7 @@ class FSDirConcatOp {
             //boolean endBlock=false;
             // verify that all the blocks are of the same length as target
             // should be enough to check the end blocks
-            final BlockInfo[] srcBlocks = srcInode.getBlocks();
+            final BlockInfoContiguous[] srcBlocks = srcInode.getBlocks();
             int idx = srcBlocks.length - 1;
             if (endSrc) {
               idx = srcBlocks.length - 2; // end block of endSrc is OK not to be full
@@ -239,7 +239,7 @@ class FSDirConcatOp {
 
       allSrcInodes[i] = inode.asFile();
     }
-    List<BlockInfo> oldBlks = trgInode.concatBlocks(allSrcInodes);
+    List<BlockInfoContiguous> oldBlks = trgInode.concatBlocks(allSrcInodes);
 
     //params for updating the EntityManager.snapshots
     INodeCandidatePrimaryKey trg_param = new INodeCandidatePrimaryKey(trgInode.getId());

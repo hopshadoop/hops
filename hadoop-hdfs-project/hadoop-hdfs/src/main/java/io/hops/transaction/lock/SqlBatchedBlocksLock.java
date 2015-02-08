@@ -15,9 +15,9 @@
  */
 package io.hops.transaction.lock;
 
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 
 import java.io.IOException;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
 
 public final class SqlBatchedBlocksLock extends BaseIndividualBlockLock {
 
@@ -27,7 +27,7 @@ public final class SqlBatchedBlocksLock extends BaseIndividualBlockLock {
     if (inodeLock instanceof BatchedINodeLock) {
       long[] inodeIds = ((BatchedINodeLock) inodeLock).getINodeIds();
       blocks.addAll(
-          acquireLockList(DEFAULT_LOCK_TYPE, BlockInfo.Finder.ByINodeIds,
+          acquireLockList(DEFAULT_LOCK_TYPE, BlockInfoContiguous.Finder.ByINodeIds,
               inodeIds));
     } else {
       throw new TransactionLocks.LockNotAddedException(

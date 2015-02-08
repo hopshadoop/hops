@@ -33,7 +33,7 @@ public interface BlockCollection {
   /**
    * Get the last block of the collection.
    */
-  public BlockInfo getLastBlock() throws IOException, StorageException;
+  public BlockInfoContiguous getLastBlock() throws IOException;
 
   /**
    * Get content summary.
@@ -49,8 +49,7 @@ public interface BlockCollection {
   /**
    * Get the blocks.
    */
-  public BlockInfo[] getBlocks()
-      throws StorageException, TransactionContextException;
+  public BlockInfoContiguous[] getBlocks() throws IOException;
 
   /**
    * Get preferred block size for the collection
@@ -82,21 +81,21 @@ public interface BlockCollection {
    * @param index
    * @return blockinfo
    */
-  public BlockInfo getBlock(int index)
+  public BlockInfoContiguous getBlock(int index)
       throws TransactionContextException, StorageException;
   
   /**
    * Set the block at the given index.
    */
-  public void setBlock(int index, BlockInfo blk) throws StorageException, TransactionContextException;
-  
+  public void setBlock(int index, BlockInfoContiguous blk) throws IOException;
+
   /**
    * Convert the last block of the collection to an under-construction block
    * and set the locations.
    */
-  public BlockInfoUnderConstruction setLastBlock(BlockInfo lastBlock,
-      DatanodeStorageInfo[] locations) throws IOException;
-  
+  public BlockInfoContiguousUnderConstruction setLastBlock(BlockInfoContiguous lastBlock,
+      DatanodeStorageInfo[] targets) throws IOException;
+
   /**
    * @return whether the block collection is under construction.
    */

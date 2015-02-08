@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
@@ -40,10 +38,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.DFSUtil;
-import org.apache.hadoop.hdfs.protocol.HdfsConstants;
-import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
-import org.apache.hadoop.util.Daemon;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -60,8 +54,14 @@ import static io.hops.transaction.lock.LockFactory.getInstance;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.fs.UnresolvedLinkException;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import static org.apache.hadoop.util.Time.now;
+import org.apache.hadoop.hdfs.protocol.HdfsConstants;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
+import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
+import org.apache.hadoop.util.Daemon;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 
 /**
  * LeaseManager does the lease housekeeping for writing on files.
@@ -199,11 +199,11 @@ public class LeaseManager {
             } catch (UnresolvedLinkException e) {
               throw new AssertionError("Lease files should reside on this FS");
             }
-            BlockInfo[] blocks = cons.getBlocks();
+            BlockInfoContiguous[] blocks = cons.getBlocks();
             if (blocks == null) {
               continue;
             }
-            for (BlockInfo b : blocks) {
+            for (BlockInfoContiguous b : blocks) {
               if (!b.isComplete()) {
                 numUCBlocks.incrementAndGet();
               }

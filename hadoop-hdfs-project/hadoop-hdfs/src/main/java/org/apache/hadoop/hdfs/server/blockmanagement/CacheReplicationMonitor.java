@@ -406,7 +406,7 @@ public class CacheReplicationMonitor extends Thread implements Closeable {
    * @param file The file.
    */
   private void rescanFile(CacheDirective directive, INodeFile file) throws StorageException, TransactionContextException {
-    BlockInfo[] blockInfos = file.getBlocks();
+    BlockInfoContiguous[] blockInfos = file.getBlocks();
 
     // Increment the "needed" statistics
     directive.addFilesNeeded(1);
@@ -430,7 +430,7 @@ public class CacheReplicationMonitor extends Thread implements Closeable {
     }
 
     long cachedTotal = 0;
-    for (BlockInfo blockInfo : blockInfos) {
+    for (BlockInfoContiguous blockInfo : blockInfos) {
       if (!blockInfo.getBlockUCState().equals(BlockUCState.COMPLETE)) {
         // We don't try to cache blocks that are under construction.
         LOG.trace("Directive {}: can't cache block {} because it is in state "
@@ -488,7 +488,7 @@ public class CacheReplicationMonitor extends Thread implements Closeable {
   }
 
   private String findReasonForNotCaching(CachedBlock cblock,
-      BlockInfo blockInfo) throws TransactionContextException, StorageException {
+      BlockInfoContiguous blockInfo) throws TransactionContextException, StorageException {
     if (blockInfo == null) {
       // Somehow, a cache report with the block arrived, but the block
       // reports from the DataNode haven't (yet?) described such a block.
@@ -547,7 +547,7 @@ public class CacheReplicationMonitor extends Thread implements Closeable {
           List<DatanodeDescriptor> cached = cblock.getDatanodes(Type.CACHED);
           List<DatanodeDescriptor> pendingUncached = cblock.getDatanodes(Type.PENDING_UNCACHED);
 
-          BlockInfo blockInfo = null;
+          BlockInfoContiguous blockInfo = null;
           if(cblock.getInodeId()>0){
             blockInfo = blockManager.
               getStoredBlock(new Block(cblock.getBlockId()));
@@ -660,7 +660,7 @@ public class CacheReplicationMonitor extends Thread implements Closeable {
       List<DatanodeDescriptor> pendingCached) throws StorageException, TransactionContextException {
     // To figure out which replicas can be cached, we consult the
     // blocksMap.  We don't want to try to cache a corrupt replica, though.
-    BlockInfo blockInfo = blockManager.
+    BlockInfoContiguous blockInfo = blockManager.
         getStoredBlock(new Block(cachedBlock.getBlockId()));
     if (blockInfo == null) {
       if (LOG.isDebugEnabled()) {
@@ -699,7 +699,8 @@ public class CacheReplicationMonitor extends Thread implements Closeable {
       Iterator<CachedBlock> it = datanode.getPendingCached(blockManager.getDatanodeManager()).iterator();
       while (it.hasNext()) {
         CachedBlock cBlock = it.next();
-        BlockInfo info = blockManager.getStoredBlock(new Block(cBlock.getBlockId()));
+        BlockInfoContiguous info = 
+            blockManager.getStoredBlock(new Block(cBlock.getBlockId()));
         if (info != null) {
           pendingBytes -= info.getNumBytes();
         }
@@ -708,7 +709,8 @@ public class CacheReplicationMonitor extends Thread implements Closeable {
       // Add pending uncached blocks from effective capacity
       while (it.hasNext()) {
         CachedBlock cBlock = it.next();
-        BlockInfo info = blockManager.getStoredBlock(new Block(cBlock.getBlockId()));
+        BlockInfoContiguous info = 
+            blockManager.getStoredBlock(new Block(cBlock.getBlockId()));
         if (info != null) {
           pendingBytes += info.getNumBytes();
         }
