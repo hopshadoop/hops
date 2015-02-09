@@ -434,8 +434,10 @@ public class DatanodeManager {
       while (lastActiveIndex > 0 && isInactive(di[lastActiveIndex])) {
           --lastActiveIndex;
       }
-      int activeLen = lastActiveIndex + 1;      
+      int activeLen = lastActiveIndex + 1;    
       networktopology.sortByDistance(client, b.getLocations(), activeLen);
+      // must invalidate cache since we modified locations array
+      b.invalidateCachedStorageInfo();
     }
   }
   

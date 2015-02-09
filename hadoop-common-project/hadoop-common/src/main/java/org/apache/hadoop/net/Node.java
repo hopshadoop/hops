@@ -61,4 +61,7 @@ public interface Node {
    * @param i the level
    */
   public void setLevel(int i);
+  
+  @Override
+  public boolean equals(Object to);
 }
