@@ -700,13 +700,13 @@ public class TestDecommission {
     
     ArrayList<String> nodes = new ArrayList<String>();
     ArrayList<DatanodeInfo> dnInfos = new ArrayList<DatanodeInfo>();
-   
+
     DatanodeManager dm = ns.getBlockManager().getDatanodeManager();
     for (DatanodeInfo datanodeInfo : dnInfos4FirstBlock) {
       DatanodeInfo found = datanodeInfo;
       for (DatanodeInfo dif: dnInfos4LastBlock) {
         if (datanodeInfo.equals(dif)) {
-         found = null;         
+         found = null;
         }
       }
       if (found != null) {
