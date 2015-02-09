@@ -36,7 +36,7 @@ import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
-import org.apache.hadoop.hdfs.server.protocol.DatanodeInfoWithStorage;
+import org.apache.hadoop.hdfs.protocol.DatanodeInfoWithStorage;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -213,15 +213,15 @@ public class TestDatanodeManager {
     dm.sortLocatedBlocks(targetIp, blocks);
 
     // check that storage IDs/types are aligned with datanode locs
-    DatanodeInfoWithStorage[] sortedLocs = block.getLocations();
+    DatanodeInfo[] sortedLocs = block.getLocations();
     storageIDs = block.getStorageIDs();
     storageTypes = block.getStorageTypes();
     assertThat(sortedLocs.length, is(4));
     assertThat(storageIDs.length, is(4));
     assertThat(storageTypes.length, is(4));
     for(int i = 0; i < sortedLocs.length; i++) {
-      assertThat(sortedLocs[i].getStorageID(), is(storageIDs[i]));
-      assertThat(sortedLocs[i].getStorageType(), is(storageTypes[i]));
+      assertThat(((DatanodeInfoWithStorage)sortedLocs[i]).getStorageID(), is(storageIDs[i]));
+      assertThat(((DatanodeInfoWithStorage)sortedLocs[i]).getStorageType(), is(storageTypes[i]));
     }
 
     // Ensure the local node is first.
