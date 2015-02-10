@@ -20,6 +20,8 @@ package org.apache.hadoop.hdfs.server.datanode;
 import com.google.common.annotations.VisibleForTesting;
 import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.SortedActiveNodeList;
+
+import java.io.EOFException;
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.StorageType;
@@ -45,7 +47,6 @@ import org.apache.hadoop.util.VersionInfo;
 import org.apache.hadoop.util.VersionUtil;
 
 import java.io.IOException;
-import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.net.SocketTimeoutException;
 import java.util.Collection;
@@ -448,7 +449,11 @@ class BPServiceActor implements Runnable {
         // Use returned registration from namenode with updated fields
         bpRegistration = bpNamenode.registerDatanode(bpRegistration);
         break;
-      } catch (SocketTimeoutException e) {  // namenode is busy
+      } catch(EOFException e) {  // namenode might have just restarted
+        LOG.info("Problem connecting to server: " + nnAddr + " :"
+            + e.getLocalizedMessage());
+        sleepAndLogInterrupts(1000, "connecting to server");
+      } catch(SocketTimeoutException e) {  // namenode is busy
         LOG.info("Problem connecting to server: " + nnAddr);
         sleepAndLogInterrupts(1000, "connecting to server");
       }
