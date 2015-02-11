@@ -175,12 +175,7 @@ public class TestBalancerWithNodeGroup extends TestCase {
 
     // start rebalancing
     Collection<URI> namenodes = DFSUtil.getNsServiceRpcUris(conf);
-    Set<String>  datanodes = new HashSet<String>();
-      Balancer.Parameters p = new Balancer.Parameters(
-          Balancer.Parameters.DEFAULT.policy,
-          Balancer.Parameters.DEFAULT.threshold,
-          datanodes, Balancer.Parameters.DEFAULT.nodesToBeIncluded);
-    final int r = Balancer.run(namenodes, p, conf);
+    final int r = Balancer.run(namenodes, Balancer.Parameters.DEFAULT, conf);
     assertEquals(ExitStatus.SUCCESS.getExitCode(), r);
 
     waitForHeartBeat(totalUsedSpace, totalCapacity);
