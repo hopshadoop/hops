@@ -142,14 +142,18 @@ class BlockReceiver implements Closeable {
   private long lastResponseTime = 0;
   private boolean isReplaceBlock = false;
   private DataOutputStream replyOut = null;
+  
+  private boolean pinning;
 
   BlockReceiver(final ExtendedBlock block, final StorageType storageType,
       final DataInputStream in,
       final String inAddr, final String myAddr,
-      final BlockConstructionStage stage, final long newGs,
-      final long minBytesRcvd, final long maxBytesRcvd, final String clientname,
-      final DatanodeInfo srcDataNode, final DataNode datanode,
-      DataChecksum requestedChecksum, CachingStrategy cachingStrategy) throws IOException {
+      final BlockConstructionStage stage, 
+      final long newGs, final long minBytesRcvd, final long maxBytesRcvd, 
+      final String clientname, final DatanodeInfo srcDataNode,
+      final DataNode datanode, DataChecksum requestedChecksum, 
+      CachingStrategy cachingStrategy,
+      final boolean pinning) throws IOException {
     try {
       this.block = block;
       this.in = in;
@@ -173,12 +177,15 @@ class BlockReceiver implements Closeable {
       this.isTransfer = stage == BlockConstructionStage.TRANSFER_RBW ||
           stage == BlockConstructionStage.TRANSFER_FINALIZED;
 
+      this.pinning = pinning;
       if (LOG.isDebugEnabled()) {
-        LOG.debug(
-            getClass().getSimpleName() + ": " + block
-                + "\n  isClient  =" + isClient + ", clientname=" + clientname
-                + "\n  isDatanode=" + isDatanode + ", srcDataNode=" + srcDataNode
-                + "\n  inAddr=" + inAddr + ", myAddr=" + myAddr + "\n  cachingStrategy = " + cachingStrategy);
+        LOG.debug(getClass().getSimpleName() + ": " + block
+            + "\n  isClient  =" + isClient + ", clientname=" + clientname
+            + "\n  isDatanode=" + isDatanode + ", srcDataNode=" + srcDataNode
+            + "\n  inAddr=" + inAddr + ", myAddr=" + myAddr
+            + "\n  cachingStrategy = " + cachingStrategy
+            + "\n  pinning=" + pinning
+            );
       }
 
       //
@@ -1295,7 +1302,13 @@ class BlockReceiver implements Closeable {
           : 0;
       block.setNumBytes(replicaInfo.getNumBytes());
       datanode.data.finalizeBlock(block);
-      datanode.closeBlock(block, DataNode.EMPTY_DEL_HINT, replicaInfo.getStorageUuid());
+      
+      if (pinning) {
+        datanode.data.setPinning(block);
+      }
+      
+      datanode.closeBlock(
+          block, DataNode.EMPTY_DEL_HINT, replicaInfo.getStorageUuid());
       if (ClientTraceLog.isInfoEnabled() && isClient) {
         long offset = 0;
         DatanodeRegistration dnR = datanode.getDNRegistrationForBP(block

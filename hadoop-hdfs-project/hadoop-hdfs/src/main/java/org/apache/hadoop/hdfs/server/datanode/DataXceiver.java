@@ -597,8 +597,10 @@ class DataXceiver extends Receiver implements Runnable {
       final long minBytesRcvd,
       final long maxBytesRcvd,
       final long latestGenerationStamp,
-      DataChecksum requestedChecksum,  CachingStrategy cachingStrategy)
-      throws IOException {
+      DataChecksum requestedChecksum,  
+      CachingStrategy cachingStrategy,
+      final boolean pinning,
+      final boolean[] targetPinnings) throws IOException {
     previousOpClientName = clientname;
     updateCurrentThreadName("Receiving block " + block);
     final boolean isDatanode = clientname.length() == 0;
@@ -611,17 +613,17 @@ class DataXceiver extends Receiver implements Runnable {
       throw new IOException(stage + " does not support multiple targets " +
           Arrays.asList(targets));
     }
-
+    
     if (LOG.isDebugEnabled()) {
-      LOG.debug("opWriteBlock: stage=" + stage + ", clientname=" + clientname +
-              "\n  block  =" + block + ", newGs=" + latestGenerationStamp +
-              ", bytesRcvd=[" + minBytesRcvd + ", " + maxBytesRcvd + "]" +
-              "\n  targets=" + Arrays.asList(targets) + "; pipelineSize=" +
-              pipelineSize + ", srcDataNode=" + srcDataNode +
-              "\n storageType= " + storageType + "; tagetStorageTypes= " + 
-              Arrays.asList(targetStorageTypes));
-      LOG.debug("isDatanode=" + isDatanode + ", isClient=" + isClient +
-          ", isTransfer=" + isTransfer);
+      LOG.debug("opWriteBlock: stage=" + stage + ", clientname=" + clientname 
+      		+ "\n  block  =" + block + ", newGs=" + latestGenerationStamp
+      		+ ", bytesRcvd=[" + minBytesRcvd + ", " + maxBytesRcvd + "]"
+          + "\n  targets=" + Arrays.asList(targets)
+          + "; pipelineSize=" + pipelineSize + ", srcDataNode=" + srcDataNode
+          + ", pinning=" + pinning);
+      LOG.debug("isDatanode=" + isDatanode
+          + ", isClient=" + isClient
+          + ", isTransfer=" + isTransfer);
       LOG.debug("writeBlock receive buf size " + peer.getReceiveBufferSize() +
                 " tcp no delay " + peer.getTcpNoDelay());
     }
@@ -654,12 +656,12 @@ class DataXceiver extends Receiver implements Runnable {
       if (isDatanode ||
           stage != BlockConstructionStage.PIPELINE_CLOSE_RECOVERY) {
         // open a block receiver
-        blockReceiver =
-            new BlockReceiver(block, storageType, in,
-                peer.getRemoteAddressString(),
-                peer.getLocalAddressString(), stage,
-                latestGenerationStamp, minBytesRcvd, maxBytesRcvd, clientname,
-                srcDataNode, datanode, requestedChecksum, cachingStrategy);
+        blockReceiver = new BlockReceiver(block, storageType, in,
+            peer.getRemoteAddressString(),
+            peer.getLocalAddressString(), 
+            stage, latestGenerationStamp, minBytesRcvd, maxBytesRcvd, 
+            clientname, srcDataNode, datanode, requestedChecksum, 
+            cachingStrategy, pinning);
 
         storageUuid = blockReceiver.getStorageUuid();
       } else {
@@ -701,11 +703,20 @@ class DataXceiver extends Receiver implements Runnable {
                   HdfsConstants.SMALL_BUFFER_SIZE));
           mirrorIn = new DataInputStream(unbufMirrorIn);
 
-          new Sender(mirrorOut)
-              .writeBlock(originalBlock, targetStorageTypes[0], blockToken,
-                  clientname, targets, targetStorageTypes, srcDataNode, stage,
-                  pipelineSize, minBytesRcvd, maxBytesRcvd,
-                  latestGenerationStamp, requestedChecksum, cachingStrategy);
+          // Do not propagate allowLazyPersist to downstream DataNodes.
+          if (targetPinnings != null && targetPinnings.length > 0) {
+            new Sender(mirrorOut).writeBlock(originalBlock, targetStorageTypes[0],
+              blockToken, clientname, targets, targetStorageTypes, srcDataNode,
+              stage, pipelineSize, minBytesRcvd, maxBytesRcvd,
+              latestGenerationStamp, requestedChecksum, cachingStrategy,
+              targetPinnings[0], targetPinnings);
+          } else {
+            new Sender(mirrorOut).writeBlock(originalBlock, targetStorageTypes[0],
+              blockToken, clientname, targets, targetStorageTypes, srcDataNode,
+              stage, pipelineSize, minBytesRcvd, maxBytesRcvd,
+              latestGenerationStamp, requestedChecksum, cachingStrategy,
+              false, targetPinnings);
+          }
 
           mirrorOut.flush();
 
@@ -912,7 +923,14 @@ class DataXceiver extends Receiver implements Runnable {
       }
 
     }
-
+    
+    if (datanode.data.getPinning(block)) {
+      String msg = "Not able to copy block " + block.getBlockId() + " " +
+          "to " + peer.getRemoteAddressString() + " because it's pinned ";
+      LOG.info(msg);
+      sendResponse(ERROR, msg);
+    }
+    
     if (!dataXceiverServer.balanceThrottler.acquire()) { // not able to start
       String msg = "Not able to copy block " + block.getBlockId() + " " +
           "to " + peer.getRemoteAddressString() + " because threads " +
@@ -1072,7 +1090,7 @@ class DataXceiver extends Receiver implements Runnable {
             proxyReply, proxySock.getRemoteSocketAddress().toString(),
             proxySock.getLocalSocketAddress().toString(),
             null, 0, 0, 0, "", null, datanode, remoteChecksum,
-            CachingStrategy.newDropBehind());
+            CachingStrategy.newDropBehind(), false);
         
         // receive a block
         blockReceiver.receiveBlock(null, null, replyOut, null, 

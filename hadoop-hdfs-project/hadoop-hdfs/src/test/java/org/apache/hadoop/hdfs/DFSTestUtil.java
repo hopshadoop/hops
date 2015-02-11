@@ -334,27 +334,43 @@ public class DFSTestUtil {
   public static void createFile(FileSystem fs, Path fileName, int bufferLen,
       long fileLen, long blockSize, short replFactor, long seed)
       throws IOException {
-    createFile(fs, fileName, bufferLen, fileLen, blockSize,
-        replFactor, seed, false);
+    createFile(fs, fileName, bufferLen, fileLen, blockSize, replFactor,
+        seed, false);
   }
 
   public static void createFile(FileSystem fs, Path fileName,
       int bufferLen, long fileLen, long blockSize,
       short replFactor, long seed, boolean flush) throws IOException {
-    assert bufferLen > 0;
-    if (!fs.mkdirs(fileName.getParent())) {
+        createFile(fs, fileName, bufferLen, fileLen, blockSize,
+          replFactor, seed, flush, null);
+  }
+
+  public static void createFile(FileSystem fs, Path fileName,
+      int bufferLen, long fileLen, long blockSize,
+      short replFactor, long seed, boolean flush,
+      InetSocketAddress[] favoredNodes) throws IOException {
+  assert bufferLen > 0;
+  if (!fs.mkdirs(fileName.getParent())) {
       throw new IOException("Mkdirs failed to create " +
-          fileName.getParent().toString());
+                fileName.getParent().toString());
+  }
+  FSDataOutputStream out = null;
+  EnumSet<CreateFlag> createFlags = EnumSet.of(CREATE);
+  createFlags.add(OVERWRITE);
+  try {
+    if (favoredNodes == null) {
+      out = fs.create(
+        fileName,
+        FsPermission.getFileDefault(),
+        createFlags,
+        fs.getConf().getInt(
+          CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096),
+        replFactor, blockSize, null);
+    } else {
+      out = ((DistributedFileSystem) fs).create(fileName,
+        FsPermission.getDefault(), true, bufferLen, replFactor, blockSize,
+        null, favoredNodes, null);
     }
-    FSDataOutputStream out = null;
-    EnumSet<CreateFlag> createFlags = EnumSet.of(CREATE);
-    createFlags.add(OVERWRITE);
-
-    try {
-      out = fs.create(fileName, FsPermission.getFileDefault(), createFlags,
-          fs.getConf().getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096),
-          replFactor, blockSize, null);
-
       if (fileLen > 0) {
         byte[] toWrite = new byte[bufferLen];
         Random rb = new Random(seed);

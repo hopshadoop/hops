@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdfs;
 
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockPlacementPolicyDefault;
@@ -1075,6 +1076,12 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String[] NNTOP_WINDOWS_MINUTES_DEFAULT = {"1","5","25"};
   public static final String DFS_PIPELINE_ECN_ENABLED = "dfs.pipeline.ecn";
   public static final boolean DFS_PIPELINE_ECN_ENABLED_DEFAULT = false;
+  public static final long DFS_CLIENT_KEY_PROVIDER_CACHE_EXPIRY_DEFAULT =
+      TimeUnit.DAYS.toMillis(10);
+  public static final String DFS_DATANODE_BLOCK_PINNING_ENABLED = 
+    "dfs.datanode.block-pinning.enabled";
+  public static final boolean DFS_DATANODE_BLOCK_PINNING_ENABLED_DEFAULT =
+    false;
   
   public static final String DFS_LOCATION_DOMAIN_ID = "dfs.locationDomainId";
   public static final byte DFS_LOCATION_DOMAIN_ID_DEFAULT = 0;

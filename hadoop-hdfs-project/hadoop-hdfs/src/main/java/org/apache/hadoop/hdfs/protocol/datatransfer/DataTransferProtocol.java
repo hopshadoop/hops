@@ -94,18 +94,14 @@ public interface DataTransferProtocol {
    * @param targets other downstream datanodes in the pipeline.
    * @param targetStorageTypes target {@link StorageType}s corresponding
    *                           to the target datanodes.
-   * @param source
-   *     source datanode.
-   * @param stage
-   *     pipeline stage.
-   * @param pipelineSize
-   *     the size of the pipeline.
-   * @param minBytesRcvd
-   *     minimum number of bytes received.
-   * @param maxBytesRcvd
-   *     maximum number of bytes received.
-   * @param latestGenerationStamp
-   *     the latest generation stamp of the block.
+   * @param source source datanode.
+   * @param stage pipeline stage.
+   * @param pipelineSize the size of the pipeline.
+   * @param minBytesRcvd minimum number of bytes received.
+   * @param maxBytesRcvd maximum number of bytes received.
+   * @param latestGenerationStamp the latest generation stamp of the block.
+   * @param pinning whether to pin the block, so Balancer won't move it.
+   * @param targetPinnings whether to pin the block on target datanode
    */
   public void writeBlock(final ExtendedBlock blk,
       final StorageType storageType,
@@ -119,8 +115,10 @@ public interface DataTransferProtocol {
       final long minBytesRcvd,
       final long maxBytesRcvd,
       final long latestGenerationStamp,
-      final DataChecksum requestedChecksum, final CachingStrategy cachingStrategy)
-      throws IOException;
+      final DataChecksum requestedChecksum, 
+      final CachingStrategy cachingStrategyfinal,
+      boolean pinning,
+      final boolean[] targetPinnings) throws IOException;
 
   /**
    * Transfer a block to another datanode.
