@@ -150,7 +150,7 @@ class FSDirDeleteOp {
         List<AclEntry> nearestDefaultsForSubtree = fsn.calculateNearestDefaultAclForSubtree(pathInfo);
         AbstractFileTree.FileTree fileTree = new AbstractFileTree.FileTree(fsn, subtreeRoot, FsAction.ALL, true,
             nearestDefaultsForSubtree);
-        fileTree.buildUp();
+        fileTree.buildUp(fsd.getBlockStoragePolicySuite());
         fsn.delayAfterBbuildingTree("Built tree for " + srcArg + " for delete op");
 
         if (fsd.isQuotaEnabled()) {
@@ -452,7 +452,8 @@ class FSDirDeleteOp {
     }    
             
     // collect block
-    targetNode.destroyAndCollectBlocks(collectedBlocks, removedINodes);
+    targetNode.destroyAndCollectBlocks(fsd.getBlockStoragePolicySuite(),
+        collectedBlocks, removedINodes);
     
     if (NameNode.stateChangeLog.isDebugEnabled()) {
       NameNode.stateChangeLog.debug("DIR* FSDirectory.unprotectedDelete: "

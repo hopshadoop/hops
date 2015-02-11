@@ -28,6 +28,7 @@ import org.apache.hadoop.hdfs.protocol.Block;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 
 /**
  * An {@link INode} representing a symbolic link.
@@ -73,19 +74,21 @@ public class INodeSymlink extends INodeWithAdditionalFields {
   }
 
   @Override
-  DirCounts spaceConsumedInTree(DirCounts counts) {
-    counts.nsCount += 1;
+  QuotaCounts computeQuotaUsage(BlockStoragePolicySuite bsps, QuotaCounts counts) {
+    counts.addNameSpace(1);
     return counts;
   }
   
   @Override
-  public void destroyAndCollectBlocks(BlocksMapUpdateInfo collectedBlocks,
+  public void destroyAndCollectBlocks(final BlockStoragePolicySuite bsps,
+      BlocksMapUpdateInfo collectedBlocks,
       final List<INode> removedINodes) {
     removedINodes.add(this);
   }
 
   @Override
-  ContentSummaryComputationContext computeContentSummary(final ContentSummaryComputationContext summary) {
+  ContentSummaryComputationContext computeContentSummary(
+      final ContentSummaryComputationContext summary) {
     summary.getCounts().add(Content.SYMLINK, 1);
     return summary;
   }

@@ -50,64 +50,70 @@ public class EnumCounters<E extends Enum<E>> {
     this.enumClass = enumClass;
     this.counters = new long[enumConstants.length];
   }
+
+  public EnumCounters(final Class<E> enumClass, long defaultVal) {
+    final E[] enumConstants = enumClass.getEnumConstants();
+    Preconditions.checkNotNull(enumConstants);
+    this.enumClass = enumClass;
+    this.counters = new long[enumConstants.length];
+    reset(defaultVal);
+  }
   
   /** @return the value of counter e. */
-  public final long get(final E e) {
+  public synchronized final long get(final E e) {
     return counters[e.ordinal()];
   }
 
   /** Negate all counters. */
-  public final void negation() {
+  public synchronized final void negation() {
     for(int i = 0; i < counters.length; i++) {
       counters[i] = -counters[i];
     }
   }
   
   /** Set counter e to the given value. */
-  public final void set(final E e, final long value) {
+  public synchronized final void set(final E e, final long value) {
     counters[e.ordinal()] = value;
   }
 
   /** Set this counters to that counters. */
-  public final void set(final EnumCounters<E> that) {
+  public synchronized final void set(final EnumCounters<E> that) {
     for(int i = 0; i < counters.length; i++) {
       this.counters[i] = that.counters[i];
     }
   }
 
   /** Reset all counters to zero. */
-  public final void reset() {
-    for(int i = 0; i < counters.length; i++) {
-      this.counters[i] = 0L;
-    }
+  public synchronized final void reset() {
+    reset(0L);
   }
 
   /** Add the given value to counter e. */
-  public final void add(final E e, final long value) {
+  public synchronized final void add(final E e, final long value) {
     counters[e.ordinal()] += value;
   }
 
   /** Add that counters to this counters. */
-  public final void add(final EnumCounters<E> that) {
+  public synchronized final void add(final EnumCounters<E> that) {
     for(int i = 0; i < counters.length; i++) {
       this.counters[i] += that.counters[i];
     }
   }
 
   /** Subtract the given value from counter e. */
-  public final void subtract(final E e, final long value) {
+  public synchronized final void subtract(final E e, final long value) {
     counters[e.ordinal()] -= value;
   }
 
   /** Subtract this counters from that counters. */
-  public final void subtract(final EnumCounters<E> that) {
+  public synchronized final void subtract(final EnumCounters<E> that) {
     for(int i = 0; i < counters.length; i++) {
       this.counters[i] -= that.counters[i];
     }
   }
   
   /** @return the sum of all counters. */
-  public final long sum() {
+  public synchronized final long sum() {
     long sum = 0;
     for(int i = 0; i < counters.length; i++) {
       sum += counters[i];
@@ -116,7 +122,7 @@ public class EnumCounters<E extends Enum<E>> {
   }
 
   @Override
-  public boolean equals(Object obj) {
+  public synchronized boolean equals(Object obj) {
     if (obj == this) {
       return true;
     } else if (obj == null || !(obj instanceof EnumCounters)) {
@@ -128,12 +134,12 @@ public class EnumCounters<E extends Enum<E>> {
   }
 
   @Override
-  public int hashCode() {
+  public synchronized int hashCode() {
     return Arrays.hashCode(counters);
   }
 
   @Override
-  public String toString() {
+  public synchronized String toString() {
     final E[] enumConstants = enumClass.getEnumConstants();
     final StringBuilder b = new StringBuilder();
     for(int i = 0; i < counters.length; i++) {
@@ -141,6 +147,30 @@ public class EnumCounters<E extends Enum<E>> {
       b.append(name).append("=").append(counters[i]).append(", ");
     }
     return b.substring(0, b.length() - 2);
+  }
+
+  public synchronized final void reset(long val) {
+    for(int i = 0; i < counters.length; i++) {
+      this.counters[i] = val;
+    }
+  }
+
+  public synchronized boolean allLessOrEqual(long val) {
+    for (long c : counters) {
+      if (c > val) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  public synchronized boolean anyGreaterOrEqual(long val) {
+    for (long c: counters) {
+      if (c >= val) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**

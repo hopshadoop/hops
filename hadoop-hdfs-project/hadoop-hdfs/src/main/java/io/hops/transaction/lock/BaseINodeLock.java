@@ -281,7 +281,7 @@ public abstract class BaseINodeLock extends Lock {
         pks.add(pk);
       }
     }
-    acquireLockList(DEFAULT_LOCK_TYPE, INodeAttributes.Finder.ByINodeIds, pks);
+    acquireLockList(DEFAULT_LOCK_TYPE, DirectoryWithQuotaFeature.Finder.ByINodeIds, pks);
   }
 
   protected void setPartitioningKey(Long partitionId)

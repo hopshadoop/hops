@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.base.Preconditions;
+import io.hops.exception.StorageException;
+import io.hops.exception.TransactionContextException;
 import io.hops.metadata.hdfs.entity.INodeCandidatePrimaryKey;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.context.HdfsTransactionContextMaintenanceCmds;
@@ -33,9 +35,11 @@ import io.hops.transaction.lock.TransactionLockTypes.LockType;
 import io.hops.transaction.lock.TransactionLocks;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.fs.permission.FsAction;
+import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
 import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
+import org.apache.hadoop.hdfs.StorageType;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -46,6 +50,7 @@ import java.util.Set;
 import org.apache.hadoop.ipc.RetryCache.CacheEntry;
 import org.apache.hadoop.ipc.RetryCacheDistributed;
 import org.apache.hadoop.ipc.Server;
+import java.util.List;
 
 import static org.apache.hadoop.util.Time.now;
 
@@ -180,26 +185,44 @@ class FSDirConcatOp {
     }
     return si.toArray(new INodeFile[si.size()]);
   }
-  
-    private static long computeQuotaDelta(INodeFile target, INodeFile[] srcList) throws IOException{
-    long delta = 0;
+
+  private static QuotaCounts computeQuotaDeltas(FSDirectory fsd, INodeFile target, INodeFile[] srcList) throws
+      StorageException, TransactionContextException {
+    QuotaCounts deltas = new QuotaCounts.Builder().build();
     short targetRepl = target.getBlockReplication();
     for (INodeFile src : srcList) {
-      if (targetRepl != src.getBlockReplication()) {
-        delta += src.computeFileSize() *
-            (targetRepl - src.getBlockReplication());
+      short srcRepl = src.getBlockReplication();
+      long fileSize = src.computeFileSize();
+      if (targetRepl != srcRepl) {
+        deltas.addDiskSpace(fileSize * (targetRepl - srcRepl));
+        BlockStoragePolicy bsp =
+            fsd.getBlockStoragePolicySuite().getPolicy(src.getStoragePolicyID());
+        if (bsp != null) {
+          List<StorageType> srcTypeChosen = bsp.chooseStorageTypes(srcRepl);
+          for (StorageType t : srcTypeChosen) {
+            if (t.supportTypeQuota()) {
+              deltas.addTypeSpace(t, -fileSize);
+            }
+          }
+          List<StorageType> targetTypeChosen = bsp.chooseStorageTypes(targetRepl);
+          for (StorageType t : targetTypeChosen) {
+            if (t.supportTypeQuota()) {
+              deltas.addTypeSpace(t, fileSize);
+            }
+          }
+        }
       }
     }
-    return delta;
+    return deltas;
   }
 
   private static void verifyQuota(FSDirectory fsd, INodesInPath targetIIP,
-      long delta) throws QuotaExceededException, IOException{
+      QuotaCounts deltas) throws QuotaExceededException, StorageException, TransactionContextException {
     if (!fsd.getFSNamesystem().isImageLoaded()) {
       // Do not check quota if editlog is still being processed
       return;
     }
-    FSDirectory.verifyQuota(targetIIP, targetIIP.length() - 1, 0, delta, null);
+    FSDirectory.verifyQuota(targetIIP, targetIIP.length() - 1, deltas, null);
   }
   
   /**
@@ -214,8 +237,8 @@ class FSDirConcatOp {
     }
 
     final INodeFile trgInode = targetIIP.getLastINode().asFile();
-    long delta = computeQuotaDelta(trgInode, srcList);
-    verifyQuota(fsd, targetIIP, delta);
+    QuotaCounts deltas = computeQuotaDeltas(fsd, trgInode, srcList);
+    verifyQuota(fsd, targetIIP, deltas);
 
     INodeDirectory trgParent = targetIIP.getINode(-2).asDirectory();
     List<BlockInfoContiguous> oldBlks = trgInode.concatBlocks(srcList);
@@ -240,8 +263,7 @@ class FSDirConcatOp {
     trgInode.setModificationTime(timestamp);
     trgParent.updateModificationTime(timestamp);
     // update quota on the parent directory ('count' files removed, 0 space)
-    fsd.unprotectedUpdateCount(targetIIP, targetIIP.length() - 1,
-        -count, delta);
+    fsd.unprotectedUpdateCount(targetIIP, targetIIP.length() - 1, deltas);
     EntityManager
         .snapshotMaintenance(HdfsTransactionContextMaintenanceCmds.Concat,
             trg_param, srcs_param, oldBlks);

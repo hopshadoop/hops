@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import com.google.common.base.Preconditions;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.HdfsStorageFactory;
@@ -27,6 +26,7 @@ import io.hops.transaction.EntityManager;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockCollection;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguousUnderConstruction;
@@ -34,6 +34,8 @@ import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.hdfs.server.common.GenerationStamp;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
+import org.apache.hadoop.hdfs.StorageType;
+import com.google.common.base.Preconditions;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -313,7 +315,8 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
   }
 
   @Override
-  public void destroyAndCollectBlocks(BlocksMapUpdateInfo collectedBlocks, final List<INode> removedINodes)
+  public void destroyAndCollectBlocks(BlockStoragePolicySuite bsps,
+      BlocksMapUpdateInfo collectedBlocks, final List<INode> removedINodes)
       throws StorageException, TransactionContextException {
     parent = null;
     BlockInfoContiguous[] blocks = getBlocks();
@@ -336,7 +339,7 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
     return getFullPathName();
   }
 
-
+  
   @Override
   public final ContentSummaryComputationContext computeContentSummary(
       final ContentSummaryComputationContext summary) throws StorageException, TransactionContextException {
@@ -354,50 +357,65 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
    * @throws io.hops.exception.TransactionContextException
    */
   public final long computeFileSizeNotIncludingLastUcBlock() throws StorageException, TransactionContextException {
-    return computeFileSize(false);
+    return computeFileSize(false, false);
   }
   
   public long computeFileSize()
       throws StorageException, TransactionContextException {
-    return computeFileSize(true, getBlocks());
+    return computeFileSize(true, false);
   }  
 
   /**
    * Compute file size.
    * May or may not include BlockInfoUnderConstruction.
    */
-  public long computeFileSize(boolean includesBlockInfoUnderConstruction)
-      throws StorageException, TransactionContextException {
-    return computeFileSize(includesBlockInfoUnderConstruction, getBlocks());
-  }
-
-  static long computeFileSize(boolean includesBlockInfoUnderConstruction,
-      BlockInfoContiguous[] blocks) throws StorageException {
+  public final long computeFileSize(boolean includesLastUcBlock,
+      boolean usePreferredBlockSize4LastUcBlock) throws StorageException, TransactionContextException {
+    BlockInfoContiguous[] blocks = getBlocks();
     if (blocks == null || blocks.length == 0) {
       return 0;
     }
     final int last = blocks.length - 1;
     //check if the last block is BlockInfoUnderConstruction
-    long bytes = 0;
-    
-    if(blocks[last] instanceof BlockInfoContiguousUnderConstruction){
-        if(includesBlockInfoUnderConstruction){
-            bytes = blocks[last].getNumBytes();
-        }
-    }else{
-        bytes = blocks[last].getNumBytes();
+    long size = blocks[last].getNumBytes();
+
+    if (blocks[last] instanceof BlockInfoContiguousUnderConstruction) {
+      if (!includesLastUcBlock) {
+        size = 0;
+      } else if (usePreferredBlockSize4LastUcBlock) {
+        size = getPreferredBlockSize();
+      }
     }
+    //sum other blocks
     for (int i = 0; i < last; i++) {
-      bytes += blocks[i].getNumBytes();
+      size += blocks[i].getNumBytes();
     }
-    return bytes;
+    return size;
   }
 
   @Override
-  DirCounts spaceConsumedInTree(DirCounts counts)
+  QuotaCounts computeQuotaUsage(BlockStoragePolicySuite bsps, QuotaCounts counts)
       throws StorageException, TransactionContextException {
-    counts.nsCount += 1;
-    counts.dsCount += diskspaceConsumed();
+    long nsDelta = 1;
+    final long dsDeltaNoReplication;
+    short dsReplication;
+    dsDeltaNoReplication = diskspaceConsumedNoReplication();
+    dsReplication = getBlockReplication();
+    counts.addNameSpace(nsDelta);
+    counts.addDiskSpace(dsDeltaNoReplication * dsReplication);
+    
+    //storage policy is not set for new inodes
+    if (dsDeltaNoReplication > 0 && getStoragePolicyID() != BlockStoragePolicySuite.ID_UNSPECIFIED){
+      BlockStoragePolicy bsp = bsps.getPolicy(getStoragePolicyID());
+      List<StorageType> storageTypes = bsp.chooseStorageTypes(dsReplication);
+      for (StorageType t : storageTypes) {
+        if (!t.supportTypeQuota()) {
+          continue;
+        }
+        counts.addTypeSpace(t, dsDeltaNoReplication);
+      }
+    }
+
     return counts;
   }
 
@@ -406,44 +424,21 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
    * including blocks in its snapshots.
    * Use preferred block size for the last block if it is under construction.
    */
-  long diskspaceConsumed() throws StorageException, TransactionContextException {
+  public final long diskspaceConsumed() throws StorageException, TransactionContextException {
+    return diskspaceConsumedNoReplication() * getBlockReplication();
+  }
+
+  public final long diskspaceConsumedNoReplication() throws StorageException, TransactionContextException {
     if(isFileStoredInDB()){
       // We do not know the replicaton of the database here. However, to be
       // consistent with normal files we will multiply the file size by the
       // replication factor.
-      return getSize() * getBlockReplication();
-    }else {
-      return diskspaceConsumed(getBlocks()); // Compute the size of the file. Takes replication in to account
+      return getSize();
+    }else{
+      return computeFileSize(true, true);
     }
-  }
-  
-  long diskspaceConsumed(Block[] blkArr) {
-    return diskspaceConsumed(blkArr, isUnderConstruction(),
-        getPreferredBlockSize(), getBlockReplication());
   }
 
-  static long diskspaceConsumed(Block[] blkArr, boolean underConstruction,
-      long preferredBlockSize, short blockReplication) {
-    long size = 0;
-    if (blkArr == null) {
-      return 0;
-    }
-
-    for (Block blk : blkArr) {
-      if (blk != null) {
-        size += blk.getNumBytes();
-      }
-    }
-    /* If the last block is being written to, use prefferedBlockSize
-     * rather than the actual block size.
-     */
-    if (blkArr.length > 0 && blkArr[blkArr.length - 1] != null &&
-        underConstruction) {
-      size += preferredBlockSize - blkArr[blkArr.length - 1].getNumBytes();
-    }
-    return size * blockReplication;
-  }
-  
   /**
    * Return the penultimate allocated block for this file.
    */
@@ -630,7 +625,7 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
     save();
   }
   public void recomputeFileSize() throws StorageException, TransactionContextException {
-    setSizeNoPersistence(this.computeFileSize(true));
+    setSizeNoPersistence(this.computeFileSize(true, false));
     save();
   }
 

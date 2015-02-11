@@ -46,6 +46,7 @@ import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 import org.apache.hadoop.hdfs.server.namenode.INode.BlocksMapUpdateInfo;
 
 import java.io.FileNotFoundException;
@@ -99,8 +100,8 @@ class FSDirRenameOp {
    * dstInodes[dstInodes.length-1]
    */
   static void verifyQuotaForRename(FSDirectory fsd,
-      INodesInPath src, INodesInPath dst, INode.DirCounts srcCounts,
-      INode.DirCounts dstCounts)
+      INodesInPath src, INodesInPath dst, QuotaCounts srcCounts,
+      QuotaCounts dstCounts)
       throws QuotaExceededException, StorageException, TransactionContextException {
     if (!fsd.getFSNamesystem().isImageLoaded() || !fsd.isQuotaEnabled()) {
       // Do not check quota if edits log is still being processed
@@ -110,17 +111,15 @@ class FSDirRenameOp {
     for (int i = 0; src.getINode(i).equals(dst.getINode(i)); i++) {
       commonAncestor = src.getINode(i);
     }
-    long nsDelta = srcCounts.getNsCount();
-    long dsDelta = srcCounts.getDsCount();
-
+    
+    final QuotaCounts delta = new QuotaCounts.Builder().quotaCount(srcCounts).build();
+    
     // Reduce the required quota by dst that is being removed
-    INode dstInode = dst.getLastINode();
-    if (dstInode != null) {
-      nsDelta -= dstCounts.getNsCount();
-      dsDelta -= dstCounts.getDsCount();
+    INode dstINode = dst.getLastINode();
+    if (dstINode != null) {
+      delta.subtract(dstCounts);
     }
-    FSDirectory.verifyQuota(dst, dst.length() - 1, nsDelta, dsDelta,
-        commonAncestor);
+    FSDirectory.verifyQuota(dst, dst.length() - 1, delta, commonAncestor);
   }
 
   /**
@@ -215,12 +214,9 @@ class FSDirRenameOp {
     //mechanism on the src and dst
     //However the quota is enabled then all the quota update on the dst
     //must be applied before the move operation.
-    INode.DirCounts srcCounts = new INode.DirCounts();
-    srcCounts.nsCount = srcInfo.getNsCount(); //if not dir then it will return zero
-    srcCounts.dsCount = srcInfo.getDsCount();
-    INode.DirCounts dstCounts = new INode.DirCounts();
-    dstCounts.nsCount = dstInfo.getNsCount();
-    dstCounts.dsCount = dstInfo.getDsCount();
+    QuotaCounts srcCounts = new QuotaCounts.Builder().quotaCount(srcInfo.getUsage()).build();
+    QuotaCounts dstCounts = new QuotaCounts.Builder().quotaCount(dstInfo.getUsage()).build();
+    
     boolean isUsingSubTreeLocks = srcInfo.isDir();
     boolean renameTransactionCommitted = false;
     INodeIdentifier srcSubTreeRoot = null;
@@ -240,15 +236,14 @@ class FSDirRenameOp {
               dstDataSet, srcSubTreeRoot)) {
             srcFileTree = new AbstractFileTree.LoggingQuotaCountingFileTree(fsd.getFSNamesystem(),
                     srcSubTreeRoot, srcDataSet, dstDataSet);
-            srcFileTree.buildUp();
+            srcFileTree.buildUp(fsd.getBlockStoragePolicySuite());
             logEntries = ((AbstractFileTree.LoggingQuotaCountingFileTree) srcFileTree).getMetadataLogEntries();
           } else {
             srcFileTree = new AbstractFileTree.QuotaCountingFileTree(fsd.getFSNamesystem(),
                     srcSubTreeRoot);
-            srcFileTree.buildUp();
+            srcFileTree.buildUp(fsd.getBlockStoragePolicySuite());
           }
-          srcCounts.nsCount = srcFileTree.getNamespaceCount();
-          srcCounts.dsCount = srcFileTree.getDiskspaceCount();
+          srcCounts = new QuotaCounts.Builder().quotaCount(srcFileTree.getQuotaCount()).build();
         }
         fsd.getFSNamesystem().delayAfterBbuildingTree("Built tree of "+ src +" for rename. ");
       } else {
@@ -261,7 +256,6 @@ class FSDirRenameOp {
 
       // the rename Tx has committed. it has also remove the subTreeLocks
       renameTransactionCommitted = true;
-
       return retValue;
 
     } finally {
@@ -274,7 +268,7 @@ class FSDirRenameOp {
   }
 
   private static boolean renameToTransaction(final FSDirectory fsd, final String src, final long srcINodeID,
-      final String dst, final INode.DirCounts srcCounts, final INode.DirCounts dstCounts,
+      final String dst, final QuotaCounts srcCounts, final QuotaCounts dstCounts,
       final boolean isUsingSubTreeLocks, final Collection<MetadataLogEntry> logEntries, final INodesInPath srcIIP,
       final INodesInPath dstIIP, final long timestamp) throws IOException {
 
@@ -357,7 +351,7 @@ class FSDirRenameOp {
             }
 
             tx.updateMtimeAndLease(timestamp);
-            tx.updateQuotasInSourceTree();
+            tx.updateQuotasInSourceTree(fsd.getBlockStoragePolicySuite());
 
             tx.logMetadataEvent();
             tx.snapshotMaintenance();
@@ -498,12 +492,8 @@ class FSDirRenameOp {
     //mechanism on the src and dst
     //However the quota is enabled then all the quota update on the dst
     //must be applied before the move operation.
-    INode.DirCounts srcCounts = new INode.DirCounts();
-    srcCounts.nsCount = srcInfo.getNsCount(); //if not dir then it will return zero
-    srcCounts.dsCount = srcInfo.getDsCount();
-    INode.DirCounts dstCounts = new INode.DirCounts();
-    dstCounts.nsCount = dstInfo.getNsCount();
-    dstCounts.dsCount = dstInfo.getDsCount();
+    QuotaCounts srcCounts = new QuotaCounts.Builder().quotaCount(srcInfo.getUsage()).build();
+    QuotaCounts dstCounts = new QuotaCounts.Builder().quotaCount(dstInfo.getUsage()).build();
     boolean isUsingSubTreeLocks = srcInfo.isDir();
     boolean renameTransactionCommitted = false;
     INodeIdentifier srcSubTreeRoot = null;
@@ -522,15 +512,14 @@ class FSDirRenameOp {
               dstDataSet, srcSubTreeRoot)) {
             srcFileTree = new AbstractFileTree.LoggingQuotaCountingFileTree(fsd.getFSNamesystem(),
                     srcSubTreeRoot, srcDataSet, dstDataSet);
-            srcFileTree.buildUp();
+            srcFileTree.buildUp(fsd.getBlockStoragePolicySuite());
             logEntries = ((AbstractFileTree.LoggingQuotaCountingFileTree) srcFileTree).getMetadataLogEntries();
           } else {
             srcFileTree = new AbstractFileTree.QuotaCountingFileTree(fsd.getFSNamesystem(),
                     srcSubTreeRoot);
-            srcFileTree.buildUp();
+            srcFileTree.buildUp(fsd.getBlockStoragePolicySuite());
           }
-          srcCounts.nsCount = srcFileTree.getNamespaceCount();
-          srcCounts.dsCount = srcFileTree.getDiskspaceCount();
+          srcCounts = new QuotaCounts.Builder().quotaCount(srcFileTree.getQuotaCount()).build();
 
           fsd.getFSNamesystem().delayAfterBbuildingTree("Built Tree for "+src+" for rename. ");
         }
@@ -557,7 +546,7 @@ class FSDirRenameOp {
 
   private 
   static RenameResult renameToTransaction(final FSDirectory fsd, final String src, final long srcINodeID, final String dst,
-      final INode.DirCounts srcCounts, final INode.DirCounts dstCounts,
+      final QuotaCounts srcCounts, final QuotaCounts dstCounts,
       final boolean isUsingSubTreeLocks,
       final Collection<MetadataLogEntry> logEntries, final INodesInPath srcIIP,
       final INodesInPath dstIIP, final long timestamp,
@@ -626,6 +615,8 @@ class FSDirRenameOp {
 
         AbstractFileTree.LoggingQuotaCountingFileTree.updateLogicalTime(logEntries);
 
+        BlockStoragePolicySuite bsps = fsd.getBlockStoragePolicySuite();
+        
         for (Options.Rename op : options) {
           if (op == Rename.KEEP_ENCODING_STATUS) {
             INodesInPath srcInodesInPath = fsd.getINodesInPath(src, false);
@@ -677,7 +668,7 @@ class FSDirRenameOp {
             if (undoRemoveDst) {
               undoRemoveDst = false;
               if (removedNum > 0) {
-                filesDeleted = tx.cleanDst();
+                filesDeleted = tx.cleanDst(bsps);
               }
             }
             
@@ -687,7 +678,7 @@ class FSDirRenameOp {
             }
             
             tx.snapshotMaintenance();
-            tx.updateQuotasInSourceTree();
+            tx.updateQuotasInSourceTree(bsps);
             HdfsFileStatus auditStat = fsd.getAuditFileInfo(dstIIP);
             return new RenameResult(filesDeleted, auditStat);
           }
@@ -806,15 +797,15 @@ class FSDirRenameOp {
     private final String dst;
     private final INodeDirectory srcParent;
     private final byte[] srcChildName;
-    private final INode.DirCounts srcCounts;
-    private final INode.DirCounts dstCounts;
+    private final QuotaCounts srcCounts;
+    private final QuotaCounts dstCounts;
     private INode srcChild;
     private INode oldDstChild;
     private INode srcClone;
 
     RenameOperation(FSDirectory fsd, String src, String dst,
-                    INodesInPath srcIIP, INodesInPath dstIIP, INode.DirCounts srcCounts,
-                    INode.DirCounts dstCounts)
+                    INodesInPath srcIIP, INodesInPath dstIIP, QuotaCounts srcCounts,
+                    QuotaCounts dstCounts)
         throws QuotaExceededException, IOException {
       this.fsd = fsd;
       this.src = src;
@@ -902,14 +893,14 @@ class FSDirRenameOp {
       fsd.addLastINodeNoQuotaCheck(dstParentIIP, oldDstChild, dstCounts); 
     }
 
-    boolean cleanDst()
+    boolean cleanDst(BlockStoragePolicySuite bsps)
         throws QuotaExceededException, IOException {
       Preconditions.checkState(oldDstChild != null);
       BlocksMapUpdateInfo collectedBlocks = new BlocksMapUpdateInfo();
       List<INode> removedINodes = new ChunkedArrayList<>();
       final boolean filesDeleted;
       
-      oldDstChild.destroyAndCollectBlocks(collectedBlocks, removedINodes);
+      oldDstChild.destroyAndCollectBlocks(bsps, collectedBlocks, removedINodes);
       filesDeleted = true;
       
       fsd.getFSNamesystem().removeLeasesAndINodes(src, removedINodes);
@@ -917,7 +908,7 @@ class FSDirRenameOp {
       return filesDeleted;
     }
 
-    void updateQuotasInSourceTree() throws QuotaExceededException {
+    void updateQuotasInSourceTree(BlockStoragePolicySuite bsps) throws QuotaExceededException {
       // update the quota usage in src tree
       // for snapshot
     }

@@ -28,7 +28,6 @@ import io.hops.exception.StorageException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.QuotaUpdateDataAccess;
 import io.hops.metadata.StorageMap;
-import io.hops.metadata.hdfs.dal.INodeAttributesDataAccess;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.security.UsersGroups;
@@ -79,7 +78,6 @@ import org.apache.hadoop.hdfs.server.datanode.DataNodeLayoutVersion;
 import org.apache.hadoop.hdfs.server.datanode.TestTransferRbw;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.INode;
-import org.apache.hadoop.hdfs.server.namenode.INodeAttributes;
 import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
 import org.apache.hadoop.hdfs.server.namenode.LeaseManager;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
@@ -132,6 +130,8 @@ import org.junit.Assert;
 import org.junit.Assume;
 
 import static org.junit.Assert.assertEquals;
+import io.hops.metadata.hdfs.dal.DirectoryWithQuotaFeatureDataAccess;
+import org.apache.hadoop.hdfs.server.namenode.DirectoryWithQuotaFeature;
 
 /**
  * Utilities for HDFS tests
@@ -1208,13 +1208,15 @@ public class DFSTestUtil {
             newINodes.add(newRootINode);
             da.prepare(INode.EMPTY_LIST, newINodes, INode.EMPTY_LIST);
 
-            INodeAttributes inodeAttributes =
-                new INodeAttributes(newRootINode.getId(), newRootINode.isInTree(), Long.MAX_VALUE, 1L, -1L, 0L);
-            INodeAttributesDataAccess ida =
-                (INodeAttributesDataAccess) HdfsStorageFactory
-                    .getDataAccess(INodeAttributesDataAccess.class);
-            List<INodeAttributes> attrList = new ArrayList<INodeAttributes>();
-            attrList.add(inodeAttributes);
+            DirectoryWithQuotaFeature directoryWithQuotaFeature =
+                new DirectoryWithQuotaFeature.Builder(newRootINode.
+                getId()).nameSpaceQuota(Long.MAX_VALUE).nameSpaceUsage(1L).spaceQuota(-1L).spaceUsage(0L).build();
+            newRootINode.addDirectoryWithQuotaFeature(directoryWithQuotaFeature);
+            DirectoryWithQuotaFeatureDataAccess ida =
+                (DirectoryWithQuotaFeatureDataAccess) HdfsStorageFactory
+                    .getDataAccess(DirectoryWithQuotaFeatureDataAccess.class);
+            List<DirectoryWithQuotaFeature> attrList = new ArrayList<DirectoryWithQuotaFeature>();
+            attrList.add(directoryWithQuotaFeature);
             ida.prepare(attrList, null);
 
             return newRootINode;
@@ -1403,6 +1405,8 @@ public class DFSTestUtil {
     // OP_SET_QUOTA 14
     filesystem.setQuota(pathDirectoryMkdir, 1000L,
         HdfsConstants.QUOTA_DONT_SET);
+    // OP_SET_QUOTA_BY_STORAGETYPE
+    filesystem.setQuotaByStorageType(pathDirectoryMkdir, StorageType.SSD, 888L);
     // OP_RENAME 15
     fc.rename(pathFileCreate, pathFileMoved, Rename.NONE);
     // OP_CONCAT_DELETE 16

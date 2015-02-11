@@ -29,18 +29,12 @@ import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.transaction.EntityManager;
 import java.io.FileNotFoundException;
 import java.io.PrintStream;
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.nio.charset.Charset;
-import java.util.List;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
+import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.AclException;
 import org.apache.hadoop.hdfs.protocol.Block;
@@ -187,28 +181,6 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
     }
 
   }
-  
-  /** Wrapper of two counters for namespace consumed and diskspace consumed. */
-  static class DirCounts {
-    /** namespace count */
-    long nsCount = 0;
-    /** diskspace count */
-    long dsCount = 0;
-    
-    /**
-     * returns namespace count
-     */
-    long getNsCount() {
-      return nsCount;
-    }
-
-    /**
-     * returns diskspace count
-     */
-    long getDsCount() {
-      return dsCount;
-    }
-  }
 
   private int numAces;
   /** parent is {@link INodeDirectory} */
@@ -318,7 +290,11 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
    * directory, the method goes down the subtree and collects blocks from the
    * descents, and clears its parent/children references as well. The method
    * also clears the diff list if the INode contains snapshot diff list.
-   * 
+   *
+   * @param bsps
+   *          block storage policy suite to calculate intended storage type usage
+   *          This is needed because INodeReference#destroyAndCollectBlocks() needs
+   *          to call INode#cleanSubtree(), which calls INode#computeQuotaUsage().
    * @param collectedBlocks
    *          blocks collected from the descents for further block
    *          deletion/update will be added to this map.
@@ -326,7 +302,9 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
    *          INodes collected from the descents for further cleaning up of
    *          inodeMap
    */
-public abstract void destroyAndCollectBlocks(BlocksMapUpdateInfo v, List<INode> removedINodes)
+  public abstract void destroyAndCollectBlocks(
+      BlockStoragePolicySuite bsps,
+      BlocksMapUpdateInfo collectedBlocks, List<INode> removedINodes) 
       throws StorageException, TransactionContextException;
 
   /**
@@ -344,29 +322,31 @@ public abstract void destroyAndCollectBlocks(BlocksMapUpdateInfo v, List<INode> 
   public final ContentSummary computeAndConvertContentSummary(
       ContentSummaryComputationContext summary) throws StorageException, TransactionContextException {
     Content.Counts counts = computeContentSummary(summary).getCounts();
-    final Quota.Counts q = getQuotaCounts();
+    final QuotaCounts q = getQuotaCounts();
     return new ContentSummary(counts.get(Content.LENGTH),
         counts.get(Content.FILE) + counts.get(Content.SYMLINK),
-        counts.get(Content.DIRECTORY), q.get(Quota.NAMESPACE),
-        counts.get(Content.DISKSPACE), q.get(Quota.DISKSPACE));
+        counts.get(Content.DIRECTORY), q.getNameSpace(),
+        counts.get(Content.DISKSPACE), q.getDiskSpace());
+    // TODO: storage type quota reporting HDFS-7701.
   }
 
   /**
    * @param summary the context object holding counts for the subtree.
    * @return The same objects as summary.
    */
-  abstract ContentSummaryComputationContext computeContentSummary(ContentSummaryComputationContext summary)
+  abstract ContentSummaryComputationContext computeContentSummary(
+      ContentSummaryComputationContext summary)
       throws StorageException, TransactionContextException;
   
-  public void addSpaceConsumed(long nsDelta, long dsDelta)
+  public void addSpaceConsumed(QuotaCounts counts)
     throws StorageException, TransactionContextException {
-    addSpaceConsumed2Parent(nsDelta, dsDelta);
+    addSpaceConsumed2Parent(counts);
   }
   
-  void addSpaceConsumed2Parent(long nsDelta, long dsDelta)
+  void addSpaceConsumed2Parent(QuotaCounts counts)
     throws StorageException, TransactionContextException {
     if (parent != null) {
-      parent.addSpaceConsumed(nsDelta, dsDelta);
+      parent.addSpaceConsumed(counts);
     }
   }
   
@@ -375,21 +355,25 @@ public abstract void destroyAndCollectBlocks(BlocksMapUpdateInfo v, List<INode> 
    *
    *  @return the quota counts.  The count is -1 if it is not set.
    */
-  public Quota.Counts getQuotaCounts() throws StorageException, TransactionContextException{
-    return Quota.Counts.newInstance(-1, -1);
+  public QuotaCounts getQuotaCounts() throws StorageException, TransactionContextException {
+    return new QuotaCounts.Builder().
+        nameCount(HdfsConstants.QUOTA_RESET).
+        spaceCount(HdfsConstants.QUOTA_RESET).
+        typeCounts(HdfsConstants.QUOTA_RESET).
+        build();
   }
-  
-  boolean isQuotaSet() throws StorageException, TransactionContextException {
-    final Quota.Counts q = getQuotaCounts();
-    return q.get(Quota.NAMESPACE) >= 0 || q.get(Quota.DISKSPACE) >= 0;
+
+  public final boolean isQuotaSet() throws StorageException, TransactionContextException {
+    final QuotaCounts qc = getQuotaCounts();
+    return qc.anyNsSpCountGreaterOrEqual(0) || qc.anyTypeCountGreaterOrEqual(0);
   }
-  
+
   /**
    * Adds total number of names and total disk space taken under
    * this tree to counts.
    * Returns updated counts object.
    */
-  abstract DirCounts spaceConsumedInTree(DirCounts counts)
+  abstract QuotaCounts computeQuotaUsage( BlockStoragePolicySuite bsps, QuotaCounts counts)
       throws StorageException, TransactionContextException;
   
   /**
@@ -780,7 +764,7 @@ public abstract void destroyAndCollectBlocks(BlocksMapUpdateInfo v, List<INode> 
     //if This inode is of type INodeDirectoryWithQuota then also delete the INode Attribute table
     if ((node instanceof INodeDirectory) && ((INodeDirectory) node).isWithQuota()) {
       final DirectoryWithQuotaFeature q = ((INodeDirectory) node).getDirectoryWithQuotaFeature();
-      q.removeAttributes((INodeDirectory) node);
+      q.remove();
       ((INodeDirectory) node).removeFeature(q);
     }
     
