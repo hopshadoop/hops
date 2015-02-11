@@ -321,6 +321,8 @@ Release 2.7.0 - UNRELEASED
 
     HDFS-7760. Document truncate for WebHDFS. (shv)
 
+    HDFS-7761. cleanup unnecssary code logic in LocatedBlock. (yliu)
+
   OPTIMIZATIONS
 
   BUG FIXES
