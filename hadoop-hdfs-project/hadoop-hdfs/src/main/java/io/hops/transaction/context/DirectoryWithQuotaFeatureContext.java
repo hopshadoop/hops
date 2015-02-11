@@ -21,37 +21,36 @@ import io.hops.exception.StorageCallPreventedException;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.common.FinderType;
-import io.hops.metadata.hdfs.dal.INodeAttributesDataAccess;
+import io.hops.metadata.hdfs.dal.DirectoryWithQuotaFeatureDataAccess;
 import io.hops.metadata.hdfs.entity.INodeCandidatePrimaryKey;
 import io.hops.transaction.lock.TransactionLocks;
 import org.apache.hadoop.hdfs.server.namenode.INode;
-import org.apache.hadoop.hdfs.server.namenode.INodeAttributes;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
+import org.apache.hadoop.hdfs.server.namenode.DirectoryWithQuotaFeature;
 import org.apache.hadoop.hdfs.server.namenode.Quota;
 
-public class INodeAttributesContext
-    extends BaseEntityContext<Long, INodeAttributes> {
+public class DirectoryWithQuotaFeatureContext
+    extends BaseEntityContext<Long, DirectoryWithQuotaFeature> {
 
-  private final INodeAttributesDataAccess<INodeAttributes> dataAccess;
+  private final DirectoryWithQuotaFeatureDataAccess<DirectoryWithQuotaFeature> dataAccess;
 
-  public INodeAttributesContext(
-      INodeAttributesDataAccess<INodeAttributes> dataAccess) {
+  public DirectoryWithQuotaFeatureContext(
+      DirectoryWithQuotaFeatureDataAccess<DirectoryWithQuotaFeature> dataAccess) {
     this.dataAccess = dataAccess;
   }
 
   @Override
-  public void update(INodeAttributes iNodeAttributes)
+  public void update(DirectoryWithQuotaFeature directoryWithQuotaFeature)
       throws TransactionContextException {
-    if (iNodeAttributes.isInTree()) {
-      super.update(iNodeAttributes);
+    if (directoryWithQuotaFeature.getInodeId()!=null) {
+      super.update(directoryWithQuotaFeature);
       if(isLogTraceEnabled()){
-        log("updated-attributes", "id", iNodeAttributes.getInodeId(), "DSQ", iNodeAttributes.getQuotaCounts().get(
-            Quota.DISKSPACE), "DS", iNodeAttributes.getDiskspace(), "NSQ", iNodeAttributes.getQuotaCounts().get(
-                Quota.NAMESPACE), "NS", iNodeAttributes.getNsCount());
+        log("updated-attributes", "id", directoryWithQuotaFeature.getInodeId(), "quota", directoryWithQuotaFeature.
+            getQuota(), " usage", directoryWithQuotaFeature.getSpaceConsumed());
       }
     } else {
       if(isLogTraceEnabled()) {
@@ -61,11 +60,11 @@ public class INodeAttributesContext
   }
 
   @Override
-  public void remove(INodeAttributes iNodeAttributes)
+  public void remove(DirectoryWithQuotaFeature directoryWithQuotaFeature)
       throws TransactionContextException {
-    super.remove(iNodeAttributes);
+    super.remove(directoryWithQuotaFeature);
     if(isLogTraceEnabled()) {
-      log("removed-attributes", "id", iNodeAttributes.getInodeId());
+      log("removed-attributes", "id", directoryWithQuotaFeature.getInodeId());
       for(int i = 0; i < Thread.currentThread().getStackTrace().length;i++){
        System.out.println(Thread.currentThread().getStackTrace()[i]) ;
       }
@@ -73,9 +72,9 @@ public class INodeAttributesContext
   }
 
   @Override
-  public INodeAttributes find(FinderType<INodeAttributes> finder,
-      Object... params) throws TransactionContextException, StorageException {
-    INodeAttributes.Finder qfinder = (INodeAttributes.Finder) finder;
+  public DirectoryWithQuotaFeature find(FinderType<DirectoryWithQuotaFeature> finder, Object... params) throws
+      TransactionContextException, StorageException {
+    DirectoryWithQuotaFeature.Finder qfinder = (DirectoryWithQuotaFeature.Finder) finder;
     switch (qfinder) {
       case ByINodeId:
         return findByPrimaryKey(qfinder, params);
@@ -84,10 +83,9 @@ public class INodeAttributesContext
   }
 
   @Override
-  public Collection<INodeAttributes> findList(
-      FinderType<INodeAttributes> finder, Object... params)
+  public Collection<DirectoryWithQuotaFeature> findList(FinderType<DirectoryWithQuotaFeature> finder, Object... params)
       throws TransactionContextException, StorageException {
-    INodeAttributes.Finder qfinder = (INodeAttributes.Finder) finder;
+    DirectoryWithQuotaFeature.Finder qfinder = (DirectoryWithQuotaFeature.Finder) finder;
     switch (qfinder) {
       case ByINodeIds:
         return findByPrimaryKeys(qfinder, params);
@@ -96,17 +94,16 @@ public class INodeAttributesContext
   }
 
   @Override
-  public void prepare(TransactionLocks tlm)
-      throws TransactionContextException, StorageException {
-    Collection<INodeAttributes> modified =
+  public void prepare(TransactionLocks tlm) throws TransactionContextException, StorageException {
+    Collection<DirectoryWithQuotaFeature> modified =
         new ArrayList<>(getModified());
     modified.addAll(getAdded());
     dataAccess.prepare(modified, getRemoved());
   }
 
   @Override
-  Long getKey(INodeAttributes iNodeAttributes) {
-    return iNodeAttributes.getInodeId();
+  Long getKey(DirectoryWithQuotaFeature directoryWithQuotaFeature) {
+    return directoryWithQuotaFeature.getInodeId();
   }
 
   @Override
@@ -131,10 +128,10 @@ public class INodeAttributesContext
     }
   }
 
-  private INodeAttributes findByPrimaryKey(INodeAttributes.Finder qfinder,
-      Object[] params) throws StorageCallPreventedException, StorageException {
+  private DirectoryWithQuotaFeature findByPrimaryKey(DirectoryWithQuotaFeature.Finder qfinder, Object[] params) throws
+      StorageCallPreventedException, StorageException {
     final long inodeId = (Long) params[0];
-    INodeAttributes result = null;
+    DirectoryWithQuotaFeature result = null;
     if (contains(inodeId)) {
       result = get(inodeId);
       hit(qfinder, result, "inodeid", inodeId);
@@ -147,12 +144,11 @@ public class INodeAttributesContext
     return result;
   }
 
-  private Collection<INodeAttributes> findByPrimaryKeys(
-      INodeAttributes.Finder qfinder, Object[] params)
-      throws StorageCallPreventedException, StorageException {
+  private Collection<DirectoryWithQuotaFeature> findByPrimaryKeys(DirectoryWithQuotaFeature.Finder qfinder,
+      Object[] params) throws StorageCallPreventedException, StorageException {
     final List<INodeCandidatePrimaryKey> inodePks =
         (List<INodeCandidatePrimaryKey>) params[0];
-    Collection<INodeAttributes> result = null;
+    Collection<DirectoryWithQuotaFeature> result = null;
     if (contains(inodePks)) {
       result = get(inodePks);
       hit(qfinder, result, "inodeids", inodePks);
@@ -162,10 +158,9 @@ public class INodeAttributesContext
       gotFromDB(result);
       miss(qfinder, result, "inodeids", inodePks);
       if(result!=null){
-        for(INodeAttributes iNodeAttributes:result){
-          log("read-attributes", "id", iNodeAttributes.getInodeId(), "DSQ", iNodeAttributes.getQuotaCounts().get(
-              Quota.DISKSPACE), "DS", iNodeAttributes.getDiskspace(), "NSQ", iNodeAttributes.getQuotaCounts().get(
-                  Quota.NAMESPACE), "NS", iNodeAttributes.getNsCount());
+        for(DirectoryWithQuotaFeature directoryWithQuotaFeature:result){
+          log("attributes", "id", directoryWithQuotaFeature.getInodeId(), "quota", directoryWithQuotaFeature.
+            getQuota(), " usage", directoryWithQuotaFeature.getSpaceConsumed());
         }
 
       }
@@ -183,24 +178,21 @@ public class INodeAttributesContext
     return true;
   }
 
-  private Collection<INodeAttributes> get(
-      List<INodeCandidatePrimaryKey> iNodeCandidatePKs) {
-    Collection<INodeAttributes> iNodeAttributeses =
-        new ArrayList<>(iNodeCandidatePKs.size());
+  private Collection<DirectoryWithQuotaFeature> get(List<INodeCandidatePrimaryKey> iNodeCandidatePKs) {
+    Collection<DirectoryWithQuotaFeature> directoryWithQuotaFeatures = new ArrayList<>(iNodeCandidatePKs.size());
     for (INodeCandidatePrimaryKey pk : iNodeCandidatePKs) {
-      iNodeAttributeses.add(get(pk.getInodeId()));
+      directoryWithQuotaFeatures.add(get(pk.getInodeId()));
     }
-    return iNodeAttributeses;
+    return directoryWithQuotaFeatures;
   }
 
-  private void updateAttributes(INodeCandidatePrimaryKey trg_param,
-      List<INodeCandidatePrimaryKey> toBeDeletedSrcs)
+  private void updateAttributes(INodeCandidatePrimaryKey trg_param, List<INodeCandidatePrimaryKey> toBeDeletedSrcs)
       throws TransactionContextException {
     toBeDeletedSrcs.remove(trg_param);
     for (INodeCandidatePrimaryKey src : toBeDeletedSrcs) {
       if (contains(src.getInodeId())) {
-        INodeAttributes toBeDeleted = get(src.getInodeId());
-        INodeAttributes toBeAdded = clone(toBeDeleted, trg_param.getInodeId());
+        DirectoryWithQuotaFeature toBeDeleted = get(src.getInodeId());
+        DirectoryWithQuotaFeature toBeAdded = clone(toBeDeleted, trg_param.getInodeId());
 
         remove(toBeDeleted);
         if(isLogTraceEnabled()) {
@@ -217,9 +209,11 @@ public class INodeAttributesContext
     }
   }
 
-  private INodeAttributes clone(INodeAttributes src, long inodeId) {
-    return new INodeAttributes(inodeId, src.getQuotaCounts().get(Quota.NAMESPACE), src.getNsCount(),
-        src.getQuotaCounts().get(Quota.DISKSPACE), src.getDiskspace());
+  private DirectoryWithQuotaFeature clone(DirectoryWithQuotaFeature src, long inodeId) {
+    return new DirectoryWithQuotaFeature.Builder(inodeId).nameSpaceQuota(src.getQuota().getNameSpace()).
+        nameSpaceUsage(src.getSpaceConsumed().getNameSpace()).spaceQuota(src.getQuota().getDiskSpace()).spaceUsage(
+        src.getSpaceConsumed().getDiskSpace()).typeQuotas(src.getQuota().getTypeSpaces()).typeUsages(src.
+        getSpaceConsumed().getTypeSpaces()).build();
   }
 
 }

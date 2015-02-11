@@ -24,7 +24,6 @@ import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.leader_election.node.ActiveNode;
 import io.hops.metadata.HdfsStorageFactory;
-import io.hops.metadata.hdfs.dal.INodeAttributesDataAccess;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
@@ -50,6 +49,10 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
+import io.hops.metadata.hdfs.dal.DirectoryWithQuotaFeatureDataAccess;
+import org.apache.hadoop.hdfs.StorageType;
+import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 
 @VisibleForTesting
 abstract class AbstractFileTree {
@@ -80,12 +83,15 @@ abstract class AbstractFileTree {
     private final short depth; //this is the depth of the inode in the file system tree
     private final int level;
     private List<AclEntry> inheritedDefaultsAsAccess;
+    private BlockStoragePolicySuite bsps;
     
-    private ChildCollector(ProjectedINode parent, short depth, int level, List<AclEntry> inheritedDefaultsAsAccess) {
+    private ChildCollector(ProjectedINode parent, short depth, int level, List<AclEntry> inheritedDefaultsAsAccess,
+        BlockStoragePolicySuite bsps) {
       this.parent = parent;
       this.level = level;
       this.depth = depth;
       this.inheritedDefaultsAsAccess = inheritedDefaultsAsAccess;
+      this.bsps = bsps;
     }
     
     @Override
@@ -125,7 +131,7 @@ abstract class AbstractFileTree {
                     }
                   }
                 }
-                addChildNode(parent, level, child);
+                addChildNode(parent, level, child, bsps);
               }
   
               if (exception != null) {
@@ -146,7 +152,7 @@ abstract class AbstractFileTree {
                 List<AclEntry> newDefaults = filterAccessEntries(acls.get(child));
                 if (child.isDirectory()) {
                   collectChildren(child, ((short) (depth + 1)), level + 1, newDefaults.isEmpty()
-                      ? inheritedDefaultsAsAccess : newDefaults);
+                      ? inheritedDefaultsAsAccess : newDefaults, bsps);
                 }
               }
               return null;
@@ -236,14 +242,14 @@ abstract class AbstractFileTree {
     }
   }
   
-  public void buildUp() throws IOException {
-    INode subtreeRoot = readSubtreeRoot();
+  public void buildUp(BlockStoragePolicySuite bsps) throws IOException {
+    INode subtreeRoot = readSubtreeRoot(bsps);
     if (!subtreeRoot.isDirectory()) {
       return;
     }
     
     
-    collectChildren(newProjectedInode(subtreeRoot, 0), subtreeRootId.getDepth(), 2, subtreeRootDefaultEntries);
+    collectChildren(newProjectedInode(subtreeRoot, 0), subtreeRootId.getDepth(), 2, subtreeRootDefaultEntries, bsps);
     while (true) {
       try {
         Future future = activeCollectors.poll();
@@ -277,11 +283,12 @@ abstract class AbstractFileTree {
     }
   }
   
-  protected abstract void addSubtreeRoot(ProjectedINode node);
+  protected abstract void addSubtreeRoot(ProjectedINode node, BlockStoragePolicySuite bsps);
   
-  protected abstract void addChildNode(ProjectedINode parent, int level, ProjectedINode child);
+  protected abstract void addChildNode(ProjectedINode parent, int level, ProjectedINode child,
+      BlockStoragePolicySuite bsps);
   
-  private INode readSubtreeRoot() throws IOException {
+  private INode readSubtreeRoot(final BlockStoragePolicySuite bsps) throws IOException {
     return (INode) new LightWeightRequestHandler(
         HDFSOperationType.GET_SUBTREE_ROOT) {
       @Override
@@ -317,15 +324,16 @@ abstract class AbstractFileTree {
         
         ProjectedINode pin = AbstractFileTree.newProjectedInode(subtreeRoot, size);
   
-        addSubtreeRoot(pin);
+        addSubtreeRoot(pin, bsps);
         return subtreeRoot;
       }
     }.handle(this);
   }
   
-  private void collectChildren(ProjectedINode parent, short depth, int level, List<AclEntry> inheritedDefaults) {
+  private void collectChildren(ProjectedINode parent, short depth, int level, List<AclEntry> inheritedDefaults,
+      BlockStoragePolicySuite bsps) {
     activeCollectors.add(namesystem.getFSOperationsExecutor().
-        submit(new ChildCollector(parent, depth, level, inheritedDefaults)));
+        submit(new ChildCollector(parent, depth, level, inheritedDefaults, bsps)));
   }
   
   /**
@@ -354,11 +362,8 @@ abstract class AbstractFileTree {
   
   @VisibleForTesting
   static class CountingFileTree extends AbstractFileTree {
-    private final AtomicLong fileCount = new AtomicLong(0);
-    private final AtomicLong directoryCount = new AtomicLong(0);
-    private final AtomicLong diskspaceCount = new AtomicLong(0);
-    private final AtomicLong fileSizeSummary = new AtomicLong(0);
-    
+    Content.Counts counts = Content.Counts.newInstance();
+    QuotaCounts usedCounts = new QuotaCounts.Builder().build();
     public CountingFileTree(FSNamesystem namesystem, INodeIdentifier subtreeRootId)
         throws AccessControlException {
       super(namesystem, subtreeRootId);
@@ -370,52 +375,53 @@ abstract class AbstractFileTree {
     }
     
     @Override
-    protected void addSubtreeRoot(ProjectedINode node) {
-      addNode(node);
+    protected void addSubtreeRoot(ProjectedINode node, BlockStoragePolicySuite bsps) {
+      addNode(node, bsps);
     }
     
     @Override
-    protected void addChildNode(ProjectedINode parent, int level, ProjectedINode node) {
-      addNode(node);
+    protected void addChildNode(ProjectedINode parent, int level, ProjectedINode node, BlockStoragePolicySuite bsps) {
+      addNode(node, bsps);
     }
     
-    protected void addNode(final ProjectedINode node) {
+    protected void addNode(final ProjectedINode node, BlockStoragePolicySuite bsps) {
       if (node.isDirectory()) {
-        directoryCount.addAndGet(1);
+        counts.add(Content.DIRECTORY, 1);
+        usedCounts.addNameSpace(1);
       } else if (node.isSymlink()) {
-        fileCount.addAndGet(1);
+        counts.add(Content.SYMLINK, 1);
+        usedCounts.addNameSpace(1);
       } else {
-        fileCount.addAndGet(1);
-        diskspaceCount.addAndGet(node.getFileSize() * INode.HeaderFormat.getReplication(node.getHeader()));
-        fileSizeSummary.addAndGet(node.getFileSize());
+        counts.add(Content.FILE, 1);
+        counts.add(Content.LENGTH, node.getFileSize());
+        counts.add(Content.DISKSPACE, node.getFileSize() * INode.HeaderFormat.getReplication(node.getHeader()));
+        usedCounts.addDiskSpace(node.getFileSize() * INode.HeaderFormat.getReplication(node.getHeader()));
+        usedCounts.addNameSpace(1);
+        if (node.getStoragePolicyID()!= BlockStoragePolicySuite.ID_UNSPECIFIED) {
+          BlockStoragePolicy bsp = bsps.getPolicy(node.getStoragePolicyID());
+          List<StorageType> storageTypes = bsp.chooseStorageTypes(INode.HeaderFormat.getReplication(node.getHeader()));
+          for (StorageType t : storageTypes) {
+            if (!t.supportTypeQuota()) {
+              continue;
+            }
+            usedCounts.addTypeSpace(t, node.getFileSize());
+          }
+        }
       }
     }
-    
-    long getNamespaceCount() {
-      return directoryCount.get() + fileCount.get();
+
+    public Content.Counts getCounts() {
+      return counts;
     }
-    
-    long getDiskspaceCount() {
-      return diskspaceCount.get();
-    }
-    
-    long getFileSizeSummary() {
-      return fileSizeSummary.get();
-    }
-    
-    public long getFileCount() {
-      return fileCount.get();
-    }
-    
-    public long getDirectoryCount() {
-      return directoryCount.get();
+
+    public QuotaCounts getUsedCounts() {
+      return usedCounts;
     }
   }
   
   @VisibleForTesting
   static class QuotaCountingFileTree extends AbstractFileTree {
-    private final AtomicLong namespaceCount = new AtomicLong(0);
-    private final AtomicLong diskspaceCount = new AtomicLong(0);
+    private final QuotaCounts quotaCounts = new QuotaCounts.Builder().build();
   
     public QuotaCountingFileTree(FSNamesystem namesystem, INodeIdentifier subtreeRootId)
         throws AccessControlException {
@@ -423,12 +429,12 @@ abstract class AbstractFileTree {
     }
   
     @Override
-    protected void addSubtreeRoot(ProjectedINode node) {
+    protected void addSubtreeRoot(ProjectedINode node, BlockStoragePolicySuite bsps) {
       addNode(node);
     }
   
     @Override
-    protected void addChildNode(ProjectedINode parent, int level, ProjectedINode node) {
+    protected void addChildNode(ProjectedINode parent, int level, ProjectedINode node, BlockStoragePolicySuite bsps) {
       if (!parent.isDirWithQuota())
         addNode(node);
     }
@@ -439,13 +445,12 @@ abstract class AbstractFileTree {
             HDFSOperationType.GET_SUBTREE_ATTRIBUTES) {
           @Override
           public Object performTask() throws StorageException, IOException {
-            INodeAttributesDataAccess<INodeAttributes> dataAccess =
-                (INodeAttributesDataAccess) HdfsStorageFactory
-                    .getDataAccess(INodeAttributesDataAccess.class);
-            INodeAttributes attributes =
+            DirectoryWithQuotaFeatureDataAccess<DirectoryWithQuotaFeature> dataAccess =
+                (DirectoryWithQuotaFeatureDataAccess) HdfsStorageFactory
+                    .getDataAccess(DirectoryWithQuotaFeatureDataAccess.class);
+            DirectoryWithQuotaFeature feature =
                 dataAccess.findAttributesByPk(node.getId());
-            namespaceCount.addAndGet(attributes.getNsCount());
-            diskspaceCount.addAndGet(attributes.getDiskspace());
+            quotaCounts.add(feature.getSpaceConsumed());
             return null;
           }
         };
@@ -456,21 +461,17 @@ abstract class AbstractFileTree {
           setExceptionIfNull(e);
         }
       } else {
-        namespaceCount.addAndGet(1);
+        quotaCounts.addNameSpace(1);
         if (!node.isDirectory() && !node.isSymlink()) {
-          diskspaceCount.addAndGet(node.getFileSize() * INode.HeaderFormat.getReplication(node.getHeader()));
+          quotaCounts.addDiskSpace(node.getFileSize() * INode.HeaderFormat.getReplication(node.getHeader()));
         }
       }
     }
   
-    long getNamespaceCount() {
-      return namespaceCount.get();
+    QuotaCounts getQuotaCount() {
+      return quotaCounts;
     }
-  
-    long getDiskspaceCount() {
-      return diskspaceCount.get();
-    }
-  
+    
   }
     static class LoggingQuotaCountingFileTree extends QuotaCountingFileTree {
       private ConcurrentLinkedQueue<MetadataLogEntry> metadataLogEntries =
@@ -487,7 +488,7 @@ abstract class AbstractFileTree {
       }
       
       @Override
-      protected void addChildNode(ProjectedINode parent, int level, ProjectedINode node) {
+      protected void addChildNode(ProjectedINode parent, int level, ProjectedINode node, BlockStoragePolicySuite bsps) {
         if(srcDataset == null){
           if(dstDataset == null){
             //Do nothing as non of the directories are metaEnabled
@@ -515,7 +516,7 @@ abstract class AbstractFileTree {
           }
         }
         
-        super.addChildNode(parent, level, node);
+        super.addChildNode(parent, level, node, bsps);
       }
       
       public Collection<MetadataLogEntry> getMetadataLogEntries() {
@@ -565,14 +566,14 @@ abstract class AbstractFileTree {
       
       
       @Override
-      protected void addSubtreeRoot(ProjectedINode node) {
+      protected void addSubtreeRoot(ProjectedINode node, BlockStoragePolicySuite bsps) {
         inodesByLevel.put(ROOT_LEVEL, node);
         inodesById.put(node.getId(), node);
         dirsByLevel.put(ROOT_LEVEL, node);
       }
       
       @Override
-      protected void addChildNode(ProjectedINode parent, int level, ProjectedINode node) {
+      protected void addChildNode(ProjectedINode parent, int level, ProjectedINode node, BlockStoragePolicySuite bsps) {
         inodesByParent.put(parent.getId(), node);
         inodesByLevel.put(level, node);
         inodesById.put(node.getId(), node);
@@ -649,15 +650,15 @@ abstract class AbstractFileTree {
       }
       
       @Override
-      protected void addSubtreeRoot(ProjectedINode node) {
+      protected void addSubtreeRoot(ProjectedINode node, BlockStoragePolicySuite bsps) {
         synchronizedList.add(node.getId());
-        super.addSubtreeRoot(node);
+        super.addSubtreeRoot(node, bsps);
       }
       
       @Override
-      protected void addChildNode(ProjectedINode parent, int level, ProjectedINode node) {
+      protected void addChildNode(ProjectedINode parent, int level, ProjectedINode node, BlockStoragePolicySuite bsps) {
         synchronizedList.add(node.getId());
-        super.addChildNode(parent, level, node);
+        super.addChildNode(parent, level, node, bsps);
       }
       
       /**

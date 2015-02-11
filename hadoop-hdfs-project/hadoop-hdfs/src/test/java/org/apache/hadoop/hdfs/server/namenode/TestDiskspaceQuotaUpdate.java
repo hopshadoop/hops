@@ -89,16 +89,16 @@ public class TestDiskspaceQuotaUpdate {
         fileLen, BLOCKSIZE, REPLICATION, seed);
     //let time to the quota manager to update the quota
     Thread.sleep(1000);
-    Quota.Counts cnt = getSpaceConsumed(foo);
-    assertEquals(2, cnt.get(Quota.NAMESPACE));
-    assertEquals(fileLen * REPLICATION, cnt.get(Quota.DISKSPACE));
+    QuotaCounts cnt = getSpaceConsumed(foo);
+    assertEquals(2, cnt.getNameSpace());
+    assertEquals(fileLen * REPLICATION, cnt.getDiskSpace());
   }
 
 
   /**
    * Test if the quota can be correctly updated for append
    */
-  @Test (timeout=60000)
+  @Test //(timeout=60000)
   public void testUpdateQuotaForAppend() throws Exception {
     final Path foo = new Path(dir ,"foo");
     final Path bar = new Path(foo, "bar");
@@ -114,9 +114,9 @@ public class TestDiskspaceQuotaUpdate {
     //let time to the quota manager to update the quota
     Thread.sleep(1000);
 
-    Quota.Counts quota = getSpaceConsumed(foo);
-    long ns = quota.get(Quota.NAMESPACE);
-    long ds = quota.get(Quota.DISKSPACE);
+    QuotaCounts quota = getSpaceConsumed(foo);
+    long ns = quota.getNameSpace();
+    long ds = quota.getDiskSpace();
     assertEquals(2, ns); // foo and bar
     assertEquals(currentFileLen * REPLICATION, ds);
     ContentSummary c = dfs.getContentSummary(foo);
@@ -130,8 +130,8 @@ public class TestDiskspaceQuotaUpdate {
     Thread.sleep(1000);
     
     quota = getSpaceConsumed(foo);
-    ns = quota.get(Quota.NAMESPACE);
-    ds = quota.get(Quota.DISKSPACE);
+    ns = quota.getNameSpace();
+    ds = quota.getDiskSpace();
     assertEquals(2, ns); // foo and bar
     assertEquals(currentFileLen * REPLICATION, ds);
     c = dfs.getContentSummary(foo);
@@ -142,8 +142,8 @@ public class TestDiskspaceQuotaUpdate {
     //let time to the quota manager to update the quota
     Thread.sleep(1000);
     quota = getSpaceConsumed(foo);
-    ns = quota.get(Quota.NAMESPACE);
-    ds = quota.get(Quota.DISKSPACE);
+    ns = quota.getNameSpace();
+    ds = quota.getDiskSpace();
     assertEquals(2, ns); // foo and bar
     assertEquals(currentFileLen * REPLICATION, ds);
     c = dfs.getContentSummary(foo);
@@ -170,11 +170,11 @@ public class TestDiskspaceQuotaUpdate {
     Thread.sleep(1000);
     
 //    INodeDirectory fooNode = getINode4Write(foo);
-    Quota.Counts quota = getSpaceConsumed(foo);
+    QuotaCounts quota = getSpaceConsumed(foo);
 //        fooNode.getDirectoryWithQuotaFeature()
 //        .getSpaceConsumed(fooNode);
-    long ns = quota.get(Quota.NAMESPACE);
-    long ds = quota.get(Quota.DISKSPACE);
+    long ns = quota.getNameSpace();
+    long ds = quota.getDiskSpace();
     assertEquals(2, ns); // foo and bar
     assertEquals(BLOCKSIZE * 2 * REPLICATION, ds); // file is under construction
 
@@ -186,8 +186,8 @@ public class TestDiskspaceQuotaUpdate {
 //    fooNode = getINode4Write(foo);
 //    quota = fooNode.getDirectoryWithQuotaFeature().getSpaceConsumed(fooNode);
     quota = getSpaceConsumed(foo);
-    ns = quota.get(Quota.NAMESPACE);
-    ds = quota.get(Quota.DISKSPACE);
+    ns = quota.getNameSpace();
+    ds = quota.getDiskSpace();
     assertEquals(2, ns);
     assertEquals((BLOCKSIZE + BLOCKSIZE / 2) * REPLICATION, ds);
 
@@ -198,13 +198,13 @@ public class TestDiskspaceQuotaUpdate {
     
 //    quota = fooNode.getDirectoryWithQuotaFeature().getSpaceConsumed(fooNode);
     quota = getSpaceConsumed(foo);
-    ns = quota.get(Quota.NAMESPACE);
-    ds = quota.get(Quota.DISKSPACE);
+    ns = quota.getNameSpace();
+    ds = quota.getDiskSpace();
     assertEquals(2, ns); // foo and bar
     assertEquals((BLOCKSIZE * 2 + BLOCKSIZE / 2) * REPLICATION, ds);
   }
 
-  Quota.Counts getSpaceConsumed(final Path foo) throws IOException {
+  QuotaCounts getSpaceConsumed(final Path foo) throws IOException {
     HopsTransactionalRequestHandler handler = new HopsTransactionalRequestHandler(HDFSOperationType.TEST) {
 
       @Override
@@ -222,10 +222,10 @@ public class TestDiskspaceQuotaUpdate {
       public Object performTask() throws IOException {
         INodeDirectory fooNode = fsdir.getINode4Write(foo.toString()).asDirectory();
         assertTrue(fooNode.isQuotaSet());
-        return fooNode.getDirectoryWithQuotaFeature().getSpaceConsumed(fooNode);
+        return fooNode.getDirectoryWithQuotaFeature().getSpaceConsumed();
       }
     };
-    return (Quota.Counts) handler.handle();
+    return (QuotaCounts) handler.handle();
   }
 
 //  INodeDirectory getINode4Write(final Path foo) throws IOException {

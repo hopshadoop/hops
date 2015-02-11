@@ -376,7 +376,7 @@ class FSDirStatAndListingOp {
       if(isStoredInDB){
         size = fileNode.getSize();
       } else {
-        size = fileNode.computeFileSize(true);
+        size = fileNode.computeFileSize();
       }
       replication = fileNode.getBlockReplication();
       blocksize = fileNode.getPreferredBlockSize();
@@ -448,7 +448,7 @@ class FSDirStatAndListingOp {
       throw new FileNotFoundException("File does not exist: " + src);
     }
     final INode subtreeRoot = pathInfo.getINodesInPath().getLastINode();
-    final INodeAttributes subtreeAttr = pathInfo.getSubtreeRootAttributes();
+    final QuotaCounts subtreeQuota = pathInfo.getQuota();
     final INodeIdentifier subtreeRootIdentifier = new INodeIdentifier(subtreeRoot.getId(), subtreeRoot.getParentId(),
         subtreeRoot.getLocalName(), subtreeRoot.getPartitionId());
     subtreeRootIdentifier.setDepth(((short) (INodeDirectory.ROOT_DIR_DEPTH + pathInfo.getPathComponents().length - 1)));
@@ -461,14 +461,18 @@ class FSDirStatAndListingOp {
     //access:null, subAccess:FsAction.READ_EXECUTE, ignoreEmptyDir:true
     final AbstractFileTree.CountingFileTree fileTree = new AbstractFileTree.CountingFileTree(fsd.getFSNamesystem(),
         subtreeRootIdentifier, FsAction.READ_EXECUTE, true, nearestDefaultsForSubtree);
-    fileTree.buildUp();
+    fileTree.buildUp(fsd.getBlockStoragePolicySuite());
 
-    ContentSummary cs = new ContentSummary(fileTree.getFileSizeSummary(),
-        fileTree.getFileCount(), fileTree.getDirectoryCount(),
-        subtreeAttr == null ? subtreeRoot.getQuotaCounts().get(Quota.NAMESPACE) : subtreeAttr.getQuotaCounts().get(
-            Quota.NAMESPACE),
-        fileTree.getDiskspaceCount(), subtreeAttr == null ? subtreeRoot
-        .getQuotaCounts().get(Quota.DISKSPACE) : subtreeAttr.getQuotaCounts().get(Quota.DISKSPACE));
+    Content.Counts counts = fileTree.getCounts();
+    QuotaCounts q = subtreeQuota;
+    if(q==null){
+      q=subtreeRoot.getQuotaCounts();
+    }
+    ContentSummary cs = new ContentSummary(counts.get(Content.LENGTH),
+        counts.get(Content.FILE) + counts.get(Content.SYMLINK),
+        counts.get(Content.DIRECTORY), q.getNameSpace(),
+        counts.get(Content.DISKSPACE), q.getDiskSpace());
+    
     fsd.addYieldCount(0);
     return cs;
   }

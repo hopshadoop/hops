@@ -214,7 +214,7 @@ public class INodeDALAdaptor
       hopINode.setParentId(inode.getParentId());
       hopINode.setPermission(inode.getFsPermission().toShort());
       if(!inode.isSymlink()){
-        hopINode.setStoragePolicy(inode.getLocalStoragePolicyID());
+        hopINode.setStoragePolicyID(inode.getLocalStoragePolicyID());
       }
       hopINode.setSubtreeLocked(inode.isSTOLocked());
       hopINode.setSubtreeLockOwner(inode.getSTOLockOwner());
@@ -262,7 +262,7 @@ public class INodeDALAdaptor
         if (hopINode.isDirectory()) {
           if (hopINode.isDirWithQuota()) {
             inode = new INodeDirectory(hopINode.getId(), hopINode.getName(), ps, true);
-            DirectoryWithQuotaFeature quota = new DirectoryWithQuotaFeature();
+            DirectoryWithQuotaFeature quota = new DirectoryWithQuotaFeature.Builder(inode.getId()).build();
             ((INodeDirectory)inode).addFeature(quota);
           } else {
             String iname = (hopINode.getName().length() == 0) ? INodeDirectory.ROOT_NAME : hopINode.getName();
@@ -279,7 +279,7 @@ public class INodeDALAdaptor
         } else {
           inode = new INodeFile(hopINode.getId(), ps, hopINode.getHeader(),
               hopINode.getModificationTime(), hopINode.getAccessTime(), hopINode.isFileStoredInDB(),
-              hopINode.getStoragePolicy(), true);
+              hopINode.getStoragePolicyID(), true);
           if (hopINode.isUnderConstruction()) {
             FileUnderConstructionFeature ucf = new FileUnderConstructionFeature(hopINode.getClientName(),
                 hopINode.getClientMachine(), inode);
@@ -300,7 +300,7 @@ public class INodeDALAdaptor
         inode.setHeaderNoPersistance(hopINode.getHeader());
         inode.setPartitionIdNoPersistance(hopINode.getPartitionId());
         inode.setLogicalTimeNoPersistance(hopINode.getLogicalTime());
-        inode.setBlockStoragePolicyIDNoPersistance(hopINode.getStoragePolicy());
+        inode.setBlockStoragePolicyIDNoPersistance(hopINode.getStoragePolicyID());
         inode.setNumAcesNoPersistence(hopINode.getNumAces());
       }
       return inode;

@@ -162,7 +162,7 @@ public class TestSubtreeLock extends TestCase {
       AbstractFileTree.FileTree fileTree = AbstractFileTree
               .createFileTreeFromPath(cluster.getNamesystem(),
               path0.toUri().getPath());
-      fileTree.buildUp();
+      fileTree.buildUp(cluster.getNameNode().getNamesystem().getBlockManager().getStoragePolicySuite());
       assertEquals(path0.getName(), fileTree.getSubtreeRoot().getName());
       assertEquals(7, fileTree.getAll().size());
       assertEquals(4, fileTree.getHeight());
@@ -210,12 +210,11 @@ public class TestSubtreeLock extends TestCase {
       AbstractFileTree.CountingFileTree fileTree = AbstractFileTree
               .createCountingFileTreeFromPath(cluster.getNamesystem(),
               path0.toUri().getPath());
-      fileTree.buildUp();
-      assertEquals(7, fileTree.getNamespaceCount());
-      assertEquals(bytes0 + bytes1, fileTree.getDiskspaceCount());
-      assertEquals(3, fileTree.getDirectoryCount());
-      assertEquals(4, fileTree.getFileCount());
-      assertEquals(fileTree.getDiskspaceCount(), fileTree.getFileSizeSummary());
+      fileTree.buildUp(cluster.getNameNode().getNamesystem().getBlockManager().getStoragePolicySuite());
+      assertEquals(7, fileTree.getUsedCounts().getNameSpace());
+      assertEquals(bytes0 + bytes1, fileTree.getUsedCounts().getDiskSpace());
+      assertEquals(3, fileTree.getCounts().get(Content.DIRECTORY));
+      assertEquals(4, fileTree.getCounts().get(Content.FILE));
     } finally {
       if (cluster != null) {
         cluster.shutdown();

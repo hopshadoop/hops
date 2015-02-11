@@ -66,7 +66,8 @@ public class NameNodeLayoutVersion {
     ROLLING_UPGRADE(-49, -48, "Support rolling upgrade", false),
     BLOCK_STORAGE_POLICY(-50, "Block Storage policy"),
     TRUNCATE(-51, "Truncate"),
-    APPEND_NEW_BLOCK(-52, "Support appending to new block");;
+    APPEND_NEW_BLOCK(-52, "Support appending to new block"),
+    QUOTA_BY_STORAGE_TYPE(-53, "Support quota for specific storage types");
     
     private final FeatureInfo info;
 

@@ -24,22 +24,20 @@ public class PathInformation {
   private byte[][] pathComponents;
   private INodesInPath IIP;
   private boolean dir;
-  private long nsCount;
-  private long dsCount;
+  private QuotaCounts usage;
+  private QuotaCounts quota;
   
-  private final INodeAttributes subtreeRootAttributes;
   private final List<AclEntry>[] pathInodeAcls;
 
   public PathInformation(String path,
       byte[][] pathComponents, INodesInPath IIP,
-      boolean dir, long nsCount, long dsCount, INodeAttributes subtreeRootAttributes, List<AclEntry>[] pathInodeAcls) {
+      boolean dir, QuotaCounts quota, QuotaCounts usage, List<AclEntry>[] pathInodeAcls) {
     this.path = path;
     this.pathComponents = pathComponents;
     this.IIP = IIP;
     this.dir = dir;
-    this.nsCount = nsCount;
-    this.dsCount = dsCount;
-    this.subtreeRootAttributes = subtreeRootAttributes;
+    this.quota = quota;
+    this.usage = usage;
     this.pathInodeAcls = pathInodeAcls;
   }
 
@@ -55,20 +53,16 @@ public class PathInformation {
     return dir;
   }
 
-  public long getNsCount() {
-    return nsCount;
-  }
-
-  public long getDsCount() {
-    return dsCount;
-  }
-
   public INodesInPath getINodesInPath(){
     return IIP;
   }
   
-  public INodeAttributes getSubtreeRootAttributes() {
-    return subtreeRootAttributes;
+  public QuotaCounts getQuota() {
+    return quota;
+  }
+
+  public QuotaCounts getUsage() {
+    return usage;
   }
 
   public List<AclEntry>[] getPathInodeAcls() {

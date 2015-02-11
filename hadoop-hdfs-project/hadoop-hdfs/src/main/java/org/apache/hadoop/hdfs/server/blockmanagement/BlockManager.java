@@ -532,9 +532,11 @@ public class BlockManager {
     }
   }
 
-  /**
-   * get the BlockTokenSecretManager
-   */
+  public BlockStoragePolicySuite getStoragePolicySuite() {
+    return storagePolicySuite;
+  }
+
+  /** get the BlockTokenSecretManager */
   @VisibleForTesting
   public BlockTokenSecretManager getBlockTokenSecretManager() {
     return blockTokenSecretManager;

@@ -40,6 +40,8 @@ import org.apache.hadoop.util.Daemon;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import org.apache.hadoop.hdfs.StorageType;
+import org.apache.hadoop.hdfs.util.EnumCounters;
 
 import static org.apache.hadoop.util.ExitUtil.terminate;
 
@@ -92,12 +94,15 @@ public class QuotaUpdateManager {
     return IDsGeneratorFactory.getInstance().getUniqueQuotaUpdateID();
   }
 
-  public void addUpdate(final long inodeId, final long namespaceDelta,
-      final long diskspaceDelta)
+  public void addUpdate(final long inodeId, QuotaCounts counts)
       throws StorageException, TransactionContextException {
 
+    Map<QuotaUpdate.StorageType, Long> typeSpaces = new HashMap<>();
+    for(StorageType t: StorageType.asList()){
+      typeSpaces.put(QuotaUpdate.StorageType.valueOf(t.name()), counts.getTypeSpace(t));
+    }
     QuotaUpdate update =
-        new QuotaUpdate(nextId(), inodeId, namespaceDelta, diskspaceDelta);
+        new QuotaUpdate(nextId(), inodeId, counts.getNameSpace(), counts.getDiskSpace(), typeSpaces);
     EntityManager.add(update);
   }
 
@@ -240,43 +245,46 @@ public class QuotaUpdateManager {
           return null;
         }
 
-        long namespaceDelta = 0;
-        long diskspaceDelta = 0;
+        QuotaCounts counts = new QuotaCounts.Builder().build();
         for (QuotaUpdate update : updates) {
-          namespaceDelta += update.getNamespaceDelta();
-          diskspaceDelta += update.getDiskspaceDelta();
+          counts.addDiskSpace(update.getDiskspaceDelta());
+          counts.addNameSpace(update.getNamespaceDelta());
+          
+          for (Map.Entry<QuotaUpdate.StorageType, Long> entry : update.getTypeSpaces().entrySet()) {
+            counts.addTypeSpace(StorageType.valueOf(entry.getKey().name()), entry.getValue());
+          }
           LOG.debug("handling " + update);
           EntityManager.remove(update);
         }
 
         if (dir == null) {
-          LOG.debug("dropping update for " + updates.get(0) + " ns " +
-              namespaceDelta + " ds " + diskspaceDelta +
-              " because of deletion");
-          return null;
-        }
-        if (namespaceDelta == 0 && diskspaceDelta == 0) {
+          LOG.debug("dropping update for " + updates.get(0) + " quota " + counts + " because of deletion");
           return null;
         }
 
         if (dir != null && dir.isQuotaSet()) {
           final DirectoryWithQuotaFeature q = dir.getDirectoryWithQuotaFeature();
           if (q != null) {
-            INodeAttributes attributes = q.getINodeAttributes(dir);
-            attributes.setNsCount(attributes.getNsCount() + namespaceDelta);
-            attributes.setDiskspace(attributes.getDiskspace() + diskspaceDelta);
+            q.addSpaceConsumed2Cache(counts);
+            
             LOG.debug("applying aggregated update for directory " + dir.getId() +
-                " with namespace delta " + namespaceDelta +
-                " and diskspace delta " + diskspaceDelta);
+                " with quota " + counts);
           }
         }
 
         if (dir != null && dir.getId() != INodeDirectory.ROOT_INODE_ID) {
-          QuotaUpdate parentUpdate =
-              new QuotaUpdate(nextId(), dir.getParentId(), namespaceDelta,
-                  diskspaceDelta);
-          EntityManager.add(parentUpdate);
-          LOG.debug("adding parent update " + parentUpdate);
+          boolean allNull = counts.getDiskSpace()==0 && counts.getNameSpace()==0;
+          Map<QuotaUpdate.StorageType, Long > typeSpace = new HashMap<>();
+          for(StorageType type : StorageType.asList()){
+            typeSpace.put(QuotaUpdate.StorageType.valueOf(type.name()), counts.getTypeSpace(type));
+            allNull = allNull && counts.getTypeSpace(type)==0;
+          }
+          if (!allNull) {
+            QuotaUpdate parentUpdate = new QuotaUpdate(nextId(), dir.getParentId(), counts.getNameSpace(),
+                counts.getDiskSpace(), typeSpace);
+            EntityManager.add(parentUpdate);
+            LOG.debug("adding parent update " + parentUpdate);
+          }
         }
         return null;
       }

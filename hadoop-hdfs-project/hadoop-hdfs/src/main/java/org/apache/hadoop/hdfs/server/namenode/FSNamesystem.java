@@ -125,6 +125,7 @@ import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorageReport;
 import org.apache.hadoop.hdfs.server.protocol.HeartbeatResponse;
 import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
+import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.io.EnumSetWritable;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.Text;
@@ -1501,7 +1502,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     
     final AbstractFileTree.FileTree fileTree = new AbstractFileTree.FileTree(
         FSNamesystem.this, inode);
-    fileTree.buildUp();
+    fileTree.buildUp(getBlockManager().getStoragePolicySuite());
     return fileTree;
   }
   
@@ -1730,7 +1731,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     // update the quota: use the preferred block size for UC block
     final long diff =
         file.getPreferredBlockSize() - truncatedBlockUC.getNumBytes();
-    dir.updateSpaceConsumed(iip, 0, diff * file.getBlockReplication());
+    dir.updateSpaceConsumed(iip, 0, diff, file.getBlockReplication());
     return newBlock;
   }
 
@@ -2073,7 +2074,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         if (ret != null && dir.isQuotaEnabled()) {
           // update the quota: use the preferred block size for UC block
           final long diff = file.getPreferredBlockSize() - ret.getBlockSize();
-          dir.updateSpaceConsumed(iip, 0, diff * file.getBlockReplication());
+          dir.updateSpaceConsumed(iip, 0, diff, file.getBlockReplication());
         }
       } else {
         BlockInfoContiguous lastBlock = file.getLastBlock();
@@ -2562,7 +2563,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
 
             persistNewBlock(src2, pendingFile);
-            offset = pendingFile.computeFileSize(true);
+            offset = pendingFile.computeFileSize();
 
             Lease lease = leaseManager.getLease(clientName);
             lease.updateLastTwoBlocksInLeasePath(src2, newBlock,
@@ -2704,7 +2705,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         NameNode.stateChangeLog.info("BLOCK* allocateBlock: " +
             "caught retry for allocation of a new block in " +
             src + ". Returning previously allocated block " + lastBlockInFile);
-        long offset = pendingFile.computeFileSize(true);
+        long offset = pendingFile.computeFileSize();
         onRetryBlock[0] = makeLocatedBlock(lastBlockInFile,
             ((BlockInfoContiguousUnderConstruction) lastBlockInFile).getExpectedStorageLocations(
                 getBlockManager().getDatanodeManager()),
@@ -3124,9 +3125,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     //update quota
     if (dir.isQuotaEnabled()) {
       //account for only newly added data
-      long spaceConsumed = (data.length - oldSize) * pendingFile
-          .getBlockReplication();
-      dir.updateSpaceConsumed(iip, 0, spaceConsumed);
+      long delta = (data.length - oldSize);
+      dir.updateSpaceConsumed(iip, 0,delta, pendingFile
+          .getBlockReplication());
     }
 
 
@@ -3684,7 +3685,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       if (diff > 0) {
         // Adjust disk space consumption if required
         dir.updateSpaceConsumed(iip, 0,
-            -diff * fileINode.getBlockReplication());
+            -diff, fileINode.getBlockReplication());
       }
     }
   }
@@ -7081,10 +7082,10 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    *    the diskspace quota to be set
    * @throws IOException, UnresolvedLinkException
    */
-  void setQuota(String src, long nsQuota, long dsQuota)
+  void setQuota(String src, long nsQuota, long dsQuota, StorageType type)
       throws IOException {
     checkNameNodeSafeMode("Cannot set quota on " + src);
-    FSDirAttrOp.setQuota(dir, src, nsQuota, dsQuota);
+    FSDirAttrOp.setQuota(dir, src, nsQuota, dsQuota, type);
   }
 
   /**
@@ -7968,22 +7969,23 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             }
 
             boolean isDir = false;
-            INode.DirCounts srcCounts = new INode.DirCounts();
 
-            INodeAttributes quotaDirAttributes = null;
+            QuotaCounts usage = new QuotaCounts.Builder().build();
+            QuotaCounts quota = new QuotaCounts.Builder().build();
             INode leafInode = iip.getLastINode();
             if(leafInode != null){  // complete path resolved
               if(leafInode instanceof INodeFile ){
                 isDir = false;
                 //do ns and ds counts for file only
-                leafInode.spaceConsumedInTree(srcCounts);
+                leafInode.computeQuotaUsage(getBlockManager().getStoragePolicySuite(), usage);
               } else{
                 isDir =true;
-                if(leafInode instanceof INodeDirectory && dir
-                    .isQuotaEnabled()){
-                  final DirectoryWithQuotaFeature q = ((INodeDirectory) leafInode).getDirectoryWithQuotaFeature();
+                if(leafInode instanceof INodeDirectory && dir.isQuotaEnabled()){
+                  DirectoryWithQuotaFeature q = ((INodeDirectory) leafInode).getDirectoryWithQuotaFeature();
                   if (q != null) {
-                    quotaDirAttributes = q.getINodeAttributes((INodeDirectory) leafInode);
+                    quota = q.getQuota();
+                  } else {
+                    quota = leafInode.getQuotaCounts();
                   }
                 }
               }
@@ -7999,8 +8001,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             }
 
             return new PathInformation(path, pathComponents,
-                iip,isDir,
-                srcCounts.getNsCount(), srcCounts.getDsCount(), quotaDirAttributes, acls);
+                iip,isDir, quota, usage, acls);
           }
         };
     return (PathInformation)handler.handle(this);
@@ -8138,9 +8139,10 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           INodeDirectory quotaDir = (INodeDirectory) subtreeRoot;
           final DirectoryWithQuotaFeature q = quotaDir.getDirectoryWithQuotaFeature();
           if (q != null) {
-            return new LastUpdatedContentSummary(q.numItemsInTree(quotaDir),
-                q.diskspaceConsumed(quotaDir), quotaDir.getQuotaCounts().get(Quota.NAMESPACE), quotaDir
-                .getQuotaCounts().get(Quota.DISKSPACE));
+            
+            return new LastUpdatedContentSummary(q.getSpaceConsumed().getNameSpace(), 
+                q.getSpaceConsumed().getDiskSpace(), quotaDir.getQuotaCounts().getNameSpace(), 
+                quotaDir.getQuotaCounts().getDiskSpace());
           }
         }
         return null;

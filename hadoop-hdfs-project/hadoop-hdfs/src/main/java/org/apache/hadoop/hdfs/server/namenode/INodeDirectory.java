@@ -17,15 +17,11 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.transaction.EntityManager;
-import org.apache.hadoop.fs.permission.PermissionStatus;
-import org.apache.hadoop.hdfs.DFSUtil;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -33,6 +29,13 @@ import java.io.PrintWriter;
 import java.util.Collections;
 import java.util.List;
 import org.apache.hadoop.fs.PathIsNotDirectoryException;
+import org.apache.hadoop.fs.permission.PermissionStatus;
+import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
+import org.apache.hadoop.hdfs.StorageType;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 
 /**
  * Directory INode class.
@@ -129,30 +132,43 @@ public class INodeDirectory extends INodeWithAdditionalFields {
     return (INodeDirectory) inode;
   }
   
-  void setQuota(long nsQuota, long nsCount, long dsQuota, long dsCount)
+  void setQuota(BlockStoragePolicySuite bsps, long nsQuota, long dsQuota, QuotaCounts c, StorageType type)
     throws StorageException, TransactionContextException {
     DirectoryWithQuotaFeature quota = getDirectoryWithQuotaFeature();
     if (quota != null) {
       // already has quota; so set the quota to the new values
-      quota.setQuota(this, nsQuota, dsQuota);
+      if (type != null) {
+        quota.setQuota(dsQuota, type);
+      } else {
+        quota.setQuota(nsQuota, dsQuota);
+      }
+      quota.setQuota(nsQuota, dsQuota);
     } else {
-      addDirectoryWithQuotaFeature(nsQuota, nsCount, dsQuota, dsCount);
+      DirectoryWithQuotaFeature.Builder builder =
+          new DirectoryWithQuotaFeature.Builder(this.getId()).nameSpaceQuota(nsQuota);
+      if (type != null) {
+        builder.typeQuota(type, dsQuota);
+      } else {
+        builder.spaceQuota(dsQuota);
+      }
+      addDirectoryWithQuotaFeature(builder.build(true)).setSpaceConsumed(c);
+    
     }
   }
 
   @Override
-  public Quota.Counts getQuotaCounts() throws StorageException, TransactionContextException {
+  public QuotaCounts getQuotaCounts() throws StorageException, TransactionContextException {
     final DirectoryWithQuotaFeature q = getDirectoryWithQuotaFeature();
-    return q != null ? q.getQuota(this) : super.getQuotaCounts();
+    return q != null ? q.getQuota() : super.getQuotaCounts();
   }
   
-  public void addSpaceConsumed(long nsDelta, long dsDelta)
+  public void addSpaceConsumed(QuotaCounts counts)
     throws StorageException, TransactionContextException {
     DirectoryWithQuotaFeature q = getDirectoryWithQuotaFeature();
     if (q != null) {
-      q.addSpaceConsumed(this, nsDelta, dsDelta);
+      q.addSpaceConsumed(this, counts);
     } else {
-      parent.addSpaceConsumed2Parent(nsDelta, dsDelta);
+      addSpaceConsumed2Parent(counts);
     }
   }
   
@@ -160,26 +176,35 @@ public class INodeDirectory extends INodeWithAdditionalFields {
    * If the directory contains a {@link DirectoryWithQuotaFeature}, return it;
    * otherwise, return null.
    */
-  public final DirectoryWithQuotaFeature getDirectoryWithQuotaFeature() {
+  public final DirectoryWithQuotaFeature getDirectoryWithQuotaFeature() throws TransactionContextException, StorageException {
+    int i=0;
     for (Feature f : features) {
       if (f instanceof DirectoryWithQuotaFeature) {
-        return (DirectoryWithQuotaFeature) f;
+        DirectoryWithQuotaFeature feature = EntityManager.find(DirectoryWithQuotaFeature.Finder.ByINodeId, this.getId());
+        features[i]=feature;
+        return feature;
       }
+      i++;
     }
     return null;
   }
   
   /** Is this directory with quota? */
   public final boolean isWithQuota() {
-    return getDirectoryWithQuotaFeature() != null;
+    for (Feature f : features) {
+      if (f instanceof DirectoryWithQuotaFeature) {
+        return true;
+      }
+    } 
+    return false;
   }
   
-  DirectoryWithQuotaFeature addDirectoryWithQuotaFeature(long nsQuota, long nsCount, long dsQuota, long dsCount)
+  public DirectoryWithQuotaFeature addDirectoryWithQuotaFeature(
+      DirectoryWithQuotaFeature q)
     throws StorageException, TransactionContextException {
     Preconditions.checkState(!isWithQuota(), "Directory is already with quota");
-    final DirectoryWithQuotaFeature quota = new DirectoryWithQuotaFeature(this, nsQuota, nsCount, dsQuota, dsCount);
-    addFeature(quota);
-    return quota;
+    addFeature(q);
+    return q;
   }
   
   /**
@@ -438,29 +463,42 @@ public class INodeDirectory extends INodeWithAdditionalFields {
   }
 
   @Override
-  DirCounts spaceConsumedInTree(DirCounts counts)
+  QuotaCounts computeQuotaUsage(BlockStoragePolicySuite bsps, QuotaCounts counts)
       throws StorageException, TransactionContextException {
     if (isWithQuota()) {
       final DirectoryWithQuotaFeature q = getDirectoryWithQuotaFeature();
-      if (q != null) {
-        q.spaceConsumedInTree(this, counts);
+      if (q != null && q.isQuotaSet()) {
+        return q.addNamespaceDiskspace(counts);
       }
     } else {
-      counts.nsCount += 1;
-      if (isInTree()) {
-        List<INode> children = getChildren();
-        if (children != null) {
-          for (INode child : children) {
-            child.spaceConsumedInTree(counts);
-          }
-        }
-      }
+      computeDirectoryQuotaUsage(bsps, counts);
     }
     return counts;
   }
   
+  private QuotaCounts computeDirectoryQuotaUsage(BlockStoragePolicySuite bsps,
+      QuotaCounts counts) throws StorageException, TransactionContextException {
+    if (isInTree()) {
+      List<INode> children = getChildren();
+      if (children != null) {
+        for (INode child : children) {
+          child.computeQuotaUsage(bsps, counts);
+        }
+      }
+    }
+    return computeQuotaUsage4CurrentDirectory(bsps, counts);
+  }
+  
+  /** Add quota usage for this inode excluding children. */
+  public QuotaCounts computeQuotaUsage4CurrentDirectory(
+      BlockStoragePolicySuite bsps, QuotaCounts counts) {
+    counts.addNameSpace(1);
+    return counts;
+  }
+  
   @Override
-  ContentSummaryComputationContext computeContentSummary(ContentSummaryComputationContext summary)
+  ContentSummaryComputationContext computeContentSummary(
+      ContentSummaryComputationContext summary)
     throws StorageException, TransactionContextException {
     final DirectoryWithQuotaFeature q = getDirectoryWithQuotaFeature();
     if (q != null) {
@@ -542,12 +580,14 @@ public class INodeDirectory extends INodeWithAdditionalFields {
   }
 
   @Override
-  public void destroyAndCollectBlocks(BlocksMapUpdateInfo collectedBlocks, final List<INode> removedINodes)
+  public void destroyAndCollectBlocks(final BlockStoragePolicySuite bsps,
+      BlocksMapUpdateInfo collectedBlocks, 
+      final List<INode> removedINodes)
       throws StorageException, TransactionContextException {
     List<INode> children = getChildren();
     if (children != null) {
       for (INode child : children) {
-        child.destroyAndCollectBlocks(collectedBlocks, removedINodes);
+        child.destroyAndCollectBlocks(bsps, collectedBlocks, removedINodes);
       }
     }
     parent = null;
