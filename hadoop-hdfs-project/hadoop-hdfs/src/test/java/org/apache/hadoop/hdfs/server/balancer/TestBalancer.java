@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hdfs.server.balancer;
 
+import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
+import static org.apache.hadoop.hdfs.StorageType.DEFAULT;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -25,6 +27,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.URI;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -52,8 +55,9 @@ import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
+import org.apache.hadoop.hdfs.StorageType;
+import org.apache.hadoop.hdfs.protocol.*;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
-import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.server.balancer.Balancer.Cli;
 import org.apache.hadoop.hdfs.server.balancer.Balancer.Parameters;
 import org.apache.hadoop.hdfs.server.balancer.Balancer.Result;
@@ -275,7 +279,64 @@ public class TestBalancer {
   }
 
   /**
-   * Wait until balanced: each datanode gives utilization within
+   * Make sure that balancer can't move pinned blocks.
+   * If specified favoredNodes when create file, blocks will be pinned use 
+   * sticky bit.
+   * @throws Exception
+   */
+  @Test(timeout=100000)
+  public void testBalancerWithPinnedBlocks() throws Exception {
+    final Configuration conf = new HdfsConfiguration();
+    initConf(conf);
+    conf.setBoolean(DFS_DATANODE_BLOCK_PINNING_ENABLED, true);
+    
+    long[] capacities =  new long[] { CAPACITY, CAPACITY };
+    String[] racks = { RACK0, RACK1 };
+    int numOfDatanodes = capacities.length;
+
+    cluster = new MiniDFSCluster.Builder(conf).numDataNodes(capacities.length)
+      .hosts(new String[]{"localhost", "localhost"})
+      .racks(racks).simulatedCapacities(capacities).build();
+
+    try {
+      cluster.waitActive();
+      client = NameNodeProxies.createProxy(conf,
+          cluster.getFileSystem(0).getUri(), ClientProtocol.class).getProxy();
+      
+      // fill up the cluster to be 80% full
+      long totalCapacity = sum(capacities);
+      long totalUsedSpace = totalCapacity * 8 / 10;
+      InetSocketAddress[] favoredNodes = new InetSocketAddress[numOfDatanodes];
+      for (int i = 0; i < favoredNodes.length; i++) {
+        favoredNodes[i] = cluster.getDataNodes().get(i).getXferAddress();
+      }
+
+      DFSTestUtil.createFile(cluster.getFileSystem(0), filePath, 1024,
+          totalUsedSpace / numOfDatanodes, DEFAULT_BLOCK_SIZE,
+          (short) numOfDatanodes, 0, false, favoredNodes);
+      
+      // start up an empty node with the same capacity
+      cluster.startDataNodes(conf, 1, true, null, new String[] { RACK2 },
+          new long[] { CAPACITY });
+      
+      totalCapacity += CAPACITY;
+      
+      // run balancer and validate results
+      waitForHeartBeat(totalUsedSpace, totalCapacity, client, cluster);
+
+      // start rebalancing
+      Collection<URI> namenodes = DFSUtil.getNsServiceRpcUris(conf);
+      int r = Balancer.run(namenodes, Balancer.Parameters.DEFAULT, conf);
+      assertEquals(ExitStatus.NO_MOVE_PROGRESS.getExitCode(), r);
+      
+    } finally {
+      cluster.shutdown();
+    }
+    
+  }
+  
+  /**
+   * Wait until balanced: each datanode gives utilization within 
    * BALANCE_ALLOWED_VARIANCE of average
    * @throws IOException
    * @throws TimeoutException

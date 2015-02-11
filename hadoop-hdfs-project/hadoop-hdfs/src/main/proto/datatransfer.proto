@@ -114,6 +114,10 @@ message OpWriteBlockProto {
   optional CachingStrategyProto cachingStrategy = 10;
   optional StorageTypeProto storageType = 11 [default = DISK];
   repeated StorageTypeProto targetStorageTypes = 12;
+
+  //whether to pin the block, so Balancer won't move it.
+  optional bool pinning = 13 [default = false];
+  repeated bool targetPinnings = 14;
 }
 
 message OpTransferBlockProto {

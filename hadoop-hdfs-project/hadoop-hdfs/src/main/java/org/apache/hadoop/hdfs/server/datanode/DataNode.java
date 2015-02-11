@@ -2288,10 +2288,10 @@ public class DataNode extends ReconfigurableBase
             DataNode.this, null, cachingStrategy);
         DatanodeInfo srcNode = new DatanodeInfo(bpReg);
 
-        new Sender(out)
-            .writeBlock(b, targetStorageTypes[0], accessToken, clientname,
-                targets, targetStorageTypes, srcNode, stage, 0, 0, 0, 0,
-                blockSender.getChecksum(), cachingStrategy);
+        new Sender(out).writeBlock(b, targetStorageTypes[0], accessToken, 
+            clientname, targets, targetStorageTypes, srcNode, 
+            stage, 0, 0, 0, 0, blockSender.getChecksum(), cachingStrategy,
+            false, null);
 
         // send data & checksum
         blockSender.sendBlock(out, unbufOut, null);

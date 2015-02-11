@@ -190,7 +190,9 @@ public abstract class Receiver implements DataTransferProtocol {
           fromProto(proto.getRequestedChecksum()),
           (proto.hasCachingStrategy() ?
               getCachingStrategy(proto.getCachingStrategy()) :
-            CachingStrategy.newDefaultStrategy()));
+            CachingStrategy.newDefaultStrategy()),
+          (proto.hasPinning() ? proto.getPinning(): false),
+          (PBHelper.convertBooleanList(proto.getTargetPinningsList())));
      } finally {
       if (traceScope != null) traceScope.close();
      }

@@ -124,16 +124,17 @@ public class Sender implements DataTransferProtocol {
       final long minBytesRcvd,
       final long maxBytesRcvd,
       final long latestGenerationStamp,
-      DataChecksum requestedChecksum, final CachingStrategy cachingStrategy)
-      throws IOException {
-    ClientOperationHeaderProto header =
-        DataTransferProtoUtil.buildClientHeader(blk, clientName, blockToken);
+      DataChecksum requestedChecksum, 
+      final CachingStrategy cachingStrategy,
+      final boolean pinning,
+      final boolean[] targetPinnings) throws IOException {
+    ClientOperationHeaderProto header = DataTransferProtoUtil.buildClientHeader(
+        blk, clientName, blockToken);
     
     ChecksumProto checksumProto =
         DataTransferProtoUtil.toProto(requestedChecksum);
 
-    OpWriteBlockProto.Builder proto =
-        OpWriteBlockProto.newBuilder()
+    OpWriteBlockProto.Builder proto = OpWriteBlockProto.newBuilder()
             .setHeader(header)
             .setStorageType(PBHelper.convertStorageType(storageType))
             .addAllTargets(PBHelper.convert(targets, 1))
@@ -141,7 +142,10 @@ public class Sender implements DataTransferProtocol {
             .setStage(toProto(stage)).setPipelineSize(pipelineSize)
             .setMinBytesRcvd(minBytesRcvd).setMaxBytesRcvd(maxBytesRcvd)
             .setLatestGenerationStamp(latestGenerationStamp)
-            .setRequestedChecksum(checksumProto).setCachingStrategy(getCachingStrategy(cachingStrategy));
+            .setRequestedChecksum(checksumProto)
+            .setCachingStrategy(getCachingStrategy(cachingStrategy))
+            .setPinning(pinning)
+            .addAllTargetPinnings(PBHelper.convert(targetPinnings, 1));
     
     if (source != null) {
       proto.setSource(PBHelper.convertDatanodeInfo(source));

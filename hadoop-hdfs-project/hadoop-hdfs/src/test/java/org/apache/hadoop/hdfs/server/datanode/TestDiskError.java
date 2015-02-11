@@ -146,14 +146,13 @@ public class TestDiskError {
     // write the header.
     DataOutputStream out = new DataOutputStream(s.getOutputStream());
 
-    DataChecksum checksum =
-        DataChecksum.newDataChecksum(DataChecksum.Type.CRC32, 512);
-    new Sender(out)
-        .writeBlock(block.getBlock(), StorageType.DEFAULT,
+    DataChecksum checksum = DataChecksum.newDataChecksum(
+        DataChecksum.Type.CRC32, 512);
+    new Sender(out).writeBlock(block.getBlock(), StorageType.DEFAULT,
             BlockTokenSecretManager.DUMMY_TOKEN, "",
             new DatanodeInfo[0], new StorageType[0], null,
             BlockConstructionStage.PIPELINE_SETUP_CREATE, 1, 0L, 0L, 0L,
-            checksum, CachingStrategy.newDefaultStrategy());
+            checksum, CachingStrategy.newDefaultStrategy(), false, null);
     out.flush();
 
     // close the connection before sending the content of the block
