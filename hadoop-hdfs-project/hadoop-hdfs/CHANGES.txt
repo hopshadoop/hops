@@ -313,6 +313,8 @@ Release 2.7.0 - UNRELEASED
 
     HDFS-7058. Tests for truncate CLI. (Dasha Boudnik via shv)
 
+    HDFS-7760. Document truncate for WebHDFS. (shv)
+
   OPTIMIZATIONS
 
   BUG FIXES
