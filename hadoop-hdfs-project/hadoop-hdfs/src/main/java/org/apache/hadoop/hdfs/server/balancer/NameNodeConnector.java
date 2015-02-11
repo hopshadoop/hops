@@ -68,20 +68,21 @@ import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.DataEncryptionKeyFactor
 @InterfaceAudience.Private
 public class NameNodeConnector implements Closeable {
   private static final Log LOG = LogFactory.getLog(NameNodeConnector.class);
-  
-  private static final int MAX_NOT_CHANGED_ITERATIONS = 5;
+
+  public static final int DEFAULT_MAX_IDLE_ITERATIONS = 5;
   private static boolean write2IdFile = true;
  
   /**
    * Create {@link NameNodeConnector} for the given namenodes.
    */
   public static List<NameNodeConnector> newNameNodeConnectors(
-      Collection<URI> namenodes, String name, Path idPath, Configuration conf)
-      throws IOException {
+      Collection<URI> namenodes, String name, Path idPath, Configuration conf,
+      int maxIdleIterations) throws IOException {
     final List<NameNodeConnector> connectors = new ArrayList<NameNodeConnector>(
         namenodes.size());
     for (URI uri : namenodes) {
-      NameNodeConnector nnc = new NameNodeConnector(name, uri, idPath, null, conf);
+      NameNodeConnector nnc = new NameNodeConnector(name, uri, idPath,
+          null, conf, maxIdleIterations);
       connectors.add(nnc);
     }
     return connectors;
@@ -89,11 +90,12 @@ public class NameNodeConnector implements Closeable {
 
   public static List<NameNodeConnector> newNameNodeConnectors(
       Map<URI, List<Path>> namenodes, String name, Path idPath,
-      Configuration conf) throws IOException {
+      Configuration conf, int maxIdleIterations) throws IOException {
     final List<NameNodeConnector> connectors = new ArrayList<NameNodeConnector>(
         namenodes.size());
     for (Map.Entry<URI, List<Path>> entry : namenodes.entrySet()) {
-      NameNodeConnector nnc = new NameNodeConnector(name, entry.getKey(), idPath, entry.getValue(), conf);
+      NameNodeConnector nnc = new NameNodeConnector(name, entry.getKey(),
+          idPath, entry.getValue(), conf, maxIdleIterations);
       connectors.add(nnc);
     }
     return connectors;
@@ -117,14 +119,19 @@ public class NameNodeConnector implements Closeable {
   final OutputStream out;
   private final List<Path> targetPaths;
   private final AtomicLong bytesMoved = new AtomicLong();
-  
+
+  private final int maxNotChangedIterations;
   private int notChangedIterations = 0;
 
-  public NameNodeConnector(String name, URI nameNodeUri, Path idPath, List<Path> targetPaths, Configuration conf) 
+  public NameNodeConnector(String name, URI nameNodeUri, Path idPath,
+                           List<Path> targetPaths, Configuration conf,
+                           int maxNotChangedIterations)
       throws IOException {
     this.nameNodeUri = nameNodeUri;
     this.idPath = idPath;
-    this.targetPaths = targetPaths == null || targetPaths.isEmpty() ? Arrays.asList(new Path("/")) : targetPaths;
+    this.targetPaths = targetPaths == null || targetPaths.isEmpty() ? Arrays
+        .asList(new Path("/")) : targetPaths;
+    this.maxNotChangedIterations = maxNotChangedIterations;
 
     this.namenode = NameNodeProxies.createProxy(conf, nameNodeUri, NamenodeProtocol.class).getProxy();
     this.client = NameNodeProxies.createProxy(conf, nameNodeUri,
@@ -189,7 +196,14 @@ public class NameNodeConnector implements Closeable {
       notChangedIterations = 0;
     } else {
       notChangedIterations++;
-      if (notChangedIterations >= MAX_NOT_CHANGED_ITERATIONS) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("No block has been moved for " +
+            notChangedIterations + " iterations, " +
+            "maximum notChangedIterations before exit is: " +
+            ((maxNotChangedIterations >= 0) ? maxNotChangedIterations : "Infinite"));
+      }
+      if ((maxNotChangedIterations >= 0) &&
+          (notChangedIterations >= maxNotChangedIterations)) {
         System.out.println("No block has been moved for "
             + notChangedIterations + " iterations. Exiting...");
         return false;
