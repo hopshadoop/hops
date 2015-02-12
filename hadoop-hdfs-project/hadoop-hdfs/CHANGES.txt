@@ -392,6 +392,9 @@ Release 2.7.0 - UNRELEASED
     HDFS-7439. Add BlockOpResponseProto's message to the exception messages.
     (Takanobu Asanuma via szetszwo)
 
+    HDFS-7789. DFSck should resolve the path to support cross-FS symlinks.
+    (gera)
+
   OPTIMIZATIONS
 
   BUG FIXES
