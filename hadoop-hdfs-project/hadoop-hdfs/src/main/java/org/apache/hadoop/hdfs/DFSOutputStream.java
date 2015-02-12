@@ -2051,6 +2051,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
   static DFSOutputStream newStreamForAppend(DFSClient dfsClient, String src,
       boolean toNewBlock, int bufferSize, Progressable progress,
       LocatedBlock lastBlock, HdfsFileStatus stat, DataChecksum checksum,
+      String[] favoredNodes,
       boolean saveSmallFilesInDB, final int dbFileMaxSize, boolean emulateHDFSClient)
       throws IOException {
             
@@ -2078,6 +2079,9 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
       
     final DFSOutputStream out = new DFSOutputStream(dfsClient, src, toNewBlock,
         progress, lastBlock, stat, checksum, saveSmallFilesInDB, dbFileMaxSize);
+    if (favoredNodes != null && favoredNodes.length != 0) {
+      out.streamer.setFavoredNodes(favoredNodes);
+    }
     out.start();
     return out;
   }

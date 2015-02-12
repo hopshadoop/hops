@@ -1613,6 +1613,17 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     if(LOG.isDebugEnabled()) {
       LOG.debug(src + ": masked=" + masked);
     }
+    final DFSOutputStream result = DFSOutputStream.newStreamForCreate(this,
+        src, masked, flag, createParent, replication, blockSize, progress,
+        buffersize, dfsClientConf.createChecksum(checksumOpt),
+        getFavoredNodesStr(favoredNodes),
+        policy, isStoreSmallFilesInDB(),
+        getDBFileMaxSize());
+    beginFileLease(result.getFileId(), result);
+    return result;
+  }
+
+  private String[] getFavoredNodesStr(InetSocketAddress[] favoredNodes) {
     String[] favoredNodeStrs = null;
     if (favoredNodes != null) {
       favoredNodeStrs = new String[favoredNodes.length];
@@ -1622,14 +1633,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
                          + favoredNodes[i].getPort();
       }
     }
-    final DFSOutputStream result = DFSOutputStream.newStreamForCreate(this,
-        src, masked, flag, createParent, replication, blockSize, progress,
-        buffersize, dfsClientConf.createChecksum(checksumOpt), favoredNodeStrs,
-            policy, isStoreSmallFilesInDB(),
-            getDBFileMaxSize());
-
-    beginFileLease(result.getFileId(), result);
-    return result;
+    return favoredNodeStrs;
   }
 
   /**
@@ -1647,7 +1651,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
         }
         return null;
       }
-      return callAppend(src, buffersize, flag, progress);
+      return callAppend(src, buffersize, flag, progress, null);
     }
     return null;
   }
@@ -1719,7 +1723,8 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
 
   /** Method to get stream returned by append call */
   private DFSOutputStream callAppend(String src, int buffersize,
-      EnumSet<CreateFlag> flag, Progressable progress) throws IOException {
+      EnumSet<CreateFlag> flag, Progressable progress, String[] favoredNodes)
+      throws IOException {
     CreateFlag.validateForAppend(flag);
     try {
       LastBlockWithStatus blkWithStatus = namenode.append(src, clientName,
@@ -1727,7 +1732,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
       return DFSOutputStream.newStreamForAppend(this, src,
           flag.contains(CreateFlag.NEW_BLOCK),
           buffersize, progress, blkWithStatus.getLastBlock(),
-          blkWithStatus.getFileStatus(), dfsClientConf.createChecksum(),
+          blkWithStatus.getFileStatus(), dfsClientConf.createChecksum(), favoredNodes,
           isStoreSmallFilesInDB(), getDBFileMaxSize(), dfsClientConf.hdfsClientEmulationForSF);
     } catch(RemoteException re) {
       throw re.unwrapRemoteException(AccessControlException.class,
@@ -1755,14 +1760,38 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
   public HdfsDataOutputStream append(final String src, final int buffersize,
       EnumSet<CreateFlag> flag, final Progressable progress,
       final FileSystem.Statistics statistics) throws IOException {
-    final DFSOutputStream out = append(src, buffersize, flag, progress);
-    return new HdfsDataOutputStream(out, statistics, out.getInitialLen());
+    final DFSOutputStream out = append(src, buffersize, flag, null, progress);
+    return createWrappedOutputStream(out, statistics, out.getInitialLen());
+  }
+
+  /**
+   * Append to an existing HDFS file.
+   * 
+   * @param src file name
+   * @param buffersize buffer size
+   * @param flag indicates whether to append data to a new block instead of the
+   *          last block
+   * @param progress for reporting write-progress; null is acceptable.
+   * @param statistics file system statistics; null is acceptable.
+   * @param favoredNodes FavoredNodes for new blocks
+   * @return an output stream for writing into the file
+   * @see ClientProtocol#append(String, String, EnumSetWritable)
+   */
+  public HdfsDataOutputStream append(final String src, final int buffersize,
+      EnumSet<CreateFlag> flag, final Progressable progress,
+      final FileSystem.Statistics statistics,
+      final InetSocketAddress[] favoredNodes) throws IOException {
+    final DFSOutputStream out = append(src, buffersize, flag,
+        getFavoredNodesStr(favoredNodes), progress);
+    return createWrappedOutputStream(out, statistics, out.getInitialLen());
   }
 
   private DFSOutputStream append(String src, int buffersize,
-      EnumSet<CreateFlag> flag, Progressable progress) throws IOException {
+      EnumSet<CreateFlag> flag, String[] favoredNodes, Progressable progress)
+      throws IOException {
     checkOpen();
-    final DFSOutputStream result = callAppend(src, buffersize, flag, progress);
+    final DFSOutputStream result = callAppend(src, buffersize, flag, progress,
+        favoredNodes);
     beginFileLease(result.getFileId(), result);
     return result;
   }

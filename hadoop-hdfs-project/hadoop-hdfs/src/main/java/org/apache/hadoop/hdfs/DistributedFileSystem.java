@@ -315,6 +315,17 @@ public class DistributedFileSystem extends FileSystem {
     return append(f, EnumSet.of(CreateFlag.APPEND), bufferSize, progress);
   }
 
+  /**
+   * Append to an existing file (optional operation).
+   * 
+   * @param f the existing file to be appended.
+   * @param flag Flags for the Append operation. CreateFlag.APPEND is mandatory
+   *          to be present.
+   * @param bufferSize the size of the buffer to be used.
+   * @param progress for reporting progress if it is not null.
+   * @return Returns instance of {@link FSDataOutputStream}
+   * @throws IOException
+   */
   public FSDataOutputStream append(Path f, final EnumSet<CreateFlag> flag,
       final int bufferSize, final Progressable progress) throws IOException {
     statistics.incrementWriteOps(1);
@@ -429,6 +440,38 @@ public class DistributedFileSystem extends FileSystem {
         throw new UnsupportedOperationException("Cannot create with" +
             " favoredNodes through a symlink to a non-DistributedFileSystem: "
             + f + " -> " + p);
+      }
+    }.resolve(this, absF);
+  }
+
+  /**
+   * Append to an existing file (optional operation).
+   * 
+   * @param f the existing file to be appended.
+   * @param flag Flags for the Append operation. CreateFlag.APPEND is mandatory
+   *          to be present.
+   * @param bufferSize the size of the buffer to be used.
+   * @param progress for reporting progress if it is not null.
+   * @param favoredNodes Favored nodes for new blocks
+   * @return Returns instance of {@link FSDataOutputStream}
+   * @throws IOException
+   */
+  public FSDataOutputStream append(Path f, final EnumSet<CreateFlag> flag,
+      final int bufferSize, final Progressable progress,
+      final InetSocketAddress[] favoredNodes) throws IOException {
+    statistics.incrementWriteOps(1);
+    Path absF = fixRelativePart(f);
+    return new FileSystemLinkResolver<FSDataOutputStream>() {
+      @Override
+      public FSDataOutputStream doCall(final Path p)
+          throws IOException {
+        return dfs.append(getPathName(p), bufferSize, flag, progress,
+            statistics, favoredNodes);
+      }
+      @Override
+      public FSDataOutputStream next(final FileSystem fs, final Path p)
+          throws IOException {
+        return fs.append(p, bufferSize);
       }
     }.resolve(this, absF);
   }
