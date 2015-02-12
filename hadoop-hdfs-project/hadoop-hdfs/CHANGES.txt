@@ -325,6 +325,8 @@ Release 2.7.0 - UNRELEASED
 
     HDFS-7761. cleanup unnecssary code logic in LocatedBlock. (yliu)
 
+    HDFS-7694. FSDataInputStream should support "unbuffer" (cmccabe)
+
   OPTIMIZATIONS
 
   BUG FIXES
