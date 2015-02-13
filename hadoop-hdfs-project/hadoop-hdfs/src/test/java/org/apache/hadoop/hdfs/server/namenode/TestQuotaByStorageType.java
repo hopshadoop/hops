@@ -27,7 +27,6 @@ import io.hops.transaction.lock.TransactionLocks;
 import java.io.IOException;
   import static org.apache.hadoop.hdfs.StorageType.DEFAULT;
   import static org.junit.Assert.assertEquals;
-  import static org.junit.Assert.assertFalse;
   import static org.junit.Assert.assertTrue;
   import static org.junit.Assert.fail;
 
@@ -37,16 +36,19 @@ import java.io.IOException;
   import org.apache.hadoop.fs.Path;
   import org.apache.hadoop.hdfs.*;
   import org.apache.hadoop.hdfs.protocol.HdfsConstants;
+  import org.apache.hadoop.test.GenericTestUtils;
   import org.junit.After;
 import static org.junit.Assert.assertTrue;
   import org.junit.Before;
   import org.junit.Test;
 
+  import java.io.IOException;
+
 public class TestQuotaByStorageType {
 
   private static final int BLOCKSIZE = 1024;
   private static final short REPLICATION = 3;
-  static final long seed = 0L;
+  private static final long seed = 0L;
   private static final Path dir = new Path("/TestQuotaByStorageType");
 
   private Configuration conf;
@@ -226,7 +228,6 @@ public class TestQuotaByStorageType {
     Thread.sleep(1000);
     // Verify space consumed and remaining quota
     long ssdConsumed = getSpaceConsumed(foo).getTypeSpaces().get(StorageType.SSD);
-    ;
     assertEquals(file1Len, ssdConsumed);
 
     // move file from foo to bar
@@ -367,7 +368,6 @@ public class TestQuotaByStorageType {
     Thread.sleep(5000);
     INode fnode = getINode4Write(parent);
     long currentSSDConsumed = getSpaceConsumed(parent).getTypeSpaces().get(StorageType.SSD);
-    ;
     assertEquals(file1Len, currentSSDConsumed);
 
     // Create the 2nd file of size BLOCKSIZE under child directory and expect quota exceeded exception
@@ -411,11 +411,19 @@ public class TestQuotaByStorageType {
     }
   }
 
+  /**
+   * Both traditional space quota and the storage type quota for SSD are set and
+   * not exceeded.
+   */
   @Test(timeout = 60000)
   public void testQuotaByStorageTypeWithTraditionalQuota() throws Exception {
     final Path foo = new Path(dir, "foo");
     dfs.mkdirs(foo);
+
+    dfs.setStoragePolicy(foo, HdfsConstants.ONESSD_STORAGE_POLICY_NAME);
+    dfs.setQuotaByStorageType(foo, StorageType.SSD, BLOCKSIZE * 10);
     dfs.setQuota(foo, Long.MAX_VALUE - 1, REPLICATION * BLOCKSIZE * 10);
+
     INode fnode = getINode4Write(foo);
 
     Path createdFile = new Path(foo, "created_file.data");
@@ -444,6 +452,82 @@ public class TestQuotaByStorageType {
         counts.getNameSpace());
     assertEquals(subtree, 0,
         counts.getDiskSpace());
+  }
+
+  /**
+   * Both traditional space quota and the storage type quota for SSD are set and
+   * exceeded. expect DSQuotaExceededException is thrown as we check traditional
+   * space quota first and then storage type quota.
+   */
+  @Test(timeout = 60000)
+  public void testQuotaByStorageTypeAndTraditionalQuotaException1()
+      throws Exception {
+    testQuotaByStorageTypeOrTraditionalQuotaExceededCase(
+        4 * REPLICATION, 4, 5, REPLICATION);
+  }
+
+  /**
+   * Both traditional space quota and the storage type quota for SSD are set and
+   * SSD quota is exceeded but traditional space quota is not exceeded.
+   */
+  @Test(timeout = 60000)
+  public void testQuotaByStorageTypeAndTraditionalQuotaException2()
+      throws Exception {
+    testQuotaByStorageTypeOrTraditionalQuotaExceededCase(
+        5 * REPLICATION, 4, 5, REPLICATION);
+  }
+
+  /**
+   * Both traditional space quota and the storage type quota for SSD are set and
+   * traditional space quota is exceeded but SSD quota is not exceeded.
+   */
+  @Test(timeout = 60000)
+  public void testQuotaByStorageTypeAndTraditionalQuotaException3()
+      throws Exception {
+    testQuotaByStorageTypeOrTraditionalQuotaExceededCase(
+        4 * REPLICATION, 5, 5, REPLICATION);
+  }
+
+  private void testQuotaByStorageTypeOrTraditionalQuotaExceededCase(
+      long storageSpaceQuotaInBlocks, long ssdQuotaInBlocks,
+      long testFileLenInBlocks, short replication) throws Exception {
+    final String METHOD_NAME = GenericTestUtils.getMethodName();
+    final Path testDir = new Path(dir, METHOD_NAME);
+
+    dfs.mkdirs(testDir);
+    dfs.setStoragePolicy(testDir, HdfsConstants.ONESSD_STORAGE_POLICY_NAME);
+
+    final long ssdQuota = BLOCKSIZE * ssdQuotaInBlocks;
+    final long storageSpaceQuota = BLOCKSIZE * storageSpaceQuotaInBlocks;
+
+    dfs.setQuota(testDir, Long.MAX_VALUE - 1, storageSpaceQuota);
+    dfs.setQuotaByStorageType(testDir, StorageType.SSD, ssdQuota);
+
+    INode testDirNode = getINode4Write(testDir);
+
+    Path createdFile = new Path(testDir, "created_file.data");
+    long fileLen = testFileLenInBlocks * BLOCKSIZE;
+
+    try {
+      DFSTestUtil.createFile(dfs, createdFile, BLOCKSIZE / 16,
+          fileLen, BLOCKSIZE, replication, seed);      
+      //let time for the quota monitor to apply quota
+      Thread.sleep(1000);
+      // Create the 2nd file of size 1.5 * BLOCKSIZE under directory "foo" and expect no exception
+      Path createdFile2 = new Path(testDir, "created_file2.data");
+      DFSTestUtil.createFile(dfs, createdFile2, BLOCKSIZE / 16,
+          fileLen, BLOCKSIZE, replication, seed);
+      fail("Should have failed with DSQuotaExceededException or " +
+          "QuotaByStorageTypeExceededException ");
+    } catch (Throwable t) {
+      LOG.info("Got expected exception ", t);
+      Thread.sleep(5000);
+      long currentSSDConsumed = getSpaceConsumed(testDir).getTypeSpaces().get(StorageType.SSD);
+      //our quota mechanism cannot detect when one file being writen is too long (because of assynchrony)
+      //but it should detect it for the second file so the total ammount of data should be equal to the size
+      //of the first file.
+      assertEquals(fileLen, currentSSDConsumed);
+    }
   }
 
   @Test(timeout = 60000)
