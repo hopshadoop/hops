@@ -357,8 +357,8 @@ public class NameNode implements NameNodeStatusMXBean {
    * client connection
    */
   public static InetSocketAddress getServiceAddress(Configuration conf,
-      boolean fallback) {
-    String addr = conf.get(DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY);
+                                                        boolean fallback) {
+    String addr = conf.getTrimmed(DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY);
     if (addr == null || addr.isEmpty()) {
       return fallback ? getAddress(conf) : null;
     }
@@ -493,8 +493,8 @@ public class NameNode implements NameNodeStatusMXBean {
    * @return the NameNode HTTP address
    */
   public static InetSocketAddress getHttpAddress(Configuration conf) {
-    return NetUtils.createSocketAddr(conf.get(DFS_NAMENODE_HTTP_ADDRESS_KEY,
-            DFS_NAMENODE_HTTP_ADDRESS_DEFAULT));
+    return  NetUtils.createSocketAddr(
+        conf.getTrimmed(DFS_NAMENODE_HTTP_ADDRESS_KEY, DFS_NAMENODE_HTTP_ADDRESS_DEFAULT));
   }
 
   protected void loadNamesystem(Configuration conf) throws IOException {
