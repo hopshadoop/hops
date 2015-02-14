@@ -36,6 +36,7 @@ import org.apache.hadoop.hdfs.StorageType;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 
 /**
  * Directory INode class.
@@ -131,25 +132,24 @@ public class INodeDirectory extends INodeWithAdditionalFields {
     INode inode = EntityManager.find(Finder.ByINodeIdFTIS, ROOT_INODE_ID);
     return (INodeDirectory) inode;
   }
-  
-  void setQuota(BlockStoragePolicySuite bsps, long nsQuota, long dsQuota, QuotaCounts c, StorageType type)
+
+  void setQuota(BlockStoragePolicySuite bsps, long nsQuota, long ssQuota, QuotaCounts c, StorageType type) 
     throws StorageException, TransactionContextException {
     DirectoryWithQuotaFeature quota = getDirectoryWithQuotaFeature();
     if (quota != null) {
       // already has quota; so set the quota to the new values
       if (type != null) {
-        quota.setQuota(dsQuota, type);
+        quota.setQuota(ssQuota, type);
       } else {
-        quota.setQuota(nsQuota, dsQuota);
+        quota.setQuota(nsQuota, ssQuota);
       }
-      quota.setQuota(nsQuota, dsQuota);
     } else {
       DirectoryWithQuotaFeature.Builder builder =
           new DirectoryWithQuotaFeature.Builder(this.getId()).nameSpaceQuota(nsQuota);
       if (type != null) {
-        builder.typeQuota(type, dsQuota);
+        builder.typeQuota(type, ssQuota);
       } else {
-        builder.spaceQuota(dsQuota);
+        builder.storageSpaceQuota(ssQuota);
       }
       addDirectoryWithQuotaFeature(builder.build(true)).setSpaceConsumed(c);
     
@@ -162,13 +162,13 @@ public class INodeDirectory extends INodeWithAdditionalFields {
     return q != null ? q.getQuota() : super.getQuotaCounts();
   }
   
-  public void addSpaceConsumed(QuotaCounts counts)
-    throws StorageException, TransactionContextException {
+  public void addSpaceConsumed(QuotaCounts counts, boolean verify)
+    throws QuotaExceededException, StorageException, TransactionContextException {
     DirectoryWithQuotaFeature q = getDirectoryWithQuotaFeature();
     if (q != null) {
       q.addSpaceConsumed(this, counts);
     } else {
-      addSpaceConsumed2Parent(counts);
+      addSpaceConsumed2Parent(counts, verify);
     }
   }
   
@@ -468,7 +468,7 @@ public class INodeDirectory extends INodeWithAdditionalFields {
     if (isWithQuota()) {
       final DirectoryWithQuotaFeature q = getDirectoryWithQuotaFeature();
       if (q != null && q.isQuotaSet()) {
-        return q.addNamespaceDiskspace(counts);
+        return q.AddCurrentSpaceUsage(counts);
       }
     } else {
       computeDirectoryQuotaUsage(bsps, counts);
@@ -497,7 +497,7 @@ public class INodeDirectory extends INodeWithAdditionalFields {
   }
   
   @Override
-  ContentSummaryComputationContext computeContentSummary(
+  public ContentSummaryComputationContext computeContentSummary(
       ContentSummaryComputationContext summary)
     throws StorageException, TransactionContextException {
     final DirectoryWithQuotaFeature q = getDirectoryWithQuotaFeature();

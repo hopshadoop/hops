@@ -435,7 +435,7 @@ public class TestQuotaByStorageType {
     Thread.sleep(1000);
     QuotaCounts cnt = getSpaceConsumed(foo);
     assertEquals(2, cnt.getNameSpace());
-    assertEquals(fileLen * REPLICATION, cnt.getDiskSpace());
+    assertEquals(fileLen * REPLICATION, cnt.getStorageSpace());
 
     dfs.delete(createdFile, true);
 
@@ -443,7 +443,7 @@ public class TestQuotaByStorageType {
     Thread.sleep(1000);
     QuotaCounts cntAfterDelete = getSpaceConsumed(foo);
     assertEquals(1, cntAfterDelete.getNameSpace());
-    assertEquals(0, cntAfterDelete.getDiskSpace());
+    assertEquals(0, cntAfterDelete.getStorageSpace());
 
     // Validate the computeQuotaUsage()
     QuotaCounts counts = computeQuotaUsage(foo);
@@ -451,7 +451,7 @@ public class TestQuotaByStorageType {
     assertEquals(subtree, 1,
         counts.getNameSpace());
     assertEquals(subtree, 0,
-        counts.getDiskSpace());
+        counts.getStorageSpace());
   }
 
   /**

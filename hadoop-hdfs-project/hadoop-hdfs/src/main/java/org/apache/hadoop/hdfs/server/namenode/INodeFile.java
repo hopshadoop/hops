@@ -339,14 +339,13 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
     return getFullPathName();
   }
 
-  
   @Override
   public final ContentSummaryComputationContext computeContentSummary(
       final ContentSummaryComputationContext summary) throws StorageException, TransactionContextException {
     final Content.Counts counts = summary.getCounts();
     counts.add(Content.LENGTH, computeFileSize());
     counts.add(Content.FILE, 1);
-    counts.add(Content.DISKSPACE, diskspaceConsumed());
+    counts.add(Content.DISKSPACE, storagespaceConsumed());
     return summary;
   }
   
@@ -397,22 +396,22 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
   QuotaCounts computeQuotaUsage(BlockStoragePolicySuite bsps, QuotaCounts counts)
       throws StorageException, TransactionContextException {
     long nsDelta = 1;
-    final long dsDeltaNoReplication;
-    short dsReplication;
-    dsDeltaNoReplication = diskspaceConsumedNoReplication();
-    dsReplication = getBlockReplication();
+    final long ssDeltaNoReplication;
+    short replication;
+    ssDeltaNoReplication = storagespaceConsumedNoReplication();
+    replication = getBlockReplication();
     counts.addNameSpace(nsDelta);
-    counts.addDiskSpace(dsDeltaNoReplication * dsReplication);
+    counts.addStorageSpace(ssDeltaNoReplication * replication);
     
     //storage policy is not set for new inodes
-    if (dsDeltaNoReplication > 0 && getStoragePolicyID() != BlockStoragePolicySuite.ID_UNSPECIFIED){
+    if (ssDeltaNoReplication > 0 && getStoragePolicyID() != BlockStoragePolicySuite.ID_UNSPECIFIED){
       BlockStoragePolicy bsp = bsps.getPolicy(getStoragePolicyID());
-      List<StorageType> storageTypes = bsp.chooseStorageTypes(dsReplication);
+      List<StorageType> storageTypes = bsp.chooseStorageTypes(replication);
       for (StorageType t : storageTypes) {
         if (!t.supportTypeQuota()) {
           continue;
         }
-        counts.addTypeSpace(t, dsDeltaNoReplication);
+        counts.addTypeSpace(t, ssDeltaNoReplication);
       }
     }
 
@@ -424,11 +423,11 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
    * including blocks in its snapshots.
    * Use preferred block size for the last block if it is under construction.
    */
-  public final long diskspaceConsumed() throws StorageException, TransactionContextException {
-    return diskspaceConsumedNoReplication() * getBlockReplication();
+  public final long storagespaceConsumed() throws StorageException, TransactionContextException {
+    return storagespaceConsumedNoReplication() * getBlockReplication();
   }
 
-  public final long diskspaceConsumedNoReplication() throws StorageException, TransactionContextException {
+  public final long storagespaceConsumedNoReplication() throws StorageException, TransactionContextException {
     if(isFileStoredInDB()){
       // We do not know the replicaton of the database here. However, to be
       // consistent with normal files we will multiply the file size by the
@@ -479,8 +478,8 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
   }
   
 
-  /** @return the diskspace required for a full block. */
-  final long getPreferredBlockDiskspace() {
+  /** @return the storagespace required for a full block. */
+  final long getPreferredBlockStoragespace() {
     return getPreferredBlockSize() * getBlockReplication();
   }
 

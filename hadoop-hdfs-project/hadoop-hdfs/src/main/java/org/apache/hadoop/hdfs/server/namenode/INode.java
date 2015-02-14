@@ -326,7 +326,7 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
     return new ContentSummary(counts.get(Content.LENGTH),
         counts.get(Content.FILE) + counts.get(Content.SYMLINK),
         counts.get(Content.DIRECTORY), q.getNameSpace(),
-        counts.get(Content.DISKSPACE), q.getDiskSpace());
+        counts.get(Content.DISKSPACE), q.getStorageSpace());
     // TODO: storage type quota reporting HDFS-7701.
   }
 
@@ -334,19 +334,28 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
    * @param summary the context object holding counts for the subtree.
    * @return The same objects as summary.
    */
-  abstract ContentSummaryComputationContext computeContentSummary(
+  public abstract ContentSummaryComputationContext computeContentSummary(
       ContentSummaryComputationContext summary)
       throws StorageException, TransactionContextException;
-  
-  public void addSpaceConsumed(QuotaCounts counts)
-    throws StorageException, TransactionContextException {
-    addSpaceConsumed2Parent(counts);
+
+
+  /**
+   * Check and add namespace/storagespace/storagetype consumed to itself and the ancestors.
+   * @throws QuotaExceededException if quote is violated.
+   */
+  public void addSpaceConsumed(QuotaCounts counts, boolean verify)
+    throws QuotaExceededException, StorageException, TransactionContextException {
+    addSpaceConsumed2Parent(counts, verify);
   }
-  
-  void addSpaceConsumed2Parent(QuotaCounts counts)
-    throws StorageException, TransactionContextException {
+
+  /**
+   * Check and add namespace/storagespace/storagetype consumed to itself and the ancestors.
+   * @throws QuotaExceededException if quote is violated.
+   */
+  void addSpaceConsumed2Parent(QuotaCounts counts, boolean verify)
+    throws QuotaExceededException, StorageException, TransactionContextException  {
     if (parent != null) {
-      parent.addSpaceConsumed(counts);
+      parent.addSpaceConsumed(counts, verify);
     }
   }
   
@@ -357,21 +366,19 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
    */
   public QuotaCounts getQuotaCounts() throws StorageException, TransactionContextException {
     return new QuotaCounts.Builder().
-        nameCount(HdfsConstants.QUOTA_RESET).
-        spaceCount(HdfsConstants.QUOTA_RESET).
-        typeCounts(HdfsConstants.QUOTA_RESET).
+        nameSpace(HdfsConstants.QUOTA_RESET).
+        storageSpace(HdfsConstants.QUOTA_RESET).
+        typeSpaces(HdfsConstants.QUOTA_RESET).
         build();
   }
 
   public final boolean isQuotaSet() throws StorageException, TransactionContextException {
     final QuotaCounts qc = getQuotaCounts();
-    return qc.anyNsSpCountGreaterOrEqual(0) || qc.anyTypeCountGreaterOrEqual(0);
+    return qc.anyNsSsCountGreaterOrEqual(0) || qc.anyTypeSpaceCountGreaterOrEqual(0);
   }
 
   /**
-   * Adds total number of names and total disk space taken under
-   * this tree to counts.
-   * Returns updated counts object.
+   * Count subtree {@link Quota#NAMESPACE} and {@link Quota#STORAGESPACE} usages.
    */
   abstract QuotaCounts computeQuotaUsage( BlockStoragePolicySuite bsps, QuotaCounts counts)
       throws StorageException, TransactionContextException;

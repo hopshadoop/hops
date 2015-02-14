@@ -102,7 +102,7 @@ public class QuotaUpdateManager {
       typeSpaces.put(QuotaUpdate.StorageType.valueOf(t.name()), counts.getTypeSpace(t));
     }
     QuotaUpdate update =
-        new QuotaUpdate(nextId(), inodeId, counts.getNameSpace(), counts.getDiskSpace(), typeSpaces);
+        new QuotaUpdate(nextId(), inodeId, counts.getNameSpace(), counts.getStorageSpace(), typeSpaces);
     EntityManager.add(update);
   }
 
@@ -254,7 +254,7 @@ public class QuotaUpdateManager {
 
         QuotaCounts counts = new QuotaCounts.Builder().build();
         for (QuotaUpdate update : updates) {
-          counts.addDiskSpace(update.getDiskspaceDelta());
+          counts.addStorageSpace(update.getStorageSpaceDelta());
           counts.addNameSpace(update.getNamespaceDelta());
           
           for (Map.Entry<QuotaUpdate.StorageType, Long> entry : update.getTypeSpaces().entrySet()) {
@@ -281,7 +281,7 @@ public class QuotaUpdateManager {
 
         boolean hasParentUpdate = false;
         if (dir != null && dir.getId() != INodeDirectory.ROOT_INODE_ID) {
-          boolean allNull = counts.getDiskSpace()==0 && counts.getNameSpace()==0;
+          boolean allNull = counts.getStorageSpace()==0 && counts.getNameSpace()==0;
           Map<QuotaUpdate.StorageType, Long > typeSpace = new HashMap<>();
           for(StorageType type : StorageType.asList()){
             typeSpace.put(QuotaUpdate.StorageType.valueOf(type.name()), counts.getTypeSpace(type));
@@ -289,7 +289,7 @@ public class QuotaUpdateManager {
           }
           if (!allNull) {
             QuotaUpdate parentUpdate = new QuotaUpdate(nextId(), dir.getParentId(), counts.getNameSpace(),
-                counts.getDiskSpace(), typeSpace);
+                counts.getStorageSpace(), typeSpace);
             EntityManager.add(parentUpdate);
             hasParentUpdate = true;
             LOG.debug("adding parent update " + parentUpdate);
