@@ -3437,11 +3437,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     }
   }
 
-  /**
-   * Persist all metadata about this file.
-   *
-   * @param src
-   *     The string representation of the path
+  /** Persist all metadata about this file.
+   * @param src The string representation of the path
    * @param fileId The inode ID that we're fsyncing.  Older clients will pass
    *               INodeId.GRANDFATHER_INODE_ID here.
    * @param clientName
@@ -8141,8 +8138,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           if (q != null) {
             
             return new LastUpdatedContentSummary(q.getSpaceConsumed().getNameSpace(), 
-                q.getSpaceConsumed().getDiskSpace(), quotaDir.getQuotaCounts().getNameSpace(), 
-                quotaDir.getQuotaCounts().getDiskSpace());
+                q.getSpaceConsumed().getStorageSpace(), quotaDir.getQuotaCounts().getNameSpace(), 
+                quotaDir.getQuotaCounts().getStorageSpace());
           }
         }
         return null;

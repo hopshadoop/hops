@@ -354,14 +354,14 @@ public class FSDirAttrOp {
   }
 
   /**
-   * Set the namespace quota, diskspace and typeSpace quota for a directory.
+   * Set the namespace, storagespace and typespace quota for a directory.
    *
    * Note: This does not support ".inodes" relative path.
    */
-  static void setQuota(final FSDirectory fsd, String srcArg, final long nsQuota, final long dsQuota, final StorageType type)
-      throws IOException {
-        if (fsd.isPermissionEnabled()) {
-    FSPermissionChecker pc = fsd.getPermissionChecker();
+  static void setQuota(final FSDirectory fsd, String srcArg, final long nsQuota, final long ssQuota,
+      final StorageType type) throws IOException {
+    if (fsd.isPermissionEnabled()) {
+      FSPermissionChecker pc = fsd.getPermissionChecker();
       pc.checkSuperuserPrivilege();
     }
 
@@ -431,7 +431,7 @@ public class FSDirAttrOp {
         @Override
         public Object performTask() throws IOException {
 
-          INodeDirectory changed = unprotectedSetQuota(fsd, src, nsQuota, dsQuota, fileTree.getUsedCounts(), type);
+          INodeDirectory changed = unprotectedSetQuota(fsd, src, nsQuota, ssQuota, fileTree.getUsedCounts(), type);
           if (changed != null) {
             final QuotaCounts q = changed.getQuotaCounts();
           }
@@ -506,7 +506,7 @@ public class FSDirAttrOp {
    * @throws SnapshotAccessControlException if path is in RO snapshot
    */
   static INodeDirectory unprotectedSetQuota(
-      FSDirectory fsd, String src, long nsQuota, long dsQuota, QuotaCounts quotaCounts, StorageType type)
+      FSDirectory fsd, String src, long nsQuota, long ssQuota, QuotaCounts fileTreeUsage, StorageType type)
       throws FileNotFoundException, PathIsNotDirectoryException,
       QuotaExceededException, UnresolvedLinkException, 
       UnsupportedActionException, StorageException, TransactionContextException {
@@ -516,11 +516,11 @@ public class FSDirAttrOp {
     // sanity check
     if ((nsQuota < 0 && nsQuota != HdfsConstants.QUOTA_DONT_SET &&
          nsQuota != HdfsConstants.QUOTA_RESET) ||
-        (dsQuota < 0 && dsQuota != HdfsConstants.QUOTA_DONT_SET &&
-          dsQuota != HdfsConstants.QUOTA_RESET)) {
+        (ssQuota < 0 && ssQuota != HdfsConstants.QUOTA_DONT_SET &&
+          ssQuota != HdfsConstants.QUOTA_RESET)) {
       throw new IllegalArgumentException("Illegal value for nsQuota or " +
-                                         "dsQuota : " + nsQuota + " and " +
-                                         dsQuota);
+                                         "ssQuota : " + nsQuota + " and " +
+                                         ssQuota);
     }
     // sanity check for quota by storage type
     if ((type != null) && (!fsd.isQuotaByStorageTypeEnabled() ||
@@ -540,30 +540,30 @@ public class FSDirAttrOp {
     } else { // a directory inode
       final QuotaCounts oldQuota = dirNode.getQuotaCounts();
       final long oldNsQuota = oldQuota.getNameSpace();
-      final long oldDsQuota = oldQuota.getDiskSpace();
+      final long oldSsQuota = oldQuota.getStorageSpace();
 
       if (nsQuota == HdfsConstants.QUOTA_DONT_SET) {
         nsQuota = oldNsQuota;
       }
-      if (dsQuota == HdfsConstants.QUOTA_DONT_SET) {
-        dsQuota = oldDsQuota;
+      if (ssQuota == HdfsConstants.QUOTA_DONT_SET) {
+        ssQuota = oldSsQuota;
       }
 
       // unchanged space/namespace quota
-      if (type == null && oldNsQuota == nsQuota && oldDsQuota == dsQuota) {
+      if (type == null && oldNsQuota == nsQuota && oldSsQuota == ssQuota) {
         return null;
       }
 
       // unchanged type quota
       if (type != null) {
           EnumCounters<StorageType> oldTypeQuotas = oldQuota.getTypeSpaces();
-          if (oldTypeQuotas != null && oldTypeQuotas.get(type) == dsQuota) {
+          if (oldTypeQuotas != null && oldTypeQuotas.get(type) == ssQuota) {
               return null;
           }
       }
       
       if (!dirNode.isRoot()) {
-        dirNode.setQuota(fsd.getBlockStoragePolicySuite(), nsQuota, dsQuota, quotaCounts, type);
+        dirNode.setQuota(fsd.getBlockStoragePolicySuite(), nsQuota, ssQuota, fileTreeUsage, type);
         INodeDirectory parent = (INodeDirectory) iip.getINode(-2);
         parent.replaceChild(dirNode); //to update db?
       }
@@ -587,7 +587,7 @@ public class FSDirAttrOp {
     // if replication > oldBR, then newBR == replication.
     // if replication < oldBR, we don't know newBR yet.
     if (replication > oldBR) {
-      long dsDelta = file.diskspaceConsumed()/oldBR;
+      long dsDelta = file.storagespaceConsumed()/oldBR;
       fsd.updateCount(iip, 0L, dsDelta, oldBR, replication, true);
     }
 
@@ -596,7 +596,7 @@ public class FSDirAttrOp {
     final short newBR = file.getBlockReplication();
     // check newBR < oldBR case.
     if (newBR < oldBR) {
-      long dsDelta = file.diskspaceConsumed()/newBR;
+      long dsDelta = file.storagespaceConsumed()/newBR;
       fsd.updateCount(iip, 0L, dsDelta, oldBR, newBR, true);
     }
 

@@ -47,7 +47,7 @@ public class QuotaUpdateContext
       throws TransactionContextException {
     super.update(quotaUpdate);
     if(isLogTraceEnabled()) {
-      log("added-quotaUpdate", "id", quotaUpdate.getId(), "inodeId", quotaUpdate.getInodeId(), "dsDeltea", quotaUpdate.getDiskspaceDelta(), "nsDelta", quotaUpdate.getNamespaceDelta());
+      log("added-quotaUpdate", "id", quotaUpdate.getId(), "inodeId", quotaUpdate.getInodeId(), "dsDeltea", quotaUpdate.getStorageSpaceDelta(), "nsDelta", quotaUpdate.getNamespaceDelta());
     }
   }
 

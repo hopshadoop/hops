@@ -395,7 +395,7 @@ abstract class AbstractFileTree {
         counts.add(Content.FILE, 1);
         counts.add(Content.LENGTH, node.getFileSize());
         counts.add(Content.DISKSPACE, node.getFileSize() * INode.HeaderFormat.getReplication(node.getHeader()));
-        usedCounts.addDiskSpace(node.getFileSize() * INode.HeaderFormat.getReplication(node.getHeader()));
+        usedCounts.addStorageSpace(node.getFileSize() * INode.HeaderFormat.getReplication(node.getHeader()));
         usedCounts.addNameSpace(1);
         if (node.getStoragePolicyID()!= BlockStoragePolicySuite.ID_UNSPECIFIED) {
           BlockStoragePolicy bsp = bsps.getPolicy(node.getStoragePolicyID());
@@ -463,7 +463,7 @@ abstract class AbstractFileTree {
       } else {
         quotaCounts.addNameSpace(1);
         if (!node.isDirectory() && !node.isSymlink()) {
-          quotaCounts.addDiskSpace(node.getFileSize() * INode.HeaderFormat.getReplication(node.getHeader()));
+          quotaCounts.addStorageSpace(node.getFileSize() * INode.HeaderFormat.getReplication(node.getHeader()));
         }
       }
     }

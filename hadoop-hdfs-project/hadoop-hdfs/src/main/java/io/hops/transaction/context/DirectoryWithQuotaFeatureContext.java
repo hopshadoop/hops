@@ -211,8 +211,8 @@ public class DirectoryWithQuotaFeatureContext
 
   private DirectoryWithQuotaFeature clone(DirectoryWithQuotaFeature src, long inodeId) {
     return new DirectoryWithQuotaFeature.Builder(inodeId).nameSpaceQuota(src.getQuota().getNameSpace()).
-        nameSpaceUsage(src.getSpaceConsumed().getNameSpace()).spaceQuota(src.getQuota().getDiskSpace()).spaceUsage(
-        src.getSpaceConsumed().getDiskSpace()).typeQuotas(src.getQuota().getTypeSpaces()).typeUsages(src.
+        nameSpaceUsage(src.getSpaceConsumed().getNameSpace()).storageSpaceQuota(src.getQuota().getStorageSpace()).spaceUsage(
+        src.getSpaceConsumed().getStorageSpace()).typeQuotas(src.getQuota().getTypeSpaces()).typeUsages(src.
         getSpaceConsumed().getTypeSpaces()).build();
   }
 

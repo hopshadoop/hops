@@ -1210,7 +1210,7 @@ public class DFSTestUtil {
 
             DirectoryWithQuotaFeature directoryWithQuotaFeature =
                 new DirectoryWithQuotaFeature.Builder(newRootINode.
-                getId()).nameSpaceQuota(Long.MAX_VALUE).nameSpaceUsage(1L).spaceQuota(-1L).spaceUsage(0L).build();
+                getId()).nameSpaceQuota(Long.MAX_VALUE).nameSpaceUsage(1L).storageSpaceQuota(-1L).spaceUsage(0L).build();
             newRootINode.addDirectoryWithQuotaFeature(directoryWithQuotaFeature);
             DirectoryWithQuotaFeatureDataAccess ida =
                 (DirectoryWithQuotaFeatureDataAccess) HdfsStorageFactory

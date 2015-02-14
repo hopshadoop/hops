@@ -70,7 +70,7 @@ public class DirectoryWithQuotaFeatureDALAdaptor extends
       }
       DirectoryWithQuotaFeature hia = 
           new DirectoryWithQuotaFeature(dir.getInodeId(), dir.getQuota().getNameSpace(), dir.getSpaceConsumed().getNameSpace(),
-              dir.getQuota().getDiskSpace(), dir.getSpaceConsumed().getDiskSpace(), typeQuota, typeUsage);
+              dir.getQuota().getStorageSpace(), dir.getSpaceConsumed().getStorageSpace(), typeQuota, typeUsage);
       return hia;
     } else {
       return null;
@@ -89,7 +89,7 @@ public class DirectoryWithQuotaFeatureDALAdaptor extends
       }
       org.apache.hadoop.hdfs.server.namenode.DirectoryWithQuotaFeature dir
           = new org.apache.hadoop.hdfs.server.namenode.DirectoryWithQuotaFeature.Builder(hia.getInodeId()).
-              nameSpaceQuota(hia.getNsQuota()).spaceQuota(hia.getDsQuota()).spaceUsage(hia.getDsUsed()).nameSpaceUsage(
+              nameSpaceQuota(hia.getNsQuota()).storageSpaceQuota(hia.getSSQuota()).spaceUsage(hia.getSSUsed()).nameSpaceUsage(
               hia.getNsUsed()).typeQuotas(typeQuotas).typeUsages(typeUsage).build();
       return dir;
     } else {

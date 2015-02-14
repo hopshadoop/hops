@@ -471,7 +471,7 @@ class FSDirStatAndListingOp {
     ContentSummary cs = new ContentSummary(counts.get(Content.LENGTH),
         counts.get(Content.FILE) + counts.get(Content.SYMLINK),
         counts.get(Content.DIRECTORY), q.getNameSpace(),
-        counts.get(Content.DISKSPACE), q.getDiskSpace());
+        counts.get(Content.DISKSPACE), q.getStorageSpace());
     
     fsd.addYieldCount(0);
     return cs;
