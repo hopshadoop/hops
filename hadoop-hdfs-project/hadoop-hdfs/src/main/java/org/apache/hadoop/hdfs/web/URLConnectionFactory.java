@@ -47,9 +47,6 @@ import org.apache.hadoop.security.ssl.SSLFactory;
 public class URLConnectionFactory {
   private static final Log LOG = LogFactory.getLog(URLConnectionFactory.class);
 
-  /** SPNEGO authenticator */
-  private static final KerberosUgiAuthenticator AUTH = new KerberosUgiAuthenticator();
-
   /**
    * Timeout for socket connects and reads
    */
@@ -157,8 +154,8 @@ public class URLConnectionFactory {
       }
       UserGroupInformation.getCurrentUser().checkTGTAndReloginFromKeytab();
       final AuthenticatedURL.Token authToken = new AuthenticatedURL.Token();
-      return new AuthenticatedURL(AUTH, connConfigurator).openConnection(url,
-          authToken);
+      return new AuthenticatedURL(new KerberosUgiAuthenticator(),
+          connConfigurator).openConnection(url, authToken);
     } else {
       if (LOG.isDebugEnabled()) {
         LOG.debug("open URL connection");
