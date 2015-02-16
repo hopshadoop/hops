@@ -56,6 +56,7 @@ import org.apache.hadoop.hdfs.server.protocol.InterDatanodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
 import org.apache.hadoop.hdfs.server.protocol.ReplicaRecoveryInfo;
 import org.apache.hadoop.hdfs.server.protocol.StorageReport;
+import org.apache.hadoop.hdfs.server.protocol.VolumeFailureSummary;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.DataChecksum;
@@ -160,7 +161,8 @@ public class TestBlockRecovery {
         Mockito.anyLong(),
         Mockito.anyLong(),
         Mockito.anyInt(), Mockito.anyInt(),
-        Mockito.anyInt()))
+        Mockito.anyInt(),
+        Mockito.any(VolumeFailureSummary.class)))
         .thenReturn(new HeartbeatResponse(new DatanodeCommand[0],null));
 
     when(namenode.getActiveNamenodes()).thenReturn(new SortedActiveNodeList() {

@@ -102,7 +102,8 @@ public class NameNodeAdapter {
       DatanodeDescriptor dd, FSNamesystem namesystem)
       throws IOException, StorageException {
     return namesystem.handleHeartbeat(nodeReg,
-        BlockManagerTestUtil.getStorageReportsForDatanode(dd), dd.getCacheCapacity(), dd.getCacheRemaining(), 0, 0, 0);
+        BlockManagerTestUtil.getStorageReportsForDatanode(dd),
+        dd.getCacheCapacity(), dd.getCacheRemaining(), 0, 0, 0, null);
   }
 
   public static boolean setReplication(final FSNamesystem ns, final String src,

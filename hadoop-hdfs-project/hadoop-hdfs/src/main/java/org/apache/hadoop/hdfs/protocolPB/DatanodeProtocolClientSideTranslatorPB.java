@@ -60,9 +60,7 @@ import org.apache.hadoop.hdfs.server.protocol.ReceivedDeletedBlockInfo;
 import org.apache.hadoop.hdfs.server.protocol.StorageBlockReport;
 import org.apache.hadoop.hdfs.server.protocol.StorageReceivedDeletedBlocks;
 import org.apache.hadoop.hdfs.server.protocol.StorageReport;
-import org.apache.hadoop.io.retry.RetryPolicies;
-import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.io.retry.RetryProxy;
+import org.apache.hadoop.hdfs.server.protocol.VolumeFailureSummary;
 import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.ProtocolMetaInterface;
@@ -139,7 +137,7 @@ public class DatanodeProtocolClientSideTranslatorPB
   @Override
   public HeartbeatResponse sendHeartbeat(DatanodeRegistration registration,
       StorageReport[] reports, long cacheCapacity, long cacheUsed, int xmitsInProgress, int xceiverCount,
-      int failedVolumes) throws IOException {
+      int failedVolumes, VolumeFailureSummary volumeFailureSummary) throws IOException {
     HeartbeatRequestProto.Builder builder = HeartbeatRequestProto.newBuilder()
         .setRegistration(PBHelper.convert(registration))
         .setXmitsInProgress(xmitsInProgress).setXceiverCount(xceiverCount)
@@ -150,6 +148,10 @@ public class DatanodeProtocolClientSideTranslatorPB
     }
     if (cacheUsed != 0) {
       builder.setCacheUsed(cacheUsed);
+    }
+    if (volumeFailureSummary != null) {
+      builder.setVolumeFailureSummary(PBHelper.convertVolumeFailureSummary(
+          volumeFailureSummary));
     }
     HeartbeatResponseProto resp;
     try {

@@ -103,25 +103,24 @@ public interface DatanodeProtocol {
    * an array of "DatanodeCommand" objects in HeartbeatResponse.
    * A DatanodeCommand tells the DataNode to invalidate local block(s),
    * or to copy them to other DataNodes, etc.
-   *
-   * @param registration
-   *     datanode registration information
-   * @param reports
-   *     utilization report per storage
-   * @param xmitsInProgress
-   *     number of transfers from this datanode to others
-   * @param xceiverCount
-   *     number of active transceiver threads
-   * @param failedVolumes
-   *     number of failed volumes
-   * @throws IOException
-   *     on error
+   * @param registration datanode registration information
+   * @param reports utilization report per storage
+   * @param xmitsInProgress number of transfers from this datanode to others
+   * @param xceiverCount number of active transceiver threads
+   * @param failedVolumes number of failed volumes
+   * @param volumeFailureSummary info about volume failures
+   * @throws IOException on error
    */
   @Idempotent
   public HeartbeatResponse sendHeartbeat(DatanodeRegistration registration,
-      StorageReport[] reports, long dnCacheCapacity,
-      long dnCacheUsed, int xmitsInProgress, int xceiverCount,
-      int failedVolumes) throws IOException;
+                                       StorageReport[] reports,
+                                       long dnCacheCapacity,
+                                       long dnCacheUsed,
+                                       int xmitsInProgress,
+                                       int xceiverCount,
+                                       int failedVolumes,
+                                       VolumeFailureSummary volumeFailureSummary)
+      throws IOException;
 
   /**
    * blockReport() tells the NameNode about all the locally-stored blocks.
