@@ -86,6 +86,16 @@ public class TestReplicationPolicy {
 
   @Rule
   public ExpectedException exception = ExpectedException.none();
+  
+  private static void updateHeartbeatWithUsage(DatanodeDescriptor dn,
+    long capacity, long dfsUsed, long remaining, long blockPoolUsed,
+    long dnCacheCapacity, long dnCacheUsed, int xceiverCount, int volFailures) {
+    dn.getStorageInfos()[0].setUtilizationForTesting(
+        capacity, dfsUsed, remaining, blockPoolUsed);
+    dn.updateHeartbeat(
+        BlockManagerTestUtil.getStorageReportsForDatanode(dn),
+        dnCacheCapacity, dnCacheUsed, xceiverCount, volFailures, null);
+  }
 
   @BeforeClass
   public static void setupCluster() throws Exception {
@@ -367,20 +377,11 @@ public class TestReplicationPolicy {
     updateHeartbeatForExtraStorage(0L, 0L, 0L, 0L);
   }
 
-  private static void updateHeartbeatWithUsage(DatanodeDescriptor dn,
-      long capacity, long dfsUsed, long remaining, long blockPoolUsed,
-      long dnCacheCapacity, long dnCacheUsed, int xceiverCount, int volFailures) {
-    dn.getStorageInfos()[0].setUtilizationForTesting(capacity, dfsUsed, remaining, blockPoolUsed);
-    dn.
-        updateHeartbeat(BlockManagerTestUtil.getStorageReportsForDatanode(dn), dnCacheCapacity, dnCacheUsed,
-            xceiverCount, volFailures);
-  }
-
   private static void updateHeartbeatForExtraStorage(long capacity,
       long dfsUsed, long remaining, long blockPoolUsed) {
     DatanodeDescriptor dn = dataNodes[5];
     dn.getStorageInfos()[1].setUtilizationForTesting(capacity, dfsUsed, remaining, blockPoolUsed);
-    dn.updateHeartbeat(BlockManagerTestUtil.getStorageReportsForDatanode(dn), 0L, 0L, 0, 0);
+    dn.updateHeartbeat(BlockManagerTestUtil.getStorageReportsForDatanode(dn), 0L, 0L, 0, 0, null);
   }
 
   /**

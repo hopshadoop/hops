@@ -80,6 +80,7 @@ import static io.hops.transaction.lock.LockFactory.BLK;
 import java.net.InetSocketAddress;
 import org.apache.hadoop.hdfs.server.namenode.CachedBlock;
 import org.apache.hadoop.hdfs.server.protocol.BlockIdCommand;
+import org.apache.hadoop.hdfs.server.protocol.VolumeFailureSummary;
 import org.apache.hadoop.net.DNSToSwitchMappingWithDependency;
 import org.apache.hadoop.net.NetUtils;
 import static org.apache.hadoop.util.Time.now;
@@ -1284,7 +1285,8 @@ public class DatanodeManager {
    */
   public DatanodeCommand[] handleHeartbeat(DatanodeRegistration nodeReg,
       StorageReport[] reports, final String blockPoolId, long cacheCapacity, long cacheUsed, int xceiverCount,
-      int maxTransfers, int failedVolumes) throws IOException {
+      int maxTransfers, int failedVolumes,
+      VolumeFailureSummary volumeFailureSummary) throws IOException {
     synchronized (heartbeatManager) {
       synchronized (datanodeMap) {
         DatanodeDescriptor nodeinfo = null;
@@ -1304,7 +1306,8 @@ public class DatanodeManager {
           return new DatanodeCommand[]{RegisterCommand.REGISTER};
         }
 
-        heartbeatManager.updateHeartbeat(nodeinfo, reports, cacheCapacity, cacheUsed, xceiverCount, failedVolumes);
+        heartbeatManager.updateHeartbeat(nodeinfo, reports, cacheCapacity, cacheUsed, xceiverCount, failedVolumes,
+                                         volumeFailureSummary);
 
         // If we are in safemode, do not send back any recovery / replication
         // requests. Don't even drain the existing queue of work.
