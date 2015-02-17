@@ -3438,6 +3438,25 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     }
   }
 
+  /**
+   * Set the namespace quota and storage space quota for a directory.
+   * See {@link ClientProtocol#setQuota(String, long, long, StorageType)} for the
+   * contract.
+   * 
+   * Note: This does not support ".inodes" relative path.
+   */
+  void setQuota(String src, long nsQuota, long ssQuota, StorageType type)
+      throws IOException {
+    boolean success = false;
+    try {
+      checkNameNodeSafeMode("Cannot set quota on " + src);
+      FSDirAttrOp.setQuota(dir, src, nsQuota, ssQuota, type);
+      success = true;
+    } finally {
+      logAuditEvent(success, "setQuota", src);
+    }
+  }
+
   /** Persist all metadata about this file.
    * @param src The string representation of the path
    * @param fileId The inode ID that we're fsyncing.  Older clients will pass
@@ -7098,30 +7117,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
   public ExecutorService getFSOperationsExecutor() {
     return fsOperationsExecutor;
-  }
-
-  /**
-   * Setting the quota of a directory in multiple transactions. Calculating the
-   * namespace counts of a large directory tree might take to much time for a
-   * single transaction. Hence, this functions first reads up the whole tree in
-   * multiple transactions while calculating its quota counts before setting
-   * the quota in a single transaction using these counts.
-   * The subtree is locked during these operations in order to prevent any
-   * concurrent modification.
-   *
-   * Note: This does not support ".inodes" relative path.
-   * @param path1
-   *    the path of the directory where the quota should be set
-   * @param nsQuota
-   *    the namespace quota to be set
-   * @param dsQuota
-   *    the diskspace quota to be set
-   * @throws IOException, UnresolvedLinkException
-   */
-  void setQuota(String src, long nsQuota, long dsQuota, StorageType type)
-      throws IOException {
-    checkNameNodeSafeMode("Cannot set quota on " + src);
-    FSDirAttrOp.setQuota(dir, src, nsQuota, dsQuota, type);
   }
 
   /**
