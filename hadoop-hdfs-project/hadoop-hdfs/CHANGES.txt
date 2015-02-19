@@ -35,6 +35,8 @@ Release 2.7.0 - UNRELEASED
     HDFS-7584. Enable Quota Support for Storage Types (See breakdown of
     tasks below)
 
+    HDFS-7656. Expose truncate API for HDFS httpfs. (yliu)
+
   IMPROVEMENTS
     HOPS-1108. Change the plus operator to XOR for combining hashes in the block 
     reporting system (salman niazi)
