@@ -164,6 +164,9 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
 
     static long toLong(long preferredBlockSize, short replication) {
       long h = 0;
+      if (preferredBlockSize == 0) {
+        preferredBlockSize = PREFERRED_BLOCK_SIZE.BITS.getMin();
+      }
       h = PREFERRED_BLOCK_SIZE.BITS.combine(preferredBlockSize, h);
       h = REPLICATION.BITS.combine(replication, h);
       return h;
