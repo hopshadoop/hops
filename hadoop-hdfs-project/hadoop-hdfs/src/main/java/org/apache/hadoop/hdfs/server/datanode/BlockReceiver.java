@@ -661,6 +661,7 @@ class BlockReceiver implements Closeable {
               .setLastChecksumAndDataLen(offsetInBlock, lastChunkChecksum);
 
           datanode.metrics.incrBytesWritten(len);
+          datanode.metrics.incrTotalWriteTime(duration);
 
           manageWriterOsCache(offsetInBlock);
         }
