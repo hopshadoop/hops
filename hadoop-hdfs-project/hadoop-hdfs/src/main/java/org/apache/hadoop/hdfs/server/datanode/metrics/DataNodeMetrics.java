@@ -47,37 +47,31 @@ import static org.apache.hadoop.metrics2.impl.MsInfo.SessionId;
 @Metrics(about = "DataNode metrics", context = "dfs")
 public class DataNodeMetrics {
 
-  @Metric
-  MutableCounterLong bytesWritten;
-  @Metric
-  MutableCounterLong bytesRead;
-  @Metric
-  MutableCounterLong blocksWritten;
-  @Metric
-  MutableCounterLong blocksRead;
-  @Metric
-  MutableCounterLong blocksReplicated;
-  @Metric
-  MutableCounterLong blocksRemoved;
-  @Metric
-  MutableCounterLong blocksVerified;
-  @Metric
-  MutableCounterLong blockVerificationFailures;
+  @Metric MutableCounterLong bytesWritten;
+  @Metric("Milliseconds spent writing")
+  MutableCounterLong totalWriteTime;
+  @Metric MutableCounterLong bytesRead;
+  @Metric("Milliseconds spent reading")
+  MutableCounterLong totalReadTime;
+  @Metric MutableCounterLong blocksWritten;
+  @Metric MutableCounterLong blocksRead;
+  @Metric MutableCounterLong blocksReplicated;
+  @Metric MutableCounterLong blocksRemoved;
+  @Metric MutableCounterLong blocksVerified;
+  @Metric MutableCounterLong blockVerificationFailures;
   @Metric MutableCounterLong blocksCached;
   @Metric MutableCounterLong blocksUncached;
-  @Metric
-  MutableCounterLong readsFromLocalClient;
-  @Metric
-  MutableCounterLong readsFromRemoteClient;
-  @Metric
-  MutableCounterLong writesFromLocalClient;
-  @Metric
-  MutableCounterLong writesFromRemoteClient;
-  @Metric
-  MutableCounterLong blocksGetLocalPathInfo;
+  @Metric MutableCounterLong readsFromLocalClient;
+  @Metric MutableCounterLong readsFromRemoteClient;
+  @Metric MutableCounterLong writesFromLocalClient;
+  @Metric MutableCounterLong writesFromRemoteClient;
+  @Metric MutableCounterLong blocksGetLocalPathInfo;
+  @Metric("Bytes read by remote client")
+  MutableCounterLong remoteBytesRead;
+  @Metric("Bytes written by remote client")
+  MutableCounterLong remoteBytesWritten;
 
-  @Metric
-  MutableCounterLong fsyncCount;
+  @Metric MutableCounterLong fsyncCount;
   
   @Metric
   MutableCounterLong volumeFailures;
@@ -266,6 +260,15 @@ public class DataNodeMetrics {
     fsyncCount.incr();
   }
 
+  public void incrTotalWriteTime(long timeTaken) {
+    totalWriteTime.incr(timeTaken);
+  }
+
+  public void incrTotalReadTime(long timeTaken) {
+    totalReadTime.incr(timeTaken);
+  }
+
+
   public void addPacketAckRoundTripTimeNanos(long latencyNanos) {
     packetAckRoundTripTimeNanos.add(latencyNanos);
     for (MutableQuantiles q : packetAckRoundTripTimeNanosQuantiles) {
@@ -291,12 +294,23 @@ public class DataNodeMetrics {
     DefaultMetricsSystem.shutdown();
   }
 
-  public void incrWritesFromClient(boolean local) {
-    (local ? writesFromLocalClient : writesFromRemoteClient).incr();
+  public void incrWritesFromClient(boolean local, long size) {
+    if(local) {
+      writesFromLocalClient.incr();
+    } else {
+      writesFromRemoteClient.incr();
+      remoteBytesWritten.incr(size);
+    }
   }
 
-  public void incrReadsFromClient(boolean local) {
-    (local ? readsFromLocalClient : readsFromRemoteClient).incr();
+  public void incrReadsFromClient(boolean local, long size) {
+
+    if (local) {
+      readsFromLocalClient.incr();
+    } else {
+      readsFromRemoteClient.incr();
+      remoteBytesRead.incr(size);
+    }
   }
   
   public void incrVolumeFailures() {

@@ -69,10 +69,29 @@ public class NameNodeMetrics {
   @Metric("Number of blockReports from individual storages")
   MutableCounterLong storageBlockReportOps;
 
-  MutableQuantiles[] syncsQuantiles;
-  @Metric("Block report")
-  MutableRate blockReport;
-  MutableQuantiles[] blockReportQuantiles;
+  @Metric("Number of file system operations")
+  public long totalFileOps(){
+    return
+      getBlockLocations.value() +
+      createFileOps.value() +
+      filesAppended.value() +
+      addBlockOps.value() +
+      getAdditionalDatanodeOps.value() +
+      filesRenamed.value() +
+      filesTruncated.value() +
+      deleteFileOps.value() +
+      getListingOps.value() +
+      fileInfoOps.value() +
+      getLinkTargetOps.value() +
+      createSymlinkOps.value();
+  }
+
+
+  @Metric("Journal transactions") MutableRate transactions;
+  @Metric("Journal syncs") MutableRate syncs;
+  final MutableQuantiles[] syncsQuantiles;
+  @Metric("Block report") MutableRate blockReport;
+  final MutableQuantiles[] blockReportQuantiles;
   @Metric("Cache report") MutableRate cacheReport;
   MutableQuantiles[] cacheReportQuantiles;
 
