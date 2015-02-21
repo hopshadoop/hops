@@ -17,10 +17,11 @@
  */
 package org.apache.hadoop.hdfs.server.datanode.fsdataset;
 
-import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 
 import java.io.IOException;
 import java.util.List;
+
+import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 
 /**
  * Choose volumes in round-robin order.

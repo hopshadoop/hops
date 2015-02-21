@@ -20,9 +20,6 @@ package org.apache.hadoop.hdfs.server.datanode;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.hdfs.StorageType;
-import org.apache.hadoop.hdfs.server.common.Util;
 
 import java.io.File;
 import java.io.IOException;
@@ -30,7 +27,9 @@ import java.net.URI;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static java.util.regex.Pattern.compile;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdfs.server.common.Util;
 
 /**
  * Encapsulates the URI and storage medium that together describe a

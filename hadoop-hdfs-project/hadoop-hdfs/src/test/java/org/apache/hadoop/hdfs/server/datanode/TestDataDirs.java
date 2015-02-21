@@ -19,15 +19,14 @@
 package org.apache.hadoop.hdfs.server.datanode;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.hdfs.server.datanode.DataNode.DataNodeDiskChecker;
 import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.URI;
 import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.List;
