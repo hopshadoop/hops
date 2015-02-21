@@ -30,9 +30,9 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.hadoop.fs.PathIsNotDirectoryException;
 import org.apache.hadoop.fs.permission.PermissionStatus;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
-import org.apache.hadoop.hdfs.StorageType;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;

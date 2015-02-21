@@ -18,11 +18,10 @@
 package org.apache.hadoop.hdfs.server.datanode;
 
 import com.google.common.net.InetAddresses;
-import com.google.protobuf.ByteString;
 import java.net.SocketTimeoutException;
 
 import org.apache.commons.logging.Log;
-import org.apache.hadoop.hdfs.StorageType;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;

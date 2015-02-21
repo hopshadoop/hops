@@ -40,10 +40,7 @@ import org.apache.hadoop.util.Daemon;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import org.apache.hadoop.hdfs.StorageType;
-import org.apache.hadoop.hdfs.util.EnumCounters;
-
-import static org.apache.hadoop.util.ExitUtil.terminate;
+import org.apache.hadoop.fs.StorageType;
 
 /**
  * Daemon that is asynchronously updating the quota counts of directories.
