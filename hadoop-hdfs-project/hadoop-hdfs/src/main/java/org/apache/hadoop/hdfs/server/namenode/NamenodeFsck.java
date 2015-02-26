@@ -17,12 +17,12 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
+import java.util.Arrays;
 
 import com.google.common.annotations.VisibleForTesting;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
-import io.hops.metadata.hdfs.entity.Replica;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.LockFactory;
@@ -39,6 +39,7 @@ import org.apache.hadoop.hdfs.BlockReaderFactory;
 import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.DirectoryListing;
@@ -140,6 +141,7 @@ public class NamenodeFsck implements DataEncryptionKeyFactory {
   private boolean showBlocks = false;
   private boolean showLocations = false;
   private boolean showRacks = false;
+  private boolean showStoragePolcies = false;
   private boolean showCorruptFileBlocks = false;
 
   private Tracer tracer;
@@ -178,6 +180,7 @@ public class NamenodeFsck implements DataEncryptionKeyFactory {
   private final PrintWriter out;
 
   private final BlockPlacementPolicy bpPolicy;
+  private StoragePolicySummary storageTypeSummary = null;
 
   /**
    * Filesystem checker.
@@ -217,23 +220,16 @@ public class NamenodeFsck implements DataEncryptionKeyFactory {
         build();
 
     for (String key : pmap.keySet()) {
-      if (key.equals("path")) {
-        this.path = pmap.get("path")[0];
-      } else if (key.equals("move")) {
-        this.doMove = true;
-      } else if (key.equals("delete")) {
-        this.doDelete = true;
-      } else if (key.equals("files")) {
-        this.showFiles = true;
-      } else if (key.equals("blocks")) {
-        this.showBlocks = true;
-      } else if (key.equals("locations")) {
-        this.showLocations = true;
-      } else if (key.equals("racks")) {
-        this.showRacks = true;
-      } else if (key.equals("openforwrite")) {
-        this.showOpenFiles = true;
-      } else if (key.equals("listcorruptfileblocks")) {
+      if (key.equals("path")) { this.path = pmap.get("path")[0]; }
+      else if (key.equals("move")) { this.doMove = true; }
+      else if (key.equals("delete")) { this.doDelete = true; }
+      else if (key.equals("files")) { this.showFiles = true; }
+      else if (key.equals("blocks")) { this.showBlocks = true; }
+      else if (key.equals("locations")) { this.showLocations = true; }
+      else if (key.equals("racks")) { this.showRacks = true; }
+      else if (key.equals("storagepolicies")) { this.showStoragePolcies = true; }
+      else if (key.equals("openforwrite")) {this.showOpenFiles = true; }
+      else if (key.equals("listcorruptfileblocks")) {
         this.showCorruptFileBlocks = true;
       } else if (key.equals("startblockafter")) {
         this.currentCookie[0] = pmap.get("startblockafter")[0];
@@ -376,6 +372,11 @@ public class NamenodeFsck implements DataEncryptionKeyFactory {
           return;
         }
         
+        if (this.showStoragePolcies) {
+          storageTypeSummary = new StoragePolicySummary(
+              namenode.getNamesystem().getBlockManager().getStoragePolicies());
+        }
+
         Result res = new Result(conf);
 
         check(path, file, res);
@@ -384,8 +385,12 @@ public class NamenodeFsck implements DataEncryptionKeyFactory {
         out.println(" Number of data-nodes:\t\t" + totalDatanodes);
         out.println(" Number of racks:\t\t" + networktopology.getNumOfRacks());
 
-        out.println("FSCK ended at " + new Date() + " in " +
-            (Time.now() - startTime + " milliseconds"));
+        if (this.showStoragePolcies) {
+          out.print(storageTypeSummary.toString());
+        }
+
+        out.println("FSCK ended at " + new Date() + " in "
+            + (Time.now() - startTime + " milliseconds"));
 
         // If there were internal errors during the fsck operation, we want to
         // return FAILURE_STATUS, even if those errors were not immediately
@@ -533,6 +538,12 @@ public class NamenodeFsck implements DataEncryptionKeyFactory {
       if (liveReplicas > targetFileReplication) {
         res.excessiveReplicas += (liveReplicas - targetFileReplication);
         res.numOverReplicatedBlocks += 1;
+      }
+      //keep track of storage tier counts
+      if (this.showStoragePolcies && lBlk.getStorageTypes() != null) {
+        StorageType[] storageTypes = lBlk.getStorageTypes();
+        storageTypeSummary.add(Arrays.copyOf(storageTypes, storageTypes.length),
+            fsn.getBlockManager().getStoragePolicy(file.getStoragePolicy()));
       }
       // Check if block is Corrupt
       if (isCorrupt) {
