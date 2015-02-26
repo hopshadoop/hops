@@ -89,7 +89,8 @@ public class DFSck extends Configured implements Tool {
       + "blocks and files they belong to\n"
       + "\t-blocks\tprint out block report\n"
       + "\t-locations\tprint out locations for every block\n"
-      + "\t-racks\tprint out network topology for data-node locations\n\n"
+      + "\t-racks\tprint out network topology for data-node locations\n"
+      + "\t-storagepolicies\tprint out storage policy summary for the blocks\n\n"
       + "\t-blockId\tprint out which file this blockId belongs to, locations"
       + " (nodes, racks) of this block, and other diagnostics info"
       + " (under replicated, corrupted or not, etc)\n\n"
@@ -260,21 +261,15 @@ public class DFSck extends Configured implements Tool {
     String dir = null;
     boolean doListCorruptFileBlocks = false;
     for (int idx = 0; idx < args.length; idx++) {
-      if (args[idx].equals("-move")) {
-        url.append("&move=1");
-      } else if (args[idx].equals("-delete")) {
-        url.append("&delete=1");
-      } else if (args[idx].equals("-files")) {
-        url.append("&files=1");
-      } else if (args[idx].equals("-openforwrite")) {
-        url.append("&openforwrite=1");
-      } else if (args[idx].equals("-blocks")) {
-        url.append("&blocks=1");
-      } else if (args[idx].equals("-locations")) {
-        url.append("&locations=1");
-      } else if (args[idx].equals("-racks")) {
-        url.append("&racks=1");
-      } else if (args[idx].equals("-list-corruptfileblocks")) {
+      if (args[idx].equals("-move")) { url.append("&move=1"); }
+      else if (args[idx].equals("-delete")) { url.append("&delete=1"); }
+      else if (args[idx].equals("-files")) { url.append("&files=1"); }
+      else if (args[idx].equals("-openforwrite")) { url.append("&openforwrite=1"); }
+      else if (args[idx].equals("-blocks")) { url.append("&blocks=1"); }
+      else if (args[idx].equals("-locations")) { url.append("&locations=1"); }
+      else if (args[idx].equals("-racks")) { url.append("&racks=1"); }
+      else if (args[idx].equals("-storagepolicies")) { url.append("&storagepolicies=1"); }
+      else if (args[idx].equals("-list-corruptfileblocks")) {
         url.append("&listcorruptfileblocks=1");
         doListCorruptFileBlocks = true;
       } else if (args[idx].equals("-blockId")) {
