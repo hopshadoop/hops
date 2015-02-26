@@ -617,17 +617,15 @@ public class DirectoryScanner implements Runnable {
       for (String bpid : bpList) {
         LinkedList<ScanInfo> report = new LinkedList<>();
         File bpFinalizedDir = volume.getFinalizedDir(bpid);
-        result.put(bpid, compileReport(volume, bpFinalizedDir, report));
+        result.put(bpid,
+            compileReport(volume, bpFinalizedDir, bpFinalizedDir, report));
       }
       return result;
     }
 
-    /**
-     * Compile list {@link ScanInfo} for the blocks in the directory <dir>
-     */
-    private LinkedList<ScanInfo> compileReport(FsVolumeSpi vol, File dir,
-        LinkedList<ScanInfo> report) {
-      LOG.info("Scanning local blocks");
+    /** Compile list {@link ScanInfo} for the blocks in the directory <dir> */
+    private LinkedList<ScanInfo> compileReport(FsVolumeSpi vol,
+        File bpFinalizedDir, File dir, LinkedList<ScanInfo> report) {
       File[] files;
       try {
         files = FileUtil.listFiles(dir);
@@ -655,24 +653,41 @@ public class DirectoryScanner implements Runnable {
       }
 
       for (File subDir : subDirs) {
-        compileReport(vol, subDir, report);
+        compileReport(vol, bpFinalizedDir, subDir, report);
       }
 
       for (int i = blkFiles.size() - 1; i >= 0; i--) {
-        File blkFile = blkFiles.get(i);
-        long blockId = Block.filename2id(blkFile.getName());
-        File metaFile = popMetaFile(blkFile, metaFiles);
-        report.add(new ScanInfo(blockId, blkFile, metaFile, vol));
+        File blockFile = blkFiles.get(i);
+        long blockId = Block.filename2id(blockFile.getName());
+        File metaFile = popMetaFile(blockFile, metaFiles);
+        verifyFileLocation(blockFile.getParentFile(), bpFinalizedDir,
+            blockId);
+        report.add(new ScanInfo(blockId, blockFile, metaFile, vol));
         blkFiles.remove(i);
       }
 
       for (int i = metaFiles.size() - 1; i >= 0; i--) {
         File metaFile = metaFiles.get(i);
         long blockId = Block.getBlockId(metaFile.getName());
+        verifyFileLocation(files[i].getParentFile(), bpFinalizedDir,
+            blockId);
         report.add(new ScanInfo(blockId, null, metaFile, vol));
       }
 
       return report;
+    }
+
+    /**
+     * Verify whether the actual directory location of block file has the
+     * expected directory path computed using its block ID.
+     */
+    private void verifyFileLocation(File actualBlockDir,
+        File bpFinalizedDir, long blockId) {
+      File blockDir = DatanodeUtil.idToBlockDir(bpFinalizedDir, blockId);
+      if (actualBlockDir.compareTo(blockDir) != 0) {
+        LOG.warn("Block: " + blockId
+            + " has to be upgraded to block ID-based layout");
+      }
     }
   }
   
