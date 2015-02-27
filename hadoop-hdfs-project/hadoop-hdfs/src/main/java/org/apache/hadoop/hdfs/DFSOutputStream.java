@@ -2121,9 +2121,10 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
   }
   
   private void computePacketChunkSize(int psize, int csize) {
-    int chunkSize = csize + checksum.getChecksumSize();
-    chunksPerPacket = Math.max(psize / chunkSize, 1);
-    packetSize = chunkSize * chunksPerPacket;
+    final int bodySize = psize - PacketHeader.PKT_MAX_HEADER_LEN;
+    final int chunkSize = csize + checksum.getChecksumSize();
+    chunksPerPacket = Math.max(bodySize/chunkSize, 1);
+    packetSize = chunkSize*chunksPerPacket;
     if (DFSClient.LOG.isDebugEnabled()) {
       DFSClient.LOG.debug("computePacketChunkSize: src=" + src +
               ", chunkSize=" + chunkSize +
