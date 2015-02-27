@@ -249,7 +249,7 @@ public class TestDirectoryScanner {
     assertEquals(mismatchBlocks, stats.mismatchBlocks);
   }
 
-  @Test
+  @Test (timeout=600000)
   public void testDirectoryScanner() throws Exception {
     // Run the test with and without parallel scanning
     for (int parallelism = 1; parallelism < 3; parallelism++) {
@@ -264,8 +264,9 @@ public class TestDirectoryScanner {
       bpid = cluster.getNamesystem().getBlockPoolId();
       fds = DataNodeTestUtils.getFSDataset(cluster.getDataNodes().get(0));
       CONF.setInt(DFSConfigKeys.DFS_DATANODE_DIRECTORYSCAN_THREADS_KEY,
-          parallelism);
-      scanner = new DirectoryScanner(fds, CONF);
+                  parallelism);
+      DataNode dataNode = cluster.getDataNodes().get(0);
+      scanner = new DirectoryScanner(dataNode, fds, CONF);
       scanner.setRetainDiffs(true);
 
       // Add files with 100 blocks
