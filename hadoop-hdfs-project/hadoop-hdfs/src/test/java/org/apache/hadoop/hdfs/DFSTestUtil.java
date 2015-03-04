@@ -1028,7 +1028,7 @@ public class DFSTestUtil {
   }
 
   private static DatanodeID getDatanodeID(String ipAddr) {
-    return new DatanodeID(ipAddr, "localhost", "",
+    return new DatanodeID(ipAddr, "localhost", UUID.randomUUID().toString(),
         DFSConfigKeys.DFS_DATANODE_DEFAULT_PORT,
         DFSConfigKeys.DFS_DATANODE_HTTP_DEFAULT_PORT,
         DFSConfigKeys.DFS_DATANODE_HTTPS_DEFAULT_PORT,
@@ -1040,7 +1040,7 @@ public class DFSTestUtil {
   }
 
   public static DatanodeID getLocalDatanodeID(int port) {
-    return new DatanodeID("127.0.0.1", "localhost", "", port, port, port, port);
+    return new DatanodeID("127.0.0.1", "localhost", UUID.randomUUID().toString(), port, port, port, port);
   }
 
   public static DatanodeDescriptor getLocalDatanodeDescriptor() throws IOException {
@@ -1069,7 +1069,7 @@ public class DFSTestUtil {
   }
 
   public static DatanodeInfo getDatanodeInfo(String ipAddr, String host, int port) {
-    return new DatanodeInfo(new DatanodeID(ipAddr, host, "", port,
+    return new DatanodeInfo(new DatanodeID(ipAddr, host, UUID.randomUUID().toString(), port,
         DFSConfigKeys.DFS_DATANODE_HTTP_DEFAULT_PORT,
         DFSConfigKeys.DFS_DATANODE_HTTPS_DEFAULT_PORT,
         DFSConfigKeys.DFS_DATANODE_IPC_DEFAULT_PORT));

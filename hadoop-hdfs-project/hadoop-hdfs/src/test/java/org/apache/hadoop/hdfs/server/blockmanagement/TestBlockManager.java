@@ -141,10 +141,6 @@ public class TestBlockManager {
     storages = DFSTestUtil.createDatanodeStorageInfos(racks);
     nodes = Arrays.asList(DFSTestUtil.toDatanodeDescriptor(storages));
 
-    for (DatanodeDescriptor node : nodes) {
-      node.setDatanodeUuidForTesting("DN-Name-" + DatanodeStorage.generateUuid());
-    }
-
     rackA = nodes.subList(0, 3);
     rackB = nodes.subList(3, 6);
     numBuckets = conf.getInt(DFSConfigKeys.DFS_NUM_BUCKETS_KEY, DFSConfigKeys
@@ -405,9 +401,6 @@ public class TestBlockManager {
             BlockManagerTestUtil.getDatanodeDescriptor("4.4.4.4", "/rackA", true),
             BlockManagerTestUtil.getDatanodeDescriptor("5.5.5.5", "/rackA", true),
             BlockManagerTestUtil.getDatanodeDescriptor("6.6.6.6", "/rackA", true));
-    for (int i = 0; i < nodes.size(); i++) {
-      nodes.get(i).setDatanodeUuidForTesting("DN-Name-" + i);
-    }
     addNodes(nodes);
     List<DatanodeDescriptor> origNodes = nodes.subList(0, 3);
 
@@ -758,9 +751,6 @@ public class TestBlockManager {
   public void testSafeModeIBR() throws Exception {
     DatanodeDescriptor node = spy(nodes.get(0));
     DatanodeStorageInfo ds = node.getStorageInfos()[0];
-
-    node.setDatanodeUuidForTesting(ds.getStorageID());
-
     node.isAlive = true;
 
     DatanodeRegistration nodeReg =
@@ -805,8 +795,6 @@ public class TestBlockManager {
   public void testSafeModeIBRAfterIncremental() throws Exception {
     DatanodeDescriptor node = spy(nodes.get(0));
     DatanodeStorageInfo ds = node.getStorageInfos()[0];
-
-    node.setDatanodeUuidForTesting(ds.getStorageID());
 
     node.isAlive = true;
 
