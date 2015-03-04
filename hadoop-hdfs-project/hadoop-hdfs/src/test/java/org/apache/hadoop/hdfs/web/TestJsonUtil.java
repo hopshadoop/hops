@@ -26,9 +26,10 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.util.Time;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.map.ObjectReader;
 import org.junit.Assert;
 import org.junit.Test;
-import org.mortbay.util.ajax.JSON;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -67,53 +68,13 @@ public class TestJsonUtil {
     System.out.println("fstatus = " + fstatus);
     final String json = JsonUtil.toJsonString(status, true);
     System.out.println("json    = " + json.replace(",", ",\n  "));
+    ObjectReader reader = new ObjectMapper().reader(Map.class);
     final HdfsFileStatus s2 =
-        JsonUtil.toFileStatus((Map<?, ?>) JSON.parse(json), true);
+        JsonUtil.toFileStatus((Map<?, ?>) reader.readValue(json), true);
     final FileStatus fs2 = toFileStatus(s2, parent);
     System.out.println("s2      = " + s2);
     System.out.println("fs2     = " + fs2);
     Assert.assertEquals(fstatus, fs2);
-  }
-  
-  @Test
-  public void testToAclStatus() {
-    String jsonString =
-        "{\"AclStatus\":{\"entries\":[\"user::rwx\",\"user:user1:rw-\",\"group::rw-\",\"other::r-x\"],\"group\":\"supergroup\",\"owner\":\"testuser\",\"stickyBit\":false}}";
-    Map<?, ?> json = (Map<?, ?>) JSON.parse(jsonString);
-
-    List<AclEntry> aclSpec =
-        Lists.newArrayList(aclEntry(ACCESS, USER, ALL),
-            aclEntry(ACCESS, USER, "user1", READ_WRITE),
-            aclEntry(ACCESS, GROUP, READ_WRITE),
-            aclEntry(ACCESS, OTHER, READ_EXECUTE));
-
-    AclStatus.Builder aclStatusBuilder = new AclStatus.Builder();
-    aclStatusBuilder.owner("testuser");
-    aclStatusBuilder.group("supergroup");
-    aclStatusBuilder.addEntries(aclSpec);
-    aclStatusBuilder.stickyBit(false);
-
-    Assert.assertEquals("Should be equal", aclStatusBuilder.build(),
-        JsonUtil.toAclStatus(json));
-  }
-
-  @Test
-  public void testToJsonFromAclStatus() {
-    String jsonString =
-        "{\"AclStatus\":{\"entries\":[\"user:user1:rwx\",\"group::rw-\"],\"group\":\"supergroup\",\"owner\":\"testuser\",\"stickyBit\":false}}";
-    AclStatus.Builder aclStatusBuilder = new AclStatus.Builder();
-    aclStatusBuilder.owner("testuser");
-    aclStatusBuilder.group("supergroup");
-    aclStatusBuilder.stickyBit(false);
-
-    List<AclEntry> aclSpec =
-        Lists.newArrayList(aclEntry(ACCESS, USER,"user1", ALL),
-            aclEntry(ACCESS, GROUP, READ_WRITE));
-
-    aclStatusBuilder.addEntries(aclSpec);
-    Assert.assertEquals(jsonString,
-        JsonUtil.toJsonString(aclStatusBuilder.build()));
-
   }
   
   @Test
@@ -190,7 +151,49 @@ public class TestJsonUtil {
     response.put("ipAddr", "127.0.0.1");
     checkDecodeFailure(response);
   }
+  
+  @Test
+  public void testToAclStatus() throws IOException {
+    String jsonString =
+        "{\"AclStatus\":{\"entries\":[\"user::rwx\",\"user:user1:rw-\",\"group::rw-\",\"other::r-x\"],\"group\":\"supergroup\",\"owner\":\"testuser\",\"stickyBit\":false}}";
+    ObjectReader reader = new ObjectMapper().reader(Map.class);
+    Map<?, ?> json = reader.readValue(jsonString);
 
+    List<AclEntry> aclSpec =
+        Lists.newArrayList(aclEntry(ACCESS, USER, ALL),
+            aclEntry(ACCESS, USER, "user1", READ_WRITE),
+            aclEntry(ACCESS, GROUP, READ_WRITE),
+            aclEntry(ACCESS, OTHER, READ_EXECUTE));
+
+    AclStatus.Builder aclStatusBuilder = new AclStatus.Builder();
+    aclStatusBuilder.owner("testuser");
+    aclStatusBuilder.group("supergroup");
+    aclStatusBuilder.addEntries(aclSpec);
+    aclStatusBuilder.stickyBit(false);
+
+    Assert.assertEquals("Should be equal", aclStatusBuilder.build(),
+        JsonUtil.toAclStatus(json));
+  }
+
+  @Test
+  public void testToJsonFromAclStatus() {
+    String jsonString =
+        "{\"AclStatus\":{\"entries\":[\"user:user1:rwx\",\"group::rw-\"],\"group\":\"supergroup\",\"owner\":\"testuser\",\"stickyBit\":false}}";
+    AclStatus.Builder aclStatusBuilder = new AclStatus.Builder();
+    aclStatusBuilder.owner("testuser");
+    aclStatusBuilder.group("supergroup");
+    aclStatusBuilder.stickyBit(false);
+
+    List<AclEntry> aclSpec =
+        Lists.newArrayList(aclEntry(ACCESS, USER,"user1", ALL),
+            aclEntry(ACCESS, GROUP, READ_WRITE));
+
+    aclStatusBuilder.addEntries(aclSpec);
+    Assert.assertEquals(jsonString,
+        JsonUtil.toJsonString(aclStatusBuilder.build()));
+
+  }
+  
   private void checkDecodeFailure(Map<String, Object> map) {
     try {
       JsonUtil.toDatanodeInfo(map);

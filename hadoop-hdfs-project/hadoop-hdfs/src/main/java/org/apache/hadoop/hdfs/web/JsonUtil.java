@@ -42,7 +42,8 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.util.DataChecksum;
 import org.apache.hadoop.util.StringUtils;
-import org.mortbay.util.ajax.JSON;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.map.ObjectReader;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -114,72 +115,7 @@ public class JsonUtil {
     return (Token<BlockTokenIdentifier>) toToken(m);
   }
 
-  /**
-   * Convert a Token[] to a JSON array.
-   */
-  private static Object[] toJsonArray(
-      final Token<? extends TokenIdentifier>[] array) throws IOException {
-    if (array == null) {
-      return null;
-    } else if (array.length == 0) {
-      return EMPTY_OBJECT_ARRAY;
-    } else {
-      final Object[] a = new Object[array.length];
-      for (int i = 0; i < array.length; i++) {
-        a[i] = toJsonMap(array[i]);
-      }
-      return a;
-    }
-  }
-
-  /**
-   * Convert a token object to a JSON string.
-   */
-  public static String toJsonString(
-      final Token<? extends TokenIdentifier>[] tokens) throws IOException {
-    if (tokens == null) {
-      return null;
-    }
-
-    final Map<String, Object> m = new TreeMap<>();
-    m.put(Token.class.getSimpleName(), toJsonArray(tokens));
-    return toJsonString(Token.class.getSimpleName() + "s", m);
-  }
-
-  /**
-   * Convert an Object[] to a List<Token<?>>.
-   */
-  private static List<Token<?>> toTokenList(final Object[] objects)
-      throws IOException {
-    if (objects == null) {
-      return null;
-    } else if (objects.length == 0) {
-      return Collections.emptyList();
-    } else {
-      final List<Token<?>> list = new ArrayList<>(objects.length);
-      for (Object object : objects) {
-        list.add(toToken((Map<?, ?>) object));
-      }
-      return list;
-    }
-  }
-
-  /**
-   * Convert a JSON map to a List<Token<?>>.
-   */
-  public static List<Token<?>> toTokenList(final Map<?, ?> json)
-      throws IOException {
-    if (json == null) {
-      return null;
-    }
-
-    final Map<?, ?> m = (Map<?, ?>) json.get(Token.class.getSimpleName() + "s");
-    return toTokenList((Object[]) m.get(Token.class.getSimpleName()));
-  }
-
-  /**
-   * Convert an exception object to a Json string.
-   */
+  /** Convert an exception object to a Json string. */
   public static String toJsonString(final Exception e) {
     final Map<String, Object> m = new TreeMap<>();
     m.put("exception", e.getClass().getSimpleName());
@@ -209,7 +145,12 @@ public class JsonUtil {
   public static String toJsonString(final String key, final Object value) {
     final Map<String, Object> m = new TreeMap<>();
     m.put(key, value);
-    return JSON.toString(m);
+    ObjectMapper mapper = new ObjectMapper();
+    try {
+      return mapper.writeValueAsString(m);
+    } catch (IOException ignored) {
+    }
+    return null;
   }
 
   /**
@@ -266,8 +207,15 @@ public class JsonUtil {
     m.put("replication", status.getReplication());
     m.put("fileId", status.getFileId());
     m.put("childrenNum", status.getChildrenNum());
+    m.put("storagePolicy", status.getStoragePolicy());
     m.put("isFileStoredInDB", status.isFileStoredInDB());
-    return includeType ? toJsonString(FileStatus.class, m) : JSON.toString(m);
+    ObjectMapper mapper = new ObjectMapper();
+    try {
+      return includeType ?
+          toJsonString(FileStatus.class, m) : mapper.writeValueAsString(m);
+    } catch (IOException ignored) {
+    }
+    return null;
   }
 
   /**
@@ -287,24 +235,22 @@ public class JsonUtil {
     final byte[] symlink = type != PathType.SYMLINK ? null :
         DFSUtil.string2Bytes((String) m.get("symlink"));
 
-    final long fileId = m.containsKey("fileId") ?
-        (Long) m.get("fileId") : INode.ROOT_PARENT_ID;
-    final long len = (Long) m.get("length");
+    final long len = ((Number) m.get("length")).longValue();
     final String owner = (String) m.get("owner");
     final String group = (String) m.get("group");
     final FsPermission permission = toFsPermission((String) m.get("permission"),
       (Boolean)m.get("aclBit"));
-    final long aTime = (Long) m.get("accessTime");
-    final long mTime = (Long) m.get("modificationTime");
-    final long blockSize = (Long) m.get("blockSize");
-    final short replication = (short) (long) (Long) m.get("replication");
+    final long aTime = ((Number) m.get("accessTime")).longValue();
+    final long mTime = ((Number) m.get("modificationTime")).longValue();
+    final long blockSize = ((Number) m.get("blockSize")).longValue();
+    final short replication = ((Number) m.get("replication")).shortValue();
     final boolean isFileStoredInDB = m.containsKey("isFileStoredInDB")? ((Boolean) m.get("isFileStoredInDB") ): false;
+    final long fileId = m.containsKey("fileId") ?
+        ((Number) m.get("fileId")).longValue() : INode.ROOT_PARENT_ID;
+    final int childrenNum = getInt(m, "childrenNum", -1);
     final byte storagePolicy = m.containsKey("storagePolicy") ?
-        (byte) (long) (Long) m.get("storagePolicy") :
+        (byte) ((Number) m.get("storagePolicy")).longValue() :
         BlockStoragePolicySuite.ID_UNSPECIFIED;
-    Long childrenNumLong = (Long) m.get("childrenNum");
-    final int childrenNum = (childrenNumLong == null) ? -1
-            : childrenNumLong.intValue();
     return new HdfsFileStatus(len, type == PathType.DIRECTORY, replication,
         blockSize, mTime, aTime, permission, owner, group, symlink,
         DFSUtil.string2Bytes(localName), fileId, childrenNum, isFileStoredInDB, storagePolicy);
@@ -335,10 +281,11 @@ public class JsonUtil {
       return null;
     }
     
-    final String blockPoolId = (String) m.get("blockPoolId");
-    final long blockId = (Long) m.get("blockId");
-    final long numBytes = (Long) m.get("numBytes");
-    final long generationStamp = (Long) m.get("generationStamp");
+    final String blockPoolId = (String)m.get("blockPoolId");
+    final long blockId = ((Number) m.get("blockId")).longValue();
+    final long numBytes = ((Number) m.get("numBytes")).longValue();
+    final long generationStamp =
+        ((Number) m.get("generationStamp")).longValue();
     return new ExtendedBlock(blockPoolId, blockId, numBytes, generationStamp);
   }
   
@@ -381,7 +328,7 @@ public class JsonUtil {
     if (value == null) {
       return defaultValue;
     }
-    return (int) (long) (Long) value;
+    return ((Number) value).intValue();
   }
 
   private static long getLong(Map<?, ?> m, String key, final long defaultValue) {
@@ -389,7 +336,7 @@ public class JsonUtil {
     if (value == null) {
       return defaultValue;
     }
-    return (long) (Long) value;
+    return ((Number) value).longValue();
   }
   
   private static String getString(Map<?, ?> m, String key,
@@ -401,10 +348,18 @@ public class JsonUtil {
     return (String) value;
   }
 
-  /**
-   * Convert a Json map to an DatanodeInfo object.
-   */
-  static DatanodeInfo toDatanodeInfo(final Map<?, ?> m) throws IOException {
+  static List<?> getList(Map<?, ?> m, String key) {
+    Object list = m.get(key);
+    if (list instanceof List<?>) {
+      return (List<?>) list;
+    } else {
+      return null;
+    }
+  }
+
+  /** Convert a Json map to an DatanodeInfo object. */
+  static DatanodeInfo toDatanodeInfo(final Map<?, ?> m)
+      throws IOException {
     if (m == null) {
       return null;
     }
@@ -443,9 +398,9 @@ public class JsonUtil {
     return new DatanodeInfo(ipAddr,
         (String) m.get("hostName"), (String) m.get("storageID"),
         xferPort,
-        (int) (long) (Long) m.get("infoPort"),
+        ((Number) m.get("infoPort")).intValue(),
         getInt(m, "infoSecurePort", 0),
-        (int) (long) (Long) m.get("ipcPort"),
+        ((Number) m.get("ipcPort")).intValue(),
 
         getLong(m, "capacity", 0l),
         getLong(m, "dfsUsed", 0l),
@@ -476,18 +431,18 @@ public class JsonUtil {
     }
   }
 
-  /**
-   * Convert an Object[] to a DatanodeInfo[].
-   */
-  private static DatanodeInfo[] toDatanodeInfoArray(final Object[] objects) throws IOException {
+  /** Convert an Object[] to a DatanodeInfo[]. */
+  private static DatanodeInfo[] toDatanodeInfoArray(final List<?> objects)
+      throws IOException {
     if (objects == null) {
       return null;
-    } else if (objects.length == 0) {
+    } else if (objects.isEmpty()) {
       return EMPTY_DATANODE_INFO_ARRAY;
     } else {
-      final DatanodeInfo[] array = new DatanodeInfo[objects.length];
-      for (int i = 0; i < array.length; i++) {
-        array[i] = toDatanodeInfo((Map<?, ?>) objects[i]);
+      final DatanodeInfo[] array = new DatanodeInfo[objects.size()];
+      int i = 0;
+      for (Object object : objects) {
+        array[i++] = toDatanodeInfo((Map<?, ?>) object);
       }
       return array;
     }
@@ -521,17 +476,17 @@ public class JsonUtil {
       return null;
     }
 
-    final ExtendedBlock b = toExtendedBlock((Map<?, ?>) m.get("block"));
-    final DatanodeInfo[] locations =
-        toDatanodeInfoArray((Object[]) m.get("locations"));
-    final long startOffset = (Long) m.get("startOffset");
-    final boolean isCorrupt = (Boolean) m.get("isCorrupt");
+    final ExtendedBlock b = toExtendedBlock((Map<?, ?>)m.get("block"));
+    final DatanodeInfo[] locations = toDatanodeInfoArray(
+        getList(m, "locations"));
+    final long startOffset = ((Number) m.get("startOffset")).longValue();
+    final boolean isCorrupt = (Boolean)m.get("isCorrupt");
     final DatanodeInfo[] cachedLocations = toDatanodeInfoArray(
-        (Object[])m.get("cachedLocations"));
-    
-    final LocatedBlock locatedblock =
-        new LocatedBlock(b, locations, null, null, startOffset, isCorrupt, cachedLocations);
-    locatedblock.setBlockToken(toBlockToken((Map<?, ?>) m.get("blockToken")));
+        getList(m, "cachedLocations"));
+
+    final LocatedBlock locatedblock = new LocatedBlock(b, locations,
+        null, null, startOffset, isCorrupt, cachedLocations);
+    locatedblock.setBlockToken(toBlockToken((Map<?, ?>)m.get("blockToken")));
     return locatedblock;
   }
 
@@ -553,18 +508,15 @@ public class JsonUtil {
     }
   }
 
-  /**
-   * Convert an Object[] to a List of LocatedBlock.
-   */
-  private static List<LocatedBlock> toLocatedBlockList(final Object[] objects)
-      throws IOException {
+  /** Convert an List of Object to a List of LocatedBlock. */
+  private static List<LocatedBlock> toLocatedBlockList(
+      final List<?> objects) throws IOException {
     if (objects == null) {
       return null;
-    } else if (objects.length == 0) {
+    } else if (objects.isEmpty()) {
       return Collections.emptyList();
     } else {
-      final List<LocatedBlock> list =
-          new ArrayList<>(objects.length);
+      final List<LocatedBlock> list = new ArrayList<>(objects.size());
       for (Object object : objects) {
         list.add(toLocatedBlock((Map<?, ?>) object));
       }
@@ -600,15 +552,14 @@ public class JsonUtil {
       return null;
     }
 
-    final Map<?, ?> m =
-        (Map<?, ?>) json.get(LocatedBlocks.class.getSimpleName());
-    final long fileLength = (Long) m.get("fileLength");
-    final boolean isUnderConstruction = (Boolean) m.get("isUnderConstruction");
-    final List<LocatedBlock> locatedBlocks =
-        toLocatedBlockList((Object[]) m.get("locatedBlocks"));
-    final LocatedBlock lastLocatedBlock =
-        toLocatedBlock((Map<?, ?>) m.get("lastLocatedBlock"));
-    final boolean isLastBlockComplete = (Boolean) m.get("isLastBlockComplete");
+    final Map<?, ?> m = (Map<?, ?>)json.get(LocatedBlocks.class.getSimpleName());
+    final long fileLength = ((Number) m.get("fileLength")).longValue();
+    final boolean isUnderConstruction = (Boolean)m.get("isUnderConstruction");
+    final List<LocatedBlock> locatedBlocks = toLocatedBlockList(
+        getList(m, "locatedBlocks"));
+    final LocatedBlock lastLocatedBlock = toLocatedBlock(
+        (Map<?, ?>)m.get("lastLocatedBlock"));
+    final boolean isLastBlockComplete = (Boolean)m.get("isLastBlockComplete");
     return new LocatedBlocks(fileLength, isUnderConstruction, locatedBlocks,
         lastLocatedBlock, isLastBlockComplete);
   }
@@ -639,14 +590,13 @@ public class JsonUtil {
       return null;
     }
 
-    final Map<?, ?> m =
-        (Map<?, ?>) json.get(ContentSummary.class.getSimpleName());
-    final long length = (Long) m.get("length");
-    final long fileCount = (Long) m.get("fileCount");
-    final long directoryCount = (Long) m.get("directoryCount");
-    final long quota = (Long) m.get("quota");
-    final long spaceConsumed = (Long) m.get("spaceConsumed");
-    final long spaceQuota = (Long) m.get("spaceQuota");
+    final Map<?, ?> m = (Map<?, ?>)json.get(ContentSummary.class.getSimpleName());
+    final long length = ((Number) m.get("length")).longValue();
+    final long fileCount = ((Number) m.get("fileCount")).longValue();
+    final long directoryCount = ((Number) m.get("directoryCount")).longValue();
+    final long quota = ((Number) m.get("quota")).longValue();
+    final long spaceConsumed = ((Number) m.get("spaceConsumed")).longValue();
+    final long spaceQuota = ((Number) m.get("spaceQuota")).longValue();
 
     return new ContentSummary(length, fileCount, directoryCount, quota,
         spaceConsumed, spaceQuota);
@@ -676,11 +626,10 @@ public class JsonUtil {
       return null;
     }
 
-    final Map<?, ?> m =
-        (Map<?, ?>) json.get(FileChecksum.class.getSimpleName());
-    final String algorithm = (String) m.get("algorithm");
-    final int length = (int) (long) (Long) m.get("length");
-    final byte[] bytes = StringUtils.hexStringToByte((String) m.get("bytes"));
+    final Map<?, ?> m = (Map<?, ?>)json.get(FileChecksum.class.getSimpleName());
+    final String algorithm = (String)m.get("algorithm");
+    final int length = ((Number) m.get("length")).intValue();
+    final byte[] bytes = StringUtils.hexStringToByte((String)m.get("bytes"));
 
     final DataInputStream in =
         new DataInputStream(new ByteArrayInputStream(bytes));
@@ -726,7 +675,13 @@ public class JsonUtil {
     m.put("owner", status.getOwner());
     m.put("group", status.getGroup());
     m.put("stickyBit", status.isStickyBit());
-    m.put("entries", status.getEntries());
+
+    final List<String> stringEntries = new ArrayList<>();
+    for (AclEntry entry : status.getEntries()) {
+      stringEntries.add(entry.toString());
+    }
+    m.put("entries", stringEntries);
+
     FsPermission perm = status.getPermission();
     if (perm != null) {
       m.put("permission", toString(perm));
@@ -740,7 +695,13 @@ public class JsonUtil {
     final Map<String, Map<String, Object>> finalMap =
         new TreeMap<String, Map<String, Object>>();
     finalMap.put(AclStatus.class.getSimpleName(), m);
-    return JSON.toString(finalMap);
+
+    ObjectMapper mapper = new ObjectMapper();
+    try {
+      return mapper.writeValueAsString(finalMap);
+    } catch (IOException ignored) {
+    }
+    return null;
   }
 
   /** Convert a Json map to a AclStatus object. */
@@ -761,11 +722,11 @@ public class JsonUtil {
           (Boolean) m.get("aclBit"));
       aclStatusBuilder.setPermission(permission);
     }
-    final Object[] entries = (Object[]) m.get("entries");
+    final List<?> entries = (List<?>) m.get("entries");
 
     List<AclEntry> aclEntryList = new ArrayList<AclEntry>();
-    for (int i = 0; i < entries.length; i++) {
-      AclEntry aclEntry = AclEntry.parseAclEntry((String) entries[i], true);
+    for (Object entry : entries) {
+      AclEntry aclEntry = AclEntry.parseAclEntry((String) entry, true);
       aclEntryList.add(aclEntry);
     }
     aclStatusBuilder.addEntries(aclEntryList);
