@@ -47,19 +47,23 @@ public class DatanodeID implements Comparable<DatanodeID> {
   private int infoSecurePort; // info server port
   private int ipcPort;       // IPC server port
   private String xferAddr;
-  private int hashCode = -1;
 
   /**
    * UUID identifying a given datanode. For upgraded Datanodes this is the
    * same as the StorageID that was previously used by this Datanode.
    * For newly formatted Datanodes it is a UUID.
    */
-  private String datanodeUuid = null;
+  private final String datanodeUuid;
 
   public DatanodeID(DatanodeID from) {
+    this(from.getDatanodeUuid(), from);
+  }
+
+  @VisibleForTesting
+  public DatanodeID(String datanodeUuid, DatanodeID from) {
     this(from.getIpAddr(),
         from.getHostName(),
-        from.getDatanodeUuid(),
+        datanodeUuid,
         from.getXferPort(),
         from.getInfoPort(),
         from.getInfoSecurePort(),
@@ -85,14 +89,12 @@ public class DatanodeID implements Comparable<DatanodeID> {
    */
   public DatanodeID(String ipAddr, String hostName, String datanodeUuid,
       int xferPort, int infoPort, int infoSecurePort, int ipcPort) {
-    this.ipAddr = ipAddr;
+    setIpAndXferPort(ipAddr, xferPort);
     this.hostName = hostName;
     this.datanodeUuid = checkDatanodeUuid(datanodeUuid);
-    this.xferPort = xferPort;
     this.infoPort = infoPort;
     this.infoSecurePort = infoSecurePort;
     this.ipcPort = ipcPort;
-    updateXferAddrAndInvalidateHashCode();
   }
   
   //HOP: Mahmoud: 
@@ -107,14 +109,36 @@ public class DatanodeID implements Comparable<DatanodeID> {
   }
   
   public void setIpAddr(String ipAddr) {
+    //updated during registration, preserve former xferPort
+    setIpAndXferPort(ipAddr, xferPort);
+  }
+
+  private void setIpAndXferPort(String ipAddr, int xferPort) {
+    // build xferAddr string to reduce cost of frequent use
     this.ipAddr = ipAddr;
-    updateXferAddrAndInvalidateHashCode();
+    this.xferPort = xferPort;
+    this.xferAddr = ipAddr + ":" + xferPort;
   }
 
   public void setPeerHostName(String peerHostName) {
     this.peerHostName = peerHostName;
   }
   
+  /**
+   * @return data node ID.
+   */
+  public String getDatanodeUuid() {
+    return datanodeUuid;
+  }
+
+  private String checkDatanodeUuid(String uuid) {
+    if (uuid == null || uuid.isEmpty()) {
+      return null;
+    } else {
+      return uuid;
+    }
+  }
+
   /**
    * @return ipAddr;
    */
@@ -197,26 +221,6 @@ public class DatanodeID implements Comparable<DatanodeID> {
   }
 
   /**
-   * @return data node ID.
-   */
-  public String getDatanodeUuid() {
-    return datanodeUuid;
-  }
-
-  @VisibleForTesting
-  public void setDatanodeUuidForTesting(String datanodeUuid) {
-    this.datanodeUuid = datanodeUuid;
-  }
-
-  private String checkDatanodeUuid(String uuid) {
-    if (uuid == null || uuid.isEmpty()) {
-      return null;
-    } else {
-      return uuid;
-    }
-  }
-
-  /**
    * @return xferPort (the port for data streaming)
    */
   public int getXferPort() {
@@ -258,16 +262,7 @@ public class DatanodeID implements Comparable<DatanodeID> {
   
   @Override
   public int hashCode() {
-    if (hashCode == -1) {
-      int newHashCode;
-      if(datanodeUuid == null) {
-        newHashCode = xferAddr.hashCode();
-      } else {
-        newHashCode = xferAddr.hashCode() ^ datanodeUuid.hashCode();
-      }
-      hashCode = newHashCode & Integer.MAX_VALUE;
-    }
-    return hashCode;
+    return datanodeUuid.hashCode();
   }
   
   @Override
@@ -280,14 +275,12 @@ public class DatanodeID implements Comparable<DatanodeID> {
    * Note that this does not update datanodeUuid.
    */
   public void updateRegInfo(DatanodeID nodeReg) {
-    ipAddr = nodeReg.getIpAddr();
+    setIpAndXferPort(nodeReg.getIpAddr(), nodeReg.getXferPort());
     hostName = nodeReg.getHostName();
     peerHostName = nodeReg.getPeerHostName();
-    xferPort = nodeReg.getXferPort();
     infoPort = nodeReg.getInfoPort();
     infoSecurePort = nodeReg.getInfoSecurePort();
     ipcPort = nodeReg.getIpcPort();
-    updateXferAddrAndInvalidateHashCode();
   }
 
   /**
@@ -299,14 +292,5 @@ public class DatanodeID implements Comparable<DatanodeID> {
   @Override
   public int compareTo(DatanodeID that) {
     return getXferAddr().compareTo(that.getXferAddr());
-  }
-
-  // NOTE: mutable hash codes are dangerous, however this class chooses to
-  // use them.  this method must be called when a value mutates that is used
-  // to compute the hash, equality, or comparison of instances.
-  private void updateXferAddrAndInvalidateHashCode() {
-    xferAddr = ipAddr + ":" + xferPort;
-    // can't compute new hash yet because uuid might still null...
-    hashCode = -1;
   }
 }
