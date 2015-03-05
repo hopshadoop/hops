@@ -649,7 +649,7 @@ public class DirectoryScanner implements Runnable {
       List<File> subDirs = new ArrayList();
       for (File file : files) {
         if (!file.isDirectory()) {
-          if (isBlockMetaFile("blk_", file.getName())) {
+          if (isBlockMetaFile(Block.BLOCK_FILE_PREFIX, file.getName())) {
             metaFiles.add(file);
           } else if (Block.isBlockFilename(file)) {
             blkFiles.add(file);

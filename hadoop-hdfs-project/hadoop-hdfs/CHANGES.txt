@@ -397,6 +397,11 @@ Release 2.7.0 - UNRELEASED
     HDFS-7789. DFSck should resolve the path to support cross-FS symlinks.
     (gera)
 
+    HDFS-7535. Utilize Snapshot diff report for distcp. (jing9)
+
+    HDFS-1522. Combine two BLOCK_FILE_PREFIX constants into one.
+    (Dongming Liang via shv)
+
   OPTIMIZATIONS
 
   BUG FIXES

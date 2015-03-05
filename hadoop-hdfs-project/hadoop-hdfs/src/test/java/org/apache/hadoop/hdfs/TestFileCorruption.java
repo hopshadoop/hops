@@ -80,7 +80,7 @@ public class TestFileCorruption {
       assertTrue("Blocks do not exist in data-dir",
           (blocks != null) && (blocks.length > 0));
       for (File block : blocks) {
-        if (!block.getName().startsWith("blk_")) {
+        if (!block.getName().startsWith(Block.BLOCK_FILE_PREFIX)) {
           continue;
         }
         System.out
