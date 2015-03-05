@@ -402,6 +402,14 @@ Release 2.7.0 - UNRELEASED
     HDFS-1522. Combine two BLOCK_FILE_PREFIX constants into one.
     (Dongming Liang via shv)
 
+    HDFS-7746. Add a test randomly mixing append, truncate and snapshot
+    operations. (szetszwo)
+
+    HADOOP-11648. Set DomainSocketWatcher thread name explicitly.
+    (Liang Xie via ozawa)
+
+    HDFS-7855. Separate class Packet from DFSOutputStream. (Li Bo bia jing9)
+
   OPTIMIZATIONS
 
   BUG FIXES
