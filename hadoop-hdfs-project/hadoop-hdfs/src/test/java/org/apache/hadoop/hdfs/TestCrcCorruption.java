@@ -33,6 +33,13 @@ import java.nio.channels.FileChannel;
 import java.util.Random;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.DFSClientFaultInjector;
+import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
+import org.apache.hadoop.io.IOUtils;
+import org.junit.Before;
+import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -177,7 +184,7 @@ public class TestCrcCorruption {
           (blocks != null) && (blocks.length > 0));
       int num = 0;
       for (File block1 : blocks) {
-        if (block1.getName().startsWith("blk_") &&
+        if (block1.getName().startsWith(Block.BLOCK_FILE_PREFIX) &&
             block1.getName().endsWith(".meta")) {
           num++;
           if (num % 3 == 0) {
