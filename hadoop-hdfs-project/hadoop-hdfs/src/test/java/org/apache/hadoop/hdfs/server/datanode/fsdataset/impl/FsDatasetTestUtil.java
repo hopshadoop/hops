@@ -17,10 +17,20 @@
  */
 package org.apache.hadoop.hdfs.server.datanode.fsdataset.impl;
 
+import java.io.RandomAccessFile;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+import java.nio.channels.OverlappingFileLockException;
+
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
+import org.apache.hadoop.hdfs.server.common.Storage;
 import org.apache.hadoop.hdfs.server.datanode.ReplicaInfo;
+import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsDatasetSpi;
+
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.IOException;
@@ -61,5 +71,37 @@ public class FsDatasetTestUtil {
   public static Collection<ReplicaInfo> getReplicas(FsDatasetSpi<?> fsd,
       String bpid) {
     return ((FsDatasetImpl) fsd).volumeMap.replicas(bpid);
+  }
+
+  /**
+   * Asserts that the storage lock file in the given directory has been
+   * released.  This method works by trying to acquire the lock file itself.  If
+   * locking fails here, then the main code must have failed to release it.
+   *
+   * @param dir the storage directory to check
+   * @throws IOException if there is an unexpected I/O error
+   */
+  public static void assertFileLockReleased(String dir) throws IOException {
+    StorageLocation sl = StorageLocation.parse(dir);
+    File lockFile = new File(sl.getFile(), Storage.STORAGE_FILE_LOCK);
+    try (RandomAccessFile raf = new RandomAccessFile(lockFile, "rws");
+        FileChannel channel = raf.getChannel()) {
+      FileLock lock = channel.tryLock();
+      assertNotNull(String.format(
+          "Lock file at %s appears to be held by a different process.",
+          lockFile.getAbsolutePath()), lock);
+      if (lock != null) {
+        try {
+          lock.release();
+        } catch (IOException e) {
+          FsDatasetImpl.LOG.warn(String.format("I/O error releasing file lock %s.",
+              lockFile.getAbsolutePath()), e);
+          throw e;
+        }
+      }
+    } catch (OverlappingFileLockException e) {
+      fail(String.format("Must release lock file at %s.",
+          lockFile.getAbsolutePath()));
+    }
   }
 }
