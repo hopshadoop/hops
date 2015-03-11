@@ -78,23 +78,16 @@ public class DataNodeMetrics {
 
   @Metric("Count of network errors on the datanode")
   MutableCounterLong datanodeNetworkErrors;
-   
-  @Metric
-  MutableRate readBlockOp;
-  @Metric
-  MutableRate writeBlockOp;
-  @Metric
-  MutableRate blockChecksumOp;
-  @Metric
-  MutableRate copyBlockOp;
-  @Metric
-  MutableRate replaceBlockOp;
-  @Metric
-  MutableRate heartbeats;
-  @Metric
-  MutableRate blockReports;
-  @Metric
-  MutableCounterLong blockReportCount;
+
+  @Metric MutableRate readBlockOp;
+  @Metric MutableRate writeBlockOp;
+  @Metric MutableRate blockChecksumOp;
+  @Metric MutableRate copyBlockOp;
+  @Metric MutableRate replaceBlockOp;
+  @Metric MutableRate heartbeats;
+  @Metric MutableRate blockReports;
+  @Metric MutableRate incrementalBlockReports;
+  @Metric MutableCounterLong blockReportCount;
   @Metric MutableRate cacheReports;
   @Metric
   MutableRate packetAckRoundTripTimeNanos;
@@ -188,7 +181,10 @@ public class DataNodeMetrics {
 
   public void incrBlocReportCounter(int increment) {
     blockReportCount.incr(increment);
+  }
 
+  public void addIncrementalBlockReport(long latency) {
+    incrementalBlockReports.add(latency);
   }
 
   public void addCacheReport(long latency) {
