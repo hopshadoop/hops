@@ -72,6 +72,7 @@ import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeManager;
 import org.apache.hadoop.hdfs.server.blockmanagement.DecommissionManager;
+import org.apache.hadoop.test.PathUtils;
 import org.junit.Assert;
 
 import static org.junit.Assert.assertEquals;
@@ -91,7 +92,8 @@ public class TestDecommission {
   static final int BLOCKREPORT_INTERVAL_MSEC = 1000; //block report in msec
   static final int NAMENODE_REPLICATION_INTERVAL = 1; //replication interval
 
-  Random myrand = new Random();
+  final Random myrand = new Random();
+  Path dir;
   Path hostsFile;
   Path excludeFile;
   FileSystem localFileSys;
@@ -104,9 +106,7 @@ public class TestDecommission {
     // Set up the hosts/exclude files.
     localFileSys = FileSystem.getLocal(conf);
     Path workingDir = localFileSys.getWorkingDirectory();
-    Path dir = new Path(workingDir,
-        System.getProperty("test.build.data", "target/test/data") +
-            "/work-dir/decommission");
+    dir = new Path(workingDir, PathUtils.getTestDirName(getClass()) + "/work-dir/decommission");
     hostsFile = new Path(dir, "hosts");
     excludeFile = new Path(dir, "exclude");
     
@@ -128,7 +128,7 @@ public class TestDecommission {
   
   @After
   public void teardown() throws IOException {
-    cleanupFile(localFileSys, excludeFile.getParent());
+    cleanupFile(localFileSys, dir);
     if (cluster != null) {
       cluster.shutdown();
     }
