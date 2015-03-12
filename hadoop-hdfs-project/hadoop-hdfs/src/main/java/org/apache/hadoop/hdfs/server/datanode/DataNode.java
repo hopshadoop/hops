@@ -45,8 +45,10 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_STARTUP_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_MAX_NUM_BLOCKS_TO_LOG_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_MAX_NUM_BLOCKS_TO_LOG_KEY;
 import java.io.EOFException;
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.nio.channels.ServerSocketChannel;
+import java.util.HashSet;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -645,20 +647,16 @@ public class DataNode extends ReconfigurableBase
             errorMessageBuilder.append(
                 String.format("FAILED to ADD: %s: %s%n", volume,
                               e.toString()));
+            LOG.error("Failed to add volume: " + volume, e);
           }
         }
       }
 
-      if (!changedVolumes.deactivateLocations.isEmpty()) {
-        LOG.info("Deactivating volumes: " +
-            Joiner.on(",").join(changedVolumes.deactivateLocations));
-
-        data.removeVolumes(changedVolumes.deactivateLocations);
-        try {
-          storage.removeVolumes(changedVolumes.deactivateLocations);
-        } catch (IOException e) {
-          errorMessageBuilder.append(e.getMessage());
-        }
+      try {
+        removeVolumes(changedVolumes.deactivateLocations);
+      } catch (IOException e) {
+        errorMessageBuilder.append(e.getMessage());
+        LOG.error("Failed to remove volume: " + e.getMessage(), e);
       }
 
       if (errorMessageBuilder.length() > 0) {
@@ -671,12 +669,84 @@ public class DataNode extends ReconfigurableBase
     }
   }
 
-  private synchronized void setClusterId(final String nsCid, final String bpid)
+  /**
+   * Remove volumes from DataNode.
+   * See {@link removeVolumes(final Set<File>, boolean)} for details.
+   *
+   * @param locations the StorageLocations of the volumes to be removed.
+   * @throws IOException
+   */
+  private void removeVolumes(final Collection<StorageLocation> locations)
+    throws IOException {
+    if (locations.isEmpty()) {
+      return;
+    }
+    Set<File> volumesToRemove = new HashSet<>();
+    for (StorageLocation loc : locations) {
+      volumesToRemove.add(loc.getFile().getAbsoluteFile());
+    }
+    removeVolumes(volumesToRemove, true);
+  }
+
+  /**
+   * Remove volumes from DataNode.
+   *
+   * It does three things:
+   * <li>
+   *   <ul>Remove volumes and block info from FsDataset.</ul>
+   *   <ul>Remove volumes from DataStorage.</ul>
+   *   <ul>Reset configuration DATA_DIR and {@link dataDirs} to represent
+   *   active volumes.</ul>
+   * </li>
+   * @param absoluteVolumePaths the absolute path of volumes.
+   * @param clearFailure if true, clears the failure information related to the
+   *                     volumes.
+   * @throws IOException
+   */
+  private synchronized void removeVolumes(
+      final Set<File> absoluteVolumePaths, boolean clearFailure)
       throws IOException {
-    if (clusterId != null && !clusterId.equals(nsCid)) {
-      throw new IOException(
-          "Cluster IDs not matched: dn cid=" + clusterId + " but ns cid=" +
-              nsCid + "; bpid=" + bpid);
+    for (File vol : absoluteVolumePaths) {
+      Preconditions.checkArgument(vol.isAbsolute());
+    }
+
+    if (absoluteVolumePaths.isEmpty()) {
+      return;
+    }
+
+    LOG.info(String.format("Deactivating volumes (clear failure=%b): %s",
+        clearFailure, Joiner.on(",").join(absoluteVolumePaths)));
+
+    IOException ioe = null;
+    // Remove volumes and block infos from FsDataset.
+    data.removeVolumes(absoluteVolumePaths, clearFailure);
+
+    // Remove volumes from DataStorage.
+    try {
+      storage.removeVolumes(absoluteVolumePaths);
+    } catch (IOException e) {
+      ioe = e;
+    }
+
+    // Set configuration and dataDirs to reflect volume changes.
+    for (Iterator<StorageLocation> it = dataDirs.iterator(); it.hasNext(); ) {
+      StorageLocation loc = it.next();
+      if (absoluteVolumePaths.contains(loc.getFile().getAbsoluteFile())) {
+        it.remove();
+      }
+    }
+    conf.set(DFS_DATANODE_DATA_DIR_KEY, Joiner.on(",").join(dataDirs));
+
+    if (ioe != null) {
+      throw ioe;
+    }
+  }
+
+  private synchronized void setClusterId(final String nsCid, final String bpid
+      ) throws IOException {
+    if(clusterId != null && !clusterId.equals(nsCid)) {
+      throw new IOException ("Cluster IDs not matched: dn cid=" + clusterId 
+          + " but ns cid="+ nsCid + "; bpid=" + bpid);
     }
     // else
     clusterId = nsCid;
@@ -3305,10 +3375,20 @@ public class DataNode extends ReconfigurableBase
    * Check the disk error
    */
   private void checkDiskError() {
-    try {
-      data.checkDataDir();
-    } catch (DiskErrorException de) {
-      handleDiskError(de.getMessage());
+    Set<File> unhealthyDataDirs = data.checkDataDir();
+    if (unhealthyDataDirs != null && !unhealthyDataDirs.isEmpty()) {
+      try {
+        // Remove all unhealthy volumes from DataNode.
+        removeVolumes(unhealthyDataDirs, false);
+      } catch (IOException e) {
+        LOG.warn("Error occurred when removing unhealthy storage dirs: "
+            + e.getMessage(), e);
+      }
+      StringBuilder sb = new StringBuilder("DataNode failed volumes:");
+      for (File dataDir : unhealthyDataDirs) {
+        sb.append(dataDir.getAbsolutePath() + ";");
+      }
+      handleDiskError(sb.toString());
     }
   }
 

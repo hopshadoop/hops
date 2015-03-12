@@ -18,7 +18,8 @@
 package org.apache.hadoop.hdfs.server.datanode;
 
 import java.nio.channels.ClosedChannelException;
-import java.util.Collection;
+import java.util.Set;
+
 
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -46,7 +47,6 @@ import org.apache.hadoop.hdfs.server.protocol.VolumeFailureSummary;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.util.DataChecksum;
-import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 
 import javax.management.NotCompliantMBeanException;
 import javax.management.ObjectName;
@@ -956,8 +956,9 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
   }
 
   @Override
-  public void checkDataDir() throws DiskErrorException {
+  public Set<File> checkDataDir() {
     // nothing to check for simulated data set
+    return null;
   }
 
   @Override // FsDatasetSpi
@@ -1272,7 +1273,7 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
   }
   
   @Override
-  public synchronized void removeVolumes(Collection<StorageLocation> volumes) {
+  public synchronized void removeVolumes(Set<File> volumes, boolean clearFailure) {
     throw new UnsupportedOperationException();
   }
 
