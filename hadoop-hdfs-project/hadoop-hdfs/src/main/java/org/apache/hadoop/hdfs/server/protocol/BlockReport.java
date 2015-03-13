@@ -27,10 +27,11 @@ import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.datanode.Replica;
 
 import java.util.*;
+import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
+import org.apache.hadoop.hdfs.protocol.BlockListAsLongs.BlockReportReplica;
+import org.apache.hadoop.hdfs.server.datanode.FinalizedReplica;
 
-import static org.apache.hadoop.hdfs.server.protocol.BlockReportBlockState.FINALIZED;
-
-public class BlockReport implements Iterable<ReportedBlock> {
+public class BlockReport implements Iterable<BlockReportReplica> {
   
   private Bucket[] buckets;
   private int numBlocks;
@@ -55,7 +56,7 @@ public class BlockReport implements Iterable<ReportedBlock> {
       @Override
       public Iterator<Block> iterator() {
         return new Iterator<Block>() {
-          Iterator<ReportedBlock> it = BlockReport.this.iterator();
+          Iterator<BlockReportReplica> it = BlockReport.this.iterator();
           
           @Override
           public boolean hasNext() {
@@ -64,8 +65,8 @@ public class BlockReport implements Iterable<ReportedBlock> {
           
           @Override
           public Block next() {
-            ReportedBlock next = it.next();
-            return new Block(next.getBlockId(), next.getLength(), next
+            BlockReportReplica next = it.next();
+            return new Block(next.getBlockId(), next.getBytesOnDisk(), next
                 .getGenerationStamp());
           }
         };
@@ -74,7 +75,7 @@ public class BlockReport implements Iterable<ReportedBlock> {
   }
   
   @Override
-  public Iterator<ReportedBlock> iterator() {
+  public Iterator<BlockReportReplica> iterator() {
     return new BlockReportIterator();
   }
   
@@ -100,43 +101,43 @@ public class BlockReport implements Iterable<ReportedBlock> {
    * Corrupt the generation stamp of the block with the given index.
    * Not meant to be used outside of tests.
    */
-  @VisibleForTesting
-  public BlockReport corruptBlockGSForTesting(final int blockIndex, Random rand) {
-    Builder corruptReportBuilder = builder(buckets.length);
-    int i = 0;
-    for (ReportedBlock reportedBlock : this){
-      ReportedBlock toAdd;
-      if (i == blockIndex){
-        toAdd = new ReportedBlock(reportedBlock.getBlockId(), rand.nextInt(), reportedBlock.getLength(), reportedBlock.getState());
-      } else {
-        toAdd = reportedBlock;
-      }
-      corruptReportBuilder.add(toAdd);
-      i++;
-    }
-    return corruptReportBuilder.build();
-  }
+//  @VisibleForTesting
+//  public BlockReport corruptBlockGSForTesting(final int blockIndex, Random rand) {
+//    Builder corruptReportBuilder = builder(buckets.length);
+//    int i = 0;
+//    for (BlockReportReplica reportedBlock : this){
+//      BlockReportReplica toAdd;
+//      if (i == blockIndex){
+//        toAdd = new BlockReportReplica(reportedBlock.getBlockId(), rand.nextInt(), reportedBlock.getBytesOnDisk(), reportedBlock.getState());
+//      } else {
+//        toAdd = reportedBlock;
+//      }
+//      corruptReportBuilder.add(toAdd);
+//      i++;
+//    }
+//    return corruptReportBuilder.build();
+//  }
 
   /**
    * Corrupt the length of the block with the given index by truncation.
    * Not meant to be used outside of tests.
    */
-  @VisibleForTesting
-  public BlockReport corruptBlockLengthForTesting(final int blockIndex, Random rand) {
-    Builder corruptReportBuilder = builder(buckets.length);
-    int i = 0;
-    for (ReportedBlock reportedBlock : this){
-      ReportedBlock toAdd;
-      if (i == blockIndex){
-        toAdd = new ReportedBlock(reportedBlock.getBlockId(), reportedBlock.getGenerationStamp(), rand.nextInt(), reportedBlock.getState());
-      } else {
-        toAdd = reportedBlock;
-      }
-      corruptReportBuilder.add(toAdd);
-      i++;
-    }
-    return corruptReportBuilder.build();
-  }
+//  @VisibleForTesting
+//  public BlockReport corruptBlockLengthForTesting(final int blockIndex, Random rand) {
+//    Builder corruptReportBuilder = builder(buckets.length);
+//    int i = 0;
+//    for (BlockReportReplica reportedBlock : this){
+//      BlockReportReplica toAdd;
+//      if (i == blockIndex){
+//        toAdd = new BlockReportReplica(reportedBlock.getBlockId(), reportedBlock.getGenerationStamp(), rand.nextInt(), reportedBlock.getState());
+//      } else {
+//        toAdd = reportedBlock;
+//      }
+//      corruptReportBuilder.add(toAdd);
+//      i++;
+//    }
+//    return corruptReportBuilder.build();
+//  }
 
   private static byte[] hashAsFinalized(Block theBlock) {
     return HashBuckets.hash(theBlock.getBlockId(), theBlock.getGenerationStamp(),
@@ -144,8 +145,8 @@ public class BlockReport implements Iterable<ReportedBlock> {
             .getValue());
   }
   
-  public static byte[] hashAsFinalized(ReportedBlock block){
-    Block toHash = new Block(block.getBlockId(), block.getLength(),
+  public static byte[] hashAsFinalized(BlockReportReplica block){
+    Block toHash = new Block(block.getBlockId(), block.getBytesOnDisk(),
         block.getGenerationStamp());
     return hashAsFinalized(toHash);
   }
@@ -168,7 +169,7 @@ public class BlockReport implements Iterable<ReportedBlock> {
 
   public static class Builder {
     private final int NUM_BUCKETS;
-    private ArrayList<ReportedBlock>[] buckets;
+    private ArrayList<Replica>[] buckets;
     private byte[][] hashes;
     private int blockCounter = 0;
   
@@ -176,127 +177,104 @@ public class BlockReport implements Iterable<ReportedBlock> {
       NUM_BUCKETS = numBuckets;
       buckets = new ArrayList[NUM_BUCKETS];
       hashes = new byte[NUM_BUCKETS][HashBuckets.HASH_LENGTH];
-      for (int i = 0; i < NUM_BUCKETS; i++) {
+      for (int i = 0; i < NUM_BUCKETS; i++) {        
         buckets[i] = new ArrayList<>();
       }
     }
 
-    @VisibleForTesting
-    public Builder add(ReportedBlock reportBlock){
-      int bucket = bucket(reportBlock.getBlockId(), NUM_BUCKETS);
-      buckets[bucket].add(reportBlock);
-      HdfsServerConstants.ReplicaState replicaState = null;
-      switch (reportBlock.getState()){
-        case FINALIZED:
-          replicaState = HdfsServerConstants.ReplicaState.FINALIZED;
-          break;
-        case RBW:
-          replicaState = HdfsServerConstants.ReplicaState.RBW;
-          break;
-        case RUR:
-          replicaState = HdfsServerConstants.ReplicaState.RUR;
-          break;
-        case RWR:
-          replicaState = HdfsServerConstants.ReplicaState.RWR;
-          break;
-        case TEMPORARY:
-          replicaState = HdfsServerConstants.ReplicaState.TEMPORARY;
-          break;
-      }
-      byte[] hash = HashBuckets.hash(reportBlock.getBlockId(),reportBlock.getGenerationStamp(),reportBlock.getLength(),
-              replicaState.getValue());
-      HashBuckets.XORHashes(hashes[bucket], hash);
-      blockCounter++;
-      return this;
-    }
+//    @VisibleForTesting
+//    public Builder add(Replica reportBlock){
+//      int bucket = bucket(reportBlock.getBlockId(), NUM_BUCKETS);
+//      buckets[bucket].add(reportBlock);
+//      HdfsServerConstants.ReplicaState replicaState = null;
+//      switch (reportBlock.getState()){
+//        case FINALIZED:
+//          replicaState = HdfsServerConstants.ReplicaState.FINALIZED;
+//          break;
+//        case RBW:
+//          replicaState = HdfsServerConstants.ReplicaState.RBW;
+//          break;
+//        case RUR:
+//          replicaState = HdfsServerConstants.ReplicaState.RUR;
+//          break;
+//        case RWR:
+//          replicaState = HdfsServerConstants.ReplicaState.RWR;
+//          break;
+//        case TEMPORARY:
+//          replicaState = HdfsServerConstants.ReplicaState.TEMPORARY;
+//          break;
+//      }
+//      byte[] hash = HashBuckets.hash(reportBlock.getBlockId(),reportBlock.getGenerationStamp(),reportBlock.getBytesOnDisk(),
+//              replicaState.getValue());
+//      HashBuckets.XORHashes(hashes[bucket], hash);
+//      blockCounter++;
+//      return this;
+//    }
   
     public Builder add(Replica replica) {
       int bucket = bucket(replica, NUM_BUCKETS);
-      buckets[bucket].add(new ReportedBlock(replica.getBlockId(), replica
-          .getGenerationStamp(), replica.getNumBytes(), fromReplicaState(
-          replica.getState())));
+      buckets[bucket].add(replica);
       HashBuckets.XORHashes(hashes[bucket], hash(replica));
       blockCounter++;
       return this;
     }
     
-    public Builder addAllAsFinalized(List<Block> blocks){
-      for (Block block : blocks){
-        addAsFinalized(block);
-      }
-      return this;
-    }
-    
-    public Builder addAsFinalized(Block theBlock) {
-      int bucket = bucket(theBlock, NUM_BUCKETS);
-      buckets[bucket].add(new ReportedBlock(theBlock.getBlockId(),
-          theBlock.getGenerationStamp(), theBlock.getNumBytes(),
-          FINALIZED));
-      HashBuckets.XORHashes(hashes[bucket], hashAsFinalized(theBlock));
-      blockCounter++;
-      return this;
-    }
+//    public Builder addAllAsFinalized(List<Block> blocks){
+//      for (Block block : blocks){
+//        addAsFinalized(block);
+//      }
+//      return this;
+//    }
+//    
+//    public Builder addAsFinalized(Block theBlock) {
+//      int bucket = bucket(theBlock, NUM_BUCKETS);
+//      buckets[bucket].add(new FinalizedReplica(theBlock, null, null));
+//      HashBuckets.XORHashes(hashes[bucket], hashAsFinalized(theBlock));
+//      blockCounter++;
+//      return this;
+//    }
   
   
     public BlockReport build(){
       Bucket[] bucketArray = new Bucket[NUM_BUCKETS];
       for (int i = 0; i < NUM_BUCKETS; i++){
-        bucketArray[i] = new Bucket(buckets[i].toArray(new
-                ReportedBlock[buckets[i].size()]));
+        bucketArray[i] = new Bucket(BlockListAsLongs.encode(buckets[i]));
         bucketArray[i].setHash(hashes[i]);
       }
       return new BlockReport(bucketArray, blockCounter);
-    }
-  
-  
-    private BlockReportBlockState fromReplicaState(HdfsServerConstants
-        .ReplicaState state) {
-      switch (state) {
-        case FINALIZED:
-          return BlockReportBlockState.FINALIZED;
-        case RBW:
-          return BlockReportBlockState.RBW;
-        case RUR:
-          return BlockReportBlockState.RUR;
-        case RWR:
-          return BlockReportBlockState.RWR;
-        case TEMPORARY:
-          return BlockReportBlockState.TEMPORARY;
-        default:
-          throw new RuntimeException("Unimplemented state");
-      }
-    }
-  
+    }  
   }
   
-  private class BlockReportIterator implements Iterator<ReportedBlock>{
+  private class BlockReportIterator implements Iterator<BlockReportReplica>{
   
     int currentBucket;
-    int currentBucketOffset;
+    Iterator<BlockReportReplica> currentBucketIterator;
   
     BlockReportIterator(){
       currentBucket = 0;
-      currentBucketOffset = 0;
+      currentBucketIterator = null;
     }
     
     @Override
     public boolean hasNext() {
-      if (currentBucket < buckets.length){
-        if(currentBucketOffset < buckets[currentBucket].getBlocks().length){
+      while (currentBucket < buckets.length){
+        if(currentBucketIterator==null){
+          currentBucketIterator = buckets[currentBucket].getBlocks().iterator();
+        }
+        if(currentBucketIterator.hasNext()){
           return true;
         } else {
           currentBucket++;
-          currentBucketOffset=0;
-          return hasNext();
+          currentBucketIterator = null;
         }
       }
       return false;
     }
-  
+        
     @Override
-    public ReportedBlock next() {
+    public BlockReportReplica next() {
       if (hasNext()) {
-        return buckets[currentBucket].getBlocks()[currentBucketOffset++];
+        return currentBucketIterator.next();
       } else {
         throw new NoSuchElementException();
       }
