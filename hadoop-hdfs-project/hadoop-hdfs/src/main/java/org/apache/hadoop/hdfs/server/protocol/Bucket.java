@@ -1,22 +1,24 @@
 package org.apache.hadoop.hdfs.server.protocol;
 
+import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
+
 public class Bucket {
   
-  private ReportedBlock[] blocks;
+  private BlockListAsLongs blocks;
 
   private byte[] hash;
   
   public Bucket(){}
   
-  public Bucket(ReportedBlock[] blocks){
+  public Bucket(BlockListAsLongs blocks){
     this.blocks = blocks;
   }
 
-  public void setBlocks(ReportedBlock[] blocks) {
+  public void setBlocks(BlockListAsLongs blocks) {
     this.blocks = blocks;
   }
   
-  public ReportedBlock[] getBlocks() {
+  public BlockListAsLongs getBlocks() {
     return blocks;
   }
 

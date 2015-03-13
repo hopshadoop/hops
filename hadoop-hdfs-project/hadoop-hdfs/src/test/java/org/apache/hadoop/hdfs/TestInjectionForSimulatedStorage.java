@@ -31,7 +31,6 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.server.datanode.SimulatedFSDataset;
 import org.apache.hadoop.hdfs.server.protocol.BlockReport;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
-import org.apache.hadoop.hdfs.server.protocol.ReportedBlock;
 import org.apache.hadoop.util.Time;
 import org.junit.Test;
 
@@ -180,8 +179,8 @@ public class TestInjectionForSimulatedStorage {
       Set<Block> uniqueBlocks = new HashSet<Block>();
       for(Map<DatanodeStorage, BlockReport> map : blocksList) {
         for(BlockReport blockList : map.values()) {
-          for(ReportedBlock b : blockList) {
-            uniqueBlocks.add(new Block(b.getBlockId(), b.getLength(), b.getGenerationStamp()));
+          for(Block b : blockList) {
+            uniqueBlocks.add(new Block(b));
           }
         }
       }

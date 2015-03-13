@@ -1481,7 +1481,8 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
             break;
           case RUR:
             ReplicaUnderRecovery rur = (ReplicaUnderRecovery) b;
-            builders.get(b.getVolume().getStorageID()).add(rur.getOriginalReplica());
+            builders.get(rur.getVolume().getStorageID())
+                .add(rur.getOriginalReplica());
             break;
           case TEMPORARY:
             break;
@@ -1492,7 +1493,8 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
     }
 
     for (FsVolumeImpl v : curVolumes) {
-      blockReportsMap.put(v.toDatanodeStorage(),builders.get(v.getStorageID()).build());
+      blockReportsMap.put(v.toDatanodeStorage(),
+                          builders.get(v.getStorageID()).build());
     }
 
     return blockReportsMap;

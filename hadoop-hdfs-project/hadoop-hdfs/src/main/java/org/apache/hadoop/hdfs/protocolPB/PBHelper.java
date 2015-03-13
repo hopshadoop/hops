@@ -161,8 +161,6 @@ import org.apache.hadoop.hdfs.server.protocol.BlockIdCommand;
 import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand;
 import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand.RecoveringBlock;
 import org.apache.hadoop.hdfs.server.protocol.BlockReport;
-import org.apache.hadoop.hdfs.server.protocol.ReportedBlock;
-import org.apache.hadoop.hdfs.server.protocol.BlockReportBlockState;
 import org.apache.hadoop.hdfs.server.protocol.Bucket;
 import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations;
 import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations.BlockWithLocations;
@@ -199,6 +197,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
+import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
 import org.apache.hadoop.hdfs.protocol.FsAclPermission;
 import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
 
@@ -431,7 +430,7 @@ public class PBHelper {
     StorageInfoProto storage = info.getStorageInfo();
     return new NamespaceInfo(storage.getNamespaceID(), storage.getClusterID(),
         info.getBlockPoolID(), storage.getCTime(), info.getBuildVersion(),
-        info.getSoftwareVersion());
+        info.getSoftwareVersion(), info.getCapabilities());
   }
 
   public static NamenodeCommand convert(NamenodeCommandProto cmd) {
@@ -1122,7 +1121,9 @@ public class PBHelper {
     return NamespaceInfoProto.newBuilder().setBlockPoolID(info.getBlockPoolID())
         .setBuildVersion(info.getBuildVersion()).setUnused(0)
         .setStorageInfo(PBHelper.convert((StorageInfo) info))
-        .setSoftwareVersion(info.getSoftwareVersion()).build();
+        .setSoftwareVersion(info.getSoftwareVersion())
+        .setCapabilities(info.getCapabilities())
+        .build();
   }
 
   // Located Block Arrays and Lists
@@ -2209,7 +2210,7 @@ public class PBHelper {
     return responseProto.build();
   }
   
-  public static DatanodeProtocolProtos.BlockReportProto convert(BlockReport report) {
+  public static DatanodeProtocolProtos.BlockReportProto convert(BlockReport report, boolean useBlocksBuffer) {
 
     List<DatanodeProtocolProtos.BlockReportBucketProto> bucketProtos = new
             ArrayList<>();
@@ -2219,46 +2220,22 @@ public class PBHelper {
 
       bucketBuilder.setHash(ByteString.copyFrom(bucket.getHash()));
 
-      for (ReportedBlock block : bucket.getBlocks()) {
-        bucketBuilder.addBlocks(
-                DatanodeProtocolProtos.BlockReportBlockProto.newBuilder()
-                        .setBlockId(block.getBlockId())
-                        .setGenerationStamp(block.getGenerationStamp())
-                        .setLength(block.getLength())
-                        .setState(convert(block.getState())));
+      BlockListAsLongs blocks = bucket.getBlocks();
+      if (useBlocksBuffer) {
+        bucketBuilder.setNumberOfBlocks(blocks.getNumberOfBlocks());
+        bucketBuilder.addAllBlocksBuffers(blocks.getBlocksBuffers());
+      }else {
+        for (long value : blocks.getBlockListAsLongs()) {
+          bucketBuilder.addBlocks(value);
+        }
       }
-
       bucketProtos.add(bucketBuilder.build());
     }
 
     return DatanodeProtocolProtos.BlockReportProto.newBuilder()
             .addAllBuckets(bucketProtos).build();
   }
-  
-  private static DatanodeProtocolProtos.BlockReportBlockProto.BlockReportBlockStateProto convert(BlockReportBlockState
-      state){
-    switch (state){
-      case FINALIZED:
-        return DatanodeProtocolProtos.BlockReportBlockProto
-            .BlockReportBlockStateProto.FINALIZED;
-      case RBW:
-        return DatanodeProtocolProtos.BlockReportBlockProto
-            .BlockReportBlockStateProto.RBW;
-      case RUR:
-        return DatanodeProtocolProtos.BlockReportBlockProto
-            .BlockReportBlockStateProto.RUR;
-      case RWR:
-        return DatanodeProtocolProtos.BlockReportBlockProto
-            .BlockReportBlockStateProto.RWR;
-      case TEMPORARY:
-        return DatanodeProtocolProtos.BlockReportBlockProto
-            .BlockReportBlockStateProto.TEMPORARY;
-      default:
-        throw new RuntimeException();
-      
-    }
-  }
-  
+    
   public static BlockReport convert(
       DatanodeProtocolProtos.BlockReportProto blockReportProto) {
     int numBuckets = blockReportProto.getBucketsCount();
@@ -2269,16 +2246,20 @@ public class PBHelper {
     
     for(int i = 0; i < numBuckets ; i ++){
       DatanodeProtocolProtos.BlockReportBucketProto bucketProto = blockReportProto.getBuckets(i);
-      int numBlocksInBucket = bucketProto.getBlocksCount();
       
-      numBlocks += numBlocksInBucket;
-      
-      ReportedBlock[] blocks = new ReportedBlock[numBlocksInBucket];
-      for (int j = 0; j < numBlocksInBucket; j++){
-        DatanodeProtocolProtos.BlockReportBlockProto blockProto = bucketProto.getBlocks(j);
-        blocks[j] = new ReportedBlock(blockProto.getBlockId(), blockProto
-            .getGenerationStamp(), blockProto.getLength(), convert(blockProto
-            .getState()));
+      BlockListAsLongs blocks;
+      if (bucketProto.hasNumberOfBlocks()) {// new style buffer based reports
+        int num = (int) bucketProto.getNumberOfBlocks();
+        Preconditions.checkState(bucketProto.getBlocksCount() == 0,
+            "cannot send both blocks list and buffers");
+        numBlocks += num;
+
+        blocks = BlockListAsLongs.decodeBuffers(num, bucketProto.getBlocksBuffersList());
+      } else {
+        int numBlocksInBucket = bucketProto.getBlocksCount();
+
+        numBlocks += numBlocksInBucket;
+        blocks = BlockListAsLongs.decodeLongs(bucketProto.getBlocksList());
       }
       
       Bucket bucket = new Bucket();
@@ -2289,25 +2270,7 @@ public class PBHelper {
     
     return new BlockReport(buckets, numBlocks);
   }
-  
-  private static BlockReportBlockState convert(
-      DatanodeProtocolProtos.BlockReportBlockProto.BlockReportBlockStateProto state) {
-    switch (state){
-      case FINALIZED:
-        return BlockReportBlockState.FINALIZED;
-      case RBW:
-        return BlockReportBlockState.RBW;
-      case RUR:
-        return BlockReportBlockState.RUR;
-      case RWR:
-        return BlockReportBlockState.RWR;
-      case TEMPORARY:
-        return BlockReportBlockState.TEMPORARY;
-      default:
-        throw new RuntimeException();
-    }
-  }
-  
+    
   public static CipherOptionProto convert(CipherOption option) {
     if (option != null) {
       CipherOptionProto.Builder builder = CipherOptionProto.

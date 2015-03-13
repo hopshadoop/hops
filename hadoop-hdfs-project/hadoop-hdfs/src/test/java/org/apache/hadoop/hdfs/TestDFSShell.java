@@ -28,7 +28,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
-import org.apache.hadoop.hdfs.server.protocol.ReportedBlock;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.hdfs.tools.DFSAdmin;
 import org.apache.hadoop.io.IOUtils;
@@ -64,6 +63,7 @@ import java.util.zip.DeflaterOutputStream;
 import java.util.zip.GZIPOutputStream;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
+import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.server.protocol.BlockReport;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.not;
@@ -1422,7 +1422,7 @@ public class TestDFSShell {
       DataNode dn = datanodes.get(i);
       Map<DatanodeStorage, BlockReport> map = blocks.get(i);
       for(Map.Entry<DatanodeStorage, BlockReport> e : map.entrySet()) {
-        for(ReportedBlock b : e.getValue()) {
+        for(Block b : e.getValue()) {
           files.add(DataNodeTestUtils.getFile(dn, poolId, b.getBlockId()));
         }
       }

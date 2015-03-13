@@ -128,7 +128,12 @@ import org.junit.Assume;
 
 import static org.junit.Assert.assertEquals;
 import io.hops.metadata.hdfs.dal.DirectoryWithQuotaFeatureDataAccess;
+import org.apache.hadoop.hdfs.security.token.block.ExportedBlockKeys;
+import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
+import org.apache.hadoop.hdfs.server.common.StorageInfo;
 import org.apache.hadoop.hdfs.server.namenode.DirectoryWithQuotaFeature;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
+import org.apache.hadoop.util.VersionInfo;
 
 /**
  * Utilities for HDFS tests
@@ -1129,6 +1134,11 @@ public class DFSTestUtil {
       String rackLocation, String hostname) {
     return getDatanodeDescriptor(ipAddr, 
         DFSConfigKeys.DFS_DATANODE_DEFAULT_PORT, rackLocation, hostname);
+  }
+  
+  public static DatanodeRegistration getLocalDatanodeRegistration() {
+    return new DatanodeRegistration(getLocalDatanodeID(), new StorageInfo(
+        HdfsServerConstants.NodeType.DATA_NODE), new ExportedBlockKeys(), VersionInfo.getVersion());
   }
     
   public static DatanodeStorageInfo createDatanodeStorageInfo(

@@ -272,7 +272,7 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
 
     @Override
     public ReplicaState getState() {
-      return null;
+      return finalized ? ReplicaState.FINALIZED : ReplicaState.RBW;
     }
 
     @Override
@@ -521,7 +521,7 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
   }
 
   public synchronized void injectBlocks(String bpid,
-      Iterable<Block> injectBlocks) throws IOException {
+      Iterable<? extends Block> injectBlocks) throws IOException {
     ExtendedBlock blk = new ExtendedBlock();
     if (injectBlocks != null) {
       for (Block b : injectBlocks) { // if any blocks in list is bad, reject list
@@ -582,7 +582,7 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
     if (map != null) {
       for (BInfo b : map.values()) {
         if (b.isFinalized()) {
-          builder.addAsFinalized(b.theBlock);
+          builder.add(b);
         }
       }
     }
