@@ -147,11 +147,14 @@ public interface DataTransferProtocol {
    * @param blk             The block to get file descriptors for.
    * @param blockToken      Security token for accessing the block.
    * @param maxVersion      Maximum version of the block data the client 
-   *                        can understand.
+   *                          can understand.
+   * @param supportsReceiptVerification  True if the client supports
+   *                          receipt verification.
    */
   public void requestShortCircuitFds(final ExtendedBlock blk,
       final Token<BlockTokenIdentifier> blockToken,
-      SlotId slotId, int maxVersion) throws IOException;
+      SlotId slotId, int maxVersion, boolean supportsReceiptVerification)
+        throws IOException;
 
   /**
    * Release a pair of short-circuit FDs requested earlier.
