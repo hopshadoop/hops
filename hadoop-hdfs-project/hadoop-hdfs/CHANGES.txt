@@ -51,6 +51,10 @@ Release 2.7.0 - UNRELEASED
 
     HDFS-7656. Expose truncate API for HDFS httpfs. (yliu)
 
+    HDFS-6488. Support HDFS superuser in NFS gateway. (brandonli)
+
+    HDFS-7838. Expose truncate API for libhdfs. (yliu)
+
   IMPROVEMENTS
     HOPS-1108. Change the plus operator to XOR for combining hashes in the block 
     reporting system (salman niazi)
