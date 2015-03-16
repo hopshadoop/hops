@@ -376,10 +376,10 @@ public class TestFileTruncate {
       boolean isReady = fs.truncate(p, newLength);
       assertFalse(isReady);
     } finally {
-      cluster.restartDataNode(dn);
+      cluster.restartDataNode(dn, true, true);
       cluster.waitActive();
-      cluster.triggerBlockReports();
     }
+    checkBlockRecovery(p);
 
     LocatedBlock newBlock = getLocatedBlocks(p).getLastLocatedBlock();
     /*
@@ -396,7 +396,6 @@ public class TestFileTruncate {
     assertEquals(newBlock.getBlock().getGenerationStamp(),
         oldBlock.getBlock().getGenerationStamp() + 1);
 
-    checkBlockRecovery(p);
     // Wait replicas come to 3
     DFSTestUtil.waitReplication(fs, p, REPLICATION);
     // Old replica is disregarded and replaced with the truncated one
@@ -435,9 +434,10 @@ public class TestFileTruncate {
     boolean isReady = fs.truncate(p, newLength);
     assertFalse(isReady);
 
-    cluster.restartDataNode(dn0);
-    cluster.restartDataNode(dn1);
+    cluster.restartDataNode(dn0, true, true);
+    cluster.restartDataNode(dn1, true, true);
     cluster.waitActive();
+    checkBlockRecovery(p);
     cluster.triggerBlockReports();
 
     LocatedBlock newBlock = getLocatedBlocks(p).getLastLocatedBlock();
@@ -450,7 +450,6 @@ public class TestFileTruncate {
     assertEquals(newBlock.getBlock().getGenerationStamp(),
         oldBlock.getBlock().getGenerationStamp() + 1);
 
-    checkBlockRecovery(p);
     // Wait replicas come to 3
     DFSTestUtil.waitReplication(fs, p, REPLICATION);
     // Old replica is disregarded and replaced with the truncated one on dn0
@@ -494,6 +493,7 @@ public class TestFileTruncate {
     assertFalse(isReady);
 
     cluster.shutdownDataNodes();
+    cluster.setDataNodesDead();
     try {
       for(int i = 0; i < SUCCESS_ATTEMPTS && cluster.isDataNodeUp(); i++) {
         Thread.sleep(SLEEP);
@@ -506,6 +506,7 @@ public class TestFileTruncate {
           StartupOption.REGULAR, null);
       cluster.waitActive();
     }
+    checkBlockRecovery(p);
 
     fs.delete(parent, true);
   }
