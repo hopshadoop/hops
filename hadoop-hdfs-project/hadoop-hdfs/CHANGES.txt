@@ -878,6 +878,18 @@ Release 2.7.0 - UNRELEASED
     TestFsDatasetImpl#testAddVolumeFailureReleasesInUseLock on Linux
     (Xiaoyu Yao via Arpit Agarwal)
 
+    HDFS-7722. DataNode#checkDiskError should also remove Storage when error
+    is found. (Lei Xu via Colin P. McCabe)
+
+    HDFS-7697. Mark the PB OIV tool as experimental. (Lei Xu via wheat9)
+
+    HDFS-7914. TestJournalNode#testFailToStartWithBadConfig fails when the
+    default dfs.journalnode.http-address port 8480 is in use. (Xiaoyu Yao via
+    Arpit Agarwal)
+
+    HDFS-7945. The WebHdfs system on DN does not honor the length parameter.
+    (wheat9)
+
     BREAKDOWN OF HDFS-7584 SUBTASKS AND RELATED JIRAS
 
       HDFS-7720. Quota by Storage Type API, tools and ClientNameNode
