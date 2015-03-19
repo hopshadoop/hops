@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs;
 import java.util.Random;
 import org.apache.hadoop.hdfs.protocol.datatransfer.PacketHeader;
 import org.apache.hadoop.io.DataOutputBuffer;
+import org.apache.htrace.core.SpanId;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -65,4 +66,29 @@ public class TestDFSPacket {
       }
     }
   }
+
+  @Test
+  public void testAddParentsGetParents() throws Exception {
+    DFSPacket p = new DFSPacket(null, maxChunksPerPacket,
+                                0, 0, checksumSize, false);
+    SpanId parents[] = p.getTraceParents();
+    Assert.assertEquals(0, parents.length);
+    p.addTraceParent(new SpanId(0, 123));
+    p.addTraceParent(new SpanId(0, 123));
+    parents = p.getTraceParents();
+    Assert.assertEquals(1, parents.length);
+    Assert.assertEquals(new SpanId(0, 123), parents[0]);
+    parents = p.getTraceParents(); // test calling 'get' again.
+    Assert.assertEquals(1, parents.length);
+    Assert.assertEquals(new SpanId(0, 123), parents[0]);
+    p.addTraceParent(new SpanId(0, 1));
+    p.addTraceParent(new SpanId(0, 456));
+    p.addTraceParent(new SpanId(0, 789));
+    parents = p.getTraceParents();
+    Assert.assertEquals(4, parents.length);
+    Assert.assertEquals(new SpanId(0, 1), parents[0]);
+    Assert.assertEquals(new SpanId(0, 123), parents[1]);
+    Assert.assertEquals(new SpanId(0, 456), parents[2]);
+    Assert.assertEquals(new SpanId(0, 789), parents[3]);
+}
 }

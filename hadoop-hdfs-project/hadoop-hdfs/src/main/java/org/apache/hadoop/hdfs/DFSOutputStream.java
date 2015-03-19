@@ -107,6 +107,7 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
+import org.apache.htrace.core.Span;
 
 
 /**
@@ -418,7 +419,6 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
       long lastPacket = Time.now();
       TraceScope scope = null;
       while (!streamerClosed && dfsClient.clientRunning) {
-
         // if the Responder encountered an error, shutdown Responder
         if (hasError && response != null) {
           try {
@@ -468,6 +468,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
             // get packet to be sent.
             if (dataQueue.isEmpty()) {
               one = createHeartbeatPacket();
+              assert one != null;
             } else {
               one = dataQueue.getFirst(); // regular data packet
               SpanId[] parents = one.getTraceParents();
@@ -478,7 +479,6 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
               }
             }
           }
-          assert one != null;
 
           // get new block from namenode.
           if (stage == BlockConstructionStage.PIPELINE_SETUP_CREATE) {
@@ -781,8 +781,8 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
         setName("ResponseProcessor for block " + block);
         PipelineAck ack = new PipelineAck();
 
-        while (!responderClosed && dfsClient.clientRunning &&
-                !isLastPacketInBlock) {
+        TraceScope scope = null;
+        while (!responderClosed && dfsClient.clientRunning && !isLastPacketInBlock) {
           // process responses from datanodes.
           try {
             // read an ack from the pipeline
@@ -856,6 +856,11 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
             block.setNumBytes(one.getLastByteOffsetBlock());
 
             synchronized (dataQueue) {
+              scope = one.getTraceScope();
+              if (scope != null) {
+                scope.reattach();
+                one.setTraceScope(null);
+              }
               lastAckedSeqno = seqno;
               ackQueue.removeFirst();
               dataQueue.notifyAll();
@@ -880,6 +885,11 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
               }
               responderClosed = true;
             }
+          } finally {
+            if (scope != null) {
+              scope.close();
+            }
+            scope = null;
           }
         }
       }
@@ -940,6 +950,12 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
           // a client waiting on close() will be aware that the flush finished.
           synchronized (dataQueue) {
             DFSPacket endOfBlockPacket = dataQueue.remove();  // remove the end of block packet
+            TraceScope scope = endOfBlockPacket.getTraceScope();
+            if (scope != null) {
+              scope.reattach();
+              scope.close();
+              endOfBlockPacket.setTraceScope(null);
+            }
             assert endOfBlockPacket.isLastPacketInBlock();
             assert lastAckedSeqno == endOfBlockPacket.getSeqno() - 1;
             lastAckedSeqno = endOfBlockPacket.getSeqno();
@@ -1773,21 +1789,27 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
       EncodingPolicy policy, boolean saveSmallFilesInDB,
       final int dbFileMaxSize) throws IOException {
     final HdfsFileStatus stat;
+    TraceScope scope =
+      dfsClient.newPathTraceScope("newStreamForCreate", src);
     try {
-      stat = dfsClient.namenode.create(src, masked, dfsClient.clientName,
-          new EnumSetWritable<>(flag), createParent, replication,
-              blockSize, policy);
-    } catch (RemoteException re) {
-      throw re.unwrapRemoteException(AccessControlException.class,
-              DSQuotaExceededException.class, FileAlreadyExistsException.class,
-              FileNotFoundException.class, ParentNotDirectoryException.class,
-              NSQuotaExceededException.class, SafeModeException.class,
-              UnresolvedPathException.class);
+      try {
+        stat = dfsClient.namenode.create(src, masked, dfsClient.clientName,
+            new EnumSetWritable<>(flag), createParent, replication,
+            blockSize, policy);
+      } catch (RemoteException re) {
+        throw re.unwrapRemoteException(AccessControlException.class,
+            DSQuotaExceededException.class, FileAlreadyExistsException.class,
+            FileNotFoundException.class, ParentNotDirectoryException.class,
+            NSQuotaExceededException.class, SafeModeException.class,
+            UnresolvedPathException.class);
+      }
+      final DFSOutputStream out = new DFSOutputStream(dfsClient, src, stat,
+          flag, progress, checksum, favoredNodes, policy, saveSmallFilesInDB, dbFileMaxSize);
+      out.start();
+      return out;
+    } finally {
+      scope.close();
     }
-    final DFSOutputStream out = new DFSOutputStream(dfsClient, src, stat,
-        flag, progress, checksum,favoredNodes, policy,saveSmallFilesInDB, dbFileMaxSize);
-    out.start();
-    return out;
   }
 
   static DFSOutputStream newStreamForCreate(DFSClient dfsClient, String src,
@@ -1834,36 +1856,41 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
       String[] favoredNodes,
       boolean saveSmallFilesInDB, final int dbFileMaxSize, boolean emulateHDFSClient)
       throws IOException {
-            
-    if (stat.isFileStoredInDB()) {
-      String errorMessage = null;
-      if (!saveSmallFilesInDB && !emulateHDFSClient) {
-        errorMessage = "The file is stored in the database. Parameter to store the data in the database is disabled. " +
-                "Set the " + DFSConfigKeys.DFS_STORE_SMALL_FILES_IN_DB_KEY + " configuration parameter in the hdfs " +
-                "configuration file";
-      } else if (stat.getLen() > stat.getBlockSize()) {
-        errorMessage = "Invalid paraters for appending a file stored in the database. Block size can not be smaller " +
-                "than the max size of a file stored in the database";
-      } else if (dbFileMaxSize > stat.getBlockSize()) {
-        errorMessage = "Invalid paraters for appending a file stored in the database. Files stored in the database " +
-                "can not be larger than a HDFS block";
-      }
+    TraceScope scope =
+        dfsClient.newPathTraceScope("newStreamForAppend", src);
+    try {        
+      if (stat.isFileStoredInDB()) {
+        String errorMessage = null;
+        if (!saveSmallFilesInDB && !emulateHDFSClient) {
+          errorMessage = "The file is stored in the database. Parameter to store the data in the database is disabled. " +
+                  "Set the " + DFSConfigKeys.DFS_STORE_SMALL_FILES_IN_DB_KEY + " configuration parameter in the hdfs " +
+                  "configuration file";
+        } else if (stat.getLen() > stat.getBlockSize()) {
+          errorMessage = "Invalid paraters for appending a file stored in the database. Block size can not be smaller " +
+                  "than the max size of a file stored in the database";
+        } else if (dbFileMaxSize > stat.getBlockSize()) {
+          errorMessage = "Invalid paraters for appending a file stored in the database. Files stored in the database " +
+                  "can not be larger than a HDFS block";
+        }
 
-      if (errorMessage != null) {
-        throw new IOException(errorMessage + " Stat.isStoredInDB: " + stat.isFileStoredInDB() +
-                " saveSmallFilesInDB: " + saveSmallFilesInDB + " Stat.len: " + stat.getLen() + " dbFileMaxSize: " +
-                dbFileMaxSize + " BlockSize: " + stat.getBlockSize());
+        if (errorMessage != null) {
+          throw new IOException(errorMessage + " Stat.isStoredInDB: " + stat.isFileStoredInDB() +
+                  " saveSmallFilesInDB: " + saveSmallFilesInDB + " Stat.len: " + stat.getLen() + " dbFileMaxSize: " +
+                  dbFileMaxSize + " BlockSize: " + stat.getBlockSize());
+        }
       }
-    }
             
       
-    final DFSOutputStream out = new DFSOutputStream(dfsClient, src, toNewBlock,
-        progress, lastBlock, stat, checksum, saveSmallFilesInDB, dbFileMaxSize);
-    if (favoredNodes != null && favoredNodes.length != 0) {
-      out.streamer.setFavoredNodes(favoredNodes);
+      final DFSOutputStream out = new DFSOutputStream(dfsClient, src, toNewBlock,
+          progress, lastBlock, stat, checksum, saveSmallFilesInDB, dbFileMaxSize);
+      if (favoredNodes != null && favoredNodes.length != 0) {
+        out.streamer.setFavoredNodes(favoredNodes);
+      }
+      out.start();
+      return out;
+    } finally {
+      scope.close();
     }
-    out.start();
-    return out;
   }
 
   /**
@@ -1959,19 +1986,35 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
     synchronized (dataQueue) {
       try {
       // If queue is full, then wait till we have enough space
-        while (!isClosed() && dataQueue.size() + ackQueue.size() > dfsClient.getConf().writeMaxPackets) {
-          try {
-            dataQueue.wait();
-          } catch (InterruptedException e) {
-            // If we get interrupted while waiting to queue data, we still need to get rid
-            // of the current packet. This is because we have an invariant that if
-            // currentPacket gets full, it will get queued before the next writeChunk.
-            //
-            // Rather than wait around for space in the queue, we should instead try to
-            // return to the caller as soon as possible, even though we slightly overrun
-            // the MAX_PACKETS length.
-            Thread.currentThread().interrupt();
-            break;
+        boolean firstWait = true;
+        try {
+          while (!isClosed() && dataQueue.size() + ackQueue.size() >
+              dfsClient.getConf().writeMaxPackets) {
+            if (firstWait) {
+              Span span = Tracer.getCurrentSpan();
+              if (span != null) {
+                span.addTimelineAnnotation("dataQueue.wait");
+              }
+              firstWait = false;
+            }
+            try {
+              dataQueue.wait();
+            } catch (InterruptedException e) {
+              // If we get interrupted while waiting to queue data, we still need to get rid
+              // of the current packet. This is because we have an invariant that if
+              // currentPacket gets full, it will get queued before the next writeChunk.
+              //
+              // Rather than wait around for space in the queue, we should instead try to
+              // return to the caller as soon as possible, even though we slightly overrun
+              // the MAX_PACKETS length.
+              Thread.currentThread().interrupt();
+              break;
+            }
+          }
+        } finally {
+          Span span = Tracer.getCurrentSpan();
+          if ((span != null) && (!firstWait)) {
+            span.addTimelineAnnotation("end.wait");
           }
         }
         checkClosed();
@@ -2076,12 +2119,24 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
    */
   @Override
   public void hflush() throws IOException {
-    flushOrSync(false, EnumSet.noneOf(SyncFlag.class));
+    TraceScope scope =
+        dfsClient.newPathTraceScope("hflush", src);
+    try {
+      flushOrSync(false, EnumSet.noneOf(SyncFlag.class));
+    } finally {
+      scope.close();
+    }
   }
 
   @Override
   public void hsync() throws IOException {
-    hsync(EnumSet.noneOf(SyncFlag.class));
+    TraceScope scope =
+        dfsClient.newPathTraceScope("hsync", src);
+    try {
+      flushOrSync(true, EnumSet.noneOf(SyncFlag.class));
+    } finally {
+      scope.close();
+    }
   }
 
   /**
@@ -2098,7 +2153,13 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
    *     whether or not to update the block length in NameNode.
    */
   public void hsync(EnumSet<SyncFlag> syncFlags) throws IOException {
-    flushOrSync(true, syncFlags);
+    TraceScope scope =
+        dfsClient.newPathTraceScope("hsync", src);
+    try {
+      flushOrSync(true, syncFlags);
+    } finally {
+      scope.close();
+    }
   }
 
   /**
@@ -2281,37 +2342,43 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
   }
 
   private void waitForAckedSeqno(long seqno) throws IOException {
-    if (canStoreFileInDB()) {
-      LOG.debug("Stuffed Inode:  Closing File. Datanode ack skipped. All the data will be stored in the database");
-    } else {
-      if (DFSClient.LOG.isDebugEnabled()) {
-        DFSClient.LOG.debug("Waiting for ack for: " + seqno);
-      }
-      long begin = Time.monotonicNow();
-      try {
-        synchronized (dataQueue) {
-          while (!isClosed()) {
-            checkClosed();
-            if (lastAckedSeqno >= seqno) {
-              break;
-            }
-            try {
-              dataQueue.wait(1000); // when we receive an ack, we notify on
-                                    // dataQueue
-            } catch (InterruptedException ie) {
-              throw new InterruptedIOException(
-                  "Interrupted while waiting for data to be acknowledged by pipeline");
+    TraceScope scope = dfsClient.getTracer().
+        newScope("waitForAckedSeqno");
+    try {
+      if (canStoreFileInDB()) {
+        LOG.debug("Stuffed Inode:  Closing File. Datanode ack skipped. All the data will be stored in the database");
+      } else {
+        if (DFSClient.LOG.isDebugEnabled()) {
+          DFSClient.LOG.debug("Waiting for ack for: " + seqno);
+        }
+        long begin = Time.monotonicNow();
+        try {
+          synchronized (dataQueue) {
+            while (!isClosed()) {
+              checkClosed();
+              if (lastAckedSeqno >= seqno) {
+                break;
+              }
+              try {
+                dataQueue.wait(1000); // when we receive an ack, we notify on
+                // dataQueue
+              } catch (InterruptedException ie) {
+                throw new InterruptedIOException(
+                    "Interrupted while waiting for data to be acknowledged by pipeline");
+              }
             }
           }
+          checkClosed();
+        } catch (ClosedChannelException e) {
         }
-        checkClosed();
-      } catch (ClosedChannelException e) {
+        long duration = Time.monotonicNow() - begin;
+        if (duration > dfsclientSlowLogThresholdMs) {
+          DFSClient.LOG.warn("Slow waitForAckedSeqno took " + duration
+              + "ms (threshold=" + dfsclientSlowLogThresholdMs + "ms)");
+        }
       }
-      long duration = Time.monotonicNow() - begin;
-      if (duration > dfsclientSlowLogThresholdMs) {
-        DFSClient.LOG.warn("Slow waitForAckedSeqno took " + duration
-            + "ms (threshold=" + dfsclientSlowLogThresholdMs + "ms)");
-      }
+    }finally {
+      scope.close();
     }
   }
 
@@ -2375,6 +2442,16 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
    */
   @Override
   public synchronized void close() throws IOException {
+    TraceScope scope =
+        dfsClient.newPathTraceScope("DFSOutputStream#close", src);
+    try {
+      closeImpl();
+    } finally {
+      scope.close();
+    }
+  }
+
+  private synchronized void closeImpl() throws IOException {
     if (isClosed()) {
       IOException e = lastException.getAndSet(null);
       if (e == null) {
@@ -2416,7 +2493,12 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
     flushInternal();             // flush all data to Datanodes
     // get last block before destroying the streamer
     ExtendedBlock lastBlock = streamer.getBlock();
-    completeFile(lastBlock);
+    TraceScope scope = dfsClient.getTracer().newScope("completeFile");
+    try {
+      completeFile(lastBlock);
+    } finally {
+      scope.close();
+    }
     closeThreads(false);
     dfsClient.endFileLease(fileId);
   }

@@ -450,6 +450,8 @@ Release 2.7.0 - UNRELEASED
     HDFS-7940. Add tracing to DFSClient#setQuotaByStorageType (Rakesh R via
     Colin P. McCabe)
 
+    HDFS-7054. Make DFSOutputStream tracing more fine-grained (cmccabe)
+
   OPTIMIZATIONS
 
   BUG FIXES
