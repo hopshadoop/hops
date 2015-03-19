@@ -275,7 +275,7 @@ class DFSPacket {
         " lastPacketInBlock: " + this.lastPacketInBlock +
         " lastByteOffsetInBlock: " + this.getLastByteOffsetBlock();
   }
-  
+
   /**
    * Add a trace parent span for this packet.<p/>
    *
