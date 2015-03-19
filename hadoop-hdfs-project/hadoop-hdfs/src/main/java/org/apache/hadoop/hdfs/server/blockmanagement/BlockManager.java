@@ -2317,6 +2317,45 @@ public class BlockManager {
     }
   }
 
+    /**
+   * Mark block replicas as corrupt except those on the storages in 
+   * newStorages list.
+   */
+  public void markBlockReplicasAsCorrupt(BlockInfoContiguous block, 
+      long oldGenerationStamp, long oldNumBytes, 
+      DatanodeStorageInfo[] newStorages) throws IOException {
+    BlockToMarkCorrupt b = null;
+    if (block.getGenerationStamp() != oldGenerationStamp) {
+      b = new BlockToMarkCorrupt(block, oldGenerationStamp,
+          "genstamp does not match " + oldGenerationStamp
+          + " : " + block.getGenerationStamp(), Reason.GENSTAMP_MISMATCH);
+    } else if (block.getNumBytes() != oldNumBytes) {
+      b = new BlockToMarkCorrupt(block,
+          "length does not match " + oldNumBytes
+          + " : " + block.getNumBytes(), Reason.SIZE_MISMATCH);
+    } else {
+      return;
+    }
+
+    for (DatanodeStorageInfo storage : getStorages(block)) {
+      boolean isCorrupt = true;
+      if (newStorages != null) {
+        for (DatanodeStorageInfo newStorage : newStorages) {
+          if (newStorage!= null && storage.equals(newStorage)) {
+            isCorrupt = false;
+            break;
+          }
+        }
+      }
+      if (isCorrupt) {
+        blockLog.info("BLOCK* markBlockReplicasAsCorrupt: mark block replica" +
+            " {} on {} as corrupt because the dn is not in the new committed " +
+            "storage list.", b, storage.getDatanodeDescriptor());
+        markBlockAsCorrupt(b, storage, storage.getDatanodeDescriptor());
+      }
+    }
+  }
+  
   @VisibleForTesting
   public ReportStatistics processReport(final DatanodeStorageInfo storage,final BlockReport report) throws
       IOException {
