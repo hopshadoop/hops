@@ -385,11 +385,7 @@ public class TestFileTruncate {
     /*
      * For non copy-on-truncate, the truncated block id is the same, but the 
      * GS should increase.
-     * We trigger block report for dn0 after it restarts, since the GS 
-     * of replica for the last block on it is old, so the reported last block
-     * from dn0 should be marked corrupt on nn and the replicas of last block 
-     * on nn should decrease 1, then the truncated block will be replicated 
-     * to dn0.
+     * The truncated block will be replicated to dn0 after it restarts.
      */
     assertEquals(newBlock.getBlock().getBlockId(), 
         oldBlock.getBlock().getBlockId());
@@ -438,7 +434,6 @@ public class TestFileTruncate {
     cluster.restartDataNode(dn1, true, true);
     cluster.waitActive();
     checkBlockRecovery(p);
-    cluster.triggerBlockReports();
 
     LocatedBlock newBlock = getLocatedBlocks(p).getLastLocatedBlock();
     /*
