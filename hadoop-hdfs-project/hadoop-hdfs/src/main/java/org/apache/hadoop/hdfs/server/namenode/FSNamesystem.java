@@ -2073,6 +2073,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   LocatedBlock prepareFileForAppend(String src, INodesInPath iip,
       String leaseHolder, String clientMachine, boolean newBlock) throws IOException {
     final INodeFile file = iip.getLastINode().asFile();
+    final QuotaCounts delta = verifyQuotaForUCBlock(file, iip);
+
     file.toUnderConstruction(leaseHolder, clientMachine);
 
     Lease lease = leaseManager.addLease(
@@ -2087,7 +2089,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       LocatedBlock ret = null;
       if (!newBlock) {
         ret = blockManager.convertLastBlockToUnderConstruction(file, 0);
-        if (ret != null && dir.isQuotaEnabled()) {
+        if (ret != null && delta != null && dir.isQuotaEnabled()) {
+          Preconditions.checkState(delta.getStorageSpace() >= 0,
+            "appending to a block with size larger than the preferred block size");
           // update the quota: use the preferred block size for UC block
           final long diff = file.getPreferredBlockSize() - ret.getBlockSize();
           dir.updateSpaceConsumed(iip, 0, diff, file.getBlockReplication());
@@ -2102,6 +2106,47 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       lease.updateLastTwoBlocksInLeasePath(src, file.getLastBlock(), file.getPenultimateBlock());
       return ret;
     }
+  }
+
+  /**
+   * Verify quota when using the preferred block size for UC block. This is
+   * usually used by append and truncate
+   * @throws QuotaExceededException when violating the storage quota
+   * @return expected quota usage update. null means no change or no need to
+   *         update quota usage later
+   */
+  private QuotaCounts verifyQuotaForUCBlock(INodeFile file, INodesInPath iip)
+      throws QuotaExceededException, IOException {
+    if (!isImageLoaded() || !dir.isQuotaEnabled()) {
+      // Do not check quota if editlog is still being processed
+      return null;
+    }
+    if (file.getLastBlock() != null) {
+      final QuotaCounts delta = computeQuotaDeltaForUCBlock(file);
+        FSDirectory.verifyQuota(iip, iip.length() - 1, delta, null);
+        return delta;
+    }
+    return null;
+  }
+
+  /** Compute quota change for converting a complete block to a UC block */
+  private QuotaCounts computeQuotaDeltaForUCBlock(INodeFile file) throws IOException {
+    final QuotaCounts delta = new QuotaCounts.Builder().build();
+    final BlockInfoContiguous lastBlock = file.getLastBlock();
+    if (lastBlock != null) {
+      final long diff = file.getPreferredBlockSize() - lastBlock.getNumBytes();
+      final short repl = file.getBlockReplication();
+      delta.addStorageSpace(diff * repl);
+      final BlockStoragePolicy policy = dir.getBlockStoragePolicySuite()
+          .getPolicy(file.getStoragePolicyID());
+      List<StorageType> types = policy.chooseStorageTypes(repl);
+      for (StorageType t : types) {
+        if (t.supportTypeQuota()) {
+          delta.addTypeSpace(t, diff);
+        }
+      }
+    }
+    return delta;
   }
 
   /**
@@ -2673,7 +2718,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       // doesn't match up with what we think is the last block. There are
       // four possibilities:
       // 1) This is the first block allocation of an append() pipeline
-      //    which started appending exactly at a block boundary.
+      //    which started appending exactly at or exceeding the block boundary.
       //    In this case, the client isn't passed the previous block,
       //    so it makes the allocateBlock() call with previous=null.
       //    We can distinguish this since the last block of the file
@@ -2698,8 +2743,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       BlockInfoContiguous penultimateBlock = pendingFile.getPenultimateBlock();
       if (previous == null &&
           lastBlockInFile != null &&
-          lastBlockInFile.getNumBytes() ==
-              pendingFile.getPreferredBlockSize() &&
+          lastBlockInFile.getNumBytes() >= pendingFile.getPreferredBlockSize() &&
           lastBlockInFile.isComplete()) {
         // Case 1
         if (NameNode.stateChangeLog.isDebugEnabled()) {
