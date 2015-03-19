@@ -53,6 +53,16 @@ import java.util.List;
 
 import static org.apache.hadoop.util.Time.now;
 
+/**
+ * Restrictions for a concat operation:
+ * <pre>
+ * 1. the src file and the target file are in the same dir
+ * 2. all the source files are not in snapshot
+ * 3. any source file cannot be the same with the target file
+ * 4. source files cannot be under construction or empty
+ * 5. source file's preferred block size cannot be greater than the target file
+ * </pre>
+ */
 class FSDirConcatOp {
 
   static HdfsFileStatus concat(final FSDirectory fsd, final String target, final String[] srcs)
@@ -164,14 +174,24 @@ class FSDirConcatOp {
             + " is not in the same directory with the target "
             + targetIIP.getPath());
       }
-
+      // source file cannot be the same with the target file
       if (srcINode == targetINode) {
         throw new HadoopIllegalArgumentException("concat: the src file " + src
             + " is the same with the target file " + targetIIP.getPath());
       }
-      if (srcINodeFile.isUnderConstruction() || srcINodeFile.numBlocks() == 0) {
+      // source file cannot be under construction or empty
+      if(srcINodeFile.isUnderConstruction() || srcINodeFile.numBlocks() == 0) {
         throw new HadoopIllegalArgumentException("concat: source file " + src
             + " is invalid or empty or underConstruction");
+      }
+      // source file's preferred block size cannot be greater than the target
+      // file
+      if (srcINodeFile.getPreferredBlockSize() >
+          targetINode.getPreferredBlockSize()) {
+        throw new HadoopIllegalArgumentException("concat: source file " + src
+            + " has preferred block size " + srcINodeFile.getPreferredBlockSize()
+            + " which is greater than the target file's preferred block size "
+            + targetINode.getPreferredBlockSize());
       }
       si.add(srcINodeFile);
     }
@@ -185,10 +205,10 @@ class FSDirConcatOp {
     return si.toArray(new INodeFile[si.size()]);
   }
 
-  private static QuotaCounts computeQuotaDeltas(FSDirectory fsd, INodeFile target, INodeFile[] srcList) throws
-      StorageException, TransactionContextException {
+  private static QuotaCounts computeQuotaDeltas(FSDirectory fsd,
+      INodeFile target, INodeFile[] srcList) throws StorageException, TransactionContextException {
     QuotaCounts deltas = new QuotaCounts.Builder().build();
-    short targetRepl = target.getBlockReplication();
+    final short targetRepl = target.getBlockReplication();
     for (INodeFile src : srcList) {
       short srcRepl = src.getBlockReplication();
       long fileSize = src.computeFileSize();
