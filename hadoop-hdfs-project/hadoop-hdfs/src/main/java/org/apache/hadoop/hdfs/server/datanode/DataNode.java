@@ -1845,9 +1845,11 @@ public class DataNode extends ReconfigurableBase
       while (true) {
         // When shutting down for restart, wait 2.5 seconds before forcing
         // termination of receiver threads.
-        if (!this.shutdownForUpgrade || 
-            (this.shutdownForUpgrade && (Time.monotonicNow() - timeNotified > 2500))) {
+        if (!this.shutdownForUpgrade ||
+            (this.shutdownForUpgrade && (Time.monotonicNow() - timeNotified
+                > 1000))) {
           this.threadGroup.interrupt();
+          break;
         }
         LOG.info("Waiting for threadgroup to exit, active threads is " +
                  this.threadGroup.activeCount());
@@ -1858,8 +1860,8 @@ public class DataNode extends ReconfigurableBase
           Thread.sleep(sleepMs);
         } catch (InterruptedException e) {}
         sleepMs = sleepMs * 3 / 2; // exponential backoff
-        if (sleepMs > 1000) {
-          sleepMs = 1000;
+        if (sleepMs > 200) {
+          sleepMs = 200;
         }
       }
       this.threadGroup = null;
