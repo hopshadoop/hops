@@ -232,32 +232,32 @@ public class TestDiskspaceQuotaUpdate {
     return (QuotaCounts) handler.handle();
   }
 
-//  INodeDirectory getINode4Write(final Path foo) throws IOException {
-//    HopsTransactionalRequestHandler handler = new HopsTransactionalRequestHandler(HDFSOperationType.TEST) {
-//
-//      @Override
-//      public void acquireLock(TransactionLocks locks) throws IOException {
-//        LockFactory lf = getInstance();
-//        INodeLock il = lf.getINodeLock(TransactionLockTypes.INodeLockType.WRITE_ON_TARGET_AND_PARENT,
-//            TransactionLockTypes.INodeResolveType.PATH, foo.toString());
-//        locks.add(il).add(lf.getLeaseLock(TransactionLockTypes.LockType.READ))
-//            .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED, foo.toString()))
-//            .add(lf.getBlockLock())
-//            .add(lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.UC, LockFactory.BLK.UR));
-//      }
-//
-//      @Override
-//      public Object performTask() throws IOException {
-//        return fsdir.getINode4Write(foo.toString()).asDirectory();
-//      }
-//    };
-//    return (INodeDirectory) handler.handle();
-//  }
+  INodeFile getINodeFile(final Path foo) throws IOException {
+    HopsTransactionalRequestHandler handler = new HopsTransactionalRequestHandler(HDFSOperationType.TEST) {
+
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = getInstance();
+        INodeLock il = lf.getINodeLock(TransactionLockTypes.INodeLockType.WRITE_ON_TARGET_AND_PARENT,
+            TransactionLockTypes.INodeResolveType.PATH, foo.toString());
+        locks.add(il).add(lf.getLeaseLock(TransactionLockTypes.LockType.READ))
+            .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED, foo.toString()))
+            .add(lf.getBlockLock())
+            .add(lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.UC, LockFactory.BLK.UR));
+      }
+
+      @Override
+      public Object performTask() throws IOException {
+        return fsdir.getINode(foo.toString()).asFile();
+      }
+    };
+    return (INodeFile) handler.handle();
+  }
 
   /**
    * Test append over storage quota does not mark file as UC or create lease
    */
-  @Test (timeout=60000)
+  @Test //(timeout=60000)
   public void testAppendOverStorageQuota() throws Exception {
     final Path dir = new Path("/TestAppendOverQuota");
     final Path file = new Path(dir, "file");
@@ -268,10 +268,7 @@ public class TestDiskspaceQuotaUpdate {
 
     // lower quota to cause exception when appending to partial block
     dfs.setQuota(dir, Long.MAX_VALUE - 1, 1);
-    final INodeDirectory dirNode = fsdir.getINode4Write(dir.toString())
-        .asDirectory();
-    final long spaceUsed = dirNode.getDirectoryWithQuotaFeature()
-        .getSpaceConsumed().getStorageSpace();
+    final long spaceUsed = getSpaceConsumed(dir).getStorageSpace();
     try {
       DFSTestUtil.appendFile(dfs, file, BLOCKSIZE);
       Assert.fail("append didn't fail");
@@ -280,14 +277,13 @@ public class TestDiskspaceQuotaUpdate {
     }
 
     // check that the file exists, isn't UC, and has no dangling lease
-    INodeFile inode = fsdir.getINode(file.toString()).asFile();
+    INodeFile inode = getINodeFile(file);
     Assert.assertNotNull(inode);
     Assert.assertFalse("should not be UC", inode.isUnderConstruction());
-    Assert.assertNull("should not have a lease", cluster.getNamesystem()
-        .getLeaseManager().getLeaseByPath(file.toString()));
+    Assert.assertNull("should not have a lease", TestLeaseManager.getLeaseByPath(cluster.getNamesystem().
+        getLeaseManager(), file.toString()));
     // make sure the quota usage is unchanged
-    final long newSpaceUsed = dirNode.getDirectoryWithQuotaFeature()
-        .getSpaceConsumed().getStorageSpace();
+    final long newSpaceUsed = getSpaceConsumed(dir).getStorageSpace();
     assertEquals(spaceUsed, newSpaceUsed);
     // make sure edits aren't corrupted
     dfs.recoverLease(file);
@@ -311,10 +307,7 @@ public class TestDiskspaceQuotaUpdate {
 
     // set quota of SSD to 1L
     dfs.setQuotaByStorageType(dir, StorageType.SSD, 1L);
-    final INodeDirectory dirNode = fsdir.getINode4Write(dir.toString())
-        .asDirectory();
-    final long spaceUsed = dirNode.getDirectoryWithQuotaFeature()
-        .getSpaceConsumed().getStorageSpace();
+    final long spaceUsed = getSpaceConsumed(dir).getStorageSpace();
     try {
       DFSTestUtil.appendFile(dfs, file, BLOCKSIZE);
       Assert.fail("append didn't fail");
@@ -323,14 +316,49 @@ public class TestDiskspaceQuotaUpdate {
     }
 
     // check that the file exists, isn't UC, and has no dangling lease
-    INodeFile inode = fsdir.getINode(file.toString()).asFile();
+    INodeFile inode = getINodeFile(file);
     Assert.assertNotNull(inode);
     Assert.assertFalse("should not be UC", inode.isUnderConstruction());
-    Assert.assertNull("should not have a lease", cluster.getNamesystem()
-        .getLeaseManager().getLeaseByPath(file.toString()));
+    Assert.assertNull("should not have a lease", TestLeaseManager.getLeaseByPath(cluster.getNamesystem().
+        getLeaseManager(), file.toString()));
     // make sure the quota usage is unchanged
-    final long newSpaceUsed = dirNode.getDirectoryWithQuotaFeature()
-        .getSpaceConsumed().getStorageSpace();
+    final long newSpaceUsed = getSpaceConsumed(dir).getStorageSpace();
+    assertEquals(spaceUsed, newSpaceUsed);
+    // make sure edits aren't corrupted
+    dfs.recoverLease(file);
+    cluster.restartNameNodes();
+  }
+
+  /**
+   * Test truncate over quota does not mark file as UC or create a lease
+   */
+  @Test (timeout=60000)
+  public void testTruncateOverQuota() throws Exception {
+    final Path dir = new Path("/TestTruncateOverquota");
+    final Path file = new Path(dir, "file");
+
+    // create partial block file
+    dfs.mkdirs(dir);
+    DFSTestUtil.createFile(dfs, file, BLOCKSIZE/2, REPLICATION, seed);
+
+    // lower quota to cause exception when appending to partial block
+    dfs.setQuota(dir, Long.MAX_VALUE - 1, 1);
+    final long spaceUsed = getSpaceConsumed(dir).getStorageSpace();
+    try {
+      dfs.truncate(file, BLOCKSIZE / 2 - 1);
+      Assert.fail("truncate didn't fail");
+    } catch (RemoteException e) {
+      assertTrue(e.getClassName().contains("DSQuotaExceededException"));
+    }
+
+    // check that the file exists, isn't UC, and has no dangling lease
+    INodeFile inode = getINodeFile(file);
+    Assert.assertNotNull(inode);
+    Assert.assertFalse("should not be UC", inode.isUnderConstruction());
+    Assert.assertNull("should not have a lease", TestLeaseManager.getLeaseByPath(cluster.getNamesystem().
+        getLeaseManager(), file.toString()));
+    // make sure the quota usage is unchanged
+    final long newSpaceUsed = getSpaceConsumed(dir).getStorageSpace();
     assertEquals(spaceUsed, newSpaceUsed);
     // make sure edits aren't corrupted
     dfs.recoverLease(file);

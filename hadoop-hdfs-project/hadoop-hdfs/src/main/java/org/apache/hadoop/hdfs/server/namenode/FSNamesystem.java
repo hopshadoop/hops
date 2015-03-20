@@ -1657,8 +1657,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
               ", truncate size: " + newLength + ".");
     }
     // Perform INodeFile truncation.
-    boolean onBlockBoundary = dir.truncate(iip, newLength,
-        toRemoveBlocks, mtime);
+    final QuotaCounts delta = new QuotaCounts.Builder().build();
+    boolean onBlockBoundary = dir.truncate(iip, newLength, toRemoveBlocks,
+        mtime, delta);
     Block truncateBlock = null;
     if(file.isFileStoredInDB()){
       int newLengthInt = (int) newLength;  //small files should be small enough for their size to fit in an int
@@ -1669,14 +1670,18 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       file.storeFileDataInDB(newData);
       return onBlockBoundary;
     }
-    if(! onBlockBoundary) {
+    if(!onBlockBoundary) {
       // Open file for write, but don't log into edits
       long lastBlockDelta = file.computeFileSize() - newLength;
       assert lastBlockDelta > 0 : "delta is 0 only if on block bounday";
       truncateBlock = prepareFileForTruncate(iip, clientName, clientMachine,
           lastBlockDelta, null);
     }
-    file.recomputeFileSize();
+
+    // update the quota: use the preferred block size for UC block
+    dir.updateCountNoQuotaCheck(iip, iip.length() - 1, delta);
+
+    file.recomputeFileSize();  
     return onBlockBoundary;
 }
 
@@ -1741,13 +1746,10 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           + truncatedBlockUC.getTruncateBlock().getNumBytes()
           + " block=" + truncatedBlockUC);
     }
-    if(shouldRecoverNow)
+    if (shouldRecoverNow) {
       truncatedBlockUC.initializeBlockRecovery(newBlock.getGenerationStamp(), getBlockManager().getDatanodeManager());
+    }
 
-    // update the quota: use the preferred block size for UC block
-    final long diff =
-        file.getPreferredBlockSize() - truncatedBlockUC.getNumBytes();
-    dir.updateSpaceConsumed(iip, 0, diff, file.getBlockReplication());
     return newBlock;
   }
 
