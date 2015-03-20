@@ -276,9 +276,11 @@ public class TestReplication {
   }
   
   // Waits for all of the blocks to have expected replication
-  private void waitForBlockReplication(String filename, ClientProtocol namenode,
-      int expected, long maxWaitSec) throws IOException {
-    long start = Time.now();
+  private void waitForBlockReplication(String filename, 
+                                       ClientProtocol namenode,
+                                       int expected, long maxWaitSec) 
+                                       throws IOException {
+    long start = Time.monotonicNow();
     
     //wait for all the blocks to be replicated;
     LOG.info("Checking for block replication for " + filename);
@@ -301,7 +303,8 @@ public class TestReplication {
         return;
       }
       
-      if (maxWaitSec > 0 && (Time.now() - start) > (maxWaitSec * 1000)) {
+      if (maxWaitSec > 0 && 
+          (Time.monotonicNow() - start) > (maxWaitSec * 1000)) {
         throw new IOException("Timedout while waiting for all blocks to " +
             " be replicated for " + filename);
       }

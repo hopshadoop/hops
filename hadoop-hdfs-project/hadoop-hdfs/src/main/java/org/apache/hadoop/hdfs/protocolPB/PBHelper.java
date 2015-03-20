@@ -507,16 +507,14 @@ public class PBHelper {
   }
 
   static public DatanodeInfo convert(DatanodeInfoProto di) {
-    if (di == null) {
-      return null;
-    }
-    DatanodeInfo datanodeInfo = new DatanodeInfo(PBHelper.convert(di.getId()),
-        di.hasLocation() ? di.getLocation() : null, di.getCapacity(),
-        di.getDfsUsed(), di.getRemaining(), di.getBlockPoolUsed(),
-        di.getCacheCapacity(), di.getCacheUsed(),
-        di.getLastUpdate(), di.getXceiverCount(),
-        PBHelper.convert(di.getAdminState()));
-    return datanodeInfo;
+    if (di == null) return null;
+    return new DatanodeInfo(
+        PBHelper.convert(di.getId()),
+        di.hasLocation() ? di.getLocation() : null , 
+        di.getCapacity(),  di.getDfsUsed(),  di.getRemaining(),
+        di.getBlockPoolUsed(), di.getCacheCapacity(), di.getCacheUsed(),
+        di.getLastUpdate(), di.getLastUpdateMonotonic(),
+        di.getXceiverCount(), PBHelper.convert(di.getAdminState()));
   }
 
   static public DatanodeInfoProto convertDatanodeInfo(DatanodeInfo di) {
@@ -582,6 +580,7 @@ public class PBHelper {
         .setCacheCapacity(info.getCacheCapacity())
         .setCacheUsed(info.getCacheUsed())
         .setLastUpdate(info.getLastUpdate())
+        .setLastUpdateMonotonic(info.getLastUpdateMonotonic())
         .setXceiverCount(info.getXceiverCount())
         .setAdminState(PBHelper.convert(info.getAdminState()))
         .build();

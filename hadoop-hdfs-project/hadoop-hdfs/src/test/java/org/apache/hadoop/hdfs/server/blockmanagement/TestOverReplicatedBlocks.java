@@ -24,6 +24,7 @@ import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLocks;
+import static org.apache.hadoop.util.Time.monotonicNow;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -49,7 +50,6 @@ import java.io.IOException;
 import java.util.Collection;
 
 import static io.hops.transaction.lock.LockFactory.BLK;
-import static org.apache.hadoop.util.Time.now;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -204,9 +204,9 @@ public class TestOverReplicatedBlocks {
       do {
         nodeInfo = namesystem.getBlockManager().getDatanodeManager()
             .getDatanode(dnReg);
-        lastHeartbeat = nodeInfo.getLastUpdate();
-      } while (now() - lastHeartbeat < waitTime);
-      fs.setReplication(fileName, (short) 3);
+        lastHeartbeat = nodeInfo.getLastUpdateMonotonic();
+      } while (monotonicNow() - lastHeartbeat < waitTime);
+      fs.setReplication(fileName, (short)3);
 
       BlockLocation locs[] =
           fs.getFileBlockLocations(fs.getFileStatus(fileName), 0,

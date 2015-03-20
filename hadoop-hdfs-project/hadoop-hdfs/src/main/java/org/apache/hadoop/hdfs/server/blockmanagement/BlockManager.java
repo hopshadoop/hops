@@ -2134,7 +2134,6 @@ public class BlockManager {
   public List<Integer> checkHashes(final DatanodeID nodeID,
                                    final DatanodeStorage storage,
                                    final BlockReport newReport) throws IOException {
-    final long startTime = Time.now(); //after acquiring write lock
 
     DatanodeDescriptor node = datanodeManager.getDatanode(nodeID);
     if (node == null || !node.isAlive) {
@@ -2262,9 +2261,9 @@ public class BlockManager {
     if (getPostponedMisreplicatedBlocksCount() == 0) {
       return;
     }
-
-    long startTimeRescanPostponedMisReplicatedBlocks = Time.now();
-    long startPostponedMisReplicatedBlocksCount = getPostponedMisreplicatedBlocksCount();
+    long startTimeRescanPostponedMisReplicatedBlocks = Time.monotonicNow();
+    long startPostponedMisReplicatedBlocksCount =
+        getPostponedMisreplicatedBlocksCount();
     try {
       // blocksPerRescan is the configured number of blocks per rescan.
       // Randomly select blocksPerRescan consecutive blocks from the HashSet
@@ -2348,14 +2347,16 @@ public class BlockManager {
       }
       postponedMisreplicatedBlocks.removeAll(toRemove);
     } finally {
-      long endPostponedMisReplicatedBlocksCount = getPostponedMisreplicatedBlocksCount();
-      LOG.info("Rescan of postponedMisreplicatedBlocks completed in " + (Time.now()
-          - startTimeRescanPostponedMisReplicatedBlocks) + " msecs. " + endPostponedMisReplicatedBlocksCount
-          + " blocks are left. " + (startPostponedMisReplicatedBlocksCount - endPostponedMisReplicatedBlocksCount)
-          + " blocks are removed.");
+      long endPostponedMisReplicatedBlocksCount =
+          getPostponedMisreplicatedBlocksCount();
+      LOG.info("Rescan of postponedMisreplicatedBlocks completed in " +
+          (Time.monotonicNow() - startTimeRescanPostponedMisReplicatedBlocks) +
+          " msecs. " + endPostponedMisReplicatedBlocksCount +
+          " blocks are left. " + (startPostponedMisReplicatedBlocksCount -
+          endPostponedMisReplicatedBlocksCount) + " blocks are removed.");
     }
   }
-
+  
     /**
    * Mark block replicas as corrupt except those on the storages in 
    * newStorages list.
@@ -3509,66 +3510,6 @@ public class BlockManager {
       }
     }
   }
-    
-//  private void restetMisReplicatesIndex() throws IOException{
-//    while(namesystem.isLeader() && sizeOfMisReplicatedRangeQueue()>0){
-//      cleanMisReplicatedRangeQueue();
-//    }
-//  }
-  
-//  private void lockMisReplicatedRangeQueue(long nnId) throws IOException {
-//    new LightWeightRequestHandler(
-//        HDFSOperationType.UPDATE_MIS_REPLICATED_RANGE_QUEUE) {
-//      @Override
-//      public Object performTask() throws IOException {
-//        HdfsStorageFactory.getConnector().writeLock();
-//        MisReplicatedRangeQueueDataAccess da =
-//            (MisReplicatedRangeQueueDataAccess) HdfsStorageFactory
-//                .getDataAccess(MisReplicatedRangeQueueDataAccess.class);
-//        da.insert(nnId, -2, -2);
-//        return null;
-//      }
-//    }.handle();
-//  }
-//  
-//  private void unlockMisReplicatedRangeQueue(long nnId) throws IOException {
-//    new LightWeightRequestHandler(
-//        HDFSOperationType.UPDATE_MIS_REPLICATED_RANGE_QUEUE) {
-//      @Override
-//      public Object performTask() throws IOException {
-//        HdfsStorageFactory.getConnector().writeLock();
-//        MisReplicatedRangeQueueDataAccess da =
-//            (MisReplicatedRangeQueueDataAccess) HdfsStorageFactory
-//                .getDataAccess(MisReplicatedRangeQueueDataAccess.class);
-//        da.remove(nnId, -2, -2);
-//        return null;
-//      }
-//    }.handle();
-//  }
-//  
-//  private boolean isMisReplicatedRangeQueueLocked() throws IOException {
-//    return (boolean) new LightWeightRequestHandler(
-//        HDFSOperationType.UPDATE_MIS_REPLICATED_RANGE_QUEUE) {
-//      @Override
-//      public Object performTask() throws IOException {
-//        HdfsStorageFactory.getConnector().writeLock();
-//        MisReplicatedRangeQueueDataAccess da = (MisReplicatedRangeQueueDataAccess) HdfsStorageFactory
-//            .getDataAccess(MisReplicatedRangeQueueDataAccess.class);
-//        Long leaderIndex = da.getStartIndex(namesystem.getNameNode().getActiveNameNodes().getLeader().getId());
-//        if (leaderIndex < -1) {
-//          return true;
-//        } else {
-//          return false;
-//        }
-//      }
-//    }.handle();
-//  }
-  
-//  private void waitOnMisReplicatedRangeQueueLock() throws InterruptedException, IOException{
-//    while(isMisReplicatedRangeQueueLocked()){
-//      Thread.sleep(500);
-//    }
-//  }
   
   private List<MisReplicatedRange> checkMisReplicatedRangeQueue() throws IOException {
     final LightWeightRequestHandler cleanMisReplicatedRangeQueueHandler = new LightWeightRequestHandler(
@@ -3600,26 +3541,6 @@ public class BlockManager {
     return toProcess;
   }
   
-//  private boolean waitMisReplicatedRangeQueue() throws IOException {
-//    return (boolean) new LightWeightRequestHandler(
-//        HDFSOperationType.UPDATE_MIS_REPLICATED_RANGE_QUEUE) {
-//      @Override
-//      public Object performTask() throws IOException {
-//        HdfsStorageFactory.getConnector().writeLock();
-//        MisReplicatedRangeQueueDataAccess da =
-//            (MisReplicatedRangeQueueDataAccess) HdfsStorageFactory
-//                .getDataAccess(MisReplicatedRangeQueueDataAccess.class);
-//        List<Long> startIndexes= da.getAllStartIndex();
-//        
-//        for(long startIndex: startIndexes){
-//          if(startIndex>=0){
-//            return true;
-//          }
-//        }
-//        return false;
-//      }
-//    }.handle();
-//  }
   
   private void processMisReplicatesAsync() throws InterruptedException, IOException {
     final AtomicLong nrInvalid = new AtomicLong(0);
@@ -3627,7 +3548,7 @@ public class BlockManager {
     final AtomicLong nrUnderReplicated = new AtomicLong(0);
     final AtomicLong nrPostponed = new AtomicLong(0);
     final AtomicLong nrUnderConstruction = new AtomicLong(0);
-    long startTimeMisReplicatedScan = Time.now();
+    long startTimeMisReplicatedScan = Time.monotonicNow();
     
     
     long totalBlocks = blocksMap.size();
@@ -3685,7 +3606,8 @@ public class BlockManager {
         NameNode.stateChangeLog
             .info("STATE* Replication Queue initialization "
                 + "scan for invalid, over- and under-replicated blocks "
-                + "completed in " + (Time.now() - startTimeMisReplicatedScan)
+                + "completed in "
+                + (Time.monotonicNow() - startTimeMisReplicatedScan)
                 + " msec");
         break;
       }

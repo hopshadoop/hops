@@ -44,7 +44,6 @@ import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.protocol.*;
 import org.apache.hadoop.hdfs.server.protocol.ReceivedDeletedBlockInfo.BlockStatus;
 import org.apache.hadoop.ipc.RemoteException;
-import org.apache.hadoop.util.Time;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -63,7 +62,7 @@ import org.apache.hadoop.hdfs.server.protocol.BlockIdCommand;
 import org.apache.hadoop.hdfs.server.protocol.BlockReport;
 import org.apache.hadoop.hdfs.server.protocol.BlockReportContext;
 
-import static org.apache.hadoop.util.Time.now;
+import static org.apache.hadoop.util.Time.monotonicNow;
 
 /**
  * One instance per block-pool/namespace on the DN, which handles the
@@ -810,7 +809,7 @@ class BPOfferService implements Runnable {
 
     while (dn.shouldRun) {  //as long as datanode is alive keep working
       try {
-        long startTime = now();
+        long startTime = monotonicNow();
         boolean sendHeartbeat =
             startTime - lastHeartbeat >= dnConf.heartBeatInterval;
 
@@ -892,12 +891,12 @@ class BPOfferService implements Runnable {
 
     // Send incremental block reports to the Namenode outside the lock
     boolean success = false;
-    final long startTime = Time.monotonicNow();
+    final long startTime = monotonicNow();
     try {
       blockReceivedAndDeletedWithRetry(reports.toArray(new StorageReceivedDeletedBlocks[reports.size()]));
       success = true;
     } finally {
-      dn.getMetrics().addIncrementalBlockReport(Time.monotonicNow() - startTime);
+      dn.getMetrics().addIncrementalBlockReport(monotonicNow() - startTime);
       if (!success) {
         synchronized (pendingIncrementalBRperStorage) {
           for (StorageReceivedDeletedBlocks report : reports) {
@@ -989,7 +988,7 @@ class BPOfferService implements Runnable {
   
   List<DatanodeCommand> blockReport() throws IOException {
     // send block report if timer has expired.
-    final long startTime = now();
+    final long startTime = monotonicNow();
     if (startTime - lastBlockReport <= dnConf.blockReportInterval) {
       return null;
     }
@@ -1006,7 +1005,7 @@ class BPOfferService implements Runnable {
     reportReceivedDeletedBlocks();
     lastHeartbeat = startTime;
 
-    long brCreateStartTime = now();
+    long brCreateStartTime = monotonicNow();
     Map<DatanodeStorage, BlockReport> perVolumeBlockLists =
         dn.getFSDataset().getBlockReports(getBlockPoolId());
 
@@ -1043,7 +1042,7 @@ class BPOfferService implements Runnable {
       }
 
       // Send the reports to the NN.
-      brSendStartTime = now();
+      brSendStartTime = monotonicNow();
       long reportId = generateUniqueBlockReportId();
       try {
         if (totalBlockCount < dnConf.blockReportSplitThreshold) {
@@ -1078,7 +1077,7 @@ class BPOfferService implements Runnable {
         success = true;
       } finally {
         // Log the block report processing stats from Datanode perspective
-        long brSendCost = now() - brSendStartTime;
+        long brSendCost = monotonicNow() - brSendStartTime;
         long brCreateCost = brSendStartTime - brCreateStartTime;
         dn.getMetrics().addBlockReport(brSendCost);
         dn.getMetrics().incrBlocReportCounter(numReportsSent);
@@ -1173,7 +1172,7 @@ class BPOfferService implements Runnable {
        *   1) normal like 9:20:18, next report should be at 10:20:14
        *   2) unexpected like 11:35:43, next report should be at 12:20:14
        */
-      lastBlockReport += (now() - lastBlockReport) /
+      lastBlockReport += (monotonicNow() - lastBlockReport) /
           dnConf.blockReportInterval * dnConf.blockReportInterval;
     }
   }
@@ -1185,7 +1184,7 @@ class BPOfferService implements Runnable {
     }
     // send cache report if timer has expired.
     DatanodeCommand cmd = null;
-    long startTime = Time.monotonicNow();
+    long startTime = monotonicNow();
     if (startTime - lastCacheReport > dnConf.cacheReportInterval) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Sending cacheReport from service actor: " + this);
@@ -1194,7 +1193,7 @@ class BPOfferService implements Runnable {
 
       String bpid = getBlockPoolId();
       List<Long> blockIds = dn.getFSDataset().getCacheReport(bpid);
-      long createTime = Time.monotonicNow();
+      long createTime = monotonicNow();
 
       if (!hasHandler) {
         if(!nnList.isEmpty()){
@@ -1210,7 +1209,7 @@ class BPOfferService implements Runnable {
       }
       
       cmd = blkReportHander.cacheReport(bpRegistration, bpid, blockIds);
-      long sendTime = Time.monotonicNow();
+      long sendTime = monotonicNow();
       long createCost = createTime - startTime;
       long sendCost = sendTime - createTime;
       dn.getMetrics().addCacheReport(sendCost);
@@ -1229,7 +1228,7 @@ class BPOfferService implements Runnable {
    */
   void scheduleBlockReportInt(long delay) {
     if (delay > 0) { // send BR after random delay
-      lastBlockReport = Time.now() - (dnConf.blockReportInterval -
+      lastBlockReport = monotonicNow() - (dnConf.blockReportInterval -
           DFSUtil.getRandom().nextInt((int) (delay)));
     } else { // send at next heartbeat
       lastBlockReport = 0;

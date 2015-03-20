@@ -59,9 +59,11 @@ public class TestInjectionForSimulatedStorage {
 
 
   // Waits for all of the blocks to have expected replication
-  private void waitForBlockReplication(String filename, ClientProtocol namenode,
-      int expected, long maxWaitSec) throws IOException {
-    long start = Time.now();
+  private void waitForBlockReplication(String filename, 
+                                       ClientProtocol namenode,
+                                       int expected, long maxWaitSec) 
+                                       throws IOException {
+    long start = Time.monotonicNow();
     
     //wait for all the blocks to be replicated;
     LOG.info("Checking for block replication for " + filename);
@@ -83,12 +85,12 @@ public class TestInjectionForSimulatedStorage {
               ", got " + actual + ".");
           break;
         }
-        LOG.info("Not enough replicas for " + (i + 1) + "th block " +
-            block.getBlock() +
-            " yet. Expecting " + expected + ", got " +
-            actual + ".");
-
-        if (maxWaitSec > 0 && (Time.now() - start) > (maxWaitSec * 1000)) {
+        LOG.info("Not enough replicas for " + (i+1) + "th block " + block.getBlock() +
+                               " yet. Expecting " + expected + ", got " + 
+                               actual + ".");
+      
+        if (maxWaitSec > 0 && 
+            (Time.monotonicNow() - start) > (maxWaitSec * 1000)) {
           throw new IOException("Timedout while waiting for all blocks to " +
               " be replicated for " + filename);
         }

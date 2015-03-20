@@ -240,6 +240,7 @@ class JsonUtilClient {
         getLong(m, "cacheCapacity", 0l),
         getLong(m, "cacheUsed", 0l),
         getLong(m, "lastUpdate", 0l),
+        getLong(m, "lastUpdateMonotonic", 0l),
         getInt(m, "xceiverCount", 0),
         getString(m, "networkLocation", ""),
         DatanodeInfo.AdminStates.valueOf(getString(m, "adminState", "NORMAL")));
