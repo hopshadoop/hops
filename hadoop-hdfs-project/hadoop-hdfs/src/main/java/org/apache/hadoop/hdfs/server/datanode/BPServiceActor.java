@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs.server.datanode;
 import com.google.common.annotations.VisibleForTesting;
 import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.SortedActiveNodeList;
+import static org.apache.hadoop.util.Time.monotonicNow;
 
 import java.io.EOFException;
 import org.apache.commons.logging.Log;
@@ -35,7 +36,6 @@ import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.protocol.*;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.RemoteException;
-import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.VersionInfo;
 import org.apache.hadoop.util.VersionUtil;
 
@@ -45,8 +45,6 @@ import java.net.SocketTimeoutException;
 import java.util.Collection;
 import java.util.List;
 import org.apache.hadoop.hdfs.protocol.RollingUpgradeStatus;
-
-import static org.apache.hadoop.util.Time.now;
 
 /**
  * A thread per active or standby namenode to perform:
@@ -346,7 +344,7 @@ class BPServiceActor implements Runnable {
     //
     while (shouldRun()) {
       try {
-        long startTime = now();
+        long startTime = monotonicNow();
 
         //
         // Every so often, send heartbeat or block-report
@@ -371,15 +369,15 @@ class BPServiceActor implements Runnable {
 
             connectedToNN = true;
 
-            dn.getMetrics().addHeartbeat(now() - startTime);
+            dn.getMetrics().addHeartbeat(monotonicNow() - startTime);
 
             handleRollingUpgradeStatus(resp);
             
-            long startProcessCommands = now();
+            long startProcessCommands = monotonicNow();
             if (!processCommand(resp.getCommands())) {
               continue;
             }
-            long endProcessCommands = now();
+            long endProcessCommands = monotonicNow();
             if (endProcessCommands - startProcessCommands > 2000) {
               LOG.info("Took " + (endProcessCommands - startProcessCommands) +
                   "ms to process " + resp.getCommands().length +
@@ -389,7 +387,7 @@ class BPServiceActor implements Runnable {
         }
 
         long waitTime =
-            Math.abs(dnConf.heartBeatInterval - (Time.now() - startTime));
+            Math.abs(dnConf.heartBeatInterval - (monotonicNow() - startTime));
         if (waitTime > dnConf.heartBeatInterval) {
           // above code took longer than dnConf.heartBeatInterval to execute
           // set wait time to 1 ms to send a new HB immediately

@@ -550,6 +550,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
 
     setXceiverCount(xceiverCount);
     setLastUpdate(Time.now());
+    setLastUpdateMonotonic(Time.monotonicNow());
     this.volumeFailures = volFailures;
     this.volumeFailureSummary = volumeFailureSummary;
     for (StorageReport report : reports) {
@@ -568,7 +569,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
         LOG.error("could not handle storage report for storage: " + report.getStorage().getStorageID(), ex);
       }
     }
-    rollBlocksScheduled(getLastUpdate());
+    rollBlocksScheduled(getLastUpdateMonotonic());
 
     // Update total metrics for the node.
     setCapacity(totalCapacity);

@@ -59,7 +59,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import static org.apache.hadoop.util.Time.now;
+import static org.apache.hadoop.util.Time.monotonicNow;
 
 import java.util.Map;
 import java.util.Set;
@@ -226,7 +226,7 @@ public class DecommissionManager {
           LOG.info("Starting decommission of {} {} with {} blocks",
               node, storage, storage.numBlocks());
         }
-        node.decommissioningStatus.setStartTime(now());
+        node.decommissioningStatus.setStartTime(monotonicNow());
         pendingNodes.add(node);
       }
     } else {

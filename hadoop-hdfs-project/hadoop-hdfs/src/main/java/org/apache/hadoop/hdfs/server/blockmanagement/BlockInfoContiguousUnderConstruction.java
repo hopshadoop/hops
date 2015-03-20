@@ -253,11 +253,11 @@ public class BlockInfoContiguousUnderConstruction extends BlockInfoContiguous {
       if (!(dn!= null && dn.isAlive && !replicas.get(i).getChosenAsPrimary())) {
         continue;
       }
-      if (dn.getLastUpdate() > mostRecentLastUpdate) {
+      if (dn.getLastUpdateMonotonic() > mostRecentLastUpdate) {
         primary = replicas.get(i);
         primaryNodeIndex = i;
         primaryDn = dn;
-        mostRecentLastUpdate = primaryDn.getLastUpdate();
+        mostRecentLastUpdate = primaryDn.getLastUpdateMonotonic();
       }
     }
     if (primary != null) {

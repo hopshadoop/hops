@@ -17,24 +17,19 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_BLOCK_WRITE_LOCATEFOLLOWINGBLOCK_RETRIES_KEY;
-import static org.junit.Assert.*;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.DF;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
-import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockManagerTestUtil;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeManager;
 import org.junit.Test;
@@ -207,7 +202,7 @@ public class TestNamenodeCapacityReport {
         DataNode dn = datanodes.get(i);
         DatanodeDescriptor dnd = dnm.getDatanode(dn.getDatanodeId());
         dn.shutdown();
-        dnd.setLastUpdate(0L);
+        DFSTestUtil.setDatanodeDead(dnd);
         BlockManagerTestUtil.checkHeartbeat(namesystem.getBlockManager());
         //Verify decommission of dead node won't impact nodesInService metrics.
         dnm.getDecomManager().startDecommission(dnd);
@@ -289,7 +284,7 @@ public class TestNamenodeCapacityReport {
         dn.shutdown();
         // force it to appear dead so live count decreases
         DatanodeDescriptor dnDesc = dnm.getDatanode(dn.getDatanodeId());
-        dnDesc.setLastUpdate(0L);
+        DFSTestUtil.setDatanodeDead(dnDesc);
         BlockManagerTestUtil.checkHeartbeat(namesystem.getBlockManager());
         assertEquals(nodes-1-i, namesystem.getNumLiveDataNodes());
         // first few nodes are already out of service
