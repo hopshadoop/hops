@@ -74,12 +74,11 @@ public class TestBlockReplacement {
   public void testThrottler() throws IOException {
     Configuration conf = new HdfsConfiguration();
     FileSystem.setDefaultUri(conf, "hdfs://localhost:0");
-    long bandwidthPerSec = 1024 * 1024L;
-    final long TOTAL_BYTES = 6 * bandwidthPerSec;
-    long bytesToSend = TOTAL_BYTES;
-    long start = Time.now();
-    DataTransferThrottler throttler =
-        new DataTransferThrottler(bandwidthPerSec);
+    long bandwidthPerSec = 1024*1024L;
+    final long TOTAL_BYTES =6*bandwidthPerSec; 
+    long bytesToSend = TOTAL_BYTES; 
+    long start = Time.monotonicNow();
+    DataTransferThrottler throttler = new DataTransferThrottler(bandwidthPerSec);
     long totalBytes = 0L;
     long bytesSent = 1024 * 512L; // 0.5MB
     throttler.throttle(bytesSent);
@@ -92,8 +91,8 @@ public class TestBlockReplacement {
     } catch (InterruptedException ignored) {
     }
     throttler.throttle(bytesToSend);
-    long end = Time.now();
-    assertTrue(totalBytes * 1000 / (end - start) <= bandwidthPerSec);
+    long end = Time.monotonicNow();
+    assertTrue(totalBytes*1000/(end-start)<=bandwidthPerSec);
   }
   
   @Test
@@ -262,7 +261,7 @@ public class TestBlockReplacement {
       throws IOException, TimeoutException {
     boolean notDone;
     final long TIMEOUT = 20000L;
-    long starttime = Time.now();
+    long starttime = Time.monotonicNow();
     long failtime = starttime + TIMEOUT;
     do {
       try {
@@ -287,7 +286,7 @@ public class TestBlockReplacement {
           }
         }
       }
-      if (Time.now() > failtime) {
+      if (Time.monotonicNow() > failtime) {
         String expectedNodesList = "";
         String currentNodesList = "";
         for (DatanodeInfo dn : includeNodes) {

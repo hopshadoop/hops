@@ -33,6 +33,7 @@ import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManagerTestUtil;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
@@ -172,12 +173,13 @@ public class TestNameNodeMetrics {
     for (int i = 0; i < 2; i++) {
       DataNode dn = cluster.getDataNodes().get(i);
       DataNodeTestUtils.setHeartbeatsDisabledForTests(dn, true);
-      long staleInterval =
-          CONF.getLong(DFSConfigKeys.DFS_NAMENODE_STALE_DATANODE_INTERVAL_KEY,
-              DFSConfigKeys.DFS_NAMENODE_STALE_DATANODE_INTERVAL_DEFAULT);
-      cluster.getNameNode().getNamesystem().getBlockManager()
-          .getDatanodeManager().getDatanode(dn.getDatanodeId())
-          .setLastUpdate(Time.now() - staleInterval - 1);
+      long staleInterval = CONF.getLong(
+          DFSConfigKeys.DFS_NAMENODE_STALE_DATANODE_INTERVAL_KEY,
+          DFSConfigKeys.DFS_NAMENODE_STALE_DATANODE_INTERVAL_DEFAULT);
+      DatanodeDescriptor dnDes = cluster.getNameNode().getNamesystem()
+          .getBlockManager().getDatanodeManager()
+          .getDatanode(dn.getDatanodeId());
+      DFSTestUtil.resetLastUpdatesWithOffset(dnDes, -(staleInterval + 1));
     }
     // Let HeartbeatManager to check heartbeat
     BlockManagerTestUtil.checkHeartbeat(
@@ -188,9 +190,10 @@ public class TestNameNodeMetrics {
     for (int i = 0; i < 2; i++) {
       DataNode dn = cluster.getDataNodes().get(i);
       DataNodeTestUtils.setHeartbeatsDisabledForTests(dn, false);
-      cluster.getNameNode().getNamesystem().getBlockManager()
-          .getDatanodeManager().getDatanode(dn.getDatanodeId())
-          .setLastUpdate(Time.now());
+      DatanodeDescriptor dnDes = cluster.getNameNode().getNamesystem()
+          .getBlockManager().getDatanodeManager()
+          .getDatanode(dn.getDatanodeId());
+      DFSTestUtil.resetLastUpdatesWithOffset(dnDes, 0);
     }
     
     // Let HeartbeatManager to refresh

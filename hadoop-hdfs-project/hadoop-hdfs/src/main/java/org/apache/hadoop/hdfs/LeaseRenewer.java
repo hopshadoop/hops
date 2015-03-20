@@ -318,7 +318,8 @@ public class LeaseRenewer {
    * Is the empty period longer than the grace period?
    */
   private synchronized boolean isRenewerExpired() {
-    return emptyTime != Long.MAX_VALUE && Time.now() - emptyTime > gracePeriod;
+    return emptyTime != Long.MAX_VALUE
+        && Time.monotonicNow() - emptyTime > gracePeriod;
   }
 
   synchronized void put(final long inodeId, final DFSOutputStream out,
@@ -388,7 +389,7 @@ public class LeaseRenewer {
           }
         }
         //discover the first time that all file-being-written maps are empty.
-        emptyTime = Time.now();
+        emptyTime = Time.monotonicNow();
       }
     }
   }
@@ -405,7 +406,7 @@ public class LeaseRenewer {
       }
       if (emptyTime == Long.MAX_VALUE) {
         //discover the first time that the client list is empty.
-        emptyTime = Time.now();
+        emptyTime = Time.monotonicNow();
       }
     }
 
@@ -475,9 +476,9 @@ public class LeaseRenewer {
    * when the lease period is half over.
    */
   private void run(final int id) throws InterruptedException {
-    for (long lastRenewed = Time.now(); !Thread.interrupted();
-         Thread.sleep(getSleepPeriod())) {
-      final long elapsed = Time.now() - lastRenewed;
+    for(long lastRenewed = Time.monotonicNow(); !Thread.interrupted();
+        Thread.sleep(getSleepPeriod())) {
+      final long elapsed = Time.monotonicNow() - lastRenewed;
       if (elapsed >= getRenewalTime()) {
         try {
           renew();
@@ -485,7 +486,7 @@ public class LeaseRenewer {
             LOG.debug("Lease renewer daemon for " + clientsString() +
                 " with renew id " + id + " executed");
           }
-          lastRenewed = Time.now();
+          lastRenewed = Time.monotonicNow();
         } catch (SocketTimeoutException ie) {
           LOG.warn("Failed to renew lease for " + clientsString() + " for " +
               (elapsed / 1000) + " seconds.  Aborting ...", ie);
@@ -520,7 +521,7 @@ public class LeaseRenewer {
         // registered with this renewer, stop the daemon after the grace
         // period.
         if (!clientsRunning() && emptyTime == Long.MAX_VALUE) {
-          emptyTime = Time.now();
+          emptyTime = Time.monotonicNow();
         }
       }
     }

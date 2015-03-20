@@ -51,6 +51,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
   private long cacheCapacity;
   private long cacheUsed;
   private long lastUpdate;
+  private long lastUpdateMonotonic;
   private int xceiverCount;
   private String location = NetworkTopology.DEFAULT_RACK;
   private String softwareVersion;
@@ -94,6 +95,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
     this.cacheCapacity = from.getCacheCapacity();
     this.cacheUsed = from.getCacheUsed();
     this.lastUpdate = from.getLastUpdate();
+    this.lastUpdateMonotonic = from.getLastUpdateMonotonic();
     this.xceiverCount = from.getXceiverCount();
     this.location = from.getNetworkLocation();
     this.adminState = from.getAdminState();
@@ -108,6 +110,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
     this.cacheCapacity = 0L;
     this.cacheUsed = 0L;
     this.lastUpdate = 0L;
+    this.lastUpdateMonotonic = 0L;
     this.xceiverCount = 0;
     this.adminState = null;
   }
@@ -117,27 +120,31 @@ public class DatanodeInfo extends DatanodeID implements Node {
     this.location = location;
   }
   
-  public DatanodeInfo(DatanodeID nodeID, String location, final long capacity,
-      final long dfsUsed, final long remaining, final long blockPoolUsed,
-      final long cacheCapacity, final long cacheUsed,
-      final long lastUpdate, final int xceiverCount,
-      final AdminStates adminState) {
+  public DatanodeInfo(DatanodeID nodeID, String location,
+      final long capacity, final long dfsUsed, final long remaining,
+      final long blockPoolUsed, final long cacheCapacity, final long cacheUsed,
+      final long lastUpdate, final long lastUpdateMonotonic,
+      final int xceiverCount, final AdminStates adminState) {
     this(nodeID.getIpAddr(), nodeID.getHostName(), nodeID.getDatanodeUuid(),
-        nodeID.getXferPort(), nodeID.getInfoPort(), nodeID.getInfoSecurePort(), nodeID.getIpcPort(),
-        capacity, dfsUsed, remaining, blockPoolUsed, cacheCapacity, cacheUsed, lastUpdate, xceiverCount,
-        location, adminState);
+        nodeID.getXferPort(), nodeID.getInfoPort(), nodeID.getInfoSecurePort(),
+        nodeID.getIpcPort(), capacity, dfsUsed, remaining, blockPoolUsed,
+        cacheCapacity, cacheUsed, lastUpdate, lastUpdateMonotonic,
+        xceiverCount, location, adminState);
   }
 
   /**
    * Constructor
    */
   public DatanodeInfo(final String ipAddr, final String hostName,
-      final String datanodeUuid, final int xferPort, final int infoPort, final int infoSecurePort,
-      final int ipcPort, final long capacity, final long dfsUsed,
-      final long remaining, final long blockPoolUsed, final long cacheCapacity, final long cacheUsed,
-      final long lastUpdate, final int xceiverCount, final String networkLocation,
+      final String datanodeUuid, final int xferPort, final int infoPort,
+      final int infoSecurePort, final int ipcPort,
+      final long capacity, final long dfsUsed, final long remaining,
+      final long blockPoolUsed, final long cacheCapacity, final long cacheUsed,
+      final long lastUpdate, final long lastUpdateMonotonic,
+      final int xceiverCount, final String networkLocation,
       final AdminStates adminState) {
-    super(ipAddr, hostName, datanodeUuid, xferPort, infoPort, infoSecurePort, ipcPort);
+    super(ipAddr, hostName, datanodeUuid, xferPort, infoPort,
+            infoSecurePort, ipcPort);
     this.capacity = capacity;
     this.dfsUsed = dfsUsed;
     this.remaining = remaining;
@@ -145,6 +152,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
     this.cacheCapacity = cacheCapacity;
     this.cacheUsed = cacheUsed;
     this.lastUpdate = lastUpdate;
+    this.lastUpdateMonotonic = lastUpdateMonotonic;
     this.xceiverCount = xceiverCount;
     this.location = networkLocation;
     this.adminState = adminState;
@@ -252,18 +260,27 @@ public class DatanodeInfo extends DatanodeID implements Node {
   }
 
   /**
-   * The time when this information was accurate.
+   * Get the last update timestamp.
+   * Return value is suitable for Date conversion.
    */
-  public long getLastUpdate() {
-    return lastUpdate;
-  }
+  public long getLastUpdate() { return lastUpdate; }
+
+  /** 
+   * The time when this information was accurate. <br>
+   * Ps: So return value is ideal for calculation of time differences.
+   * Should not be used to convert to Date.  
+   */
+  public long getLastUpdateMonotonic() { return lastUpdateMonotonic;}
 
   /**
-   * number of active connections
+   * Set lastUpdate monotonic time
    */
-  public int getXceiverCount() {
-    return xceiverCount;
+  public void setLastUpdateMonotonic(long lastUpdateMonotonic) {
+    this.lastUpdateMonotonic = lastUpdateMonotonic;
   }
+
+  /** number of active connections */
+  public int getXceiverCount() { return xceiverCount; }
 
   /**
    * Sets raw capacity.
@@ -496,7 +513,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
    * @return true if the node is stale
    */
   public boolean isStale(long staleInterval) {
-    return (Time.now() - lastUpdate) >= staleInterval;
+    return (Time.monotonicNow() - lastUpdateMonotonic) >= staleInterval;
   }
   
   /**

@@ -146,8 +146,8 @@ public class TestLease {
       // call renewLease() manually.
       // make it look like the soft limit has been exceeded.
       LeaseRenewer originalRenewer = dfs.getLeaseRenewer();
-      dfs.lastLeaseRenewal =
-          Time.now() - HdfsConstants.LEASE_SOFTLIMIT_PERIOD - 1000;
+      dfs.lastLeaseRenewal = Time.monotonicNow()
+      - HdfsConstants.LEASE_SOFTLIMIT_PERIOD - 1000;
       try {
         dfs.renewLease();
       } catch (IOException e) {
@@ -163,8 +163,8 @@ public class TestLease {
       }
 
       // make it look like the hard limit has been exceeded.
-      dfs.lastLeaseRenewal =
-          Time.now() - HdfsConstants.LEASE_HARDLIMIT_PERIOD - 1000;
+      dfs.lastLeaseRenewal = Time.monotonicNow()
+      - HdfsConstants.LEASE_HARDLIMIT_PERIOD - 1000;
       dfs.renewLease();
 
       // this should not work.
