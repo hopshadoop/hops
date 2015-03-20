@@ -687,4 +687,31 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
     }
     return size;
   }
+
+  /**
+   * compute the quota usage change for a truncate op
+   * @param newLength the length for truncation
+   * @return the quota usage delta (not considering replication factor)
+   */
+  long computeQuotaDeltaForTruncate(final long newLength) throws StorageException, TransactionContextException {
+    final BlockInfoContiguous[] blocks = getBlocks();
+    if (blocks == null || blocks.length == 0) {
+      return 0;
+    }
+
+    int n = 0;
+    long size = 0;
+    for (; n < blocks.length && newLength > size; n++) {
+      size += blocks[n].getNumBytes();
+    }
+    final boolean onBoundary = size == newLength;
+
+    long truncateSize = 0;
+    for (int i = (onBoundary ? n : n - 1); i < blocks.length; i++) {
+      truncateSize += blocks[i].getNumBytes();
+    }
+
+    return onBoundary ? -truncateSize : (getPreferredBlockSize() - truncateSize);
+  }
+
 }

@@ -502,7 +502,7 @@ public class FSDirectory implements Closeable {
    * update quota of each inode and check to see if quota is exceeded.
    * See {@link #updateCount(INodesInPath, int, QuotaCounts, boolean)}
    */
-  private void updateCountNoQuotaCheck(INodesInPath inodesInPath, 
+  void updateCountNoQuotaCheck(INodesInPath inodesInPath, 
       int numOfINodes, QuotaCounts counts)
       throws StorageException, TransactionContextException {
     try {
@@ -922,9 +922,9 @@ public class FSDirectory implements Closeable {
 
   boolean truncate(INodesInPath iip, long newLength,
                    BlocksMapUpdateInfo collectedBlocks,
-                   long mtime)
+                   long mtime, QuotaCounts delta)
       throws IOException {
-    return unprotectedTruncate(iip, newLength, collectedBlocks, mtime);
+    return unprotectedTruncate(iip, newLength, collectedBlocks, mtime, delta);
   }
 
   /**
@@ -941,18 +941,40 @@ public class FSDirectory implements Closeable {
    */
   boolean unprotectedTruncate(INodesInPath iip, long newLength,
                               BlocksMapUpdateInfo collectedBlocks,
-                              long mtime) throws IOException {
+                              long mtime, QuotaCounts delta) throws IOException {
     INodeFile file = iip.getLastINode().asFile();
-    long oldDiskspaceNoRep = file.storagespaceConsumedNoReplication();
+    
+    verifyQuotaForTruncate(iip, file, newLength, delta);
+    
     long remainingLength =
         file.collectBlocksBeyondMax(newLength, collectedBlocks);
     file.setModificationTime(mtime);
-    updateCount(iip, 0, file.storagespaceConsumedNoReplication() - oldDiskspaceNoRep,
-      file.getBlockReplication(), true);
     // If on block boundary, then return
     return (remainingLength - newLength) == 0;
   }
 
+  private void verifyQuotaForTruncate(INodesInPath iip, INodeFile file,
+      long newLength, QuotaCounts delta) throws QuotaExceededException, 
+      TransactionContextException, StorageException {
+    if (!getFSNamesystem().isImageLoaded()) {
+      // Do not check quota if edit log is still being processed
+      return;
+    }
+    final long diff = file.computeQuotaDeltaForTruncate(newLength);
+    final short repl = file.getBlockReplication();
+    delta.addStorageSpace(diff * repl);
+    final BlockStoragePolicy policy = getBlockStoragePolicySuite()
+        .getPolicy(file.getStoragePolicyID());
+    List<StorageType> types = policy.chooseStorageTypes(repl);
+    for (StorageType t : types) {
+      if (t.supportTypeQuota()) {
+        delta.addTypeSpace(t, diff);
+      }
+    }
+    if (diff > 0) {
+      verifyQuota(iip, iip.length() - 1, delta, null);
+    }
+  }
 //  /**
 //   * Update the count of each directory with quota in the namespace
 //   * A directory's count is defined as the total number inodes in the tree
