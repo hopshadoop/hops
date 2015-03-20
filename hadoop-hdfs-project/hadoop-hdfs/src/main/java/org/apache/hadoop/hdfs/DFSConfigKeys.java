@@ -714,20 +714,16 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
  
 
   // Much code in hdfs is not yet updated to use these keys.
-  public static final String
-      DFS_CLIENT_BLOCK_WRITE_LOCATEFOLLOWINGBLOCK_RETRIES_KEY =
-      "dfs.client.block.write.locateFollowingBlock.retries";
-  public static final int
-      DFS_CLIENT_BLOCK_WRITE_LOCATEFOLLOWINGBLOCK_RETRIES_DEFAULT = 10;
-      //HOP default was 5
-  public static final String DFS_CLIENT_BLOCK_WRITE_RETRIES_KEY =
-      "dfs.client.block.write.retries";
-  public static final int DFS_CLIENT_BLOCK_WRITE_RETRIES_DEFAULT = 3;
-  public static final String DFS_CLIENT_MAX_BLOCK_ACQUIRE_FAILURES_KEY =
-      "dfs.client.max.block.acquire.failures";
-  public static final int DFS_CLIENT_MAX_BLOCK_ACQUIRE_FAILURES_DEFAULT = 3;
-  public static final String DFS_CLIENT_USE_LEGACY_BLOCKREADER =
-      "dfs.client.use.legacy.blockreader";
+  public static final String  DFS_CLIENT_BLOCK_WRITE_LOCATEFOLLOWINGBLOCK_RETRIES_KEY = "dfs.client.block.write.locateFollowingBlock.retries";
+  public static final int     DFS_CLIENT_BLOCK_WRITE_LOCATEFOLLOWINGBLOCK_RETRIES_DEFAULT = 5;
+  // the initial delay (unit is ms) for locateFollowingBlock, the delay time will increase exponentially(double) for each retry.
+  public static final String  DFS_CLIENT_BLOCK_WRITE_LOCATEFOLLOWINGBLOCK_INITIAL_DELAY_KEY = "dfs.client.block.write.locateFollowingBlock.initial.delay.ms";
+  public static final int     DFS_CLIENT_BLOCK_WRITE_LOCATEFOLLOWINGBLOCK_INITIAL_DELAY_DEFAULT = 400;
+  public static final String  DFS_CLIENT_BLOCK_WRITE_RETRIES_KEY = "dfs.client.block.write.retries";
+  public static final int     DFS_CLIENT_BLOCK_WRITE_RETRIES_DEFAULT = 3;
+  public static final String  DFS_CLIENT_MAX_BLOCK_ACQUIRE_FAILURES_KEY = "dfs.client.max.block.acquire.failures";
+  public static final int     DFS_CLIENT_MAX_BLOCK_ACQUIRE_FAILURES_DEFAULT = 3;
+  public static final String  DFS_CLIENT_USE_LEGACY_BLOCKREADER = "dfs.client.use.legacy.blockreader";
   public static final boolean DFS_CLIENT_USE_LEGACY_BLOCKREADER_DEFAULT = false;
   public static final String  DFS_CLIENT_USE_LEGACY_BLOCKREADERLOCAL = "dfs.client.use.legacy.blockreader.local";
   public static final boolean DFS_CLIENT_USE_LEGACY_BLOCKREADERLOCAL_DEFAULT = false;

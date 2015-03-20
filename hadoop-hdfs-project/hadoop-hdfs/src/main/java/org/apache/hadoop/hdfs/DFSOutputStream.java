@@ -1593,9 +1593,8 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
                                               DatanodeInfo[] excludedNodes)
             throws IOException {
       int retries = dfsClient.getConf().nBlockWriteLocateFollowingRetry;
-
-      long sleeptime = 1000;  //HOP default value was 400
-
+      long sleeptime = dfsClient.getConf().
+          blockWriteLocateFollowingInitialDelayMs;
       while (true) {
         long localstart = Time.now();
         while (true) {
@@ -2511,7 +2510,8 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
     }
 
     long localstart = Time.now();
-    long localTimeout = 400;
+    long sleeptime = dfsClient.getConf().
+        blockWriteLocateFollowingInitialDelayMs;
     boolean fileComplete = false;
     int retries = dfsClient.getConf().nBlockWriteLocateFollowingRetry;
 
@@ -2537,8 +2537,8 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable, CanSetD
                 + " does not have enough number of replicas.");
           }
           retries--;
-          Thread.sleep(localTimeout);
-          localTimeout *= 2;
+          Thread.sleep(sleeptime);
+          sleeptime *= 2;
           if (Time.now() - localstart > 5000) {
             DFSClient.LOG.info("Could not complete " + src + " retrying...");
           }
