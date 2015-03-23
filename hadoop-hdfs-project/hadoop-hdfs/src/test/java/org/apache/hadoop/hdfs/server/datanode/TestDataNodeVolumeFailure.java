@@ -227,7 +227,7 @@ public class TestDataNodeVolumeFailure {
     DFSTestUtil.waitReplication(fs, file1, (short) 2);
 
     File dn0Vol1 = new File(dataDir, "data_0_0");
-    assertTrue(FileUtil.setExecutable(dn0Vol1, false));
+    DataNodeTestUtils.injectDataDirFailure(dn0Vol1);
     DataNode dn0 = cluster.getDataNodes().get(0);
     long lastDiskErrorCheck = dn0.getLastDiskErrorCheck();
     dn0.checkDiskErrorAsync();
@@ -303,8 +303,7 @@ public class TestDataNodeVolumeFailure {
     // Fail the first volume on both datanodes
     File dn1Vol1 = cluster.getInstanceStorageDir(0, 0);
     File dn2Vol1 = cluster.getInstanceStorageDir(1, 0);
-    assertTrue("Couldn't chmod local vol", dn1Vol1.setExecutable(false));
-    assertTrue("Couldn't chmod local vol", dn2Vol1.setExecutable(false));
+    DataNodeTestUtils.injectDataDirFailure(dn1Vol1, dn2Vol1);
 
     Path file2 = new Path("/test2");
     DFSTestUtil.createFile(fs, file2, 1024, (short)3, 1L);
