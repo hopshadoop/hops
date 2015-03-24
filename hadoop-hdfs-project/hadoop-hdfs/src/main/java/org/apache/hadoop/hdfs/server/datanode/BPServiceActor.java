@@ -53,6 +53,7 @@ import java.net.SocketTimeoutException;
 import java.util.Collection;
 import java.util.List;
 import org.apache.hadoop.hdfs.protocol.RollingUpgradeStatus;
+import org.apache.hadoop.hdfs.server.protocol.BlockReportContext;
 
 import static org.apache.hadoop.util.Time.now;
 
@@ -641,8 +642,8 @@ class BPServiceActor implements Runnable {
   }
 
   public DatanodeCommand blockReport(DatanodeRegistration registration,
-      String poolId, StorageBlockReport[] reports) throws IOException {
-    return bpNamenode.blockReport(registration, poolId, reports);
+      String poolId, StorageBlockReport[] reports, BlockReportContext context) throws IOException {
+    return bpNamenode.blockReport(registration, poolId, reports, context);
   }
 
   public void blockReportCompleted(DatanodeRegistration registration) throws IOException {
