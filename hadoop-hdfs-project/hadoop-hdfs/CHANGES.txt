@@ -22,6 +22,13 @@ Release 2.8.0 - UNRELEASED
     HDFS-5356. MiniDFSCluster should close all open FileSystems when shutdown()
     (Rakesh R via vinayakumarb)
 
+    HDFS-7867. Update action param from "start" to "prepare" in rolling upgrade
+    javadoc (J.Andreina via vinayakumarb)
+
+    HDFS-3325. When configuring "dfs.namenode.safemode.threshold-pct" to a value
+    greater or equal to 1 there is mismatch in the UI report
+    (J.Andreina via vinayakumarb)
+
 Release 2.7.0 - UNRELEASED
 
   INCOMPATIBLE CHANGES
