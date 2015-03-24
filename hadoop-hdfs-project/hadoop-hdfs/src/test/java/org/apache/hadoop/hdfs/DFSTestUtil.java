@@ -1024,13 +1024,12 @@ public class DFSTestUtil {
       final DFSClient dfsClient, final DatanodeInfo... datanodes)
       throws IOException {
     assertEquals(2, datanodes.length);
-    final Socket s = DFSOutputStream
-        .createSocketForPipeline(datanodes[0], datanodes.length, dfsClient);
-    final long writeTimeout =
-        dfsClient.getDatanodeWriteTimeout(datanodes.length);
-    final DataOutputStream out = new DataOutputStream(
-        new BufferedOutputStream(NetUtils.getOutputStream(s, writeTimeout),
-            HdfsConstants.SMALL_BUFFER_SIZE));
+    final Socket s = DataStreamer.createSocketForPipeline(datanodes[0],
+        datanodes.length, dfsClient);
+    final long writeTimeout = dfsClient.getDatanodeWriteTimeout(datanodes.length);
+    final DataOutputStream out = new DataOutputStream(new BufferedOutputStream(
+        NetUtils.getOutputStream(s, writeTimeout),
+        HdfsConstants.SMALL_BUFFER_SIZE));
     final DataInputStream in = new DataInputStream(NetUtils.getInputStream(s));
 
     // send the request
