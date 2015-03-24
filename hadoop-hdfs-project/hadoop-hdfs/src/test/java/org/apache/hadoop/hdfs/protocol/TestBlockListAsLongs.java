@@ -47,6 +47,7 @@ import org.apache.hadoop.hdfs.server.datanode.FinalizedReplica;
 import org.apache.hadoop.hdfs.server.datanode.Replica;
 import org.apache.hadoop.hdfs.server.datanode.ReplicaBeingWritten;
 import org.apache.hadoop.hdfs.server.datanode.ReplicaWaitingToBeRecovered;
+import org.apache.hadoop.hdfs.server.protocol.BlockReportContext;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
@@ -221,7 +222,8 @@ public class TestBlockListAsLongs {
     // check DN sends new-style BR
     request.set(null);
     nsInfo.setCapabilities(Capability.STORAGE_BLOCK_REPORT_BUFFERS.getMask());
-    nn.blockReport(reg, "pool", sbr);
+    nn.blockReport(reg, "pool", sbr,
+        new BlockReportContext(1, 0, System.nanoTime()));
     BlockReportRequestProto proto = request.get();
     assertNotNull(proto);
     for(DatanodeProtocolProtos.BlockReportBucketProto bucket: proto.getReports(0).getReport().getBucketsList()){
@@ -232,7 +234,8 @@ public class TestBlockListAsLongs {
     // back up to prior version and check DN sends old-style BR
     request.set(null);
     nsInfo.setCapabilities(Capability.UNKNOWN.getMask());
-    nn.blockReport(reg, "pool", sbr);
+    nn.blockReport(reg, "pool", sbr,
+        new BlockReportContext(1, 0, System.nanoTime()));
     proto = request.get();
     assertNotNull(proto);
     for (DatanodeProtocolProtos.BlockReportBucketProto bucket : proto.getReports(0).getReport().getBucketsList()) {

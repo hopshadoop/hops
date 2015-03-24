@@ -464,6 +464,15 @@ public class DatanodeManager {
     return (storage == null) ? null : storage.getDatanodeDescriptor();
   }
 
+  /** Get a datanode descriptor given corresponding DatanodeUUID */
+  DatanodeDescriptor getDatanode(final String datanodeUuid) {
+    if (datanodeUuid == null) {
+      return null;
+    }
+
+    return datanodeMap.get(datanodeUuid);
+  }
+
   /**
    * Get data node by datanode ID.
    *

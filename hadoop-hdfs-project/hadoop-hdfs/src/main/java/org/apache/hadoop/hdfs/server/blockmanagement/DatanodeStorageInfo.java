@@ -124,6 +124,9 @@ public class DatanodeStorageInfo {
   private long blockPoolUsed;
   private int sid = -1;
 
+  // The ID of the last full block report which updated this storage.
+  private long lastBlockReportId = 0;
+
   /** The number of block reports received */
   private int blockReportCount = 0;
 
@@ -293,16 +296,24 @@ public class DatanodeStorageInfo {
     return (boolean) hasBlocksHandler.handle();
   }
     
+  long getLastBlockReportId() {
+    return lastBlockReportId;
+  }
+
+  void setLastBlockReportId(long lastBlockReportId) {
+    this.lastBlockReportId = lastBlockReportId;
+  }
+  
+  public State getState() {
+    return this.state;
+  }
+  
   public void setState(State s) {
     this.state = s;
   }
   
   boolean areBlocksOnFailedStorage() throws IOException {
     return getState() == State.FAILED && numBlocks() != 0;
-  }
-  
-  public State getState() {
-    return this.state;
   }
   
   public String getStorageID() {

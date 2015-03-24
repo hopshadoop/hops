@@ -343,9 +343,12 @@ class UnderReplicatedBlocks implements Iterable<Block> {
           " curPri  " + curPri +
           " oldPri  " + oldPri);
     }
-    if(oldPri != curPri) {
-      remove(block);
-    }
+    //as we use the inodeId and blockId as primary key the value will be overwriten
+    //and as ndb does not guaranty the order of the operation it is dangerous to do add an remove in
+    //the same transaction
+//    if(oldPri != curPri) {
+//      remove(block);
+//    }
     if(add(block, curPri, curExpectedReplicas, true)) {
       NameNode.blockStateChangeLog.debug(
           "BLOCK* NameSystem.UnderReplicationBlock.update: {} has only {} " +

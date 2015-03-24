@@ -136,20 +136,24 @@ public interface DatanodeProtocol {
    *     - report of blocks per storage
    *     Each finalized block is represented as 3 longs. Each under-
    *     construction replica is represented as 4 longs.
-   *     This is done instead of Block[] to reduce memory used by block
-   *     reports.
+   *     This is done instead of Block[] to reduce memory used by block reports.
+   * @param reports report of blocks per storage
+   * @param context Context information for this block report.
+   *
    * @return - the next command for DN to process.
    * @throws IOException
    */
   @Idempotent
   public DatanodeCommand blockReport(DatanodeRegistration registration,
-      String poolId, StorageBlockReport[] reports) throws IOException;
+            String poolId, StorageBlockReport[] reports,
+            BlockReportContext context) throws IOException;
+    
 
   /**
    * Communicates the complete list of locally cached blocks to the NameNode.
    * 
    * This method is similar to
-   * {@link #blockReport(DatanodeRegistration, String, StorageBlockReport[])},
+   * {@link #blockReport(DatanodeRegistration, String, StorageBlockReport[], BlockReportContext)},
    * which is used to communicated blocks stored on disk.
    *
    * @param            The datanode registration.

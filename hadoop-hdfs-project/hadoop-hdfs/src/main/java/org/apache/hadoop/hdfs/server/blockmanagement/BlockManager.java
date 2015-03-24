@@ -74,6 +74,7 @@ import org.apache.hadoop.hdfs.server.namenode.metrics.NameNodeMetrics;
 import org.apache.hadoop.hdfs.server.protocol.BlockCommand;
 import org.apache.hadoop.hdfs.server.protocol.BlockReport;
 import org.apache.hadoop.hdfs.server.protocol.Bucket;
+import org.apache.hadoop.hdfs.server.protocol.BlockReportContext;
 import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations;
 import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations.BlockWithLocations;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
@@ -2161,8 +2162,9 @@ public class BlockManager {
    */
   public boolean processReport(final DatanodeID nodeID,
       final DatanodeStorage storage,
-      final BlockReport newReport) throws IOException {
-    final long startTime = Time.now(); //after acquiring write lock
+      final BlockReport newReport, BlockReportContext context,
+      boolean lastStorageInRpc) throws IOException {
+    final long startTime = Time.monotonicNow(); //after acquiring write lock
 
     DatanodeDescriptor node = datanodeManager.getDatanode(nodeID);
     if (node == null || !node.isAlive) {
@@ -2190,6 +2192,29 @@ public class BlockManager {
       reportStatistics = processReport(storageInfo, newReport);
 
       storageInfo.receivedBlockReport();
+      if (context != null) {
+        storageInfo.setLastBlockReportId(context.getReportId());
+        if (lastStorageInRpc) {
+          int rpcsSeen = node.updateBlockReportContext(context);
+          if (rpcsSeen >= context.getTotalRpcs()) {
+            List<DatanodeStorageInfo> zombies = node.removeZombieStorages();
+            if (zombies.isEmpty()) {
+              LOG.debug("processReport 0x{}: no zombie storages found.",
+                  Long.toHexString(context.getReportId()));
+            } else {
+              for (DatanodeStorageInfo zombie : zombies) {
+                removeZombieReplicas(context, zombie);
+              }
+            }
+            node.clearBlockReportContext();
+          } else {
+            LOG.debug("processReport 0x{}: {} more RPCs remaining in this " +
+                    "report.", Long.toHexString(context.getReportId()),
+                (context.getTotalRpcs() - rpcsSeen)
+            );
+          }
+        }
+      }
 
       final long endTime = Time.now();
 
@@ -2209,6 +2234,20 @@ public class BlockManager {
           getNumberOfBlocks() + ", processing time: " + (endTime - startTime) + " ms. " + reportStatistics, t);
       throw t;
     }
+  }
+
+  private void removeZombieReplicas(BlockReportContext context,
+      DatanodeStorageInfo zombie) throws IOException {
+    LOG.warn("processReport 0x{}: removing zombie storage {}, which no " +
+             "longer exists on the DataNode.",
+              Long.toHexString(context.getReportId()), zombie.getStorageID());
+    int prevBlocks = zombie.numBlocks();
+    removeBlocksAssociatedTo(zombie);
+    assert(zombie.numBlocks() == 0);
+    LOG.warn("processReport 0x{}: removed {} replicas from storage {}, " +
+            "which no longer exists on the DataNode.",
+            Long.toHexString(context.getReportId()), prevBlocks,
+            zombie.getStorageID());
   }
 
   /**
@@ -5055,7 +5094,7 @@ public class BlockManager {
         return null;
       }
     }.handle(namesystem);
-    LOG.info("removed " + removedBlocks.get() + " replicas from " + node.getName());
+    LOG.debug("removed " + removedBlocks.get() + " replicas from " + node.getName());
   }
   
   private void removeStoredBlocksTx(final List<Long> inodeIds,

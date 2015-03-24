@@ -70,6 +70,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.hadoop.hdfs.client.BlockReportOptions;
 import org.apache.hadoop.hdfs.server.protocol.BlockIdCommand;
 import org.apache.hadoop.hdfs.server.protocol.BlockReport;
+import org.apache.hadoop.hdfs.server.protocol.BlockReportContext;
 
 import static org.apache.hadoop.util.Time.now;
 
@@ -1110,11 +1111,13 @@ public class IncrementalBRTask implements Callable{
 
       // Send the reports to the NN.
       brSendStartTime = now();
+      long reportId = generateUniqueBlockReportId();
       try {
         if (totalBlockCount < dnConf.blockReportSplitThreshold) {
           // Below split threshold, send all reports in a single message.
           DatanodeCommand cmd = blkReportHander.blockReport(
-              bpRegistration, getBlockPoolId(), reports);
+              bpRegistration, getBlockPoolId(), reports,
+              new BlockReportContext(1, 0, reportId));
           numRPCs = 1;
           numReportsSent = reports.length;
           if (cmd != null) {
@@ -1122,9 +1125,10 @@ public class IncrementalBRTask implements Callable{
           }
         } else {
           // Send one block report per message.
-          for (StorageBlockReport report : reports) {
-            StorageBlockReport singleReport[] = {report};
-            DatanodeCommand cmd = blkReportHander.blockReport(bpRegistration, getBlockPoolId(), singleReport);
+          for (int r = 0; r < reports.length; r++) {
+            StorageBlockReport singleReport[] = { reports[r] };
+            DatanodeCommand cmd = blkReportHander.blockReport(bpRegistration, getBlockPoolId(), singleReport,
+                new BlockReportContext(reports.length, r, reportId));
             numReportsSent++;
             numRPCs++;
             if (cmd != null) {
@@ -1141,11 +1145,12 @@ public class IncrementalBRTask implements Callable{
         dn.getMetrics().incrBlocReportCounter(numReportsSent);
         final int nCmds = cmds.size();
         LOG.info((success ? "S" : "Uns") +
-          "uccessfully sent " + numReportsSent +
-          " of " + reports.length +
-          " blockreports for " + totalBlockCount +
-          " total blocks using " + numRPCs +
-          " RPCs. This took " + brCreateCost +
+          "uccessfully sent block report 0x" +
+          Long.toHexString(reportId) + ",  containing " + reports.length +
+          " storage report(s), of which we sent " + numReportsSent + "." +
+          " The reports had " + totalBlockCount +
+          " total blocks and used " + numRPCs +
+          " RPC(s). This took " + brCreateCost +
           " msec to generate and " + brSendCost +
           " msecs for RPC and NN processing." +
           " Got back " +
@@ -1279,7 +1284,18 @@ public class IncrementalBRTask implements Callable{
     return sendImmediateIBR;
   }
 
-   void updateNNList(SortedActiveNodeList list) throws IOException {
+  private long prevBlockReportId = 0;
+
+  private long generateUniqueBlockReportId() {
+    long id = System.nanoTime();
+    if (id <= prevBlockReportId) {
+      id = prevBlockReportId + 1;
+    }
+    prevBlockReportId = id;
+    return id;
+  }
+  
+  void updateNNList(SortedActiveNodeList list) throws IOException {
     writeLock();
     try {
       ArrayList<InetSocketAddress> nnAddresses = new ArrayList<InetSocketAddress>();
