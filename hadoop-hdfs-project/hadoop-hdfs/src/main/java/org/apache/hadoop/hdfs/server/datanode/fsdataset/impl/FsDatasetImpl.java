@@ -2301,8 +2301,9 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
   @Override
   public synchronized void shutdownBlockPool(String bpid) {
     LOG.info("Removing block pool " + bpid);
+    Map<DatanodeStorage, BlockReport> blocksPerVolume =  getBlockReports(bpid);
     volumeMap.cleanUpBlockPool(bpid);
-    volumes.removeBlockPool(bpid);
+    volumes.removeBlockPool(bpid, blocksPerVolume);
   }
   
   /**

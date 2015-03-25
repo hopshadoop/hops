@@ -19,7 +19,14 @@ package org.apache.hadoop.hdfs.server.protocol;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.hash.Hashing;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.CodedInputStream;
+import com.google.protobuf.CodedOutputStream;
+import com.google.protobuf.WireFormat;
 import io.hops.metadata.hdfs.entity.HashBucket;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
 import org.apache.hadoop.hdfs.server.blockmanagement.HashBuckets;
@@ -29,6 +36,7 @@ import org.apache.hadoop.hdfs.server.datanode.Replica;
 import java.util.*;
 import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
 import org.apache.hadoop.hdfs.protocol.BlockListAsLongs.BlockReportReplica;
+import static org.apache.hadoop.hdfs.protocol.BlockListAsLongs.decodeBuffer;
 import org.apache.hadoop.hdfs.server.datanode.FinalizedReplica;
 
 public class BlockReport implements Iterable<BlockReportReplica> {
@@ -285,5 +293,52 @@ public class BlockReport implements Iterable<BlockReportReplica> {
       throw new UnsupportedOperationException("Not allowed to remove blocks" +
           " from blockReport.");
     }
+  }
+
+  public void writeTo(OutputStream os) throws IOException {
+    CodedOutputStream cos = CodedOutputStream.newInstance(os);
+    cos.writeInt32(1, buckets.length);
+    int fieldId = 2;
+    for(Bucket b: buckets){
+      
+      cos.writeInt32(fieldId++, b.getBlocks().getNumberOfBlocks());
+      cos.writeBytes(fieldId++, b.getBlocks().getBlocksBuffer());
+    }
+    cos.flush();
+  }
+  
+    public static BlockReport readFrom(InputStream is) throws IOException {
+      
+    CodedInputStream cis = CodedInputStream.newInstance(is);
+    int numBuckets = -1;
+    Map<Integer, Integer> numBlocksInBucket = new HashMap<>();
+    Map<Integer, ByteString> bucketBlocksBuf = new HashMap<>();
+    while (!cis.isAtEnd()) {
+      int tag = cis.readTag();
+      int field = WireFormat.getTagFieldNumber(tag);
+      if(field == 0){
+        break;
+      } else if(field==1){
+        numBuckets = (int)cis.readInt32();
+      } else if (field > 1 && field % 2==0){
+        numBlocksInBucket.put(field/2-1, (int)cis.readInt32());
+      } else if (field > 1 && field % 2==1){
+        bucketBlocksBuf.put(field/2-1, cis.readBytes());
+      }
+    }
+    if(numBuckets != -1) {
+      Bucket[] buckets = new Bucket[numBuckets];
+      int numBlocks = 0;
+      for(int i=0; i<numBuckets ;i++){
+        if (numBlocksInBucket.get(i) != null && bucketBlocksBuf.get(i) != null) {
+          numBlocks += numBlocksInBucket.get(i);
+          BlockListAsLongs blocks = BlockListAsLongs.decodeBuffer(numBlocksInBucket.get(i), bucketBlocksBuf.get(i));
+          buckets[i] = new Bucket(blocks);
+        }
+      }
+      return new BlockReport(buckets, numBlocks);
+    } 
+    
+    return null;
   }
 }
