@@ -50,6 +50,7 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.server.datanode.DataStorage;
 import org.apache.hadoop.hdfs.server.datanode.DatanodeUtil;
@@ -62,6 +63,7 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.hadoop.hdfs.server.protocol.BlockReport;
 import org.apache.hadoop.util.Time;
 import org.codehaus.jackson.annotate.JsonProperty;
 import org.codehaus.jackson.map.ObjectMapper;
@@ -803,7 +805,7 @@ public class FsVolumeImpl implements FsVolumeSpi {
     cacheExecutor.shutdown();
     Set<Entry<String, BlockPoolSlice>> set = bpSlices.entrySet();
     for (Entry<String, BlockPoolSlice> entry : set) {
-      entry.getValue().shutdown();
+      entry.getValue().shutdown(null);
     }
   }
 
@@ -813,10 +815,10 @@ public class FsVolumeImpl implements FsVolumeSpi {
     bpSlices.put(bpid, bp);
   }
   
-  void shutdownBlockPool(String bpid) {
+  void shutdownBlockPool(String bpid, BlockReport blocksListsAsLongs) {
     BlockPoolSlice bp = bpSlices.get(bpid);
     if (bp != null) {
-      bp.shutdown();
+      bp.shutdown(blocksListsAsLongs);
     }
     bpSlices.remove(bpid);
   }

@@ -293,11 +293,12 @@ public class UpgradeUtilities {
         }
         continue;
       }
-      
-      // skip VERSION and dfsUsed file for DataNodes
+
+      // skip VERSION and dfsUsed and replicas file for DataNodes
       if (nodeType == DATA_NODE &&
-         (aList.getName().equals("VERSION") || 
-         aList.getName().equals("dfsUsed"))) {
+          (aList.getName().equals("VERSION") ||
+              aList.getName().equals("dfsUsed") ||
+              aList.getName().equals("replicas"))) {
         continue;
       }
       
