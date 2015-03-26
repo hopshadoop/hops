@@ -341,11 +341,25 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
 
   @Override
   public final ContentSummaryComputationContext computeContentSummary(
-      final ContentSummaryComputationContext summary) throws StorageException, TransactionContextException {
-    final Content.Counts counts = summary.getCounts();
-    counts.add(Content.LENGTH, computeFileSize());
-    counts.add(Content.FILE, 1);
-    counts.add(Content.DISKSPACE, storagespaceConsumed());
+      final ContentSummaryComputationContext summary) throws TransactionContextException, StorageException {
+    final ContentCounts counts = summary.getCounts();
+    long fileLen = 0;
+    fileLen = computeFileSize();
+    counts.addContent(Content.FILE, 1);
+    counts.addContent(Content.LENGTH, fileLen);
+    counts.addContent(Content.DISKSPACE, storagespaceConsumed());
+
+    if (getStoragePolicyID() != BlockStoragePolicySuite.ID_UNSPECIFIED) {
+      BlockStoragePolicy bsp = summary.getBlockStoragePolicySuite().
+          getPolicy(getStoragePolicyID());
+      List<StorageType> storageTypes = bsp.chooseStorageTypes(HeaderFormat.getReplication(header));
+      for (StorageType t : storageTypes) {
+        if (!t.supportTypeQuota()) {
+          continue;
+        }
+        counts.addTypeSpace(t, fileLen);
+      }
+    }
     return summary;
   }
   

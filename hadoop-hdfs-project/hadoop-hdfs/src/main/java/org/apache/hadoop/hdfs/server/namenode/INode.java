@@ -328,13 +328,11 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
       BlocksMapUpdateInfo collectedBlocks, List<INode> removedINodes) 
       throws StorageException, TransactionContextException;
 
-  /**
-   * Compute {@link ContentSummary}.
-   */
-  public final ContentSummary computeContentSummary()
-      throws StorageException, TransactionContextException {
+  /** Compute {@link ContentSummary}. Blocking call */
+  public final ContentSummary computeContentSummary(BlockStoragePolicySuite bsps) throws StorageException,
+      TransactionContextException {
     return computeAndConvertContentSummary(
-        new ContentSummaryComputationContext());
+        new ContentSummaryComputationContext(bsps));
   }
   
   /**
@@ -342,16 +340,23 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
    */
   public final ContentSummary computeAndConvertContentSummary(
       ContentSummaryComputationContext summary) throws StorageException, TransactionContextException {
-    Content.Counts counts = computeContentSummary(summary).getCounts();
+    ContentCounts counts = computeContentSummary(summary).getCounts();
     final QuotaCounts q = getQuotaCounts();
-    return new ContentSummary(counts.get(Content.LENGTH),
-        counts.get(Content.FILE) + counts.get(Content.SYMLINK),
-        counts.get(Content.DIRECTORY), q.getNameSpace(),
-        counts.get(Content.DISKSPACE), q.getStorageSpace());
-    // TODO: storage type quota reporting HDFS-7701.
+    return new ContentSummary.Builder().
+        length(counts.getLength()).
+        fileCount(counts.getFileCount() + counts.getSymlinkCount()).
+        directoryCount(counts.getDirectoryCount()).
+        quota(q.getNameSpace()).
+        spaceConsumed(counts.getStoragespace()).
+        spaceQuota(q.getStorageSpace()).
+        typeConsumed(counts.getTypeSpaces()).
+        typeQuota(q.getTypeSpaces().asArray()).
+        build();
   }
 
   /**
+   * Count subtree content summary with a {@link ContentCounts}.
+   *
    * @param summary the context object holding counts for the subtree.
    * @return The same objects as summary.
    */

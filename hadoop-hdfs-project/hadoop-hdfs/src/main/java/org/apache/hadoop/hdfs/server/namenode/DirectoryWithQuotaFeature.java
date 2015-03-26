@@ -203,12 +203,12 @@ public class DirectoryWithQuotaFeature implements INode.Feature {
   ContentSummaryComputationContext computeContentSummary(final INodeDirectory dir,
       final ContentSummaryComputationContext summary)
     throws StorageException, TransactionContextException {
-    final long original = summary.getCounts().get(Content.DISKSPACE);
+    final long original = summary.getCounts().getStoragespace();
     long oldYieldCount = summary.getYieldCount();
     dir.computeDirectoryContentSummary(summary);
     // Check only when the content has not changed in the middle.
     if (oldYieldCount == summary.getYieldCount()) {
-      checkStoragespace(dir, summary.getCounts().get(Content.DISKSPACE) - original);
+      checkStoragespace(dir, summary.getCounts().getStoragespace() - original);
     }
     return summary;
   }
@@ -375,5 +375,4 @@ public class DirectoryWithQuotaFeature implements INode.Feature {
   public Long getInodeId() {
     return inodeId;
   }
-
 }

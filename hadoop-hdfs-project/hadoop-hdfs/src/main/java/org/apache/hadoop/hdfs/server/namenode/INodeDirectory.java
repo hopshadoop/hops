@@ -542,8 +542,7 @@ public class INodeDirectory extends INodeWithAdditionalFields {
     }
     
     // Increment the directory count for this directory.
-    summary.getCounts().add(Content.DIRECTORY, 1);
-
+    summary.getCounts().addContent(Content.DIRECTORY, 1);
     // Relinquish and reacquire locks if necessary.
     summary.yield();
 

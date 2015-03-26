@@ -280,6 +280,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 import org.apache.hadoop.hdfs.server.protocol.StorageReport;
 
 /**
@@ -7311,7 +7312,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           INodeIdentifier iNodeIdentifier =  new INodeIdentifier(inode.getId(), inode.getParentId(),
               inode.getLocalName(), inode.getPartitionId());
           iNodeIdentifier.setDepth(inode.myDepth());
-
+          iNodeIdentifier.setStoragePolicy(inode.getStoragePolicyID());
           //Wait before commit. Only for testing
           delayBeforeSTOFlag(stoType.toString());
           return  iNodeIdentifier;
@@ -8598,6 +8599,16 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    return new ArrayList<>();
   }
 
+  public byte calculateNearestinheritedStoragePolicy(final PathInformation pathInfo) throws IOException {
+    for (int i = pathInfo.getINodesInPath().length() - 1; i > -1; i--) {
+      byte storagePolicy = pathInfo.getINodesInPath().getINode(i).getLocalStoragePolicyID();
+      if (storagePolicy != BlockStoragePolicySuite.ID_UNSPECIFIED) {
+        return storagePolicy;
+      }
+    }
+    return BlockStoragePolicySuite.ID_UNSPECIFIED;
+  }
+  
   public void setDelayBeforeSTOFlag(long delay){
     if(isTestingSTO)
       this.delayBeforeSTOFlag = delay;

@@ -56,6 +56,7 @@ import java.util.Iterator;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_ACCESSTIME_PRECISION_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_QUOTA_BY_STORAGETYPE_ENABLED_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_STORAGE_POLICY_ENABLED_KEY;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 import org.apache.hadoop.ipc.NotALeaderException;
 
 public class FSDirAttrOp {
@@ -391,6 +392,7 @@ public class FSDirAttrOp {
       if (INode.getPathNames(src).length == 0) { // this method return empty array in case of
         // path = "/"
         subtreeRoot = INodeDirectory.getRootIdentifier();
+        subtreeRoot.setStoragePolicy(BlockStoragePolicySuite.ID_UNSPECIFIED);
       } else {
         //this can only be called by super user we just want to lock the tree, not check needed
         subtreeRoot = fsd.getFSNamesystem().lockSubtree(src, SubTreeOperation.Type.QUOTA_STO);
@@ -402,7 +404,7 @@ public class FSDirAttrOp {
       }
 
       final AbstractFileTree.IdCollectingCountingFileTree fileTree = new AbstractFileTree.IdCollectingCountingFileTree(
-          fsd.getFSNamesystem(), subtreeRoot);
+          fsd.getFSNamesystem(), subtreeRoot, subtreeRoot.getStoragePolicy());
       fileTree.buildUp(fsd.getBlockStoragePolicySuite());
       Iterator<Long> idIterator = fileTree.getOrderedIds().descendingIterator();
       synchronized (idIterator) {
