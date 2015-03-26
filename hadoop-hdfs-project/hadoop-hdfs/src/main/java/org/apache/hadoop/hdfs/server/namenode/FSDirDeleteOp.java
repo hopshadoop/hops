@@ -148,7 +148,7 @@ class FSDirDeleteOp {
 
         List<AclEntry> nearestDefaultsForSubtree = fsn.calculateNearestDefaultAclForSubtree(pathInfo);
         AbstractFileTree.FileTree fileTree = new AbstractFileTree.FileTree(fsn, subtreeRoot, FsAction.ALL, true,
-            nearestDefaultsForSubtree);
+            nearestDefaultsForSubtree, subtreeRoot.getStoragePolicy());
         fileTree.buildUp(fsd.getBlockStoragePolicySuite());
         fsn.delayAfterBbuildingTree("Built tree for " + srcArg + " for delete op");
 

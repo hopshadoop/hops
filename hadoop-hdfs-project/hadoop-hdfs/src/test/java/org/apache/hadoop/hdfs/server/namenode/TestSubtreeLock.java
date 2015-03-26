@@ -213,8 +213,8 @@ public class TestSubtreeLock extends TestCase {
       fileTree.buildUp(cluster.getNameNode().getNamesystem().getBlockManager().getStoragePolicySuite());
       assertEquals(7, fileTree.getUsedCounts().getNameSpace());
       assertEquals(bytes0 + bytes1, fileTree.getUsedCounts().getStorageSpace());
-      assertEquals(3, fileTree.getCounts().get(Content.DIRECTORY));
-      assertEquals(4, fileTree.getCounts().get(Content.FILE));
+      assertEquals(3, fileTree.getCounts().getDirectoryCount());
+      assertEquals(4, fileTree.getCounts().getFileCount());
     } finally {
       if (cluster != null) {
         cluster.shutdown();

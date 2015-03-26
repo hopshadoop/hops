@@ -30,6 +30,7 @@ import io.hops.transaction.lock.TransactionLocks;
   import org.apache.commons.logging.Log;
   import org.apache.commons.logging.LogFactory;
   import org.apache.hadoop.conf.Configuration;
+  import org.apache.hadoop.fs.ContentSummary;
   import org.apache.hadoop.fs.Path;
   import org.apache.hadoop.fs.StorageType;
   import org.apache.hadoop.hdfs.DFSConfigKeys;
@@ -161,6 +162,11 @@ public class TestQuotaByStorageType {
     Thread.sleep(1000);
     ssdConsumed = getSpaceConsumed(foo).getTypeSpaces().get(StorageType.SSD);
     assertEquals(file1Len, ssdConsumed);
+
+    ContentSummary cs = dfs.getContentSummary(foo);
+    assertEquals(cs.getSpaceConsumed(), file1Len * REPLICATION);
+    assertEquals(cs.getTypeConsumed(StorageType.SSD), file1Len);
+    assertEquals(cs.getTypeConsumed(StorageType.DISK), file1Len * 2);
   }
 
   @Test(timeout = 60000)
@@ -198,6 +204,11 @@ public class TestQuotaByStorageType {
     String subTree = dumpTreeRecursively(foo);
     assertEquals(subTree, 0,
             counts.getTypeSpaces().get(StorageType.SSD));
+
+    ContentSummary cs = dfs.getContentSummary(foo);
+    assertEquals(cs.getSpaceConsumed(), 0);
+    assertEquals(cs.getTypeConsumed(StorageType.SSD), 0);
+    assertEquals(cs.getTypeConsumed(StorageType.DISK), 0);
   }
 
   @Test(timeout = 60000)
@@ -238,6 +249,11 @@ public class TestQuotaByStorageType {
     } catch (Throwable t) {
       LOG.info("Got expected exception ", t);
     }
+
+    ContentSummary cs = dfs.getContentSummary(foo);
+    assertEquals(cs.getSpaceConsumed(), file1Len * REPLICATION);
+    assertEquals(cs.getTypeConsumed(StorageType.SSD), file1Len);
+    assertEquals(cs.getTypeConsumed(StorageType.DISK), file1Len * 2);
   }
 
   
@@ -524,10 +540,10 @@ public class TestQuotaByStorageType {
       LOG.info("Got expected exception ", t);
       Thread.sleep(5000);
       long currentSSDConsumed = getSpaceConsumed(testDir).getTypeSpaces().get(StorageType.SSD);
-      //our quota mechanism cannot detect when one file being writen is too long (because of assynchrony)
-      //but it should detect it for the second file so the total ammount of data should be equal to the size
+      //our quota mechanism may not detect when one file being writen is too long (because of assynchrony)
+      //but it should detect it for the second file so the total ammount of data should be at most the size
       //of the first file.
-      assertEquals(fileLen, currentSSDConsumed);
+      assertTrue("SSD consumed to high " + currentSSDConsumed, fileLen >= currentSSDConsumed);
     }
   }
 
@@ -564,9 +580,18 @@ public class TestQuotaByStorageType {
     // Verify SSD consumed after truncate
     ssdConsumed = getSpaceConsumed(foo).getTypeSpaces().get(StorageType.SSD);
     assertEquals(newFile1Len, ssdConsumed);
+
+    ContentSummary cs = dfs.getContentSummary(foo);
+    assertEquals(cs.getSpaceConsumed(), newFile1Len * REPLICATION);
+    assertEquals(cs.getTypeConsumed(StorageType.SSD), newFile1Len);
+    assertEquals(cs.getTypeConsumed(StorageType.DISK), newFile1Len * 2);
   }
   
   INodeDirectory getINode4Write(final Path foo) throws IOException {
+    return getINode4Write(foo, true);
+  }
+
+  INodeDirectory getINode4Write(final Path foo, final boolean isQuotaset) throws IOException {
     HopsTransactionalRequestHandler handler = new HopsTransactionalRequestHandler(HDFSOperationType.TEST) {
 
       @Override
@@ -584,7 +609,7 @@ public class TestQuotaByStorageType {
       public Object performTask() throws IOException {
         INode fnode = fsdir.getINode4Write(foo.toString()).asDirectory();
         assertTrue(fnode.isDirectory());
-        assertTrue(fnode.isQuotaSet());
+        assertTrue(fnode.isQuotaSet()==isQuotaset);
         return fnode;
       }
     };
@@ -663,5 +688,51 @@ public class TestQuotaByStorageType {
       }
     };
     return (String) handler.handle();
+  }
+
+  @Test(timeout = 60000)
+  public void testContentSummaryWithoutQuotaByStorageType() throws Exception {
+    final Path foo = new Path(dir, "foo");
+    Path createdFile1 = new Path(foo, "created_file1.data");
+    dfs.mkdirs(foo);
+
+    // set storage policy on directory "foo" to ONESSD
+    dfs.setStoragePolicy(foo, HdfsConstants.ONESSD_STORAGE_POLICY_NAME);
+
+    INode fnode = getINode4Write(foo, false);
+
+    // Create file of size 2 * BLOCKSIZE under directory "foo"
+    long file1Len = BLOCKSIZE * 2;
+    int bufLen = BLOCKSIZE / 16;
+    DFSTestUtil.createFile(dfs, createdFile1, bufLen, file1Len, BLOCKSIZE, REPLICATION, seed);
+
+    // Verify getContentSummary without any quota set
+    ContentSummary cs = dfs.getContentSummary(foo);
+    assertEquals(cs.getSpaceConsumed(), file1Len * REPLICATION);
+    assertEquals(cs.getTypeConsumed(StorageType.SSD), file1Len);
+    assertEquals(cs.getTypeConsumed(StorageType.DISK), file1Len * 2);
+  }
+
+  @Test(timeout = 60000)
+  public void testContentSummaryWithoutStoragePolicy() throws Exception {
+    final Path foo = new Path(dir, "foo");
+    Path createdFile1 = new Path(foo, "created_file1.data");
+    dfs.mkdirs(foo);
+
+    INode fnode = getINode4Write(foo, false);
+
+    // Create file of size 2 * BLOCKSIZE under directory "foo"
+    long file1Len = BLOCKSIZE * 2;
+    int bufLen = BLOCKSIZE / 16;
+    DFSTestUtil.createFile(dfs, createdFile1, bufLen, file1Len, BLOCKSIZE, REPLICATION, seed);
+
+    // Verify getContentSummary without any quota set
+    // Expect no type quota and usage information available
+    ContentSummary cs = dfs.getContentSummary(foo);
+    assertEquals(cs.getSpaceConsumed(), file1Len * REPLICATION);
+    for (StorageType t : StorageType.values()) {
+      assertEquals(cs.getTypeConsumed(t), 0);
+      assertEquals(cs.getTypeQuota(t), -1);
+    }
   }
 }

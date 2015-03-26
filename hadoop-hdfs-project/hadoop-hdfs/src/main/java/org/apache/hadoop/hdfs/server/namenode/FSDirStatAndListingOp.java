@@ -456,22 +456,29 @@ class FSDirStatAndListingOp {
     //Calcualte subtree root default ACLs to be inherited in the tree.
     List<AclEntry> nearestDefaultsForSubtree = fsd.getFSNamesystem().calculateNearestDefaultAclForSubtree(pathInfo);
 
+    byte inheritedStoragePolicy = fsd.getFSNamesystem().calculateNearestinheritedStoragePolicy(pathInfo);
     //we do not lock the subtree and we do not need to check parent access and owner, but we need to check children access
     //permission check in Apache Hadoop: doCheckOwner:false, ancestorAccess:null, parentAccess:null, 
     //access:null, subAccess:FsAction.READ_EXECUTE, ignoreEmptyDir:true
     final AbstractFileTree.CountingFileTree fileTree = new AbstractFileTree.CountingFileTree(fsd.getFSNamesystem(),
-        subtreeRootIdentifier, FsAction.READ_EXECUTE, true, nearestDefaultsForSubtree);
+        subtreeRootIdentifier, FsAction.READ_EXECUTE, true, nearestDefaultsForSubtree, inheritedStoragePolicy);
     fileTree.buildUp(fsd.getBlockStoragePolicySuite());
 
-    Content.Counts counts = fileTree.getCounts();
+    ContentCounts counts = fileTree.getCounts();
     QuotaCounts q = subtreeQuota;
     if(q==null){
       q=subtreeRoot.getQuotaCounts();
     }
-    ContentSummary cs = new ContentSummary(counts.get(Content.LENGTH),
-        counts.get(Content.FILE) + counts.get(Content.SYMLINK),
-        counts.get(Content.DIRECTORY), q.getNameSpace(),
-        counts.get(Content.DISKSPACE), q.getStorageSpace());
+    ContentSummary cs = new ContentSummary.Builder().
+              length(counts.getLength()).
+              fileCount(counts.getFileCount() + counts.getSymlinkCount()).
+              directoryCount(counts.getDirectoryCount()).
+              quota(q.getNameSpace()).
+              spaceConsumed(counts.getStoragespace()).
+              spaceQuota(q.getStorageSpace()).
+              typeConsumed(counts.getTypeSpaces()).
+              typeQuota(q.getTypeSpaces().asArray()).
+              build();
     
     fsd.addYieldCount(0);
     return cs;

@@ -38,8 +38,7 @@ public interface BlockCollection {
   /**
    * Get content summary.
    */
-  public ContentSummary computeContentSummary()
-      throws StorageException, TransactionContextException;
+  public ContentSummary computeContentSummary(BlockStoragePolicySuite bsps) throws StorageException, TransactionContextException;
 
   /**
    * @return the number of blocks
