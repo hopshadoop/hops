@@ -489,6 +489,12 @@ Release 2.7.0 - UNRELEASED
     HDFS-7956. Improve logging for DatanodeRegistration.
     (Plamen Jeliazkov via shv)
 
+    HDFS-7976. Update NFS user guide for mount option "sync" to minimize or
+    avoid reordered writes. (brandonli)
+
+    HDFS-7410. Support CreateFlags with append() to support hsync() for
+    appending streams (Vinayakumar B via Colin P. McCabe)
+
   OPTIMIZATIONS
 
   BUG FIXES
