@@ -246,12 +246,16 @@ public class DFSOutputStream extends FSOutputSummer
   }
   
   /** Construct a new output stream for append. */
-  private DFSOutputStream(DFSClient dfsClient, String src, boolean toNewBlock,
-      Progressable progress, LocatedBlock lastBlock, HdfsFileStatus stat,
-      DataChecksum checksum, final int dbFileMaxSize, boolean forceClientToWriteSFToDisk) throws IOException {
+  private DFSOutputStream(DFSClient dfsClient, String src,
+      EnumSet<CreateFlag> flags, Progressable progress, LocatedBlock lastBlock,
+      HdfsFileStatus stat, DataChecksum checksum, final int dbFileMaxSize, boolean forceClientToWriteSFToDisk) throws
+      IOException {
     this(dfsClient, src, progress, stat, checksum);
     initialFileSize = stat.getLen(); // length of file when opened
-    
+    this.shouldSyncBlock = flags.contains(CreateFlag.SYNC_BLOCK);
+
+    boolean toNewBlock = flags.contains(CreateFlag.NEW_BLOCK);
+
     // The last partial block of the file has to be filled.
     if (!toNewBlock && lastBlock != null && !stat.isFileStoredInDB()) {
       // indicate that we are appending to an existing block
@@ -314,7 +318,7 @@ public class DFSOutputStream extends FSOutputSummer
   }
 
   static DFSOutputStream newStreamForAppend(DFSClient dfsClient, String src,
-      boolean toNewBlock, int bufferSize, Progressable progress,
+      EnumSet<CreateFlag> flags, int bufferSize, Progressable progress,
       LocatedBlock lastBlock, HdfsFileStatus stat, DataChecksum checksum,
       String[] favoredNodes,
       final int dbFileMaxSize, boolean forceClientToWriteSFToDisk) throws IOException {
@@ -335,9 +339,8 @@ public class DFSOutputStream extends FSOutputSummer
           throw new IOException(errorMessage);
         }
       }
-            
-      final DFSOutputStream out = new DFSOutputStream(dfsClient, src, toNewBlock,
-        progress, lastBlock, stat, checksum, dbFileMaxSize, forceClientToWriteSFToDisk);
+      final DFSOutputStream out = new DFSOutputStream(dfsClient, src, flags,
+          progress, lastBlock, stat, checksum, dbFileMaxSize, forceClientToWriteSFToDisk);
       if (favoredNodes != null && favoredNodes.length != 0) {
         out.streamer.setFavoredNodes(favoredNodes);
       }
